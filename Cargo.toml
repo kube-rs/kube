@@ -1,0 +1,25 @@
+[package]
+name = "kubernetes-rust"
+version = "0.1.0"
+description = "Kubernetes rust client"
+authors = ["ynqa <un.pensiero.vano@gmail.com>"]
+license-file = "LICENSE"
+repository = "https://github.com/ynqa/kubernetes-rust"
+readme = "README.md"
+keywords = ["kubernetes"]
+categories = ["web-programming::http-client"]
+
+[lib]
+name = "kubernetes_rust"
+path = "src/lib.rs"
+
+[dependencies]
+base64 = "0.9.3"
+dirs = "1.0.4"
+failure = "0.1.2"
+reqwest = "0.9.2"
+serde = "1.0.79"
+serde_derive = "1.0.79"
+serde_yaml = "0.8.5"
+openssl = "0.10.12"
+k8s-openapi = { git = "https://github.com/Arnavion/k8s-openapi-codegen", branch = "master", features = ["v1_10"] }
