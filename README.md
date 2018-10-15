@@ -11,11 +11,11 @@ List all Pods on `kube-system`:
 ```rust
 extern crate failure;
 extern crate k8s_openapi;
-extern crate kubernetes_rust;
+extern crate kubernetes;
 
 use k8s_openapi::v1_10::api::core::v1;
-use kubernetes_rust::client::APIClient;
-use kubernetes_rust::config;
+use kubernetes::client::APIClient;
+use kubernetes::config;
 
 fn main() {
     let kubeconfig = config::load_kube_config().expect("failed to load kubeconfig");

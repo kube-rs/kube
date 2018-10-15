@@ -1,5 +1,5 @@
 [package]
-name = "kubernetes-rust"
+name = "kubernetes"
 version = "0.1.0"
 description = "Kubernetes rust client"
 authors = ["ynqa <un.pensiero.vano@gmail.com>"]
@@ -10,7 +10,7 @@ keywords = ["kubernetes"]
 categories = ["web-programming::http-client"]
 
 [lib]
-name = "kubernetes_rust"
+name = "kubernetes"
 path = "src/lib.rs"
 
 [dependencies]
