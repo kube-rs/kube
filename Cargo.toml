@@ -9,10 +9,6 @@ readme = "README.md"
 keywords = ["kubernetes"]
 categories = ["web-programming::http-client"]
 
-[lib]
-name = "kubernetes"
-path = "src/lib.rs"
-
 [dependencies]
 base64 = "0.9.3"
 dirs = "1.0.4"
