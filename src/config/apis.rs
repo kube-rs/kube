@@ -106,7 +106,7 @@ impl Config {
 
 impl Cluster {
     pub fn load_certificate_authority(&self) -> Result<Option<Vec<u8>>, Error> {
-        utils::data_or_file(
+        utils::load_data_or_file(
             &self.certificate_authority_data,
             &self.certificate_authority,
         )
@@ -115,10 +115,10 @@ impl Cluster {
 
 impl AuthInfo {
     pub fn load_client_certificate(&self) -> Result<Option<Vec<u8>>, Error> {
-        utils::data_or_file(&self.client_certificate_data, &self.client_certificate)
+        utils::load_data_or_file(&self.client_certificate_data, &self.client_certificate)
     }
 
     pub fn load_client_key(&self) -> Result<Option<Vec<u8>>, Error> {
-        utils::data_or_file(&self.client_key_data, &self.client_key)
+        utils::load_data_or_file(&self.client_key_data, &self.client_key)
     }
 }
