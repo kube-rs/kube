@@ -43,10 +43,10 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
     let mut headers = header::HeaderMap::new();
 
     match (
-        utils::load_token_data_or_file(&loader.user.token, &loader.user.token_file)?,
+        utils::data_or_file(&loader.user.token, &loader.user.token_file),
         (loader.user.username, loader.user.password),
     ) {
-        (Some(token), _) => {
+        (Ok(token), _) => {
             headers.insert(
                 header::AUTHORIZATION,
                 header::HeaderValue::from_str(&format!("Bearer {}", token))?,

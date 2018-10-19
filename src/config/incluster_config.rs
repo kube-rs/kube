@@ -11,7 +11,7 @@ const SERVICE_TOKENFILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/t
 const SERVICE_CERTFILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 
 pub fn kube_server() -> Option<String> {
-    let f = |(h, p)| format!("https://{}{}", h, p);
+    let f = |(h, p)| format!("https://{}:{}", h, p);
     kube_host().and_then(|h| kube_port().map(|p| f((h, p))))
 }
 
@@ -24,14 +24,33 @@ fn kube_port() -> Option<String> {
 }
 
 pub fn load_token() -> Result<String, Error> {
-    utils::load_token_data_or_file(&None, &Some(SERVICE_TOKENFILE.to_string()))?.ok_or(format_err!(
-        "Unable to load token from {}",
-        SERVICE_TOKENFILE
-    ))
+    utils::data_or_file(&None, &Some(SERVICE_TOKENFILE.to_string()))
 }
 
 pub fn load_cert() -> Result<X509, Error> {
-    let ca = utils::load_data_or_file(&None, &Some(SERVICE_CERTFILE.to_string()))?
-        .ok_or(format_err!("Unable to load certificate"))?;
+    let ca = utils::data_or_file_with_base64(&None, &Some(SERVICE_CERTFILE.to_string()))?;
     X509::from_pem(&ca).map_err(Error::from)
+}
+
+#[test]
+fn test_kube_host() {
+    let expected = "fake.io";
+    env::set_var(SERVICE_HOSTENV, expected);
+    assert_eq!(kube_host().unwrap(), expected);
+}
+
+#[test]
+fn test_kube_port() {
+    let expected = "8080";
+    env::set_var(SERVICE_PORTENV, expected);
+    assert_eq!(kube_port().unwrap(), expected);
+}
+
+#[test]
+fn test_kube_server() {
+    let host = "fake.io";
+    let port = "8080";
+    env::set_var(SERVICE_HOSTENV, host);
+    env::set_var(SERVICE_PORTENV, port);
+    assert_eq!(kube_server().unwrap(), "https://fake.io:8080");
 }

@@ -43,14 +43,8 @@ impl KubeConfigLoader {
     }
 
     pub fn p12(&self, password: &str) -> Result<Pkcs12, Error> {
-        let client_cert = self
-            .user
-            .load_client_certificate()?
-            .ok_or(format_err!("Unable to load client certificate"))?;
-        let client_key = self
-            .user
-            .load_client_key()?
-            .ok_or(format_err!("Unable to load client key"))?;
+        let client_cert = &self.user.load_client_certificate()?;
+        let client_key = &self.user.load_client_key()?;
 
         let x509 = X509::from_pem(&client_cert)?;
         let pkey = PKey::private_key_from_pem(&client_key)?;
@@ -61,10 +55,7 @@ impl KubeConfigLoader {
     }
 
     pub fn ca(&self) -> Result<X509, Error> {
-        let ca = self
-            .cluster
-            .load_certificate_authority()?
-            .ok_or(format_err!("Unable to load certificate authority"))?;
+        let ca = &self.cluster.load_certificate_authority()?;
         X509::from_pem(&ca).map_err(Error::from)
     }
 }
