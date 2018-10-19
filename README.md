@@ -1,5 +1,6 @@
 # kubernetes-rust
 
+[![Build Status](https://travis-ci.com/ynqa/kubernetes-rust.svg?branch=master)](https://travis-ci.com/ynqa/kubernetes-rust)
 [![Client Capabilities](https://img.shields.io/badge/Kubernetes%20client-Bronze-blue.svg?style=plastic&colorB=cd7f32&colorA=306CE8)](http://bit.ly/kubernetes-client-capabilities-badge)
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-beta-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
 
