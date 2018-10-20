@@ -36,10 +36,6 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
     let ca = loader.ca()?;
     let req_ca = Certificate::from_der(&ca.to_der()?)?;
 
-    let client_builder = Client::builder()
-        .identity(req_p12)
-        .add_root_certificate(req_ca);
-
     let mut headers = header::HeaderMap::new();
 
     match (
@@ -62,6 +58,11 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
         _ => {}
     }
 
+    let client_builder = Client::builder()
+        .identity(req_p12)
+        .add_root_certificate(req_ca)
+        .default_headers(headers);
+
     Ok(Configuration::new(
         loader.cluster.server,
         client_builder.build()?,
@@ -78,14 +79,16 @@ pub fn incluster_config() -> Result<Configuration, Error> {
     let ca = incluster_config::load_cert()?;
     let req_ca = Certificate::from_der(&ca.to_der()?)?;
 
-    let client_builder = Client::builder().add_root_certificate(req_ca);
-
     let token = incluster_config::load_token()?;
     let mut headers = header::HeaderMap::new();
     headers.insert(
         header::AUTHORIZATION,
         header::HeaderValue::from_str(&format!("Bearer {}", token))?,
     );
+
+    let client_builder = Client::builder()
+        .add_root_certificate(req_ca)
+        .default_headers(headers);
 
     Ok(Configuration::new(server, client_builder.build()?))
 }
