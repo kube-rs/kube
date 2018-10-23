@@ -9,6 +9,7 @@ use reqwest::{header, Certificate, Client, Identity};
 
 use self::kube_config::KubeConfigLoader;
 
+/// Configuration stores kubernetes path and client for requests.
 pub struct Configuration {
     pub base_path: String,
     pub client: Client,
@@ -23,6 +24,15 @@ impl Configuration {
     }
 }
 
+/// Returns a config includes authentication and cluster infomation from kubeconfig file.
+///
+/// # Example
+/// ```
+/// use kubernetes::config;
+///
+/// let kubeconfig = config::load_kube_config()
+///     .expect("failed to load kubeconfig");
+/// ```
 pub fn load_kube_config() -> Result<Configuration, Error> {
     let kubeconfig = utils::kubeconfig_path()
         .or_else(utils::default_kube_path)
@@ -69,6 +79,16 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
     ))
 }
 
+/// Returns a config which is used by clients within pods on kubernetes.
+/// It will return an error if called from out of kubernetes cluster.
+///
+/// # Example
+/// ```
+/// use kubernetes::config;
+///
+/// let kubeconfig = config::incluster_config()
+///     .expect("failed to load incluster config");
+/// ```
 pub fn incluster_config() -> Result<Configuration, Error> {
     let server = incluster_config::kube_server().ok_or(format_err!(
         "Unable to load incluster config, {} and {} must be defined",

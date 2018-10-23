@@ -7,6 +7,7 @@ use openssl::x509::X509;
 
 use config::apis::{AuthInfo, Cluster, Config, Context};
 
+/// KubeConfigLoader loads current context, cluster, and authentication information.
 #[derive(Debug)]
 pub struct KubeConfigLoader {
     pub current_context: Context,

@@ -9,10 +9,12 @@ use failure::Error;
 
 const KUBECONFIG: &str = "KUBECONFIG";
 
+/// Returns kubeconfig path from specified environment variable.
 pub fn kubeconfig_path() -> Option<PathBuf> {
     env::var_os(KUBECONFIG).map(PathBuf::from)
 }
 
+/// Returns kubeconfig path from `$HOME/.kube/config`.
 pub fn default_kube_path() -> Option<PathBuf> {
     home_dir().map(|h| h.join(".kube").join("config"))
 }

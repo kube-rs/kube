@@ -6,6 +6,7 @@ use serde_yaml;
 
 use config::utils;
 
+/// Config stores information to connect remote kubernetes cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub kind: Option<String>,
@@ -21,24 +22,28 @@ pub struct Config {
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
+/// Preferences stores extensions for cli.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Preferences {
     pub colors: Option<bool>,
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
+/// NamedExtention associates name with extension.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedExtension {
     pub name: String,
     pub extension: String,
 }
 
+/// NamedCluster associates name with cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedCluster {
     pub name: String,
     pub cluster: Cluster,
 }
 
+/// Cluster stores information to connect kubernetes cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Cluster {
     pub server: String,
@@ -50,6 +55,7 @@ pub struct Cluster {
     pub certificate_authority_data: Option<String>,
 }
 
+/// NamedAuthInfo associates name with authentication.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedAuthInfo {
     pub name: String,
@@ -57,6 +63,7 @@ pub struct NamedAuthInfo {
     pub auth_info: AuthInfo,
 }
 
+/// AuthInfo stores information to tell cluster who you are.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthInfo {
     pub username: Option<String>,
@@ -82,12 +89,14 @@ pub struct AuthInfo {
     pub impersonate_groups: Option<Vec<String>>,
 }
 
+/// NamedContext associates name with context.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedContext {
     pub name: String,
     pub context: Context,
 }
 
+/// Context stores tuple of cluster and user information.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Context {
     pub cluster: String,

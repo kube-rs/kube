@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 
 use super::config::Configuration;
 
+/// APIClient requires `config::Configuration` includes client to connect with kubernetes cluster.
 pub struct APIClient {
     configuration: Rc<Configuration>,
 }
@@ -16,6 +17,7 @@ impl APIClient {
         APIClient { configuration: rc }
     }
 
+    /// Returns kubernetes resources binded `Arnavion/k8s-openapi-codegen` APIs.
     pub fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T, Error>
     where
         T: DeserializeOwned,
