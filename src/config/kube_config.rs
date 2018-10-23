@@ -7,6 +7,7 @@ use openssl::x509::X509;
 
 use config::apis::{AuthInfo, Cluster, Config, Context};
 
+/// KubeConfigLoader loads current context, cluster, and authentication information.
 #[derive(Debug)]
 pub struct KubeConfigLoader {
     pub current_context: Context,
@@ -43,8 +44,8 @@ impl KubeConfigLoader {
     }
 
     pub fn p12(&self, password: &str) -> Result<Pkcs12, Error> {
-        let client_cert = self.user.load_client_certificate()?.unwrap();
-        let client_key = self.user.load_client_key()?.unwrap();
+        let client_cert = &self.user.load_client_certificate()?;
+        let client_key = &self.user.load_client_key()?;
 
         let x509 = X509::from_pem(&client_cert)?;
         let pkey = PKey::private_key_from_pem(&client_key)?;
@@ -55,7 +56,7 @@ impl KubeConfigLoader {
     }
 
     pub fn ca(&self) -> Result<X509, Error> {
-        let ca = self.cluster.load_certificate_authority()?.unwrap();
+        let ca = &self.cluster.load_certificate_authority()?;
         X509::from_pem(&ca).map_err(Error::from)
     }
 }

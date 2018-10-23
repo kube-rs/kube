@@ -19,3 +19,6 @@ serde_derive = "1.0.79"
 serde_yaml = "0.8.5"
 openssl = "0.10.12"
 k8s-openapi = { git = "https://github.com/Arnavion/k8s-openapi-codegen", branch = "master", features = ["v1_10"] }
+
+[dev-dependencies]
+tempfile = "3.0.4"
