@@ -27,7 +27,7 @@ impl Configuration {
 /// Returns a config includes authentication and cluster infomation from kubeconfig file.
 ///
 /// # Example
-/// ```
+/// ```no_run
 /// use kubernetes::config;
 ///
 /// let kubeconfig = config::load_kube_config()
@@ -83,7 +83,7 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
 /// It will return an error if called from out of kubernetes cluster.
 ///
 /// # Example
-/// ```
+/// ```no_run
 /// use kubernetes::config;
 ///
 /// let kubeconfig = config::incluster_config()
