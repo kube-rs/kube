@@ -33,6 +33,9 @@ impl APIClient {
             }
         }.body(body);
         let text = req.send()?.text()?;
-        serde_json::from_str(&text).map_err(Error::from)
+        serde_json::from_str(&text).map_err(|e| {
+            println!("{}", text);
+            Error::from(e)
+        })
     }
 }
