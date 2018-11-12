@@ -2,6 +2,7 @@
 use failure::Error;
 use http;
 use serde::de::DeserializeOwned;
+use serde_json;
 
 use super::config::Configuration;
 
@@ -31,7 +32,7 @@ impl APIClient {
                 return Err(Error::from(format_err!("Invalid method: {}", other)));
             }
         }.body(body);
-
-        req.send()?.json().map_err(Error::from)
+        let text = req.send()?.text()?;
+        serde_json::from_str(&text).map_err(Error::from)
     }
 }
