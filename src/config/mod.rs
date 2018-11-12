@@ -10,6 +10,7 @@ use reqwest::{header, Certificate, Client, Identity};
 use self::kube_config::KubeConfigLoader;
 
 /// Configuration stores kubernetes path and client for requests.
+#[derive(Clone)]
 pub struct Configuration {
     pub base_path: String,
     pub client: Client,

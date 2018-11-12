@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use super::config::Configuration;
 
 /// APIClient requires `config::Configuration` includes client to connect with kubernetes cluster.
+#[derive(Clone)]
 pub struct APIClient {
     configuration: Configuration,
 }
