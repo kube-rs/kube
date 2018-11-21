@@ -40,12 +40,24 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
         .ok_or(format_err!("Unable to load kubeconfig"))?;
 
     let loader = KubeConfigLoader::load(kubeconfig)?;
-
-    let p12 = loader.p12(" ")?;
-    let req_p12 = Identity::from_pkcs12_der(&p12.to_der()?, " ")?;
+    let mut client_builder = Client::builder();
 
     let ca = loader.ca()?;
     let req_ca = Certificate::from_der(&ca.to_der()?)?;
+    client_builder = client_builder.add_root_certificate(req_ca);
+
+    match loader.p12(" ") {
+        Ok(p12) => {
+            let req_p12 = Identity::from_pkcs12_der(&p12.to_der()?, " ")?;
+            client_builder = client_builder.identity(req_p12);
+        }
+        Err(_e) => {
+            // last resort only if configs ask for it, and no client certs
+            if let Some(true) = loader.cluster.insecure_skip_tls_verify {
+                client_builder = client_builder.danger_accept_invalid_certs(true);
+            }
+        }
+    }
 
     let mut headers = header::HeaderMap::new();
 
@@ -69,10 +81,7 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
         _ => {}
     }
 
-    let client_builder = Client::builder()
-        .identity(req_p12)
-        .add_root_certificate(req_ca)
-        .default_headers(headers);
+    let client_builder = client_builder.default_headers(headers);
 
     Ok(Configuration::new(
         loader.cluster.server,
