@@ -12,6 +12,20 @@ pub struct APIClient {
     configuration: Configuration,
 }
 
+/// Error data returned by kube
+///
+/// Replacement data for reqwest::Response::error_for_status
+/// because it hardly ever includes good permission errors
+#[derive(Deserialize, Debug)]
+pub struct ApiError {
+    status: String,
+    #[serde(default)]
+    message: Option<String>,
+    #[serde(default)]
+    reason: Option<String>,
+    code: u16,
+}
+
 impl APIClient {
     pub fn new(configuration: Configuration) -> Self {
         APIClient { configuration }
@@ -32,10 +46,26 @@ impl APIClient {
                 return Err(Error::from(format_err!("Invalid method: {}", other)));
             }
         }.body(body);
-        let text = req.send()?.text()?;
-        serde_json::from_str(&text).map_err(|e| {
-            println!("{}", text);
-            Error::from(e)
-        })
+        let mut res = req.send()?;
+        if !res.status().is_success() {
+            let text = res.text()?;
+            // Print better debug when things do fail
+            if let Ok(errdata) = serde_json::from_str::<ApiError>(&text) {
+                println!("Unsuccessful: {:?}", errdata);
+            } else {
+                // In case some parts of ApiError for some reason don't exist..
+                println!("Unsuccessful data: {}", text);
+            }
+            // Propagate errors properly via reqwest
+            let e = res.error_for_status().unwrap_err();
+            Err(e.into())
+        } else {
+            // Should be able to coerce result into T at this point
+            let text = res.text()?;
+            serde_json::from_str(&text).map_err(|e| {
+                println!("{}", text);
+                Error::from(e)
+            })
+        }
     }
 }
