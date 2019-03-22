@@ -38,11 +38,33 @@ impl Configuration {
 ///     .expect("failed to load kubeconfig");
 /// ```
 pub fn load_kube_config() -> Result<Configuration, Error> {
+    load_kube_config_with(Default::default())
+}
+
+/// ConfigOptions stores options used when loading kubeconfig file.
+#[derive(Default)]
+pub struct ConfigOptions {
+    pub context: Option<String>,
+    pub cluster: Option<String>,
+    pub user: Option<String>,
+}
+
+/// Returns a config includes authentication and cluster information from kubeconfig file.
+///
+/// # Example
+/// ```no_run
+/// use kubernetes::config;
+///
+/// let kubeconfig = config::load_kube_config()
+///     .expect("failed to load kubeconfig");
+/// ```
+pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration, Error> {
     let kubeconfig = utils::kubeconfig_path()
         .or_else(utils::default_kube_path)
         .ok_or(format_err!("Unable to load kubeconfig"))?;
 
-    let loader = KubeConfigLoader::load(kubeconfig)?;
+    let loader =
+        KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user)?;
     let token = match &loader.user.token {
         Some(token) => Some(token.clone()),
         None => {

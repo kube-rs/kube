@@ -16,24 +16,32 @@ pub struct KubeConfigLoader {
 }
 
 impl KubeConfigLoader {
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<KubeConfigLoader, Error> {
+    pub fn load<P: AsRef<Path>>(
+        path: P,
+        context: Option<String>,
+        cluster: Option<String>,
+        user: Option<String>,
+    ) -> Result<KubeConfigLoader, Error> {
         let config = Config::load_config(path)?;
+        let context_name = context.as_ref().unwrap_or(&config.current_context);
         let current_context = config
             .contexts
             .iter()
-            .find(|named_context| named_context.name == config.current_context)
+            .find(|named_context| &named_context.name == context_name)
             .map(|named_context| &named_context.context)
             .ok_or(format_err!("Unable to load current context"))?;
+        let cluster_name = cluster.as_ref().unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
             .iter()
-            .find(|named_cluster| named_cluster.name == current_context.cluster)
+            .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
             .ok_or(format_err!("Unable to load cluster of current context"))?;
+        let user_name = user.as_ref().unwrap_or(&current_context.user);
         let user = config
             .auth_infos
             .iter()
-            .find(|named_user| named_user.name == current_context.user)
+            .find(|named_user| &named_user.name == user_name)
             .map(|named_user| {
                 let mut user = named_user.auth_info.clone();
                 match user.load_gcp() {
