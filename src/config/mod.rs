@@ -44,10 +44,10 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
     let loader = KubeConfigLoader::load(kubeconfig)?;
     let mut client_builder = Client::builder();
 
-    let ca = loader.ca()?;
-    let req_ca = Certificate::from_der(&ca.to_der()?)?;
-    client_builder = client_builder.add_root_certificate(req_ca);
-
+    if let Some(ca) = loader.ca() {
+        let req_ca = Certificate::from_der(&ca?.to_der()?)?;
+        client_builder = client_builder.add_root_certificate(req_ca);
+    }
     match loader.p12(" ") {
         Ok(p12) => {
             let req_p12 = Identity::from_pkcs12_der(&p12.to_der()?, " ")?;

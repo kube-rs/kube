@@ -114,11 +114,15 @@ impl Config {
 }
 
 impl Cluster {
-    pub fn load_certificate_authority(&self) -> Result<Vec<u8>, Error> {
-        utils::data_or_file_with_base64(
-            &self.certificate_authority_data,
-            &self.certificate_authority,
-        )
+    pub fn load_certificate_authority(&self) -> Option<Result<Vec<u8>, Error>> {
+        if self.certificate_authority_data.is_some() || self.certificate_authority.is_some() {
+            Some(utils::data_or_file_with_base64(
+                &self.certificate_authority_data,
+                &self.certificate_authority,
+            ))
+        } else {
+            None
+        }
     }
 }
 

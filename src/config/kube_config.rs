@@ -55,8 +55,8 @@ impl KubeConfigLoader {
             .map_err(Error::from)
     }
 
-    pub fn ca(&self) -> Result<X509, Error> {
-        let ca = &self.cluster.load_certificate_authority()?;
-        X509::from_pem(&ca).map_err(Error::from)
+    pub fn ca(&self) -> Option<Result<X509, Error>> {
+        let ca = self.cluster.load_certificate_authority()?;
+        Some(ca.and_then(|ca| X509::from_pem(&ca).map_err(Error::from)))
     }
 }
