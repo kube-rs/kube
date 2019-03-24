@@ -92,6 +92,8 @@ pub struct AuthInfo {
 
     #[serde(rename = "auth-provider")]
     pub auth_provider: Option<AuthProviderConfig>,
+
+    pub exec: Option<ExecConfig>,
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
@@ -99,6 +101,16 @@ pub struct AuthInfo {
 pub struct AuthProviderConfig {
     pub name: String,
     pub config: BTreeMap<String, String>,
+}
+
+/// ExecConfig stores credential-plugin configuration.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExecConfig {
+    #[serde(rename = "apiVersion")]
+    pub api_version: Option<String>,
+    pub args: Option<Vec<String>>,
+    pub command: String,
+    pub env: Option<Vec<HashMap<String, String>>>,
 }
 
 /// NamedContext associates name with context.
@@ -141,7 +153,9 @@ impl AuthInfo {
                 self.token = Some(provider.config["access-token"].clone());
                 if utils::is_expired(&provider.config["expiry"]) {
                     let client = oauth2::CredentialsClient::new()?;
-                    let token = client.request_token(&vec!["https://www.googleapis.com/auth/cloud-platform".to_string()])?;
+                    let token = client.request_token(&vec![
+                        "https://www.googleapis.com/auth/cloud-platform".to_string(),
+                    ])?;
                     self.token = Some(token.access_token);
                 }
             }
