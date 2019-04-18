@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use chrono::Utc;
 use failure::Error;
-use openssl::pkey::PKey;
+use openssl::pkey::{PKey, Private};
 use openssl::sign::Signer;
 use openssl::rsa::Padding;
 use openssl::hash::MessageDigest;
@@ -15,8 +15,12 @@ use url::form_urlencoded::Serializer;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 const DEFAULT_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:jwt-bearer";
-lazy_static! {
-    static ref DEFAULT_HEADER: String = json!({"alg": "RS256","typ": "JWT"}).to_string();
+
+
+#[derive(Debug, Serialize)]
+struct Header {
+    alg: String,
+    typ: String,
 }
 
 // https://github.com/golang/oauth2/blob/c85d3e98c914e3a33234ad863dcbff5dbc425bb8/jws/jws.go#L34-L52
@@ -115,41 +119,41 @@ impl CredentialsClient {
         })
     }
     pub fn request_token(&self, scopes: &Vec<String>) -> Result<Token, Error> {
-        let header = &self.jwt_header(scopes)?;
+        let private_key = PKey::private_key_from_pem(&self.credentials.private_key.as_bytes())?;
+        let encoded = &self.jws_encode(
+            &Claim::new(&self.credentials, scopes),
+            &Header{
+                alg: "RS256".to_string(),
+                typ: "JWT".to_string(),
+            },
+            private_key)?;
+
         let body = Serializer::new(String::new())
             .extend_pairs(vec![
                 ("grant_type".to_string(), DEFAULT_GRANT_TYPE.to_string()),
-                ("assertion".to_string(), header.to_string()),
+                ("assertion".to_string(), encoded.to_string()),
             ]).finish();
-        println!("{:?}", body);
         let token_response: TokenResponse = self.client
             .post(&self.credentials.token_uri)
             .body(body)
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
             .send()?
             .json()?;
-        println!("{:?}", token_response);
         Ok(token_response.to_token())
     }
 
-    fn jwt_header(&self, scopes: &Vec<String>) -> Result<String, Error> {
-        let claim = Claim::new(&self.credentials, scopes);
-        let header = &self.jwt_encode(&claim)?;
-        let private = &self.credentials.private_key.to_string().replace("\\n", "\n").into_bytes();
-        let decoded = PKey::private_key_from_pem(private)?;
-        let mut signer = Signer::new(MessageDigest::sha256(), &decoded)?;
+    fn jws_encode(&self, claim: &Claim, header: &Header, key: PKey<Private>) -> Result<String, Error> {
+        let encoded_header = self.base64_encode(serde_json::to_string(&header).unwrap().as_bytes());
+        let encoded_claims = self.base64_encode(serde_json::to_string(&claim).unwrap().as_bytes());
+        let signature_base = format!("{}.{}", encoded_header, encoded_claims);
+        let mut signer = Signer::new(MessageDigest::sha256(), &key)?;
         signer.set_rsa_padding(Padding::PKCS1)?;
-        signer.update(header.as_bytes())?;
+        signer.update(signature_base.as_bytes())?;
         let signature = signer.sign_to_vec()?;
-        let encoded = base64::encode_config(&signature, base64::URL_SAFE);
-        Ok([header.to_string(), ".".to_string(), encoded].join(""))
+        Ok(format!("{}.{}", signature_base, self.base64_encode(&signature)))
     }
 
-    fn jwt_encode(&self, claim: &Claim) -> Result<String, Error> {
-        let header = [
-            base64::encode_config(GOOGLE_APPLICATION_CREDENTIALS, base64::URL_SAFE),
-            ".".to_string(),
-            base64::encode_config(&serde_json::to_string(claim)?, base64::URL_SAFE)].join("");
-        Ok(header)
+    fn base64_encode(&self, bytes: &[u8]) -> String {
+        base64::encode_config(bytes, base64::URL_SAFE)
     }
 }
