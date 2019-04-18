@@ -53,7 +53,7 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
             let req_p12 = Identity::from_pkcs12_der(&p12.to_der()?, " ")?;
             client_builder = client_builder.identity(req_p12);
         }
-        Err(_e) => {
+        Err(_) => {
             // last resort only if configs ask for it, and no client certs
             if let Some(true) = loader.cluster.insecure_skip_tls_verify {
                 client_builder = client_builder.danger_accept_invalid_certs(true);

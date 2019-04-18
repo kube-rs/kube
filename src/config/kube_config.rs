@@ -34,8 +34,14 @@ impl KubeConfigLoader {
             .auth_infos
             .iter()
             .find(|named_user| named_user.name == current_context.user)
-            .map(|named_user| &named_user.auth_info)
-            .ok_or(format_err!("Unable to load user of current context"))?;
+            .map(|named_user| {
+                let mut user = named_user.auth_info.clone();
+                match user.load_gcp() {
+                    Ok(_) => Ok(user),
+                    Err(e) => Err(e),
+                }
+            })
+            .ok_or(format_err!("Unable to load user of current context"))??;
         Ok(KubeConfigLoader {
             current_context: current_context.clone(),
             cluster: cluster.clone(),

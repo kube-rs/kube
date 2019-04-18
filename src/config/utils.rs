@@ -4,6 +4,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use base64;
+use chrono::{DateTime, Utc};
 use dirs::home_dir;
 use failure::Error;
 
@@ -49,6 +50,14 @@ pub fn data_or_file<P: AsRef<Path>>(
         }
         _ => Err(format_err!("Failed to get data/file")),
     }
+}
+
+pub fn is_expired(timestamp: &str) -> bool {
+    let ts = DateTime::parse_from_rfc3339(timestamp).unwrap();
+    let now = DateTime::parse_from_rfc3339(&Utc::now().to_rfc3339()).unwrap();
+    println!("{:?}", ts);
+    println!("{:?}", now);
+    ts < now
 }
 
 #[test]
