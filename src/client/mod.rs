@@ -4,7 +4,7 @@ use http;
 use serde::de::DeserializeOwned;
 use serde_json;
 
-use super::config::Configuration;
+use crate::config::Configuration;
 
 /// APIClient requires `config::Configuration` includes client to connect with kubernetes cluster.
 #[derive(Clone)]
