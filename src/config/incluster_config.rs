@@ -3,7 +3,7 @@ use std::env;
 use failure::Error;
 use openssl::x509::X509;
 
-use config::utils;
+use crate::config::utils;
 
 pub const SERVICE_HOSTENV: &str = "KUBERNETES_SERVICE_HOST";
 pub const SERVICE_PORTENV: &str = "KUBERNETES_SERVICE_PORT";

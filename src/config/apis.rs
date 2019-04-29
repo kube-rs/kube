@@ -4,7 +4,7 @@ use std::path::Path;
 use failure::Error;
 use serde_yaml;
 
-use config::utils;
+use crate::config::utils;
 
 /// Config stores information to connect remote kubernetes cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]

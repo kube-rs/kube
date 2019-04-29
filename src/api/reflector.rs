@@ -1,4 +1,4 @@
-use api::resource::{
+use crate::api::resource::{
     list_all_crd_entries,
     watch_crd_entries_after,
     ResourceList,
