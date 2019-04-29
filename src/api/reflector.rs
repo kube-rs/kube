@@ -85,7 +85,7 @@ impl<T> Reflector<T> where
     }
 
     /// Read data for users of the reflector
-    pub fn read(&self) -> Result<Cache<T>> {
+    pub fn read(&self) -> Result<ResourceMap<T>> {
         // unwrap for users because Poison errors are not great to deal with atm.
         // If a read fails, you've probably failed to parse the Resource into a T
         // this likely implies versioning issues between:
@@ -93,7 +93,7 @@ impl<T> Reflector<T> where
         // - current applied kube state (used to parse into T)
         //
         // Very little that can be done in this case. Upgrade your app / resource.
-        let data = self.data.read().unwrap().clone();
+        let data = self.data.read().unwrap().clone().data;
         Ok(data)
     }
 
