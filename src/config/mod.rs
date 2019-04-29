@@ -29,7 +29,7 @@ impl Configuration {
 ///
 /// # Example
 /// ```no_run
-/// use kubernetes::config;
+/// use kube::config;
 ///
 /// let kubeconfig = config::load_kube_config()
 ///     .expect("failed to load kubeconfig");
@@ -94,7 +94,7 @@ pub fn load_kube_config() -> Result<Configuration, Error> {
 ///
 /// # Example
 /// ```no_run
-/// use kubernetes::config;
+/// use kube::config;
 ///
 /// let kubeconfig = config::incluster_config()
 ///     .expect("failed to load incluster config");
