@@ -16,7 +16,7 @@ See [operator-rs](https://github.com/clux/operator-rs) for ideas.
 Main ideas, depending on how complicated your need is:
 
 ### Watch calls on a resource
-You probably want a reflector?. See [operator-rs](https://github.com/clux/operator-rs).
+You probably want a reflector? See [operator-rs](https://github.com/clux/operator-rs).
 
 ### Basic calls
 Use the exposed `APIClient` herein, and write Request functions directly:

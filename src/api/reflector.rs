@@ -151,7 +151,7 @@ pub fn watch_for_cr_updates<T>(client: &APIClient, rg: &ApiResource, mut c: Cach
         debug!("Got {:?}", ev);
         match ev {
             WatchEvent::Added(o) => {
-                info!("Adding service {}", o.spec.name());
+                info!("Adding {} to {}", o.spec.name(), rg.resource);
                 c.data.entry(o.spec.name().clone())
                     .or_insert_with(|| o.spec.clone());
                 if o.metadata.resourceVersion != "" {
@@ -159,7 +159,7 @@ pub fn watch_for_cr_updates<T>(client: &APIClient, rg: &ApiResource, mut c: Cach
                 }
             },
             WatchEvent::Modified(o) => {
-                info!("Modifying service {}", o.spec.name());
+                info!("Modifying {} in {}", o.spec.name(), rg.resource);
                 c.data.entry(o.spec.name().clone())
                     .and_modify(|e| *e = o.spec.clone());
                 if o.metadata.resourceVersion != "" {
@@ -167,14 +167,14 @@ pub fn watch_for_cr_updates<T>(client: &APIClient, rg: &ApiResource, mut c: Cach
                 }
             },
             WatchEvent::Deleted(o) => {
-                info!("Removing service {}", o.spec.name());
+                info!("Removing {} from {}", o.spec.name(), rg.resource);
                 c.data.remove(&o.spec.name());
                 if o.metadata.resourceVersion != "" {
                   c.version = o.metadata.resourceVersion.clone();
                 }
             }
             WatchEvent::Error(e) => {
-                warn!("Failed to watch resource: {:?}", e);
+                warn!("Failed to watch {}: {:?}", rg.resource, e);
                 bail!("Failed to watch {}: {:?} - {:?}", rg.resource, e.message, e.reason)
             }
         }
