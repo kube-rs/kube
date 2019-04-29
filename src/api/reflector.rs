@@ -54,7 +54,7 @@ impl<T> Reflector<T> where
     /// Initializes with a full list of data from a large initial LIST call
     pub fn new(client: APIClient, r: ApiResource) -> Result<Self> {
         info!("Creating Reflector for {:?}", r);
-        let current : Cache<T> = get_cr_entries(&client, &r)?;
+        let current : Cache<T> = get_resource_entries(&client, &r)?;
         Ok(Reflector {
             client,
             resource: r,
@@ -70,7 +70,7 @@ impl<T> Reflector<T> where
         use std::thread;
         trace!("Watching {:?}", self.resource);
         let old = self.data.read().unwrap().clone();
-        match watch_for_cr_updates(&self.client, &self.resource, old) {
+        match watch_for_resource_updates(&self.client, &self.resource, old) {
             Ok(res) => {
                 *self.data.write().unwrap() = res;
             },
@@ -102,7 +102,7 @@ impl<T> Reflector<T> where
     /// Same as what is done in `State::new`.
     pub fn refresh(&self) -> Result<()> {
         debug!("Refreshing {:?}", self.resource);
-        let current : Cache<T> = get_cr_entries(&self.client, &self.resource)?;
+        let current : Cache<T> = get_resource_entries(&self.client, &self.resource)?;
         *self.data.write().unwrap() = current;
         Ok(())
     }
@@ -120,7 +120,7 @@ pub struct Cache<T> {
 }
 
 
-pub fn get_cr_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T>> where
+pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T>> where
   T: Debug + Clone + Named + DeserializeOwned
 {
     let req = list_all_crd_entries(&rg)?;
@@ -137,16 +137,16 @@ pub fn get_cr_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T
     Ok(Cache { data, version })
 }
 
-pub fn watch_for_cr_updates<T>(client: &APIClient, rg: &ApiResource, mut c: Cache<T>)
+pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c: Cache<T>)
     -> Result<Cache<T>> where
   T: Debug + Clone + Named + DeserializeOwned
 {
     let req = watch_crd_entries_after(&rg, &c.version)?;
     let res = client.request_events::<WatchEvent<Resource<T>>>(req)?;
 
-
-    // TODO: let c.version == max of individual versions?
-    // probably better, but api docs says not to rely on format of it...
+    // NB: events appear ordered, so the last one IS the max
+    // We could parse the resourceVersion as uint and take the MAX for safety
+    // but the api docs say not to rely on the format of resourceVersion anyway..
     for ev in res {
         debug!("Got {:?}", ev);
         match ev {

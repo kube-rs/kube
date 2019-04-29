@@ -1,5 +1,5 @@
 [package]
-name = "kubernetes"
+name = "kube"
 version = "0.1.0"
 description = "Kubernetes rust client with a reflector"
 authors = [
