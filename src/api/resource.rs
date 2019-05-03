@@ -68,10 +68,10 @@ pub struct ApiError {
 /// Events from a watch query
 ///
 /// Should expect a one of these per line from `watch_crd_entries_after`
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<T> where
-  T: Debug + Clone
+  T: Clone
 {
     Added(T),
     Modified(T),
@@ -79,14 +79,26 @@ pub enum WatchEvent<T> where
     Error(ApiError),
 }
 
+impl<T> Debug for WatchEvent<T> where
+   T: Clone
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match &self {
+            WatchEvent::Added(_) =>  write!(f, "Added event"),
+            WatchEvent::Modified(_) =>  write!(f, "Modified event"),
+            WatchEvent::Deleted(_) =>  write!(f, "Deleted event"),
+            WatchEvent::Error(e) =>  write!(f, "Error event: {:?}", e),
+        }
+    }
+}
 
 /// Basic resource result wrapper struct
 ///
 /// Expected to be used by `ResourceList` and `WatchEvent`
 /// Because it's experimental, it's not exposed outside the crate.
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Clone)]
 pub struct Resource<T> where
-  T: Debug + Clone
+  T: Clone
 {
     pub apiVersion: String,
     pub kind: String,
@@ -99,7 +111,7 @@ pub struct Resource<T> where
 ///
 /// Only parses a few fields relevant to a reflector.
 /// Because it's experimental, it's not exposed outside the crate.
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Deserialize, Clone, Default)]
 pub struct Metadata {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
@@ -116,7 +128,7 @@ pub struct Metadata {
 /// Because it's experimental, it's not exposed outside the crate.
 #[derive(Deserialize)]
 pub struct ResourceList<T> where
-  T: Debug + Clone
+  T: Clone
 {
     pub apiVersion: String,
     pub kind: String,

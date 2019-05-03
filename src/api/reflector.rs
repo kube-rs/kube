@@ -8,7 +8,6 @@ use crate::api::resource::{
 };
 use log::{info, warn, debug, trace};
 use serde::de::DeserializeOwned;
-use std::fmt::Debug;
 
 use crate::client::APIClient;
 use crate::{Result};
@@ -29,7 +28,7 @@ use std::{
 /// As such, a Reflector can be shared with actix-web as application state.
 #[derive(Clone)]
 pub struct Reflector<T> where
-  T: Debug + Clone
+  T: Clone
 {
     /// Application state can be read continuously with read
     ///
@@ -46,7 +45,7 @@ pub struct Reflector<T> where
 }
 
 impl<T> Reflector<T> where
-    T: Debug + Clone + DeserializeOwned
+    T: Clone + DeserializeOwned
 {
     /// Create a reflector with a kube client on a kube resource
     ///
@@ -120,7 +119,7 @@ pub struct Cache<T> {
 
 
 pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T>> where
-  T: Debug + Clone + DeserializeOwned
+  T: Clone + DeserializeOwned
 {
     let req = list_all_crd_entries(&rg)?;
     let res = client.request::<ResourceList<Resource<T>>>(req)?;
@@ -138,7 +137,7 @@ pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<C
 
 pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c: Cache<T>)
     -> Result<Cache<T>> where
-  T: Debug + Clone + DeserializeOwned
+  T: Clone + DeserializeOwned
 {
     let req = watch_crd_entries_after(&rg, &c.version)?;
     let res = client.request_events::<WatchEvent<Resource<T>>>(req)?;
@@ -147,7 +146,7 @@ pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c
     // We could parse the resourceVersion as uint and take the MAX for safety
     // but the api docs say not to rely on the format of resourceVersion anyway..
     for ev in res {
-        debug!("Got {:?}", ev);
+        trace!("Got {:?}", ev);
         match ev {
             WatchEvent::Added(o) => {
                 info!("Adding {} to {}", o.metadata.name, rg.resource);
