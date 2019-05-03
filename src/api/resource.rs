@@ -65,13 +65,6 @@ pub struct ApiError {
     code: u16,
 }
 
-/// A trait for resources to be filled in for reflector
-pub trait Named {
-    // This string is used as a lookup in the Cache (which is a map of String -> Foo)
-    fn name(&self) -> String;
-}
-
-
 /// Events from a watch query
 ///
 /// Should expect a one of these per line from `watch_crd_entries_after`
@@ -93,7 +86,7 @@ pub enum WatchEvent<T> where
 /// Because it's experimental, it's not exposed outside the crate.
 #[derive(Deserialize, Debug, Clone)]
 pub struct Resource<T> where
-  T: Debug + Clone + Named
+  T: Debug + Clone
 {
     pub apiVersion: String,
     pub kind: String,

@@ -5,7 +5,6 @@ use crate::api::resource::{
     Resource,
     WatchEvent,
     ApiResource,
-    Named,
 };
 use log::{info, warn, debug, trace};
 use serde::de::DeserializeOwned;
@@ -30,7 +29,7 @@ use std::{
 /// As such, a Reflector can be shared with actix-web as application state.
 #[derive(Clone)]
 pub struct Reflector<T> where
-  T: Debug + Clone + Named
+  T: Debug + Clone
 {
     /// Application state can be read continuously with read
     ///
@@ -47,7 +46,7 @@ pub struct Reflector<T> where
 }
 
 impl<T> Reflector<T> where
-    T: Debug + Clone + Named + DeserializeOwned
+    T: Debug + Clone + DeserializeOwned
 {
     /// Create a reflector with a kube client on a kube resource
     ///
@@ -121,7 +120,7 @@ pub struct Cache<T> {
 
 
 pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T>> where
-  T: Debug + Clone + Named + DeserializeOwned
+  T: Debug + Clone + DeserializeOwned
 {
     let req = list_all_crd_entries(&rg)?;
     let res = client.request::<ResourceList<Resource<T>>>(req)?;
@@ -130,7 +129,7 @@ pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<C
     info!("Got {} with {} elements at resourceVersion={}", res.kind, res.items.len(), version);
 
     for i in res.items {
-        data.insert(i.spec.name(), i.spec);
+        data.insert(i.metadata.name, i.spec);
     }
     let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
     debug!("Initialized with: {}", keys);
@@ -139,7 +138,7 @@ pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<C
 
 pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c: Cache<T>)
     -> Result<Cache<T>> where
-  T: Debug + Clone + Named + DeserializeOwned
+  T: Debug + Clone + DeserializeOwned
 {
     let req = watch_crd_entries_after(&rg, &c.version)?;
     let res = client.request_events::<WatchEvent<Resource<T>>>(req)?;
@@ -151,24 +150,24 @@ pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c
         debug!("Got {:?}", ev);
         match ev {
             WatchEvent::Added(o) => {
-                info!("Adding {} to {}", o.spec.name(), rg.resource);
-                c.data.entry(o.spec.name().clone())
+                info!("Adding {} to {}", o.metadata.name, rg.resource);
+                c.data.entry(o.metadata.name.clone())
                     .or_insert_with(|| o.spec.clone());
                 if o.metadata.resourceVersion != "" {
                   c.version = o.metadata.resourceVersion.clone();
                 }
             },
             WatchEvent::Modified(o) => {
-                info!("Modifying {} in {}", o.spec.name(), rg.resource);
-                c.data.entry(o.spec.name().clone())
+                info!("Modifying {} in {}", o.metadata.name, rg.resource);
+                c.data.entry(o.metadata.name.clone())
                     .and_modify(|e| *e = o.spec.clone());
                 if o.metadata.resourceVersion != "" {
                   c.version = o.metadata.resourceVersion.clone();
                 }
             },
             WatchEvent::Deleted(o) => {
-                info!("Removing {} from {}", o.spec.name(), rg.resource);
-                c.data.remove(&o.spec.name());
+                info!("Removing {} from {}", o.metadata.name, rg.resource);
+                c.data.remove(&o.metadata.name);
                 if o.metadata.resourceVersion != "" {
                   c.version = o.metadata.resourceVersion.clone();
                 }

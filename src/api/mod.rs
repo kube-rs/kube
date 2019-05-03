@@ -7,7 +7,6 @@ pub use self::reflector::{
 
 mod resource;
 pub use self::resource::{
-  Named,
   ApiResource,
   ApiError,
 };
