@@ -15,14 +15,15 @@ pub struct ApiResource {
     pub group: String,
     /// Namespace the resources reside
     pub namespace: String,
+    pub version: String,
 }
 
 /// Create a list request for a Resource
 ///
 /// Useful to fully re-fetch the state.
 pub fn list_all_crd_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
-    let urlstr = format!("/apis/{group}/v1/namespaces/{ns}/{resource}?",
-        group = r.group, resource = r.resource, ns = r.namespace);
+    let urlstr = format!("/apis/{group}/{version}/namespaces/{ns}/{resource}?",
+        group = r.group, version = r.version, resource = r.resource, ns = r.namespace);
     let urlstr = url::form_urlencoded::Serializer::new(urlstr).finish();
     let mut req = http::Request::get(urlstr);
     req.body(vec![]).map_err(Error::from)
@@ -33,8 +34,8 @@ pub fn list_all_crd_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
 ///
 /// Should be used continuously
 pub fn watch_crd_entries_after(r: &ApiResource, ver: &str) -> Result<http::Request<Vec<u8>>> {
-    let urlstr = format!("/apis/{group}/v1/namespaces/{ns}/{resource}?",
-        group = r.group, resource = r.resource, ns = r.namespace);
+    let urlstr = format!("/apis/{group}/{version}/namespaces/{ns}/{resource}?",
+        group = r.group, version = r.version, resource = r.resource, ns = r.namespace);
     let mut qp = url::form_urlencoded::Serializer::new(urlstr);
 
     qp.append_pair("timeoutSeconds", "10");
