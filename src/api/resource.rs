@@ -6,6 +6,11 @@ use serde::{Deserialize};
 use crate::{Result, Error};
 use std::collections::BTreeMap;
 
+//pub enum Resource {
+//    Deployment,
+//    Crd(String)
+//}
+
 /// Simplified resource representation
 #[derive(Clone, Debug)]
 pub struct ApiResource {
@@ -14,15 +19,21 @@ pub struct ApiResource {
     /// API Group
     pub group: String,
     /// Namespace the resources reside
-    pub namespace: String,
+    pub namespace: Option<String>,
 }
 
 /// Create a list request for a Resource
 ///
 /// Useful to fully re-fetch the state.
-pub fn list_all_crd_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
-    let urlstr = format!("/apis/{group}/v1/namespaces/{ns}/{resource}?",
-        group = r.group, resource = r.resource, ns = r.namespace);
+pub fn list_all_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
+    let urlstr = if let Some(ns) = &r.namespace {
+        format!("/apis/{group}/v1/namespaces/{ns}/{resource}?",
+            group = r.group, resource = r.resource, ns = ns)
+    } else {
+        format!("/apis/{group}/v1/{resource}?",
+            group = r.group, resource = r.resource)
+    };
+
     let urlstr = url::form_urlencoded::Serializer::new(urlstr).finish();
     let mut req = http::Request::get(urlstr);
     req.body(vec![]).map_err(Error::from)
@@ -32,9 +43,14 @@ pub fn list_all_crd_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
 /// Create watch request for a ApiResource at a given resourceVer
 ///
 /// Should be used continuously
-pub fn watch_crd_entries_after(r: &ApiResource, ver: &str) -> Result<http::Request<Vec<u8>>> {
-    let urlstr = format!("/apis/{group}/v1/namespaces/{ns}/{resource}?",
-        group = r.group, resource = r.resource, ns = r.namespace);
+pub fn watch_resource_entries_after(r: &ApiResource, ver: &str) -> Result<http::Request<Vec<u8>>> {
+    let urlstr = if let Some(ns) = &r.namespace {
+        format!("/apis/{group}/v1/namespaces/{ns}/{resource}?",
+            group = r.group, resource = r.resource, ns = ns)
+    } else {
+        format!("/apis/{group}/v1/{resource}?",
+            group = r.group, resource = r.resource)
+    };
     let mut qp = url::form_urlencoded::Serializer::new(urlstr);
 
     qp.append_pair("timeoutSeconds", "10");
@@ -67,7 +83,7 @@ pub struct ApiError {
 
 /// Events from a watch query
 ///
-/// Should expect a one of these per line from `watch_crd_entries_after`
+/// Should expect a one of these per line from `watch_resource_entries_after`
 #[derive(Deserialize)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<T> where
@@ -100,10 +116,11 @@ impl<T> Debug for WatchEvent<T> where
 pub struct Resource<T> where
   T: Clone
 {
-    pub apiVersion: String,
-    pub kind: String,
+    pub apiVersion: Option<String>,
+    pub kind: Option<String>,
     pub metadata: Metadata,
     pub spec: T,
+    // Status?
 }
 
 
@@ -124,7 +141,7 @@ pub struct Metadata {
 
 /// Basic Resource List
 ///
-/// Expected to be returned by a query from `list_all_crd_entries`
+/// Expected to be returned by a query from `list_all_resource_entries`
 /// Because it's experimental, it's not exposed outside the crate.
 #[derive(Deserialize)]
 pub struct ResourceList<T> where

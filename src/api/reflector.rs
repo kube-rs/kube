@@ -1,6 +1,6 @@
 use crate::api::resource::{
-    list_all_crd_entries,
-    watch_crd_entries_after,
+    list_all_resource_entries,
+    watch_resource_entries_after,
     ResourceList,
     Resource,
     WatchEvent,
@@ -121,13 +121,17 @@ pub struct Cache<T> {
 pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T>> where
   T: Clone + DeserializeOwned
 {
-    let req = list_all_crd_entries(&rg)?;
+    let req = list_all_resource_entries(&rg)?;
+    // NB: Resource isn't general enough here
     let res = client.request::<ResourceList<Resource<T>>>(req)?;
     let mut data = BTreeMap::new();
     let version = res.metadata.resourceVersion;
     info!("Got {} with {} elements at resourceVersion={}", res.kind, res.items.len(), version);
 
     for i in res.items {
+        // deployment for instance has status field outside .spec
+        // .spec isn't general enough - only works for CRDs
+        // also not every metadata has names
         data.insert(i.metadata.name, i.spec);
     }
     let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
@@ -139,7 +143,7 @@ pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c
     -> Result<Cache<T>> where
   T: Clone + DeserializeOwned
 {
-    let req = watch_crd_entries_after(&rg, &c.version)?;
+    let req = watch_resource_entries_after(&rg, &c.version)?;
     let res = client.request_events::<WatchEvent<Resource<T>>>(req)?;
 
     // NB: events appear ordered, so the last one IS the max
