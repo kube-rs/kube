@@ -126,7 +126,7 @@ pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<C
     let res = client.request::<ResourceList<Resource<T>>>(req)?;
     let mut data = BTreeMap::new();
     let version = res.metadata.resourceVersion;
-    info!("Got {} with {} elements at resourceVersion={}", res.kind, res.items.len(), version);
+    debug!("Got {} {} at resourceVersion={}", res.items.len(), rg.resource, version);
 
     for i in res.items {
         // deployment for instance has status field outside .spec

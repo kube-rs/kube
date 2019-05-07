@@ -128,6 +128,9 @@ pub struct Resource<T> where
 ///
 /// Only parses a few fields relevant to a reflector.
 /// Because it's experimental, it's not exposed outside the crate.
+///
+/// It's a simplified version of:
+/// `[k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html)`
 #[derive(Deserialize, Clone, Default)]
 pub struct Metadata {
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -143,12 +146,13 @@ pub struct Metadata {
 ///
 /// Expected to be returned by a query from `list_all_resource_entries`
 /// Because it's experimental, it's not exposed outside the crate.
+///
+/// It can generally be used in place of DeploymentList, NodeList, etc
+/// because [they all tend to have these fields](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
 #[derive(Deserialize)]
 pub struct ResourceList<T> where
   T: Clone
 {
-    pub apiVersion: String,
-    pub kind: String,
     pub metadata: Metadata,
     #[serde(bound(deserialize = "Vec<T>: Deserialize<'de>"))]
     pub items: Vec<T>,
