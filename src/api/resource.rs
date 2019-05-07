@@ -109,21 +109,24 @@ impl<T> Debug for WatchEvent<T> where
     }
 }
 
-/// Basic resource result wrapper struct
+/// Resource wrapper that cares about status
 ///
 /// Expected to be used by `ResourceList` and `WatchEvent`
 /// Because it's experimental, it's not exposed outside the crate.
 #[derive(Deserialize, Clone)]
-pub struct Resource<T> where
-  T: Clone
+pub struct Resource<T, U> where
+  T: Clone, U: Clone
 {
     pub apiVersion: Option<String>,
     pub kind: Option<String>,
     pub metadata: Metadata,
     pub spec: T,
-    // Status?
+    pub status: U,
 }
 
+/// Empty struct used as U when status is not present
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Discard {}
 
 /// Basic Metadata struct
 ///

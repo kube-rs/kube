@@ -1,8 +1,11 @@
 mod reflector;
 pub use self::reflector::{
   Reflector,
-  Cache,
+  ReflectorSpec,
+  ReflectorStatus,
   ResourceMap,
+  ResourceSpecMap,
+  ResourceStatusMap
 };
 
 mod resource;

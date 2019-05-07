@@ -5,6 +5,7 @@ use crate::api::resource::{
     Resource,
     WatchEvent,
     ApiResource,
+    Discard,
 };
 use log::{info, warn, debug, trace};
 use serde::de::DeserializeOwned;
@@ -27,15 +28,15 @@ use std::{
 /// It exposes it's internal state readably through a getter.
 /// As such, a Reflector can be shared with actix-web as application state.
 #[derive(Clone)]
-pub struct Reflector<T> where
-  T: Clone
+pub struct Reflector<T, U> where
+  T: Clone, U: Clone
 {
     /// Application state can be read continuously with read
     ///
     /// Write access to this data is entirely encapsulated within poll + refresh
     /// Users are meant to start a thread to poll, and maybe ask for a refresh.
     /// Beyond that, use the read call as a local cache.
-    data: Arc<RwLock<Cache<T>>>,
+    data: Arc<RwLock<Cache<T, U>>>,
 
     /// Kubernetes API Client
     client: APIClient,
@@ -44,15 +45,16 @@ pub struct Reflector<T> where
     resource: ApiResource,
 }
 
-impl<T> Reflector<T> where
-    T: Clone + DeserializeOwned
+impl<T, U> Reflector<T, U> where
+    T: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned,
 {
     /// Create a reflector with a kube client on a kube resource
     ///
     /// Initializes with a full list of data from a large initial LIST call
     pub fn new(client: APIClient, r: ApiResource) -> Result<Self> {
         info!("Creating Reflector for {:?}", r);
-        let current : Cache<T> = get_resource_entries(&client, &r)?;
+        let current : Cache<T, U> = get_resource_entries(&client, &r)?;
         Ok(Reflector {
             client,
             resource: r,
@@ -83,7 +85,7 @@ impl<T> Reflector<T> where
     }
 
     /// Read data for users of the reflector
-    pub fn read(&self) -> Result<ResourceMap<T>> {
+    pub fn read(&self) -> Result<ResourceMap<T, U>> {
         // unwrap for users because Poison errors are not great to deal with atm.
         // If a read fails, you've probably failed to parse the Resource into a T
         // this likely implies versioning issues between:
@@ -100,30 +102,37 @@ impl<T> Reflector<T> where
     /// Same as what is done in `State::new`.
     pub fn refresh(&self) -> Result<()> {
         debug!("Refreshing {:?}", self.resource);
-        let current : Cache<T> = get_resource_entries(&self.client, &self.resource)?;
+        let current : Cache<T, U> = get_resource_entries(&self.client, &self.resource)?;
         *self.data.write().unwrap() = current;
         Ok(())
     }
 }
 
+/// Convenience aliases when only grabbing one of the fields
+pub type ReflectorSpec<T> = Reflector<T, Discard>;
+pub type ReflectorStatus<U> = Reflector<Discard, U>;
+
 /// Public Resource Map typically exposed by the Reflector
-pub type ResourceMap<T> = BTreeMap<String, T>;
+pub type ResourceMap<T, U> = BTreeMap<String, (T, U)>;
+pub type ResourceSpecMap<T> = BTreeMap<String, (T, Discard)>;
+pub type ResourceStatusMap<U> = BTreeMap<String, (Discard, U)>;
 
 /// Cache state used by a Reflector
 #[derive(Default, Clone)]
-pub struct Cache<T> {
-    pub data: ResourceMap<T>,
+struct Cache<T, U> {
+    pub data: ResourceMap<T, U>,
     /// Current resourceVersion used for bookkeeping
     version: String,
 }
 
 
-pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T>> where
-  T: Clone + DeserializeOwned
+fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T, U>> where
+  T: Clone + DeserializeOwned,
+  U: Clone + DeserializeOwned,
 {
     let req = list_all_resource_entries(&rg)?;
     // NB: Resource isn't general enough here
-    let res = client.request::<ResourceList<Resource<T>>>(req)?;
+    let res = client.request::<ResourceList<Resource<T, U>>>(req)?;
     let mut data = BTreeMap::new();
     let version = res.metadata.resourceVersion;
     debug!("Got {} {} at resourceVersion={}", res.items.len(), rg.resource, version);
@@ -132,19 +141,20 @@ pub fn get_resource_entries<T>(client: &APIClient, rg: &ApiResource) -> Result<C
         // deployment for instance has status field outside .spec
         // .spec isn't general enough - only works for CRDs
         // also not every metadata has names
-        data.insert(i.metadata.name, i.spec);
+        data.insert(i.metadata.name, (i.spec, i.status));
     }
     let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
     debug!("Initialized with: {}", keys);
     Ok(Cache { data, version })
 }
 
-pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c: Cache<T>)
-    -> Result<Cache<T>> where
-  T: Clone + DeserializeOwned
+fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c: Cache<T, U>)
+    -> Result<Cache<T, U>> where
+  T: Clone + DeserializeOwned,
+  U: Clone + DeserializeOwned,
 {
     let req = watch_resource_entries_after(&rg, &c.version)?;
-    let res = client.request_events::<WatchEvent<Resource<T>>>(req)?;
+    let res = client.request_events::<WatchEvent<Resource<T, U>>>(req)?;
 
     // NB: events appear ordered, so the last one IS the max
     // We could parse the resourceVersion as uint and take the MAX for safety
@@ -155,7 +165,7 @@ pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c
             WatchEvent::Added(o) => {
                 info!("Adding {} to {}", o.metadata.name, rg.resource);
                 c.data.entry(o.metadata.name.clone())
-                    .or_insert_with(|| o.spec.clone());
+                    .or_insert_with(|| (o.spec.clone(), o.status.clone()));
                 if o.metadata.resourceVersion != "" {
                   c.version = o.metadata.resourceVersion.clone();
                 }
@@ -163,7 +173,7 @@ pub fn watch_for_resource_updates<T>(client: &APIClient, rg: &ApiResource, mut c
             WatchEvent::Modified(o) => {
                 info!("Modifying {} in {}", o.metadata.name, rg.resource);
                 c.data.entry(o.metadata.name.clone())
-                    .and_modify(|e| *e = o.spec.clone());
+                    .and_modify(|e| *e = (o.spec.clone(), o.status.clone()));
                 if o.metadata.resourceVersion != "" {
                   c.version = o.metadata.resourceVersion.clone();
                 }
