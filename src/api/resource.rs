@@ -20,6 +20,8 @@ pub struct ApiResource {
     pub group: String,
     /// Namespace the resources reside
     pub namespace: Option<String>,
+    /// API version of the resource
+    pub version: String,
 }
 
 /// Create a list request for a Resource
@@ -27,13 +29,12 @@ pub struct ApiResource {
 /// Useful to fully re-fetch the state.
 pub fn list_all_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
     let urlstr = if let Some(ns) = &r.namespace {
-        format!("/apis/{group}/v1/namespaces/{ns}/{resource}?",
-            group = r.group, resource = r.resource, ns = ns)
+        format!("/apis/{group}/{version}/namespaces/{ns}/{resource}?",
+            group = r.group, version = r.version, resource = r.resource, ns = ns)
     } else {
-        format!("/apis/{group}/v1/{resource}?",
-            group = r.group, resource = r.resource)
+        format!("/apis/{group}/{version}/{resource}?",
+            group = r.group, version = r.version, resource = r.resource)
     };
-
     let urlstr = url::form_urlencoded::Serializer::new(urlstr).finish();
     let mut req = http::Request::get(urlstr);
     req.body(vec![]).map_err(Error::from)
@@ -45,11 +46,11 @@ pub fn list_all_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8
 /// Should be used continuously
 pub fn watch_resource_entries_after(r: &ApiResource, ver: &str) -> Result<http::Request<Vec<u8>>> {
     let urlstr = if let Some(ns) = &r.namespace {
-        format!("/apis/{group}/v1/namespaces/{ns}/{resource}?",
-            group = r.group, resource = r.resource, ns = ns)
+        format!("/apis/{group}/{version}/namespaces/{ns}/{resource}?",
+            group = r.group, version = r.version, resource = r.resource, ns = ns)
     } else {
-        format!("/apis/{group}/v1/{resource}?",
-            group = r.group, resource = r.resource)
+        format!("/apis/{group}/{version}/{resource}?",
+            group = r.group, version = r.version, resource = r.resource)
     };
     let mut qp = url::form_urlencoded::Serializer::new(urlstr);
 
