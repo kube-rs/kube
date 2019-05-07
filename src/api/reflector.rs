@@ -138,9 +138,7 @@ fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Ca
     debug!("Got {} {} at resourceVersion={}", res.items.len(), rg.resource, version);
 
     for i in res.items {
-        // deployment for instance has status field outside .spec
-        // .spec isn't general enough - only works for CRDs
-        // also not every metadata has names
+        // The non-generic parts we care about are spec + status
         data.insert(i.metadata.name, (i.spec, i.status));
     }
     let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
