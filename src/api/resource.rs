@@ -6,12 +6,42 @@ use serde::{Deserialize};
 use crate::{Result, Error};
 use std::collections::BTreeMap;
 
-//pub enum Resource {
-//    Deployment,
-//    Crd(String)
-//}
+/// Convenience converter into ApiResource
+///
+/// Allows people to not have to fill in all the fields of ApiResource manually.
+/// Normally people just want the standard case with v1 urls and default prefixes.
+/// The optional arg is always the namespace.
+///
+/// CustomResource purposefully ignored from this list.
+pub enum ResourceType {
+    Nodes,
+    Deploys(Option<String>),
+}
+impl Into<ApiResource> for ResourceType {
+    fn into(self) -> ApiResource {
+        match self {
+            ResourceType::Nodes => ApiResource {
+                group: "".into(),
+                resource: "nodes".into(),
+                version: "v1".into(),
+                namespace: None,
+                prefix: "api".into()
+            },
+            ResourceType::Deploys(ns) => ApiResource {
+                group: "apps".into(),
+                resource: "deployments".into(),
+                version: "v1".into(),
+                namespace: ns,
+                prefix: "apis".into(),
+            }
+        }
+
+    }
+}
 
 /// Simplified resource representation
+///
+/// Used to construct the url for watch functions
 #[derive(Clone, Debug)]
 pub struct ApiResource {
     /// API Resource name
@@ -22,20 +52,42 @@ pub struct ApiResource {
     pub namespace: Option<String>,
     /// API version of the resource
     pub version: String,
+    /// Name of the api prefix (api or apis typically)
+    pub prefix: String,
+}
+
+impl Default for ApiResource {
+    fn default() -> Self {
+        Self {
+            resource: "pods".into(), // had to pick something here
+            namespace: None,
+            group: "".into(),
+            version: "v1".into(),
+            prefix: "apis".into(), // seems most common
+        }
+    }
+}
+impl ToString for ApiResource {
+    fn to_string(&self) -> String {
+        let pref = if self.prefix == "" { "".into() } else { format!("{}/", self.prefix) };
+        let g = if self.group == "" { "".into() } else { format!("{}/", self.group) };
+        let v = if self.version == "" { "".into() } else { format!("{}/", self.version) };
+        let n = if let Some(ns) = &self.namespace { format!("namespaces/{}/", ns) } else { "".into() };
+        format!("/{prefix}{group}{version}{namespaces}{resource}?",
+            prefix = pref,
+            group = g,
+            version = v,
+            namespaces = n,
+            resource = self.resource,
+        )
+    }
 }
 
 /// Create a list request for a Resource
 ///
 /// Useful to fully re-fetch the state.
 pub fn list_all_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
-    let urlstr = if let Some(ns) = &r.namespace {
-        format!("/apis/{group}/{version}/namespaces/{ns}/{resource}?",
-            group = r.group, version = r.version, resource = r.resource, ns = ns)
-    } else {
-        format!("/apis/{group}/{version}/{resource}?",
-            group = r.group, version = r.version, resource = r.resource)
-    };
-    let urlstr = url::form_urlencoded::Serializer::new(urlstr).finish();
+    let urlstr = url::form_urlencoded::Serializer::new(r.to_string()).finish();
     let mut req = http::Request::get(urlstr);
     req.body(vec![]).map_err(Error::from)
 }
@@ -45,14 +97,7 @@ pub fn list_all_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8
 ///
 /// Should be used continuously
 pub fn watch_resource_entries_after(r: &ApiResource, ver: &str) -> Result<http::Request<Vec<u8>>> {
-    let urlstr = if let Some(ns) = &r.namespace {
-        format!("/apis/{group}/{version}/namespaces/{ns}/{resource}?",
-            group = r.group, version = r.version, resource = r.resource, ns = ns)
-    } else {
-        format!("/apis/{group}/{version}/{resource}?",
-            group = r.group, version = r.version, resource = r.resource)
-    };
-    let mut qp = url::form_urlencoded::Serializer::new(urlstr);
+    let mut qp = url::form_urlencoded::Serializer::new(r.to_string());
 
     qp.append_pair("timeoutSeconds", "10");
     qp.append_pair("watch", "true");
@@ -124,9 +169,9 @@ pub struct Resource<T, U> where
     pub status: U,
 }
 
-/// Empty struct used as U when status is not present
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Discard {}
+
+/// Empty struct for U when status is not present
+pub type Discard = Option<()>;
 
 /// Basic Metadata struct
 ///

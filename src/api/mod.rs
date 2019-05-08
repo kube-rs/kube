@@ -5,11 +5,12 @@ pub use self::reflector::{
   ReflectorStatus,
   ResourceMap,
   ResourceSpecMap,
-  ResourceStatusMap
+  ResourceStatusMap,
 };
 
 mod resource;
 pub use self::resource::{
   ApiResource,
+  ResourceType,
   ApiError,
 };
