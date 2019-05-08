@@ -19,6 +19,7 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
+    // This example requires `kubectl apply -f examples/foo.yaml` run first
     let resource = ApiResource {
         group: "clux.dev".into(),
         resource: "foos".into(),
