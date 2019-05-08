@@ -1,8 +1,13 @@
 language: rust
-
 rust:
   - stable
-
 script:
   - cargo build
   - cargo test -v
+notifications:
+  email:
+    on_success: change
+    on_failure: always
+branches:
+  only:
+    - master
