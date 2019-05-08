@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 /// The optional arg is always the namespace.
 ///
 /// CustomResource purposefully ignored from this list.
+#[derive(Debug, Clone)]
 pub enum ResourceType {
     Nodes,
     Deploys(Option<String>),
