@@ -1,6 +1,7 @@
 0.4.0 / UNRELEASED
 ==================
   * ResourceMap now contains the full Resource<T,U> struct rather than a tuple as the value. => `value.metadata` is available in the cache.
+  * Reflectors now also cache `events` to allow apps to handle them
 
 0.3.0 / 2019-05-09
 ==================

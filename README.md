@@ -75,4 +75,7 @@ fn reconcile(c: &APIClient, evs: WatchEvents<PodSpec, PodStatus>) -> Result<(), 
 }
 ```
 
-Note that once you have called `.events()` the events are removed from the internal state.
+Note that once you have called `.events()` the events are considered handled, and are removed from the internal state.
+
+## License
+Apache 2.0 licensed. See LICENSE for details.
