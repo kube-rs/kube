@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 pub enum ResourceType {
     Nodes,
     Deploys(Option<String>),
+    Pods(Option<String>),
 }
 impl Into<ApiResource> for ResourceType {
     fn into(self) -> ApiResource {
@@ -34,7 +35,14 @@ impl Into<ApiResource> for ResourceType {
                 version: "v1".into(),
                 namespace: ns,
                 prefix: "apis".into(),
-            }
+            },
+            ResourceType::Pods(ns) => ApiResource {
+                group: "".into(),
+                resource: "pods".into(),
+                version: "v1".into(),
+                namespace: ns,
+                prefix: "api".into(),
+            },
         }
 
     }
