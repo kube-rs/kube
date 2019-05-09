@@ -14,9 +14,11 @@ See the [examples directory](./examples) for how to watch over resources in a si
 See [controller-rs](https://github.com/clux/controller-rs) for a full example with [actix](https://actix.rs/).
 
 ## Reflector
-The biggest abstraction exposed in this client is `Reflector<T, U>`. This is a struct with the internal behaviour for watching kube resources, and updating internal state.
+The biggest abstraction exposed in this client is `Reflector<T, U>`. This is effectively a cache of a resource that's meant to "reflect the state in etcd".
 
-Ideally, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
+It handles the api mechanics for watching kube resources, tracking resourceVersions, and maintaining an internal cache map.
+
+To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
@@ -44,7 +46,7 @@ The reflector itself is responsible for acquiring the write lock and update the 
 ### Informers
 The simplest abstraction exposed from this client. This is a struct with the internal behaviour for watching kube resources, but keeps no internal state except the `resourceVersion`.
 
-You tell it what type parameters `T`  (a `Spec` struct) and `U` (a `Status` struct) correspond to, which again, can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
+You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};

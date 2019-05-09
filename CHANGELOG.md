@@ -1,4 +1,9 @@
-0.4.0 / UNRELEASED
+0.5.0 / 2019-05-09
+==================
+  * `Informer` struct to handle event
+  * Reflectors no longer cache `events` - see #6
+
+0.4.0 / 2019-05-09
 ==================
   * ResourceMap now contains the full Resource<T,U> struct rather than a tuple as the value. => `value.metadata` is available in the cache.
   * Reflectors now also cache `events` to allow apps to handle them

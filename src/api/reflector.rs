@@ -19,12 +19,12 @@ use std::{
 
 /// A rust reinterpretation of of client-go's Reflector
 ///
-/// This is meant to watch and cache a resource T, by:
-/// - allowing polling in the correct kube api way
+/// This watches and caches a `Resource<T, U>` by:
+/// - seeding the cache from a large initial list call
+/// - keeping track of initial, and subsequent resourceVersions
 /// - recovering when resourceVersions get desynced
 ///
 /// It exposes it's internal state readably through a getter.
-/// As such, a Reflector can be shared with actix-web as application state.
 #[derive(Clone)]
 pub struct Reflector<T, U> where
   T: Clone, U: Clone
@@ -65,7 +65,6 @@ impl<T, U> Reflector<T, U> where
     /// If this returns an error, it tries a full refresh.
     /// This is meant to be run continually in a thread. Spawn one.
     pub fn poll(&self) -> Result<()> {
-        use std::thread;
         trace!("Watching {:?}", self.resource);
         let old = self.data.read().unwrap().clone();
         match watch_for_resource_updates(&self.client, &self.resource, old) {
@@ -74,7 +73,7 @@ impl<T, U> Reflector<T, U> where
             },
             Err(_e) => {
                 // If desynched due to mismatching resourceVersion, retry in a bit
-                thread::sleep(Duration::from_secs(10));
+                std::thread::sleep(Duration::from_secs(10));
                 self.refresh()?; // propagate error if this failed..
             }
         }
@@ -151,9 +150,8 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
     let req = watch_resource_entries_after(&rg, &c.version)?;
     let res = client.request_events::<WatchEvent<Resource<T, U>>>(req)?;
 
-    // NB: events appear ordered, so the last one IS the max
-    // We could parse the resourceVersion as uint and take the MAX for safety
-    // but the api docs say not to rely on the format of resourceVersion anyway..
+    // Follow docs conventions and store the last resourceVersion
+    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
     for ev in res {
         match ev {
             WatchEvent::Added(o) => {
@@ -185,6 +183,5 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
             }
         }
     }
-    //debug!("Updated: {}", found.join(", "));
     Ok(c) // updated in place (taken ownership)
 }

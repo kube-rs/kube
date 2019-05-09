@@ -18,12 +18,13 @@ use std::{
 
 /// A rust reinterpretation of go's Informer
 ///
-/// This is meant to watch and cache a resource T, by:
-/// - allowing polling in the correct kube api way
+/// This watches a `Resource<T, U>`, by:
+/// - seeding the intial resourceVersion with a list call
+/// - keeping track of resourceVersions after every poll
 /// - recovering when resourceVersions get desynced
 ///
-/// It exposes it's internal state readably through a getter.
-/// As such, a Informer can be shared with actix-web as application state.
+/// It contains no internal state except the `resourceVersion`,
+/// and exposes only `WatchEvents` when you call `.poll()`.
 #[derive(Clone)]
 pub struct Informer<T, U> where
   T: Clone, U: Clone
@@ -62,8 +63,9 @@ impl<T, U> Informer<T, U> where
 
     /// Run a single watch poll
     ///
-    /// If this returns an error, it tries a full refresh.
-    /// This is meant to be run continually in a thread. Spawn one.
+    /// If this returns an error, it resets the resourceVersion.
+    /// This is meant to be run continually and events are meant to be handled between.
+    /// If handling all the events is too time consuming, you probably need a queue.
     pub fn poll(&self) -> Result<WatchEvents<T, U>> {
         trace!("Watching {:?}", self.resource);
         let oldver = { self.version.read().unwrap().clone() }; // avoid holding lock
@@ -74,7 +76,11 @@ impl<T, U> Informer<T, U> where
             },
             Err(e) => {
                 warn!("Poll error: {:?}", e);
-                *self.version.write().unwrap() = "0".into(); // reset ver if failed
+                // If desynched due to mismatching resourceVersion, retry in a bit
+                std::thread::sleep(std::time::Duration::from_secs(10));
+                // Fetch a new initial version:
+                let initial = get_resource_version(&self.client, &self.resource)?;
+                *self.version.write().unwrap() = initial;
                 vec![]
             }
         };
@@ -113,7 +119,8 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, ver: &
     let events = client.request_events::<WatchEvent<Resource<T, U>>>(req)?;
     debug!("Got {} events for {}", events.len(), rg.resource);
 
-    // find last resourceVer and pass that on to avoid fetching duplicate events:
+    // Follow docs conventions and store the last resourceVersion
+    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
     let newver = events.iter().filter_map(|e| {
         match e {
             WatchEvent::Added(o) => o.metadata.resourceVersion.clone(),
