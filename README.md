@@ -6,18 +6,17 @@
 
 Rust client for [Kubernetes](http://kubernetes.io) API forking [ynqa/kubernetes-rust](https://github.com/ynqa/kubernetes-rust).
 
-This version has more error handling and a `Reflector` for easy caching of CRD state. It aims to cater to the more common operator case, but allows you sticking in dependencies like [k8s-openapi](https://github.com/Arnavion/k8s-openapi) for accurate struct representations.
+This version has more error handling and a `Reflector` for easy caching of CRD state. It aims to cater to the more common controller case, but allows you sticking in dependencies like [k8s-openapi](https://github.com/Arnavion/k8s-openapi) for accurate struct representations.
 
 ## Examples
 See the [examples directory](./examples) for how to watch over resources in a simplistic way.
 
-See [operator-rs](https://github.com/clux/operator-rs) for a full example with [actix](https://actix.rs/).
-
+See [controller-rs](https://github.com/clux/controller-rs) for a full example with [actix](https://actix.rs/).
 
 ## Reflector
-The one exposed abstraction in this client is `Reflector<T,U>`. This is a struct with the internal behaviour for watching for events, and updating internal state.
+The main abstraction exposed in this client is `Reflector<T, U>`. This is a struct with the internal behaviour for watching kube resources, and updating internal state.
 
-Ideally, you just feed in `T` and `U` as some type of `Spec` struct and some type of `Status` struct.
+Ideally, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
@@ -55,8 +54,8 @@ you can use the exposed events however you wish:
 ```rust
 fn reconcile(c: &APIClient, evs: WatchEvents<PodSpec, PodStatus>) -> Result<(), failure::Error> {
     for ev in &evs {
-           match ev {
-            // TODO: do other kube api calls with client here...
+        // Use the kube api client here..
+        match ev {
             WatchEvent::Added(o) => {
                 println!("Handling Added in {}", o.metadata.name);
             },

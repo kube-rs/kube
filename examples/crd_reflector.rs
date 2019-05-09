@@ -1,5 +1,3 @@
-extern crate failure;
-extern crate kube;
 #[macro_use] extern crate serde_derive;
 
 use kube::{
@@ -30,7 +28,7 @@ fn main() -> Result<(), failure::Error> {
     let rf : Reflector<FooResource> = Reflector::new(client, resource)?;
 
     // rf is initialized with full state, which can be extracted on demand.
-    // Output is Map of name -> (FooResource, _)
+    // Output is Map of name -> ResourceSpec<Foo>
     rf.read()?.into_iter().for_each(|(name, crd)| {
         println!("Found foo {}: {}", name, crd.spec.info);
     });

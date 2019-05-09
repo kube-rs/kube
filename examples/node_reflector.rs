@@ -1,15 +1,8 @@
-extern crate failure;
-extern crate k8s_openapi;
-extern crate kube;
-
 use kube::{
     api::{ResourceType, Reflector},
     client::APIClient,
     config,
 };
-
-// You can fill in the parts of the structs you want
-// but for full info, you probably want k8s_openapi
 use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 
 fn main() -> Result<(), failure::Error> {
@@ -20,7 +13,7 @@ fn main() -> Result<(), failure::Error> {
     let rf : Reflector<NodeSpec, NodeStatus> = Reflector::new(client, resource.into())?;
 
     // rf is initialized with full state, which can be extracted on demand.
-    // Output is Map of name -> (NodeSpec, NodeStatus)
+    // Output is Map of name -> Node
     rf.read()?.into_iter().for_each(|(name, n)| {
         println!("Found node {} ({:?}) running {:?} with labels: {:?}",
             name, n.spec.provider_id.unwrap(),

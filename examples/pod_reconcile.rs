@@ -1,13 +1,8 @@
-extern crate failure;
-extern crate k8s_openapi;
-extern crate kube;
-
 use kube::{
     api::{ResourceType, Reflector, WatchEvents, WatchEvent},
     client::APIClient,
     config,
 };
-
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 
 fn main() -> Result<(), failure::Error> {
@@ -30,22 +25,24 @@ fn main() -> Result<(), failure::Error> {
     loop {
         std::thread::sleep(std::time::Duration::from_secs(10));
         rf.poll()?;
-        let pods = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
-        println!("Current pods: {:?}", pods);
 
-        // After polling, handle the events:
+        // After polling, handle the events
         let events = rf.events()?;
         reconcile(&client, events)?;
+
+        // Can also print internal state
+        let pods = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
+        println!("Current pods: {:?}", pods);
     }
 }
 
 // This function lets the app handle an events from kube watch as they occur
 // Once this function has been completed, the events are gone from the reflector's state.
-fn reconcile(_client: &APIClient, events: WatchEvents<PodSpec, PodStatus>) -> Result<(), failure::Error> {
+fn reconcile(_c: &APIClient, events: WatchEvents<PodSpec, PodStatus>) -> Result<(), failure::Error> {
     for ev in &events {
         println!("Got {:?}", ev);
+        // TODO: Use the kube api client here..
         match ev {
-            // TODO: do other kube api calls with client here...
             WatchEvent::Added(o) => {
                 println!("Handling Added in {}", o.metadata.name);
             },
