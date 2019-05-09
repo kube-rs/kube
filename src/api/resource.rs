@@ -126,7 +126,7 @@ pub fn watch_resource_entries_after(r: &ApiResource, ver: &str) -> Result<http::
 ///
 /// This can be parsed into as a fallback in various places
 /// `WatchEvents` has a particularly egregious use of it.
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ApiError {
     pub status: String,
     #[serde(default)]
@@ -139,7 +139,7 @@ pub struct ApiError {
 /// Events from a watch query
 ///
 /// Should expect a one of these per line from `watch_resource_entries_after`
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<T> where
   T: Clone
@@ -167,7 +167,7 @@ impl<T> Debug for WatchEvent<T> where
 ///
 /// Expected to be used by `ResourceList` and `WatchEvent`
 /// Because it's experimental, it's not exposed outside the crate.
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Resource<T, U> where
   T: Clone, U: Clone
 {
@@ -186,7 +186,7 @@ pub struct Resource<T, U> where
 ///
 /// It's a simplified version of:
 /// `[k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html)`
-#[derive(Deserialize, Clone, Default)]
+#[derive(Deserialize, Serialize, Clone, Default)]
 pub struct Metadata {
     #[serde(default)]
     pub name: String,
