@@ -180,12 +180,13 @@ pub struct Resource<T, U> where
 /// `[k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html)`
 #[derive(Deserialize, Clone, Default)]
 pub struct Metadata {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[serde(default)]
     pub name: String,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub annotations: BTreeMap<String, String>,
-    // TODO: generation?
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[serde(default)]
     pub resourceVersion: String,
 }
 
