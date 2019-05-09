@@ -101,6 +101,18 @@ pub fn list_all_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8
     req.body(vec![]).map_err(Error::from)
 }
 
+/// Create a list request fetching zero Resources
+///
+/// Useful to get an initial resourceVersion
+pub fn list_zero_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
+    let mut qp = url::form_urlencoded::Serializer::new(r.to_string());
+    qp.append_pair("limit", "1"); // can't have 0..
+    let urlstr = qp.finish();
+    let mut req = http::Request::get(urlstr);
+    req.body(vec![]).map_err(Error::from)
+}
+
+
 
 /// Create watch request for a ApiResource at a given resourceVer
 ///
@@ -194,8 +206,8 @@ pub struct Metadata {
     pub labels: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub annotations: BTreeMap<String, String>,
-    #[serde(default)]
-    pub resourceVersion: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resourceVersion: Option<String>,
 }
 
 /// Basic Resource List

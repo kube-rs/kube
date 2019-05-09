@@ -6,11 +6,10 @@ use crate::api::resource::{
     WatchEvent,
     ApiResource,
 };
-use log::{info, warn, debug, trace};
 use serde::de::DeserializeOwned;
 
 use crate::client::APIClient;
-use crate::{Result};
+use crate::Result;
 
 use std::{
     collections::BTreeMap,
@@ -18,7 +17,7 @@ use std::{
     time::{Duration},
 };
 
-/// A rust rewrite of client-go's Reflector
+/// A rust reinterpretation of of client-go's Reflector
 ///
 /// This is meant to watch and cache a resource T, by:
 /// - allowing polling in the correct kube api way
@@ -36,12 +35,6 @@ pub struct Reflector<T, U> where
     /// Users are meant to start a thread to poll, and maybe ask for a refresh.
     /// Beyond that, use the read call as a local cache.
     data: Arc<RwLock<Cache<T, U>>>,
-
-    /// Event state for app reconciliation
-    ///
-    /// Write events gets bunched up in here until the app asks for them,
-    /// at which point this vector is emptied.
-    events: Arc<RwLock<WatchEvents<T, U>>>,
 
     /// Kubernetes API Client
     client: APIClient,
@@ -64,7 +57,6 @@ impl<T, U> Reflector<T, U> where
             client,
             resource: r,
             data: Arc::new(RwLock::new(current)),
-            events: Arc::new(RwLock::new(vec![])),
         })
     }
 
@@ -77,9 +69,8 @@ impl<T, U> Reflector<T, U> where
         trace!("Watching {:?}", self.resource);
         let old = self.data.read().unwrap().clone();
         match watch_for_resource_updates(&self.client, &self.resource, old) {
-            Ok((res, mut events)) => {
+            Ok(res) => {
                 *self.data.write().unwrap() = res;
-                self.events.write().unwrap().append(&mut events);
             },
             Err(_e) => {
                 // If desynched due to mismatching resourceVersion, retry in a bit
@@ -104,16 +95,6 @@ impl<T, U> Reflector<T, U> where
         Ok(data)
     }
 
-    /// Return raw events to be handled by the app
-    ///
-    /// This reads and return the events queue, then empties it
-    pub fn events(&self) -> Result<WatchEvents<T, U>> {
-        let data = self.events.read().unwrap();
-        self.events.write().unwrap().clear();
-        Ok(data.to_vec())
-
-    }
-
     /// Refresh the full resource state with a LIST call
     ///
     /// Same as what is done in `State::new`.
@@ -124,9 +105,6 @@ impl<T, U> Reflector<T, U> where
         Ok(())
     }
 }
-
-/// Convenience alias around WatchEvents
-pub type WatchEvents<T, U> = Vec<WatchEvent<Resource<T, U>>>;
 
 /// Convenience aliases when only grabbing one of the fields
 pub type ReflectorSpec<T> = Reflector<T, Option<()>>;
@@ -153,8 +131,8 @@ fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Ca
     // NB: Resource isn't general enough here
     let res = client.request::<ResourceList<Resource<T, U>>>(req)?;
     let mut data = BTreeMap::new();
-    let version = res.metadata.resourceVersion;
-    debug!("Got {} {} at resourceVersion={}", res.items.len(), rg.resource, version);
+    let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
+    debug!("Got {} {} at resourceVersion={:?}", res.items.len(), rg.resource, version);
 
     for i in res.items {
         // The non-generic parts we care about are spec + status
@@ -166,7 +144,7 @@ fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Ca
 }
 
 fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c: Cache<T, U>)
-    -> Result<(Cache<T, U>, Vec<WatchEvent<Resource<T, U>>>)> where
+    -> Result< Cache<T, U> > where
   T: Clone + DeserializeOwned,
   U: Clone + DeserializeOwned,
 {
@@ -176,32 +154,29 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
     // NB: events appear ordered, so the last one IS the max
     // We could parse the resourceVersion as uint and take the MAX for safety
     // but the api docs say not to rely on the format of resourceVersion anyway..
-    let mut events = vec![];
     for ev in res {
-        trace!("Got {:?}", ev);
-        events.push(ev.clone());
         match ev {
             WatchEvent::Added(o) => {
                 info!("Adding {} to {}", o.metadata.name, rg.resource);
                 c.data.entry(o.metadata.name.clone())
                     .or_insert_with(|| o.clone());
-                if o.metadata.resourceVersion != "" {
-                  c.version = o.metadata.resourceVersion.clone();
+                if let Some(v) = o.metadata.resourceVersion {
+                  c.version = v;
                 }
             },
             WatchEvent::Modified(o) => {
                 info!("Modifying {} in {}", o.metadata.name, rg.resource);
                 c.data.entry(o.metadata.name.clone())
                     .and_modify(|e| *e = o.clone());
-                if o.metadata.resourceVersion != "" {
-                  c.version = o.metadata.resourceVersion.clone();
+                if let Some(v) = o.metadata.resourceVersion {
+                  c.version = v;
                 }
             },
             WatchEvent::Deleted(o) => {
                 info!("Removing {} from {}", o.metadata.name, rg.resource);
                 c.data.remove(&o.metadata.name);
-                if o.metadata.resourceVersion != "" {
-                  c.version = o.metadata.resourceVersion.clone();
+                if let Some(v) = o.metadata.resourceVersion {
+                  c.version = v;
                 }
             }
             WatchEvent::Error(e) => {
@@ -211,5 +186,5 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
         }
     }
     //debug!("Updated: {}", found.join(", "));
-    Ok((c, events)) // updated in place (taken ownership)
+    Ok(c) // updated in place (taken ownership)
 }

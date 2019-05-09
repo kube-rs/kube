@@ -44,6 +44,7 @@ impl APIClient {
                 return Err(Error::from(format_err!("Invalid method: {}", other)));
             }
         }.body(body);
+        trace!("{} {}", parts.method, uri_str);
         Ok(req.send()?)
     }
 
@@ -57,10 +58,10 @@ impl APIClient {
             let text = res.text()?;
             // Print better debug when things do fail
             if let Ok(errdata) = serde_json::from_str::<ApiError>(&text) {
-                println!("Unsuccessful: {:?}", errdata);
+                warn!("Unsuccessful: {:?}", errdata);
             } else {
                 // In case some parts of ApiError for some reason don't exist..
-                println!("Unsuccessful data: {}", text);
+                warn!("Unsuccessful data: {}", text);
             }
             // Propagate errors properly via reqwest
             let e = res.error_for_status().unwrap_err();
@@ -69,7 +70,7 @@ impl APIClient {
             // Should be able to coerce result into T at this point
             let text = res.text()?;
             serde_json::from_str(&text).map_err(|e| {
-                println!("{}", text);
+                warn!("{}", text);
                 Error::from(e)
             })
         }
@@ -84,10 +85,10 @@ impl APIClient {
             let text = res.text()?;
             // Print better debug when things do fail
             if let Ok(errdata) = serde_json::from_str::<ApiError>(&text) {
-                println!("Unsuccessful: {:?}", errdata);
+                warn!("Unsuccessful: {:?}", errdata);
             } else {
                 // In case some parts of ApiError for some reason don't exist..
-                println!("Unsuccessful data: {}", text);
+                warn!("Unsuccessful data: {}", text);
             }
             // Propagate errors properly via reqwest
             let e = res.error_for_status().unwrap_err();
@@ -98,7 +99,7 @@ impl APIClient {
             let text = res.text()?;
             for l in text.lines() {
                 let r = serde_json::from_str(&l).map_err(|e| {
-                    println!("{}", l);
+                    warn!("{}", l);
                     Error::from(e)
                 })?;
                 xs.push(r);

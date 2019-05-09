@@ -6,6 +6,13 @@ pub use self::reflector::{
     ResourceMap,
     ResourceSpecMap,
     ResourceStatusMap,
+};
+
+mod informer;
+pub use self::informer::{
+    Informer,
+    InformerSpec,
+    InformerStatus,
     WatchEvents,
 };
 

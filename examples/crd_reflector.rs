@@ -1,3 +1,4 @@
+#[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 
 use kube::{
@@ -14,6 +15,8 @@ pub struct FooResource {
 }
 
 fn main() -> Result<(), failure::Error> {
+    std::env::set_var("RUST_LOG", "info,kube=trace");
+    env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
@@ -27,17 +30,15 @@ fn main() -> Result<(), failure::Error> {
     };
     let rf : Reflector<FooResource> = Reflector::new(client, resource)?;
 
-    // rf is initialized with full state, which can be extracted on demand.
-    // Output is Map of name -> ResourceSpec<Foo>
-    rf.read()?.into_iter().for_each(|(name, crd)| {
-        println!("Found foo {}: {}", name, crd.spec.info);
-    });
-
-    // r needs to have `r.poll()?` called continuosly to keep state up to date:
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(10));
+        // Update internal state by calling watch (blocks):
         rf.poll()?;
-        let deploys = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
-        println!("Current foos: {:?}", deploys);
+
+        // Read updated internal state (instant):
+        rf.read()?.into_iter().for_each(|(name, crd)| {
+            info!("foo {}: {}", name, crd.spec.info);
+        });
+
+        std::thread::sleep(std::time::Duration::from_secs(10));
     }
 }

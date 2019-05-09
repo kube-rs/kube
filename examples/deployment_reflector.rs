@@ -1,3 +1,4 @@
+#[macro_use] extern crate log;
 use kube::{
     api::{ResourceType, Reflector},
     client::APIClient,
@@ -6,6 +7,8 @@ use kube::{
 use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStatus};
 
 fn main() -> Result<(), failure::Error> {
+    std::env::set_var("RUST_LOG", "info,kube=trace");
+    env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
@@ -15,7 +18,7 @@ fn main() -> Result<(), failure::Error> {
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Deployment
     rf.read()?.into_iter().for_each(|(name, d)| {
-        println!("Found deployment for {} - {} replicas running {:?}",
+        info!("Found deployment for {} - {} replicas running {:?}",
             name, d.status.replicas.unwrap(),
             d.spec.template.spec.unwrap().containers
                 .into_iter().map(|c| c.image.unwrap()).collect::<Vec<_>>()
@@ -27,6 +30,6 @@ fn main() -> Result<(), failure::Error> {
         std::thread::sleep(std::time::Duration::from_secs(10));
         rf.poll()?;
         let deploys = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
-        println!("Current deploys: {:?}", deploys);
+        info!("Current deploys: {:?}", deploys);
     }
 }

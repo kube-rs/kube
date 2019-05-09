@@ -1,0 +1,7 @@
+apiVersion: clux.dev/v1
+kind: Foo
+metadata:
+  name: qux
+spec:
+  name: qux
+  info: this is qux
