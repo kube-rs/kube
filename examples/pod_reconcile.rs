@@ -54,7 +54,7 @@ fn reconcile(_client: &APIClient, events: WatchEvents<PodSpec, PodStatus>) -> Re
             },
             WatchEvent::Deleted(o) => {
                 println!("Handling Deleted Pod in {}", o.metadata.name);
-            }
+            },
             WatchEvent::Error(e) => {
                 println!("Error event: {:?}", e); // ought to refresh here
             }
