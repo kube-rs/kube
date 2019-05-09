@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.4.0"
+version = "0.5.0"
 description = "Opinionated Kubernetes client with reflectors"
 authors = [
   "clux <sszynrae@gmail.com>",

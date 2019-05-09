@@ -1,6 +1,6 @@
 0.5.0 / 2019-05-09
 ==================
-  * `Informer` struct to handle event
+  * added `Informer` struct dedicated to handling events
   * Reflectors no longer cache `events` - see #6
 
 0.4.0 / 2019-05-09
