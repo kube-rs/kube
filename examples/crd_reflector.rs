@@ -31,8 +31,8 @@ fn main() -> Result<(), failure::Error> {
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> (FooResource, _)
-    rf.read()?.into_iter().for_each(|(name, (spec, _))| {
-        println!("Found foo {}: {}", name, spec.info);
+    rf.read()?.into_iter().for_each(|(name, crd)| {
+        println!("Found foo {}: {}", name, crd.spec.info);
     });
 
     // r needs to have `r.poll()?` called continuosly to keep state up to date:

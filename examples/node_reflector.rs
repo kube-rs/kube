@@ -21,10 +21,10 @@ fn main() -> Result<(), failure::Error> {
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> (NodeSpec, NodeStatus)
-    rf.read()?.into_iter().for_each(|(name, (spec, status))| {
+    rf.read()?.into_iter().for_each(|(name, n)| {
         println!("Found node {} ({:?}) running {:?}",
-            name, spec.provider_id.unwrap(),
-            status.conditions.unwrap(),
+            name, n.spec.provider_id.unwrap(),
+            n.status.conditions.unwrap(),
         );
     });
 

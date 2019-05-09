@@ -5,7 +5,6 @@ use crate::api::resource::{
     Resource,
     WatchEvent,
     ApiResource,
-    Discard,
 };
 use log::{info, warn, debug, trace};
 use serde::de::DeserializeOwned;
@@ -109,22 +108,21 @@ impl<T, U> Reflector<T, U> where
 }
 
 /// Convenience aliases when only grabbing one of the fields
-pub type ReflectorSpec<T> = Reflector<T, Discard>;
-pub type ReflectorStatus<U> = Reflector<Discard, U>;
+pub type ReflectorSpec<T> = Reflector<T, Option<()>>;
+pub type ReflectorStatus<U> = Reflector<Option<()>, U>;
 
 /// Public Resource Map typically exposed by the Reflector
-pub type ResourceMap<T, U> = BTreeMap<String, (T, U)>;
-pub type ResourceSpecMap<T> = BTreeMap<String, (T, Discard)>;
-pub type ResourceStatusMap<U> = BTreeMap<String, (Discard, U)>;
+pub type ResourceMap<T, U> = BTreeMap<String, Resource<T,U>>;
+pub type ResourceSpecMap<T> = BTreeMap<String, Resource<T, Option<()>>>;
+pub type ResourceStatusMap<U> = BTreeMap<String, Resource<Option<()>, U>>;
 
 /// Cache state used by a Reflector
 #[derive(Default, Clone)]
-struct Cache<T, U> {
+struct Cache<T, U> where U: Clone, T: Clone {
     pub data: ResourceMap<T, U>,
     /// Current resourceVersion used for bookkeeping
     version: String,
 }
-
 
 fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T, U>> where
   T: Clone + DeserializeOwned,
@@ -139,7 +137,7 @@ fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Ca
 
     for i in res.items {
         // The non-generic parts we care about are spec + status
-        data.insert(i.metadata.name, (i.spec, i.status));
+        data.insert(i.metadata.name.clone(), i);
     }
     let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
     debug!("Initialized with: {}", keys);
@@ -163,7 +161,7 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
             WatchEvent::Added(o) => {
                 info!("Adding {} to {}", o.metadata.name, rg.resource);
                 c.data.entry(o.metadata.name.clone())
-                    .or_insert_with(|| (o.spec.clone(), o.status.clone()));
+                    .or_insert_with(|| o.clone());
                 if o.metadata.resourceVersion != "" {
                   c.version = o.metadata.resourceVersion.clone();
                 }
@@ -171,7 +169,7 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
             WatchEvent::Modified(o) => {
                 info!("Modifying {} in {}", o.metadata.name, rg.resource);
                 c.data.entry(o.metadata.name.clone())
-                    .and_modify(|e| *e = (o.spec.clone(), o.status.clone()));
+                    .and_modify(|e| *e = o.clone());
                 if o.metadata.resourceVersion != "" {
                   c.version = o.metadata.resourceVersion.clone();
                 }

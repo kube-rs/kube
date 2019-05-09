@@ -21,10 +21,10 @@ fn main() -> Result<(), failure::Error> {
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> (DeploymentSpec, DeploymentStatus)
-    rf.read()?.into_iter().for_each(|(name, (spec, status))| {
+    rf.read()?.into_iter().for_each(|(name, d)| {
         println!("Found deployment for {} - {} replicas running {:?}",
-            name, status.replicas.unwrap(),
-            spec.template.spec.unwrap().containers
+            name, d.status.replicas.unwrap(),
+            d.spec.template.spec.unwrap().containers
                 .into_iter().map(|c| c.image.unwrap()).collect::<Vec<_>>()
         );
     });

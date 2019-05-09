@@ -171,9 +171,6 @@ pub struct Resource<T, U> where
 }
 
 
-/// Empty struct for U when status is not present
-pub type Discard = Option<()>;
-
 /// Basic Metadata struct
 ///
 /// Only parses a few fields relevant to a reflector.
