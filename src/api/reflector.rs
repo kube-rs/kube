@@ -37,6 +37,12 @@ pub struct Reflector<T, U> where
     /// Beyond that, use the read call as a local cache.
     data: Arc<RwLock<Cache<T, U>>>,
 
+    /// Event state for app reconciliation
+    ///
+    /// Write events gets bunched up in here until the app asks for them,
+    /// at which point this vector is emptied.
+    events: Arc<RwLock<WatchEvents<T, U>>>,
+
     /// Kubernetes API Client
     client: APIClient,
 
@@ -58,6 +64,7 @@ impl<T, U> Reflector<T, U> where
             client,
             resource: r,
             data: Arc::new(RwLock::new(current)),
+            events: Arc::new(RwLock::new(vec![])),
         })
     }
 
@@ -70,8 +77,9 @@ impl<T, U> Reflector<T, U> where
         trace!("Watching {:?}", self.resource);
         let old = self.data.read().unwrap().clone();
         match watch_for_resource_updates(&self.client, &self.resource, old) {
-            Ok(res) => {
+            Ok((res, mut events)) => {
                 *self.data.write().unwrap() = res;
+                self.events.write().unwrap().append(&mut events);
             },
             Err(_e) => {
                 // If desynched due to mismatching resourceVersion, retry in a bit
@@ -96,6 +104,16 @@ impl<T, U> Reflector<T, U> where
         Ok(data)
     }
 
+    /// Return raw events to be handled by the app
+    ///
+    /// This reads and return the events queue, then empties it
+    pub fn events(&self) -> Result<WatchEvents<T, U>> {
+        let data = self.events.read().unwrap();
+        self.events.write().unwrap().clear();
+        Ok(data.to_vec())
+
+    }
+
     /// Refresh the full resource state with a LIST call
     ///
     /// Same as what is done in `State::new`.
@@ -106,6 +124,9 @@ impl<T, U> Reflector<T, U> where
         Ok(())
     }
 }
+
+/// Convenience alias around WatchEvents
+pub type WatchEvents<T, U> = Vec<WatchEvent<Resource<T, U>>>;
 
 /// Convenience aliases when only grabbing one of the fields
 pub type ReflectorSpec<T> = Reflector<T, Option<()>>;
@@ -145,7 +166,7 @@ fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Ca
 }
 
 fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c: Cache<T, U>)
-    -> Result<Cache<T, U>> where
+    -> Result<(Cache<T, U>, Vec<WatchEvent<Resource<T, U>>>)> where
   T: Clone + DeserializeOwned,
   U: Clone + DeserializeOwned,
 {
@@ -155,8 +176,10 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
     // NB: events appear ordered, so the last one IS the max
     // We could parse the resourceVersion as uint and take the MAX for safety
     // but the api docs say not to rely on the format of resourceVersion anyway..
+    let mut events = vec![];
     for ev in res {
         trace!("Got {:?}", ev);
+        events.push(ev.clone());
         match ev {
             WatchEvent::Added(o) => {
                 info!("Adding {} to {}", o.metadata.name, rg.resource);
@@ -188,5 +211,5 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
         }
     }
     //debug!("Updated: {}", found.join(", "));
-    Ok(c) // updated in place (taken ownership)
+    Ok((c, events)) // updated in place (taken ownership)
 }

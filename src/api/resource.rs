@@ -118,7 +118,7 @@ pub fn watch_resource_entries_after(r: &ApiResource, ver: &str) -> Result<http::
 ///
 /// This can be parsed into as a fallback in various places
 /// `WatchEvents` has a particularly egregious use of it.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ApiError {
     pub status: String,
     #[serde(default)]
@@ -131,7 +131,7 @@ pub struct ApiError {
 /// Events from a watch query
 ///
 /// Should expect a one of these per line from `watch_resource_entries_after`
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<T> where
   T: Clone
