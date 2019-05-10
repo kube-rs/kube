@@ -1,3 +1,4 @@
+//! A basic API client with standard kube error handling
 
 use failure::Error;
 use http;

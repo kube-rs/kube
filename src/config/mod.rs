@@ -1,3 +1,5 @@
+//! In cluster or out of cluster kubeconfig to be used by an api client
+
 mod apis;
 mod incluster_config;
 mod kube_config;

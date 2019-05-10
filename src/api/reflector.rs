@@ -1,6 +1,4 @@
 use crate::api::resource::{
-    list_all_resource_entries,
-    watch_resource_entries_after,
     ResourceList,
     Resource,
     WatchEvent,
@@ -105,14 +103,18 @@ impl<T, U> Reflector<T, U> where
     }
 }
 
-/// Convenience aliases when only grabbing one of the fields
-pub type ReflectorSpec<T> = Reflector<T, Option<()>>;
-pub type ReflectorStatus<U> = Reflector<Option<()>, U>;
-
-/// Public Resource Map typically exposed by the Reflector
+/// Resource map exposed by the Reflector from its cache
 pub type ResourceMap<T, U> = BTreeMap<String, Resource<T,U>>;
+
+/// Resource map exposed by a ReflectorSpec (when there's no Status)
 pub type ResourceSpecMap<T> = BTreeMap<String, Resource<T, Option<()>>>;
+/// Resource map exposed by a ReflectorStatus (when there's no Spec)
 pub type ResourceStatusMap<U> = BTreeMap<String, Resource<Option<()>, U>>;
+
+/// Reflector around a Spec object only (blank Status)
+pub type ReflectorSpec<T> = Reflector<T, Option<()>>;
+/// Reflector around a Status object only (blank Spec)
+pub type ReflectorStatus<U> = Reflector<Option<()>, U>;
 
 /// Cache state used by a Reflector
 #[derive(Default, Clone)]
@@ -126,7 +128,7 @@ fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Ca
   T: Clone + DeserializeOwned,
   U: Clone + DeserializeOwned,
 {
-    let req = list_all_resource_entries(&rg)?;
+    let req = rg.list_all_resource_entries()?;
     // NB: Resource isn't general enough here
     let res = client.request::<ResourceList<Resource<T, U>>>(req)?;
     let mut data = BTreeMap::new();
@@ -147,7 +149,7 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
   T: Clone + DeserializeOwned,
   U: Clone + DeserializeOwned,
 {
-    let req = watch_resource_entries_after(&rg, &c.version)?;
+    let req = rg.watch_resource_entries_after(&c.version)?;
     let res = client.request_events::<WatchEvent<Resource<T, U>>>(req)?;
 
     // Follow docs conventions and store the last resourceVersion

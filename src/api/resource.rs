@@ -3,8 +3,10 @@
 use std::fmt::Debug;
 use serde::{Deserialize};
 
+use crate::api::metadata::{
+    Metadata,
+};
 use crate::{Result, Error};
-use std::collections::BTreeMap;
 
 /// Convenience converter into ApiResource
 ///
@@ -48,9 +50,11 @@ impl Into<ApiResource> for ResourceType {
     }
 }
 
-/// Simplified resource representation
+// -------------------------------------------------------
+
+/// Resource representation from an API perspective
 ///
-/// Used to construct the url for watch functions
+/// Used to construct the url for rest api calls.
 #[derive(Clone, Debug)]
 pub struct ApiResource {
     /// API Resource name
@@ -92,52 +96,45 @@ impl ToString for ApiResource {
     }
 }
 
-/// Create a list request for a Resource
-///
-/// Useful to fully re-fetch the state.
-pub fn list_all_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
-    let urlstr = url::form_urlencoded::Serializer::new(r.to_string()).finish();
-    let mut req = http::Request::get(urlstr);
-    req.body(vec![]).map_err(Error::from)
-}
+impl ApiResource {
+    /// Create a list request to fully re-fetch the state
+    pub fn list_all_resource_entries(&self) -> Result<http::Request<Vec<u8>>> {
+        let urlstr = url::form_urlencoded::Serializer::new(self.to_string()).finish();
+        let mut req = http::Request::get(urlstr);
+        req.body(vec![]).map_err(Error::from)
+    }
 
-/// Create a list request fetching zero Resources
-///
-/// Useful to get an initial resourceVersion
-pub fn list_zero_resource_entries(r: &ApiResource) -> Result<http::Request<Vec<u8>>> {
-    let mut qp = url::form_urlencoded::Serializer::new(r.to_string());
-    qp.append_pair("limit", "1"); // can't have 0..
-    let urlstr = qp.finish();
-    let mut req = http::Request::get(urlstr);
-    req.body(vec![]).map_err(Error::from)
-}
+    /// Create a minimial list request to seed an initial resourceVersion
+    pub fn list_zero_resource_entries(&self) -> Result<http::Request<Vec<u8>>> {
+        let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
+        qp.append_pair("limit", "1"); // can't have 0..
+        let urlstr = qp.finish();
+        let mut req = http::Request::get(urlstr);
+        req.body(vec![]).map_err(Error::from)
+    }
 
+    /// Create watch request for a ApiResource at a given version
+    pub fn watch_resource_entries_after(&self, ver: &str) -> Result<http::Request<Vec<u8>>> {
+        let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
 
+        qp.append_pair("timeoutSeconds", "10");
+        qp.append_pair("watch", "true");
+        qp.append_pair("resourceVersion", ver);
 
-/// Create watch request for a ApiResource at a given resourceVer
-///
-/// Should be used continuously
-pub fn watch_resource_entries_after(r: &ApiResource, ver: &str) -> Result<http::Request<Vec<u8>>> {
-    let mut qp = url::form_urlencoded::Serializer::new(r.to_string());
-
-    qp.append_pair("timeoutSeconds", "10");
-    qp.append_pair("watch", "true");
-    qp.append_pair("resourceVersion", ver);
-
-    let urlstr = qp.finish();
-    let mut req = http::Request::get(urlstr);
-    req.body(vec![]).map_err(Error::from)
+        let urlstr = qp.finish();
+        let mut req = http::Request::get(urlstr);
+        req.body(vec![]).map_err(Error::from)
+    }
 }
 
 
 
 // -------------------------------------------------------
-// structs + trait relevant to reflector
 
 /// ApiError for when things fail
 ///
-/// This can be parsed into as a fallback in various places
-/// `WatchEvents` has a particularly egregious use of it.
+/// This can be parsed into as an error handling fallback. Needed for `WatchEvent`;
+/// It's quite commont to get a `410 Gone` when the resourceVersion is too old.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ApiError {
     pub status: String,
@@ -148,9 +145,9 @@ pub struct ApiError {
     code: u16,
 }
 
-/// Events from a watch query
+/// A raw event returned from a watch query
 ///
-/// Should expect a one of these per line from `watch_resource_entries_after`
+/// Note that a watch query returns many of these as newline separated json.
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<T> where
@@ -175,53 +172,80 @@ impl<T> Debug for WatchEvent<T> where
     }
 }
 
-/// Resource wrapper that cares about status
+// -------------------------------------------------------
+
+/// A generic kubernetes resource
 ///
-/// Expected to be used by `ResourceList` and `WatchEvent`
-/// Because it's experimental, it's not exposed outside the crate.
+/// This is used instead of a full struct for `Deployment`, `Pod`, `Node`, `CRD`, ...
+/// Kubernetes' API generally exposes core structs in this manner, but sometimes the
+/// status, `U`, is not always present, and is occasionally passed as `Option<()>`.
+///
+/// The reasons we use this wrapper rather than the actual structs are:
+/// - generic requirements on fields (need metadata) is impossible
+/// - you cannot implement traits for objects you don't own => no addon traits to k8s-openapi
+///
+/// Thankfully, this generic setup works regardless, and the user is generally
+/// unaware of the deception. Now it does require the user to pass explicit an Spec
+/// and Status structs, which is slightly awkward.
+///
+/// This struct appears in `ResourceList` and `WatchEvent`, and when using a `Reflector`,
+/// it is exposed as the value of the `ResourceMap` to make it seem like a normal resouce object.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Resource<T, U> where
   T: Clone, U: Clone
 {
+    /// The version of the API
+    ///
+    /// Marked optional because it's not always present for items in a `ResourceList`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub apiVersion: Option<String>,
+
+    /// The name of the API
+    ///
+    /// Marked optional because it's not always present for items in a `ResourceList`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
+
+    /// Resource metadata
+    ///
+    /// Contains information common to most resources about the Resource,
+    /// including the object name, annotations, labels and more.
     pub metadata: Metadata,
+
+    /// The Spec struct of a resource. I.e. `PodSpec`, `DeploymentSpec`, etc.
+    ///
+    /// This defines the desired state of the Resource as specified by the user.
     pub spec: T,
+
+    /// The Status of a resource. I.e. `PotStatus`, `DeploymentStatus`, etc.
+    ///
+    /// This publishes the state of the Resource as observed by the controller.
+    /// Internally passed as `Option<()>` when a status does not exist.
     pub status: U,
 }
 
 
-/// Basic Metadata struct
+/// A generic kubernetes resource list
 ///
-/// Only parses a few fields relevant to a reflector.
-/// Because it's experimental, it's not exposed outside the crate.
+/// This is used instead of a full struct for `DeploymentList`, `PodList`, etc.
+/// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
 ///
-/// It's a simplified version of:
-/// `[k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html)`
-#[derive(Deserialize, Serialize, Clone, Default)]
-pub struct Metadata {
-    #[serde(default)]
-    pub name: String,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub labels: BTreeMap<String, String>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub annotations: BTreeMap<String, String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resourceVersion: Option<String>,
-}
-
-/// Basic Resource List
+/// Note that this is only used internally within reflectors and informers,
+/// and is generally produced from list queries on an `ApiResource`.
 ///
-/// Expected to be returned by a query from `list_all_resource_entries`
-/// Because it's experimental, it's not exposed outside the crate.
-///
-/// It can generally be used in place of DeploymentList, NodeList, etc
-/// because [they all tend to have these fields](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
+/// It should not be exposed outside this crate
 #[derive(Deserialize)]
 pub struct ResourceList<T> where
   T: Clone
 {
+    // NB: kind and apiVersion can be set here, but no need for it atm
+
+    /// ListMeta - only really used for its resourceVersion
+    ///
+    /// See [ListMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ListMeta.html)
     pub metadata: Metadata,
+
+    /// The items we are actually interested in. In practice; T:= Resource<T,U>.
     #[serde(bound(deserialize = "Vec<T>: Deserialize<'de>"))]
     pub items: Vec<T>,
 }

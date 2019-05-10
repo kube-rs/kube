@@ -1,6 +1,4 @@
 use crate::api::resource::{
-    watch_resource_entries_after,
-    list_zero_resource_entries,
     Resource,
     ResourceList,
     WatchEvent,
@@ -49,7 +47,7 @@ impl<T, U> Informer<T, U> where
 {
     /// Create a reflector with a kube client on a kube resource
     ///
-    /// Initializes with blank version string to get all events
+    /// Initializes resourceVersion with a 1 limit list call
     pub fn new(client: APIClient, r: ApiResource) -> Result<Self> {
         info!("Creating Informer for {:?}", r);
         let initial = get_resource_version(&client, &r)?;
@@ -61,6 +59,19 @@ impl<T, U> Informer<T, U> where
         })
     }
 
+    /// Create a reflector with a kube client on a kube resource
+    ///
+    /// Initializes resourceVersion from a passed in value
+    pub fn from_version(client: APIClient, r: ApiResource, v: String) -> Result<Self> {
+        info!("Creating Informer for {:?}", r);
+        Ok(Informer {
+            client,
+            resource: r,
+            version: Arc::new(RwLock::new(v)),
+            p1: PhantomData, p2: PhantomData,
+        })
+    }
+
     /// Run a single watch poll
     ///
     /// If this returns an error, it resets the resourceVersion.
@@ -68,7 +79,7 @@ impl<T, U> Informer<T, U> where
     /// If handling all the events is too time consuming, you probably need a queue.
     pub fn poll(&self) -> Result<WatchEvents<T, U>> {
         trace!("Watching {:?}", self.resource);
-        let oldver = { self.version.read().unwrap().clone() }; // avoid holding lock
+        let oldver = self.version();
         let evs = match watch_for_resource_updates(&self.client, &self.resource, &oldver) {
             Ok((events, newver)) => {
                 *self.version.write().unwrap() = newver;
@@ -86,18 +97,24 @@ impl<T, U> Informer<T, U> where
         };
         Ok(evs)
     }
+
+    /// Return the current version
+    pub fn version(&self) -> String {
+        self.version.read().unwrap().clone()
+    }
 }
 
 /// Convenience alias around WatchEvents
 pub type WatchEvents<T, U> = Vec<WatchEvent<Resource<T, U>>>;
 
-/// Convenience aliases when only grabbing one of the fields
+/// Informer around a Spec object only (blank Status)
 pub type InformerSpec<T> = Informer<T, Option<()>>;
+/// Informer around a Status object only (blank Spec)
 pub type InformerStatus<U> = Informer<Option<()>, U>;
 
 fn get_resource_version(client: &APIClient, rg: &ApiResource) -> Result<String>
 {
-    let req = list_zero_resource_entries(&rg)?;
+    let req = rg.list_zero_resource_entries()?;
 
     // parse to void a ResourceList into void except for Metadata
     #[derive(Clone, Deserialize)]
@@ -115,7 +132,7 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, ver: &
   T: Clone + DeserializeOwned,
   U: Clone + DeserializeOwned,
 {
-    let req = watch_resource_entries_after(&rg, ver)?;
+    let req = rg.watch_resource_entries_after(ver)?;
     let events = client.request_events::<WatchEvent<Resource<T, U>>>(req)?;
     debug!("Got {} events for {}", events.len(), rg.resource);
 

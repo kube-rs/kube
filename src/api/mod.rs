@@ -1,3 +1,5 @@
+//! API helpers to make use of k8s-openapi easier
+
 mod reflector;
 pub use self::reflector::{
     Reflector,
@@ -18,8 +20,15 @@ pub use self::informer::{
 
 mod resource;
 pub use self::resource::{
+    Resource,
     ApiResource,
     ResourceType,
-    ApiError,
     WatchEvent,
+    ApiError,
+};
+
+mod metadata;
+pub use self::metadata::{
+    Metadata,
+    Initializers,
 };

@@ -1,3 +1,9 @@
+0.6.0 / UNRELEASED
+==================
+  * Expose getter `Informer::version`
+  * Exose ctor `Informer::from_version`
+  * Expose more attributes in `Metadata`
+
 0.5.0 / 2019-05-09
 ==================
   * added `Informer` struct dedicated to handling events

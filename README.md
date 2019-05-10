@@ -1,4 +1,4 @@
-# kube
+# kube-rs
 [![Build Status](https://travis-ci.org/clux/kube-rs.svg?branch=master)](https://travis-ci.org/clux/kube-rs)
 [![Client Capabilities](https://img.shields.io/badge/Kubernetes%20client-Silver-blue.svg?style=plastic&colorB=C0C0C0&colorA=306CE8)](http://bit.ly/kubernetes-client-capabilities-badge)
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-alpha-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
@@ -66,9 +66,9 @@ reconcile(&client, events)?; // pass them on somewhere
 How you handle them is up to you, you could build your own `Reflector`, or you can do more controllery logic. Here's how such a function would look:
 
 ```rust
-fn reconcile(_c: &APIClient, events: WatchEvents<PodSpec, PodStatus>) -> Result<(), failure::Error> {
+fn reconcile(c: &APIClient, events: WatchEvents<PodSpec, PodStatus>) -> Result<(), failure::Error> {
     for ev in events {
-        // TODO: Use the kube api client here..
+        // use the kube api client here..
         match ev {
             WatchEvent::Added(o) => {
                 let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
