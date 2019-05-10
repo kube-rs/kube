@@ -3,7 +3,6 @@
 [![Client Capabilities](https://img.shields.io/badge/Kubernetes%20client-Silver-blue.svg?style=plastic&colorB=C0C0C0&colorA=306CE8)](http://bit.ly/kubernetes-client-capabilities-badge)
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-alpha-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
-[![Released API docs](https://docs.rs/kube/badge.svg)](https://docs.rs/kube)
 
 Rust client for [Kubernetes](http://kubernetes.io) with reinterpretations of the `Reflector` and `Informer` abstractions from the go client.
 
@@ -13,6 +12,8 @@ This client thus aims cater to the more common controller/operator case, but all
 See the [examples directory](./examples) for how to watch over resources in a simplistic way.
 
 See [controller-rs](https://github.com/clux/controller-rs) for a full example with [actix](https://actix.rs/).
+
+**[API Docs](https://clux.github.io/kube-rs/kube/)**
 
 ## Reflector
 The biggest abstraction exposed in this client is `Reflector<T, U>`. This is effectively a cache of a resource that's meant to "reflect the state in etcd".

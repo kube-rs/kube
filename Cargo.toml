@@ -7,7 +7,7 @@ authors = [
   "ynqa <un.pensiero.vano@gmail.com>",
 ]
 license-file = "LICENSE"
-repository = "https://github.com/clux/kubernetes-rust"
+repository = "https://github.com/clux/kube-rs"
 readme = "README.md"
 keywords = ["kubernetes"]
 categories = ["web-programming::http-client"]
