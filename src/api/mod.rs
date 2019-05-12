@@ -1,21 +1,17 @@
 //! API helpers to make use of k8s-openapi easier
 
+/// Shortcut type for discarding one type parameter option
+pub type Void = Option<()>;
+
 mod reflector;
 pub use self::reflector::{
-    Reflector,
-    ReflectorSpec,
-    ReflectorStatus,
     ResourceMap,
-    ResourceSpecMap,
-    ResourceStatusMap,
+    Reflector,
 };
 
 mod informer;
 pub use self::informer::{
     Informer,
-    InformerSpec,
-    InformerStatus,
-    WatchEvents,
 };
 
 mod resource;

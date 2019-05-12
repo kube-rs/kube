@@ -27,17 +27,8 @@ use std::{
 pub struct Reflector<T, U> where
   T: Clone, U: Clone
 {
-    /// Application state can be read continuously with read
-    ///
-    /// Write access to this data is entirely encapsulated within poll + refresh
-    /// Users are meant to start a thread to poll, and maybe ask for a refresh.
-    /// Beyond that, use the read call as a local cache.
     data: Arc<RwLock<Cache<T, U>>>,
-
-    /// Kubernetes API Client
     client: APIClient,
-
-    /// Api Resource this Reflector is responsible for
     resource: ApiResource,
 }
 
@@ -72,7 +63,7 @@ impl<T, U> Reflector<T, U> where
             Err(_e) => {
                 // If desynched due to mismatching resourceVersion, retry in a bit
                 std::thread::sleep(Duration::from_secs(10));
-                self.refresh()?; // propagate error if this failed..
+                self.reset()?; // propagate error if this failed..
             }
         }
 
@@ -92,10 +83,10 @@ impl<T, U> Reflector<T, U> where
         Ok(data)
     }
 
-    /// Refresh the full resource state with a LIST call
+    /// Reset the state with a full LIST call
     ///
     /// Same as what is done in `State::new`.
-    pub fn refresh(&self) -> Result<()> {
+    pub fn reset(&self) -> Result<()> {
         debug!("Refreshing {:?}", self.resource);
         let current : Cache<T, U> = get_resource_entries(&self.client, &self.resource)?;
         *self.data.write().unwrap() = current;
@@ -105,16 +96,6 @@ impl<T, U> Reflector<T, U> where
 
 /// Resource map exposed by the Reflector from its cache
 pub type ResourceMap<T, U> = BTreeMap<String, Resource<T,U>>;
-
-/// Resource map exposed by a ReflectorSpec (when there's no Status)
-pub type ResourceSpecMap<T> = BTreeMap<String, Resource<T, Option<()>>>;
-/// Resource map exposed by a ReflectorStatus (when there's no Spec)
-pub type ResourceStatusMap<U> = BTreeMap<String, Resource<Option<()>, U>>;
-
-/// Reflector around a Spec object only (blank Status)
-pub type ReflectorSpec<T> = Reflector<T, Option<()>>;
-/// Reflector around a Status object only (blank Spec)
-pub type ReflectorStatus<U> = Reflector<Option<()>, U>;
 
 /// Cache state used by a Reflector
 #[derive(Default, Clone)]
@@ -133,14 +114,14 @@ fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Ca
     let res = client.request::<ResourceList<Resource<T, U>>>(req)?;
     let mut data = BTreeMap::new();
     let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
-    debug!("Got {} {} at resourceVersion={:?}", res.items.len(), rg.resource, version);
 
+    debug!("Got {} {} at resourceVersion={:?}", res.items.len(), rg.resource, version);
     for i in res.items {
         // The non-generic parts we care about are spec + status
         data.insert(i.metadata.name.clone(), i);
     }
     let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
-    debug!("Initialized with: {}", keys);
+    trace!("Initialized with: {}", keys);
     Ok(Cache { data, version })
 }
 
@@ -150,7 +131,7 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c:
   U: Clone + DeserializeOwned,
 {
     let req = rg.watch_resource_entries_after(&c.version)?;
-    let res = client.request_events::<WatchEvent<Resource<T, U>>>(req)?;
+    let res = client.request_events::<WatchEvent<T, U>>(req)?;
 
     // Follow docs conventions and store the last resourceVersion
     // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes

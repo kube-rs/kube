@@ -27,7 +27,6 @@ fn main() -> Result<(), failure::Error> {
 
     // r needs to have `r.poll()?` called continuosly to keep state up to date:
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(10));
         rf.poll()?;
         let deploys = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
         info!("Current nodes: {:?}", deploys);

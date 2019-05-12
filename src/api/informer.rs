@@ -1,5 +1,4 @@
 use crate::api::resource::{
-    Resource,
     ResourceList,
     WatchEvent,
     ApiResource,
@@ -8,11 +7,12 @@ use crate::client::APIClient;
 use crate::{Result};
 
 use serde::de::DeserializeOwned;
-
 use std::{
-    marker::PhantomData,
+    collections::VecDeque,
     sync::{Arc, RwLock},
 };
+
+type WatchQueue<T, U> = VecDeque<WatchEvent<T, U>>;
 
 /// A rust reinterpretation of go's Informer
 ///
@@ -21,24 +21,16 @@ use std::{
 /// - keeping track of resourceVersions after every poll
 /// - recovering when resourceVersions get desynced
 ///
-/// It contains no internal state except the `resourceVersion`,
+/// Caches WatchEvents internally
 /// and exposes only `WatchEvents` when you call `.poll()`.
 #[derive(Clone)]
 pub struct Informer<T, U> where
   T: Clone, U: Clone
 {
-    /// Current resourceVersion used for bookkeeping
+    events: Arc<RwLock<WatchQueue<T, U>>>,
     version: Arc<RwLock<String>>,
-
-    /// Kubernetes API Client
     client: APIClient,
-
-    /// Api Resource this Informer is responsible for
     resource: ApiResource,
-
-    // Informers never actually store any of T or U, they just pass them on.
-    p1: PhantomData<T>,
-    p2: PhantomData<U>,
 }
 
 impl<T, U> Informer<T, U> where
@@ -54,8 +46,8 @@ impl<T, U> Informer<T, U> where
         Ok(Informer {
             client,
             resource: r,
+            events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(initial)),
-            p1: PhantomData, p2: PhantomData,
         })
     }
 
@@ -67,8 +59,8 @@ impl<T, U> Informer<T, U> where
         Ok(Informer {
             client,
             resource: r,
+            events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(v)),
-            p1: PhantomData, p2: PhantomData,
         })
     }
 
@@ -77,25 +69,38 @@ impl<T, U> Informer<T, U> where
     /// If this returns an error, it resets the resourceVersion.
     /// This is meant to be run continually and events are meant to be handled between.
     /// If handling all the events is too time consuming, you probably need a queue.
-    pub fn poll(&self) -> Result<WatchEvents<T, U>> {
+    pub fn poll(&self) -> Result<()> {
         trace!("Watching {:?}", self.resource);
         let oldver = self.version();
-        let evs = match watch_for_resource_updates(&self.client, &self.resource, &oldver) {
+        match watch_for_resource_updates(&self.client, &self.resource, &oldver) {
             Ok((events, newver)) => {
                 *self.version.write().unwrap() = newver;
-                events
+                for e in events {
+                    self.events.write().unwrap().push_back(e);
+                }
             },
             Err(e) => {
                 warn!("Poll error: {:?}", e);
                 // If desynched due to mismatching resourceVersion, retry in a bit
                 std::thread::sleep(std::time::Duration::from_secs(10));
-                // Fetch a new initial version:
-                let initial = get_resource_version(&self.client, &self.resource)?;
-                *self.version.write().unwrap() = initial;
-                vec![]
+                self.reset()?;
             }
         };
-        Ok(evs)
+        Ok(())
+    }
+
+    /// Pop an event from the front of the WatchQueue
+    pub fn pop(&self) -> Option<WatchEvent<T, U>> {
+        self.events.write().unwrap().pop_front()
+    }
+
+    /// Reset the resourceVersion to current and clear the event queue
+    pub fn reset(&self) -> Result<()> {
+        // Fetch a new initial version:
+        let initial = get_resource_version(&self.client, &self.resource)?;
+        *self.version.write().unwrap() = initial;
+        self.events.write().unwrap().clear();
+        Ok(())
     }
 
     /// Return the current version
@@ -103,14 +108,6 @@ impl<T, U> Informer<T, U> where
         self.version.read().unwrap().clone()
     }
 }
-
-/// Convenience alias around WatchEvents
-pub type WatchEvents<T, U> = Vec<WatchEvent<Resource<T, U>>>;
-
-/// Informer around a Spec object only (blank Status)
-pub type InformerSpec<T> = Informer<T, Option<()>>;
-/// Informer around a Status object only (blank Spec)
-pub type InformerStatus<U> = Informer<Option<()>, U>;
 
 fn get_resource_version(client: &APIClient, rg: &ApiResource) -> Result<String>
 {
@@ -128,13 +125,12 @@ fn get_resource_version(client: &APIClient, rg: &ApiResource) -> Result<String>
 
 
 fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, ver: &str)
-    -> Result<(Vec<WatchEvent<Resource<T, U>>>, String)> where
+    -> Result<(Vec<WatchEvent<T, U>>, String)> where
   T: Clone + DeserializeOwned,
   U: Clone + DeserializeOwned,
 {
     let req = rg.watch_resource_entries_after(ver)?;
-    let events = client.request_events::<WatchEvent<Resource<T, U>>>(req)?;
-    debug!("Got {} events for {}", events.len(), rg.resource);
+    let events = client.request_events::<WatchEvent<T, U>>(req)?;
 
     // Follow docs conventions and store the last resourceVersion
     // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
@@ -146,7 +142,7 @@ fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, ver: &
             _ => None
         }
     }).last().unwrap_or_else(|| ver.into());
-    debug!("New resourceVersion for {} is {}", rg.resource, newver);
+    debug!("Got {} {} events, resourceVersion={}", events.len(), rg.resource, newver);
 
     Ok((events, newver))
 }

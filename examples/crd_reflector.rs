@@ -2,7 +2,7 @@
 #[macro_use] extern crate serde_derive;
 
 use kube::{
-    api::{ApiResource, ReflectorSpec as Reflector},
+    api::{ApiResource, Reflector, Void},
     client::APIClient,
     config,
 };
@@ -28,7 +28,7 @@ fn main() -> Result<(), failure::Error> {
         namespace: Some("kube-system".into()),
         ..Default::default()
     };
-    let rf : Reflector<FooResource> = Reflector::new(client, resource)?;
+    let rf : Reflector<FooResource, Void> = Reflector::new(client, resource)?;
 
     loop {
         // Update internal state by calling watch (blocks):
@@ -38,7 +38,5 @@ fn main() -> Result<(), failure::Error> {
         rf.read()?.into_iter().for_each(|(name, crd)| {
             info!("foo {}: {}", name, crd.spec.info);
         });
-
-        std::thread::sleep(std::time::Duration::from_secs(10));
     }
 }

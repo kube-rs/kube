@@ -1,8 +1,20 @@
-0.6.0 / UNRELEASED
+0.6.0 / 2019-05-12
 ==================
   * Expose getter `Informer::version`
   * Exose ctor `Informer::from_version`
   * Expose more attributes in `Metadata`
+  * `Informer::reset` convenience method added
+  * `Informer::poll` no longer returns events straight
+  * an `Informer` now caches `WatchEvent` elements into an internal queue
+  * `Informer::pop` pops a single element from its internal queue
+  * `Reflector::refresh` renamed to `Reflector::reset` (matches `Informer`)
+  * `Void` type added so we can use `Reflector<ActualSpec, Void>`
+    - removes need for Spec/Status structs:
+    - `ReflectorSpec`, `ReflectorStatus` removed
+    - `InformerSpec`, `InformerStatus` removed
+    - `ResourceSpecMap`, `ResourceStatusMap` removed
+  * `WatchEvents` removed
+  * `WatchEvent` exposed, and now wraps `Resource<T, U>``
 
 0.5.0 / 2019-05-09
 ==================

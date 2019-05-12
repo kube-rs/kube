@@ -26,7 +26,6 @@ fn main() -> Result<(), failure::Error> {
     // Here we both poll and reconcile based on events from the main thread
     // If you run this next to actix-web (say), spawn a thread and pass `rf` as app state
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(10));
         rf.poll()?;
 
         // Can also print internal state

@@ -16,9 +16,9 @@ See [controller-rs](https://github.com/clux/controller-rs) for a full example wi
 **[API Docs](https://clux.github.io/kube-rs/kube/)**
 
 ## Reflector
-The biggest abstraction exposed in this client is `Reflector<T, U>`. This is effectively a cache of a resource that's meant to "reflect the state in etcd".
+The biggest abstraction exposed in this client is `Reflector<T, U>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
 
-It handles the api mechanics for watching kube resources, tracking resourceVersions, and maintaining an internal cache map.
+It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
 
 To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
@@ -46,7 +46,7 @@ rf.read()?.into_iter().for_each(|(name, p)| {
 The reflector itself is responsible for acquiring the write lock and update the state as long as you call `poll()` periodically.
 
 ### Informers
-The simplest abstraction exposed from this client. This is a struct with the internal behaviour for watching kube resources, but keeps no internal state except the `resourceVersion`.
+The simplest abstraction exposed from this client. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with `resourceVersion`.
 
 You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
@@ -56,34 +56,35 @@ let resource = ResourceType::Pods(Some("kube-system".into()));
 let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())?;
 ```
 
-The main difference with `Reflector<T, U>` is that the only exposed function is `.poll()` and it returns `WatchEvents` that you are meant to handle yourself:
+The main difference with `Reflector<T, U>` is that after calling `.poll()` you must drain the events and reconcile them yourself:
 
 ```rust
-let events = inf.poll()?;
-reconcile(&client, events)?; // pass them on somewhere
+inf.poll()?;
+
+while let Some(event) = inf.pop() {
+    reconcile(&client, event)?;
+}
 ```
 
 How you handle them is up to you, you could build your own `Reflector`, or you can do more controllery logic. Here's how such a function would look:
 
 ```rust
-fn reconcile(c: &APIClient, events: WatchEvents<PodSpec, PodStatus>) -> Result<(), failure::Error> {
-    for ev in events {
-        // use the kube api client here..
-        match ev {
-            WatchEvent::Added(o) => {
-                let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
-                info!("Added Pod: {} (containers={:?})", o.metadata.name, containers);
-            },
-            WatchEvent::Modified(o) => {
-                let phase = o.status.phase.unwrap();
-                info!("Modified Pod: {} (phase={})", o.metadata.name, phase);
-            },
-            WatchEvent::Deleted(o) => {
-                info!("Deleted Pod: {}", o.metadata.name);
-            },
-            WatchEvent::Error(e) => {
-                warn!("Error event: {:?}", e);
-            }
+fn reconcile(c: &APIClient, event: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
+    // use the kube api client here..
+    match ev {
+        WatchEvent::Added(o) => {
+            let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
+            info!("Added Pod: {} (containers={:?})", o.metadata.name, containers);
+        },
+        WatchEvent::Modified(o) => {
+            let phase = o.status.phase.unwrap();
+            info!("Modified Pod: {} (phase={})", o.metadata.name, phase);
+        },
+        WatchEvent::Deleted(o) => {
+            info!("Deleted Pod: {}", o.metadata.name);
+        },
+        WatchEvent::Error(e) => {
+            warn!("Error event: {:?}", e);
         }
     }
     Ok(())

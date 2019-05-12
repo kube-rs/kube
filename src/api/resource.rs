@@ -117,6 +117,8 @@ impl ApiResource {
     pub fn watch_resource_entries_after(&self, ver: &str) -> Result<http::Request<Vec<u8>>> {
         let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
 
+        // Note that the timeoutSeconds is a fixed number regardless of activity
+        // Set it to a sensible 10s for now. If less frequency is required, sleep.
         qp.append_pair("timeoutSeconds", "10");
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
@@ -150,17 +152,17 @@ pub struct ApiError {
 /// Note that a watch query returns many of these as newline separated json.
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
-pub enum WatchEvent<T> where
-  T: Clone
+pub enum WatchEvent<T, U> where
+  T: Clone, U: Clone
 {
-    Added(T),
-    Modified(T),
-    Deleted(T),
+    Added(Resource<T, U>),
+    Modified(Resource<T, U>),
+    Deleted(Resource<T, U>),
     Error(ApiError),
 }
 
-impl<T> Debug for WatchEvent<T> where
-   T: Clone
+impl<T, U> Debug for WatchEvent<T, U> where
+   T: Clone, U: Clone
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
