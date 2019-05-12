@@ -15,7 +15,7 @@ use std::{
     time::{Duration},
 };
 
-/// A rust reinterpretation of of client-go's Reflector
+/// A reflection of `Resource` state in kubernetes
 ///
 /// This watches and caches a `Resource<T, U>` by:
 /// - seeding the cache from a large initial list call

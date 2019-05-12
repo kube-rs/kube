@@ -14,15 +14,15 @@ use std::{
 
 type WatchQueue<T, U> = VecDeque<WatchEvent<T, U>>;
 
-/// A rust reinterpretation of go's Informer
+/// An event informer for a `Resource`
 ///
 /// This watches a `Resource<T, U>`, by:
-/// - seeding the intial resourceVersion with a list call
+/// - seeding the intial resourceVersion with a list call (optional)
 /// - keeping track of resourceVersions after every poll
 /// - recovering when resourceVersions get desynced
 ///
-/// Caches WatchEvents internally
-/// and exposes only `WatchEvents` when you call `.poll()`.
+/// It caches WatchEvent<T, U> internally in a queue when polling.
+/// A user should drain this queue periodically.
 #[derive(Clone)]
 pub struct Informer<T, U> where
   T: Clone, U: Clone
