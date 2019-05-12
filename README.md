@@ -6,7 +6,7 @@
 
 Rust client for [Kubernetes](http://kubernetes.io) with reinterpretations of the `Reflector` and `Informer` abstractions from the go client.
 
-This client thus aims cater to the more common controller/operator case, but allows you sticking in dependencies like [k8s-openapi](https://github.com/Arnavion/k8s-openapi) for accurate struct representations.
+This client aims cater to the more common controller/operator case, but allows you sticking in dependencies like [k8s-openapi](https://github.com/Arnavion/k8s-openapi) for accurate struct representations.
 
 ## Usage
 See the [examples directory](./examples) for how to watch over resources in a simplistic way.
@@ -16,7 +16,7 @@ See [controller-rs](https://github.com/clux/controller-rs) for a full example wi
 **[API Docs](https://clux.github.io/kube-rs/kube/)**
 
 ## Reflector
-The biggest abstraction exposed in this client is `Reflector<T, U>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
+One of the main abstractions exposed from `kube::api` is `Reflector<T, U>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
 
 It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
 
@@ -46,7 +46,7 @@ rf.read()?.into_iter().for_each(|(name, p)| {
 The reflector itself is responsible for acquiring the write lock and update the state as long as you call `poll()` periodically.
 
 ### Informers
-The simplest abstraction exposed from this client. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with `resourceVersion`.
+The other main abstraction from `kube::api` is `Informer<T, U>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with `resourceVersion`.
 
 You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
@@ -56,7 +56,7 @@ let resource = ResourceType::Pods(Some("kube-system".into()));
 let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())?;
 ```
 
-The main difference with `Reflector<T, U>` is that after calling `.poll()` you must drain the events and reconcile them yourself:
+The main feature of `Informer<T, U>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
 
 ```rust
 inf.poll()?;
@@ -66,7 +66,7 @@ while let Some(event) = inf.pop() {
 }
 ```
 
-How you handle them is up to you, you could build your own `Reflector`, or you can do more controllery logic. Here's how such a function would look:
+How you handle them is up to you, you could build your own state, you can call a kube client, or you can simply print events. Here's a sketch of how such a handler would look:
 
 ```rust
 fn reconcile(c: &APIClient, event: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
@@ -115,6 +115,9 @@ cargo run --example crd_reflector
 ```
 
 then you can `kubectl apply -f crd-baz.yaml -n kube-system`, or `kubectl delete -f crd-baz.yaml -n kube-system`, or `kubectl edit foos baz -n kube-system` to verify that the events are being picked up.
+
+## Timing
+All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, call `.poll()` less often.
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.
