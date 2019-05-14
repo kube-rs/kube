@@ -31,7 +31,7 @@ let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource
 then you can `poll()` the reflector, and `read()` to get the current cached state:
 
 ```rust
-rf.poll()?; // blocks and updates state
+rf.poll()?; // watches + updates state
 
 // read state and use it:
 rf.read()?.into_iter().for_each(|(name, p)| {
@@ -45,7 +45,7 @@ rf.read()?.into_iter().for_each(|(name, p)| {
 
 The reflector itself is responsible for acquiring the write lock and update the state as long as you call `poll()` periodically.
 
-### Informers
+## Informer
 The other main abstraction from `kube::api` is `Informer<T, U>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with `resourceVersion`.
 
 You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
@@ -59,7 +59,7 @@ let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.
 The main feature of `Informer<T, U>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
 
 ```rust
-inf.poll()?;
+inf.poll()?; // watches + queues events
 
 while let Some(event) = inf.pop() {
     reconcile(&client, event)?;
