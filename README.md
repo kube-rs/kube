@@ -91,7 +91,7 @@ fn reconcile(c: &APIClient, event: WatchEvent<PodSpec, PodStatus>) -> Result<(),
 }
 ```
 
-The [node_informer example]./examples/node_informer) has an example of using api calls from within event handlers.
+The [node_informer example](./examples/node_informer) has an example of using api calls from within event handlers.
 
 ## Examples
 Examples that show a little common flows. These all have logging of this library set up to `trace`:
