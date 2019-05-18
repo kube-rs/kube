@@ -91,12 +91,16 @@ fn reconcile(c: &APIClient, event: WatchEvent<PodSpec, PodStatus>) -> Result<(),
 }
 ```
 
+The [node_informer example]./examples/node_informer) has an example of using api calls from within event handlers.
+
 ## Examples
 Examples that show a little common flows. These all have logging of this library set up to `trace`:
 
 ```sh
 # watch pod events in kube-system
 cargo run --example pod_informer
+# watch for broken nodes
+cargo run --example node_informer
 ```
 
 or for the reflectors:
