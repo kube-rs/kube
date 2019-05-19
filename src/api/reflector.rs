@@ -53,7 +53,7 @@ impl<T, U> Reflector<T, U> where
         }
     }
 
-    // builders for QueryParams - TODO: defer to internal informer in future
+    // builders for QueryParams - TODO: defer to internal informer in future?
     // for now, copy paste of informer's methods.
 
     /// Configure the timeout for the list/watch call.

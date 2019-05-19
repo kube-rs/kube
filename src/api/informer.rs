@@ -50,6 +50,8 @@ impl<T, U> Informer<T, U> where
         }
     }
 
+    // builders for QueryParams
+
     /// Configure the timeout for the list/watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
@@ -84,6 +86,7 @@ impl<T, U> Informer<T, U> where
         self
     }
 
+    // finalizers:
 
     /// Initialize without a prior version
     ///
