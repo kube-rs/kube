@@ -96,32 +96,68 @@ impl ToString for ApiResource {
     }
 }
 
+/// Common query parameters used in watch/list calls
+///
+/// Constructed internally with a builder on Informer and Reflector,
+/// but can be passed to the helper function of ApiResource.
+#[derive(Default, Clone)]
+pub struct QueryParams {
+    pub field_selector: Option<String>,
+    pub include_uninitialized: bool,
+    pub label_selector: Option<String>,
+    pub timeout: Option<u32>
+}
+
 impl ApiResource {
     /// Create a list request to fully re-fetch the state
-    pub fn list_all_resource_entries(&self) -> Result<http::Request<Vec<u8>>> {
-        let urlstr = url::form_urlencoded::Serializer::new(self.to_string()).finish();
+    pub fn list_all_resource_entries(&self, par: &QueryParams) -> Result<http::Request<Vec<u8>>> {
+        let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
+
+        if let Some(fields) = &par.field_selector {
+            qp.append_pair("fieldSelector", &fields);
+        }
+        if par.include_uninitialized {
+            qp.append_pair("includeUninitialized", "true");
+        }
+        if let Some(labels) = &par.label_selector {
+            qp.append_pair("labelSelector", &labels);
+        }
+
+        let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::from)
     }
 
     /// Create a minimial list request to seed an initial resourceVersion
-    pub fn list_zero_resource_entries(&self) -> Result<http::Request<Vec<u8>>> {
+    pub fn list_zero_resource_entries(&self, par: &QueryParams) -> Result<http::Request<Vec<u8>>> {
         let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
         qp.append_pair("limit", "1"); // can't have 0..
+        if par.include_uninitialized {
+            qp.append_pair("includeUninitialized", "true");
+        }
+        // rest of par doesn't matter here - we just need a resourceVersion
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::from)
     }
 
     /// Create watch request for a ApiResource at a given version
-    pub fn watch_resource_entries_after(&self, ver: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn watch_resource_entries_after(&self, par: &QueryParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
         let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
 
-        // Note that the timeoutSeconds is a fixed number regardless of activity
-        // Set it to a sensible 10s for now. If less frequency is required, sleep.
-        qp.append_pair("timeoutSeconds", "10");
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
+
+        qp.append_pair("timeoutSeconds", &par.timeout.unwrap_or(10).to_string());
+        if let Some(fields) = &par.field_selector {
+            qp.append_pair("fieldSelector", &fields);
+        }
+        if par.include_uninitialized {
+            qp.append_pair("includeUninitialized", "true");
+        }
+        if let Some(labels) = &par.label_selector {
+            qp.append_pair("labelSelector", &labels);
+        }
 
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);

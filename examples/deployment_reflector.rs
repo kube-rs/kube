@@ -13,7 +13,9 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     let resource = ResourceType::Deploys(Some("kube-system".into()));
-    let rf : Reflector<DeploymentSpec, DeploymentStatus> = Reflector::new(client, resource.into())?;
+    let rf : Reflector<DeploymentSpec, DeploymentStatus> =
+        Reflector::new(client, resource.into())
+        .init()?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Deployment

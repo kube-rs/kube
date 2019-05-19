@@ -13,7 +13,9 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     let resource = ResourceType::Nodes;
-    let rf : Reflector<NodeSpec, NodeStatus> = Reflector::new(client, resource.into())?;
+    let rf : Reflector<NodeSpec, NodeStatus> = Reflector::new(client, resource.into())
+        .labels("role=master")
+        .init()?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Node

@@ -28,7 +28,8 @@ fn main() -> Result<(), failure::Error> {
         namespace: Some("kube-system".into()),
         ..Default::default()
     };
-    let rf : Reflector<FooResource, Void> = Reflector::new(client, resource)?;
+    let rf : Reflector<FooResource, Void> = Reflector::new(client, resource)
+        .init()?;
 
     loop {
         // Update internal state by calling watch (blocks):

@@ -13,7 +13,8 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     let resource = ResourceType::Pods(Some("kube-system".into()));
-    let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource.into())?;
+    let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource.into())
+        .init()?;
 
     // Can read initial state now:
     rf.read()?.into_iter().for_each(|(name, p)| {

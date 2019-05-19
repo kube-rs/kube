@@ -15,7 +15,8 @@ fn main() -> Result<(), failure::Error> {
     let namespace = Some(env::var("NAMESPACE").unwrap_or("kube-system".into()));
 
     let resource = ResourceType::Pods(namespace);
-    let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())?;
+    let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())
+        .init()?;
 
     // Here we both poll and reconcile based on events from the main thread
     // If you run this next to actix-web (say), spawn a thread and pass `inf` as app state

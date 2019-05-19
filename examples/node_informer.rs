@@ -16,7 +16,9 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     let nodes = ResourceType::Nodes;
-    let ni : Informer<NodeSpec, NodeStatus> = Informer::new(client.clone(), nodes.into())?;
+    let ni = Informer::new(client.clone(), nodes.into())
+        .labels("role=worker")
+        .init()?;
 
     loop {
         ni.poll()?;
@@ -34,6 +36,7 @@ fn handle_nodes(client: &APIClient, ev: WatchEvent<NodeSpec, NodeStatus>) -> Res
             info!("New Node: {}", o.spec.provider_id.unwrap());
         },
         WatchEvent::Modified(o) => {
+            // Nodes often modify a lot - only print broken nodes
             if let Some(true) = o.spec.unschedulable {
                 let failed = o.status.conditions.unwrap().into_iter().filter(|c| {
                     // In a failed state either some of the extra conditions are not False
@@ -51,6 +54,9 @@ fn handle_nodes(client: &APIClient, ev: WatchEvent<NodeSpec, NodeStatus>) -> Res
                 let req = Event::list_event_for_all_namespaces(opts)?.0;
                 let res = client.request::<Event>(req)?;
                 warn!("Node events: {:?}", res);
+            } else {
+                // Turn up logging above to see
+                debug!("Normal node: {}", o.metadata.name);
             }
         },
         WatchEvent::Deleted(o) => {

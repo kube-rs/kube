@@ -25,7 +25,9 @@ To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct,
 ```rust
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 let resource = ResourceType::Pods(Some("kube-system".into()));
-let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource.into())?;
+let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource.into())?
+    .timeout(10)
+    .init();
 ```
 
 then you can `poll()` the reflector, and `read()` to get the current cached state:
@@ -53,7 +55,8 @@ You tell it what type parameters correspond to; `T` should be a `Spec` struct, a
 ```rust
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 let resource = ResourceType::Pods(Some("kube-system".into()));
-let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())?;
+let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())
+    .init()?;
 ```
 
 The main feature of `Informer<T, U>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
@@ -120,7 +123,7 @@ cargo run --example crd_reflector
 then you can `kubectl apply -f crd-baz.yaml -n kube-system`, or `kubectl delete -f crd-baz.yaml -n kube-system`, or `kubectl edit foos baz -n kube-system` to verify that the events are being picked up.
 
 ## Timing
-All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, call `.poll()` less often.
+All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can call `.poll()` less often. But the kube api holds for the full timeout value anyway and you can set it with `.timeout(n)`.
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.

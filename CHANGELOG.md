@@ -1,3 +1,8 @@
+0.7.0 / UNRELEASED
+==================
+  * Expose list/watch parameters #11
+
+
 0.6.0 / 2019-05-12
 ==================
   * Expose getter `Informer::version`

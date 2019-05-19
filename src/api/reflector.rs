@@ -3,6 +3,7 @@ use crate::api::resource::{
     Resource,
     WatchEvent,
     ApiResource,
+    QueryParams,
 };
 use serde::de::DeserializeOwned;
 
@@ -14,6 +15,9 @@ use std::{
     sync::{Arc, RwLock},
     time::{Duration},
 };
+
+/// Resource map exposed by the Reflector from its cache
+pub type ResourceMap<T, U> = BTreeMap<String, Resource<T,U>>;
 
 /// A reflection of `Resource` state in kubernetes
 ///
@@ -27,9 +31,11 @@ use std::{
 pub struct Reflector<T, U> where
   T: Clone, U: Clone
 {
-    data: Arc<RwLock<Cache<T, U>>>,
+    data: Arc<RwLock<ResourceMap<T, U>>>,
+    version: Arc<RwLock<String>>,
     client: APIClient,
     resource: ApiResource,
+    params: QueryParams,
 }
 
 impl<T, U> Reflector<T, U> where
@@ -37,16 +43,62 @@ impl<T, U> Reflector<T, U> where
     U: Clone + DeserializeOwned,
 {
     /// Create a reflector with a kube client on a kube resource
-    ///
-    /// Initializes with a full list of data from a large initial LIST call
-    pub fn new(client: APIClient, r: ApiResource) -> Result<Self> {
-        info!("Creating Reflector for {:?}", r);
-        let current : Cache<T, U> = get_resource_entries(&client, &r)?;
-        Ok(Reflector {
+    pub fn new(client: APIClient, r: ApiResource) -> Self {
+        Reflector {
             client,
             resource: r,
-            data: Arc::new(RwLock::new(current)),
-        })
+            params: QueryParams::default(),
+            data: Arc::new(RwLock::new(BTreeMap::new())),
+            version: Arc::new(RwLock::new(0.to_string())),
+        }
+    }
+
+    // builders for QueryParams - TODO: defer to internal informer in future
+    // for now, copy paste of informer's methods.
+
+    /// Configure the timeout for the list/watch call.
+    ///
+    /// This limits the duration of the call, regardless of any activity or inactivity.
+    /// Defaults to 10s
+    pub fn timeout(mut self, timeout_secs: u32) -> Self {
+        self.params.timeout = Some(timeout_secs);
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their fields.
+    ///
+    /// Defaults to everything.
+    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
+    /// The server only supports a limited number of field queries per type.
+    pub fn fields(mut self, field_selector: &str) -> Self {
+        self.params.field_selector = Some(field_selector.to_string());
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their labels.
+    ///
+    /// Defaults to everything.
+    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
+    pub fn labels(mut self, label_selector: &str) -> Self {
+        self.params.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// If called, partially initialized resources are included in watch/list responses.
+    pub fn include_uninitialized(mut self) -> Self {
+        self.params.include_uninitialized = true;
+        self
+    }
+
+    // finalizers:
+
+    /// Initializes with a full list of data from a large initial LIST call
+    pub fn init(self) -> Result<Self> {
+        info!("Starting Reflector for {:?}", self.resource);
+        let (data, version) = self.get_full_resource_entries()?;
+        *self.data.write().unwrap() = data;
+        *self.version.write().unwrap() = version;
+        Ok(self)
     }
 
     /// Run a single watch poll
@@ -55,16 +107,10 @@ impl<T, U> Reflector<T, U> where
     /// This is meant to be run continually in a thread. Spawn one.
     pub fn poll(&self) -> Result<()> {
         trace!("Watching {:?}", self.resource);
-        let old = self.data.read().unwrap().clone();
-        match watch_for_resource_updates(&self.client, &self.resource, old) {
-            Ok(res) => {
-                *self.data.write().unwrap() = res;
-            },
-            Err(_e) => {
-                // If desynched due to mismatching resourceVersion, retry in a bit
-                std::thread::sleep(Duration::from_secs(10));
-                self.reset()?; // propagate error if this failed..
-            }
+        if let Err(_e) = self.single_watch() {
+            // If desynched due to mismatching resourceVersion, retry in a bit
+            std::thread::sleep(Duration::from_secs(10));
+            self.reset()?; // propagate error if this failed..
         }
 
         Ok(())
@@ -79,7 +125,7 @@ impl<T, U> Reflector<T, U> where
         // - current applied kube state (used to parse into T)
         //
         // Very little that can be done in this case. Upgrade your app / resource.
-        let data = self.data.read().unwrap().clone().data;
+        let data = self.data.read().unwrap().clone();
         Ok(data)
     }
 
@@ -88,83 +134,74 @@ impl<T, U> Reflector<T, U> where
     /// Same as what is done in `State::new`.
     pub fn reset(&self) -> Result<()> {
         debug!("Refreshing {:?}", self.resource);
-        let current : Cache<T, U> = get_resource_entries(&self.client, &self.resource)?;
-        *self.data.write().unwrap() = current;
+        let (data, version) = self.get_full_resource_entries()?;
+        *self.data.write().unwrap() = data;
+        *self.version.write().unwrap() = version;
         Ok(())
     }
-}
 
-/// Resource map exposed by the Reflector from its cache
-pub type ResourceMap<T, U> = BTreeMap<String, Resource<T,U>>;
 
-/// Cache state used by a Reflector
-#[derive(Default, Clone)]
-struct Cache<T, U> where U: Clone, T: Clone {
-    pub data: ResourceMap<T, U>,
-    /// Current resourceVersion used for bookkeeping
-    version: String,
-}
+    fn get_full_resource_entries(&self) -> Result<(ResourceMap<T, U>, String)> {
+        let req = self.resource.list_all_resource_entries(&self.params)?;
+        // NB: Resource isn't general enough here
+        let res = self.client.request::<ResourceList<Resource<T, U>>>(req)?;
+        let mut data = BTreeMap::new();
+        let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
 
-fn get_resource_entries<T, U>(client: &APIClient, rg: &ApiResource) -> Result<Cache<T, U>> where
-  T: Clone + DeserializeOwned,
-  U: Clone + DeserializeOwned,
-{
-    let req = rg.list_all_resource_entries()?;
-    // NB: Resource isn't general enough here
-    let res = client.request::<ResourceList<Resource<T, U>>>(req)?;
-    let mut data = BTreeMap::new();
-    let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
-
-    debug!("Got {} {} at resourceVersion={:?}", res.items.len(), rg.resource, version);
-    for i in res.items {
-        // The non-generic parts we care about are spec + status
-        data.insert(i.metadata.name.clone(), i);
+        debug!("Got {} {} at resourceVersion={:?}", res.items.len(), self.resource.resource, version);
+        for i in res.items {
+            // The non-generic parts we care about are spec + status
+            data.insert(i.metadata.name.clone(), i);
+        }
+        let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
+        trace!("Initialized with: {}", keys);
+        Ok((data, version))
     }
-    let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
-    trace!("Initialized with: {}", keys);
-    Ok(Cache { data, version })
-}
 
-fn watch_for_resource_updates<T, U>(client: &APIClient, rg: &ApiResource, mut c: Cache<T, U>)
-    -> Result< Cache<T, U> > where
-  T: Clone + DeserializeOwned,
-  U: Clone + DeserializeOwned,
-{
-    let req = rg.watch_resource_entries_after(&c.version)?;
-    let res = client.request_events::<WatchEvent<T, U>>(req)?;
+    // Watch helper
+    fn single_watch(&self) -> Result<()> {
+        let rg = &self.resource;
+        let oldver = { self.version.read().unwrap().clone() };
+        let req = rg.watch_resource_entries_after(&self.params, &oldver)?;
+        let res = self.client.request_events::<WatchEvent<T, U>>(req)?;
 
-    // Follow docs conventions and store the last resourceVersion
-    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-    for ev in res {
-        match ev {
-            WatchEvent::Added(o) => {
-                info!("Adding {} to {}", o.metadata.name, rg.resource);
-                c.data.entry(o.metadata.name.clone())
-                    .or_insert_with(|| o.clone());
-                if let Some(v) = o.metadata.resourceVersion {
-                  c.version = v;
+        // Update in place:
+        let mut data = self.data.write().unwrap();
+        let mut ver = self.version.write().unwrap();
+
+        // Follow docs conventions and store the last resourceVersion
+        // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+        for ev in res {
+            match ev {
+                WatchEvent::Added(o) => {
+                    info!("Adding {} to {}", o.metadata.name, rg.resource);
+                    data.entry(o.metadata.name.clone())
+                        .or_insert_with(|| o.clone());
+                    if let Some(v) = o.metadata.resourceVersion {
+                        *ver = v;
+                    }
+                },
+                WatchEvent::Modified(o) => {
+                    info!("Modifying {} in {}", o.metadata.name, rg.resource);
+                    data.entry(o.metadata.name.clone())
+                        .and_modify(|e| *e = o.clone());
+                    if let Some(v) = o.metadata.resourceVersion {
+                        *ver = v;
+                    }
+                },
+                WatchEvent::Deleted(o) => {
+                    info!("Removing {} from {}", o.metadata.name, rg.resource);
+                    data.remove(&o.metadata.name);
+                    if let Some(v) = o.metadata.resourceVersion {
+                         *ver = v;
+                    }
                 }
-            },
-            WatchEvent::Modified(o) => {
-                info!("Modifying {} in {}", o.metadata.name, rg.resource);
-                c.data.entry(o.metadata.name.clone())
-                    .and_modify(|e| *e = o.clone());
-                if let Some(v) = o.metadata.resourceVersion {
-                  c.version = v;
+                WatchEvent::Error(e) => {
+                    warn!("Failed to watch {}: {:?}", rg.resource, e);
+                    bail!("Failed to watch {}: {:?} - {:?}", rg.resource, e.message, e.reason)
                 }
-            },
-            WatchEvent::Deleted(o) => {
-                info!("Removing {} from {}", o.metadata.name, rg.resource);
-                c.data.remove(&o.metadata.name);
-                if let Some(v) = o.metadata.resourceVersion {
-                  c.version = v;
-                }
-            }
-            WatchEvent::Error(e) => {
-                warn!("Failed to watch {}: {:?}", rg.resource, e);
-                bail!("Failed to watch {}: {:?} - {:?}", rg.resource, e.message, e.reason)
             }
         }
+        Ok(())
     }
-    Ok(c) // updated in place (taken ownership)
 }

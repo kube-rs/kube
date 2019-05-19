@@ -19,6 +19,7 @@ pub use self::resource::{
     Resource,
     ApiResource,
     ResourceType,
+    QueryParams,
     WatchEvent,
     ApiError,
 };
