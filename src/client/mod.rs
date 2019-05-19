@@ -106,7 +106,6 @@ impl APIClient {
                 xs.push(r);
             }
             Ok(xs)
-
         }
     }
 }

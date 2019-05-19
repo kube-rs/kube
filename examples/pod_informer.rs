@@ -24,14 +24,13 @@ fn main() -> Result<(), failure::Error> {
 
         // Handle events one by one, draining the informer
         while let Some(event) = inf.pop() {
-            reconcile(&client, event)?;
+            handle_node(&client, event)?;
         }
     }
 }
 
 // This function lets the app handle an event from kube
-fn reconcile(_c: &APIClient, ev: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
-    // TODO: Use the kube api client here..
+fn handle_node(_c: &APIClient, ev: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
     match ev {
         WatchEvent::Added(o) => {
             let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
@@ -45,7 +44,7 @@ fn reconcile(_c: &APIClient, ev: WatchEvent<PodSpec, PodStatus>) -> Result<(), f
             info!("Deleted Pod: {}", o.metadata.name);
         },
         WatchEvent::Error(e) => {
-            warn!("Error event: {:?}", e); // ought to refresh here
+            warn!("Error event: {:?}", e);
         }
     }
     Ok(())

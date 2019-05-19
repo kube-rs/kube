@@ -62,15 +62,14 @@ The main feature of `Informer<T, U>` is that after calling `.poll()` you handle 
 inf.poll()?; // watches + queues events
 
 while let Some(event) = inf.pop() {
-    reconcile(&client, event)?;
+    handle_event(&client, event)?;
 }
 ```
 
 How you handle them is up to you, you could build your own state, you can call a kube client, or you can simply print events. Here's a sketch of how such a handler would look:
 
 ```rust
-fn reconcile(c: &APIClient, event: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
-    // use the kube api client here..
+fn handle_event(c: &APIClient, event: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
     match ev {
         WatchEvent::Added(o) => {
             let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();

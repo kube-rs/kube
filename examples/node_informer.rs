@@ -4,8 +4,10 @@ use kube::{
     client::APIClient,
     config,
 };
-use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
-use k8s_openapi::api::core::v1::{Event, ListEventForAllNamespacesOptional};
+use k8s_openapi::api::core::v1::{
+    NodeSpec, NodeStatus,
+    Event, ListEventForAllNamespacesOptional,
+};
 
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
@@ -59,7 +61,7 @@ fn handle_nodes(client: &APIClient, ev: WatchEvent<NodeSpec, NodeStatus>) -> Res
             );
         },
         WatchEvent::Error(e) => {
-            warn!("Error event: {:?}", e); // ought to refresh here
+            warn!("Error event: {:?}", e);
         }
     }
     Ok(())

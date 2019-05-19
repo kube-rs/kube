@@ -15,6 +15,7 @@ fn main() -> Result<(), failure::Error> {
     let resource = ResourceType::Pods(Some("kube-system".into()));
     let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource.into())?;
 
+    // Can read initial state now:
     rf.read()?.into_iter().for_each(|(name, p)| {
         info!("Found pod {} ({}) with {:?}",
             name,
@@ -23,12 +24,11 @@ fn main() -> Result<(), failure::Error> {
         );
     });
 
-    // Here we both poll and reconcile based on events from the main thread
-    // If you run this next to actix-web (say), spawn a thread and pass `rf` as app state
+    // Poll to keep data up to date:
     loop {
         rf.poll()?;
 
-        // Can also print internal state
+        // up to date state:
         let pods = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
         info!("Current pods: {:?}", pods);
     }
