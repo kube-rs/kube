@@ -1,8 +1,9 @@
+use crate::api::Void;
 use crate::api::resource::{
     ResourceList,
     WatchEvent,
     ApiResource,
-    QueryParams,
+    GetParams,
 };
 use crate::client::APIClient;
 use crate::{Result};
@@ -32,7 +33,7 @@ pub struct Informer<T, U> where
     version: Arc<RwLock<String>>,
     client: APIClient,
     resource: ApiResource,
-    params: QueryParams,
+    params: GetParams,
 }
 
 impl<T, U> Informer<T, U> where
@@ -44,13 +45,13 @@ impl<T, U> Informer<T, U> where
         Informer {
             client,
             resource: r,
-            params: QueryParams::default(),
+            params: GetParams::default(),
             events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(0.to_string())),
         }
     }
 
-    // builders for QueryParams
+    // builders for GetParams
 
     /// Configure the timeout for the list/watch call.
     ///
@@ -155,9 +156,7 @@ impl<T, U> Informer<T, U> where
         let req = self.resource.list_zero_resource_entries(&self.params)?;
 
         // parse to void a ResourceList into void except for Metadata
-        #[derive(Clone, Deserialize)]
-        struct Discard {} // ffs
-        let res = self.client.request::<ResourceList<Option<Discard>>>(req)?;
+        let res = self.client.request::<ResourceList<Void>>(req)?;
 
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "0".into());
         debug!("Got fresh resourceVersion={} for {}", version, self.resource.resource);

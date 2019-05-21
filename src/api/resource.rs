@@ -17,36 +17,59 @@ use crate::{Result, Error};
 /// CustomResource purposefully ignored from this list.
 #[derive(Debug, Clone)]
 pub enum ResourceType {
-    Nodes,
-    Deploys(Option<String>),
-    Pods(Option<String>),
+    V1Node,
+    V1Deployment(Option<String>),
+    V1Pod(Option<String>),
+    V1DaemonSet(Option<String>),
+    V1ReplicaSet(Option<String>),
+    V1StatefulSet(Option<String>),
 }
 impl Into<ApiResource> for ResourceType {
     fn into(self) -> ApiResource {
         match self {
-            ResourceType::Nodes => ApiResource {
+            ResourceType::V1Node => ApiResource {
                 group: "".into(),
                 resource: "nodes".into(),
                 version: "v1".into(),
                 namespace: None,
                 prefix: "api".into()
             },
-            ResourceType::Deploys(ns) => ApiResource {
+            ResourceType::V1Deployment(ns) => ApiResource {
                 group: "apps".into(),
                 resource: "deployments".into(),
                 version: "v1".into(),
                 namespace: ns,
                 prefix: "apis".into(),
             },
-            ResourceType::Pods(ns) => ApiResource {
+            ResourceType::V1Pod(ns) => ApiResource {
                 group: "".into(),
                 resource: "pods".into(),
                 version: "v1".into(),
                 namespace: ns,
                 prefix: "api".into(),
             },
+            ResourceType::V1DaemonSet(ns) => ApiResource {
+                group: "apps".into(),
+                resource: "daemonsets".into(),
+                version: "v1".into(),
+                namespace: ns,
+                prefix: "apis".into(),
+            },
+            ResourceType::V1ReplicaSet(ns) => ApiResource {
+                group: "apps".into(),
+                resource: "replicasets".into(),
+                version: "v1".into(),
+                namespace: ns,
+                prefix: "apis".into(),
+            },
+            ResourceType::V1StatefulSet(ns) => ApiResource {
+                group: "apps".into(),
+                resource: "statefulsets".into(),
+                version: "v1".into(),
+                namespace: ns,
+                prefix: "apis".into(),
+            },
         }
-
     }
 }
 
@@ -86,7 +109,7 @@ impl ToString for ApiResource {
         let g = if self.group == "" { "".into() } else { format!("{}/", self.group) };
         let v = if self.version == "" { "".into() } else { format!("{}/", self.version) };
         let n = if let Some(ns) = &self.namespace { format!("namespaces/{}/", ns) } else { "".into() };
-        format!("/{prefix}{group}{version}{namespaces}{resource}?",
+        format!("/{prefix}{group}{version}{namespaces}{resource}",
             prefix = pref,
             group = g,
             version = v,
@@ -101,7 +124,7 @@ impl ToString for ApiResource {
 /// Constructed internally with a builder on Informer and Reflector,
 /// but can be passed to the helper function of ApiResource.
 #[derive(Default, Clone)]
-pub struct QueryParams {
+pub struct GetParams {
     pub field_selector: Option<String>,
     pub include_uninitialized: bool,
     pub label_selector: Option<String>,
@@ -110,8 +133,8 @@ pub struct QueryParams {
 
 impl ApiResource {
     /// Create a list request to fully re-fetch the state
-    pub fn list_all_resource_entries(&self, par: &QueryParams) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
+    pub fn list_all_resource_entries(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
+        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
 
         if let Some(fields) = &par.field_selector {
             qp.append_pair("fieldSelector", &fields);
@@ -129,8 +152,8 @@ impl ApiResource {
     }
 
     /// Create a minimial list request to seed an initial resourceVersion
-    pub fn list_zero_resource_entries(&self, par: &QueryParams) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
+    pub fn list_zero_resource_entries(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
+        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
         qp.append_pair("limit", "1"); // can't have 0..
         if par.include_uninitialized {
             qp.append_pair("includeUninitialized", "true");
@@ -142,8 +165,8 @@ impl ApiResource {
     }
 
     /// Create watch request for a ApiResource at a given version
-    pub fn watch_resource_entries_after(&self, par: &QueryParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string());
+    pub fn watch_resource_entries_after(&self, par: &GetParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
+        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
 
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
@@ -163,9 +186,34 @@ impl ApiResource {
         let mut req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::from)
     }
+
+    pub fn replace_named_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+        let base_url = format!("{base}/{name}/status", base = self.to_string(), name = name);
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        let urlstr = qp.finish();
+        let mut req = http::Request::patch(urlstr);
+        req.body(vec![]).map_err(Error::from)
+    }
 }
 
+#[test]
+fn get_paths(){
+    let r : ApiResource = ResourceType::V1Deployment(Some("ns".into())).into();
+    let gp = GetParams::default();
+    let req = r.list_all_resource_entries(&gp).unwrap();
+    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
 
+    let r2 : ApiResource = ResourceType::V1Pod(Some("ns".into())).into();
+    let req2 = r2.watch_resource_entries_after(&gp, "0").unwrap();
+    assert_eq!(req2.uri(), "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=10");
+}
+
+#[test]
+fn replace_paths(){
+    let r : ApiResource = ResourceType::V1Node.into();
+    let req = r.replace_named_status("mynode").unwrap();
+    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status");
+}
 
 // -------------------------------------------------------
 

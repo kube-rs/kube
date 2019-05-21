@@ -12,7 +12,7 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let resource = ResourceType::Pods(Some("kube-system".into()));
+    let resource = ResourceType::V1Pod(Some("kube-system".into()));
     let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource.into())
         .init()?;
 

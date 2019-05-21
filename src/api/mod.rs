@@ -1,7 +1,10 @@
 //! API helpers to make use of k8s-openapi easier
 
+/// Empty struct for Void
+#[derive(Clone, Deserialize)]
+pub struct Discard {}
 /// Shortcut type for discarding one type parameter option
-pub type Void = Option<()>;
+pub type Void = Option<Discard>;
 
 mod reflector;
 pub use self::reflector::{
@@ -19,7 +22,7 @@ pub use self::resource::{
     Resource,
     ApiResource,
     ResourceType,
-    QueryParams,
+    GetParams,
     WatchEvent,
     ApiError,
 };

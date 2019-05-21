@@ -3,7 +3,7 @@ use crate::api::resource::{
     Resource,
     WatchEvent,
     ApiResource,
-    QueryParams,
+    GetParams,
 };
 use serde::de::DeserializeOwned;
 
@@ -35,7 +35,7 @@ pub struct Reflector<T, U> where
     version: Arc<RwLock<String>>,
     client: APIClient,
     resource: ApiResource,
-    params: QueryParams,
+    params: GetParams,
 }
 
 impl<T, U> Reflector<T, U> where
@@ -47,13 +47,13 @@ impl<T, U> Reflector<T, U> where
         Reflector {
             client,
             resource: r,
-            params: QueryParams::default(),
+            params: GetParams::default(),
             data: Arc::new(RwLock::new(BTreeMap::new())),
             version: Arc::new(RwLock::new(0.to_string())),
         }
     }
 
-    // builders for QueryParams - TODO: defer to internal informer in future?
+    // builders for GetParams - TODO: defer to internal informer in future?
     // for now, copy paste of informer's methods.
 
     /// Configure the timeout for the list/watch call.

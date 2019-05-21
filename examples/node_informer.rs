@@ -15,7 +15,7 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let nodes = ResourceType::Nodes;
+    let nodes = ResourceType::V1Node;
     let ni = Informer::new(client.clone(), nodes.into())
         .labels("role=worker")
         .init()?;

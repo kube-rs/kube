@@ -14,7 +14,7 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
     let namespace = Some(env::var("NAMESPACE").unwrap_or("kube-system".into()));
 
-    let resource = ResourceType::Pods(namespace);
+    let resource = ResourceType::V1Pod(namespace);
     let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())
         .init()?;
 

@@ -12,7 +12,7 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let resource = ResourceType::Deploys(Some("kube-system".into()));
+    let resource = ResourceType::V1Deployment(Some("kube-system".into()));
     let rf : Reflector<DeploymentSpec, DeploymentStatus> =
         Reflector::new(client, resource.into())
         .init()?;

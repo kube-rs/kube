@@ -12,7 +12,7 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let resource = ResourceType::Nodes;
+    let resource = ResourceType::V1Node;
     let rf : Reflector<NodeSpec, NodeStatus> = Reflector::new(client, resource.into())
         .labels("role=master")
         .init()?;
