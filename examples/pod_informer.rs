@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use std::env;
 use kube::{
-    api::{ResourceType, Informer, WatchEvent},
+    api::{Api, Informer, WatchEvent},
     client::APIClient,
     config,
 };
@@ -12,11 +12,10 @@ fn main() -> Result<(), failure::Error> {
     env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
-    let namespace = Some(env::var("NAMESPACE").unwrap_or("kube-system".into()));
+    let namespace = env::var("NAMESPACE").unwrap_or("kube-system".into());
 
-    let resource = ResourceType::V1Pod(namespace);
-    let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())
-        .init()?;
+    let resource = Api::v1Pod().within(&namespace);
+    let inf = Informer::new(client.clone(), resource).init()?;
 
     // Here we both poll and reconcile based on events from the main thread
     // If you run this next to actix-web (say), spawn a thread and pass `inf` as app state

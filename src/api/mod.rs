@@ -17,12 +17,15 @@ pub use self::informer::{
     Informer,
 };
 
+mod api;
+pub use api::{
+    Api,
+    GetParams,
+};
+
 mod resource;
 pub use self::resource::{
     Resource,
-    ApiResource,
-    ResourceType,
-    GetParams,
     WatchEvent,
     ApiError,
 };

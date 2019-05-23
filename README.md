@@ -20,12 +20,12 @@ One of the main abstractions exposed from `kube::api` is `Reflector<T, U>`. This
 
 It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
 
-To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
+To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.NodeSpec.html):
 
 ```rust
-use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
-let resource = ResourceType::Pods(Some("kube-system".into()));
-let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource.into())?
+use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
+let api = Api::v1Node();
+let rf : Reflector<NodeSpec, NodeStatus> = Reflector::new(client, api)?
     .timeout(10)
     .init();
 ```
@@ -54,8 +54,8 @@ You tell it what type parameters correspond to; `T` should be a `Spec` struct, a
 
 ```rust
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
-let resource = ResourceType::Pods(Some("kube-system".into()));
-let inf : Informer<PodSpec, PodStatus> = Informer::new(client.clone(), resource.into())
+let api = Api::v1Pod();
+let inf : Informer<PodSpec, PodStatus> = Informer::new(client, api)
     .init()?;
 ```
 
