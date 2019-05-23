@@ -1,7 +1,8 @@
 0.7.0 / UNRELEASED
 ==================
   * Expose list/watch parameters #11
-
+  * ApiResource -> Api
+  * ResourceType has been removed in favour of `Api::v1Pod()` say
 
 0.6.0 / 2019-05-12
 ==================

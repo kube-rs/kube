@@ -2,16 +2,16 @@
 #[macro_use] extern crate serde_derive;
 
 use kube::{
-    api::{ApiResource, Reflector, Void},
+    api::{Api, Reflector, Void},
     client::APIClient,
     config,
 };
 
 // Own custom resource
 #[derive(Deserialize, Serialize, Clone)]
-pub struct FooResource {
-  name: String,
-  info: String,
+pub struct Foo {
+    name: String,
+    info: String,
 }
 
 fn main() -> Result<(), failure::Error> {
@@ -21,14 +21,11 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
-    let resource = ApiResource {
-        group: "clux.dev".into(),
-        resource: "foos".into(),
-        version: "v1".into(),
-        namespace: Some("kube-system".into()),
-        ..Default::default()
-    };
-    let rf : Reflector<FooResource, Void> = Reflector::new(client, resource)
+    let resource = Api::customResource("foos")
+        .group("clux.dev")
+        .within("kube-system");
+
+    let rf : Reflector<Foo, Void> = Reflector::new(client, resource)
         .init()?;
 
     loop {

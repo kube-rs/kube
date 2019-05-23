@@ -1,6 +1,6 @@
 #[macro_use] extern crate log;
 use kube::{
-    api::{ResourceType, Reflector},
+    api::{Api, Reflector},
     client::APIClient,
     config,
 };
@@ -12,8 +12,8 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let resource = ResourceType::Pods(Some("kube-system".into()));
-    let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource.into())
+    let resource = Api::v1Pod().within("kube-system");
+    let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource)
         .init()?;
 
     // Can read initial state now:

@@ -1,8 +1,11 @@
+use crate::api::{
+    Api,
+    GetParams,
+    Void,
+};
 use crate::api::resource::{
     ResourceList,
     WatchEvent,
-    ApiResource,
-    QueryParams,
 };
 use crate::client::APIClient;
 use crate::{Result};
@@ -13,44 +16,45 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-type WatchQueue<T, U> = VecDeque<WatchEvent<T, U>>;
+type WatchQueue<P, U> = VecDeque<WatchEvent<P, U>>;
 
 /// An event informer for a `Resource`
 ///
-/// This watches a `Resource<T, U>`, by:
+/// This watches a `Resource<P, U>`, by:
 /// - seeding the intial resourceVersion with a list call (optional)
 /// - keeping track of resourceVersions after every poll
 /// - recovering when resourceVersions get desynced
 ///
-/// It caches WatchEvent<T, U> internally in a queue when polling.
+/// It caches WatchEvent<P, U> internally in a queue when polling.
 /// A user should drain this queue periodically.
 #[derive(Clone)]
-pub struct Informer<T, U> where
-  T: Clone, U: Clone
+pub struct Informer<P, U> where
+    P: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned
 {
-    events: Arc<RwLock<WatchQueue<T, U>>>,
+    events: Arc<RwLock<WatchQueue<P, U>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
-    resource: ApiResource,
-    params: QueryParams,
+    resource: Api,
+    params: GetParams,
 }
 
-impl<T, U> Informer<T, U> where
-    T: Clone + DeserializeOwned,
+impl<P, U> Informer<P, U> where
+    P: Clone + DeserializeOwned,
     U: Clone + DeserializeOwned,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: APIClient, r: ApiResource) -> Self {
+    pub fn new(client: APIClient, r: Api) -> Self {
         Informer {
             client,
             resource: r,
-            params: QueryParams::default(),
+            params: GetParams::default(),
             events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(0.to_string())),
         }
     }
 
-    // builders for QueryParams
+    // builders for GetParams
 
     /// Configure the timeout for the list/watch call.
     ///
@@ -131,7 +135,7 @@ impl<T, U> Informer<T, U> where
     }
 
     /// Pop an event from the front of the WatchQueue
-    pub fn pop(&self) -> Option<WatchEvent<T, U>> {
+    pub fn pop(&self) -> Option<WatchEvent<P, U>> {
         self.events.write().unwrap().pop_front()
     }
 
@@ -155,9 +159,7 @@ impl<T, U> Informer<T, U> where
         let req = self.resource.list_zero_resource_entries(&self.params)?;
 
         // parse to void a ResourceList into void except for Metadata
-        #[derive(Clone, Deserialize)]
-        struct Discard {} // ffs
-        let res = self.client.request::<ResourceList<Option<Discard>>>(req)?;
+        let res = self.client.request::<ResourceList<Void>>(req)?;
 
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "0".into());
         debug!("Got fresh resourceVersion={} for {}", version, self.resource.resource);
@@ -165,10 +167,10 @@ impl<T, U> Informer<T, U> where
     }
 
     /// Watch helper
-    fn single_watch(&self) -> Result<(Vec<WatchEvent<T, U>>, String)> {
+    fn single_watch(&self) -> Result<(Vec<WatchEvent<P, U>>, String)> {
         let oldver = self.version();
-        let req = self.resource.watch_resource_entries_after(&self.params, &oldver)?;
-        let events = self.client.request_events::<WatchEvent<T, U>>(req)?;
+        let req = self.resource.watch(&self.params, &oldver)?;
+        let events = self.client.request_events::<WatchEvent<P, U>>(req)?;
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes

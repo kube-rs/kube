@@ -1,9 +1,11 @@
+use crate::api::{
+    Api,
+    GetParams,
+};
 use crate::api::resource::{
     ResourceList,
     Resource,
     WatchEvent,
-    ApiResource,
-    QueryParams,
 };
 use serde::de::DeserializeOwned;
 
@@ -17,43 +19,44 @@ use std::{
 };
 
 /// Resource map exposed by the Reflector from its cache
-pub type ResourceMap<T, U> = BTreeMap<String, Resource<T,U>>;
+pub type ResourceMap<P, U> = BTreeMap<String, Resource<P,U>>;
 
 /// A reflection of `Resource` state in kubernetes
 ///
-/// This watches and caches a `Resource<T, U>` by:
+/// This watches and caches a `Resource<P, U>` by:
 /// - seeding the cache from a large initial list call
 /// - keeping track of initial, and subsequent resourceVersions
 /// - recovering when resourceVersions get desynced
 ///
 /// It exposes it's internal state readably through a getter.
 #[derive(Clone)]
-pub struct Reflector<T, U> where
-  T: Clone, U: Clone
+pub struct Reflector<P, U> where
+    P: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned
 {
-    data: Arc<RwLock<ResourceMap<T, U>>>,
+    data: Arc<RwLock<ResourceMap<P, U>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
-    resource: ApiResource,
-    params: QueryParams,
+    resource: Api,
+    params: GetParams,
 }
 
-impl<T, U> Reflector<T, U> where
-    T: Clone + DeserializeOwned,
+impl<P, U> Reflector<P, U> where
+    P: Clone + DeserializeOwned,
     U: Clone + DeserializeOwned,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: APIClient, r: ApiResource) -> Self {
+    pub fn new(client: APIClient, r: Api) -> Self {
         Reflector {
             client,
             resource: r,
-            params: QueryParams::default(),
+            params: GetParams::default(),
             data: Arc::new(RwLock::new(BTreeMap::new())),
             version: Arc::new(RwLock::new(0.to_string())),
         }
     }
 
-    // builders for QueryParams - TODO: defer to internal informer in future?
+    // builders for GetParams - TODO: defer to internal informer in future?
     // for now, copy paste of informer's methods.
 
     /// Configure the timeout for the list/watch call.
@@ -117,7 +120,7 @@ impl<T, U> Reflector<T, U> where
     }
 
     /// Read data for users of the reflector
-    pub fn read(&self) -> Result<ResourceMap<T, U>> {
+    pub fn read(&self) -> Result<ResourceMap<P, U>> {
         // unwrap for users because Poison errors are not great to deal with atm.
         // If a read fails, you've probably failed to parse the Resource into a T
         // this likely implies versioning issues between:
@@ -141,10 +144,10 @@ impl<T, U> Reflector<T, U> where
     }
 
 
-    fn get_full_resource_entries(&self) -> Result<(ResourceMap<T, U>, String)> {
-        let req = self.resource.list_all_resource_entries(&self.params)?;
+    fn get_full_resource_entries(&self) -> Result<(ResourceMap<P, U>, String)> {
+        let req = self.resource.list(&self.params)?;
         // NB: Resource isn't general enough here
-        let res = self.client.request::<ResourceList<Resource<T, U>>>(req)?;
+        let res = self.client.request::<ResourceList<Resource<P, U>>>(req)?;
         let mut data = BTreeMap::new();
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
 
@@ -162,8 +165,8 @@ impl<T, U> Reflector<T, U> where
     fn single_watch(&self) -> Result<()> {
         let rg = &self.resource;
         let oldver = { self.version.read().unwrap().clone() };
-        let req = rg.watch_resource_entries_after(&self.params, &oldver)?;
-        let res = self.client.request_events::<WatchEvent<T, U>>(req)?;
+        let req = rg.watch(&self.params, &oldver)?;
+        let res = self.client.request_events::<WatchEvent<P, U>>(req)?;
 
         // Update in place:
         let mut data = self.data.write().unwrap();

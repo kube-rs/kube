@@ -1,6 +1,6 @@
 #[macro_use] extern crate log;
 use kube::{
-    api::{ResourceType, Reflector},
+    api::{Api, Reflector},
     client::APIClient,
     config,
 };
@@ -12,9 +12,9 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let resource = ResourceType::Deploys(Some("kube-system".into()));
+    let resource = Api::v1Deployment().within("kube-system");
     let rf : Reflector<DeploymentSpec, DeploymentStatus> =
-        Reflector::new(client, resource.into())
+        Reflector::new(client, resource)
         .init()?;
 
     // rf is initialized with full state, which can be extracted on demand.
