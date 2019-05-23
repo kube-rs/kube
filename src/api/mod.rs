@@ -28,6 +28,7 @@ pub use self::resource::{
     Resource,
     WatchEvent,
     ApiError,
+    PostResponse,
 };
 
 mod metadata;

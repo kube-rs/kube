@@ -46,7 +46,7 @@ impl Api
 {
     pub fn within(mut self, ns: &str) -> Self {
         //match &self.resource {
-        //    "nodes" | "namespaces" =>
+        //    "nodes" | "namespaces" | "customresourcedefinitions" =>
         //        panic!("{} is not a namespaced resource", self.resource),
         //    _ => {},
         //}
@@ -119,6 +119,21 @@ impl Api
             ..Default::default()
         }
     }
+    /// The definition of a customResource
+    ///
+    /// Its name MUST be in the format <.spec.name>.<.spec.group>.
+    pub fn v1beta1CustomResourceDefinition() -> Self {
+        Self {
+            group: "apiextensions.k8s.io".into(),
+            resource: "customresourcedefinitions".into(),
+            prefix: "apis".into(),
+            version: "v1beta1".into(), // latest available in 1.14.0
+            ..Default::default()
+        }
+    }
+    /// Instance of a CRD
+    ///
+    /// The version, and group must be set by the user.
     pub fn customResource(name: &str) -> Self {
         Self {
             resource: name.into(),
@@ -159,8 +174,7 @@ pub struct GetParams {
     pub timeout: Option<u32>
 }
 
-impl Api
-{
+impl Api {
     /// Create a list request to fully re-fetch the state
     pub fn list(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
         let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
@@ -217,7 +231,7 @@ impl Api
     }
 
     // TODO: dry-run PostParams
-    fn create(&self) -> Result<http::Request<Vec<u8>>> {
+    pub fn create(&self) -> Result<http::Request<Vec<u8>>> {
         let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
         qp.append_pair("dryRun", "true");
         let urlstr = qp.finish();
@@ -244,24 +258,28 @@ impl Api
     //}
 
     // TODO: need a spec for T
-    fn replace(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn replace(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.to_string() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         qp.append_pair("dryRun", "true");
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
+        //let body = serde_json::to_vec(&patch)?; TODO: needs spec T
         req.body(vec![]).map_err(Error::from)
     }
 
-    // TODO: body needs to be a U
-    fn patch_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+    /// Patch needs serialize
+    ///
+    /// Typically, you want to pass `serde_json::to_vec(some_json_subset)`.
+    pub fn patch_status(&self, name: &str, patch: &[u8]) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.to_string() + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::patch(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        req.body(patch.to_vec()).map_err(Error::from)
     }
-    fn replace_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+
+    pub fn replace_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.to_string() + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
@@ -293,7 +311,8 @@ fn replace_path(){
 #[test]
 fn patch_status_path(){
     let r = Api::v1Node();
-    let req = r.patch_status("mynode").unwrap();
+    let data = serde_json::to_vec("{}").unwrap();
+    let req = r.patch_status("mynode", &data).unwrap();
     assert_eq!(req.uri(), "/api/v1/nodes/mynode/status");
     assert_eq!(req.method(), "PATCH");
 }
@@ -317,4 +336,12 @@ fn namespace_path() { // weird object compared to other v1
     let gp = GetParams::default();
     let req = r.list(&gp).unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces")
+}
+#[test]
+fn replace_status() {
+    let r = Api::v1beta1CustomResourceDefinition();
+    let req = r.replace_status("mycrd.domain.io").unwrap();
+    assert_eq!(req.uri(),
+        "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/mycrd.domain.io/status"
+    );
 }

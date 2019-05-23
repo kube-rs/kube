@@ -130,3 +130,14 @@ pub struct ResourceList<T> where
     #[serde(bound(deserialize = "Vec<T>: Deserialize<'de>"))]
     pub items: Vec<T>,
 }
+
+#[derive(Deserialize, Serialize, Clone)]
+//#[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
+pub enum PostResponse<T> where
+    T: Clone
+{
+    Ok(T),
+    Created(T),
+    Unauthorized,
+    Other,
+}
