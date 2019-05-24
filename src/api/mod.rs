@@ -8,7 +8,7 @@ pub type Void = Option<Discard>;
 
 mod reflector;
 pub use self::reflector::{
-    ResourceMap,
+    Cache,
     Reflector,
 };
 
@@ -26,7 +26,7 @@ pub use api::{
 
 mod resource;
 pub use self::resource::{
-    Resource,
+    Object,
     WatchEvent,
     ApiError,
     PostResponse,

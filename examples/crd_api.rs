@@ -3,7 +3,7 @@
 #[macro_use] extern crate serde_derive;
 
 use kube::{
-    api::{Api, PostResponse, CreateResponse, PostParams, Resource, Void},
+    api::{Api, PostResponse, CreateResponse, PostParams, Object, Void},
     client::APIClient,
     config,
 };
@@ -51,7 +51,7 @@ fn main() -> Result<(), failure::Error> {
     };
     let pp = PostParams::default();
     let req = crds.create(&pp, serde_json::to_vec(&foocrd)?)?;
-    match client.request::<CreateResponse<Resource<CrdSpec, CrdStatus>>>(req)? {
+    match client.request::<CreateResponse<Object<CrdSpec, CrdStatus>>>(req)? {
         CreateResponse::Created(o) => info!("Created {}", o.metadata.name),
         CreateResponse::Accepted(o) => info!("Accepted {}", o.metadata.name),
         CreateResponse::Ok(o) => info!("Ok {}", o.metadata.name),
@@ -72,10 +72,10 @@ fn main() -> Result<(), failure::Error> {
     // Modify a Foo with a Patch
     //let patch = json!( info => "patched baz" );
     //let req = foos.patch("baz", &pp, serde_json::to_vec(&patch)?)?;
-    //client.request::<PostResponse<Resource<FooSpec, FooStatus>>>(req)?;
+    //client.request::<PostResponse<Object<FooSpec, FooStatus>>>(req)?;
 
     // shorthand
-    type Foo = Resource<FooSpec, FooStatus>;
+    type Foo = Object<FooSpec, FooStatus>;
     // TODO: request should return statuscode as a better useability!
 
     // Set its status:

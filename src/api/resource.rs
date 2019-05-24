@@ -34,9 +34,9 @@ pub struct ApiError {
 pub enum WatchEvent<T, U> where
   T: Clone, U: Clone
 {
-    Added(Resource<T, U>),
-    Modified(Resource<T, U>),
-    Deleted(Resource<T, U>),
+    Added(Object<T, U>),
+    Modified(Object<T, U>),
+    Deleted(Object<T, U>),
     Error(ApiError),
 }
 
@@ -55,7 +55,7 @@ impl<T, U> Debug for WatchEvent<T, U> where
 
 // -------------------------------------------------------
 
-/// A generic kubernetes resource
+/// A generic kubernetes object
 ///
 /// This is used instead of a full struct for `Deployment`, `Pod`, `Node`, `CRD`, ...
 /// Kubernetes' API generally exposes core structs in this manner, but sometimes the
@@ -69,10 +69,10 @@ impl<T, U> Debug for WatchEvent<T, U> where
 /// unaware of the deception. Now it does require the user to pass explicit an Spec
 /// and Status structs, which is slightly awkward.
 ///
-/// This struct appears in `ResourceList` and `WatchEvent`, and when using a `Reflector`,
-/// it is exposed as the value of the `ResourceMap` to make it seem like a normal resouce object.
+/// This struct appears in `ObjectList` and `WatchEvent`, and when using a `Reflector`,
+/// and is exposed as the values in `ObjectMap`.
 #[derive(Deserialize, Serialize, Clone)]
-pub struct Resource<T, U> where
+pub struct Object<T, U> where
   T: Clone, U: Clone
 {
     /// The version of the API
@@ -106,7 +106,7 @@ pub struct Resource<T, U> where
 }
 
 
-/// A generic kubernetes resource list
+/// A generic kubernetes object list
 ///
 /// This is used instead of a full struct for `DeploymentList`, `PodList`, etc.
 /// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
@@ -116,7 +116,7 @@ pub struct Resource<T, U> where
 ///
 /// It should not be exposed outside this crate
 #[derive(Deserialize)]
-pub struct ResourceList<T> where
+pub struct ObjectList<T> where
   T: Clone
 {
     // NB: kind and apiVersion can be set here, but no need for it atm

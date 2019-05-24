@@ -3,8 +3,8 @@ use crate::api::{
     GetParams,
 };
 use crate::api::resource::{
-    ResourceList,
-    Resource,
+    ObjectList,
+    Object,
     WatchEvent,
 };
 use serde::de::DeserializeOwned;
@@ -18,8 +18,8 @@ use std::{
     time::{Duration},
 };
 
-/// Resource map exposed by the Reflector from its cache
-pub type ResourceMap<P, U> = BTreeMap<String, Resource<P,U>>;
+/// Cache resource map exposed by the Reflector
+pub type Cache<P, U> = BTreeMap<String, Object<P,U>>;
 
 /// A reflection of `Resource` state in kubernetes
 ///
@@ -34,7 +34,7 @@ pub struct Reflector<P, U> where
     P: Clone + DeserializeOwned,
     U: Clone + DeserializeOwned
 {
-    data: Arc<RwLock<ResourceMap<P, U>>>,
+    data: Arc<RwLock<Cache<P, U>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
     resource: Api,
@@ -120,7 +120,7 @@ impl<P, U> Reflector<P, U> where
     }
 
     /// Read data for users of the reflector
-    pub fn read(&self) -> Result<ResourceMap<P, U>> {
+    pub fn read(&self) -> Result<Cache<P, U>> {
         // unwrap for users because Poison errors are not great to deal with atm.
         // If a read fails, you've probably failed to parse the Resource into a T
         // this likely implies versioning issues between:
@@ -144,10 +144,10 @@ impl<P, U> Reflector<P, U> where
     }
 
 
-    fn get_full_resource_entries(&self) -> Result<(ResourceMap<P, U>, String)> {
+    fn get_full_resource_entries(&self) -> Result<(Cache<P, U>, String)> {
         let req = self.resource.list(&self.params)?;
-        // NB: Resource isn't general enough here
-        let res = self.client.request::<ResourceList<Resource<P, U>>>(req)?;
+        // NB: Object isn't general enough here
+        let res = self.client.request::<ObjectList<Object<P, U>>>(req)?;
         let mut data = BTreeMap::new();
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
 

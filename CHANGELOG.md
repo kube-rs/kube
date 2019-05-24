@@ -1,8 +1,13 @@
 0.7.0 / UNRELEASED
 ==================
   * Expose list/watch parameters #11
-  * ApiResource -> Api
-  * ResourceType has been removed in favour of `Api::v1Pod()` say
+  * Many API struct renames:
+    - `ResourceMap` -> `Cache`
+    - `Resource` -> `Object`
+    - `ResourceList` -> `ObjectList`
+    - `ApiResource` -> `Api`
+  * `ResourceType` has been removed in favour of `Api::v1Pod()` say
+  * Major API overhaul to support generic operations on Object
 
 0.6.0 / 2019-05-12
 ==================
