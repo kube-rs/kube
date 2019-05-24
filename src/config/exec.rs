@@ -1,9 +1,7 @@
 use std::process::Command;
 
-use failure::Error;
-use serde_json;
-
-use config::apis;
+use crate::Error;
+use crate::config::apis;
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
 /// HTTP transports.

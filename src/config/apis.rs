@@ -1,10 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 
-use failure::Error;
-use serde_yaml;
-
+use crate::{Result};
 use crate::config::utils;
 use crate::oauth2;
 
@@ -100,7 +98,7 @@ pub struct AuthInfo {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthProviderConfig {
     pub name: String,
-    pub config: BTreeMap<String, String>,
+    pub config: HashMap<String, String>,
 }
 
 /// ExecConfig stores credential-plugin configuration.
@@ -130,7 +128,7 @@ pub struct Context {
 }
 
 impl Config {
-    pub fn load_config<P: AsRef<Path>>(path: P) -> Result<Config, Error> {
+    pub fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
         let f = File::open(path)?;
         let config = serde_yaml::from_reader(f)?;
         Ok(config)
@@ -138,7 +136,7 @@ impl Config {
 }
 
 impl Cluster {
-    pub fn load_certificate_authority(&self) -> Result<Vec<u8>, Error> {
+    pub fn load_certificate_authority(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(
             &self.certificate_authority_data,
             &self.certificate_authority,
@@ -147,7 +145,7 @@ impl Cluster {
 }
 
 impl AuthInfo {
-    pub fn load_gcp(&mut self) -> Result<bool, Error> {
+    pub fn load_gcp(&mut self) -> Result<bool> {
         match &self.auth_provider {
             Some(provider) => {
                 self.token = Some(provider.config["access-token"].clone());
@@ -164,11 +162,11 @@ impl AuthInfo {
         Ok(true)
     }
 
-    pub fn load_client_certificate(&self) -> Result<Vec<u8>, Error> {
+    pub fn load_client_certificate(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
     }
 
-    pub fn load_client_key(&self) -> Result<Vec<u8>, Error> {
+    pub fn load_client_key(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
     }
 }

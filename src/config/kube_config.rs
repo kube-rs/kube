@@ -1,10 +1,10 @@
 use std::path::Path;
-
-use failure::Error;
-use openssl::pkcs12::Pkcs12;
-use openssl::pkey::PKey;
-use openssl::x509::X509;
-
+use openssl::{
+    pkcs12::Pkcs12,
+    pkey::PKey,
+    x509::X509,
+};
+use crate::{Result, Error};
 use crate::config::apis::{AuthInfo, Cluster, Config, Context};
 
 /// KubeConfigLoader loads current context, cluster, and authentication information.
@@ -21,7 +21,7 @@ impl KubeConfigLoader {
         context: Option<String>,
         cluster: Option<String>,
         user: Option<String>,
-    ) -> Result<KubeConfigLoader, Error> {
+    ) -> Result<KubeConfigLoader> {
         let config = Config::load_config(path)?;
         let context_name = context.as_ref().unwrap_or(&config.current_context);
         let current_context = config
@@ -57,7 +57,7 @@ impl KubeConfigLoader {
         })
     }
 
-    pub fn p12(&self, password: &str) -> Result<Pkcs12, Error> {
+    pub fn p12(&self, password: &str) -> Result<Pkcs12> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
@@ -69,8 +69,8 @@ impl KubeConfigLoader {
             .map_err(Error::from)
     }
 
-    pub fn ca(&self) -> Option<Result<X509, Error>> {
-        let ca = self.cluster.load_certificate_authority()?;
-        Some(ca.and_then(|ca| X509::from_pem(&ca).map_err(Error::from)))
+    pub fn ca(&self) -> Option<Result<X509>> {
+        let ca = self.cluster.load_certificate_authority().ok()?;
+        Some(X509::from_pem(&ca).map_err(Error::from))
     }
 }
