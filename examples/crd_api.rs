@@ -1,17 +1,18 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate failure;
 #[macro_use] extern crate serde_derive;
+use serde_json::json;
 
 use kube::{
-    api::{Api, PostResponse, CreateResponse, PostParams, Object, Void},
+    api::{Api, PostResponse, PostParams, Object},
     client::APIClient,
     config,
 };
 
+//use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
     //CustomResourceDefinition as Crd,
     CustomResourceDefinitionSpec as CrdSpec,
-    CustomResourceDefinitionNames as CrdNames,
     CustomResourceDefinitionStatus as CrdStatus,
 };
 
@@ -37,35 +38,46 @@ fn main() -> Result<(), failure::Error> {
     let crds = Api::v1beta1CustomResourceDefinition();
 
     // Create the CRD so we can create Foos in kube
-    let foocrd = CrdSpec {
-        group: "clux.dev".into(),
-        version: Some("v1".into()),
-        scope: "Namespaced".into(),
-        names: CrdNames {
-            plural: "foos".into(),
-            singular: Some("foo".into()),
-            kind: "Foo".into(),
-            ..Default::default()
+    let foocrd = json!({
+        "metadata": {
+            "name": "foos.clux.dev"
         },
-        ..Default::default()
-    };
+        "spec": {
+            "group": "clux.dev",
+            "version": "v1",
+            "scope": "Namespaced",
+            "names": {
+                "plural": "foos",
+                "singular": "foo",
+                "kind": "Foo",
+            }
+        }
+    });
+
     let pp = PostParams::default();
     let req = crds.create(&pp, serde_json::to_vec(&foocrd)?)?;
-    match client.request::<CreateResponse<Object<CrdSpec, CrdStatus>>>(req)? {
-        CreateResponse::Created(o) => info!("Created {}", o.metadata.name),
-        CreateResponse::Accepted(o) => info!("Accepted {}", o.metadata.name),
-        CreateResponse::Ok(o) => info!("Ok {}", o.metadata.name),
-        CreateResponse::Error => bail!("Uh oh"),
+    if let Ok(res) = client.request::<Object<CrdSpec, CrdStatus>>(req) {
+        info!("Created {}", res.metadata.name);
+        debug!("Created CRD: {:?}", res.spec);
+    } else {
+        // TODO: need error code here for ease
     }
+
 
     // Manage the Foo CR
     let foos = Api::customResource("foos.clux.dev").version("v1");
 
     // Create some Foos
-    let f1 = FooSpec { name: "baz".into(), info: "unpatched baz".into() };
+    let f1 = json!({
+        "metadata": { "name": "baz" },
+        "spec": FooSpec { name: "baz".into(), info: "unpatched baz".into() }
+    });
     foos.create(&pp, serde_json::to_vec(&f1)?)?;
 
-    let f2 = FooSpec { name: "qux".into(), info: "unpatched qux".into() };
+    let f2 = json!({
+        "metadata": { "name": "qux" },
+        "spec": FooSpec { name: "qux".into(), info: "unpatched qux".into() }
+    });
     foos.create(&pp, serde_json::to_vec(&f2)?)?;
 
 
@@ -81,11 +93,9 @@ fn main() -> Result<(), failure::Error> {
     // Set its status:
     let fs = FooStatus { is_bad: true };
     let req = foos.replace_status("baz", &pp, serde_json::to_vec(&fs)?)?;
-    match client.request::<PostResponse<Foo>>(req)? {
-        PostResponse::Ok(o) => info!("Replaced status {:?} for {}", o.status, o.metadata.name),
-        PostResponse::Created(o) => info!("Replaced status {:?} for {}", o.status, o.metadata.name),
-        PostResponse::Error => bail!("uh oh 2"),
-    }
+    let res = client.request::<Foo>(req)?;
+    info!("Replaced status {:?} for {}", res.status, res.metadata.name);
+
 
     // Verify we can get it
     let req = foos.get("baz")?;
@@ -96,7 +106,6 @@ fn main() -> Result<(), failure::Error> {
     let req = foos.get("qux")?;
     let f2 = client.request::<Foo>(req)?;
     assert_eq!(f2.spec.info, "unpatched qux");
-
 
     Ok(())
 }

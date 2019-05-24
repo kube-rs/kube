@@ -144,6 +144,7 @@ pub enum PostResponse<T> where
     Error, // Unauthorized or other
 }
 
+
 /// Generic post response object
 ///
 /// Returned from create new
@@ -156,6 +157,8 @@ pub enum CreateResponse<T> where
     Accepted(T), // StatusCode::ACCEPTED
     Error, // Unauthorized or other
 }
+// NB: 409 CONFLICT returned when already exists..
+
 
 /// Generic response object
 ///

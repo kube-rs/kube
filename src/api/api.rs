@@ -6,7 +6,7 @@ use crate::{Result, Error};
 ///
 /// Used to construct requests from url conventions.
 /// When data is PUT/POST/PATCH'd this struct requires raw bytes.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Api {
     /// API Resource name
     pub resource: String,
@@ -16,6 +16,8 @@ pub struct Api {
     pub namespace: Option<String>,
     /// API version of the resource
     pub version: String,
+    /// Subresource version of scale (takes precedence)
+    pub scale_version: String,
     /// Name of the api prefix (api or apis typically)
     pub prefix: String,
 
@@ -28,15 +30,9 @@ impl Default for Api {
             namespace: None,
             group: "".into(),
             version: "v1".into(),
+            scale_version: "v1beta2".into(), // not stable yet
             prefix: "apis".into(), // seems most common
         }
-    }
-}
-
-impl Debug for Api {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Api {{ {} {} {} {} {:?} }}", self.resource, self.version,
-            self.group, self.prefix, self.namespace)
     }
 }
 
@@ -142,14 +138,30 @@ impl Api {
 
 // -------------------------------------------------------
 
+// TODO: set these..
+enum SubResource {
+    Scale,
+    Status,
+}
+impl SubResource {
+    fn version(&self) -> String {
+        match self {
+            SubResource::Scale => "v1beta2".into(),
+            SubResource::Status => "v1beta2".into(),
+        }
+    }
+}
 
-impl ToString for Api
-{
-    fn to_string(&self) -> String {
+impl Api {
+    fn make_url(&self, sub: Option<SubResource>) -> String {
         let pref = if self.prefix == "" { "".into() } else { format!("{}/", self.prefix) };
         let g = if self.group == "" { "".into() } else { format!("{}/", self.group) };
-        let v = if self.version == "" { "".into() } else { format!("{}/", self.version) };
+        let v = match sub {
+            Some(s) => format!("{}/", s.version()),
+            None => format!("{}/", self.version)
+        };
         let n = if let Some(ns) = &self.namespace { format!("namespaces/{}/", ns) } else { "".into() };
+
         format!("/{prefix}{group}{version}{namespaces}{resource}",
             prefix = pref,
             group = g,
@@ -181,7 +193,7 @@ pub struct PostParams {
 impl Api {
     /// Create a list request to fully re-fetch the state
     pub fn list(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
+        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "?");
 
         if let Some(fields) = &par.field_selector {
             qp.append_pair("fieldSelector", &fields);
@@ -200,7 +212,7 @@ impl Api {
 
     /// Create a minimial list request to seed an initial resourceVersion
     pub(crate) fn list_zero_resource_entries(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
+        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "?");
         qp.append_pair("limit", "1"); // can't have 0..
         if par.include_uninitialized {
             qp.append_pair("includeUninitialized", "true");
@@ -213,7 +225,7 @@ impl Api {
 
     /// Create watch request for a Api at a given version
     pub(crate) fn watch(&self, par: &GetParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
+        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "?");
 
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
@@ -236,14 +248,14 @@ impl Api {
 
     /// Get a single instance
     pub fn get(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "/" + name);
+        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "/" + name);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::from)
     }
 
     pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
+        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "?");
         if pp.dry_run {
             qp.append_pair("dryRun", "true");
         }
@@ -252,7 +264,7 @@ impl Api {
         req.body(data).map_err(Error::from)
     }
     pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.to_string() + "/" + name + "?";
+        let base_url = self.make_url(None) + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "true");
@@ -282,7 +294,7 @@ impl Api {
     //}
 
     pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.to_string() + "/" + name + "/status";
+        let base_url = self.make_url(Some(SubResource::Status)) + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "true");
@@ -293,7 +305,7 @@ impl Api {
     }
 
     pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.to_string() + "/" + name + "/status";
+        let base_url = self.make_url(Some(SubResource::Status)) + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "true");
@@ -348,7 +360,7 @@ fn patch_status_path(){
     let r = Api::v1Node();
     let pp = PostParams::default();
     let req = r.patch_status("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status");
+    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/status");
     assert_eq!(req.method(), "PATCH");
 }
 #[test]
