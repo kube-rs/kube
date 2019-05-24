@@ -131,13 +131,48 @@ pub struct ResourceList<T> where
     pub items: Vec<T>,
 }
 
+/// Generic post response object
+///
+/// Returned from patch / replace (incl. status)
 #[derive(Deserialize, Serialize, Clone)]
 //#[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum PostResponse<T> where
     T: Clone
 {
-    Ok(T),
-    Created(T),
-    Unauthorized,
-    Other,
+    Ok(T), // StatusCode::OK
+    Created(T), // StatusCode::CREATED
+    Error, // Unauthorized or other
 }
+
+/// Generic post response object
+///
+/// Returned from create new
+#[derive(Deserialize, Serialize, Clone)]
+pub enum CreateResponse<T> where
+    T: Clone
+{
+    Ok(T), // StatusCode::OK
+    Created(T), // StatusCode::CREATED
+    Accepted(T), // StatusCode::ACCEPTED
+    Error, // Unauthorized or other
+}
+
+/// Generic response object
+///
+/// Returned from patch, get, watch style requests
+#[derive(Deserialize, Serialize, Clone)]
+//#[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
+pub enum Response<T> where
+    T: Clone
+{
+    Ok(T),
+    Error, // Unauthorized or other
+}
+
+// TODO: delete collection is weird - why would it give you meta::v1::Status?
+//pub enum DeleteCollectionNamespacedDeploymentResponse {
+//    OkStatus(crate::v1_13::apimachinery::pkg::apis::meta::v1::Status),
+//    OkValue(crate::v1_13::api::apps::v1::Deployment),
+//    Unauthorized,
+//    Other,
+//}

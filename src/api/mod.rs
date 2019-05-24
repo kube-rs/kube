@@ -21,6 +21,7 @@ mod api;
 pub use api::{
     Api,
     GetParams,
+    PostParams,
 };
 
 mod resource;
@@ -29,6 +30,8 @@ pub use self::resource::{
     WatchEvent,
     ApiError,
     PostResponse,
+    CreateResponse,
+    Response,
 };
 
 mod metadata;

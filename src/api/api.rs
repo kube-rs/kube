@@ -4,7 +4,8 @@ use crate::{Result, Error};
 
 /// Resource representation from an API perspective
 ///
-/// Used to construct the url for rest api calls.
+/// Used to construct requests from url conventions.
+/// When data is PUT/POST/PATCH'd this struct requires raw bytes.
 #[derive(Clone)]
 pub struct Api {
     /// API Resource name
@@ -19,8 +20,6 @@ pub struct Api {
     pub prefix: String,
 
 }
-// TODO: put client within this so you can make a requests directly
-// would imply Api<NodeSpec, NodeStatus> is th normal instatiation...
 
 impl Default for Api {
     fn default() -> Self {
@@ -42,8 +41,7 @@ impl Debug for Api {
 }
 
 #[allow(non_snake_case)]
-impl Api
-{
+impl Api {
     pub fn within(mut self, ns: &str) -> Self {
         //match &self.resource {
         //    "nodes" | "namespaces" | "customresourcedefinitions" =>
@@ -174,6 +172,12 @@ pub struct GetParams {
     pub timeout: Option<u32>
 }
 
+/// Common query parameters for put/post/patch calls
+#[derive(Default, Clone)]
+pub struct PostParams {
+    pub dry_run: bool,
+}
+
 impl Api {
     /// Create a list request to fully re-fetch the state
     pub fn list(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
@@ -230,14 +234,34 @@ impl Api {
         req.body(vec![]).map_err(Error::from)
     }
 
-    // TODO: dry-run PostParams
-    pub fn create(&self) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
-        qp.append_pair("dryRun", "true");
+    /// Get a single instance
+    pub fn get(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "/" + name);
         let urlstr = qp.finish();
-        let mut req = http::Request::post(urlstr);
+        let mut req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::from)
     }
+
+    pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        let mut qp = url::form_urlencoded::Serializer::new(self.to_string() + "?");
+        if pp.dry_run {
+            qp.append_pair("dryRun", "true");
+        }
+        let urlstr = qp.finish();
+        let mut req = http::Request::post(urlstr);
+        req.body(data).map_err(Error::from)
+    }
+    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.to_string() + "/" + name + "?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if pp.dry_run {
+            qp.append_pair("dryRun", "true");
+        }
+        let urlstr = qp.finish();
+        let mut req = http::Request::put(urlstr);
+        req.body(data).map_err(Error::from)
+    }
+
 
     // scale subresource is not v1...
     //fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
@@ -257,35 +281,28 @@ impl Api {
     //    req.body(vec![]).map_err(Error::from)
     //}
 
-    // TODO: need a spec for T
-    pub fn replace(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.to_string() + "/" + name + "?";
-        let mut qp = url::form_urlencoded::Serializer::new(base_url);
-        qp.append_pair("dryRun", "true");
-        let urlstr = qp.finish();
-        let mut req = http::Request::put(urlstr);
-        //let body = serde_json::to_vec(&patch)?; TODO: needs spec T
-        req.body(vec![]).map_err(Error::from)
-    }
-
-    /// Patch needs serialize
-    ///
-    /// Typically, you want to pass `serde_json::to_vec(some_json_subset)`.
-    pub fn patch_status(&self, name: &str, patch: &[u8]) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.to_string() + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if pp.dry_run {
+            qp.append_pair("dryRun", "true");
+        }
         let urlstr = qp.finish();
         let mut req = http::Request::patch(urlstr);
-        req.body(patch.to_vec()).map_err(Error::from)
+        req.body(patch).map_err(Error::from)
     }
 
-    pub fn replace_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.to_string() + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if pp.dry_run {
+            qp.append_pair("dryRun", "true");
+        }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        req.body(data).map_err(Error::from)
     }
+
 }
 
 #[test]
@@ -305,29 +322,16 @@ fn watch_path() {
 #[test]
 fn replace_path(){
     let r = Api::v1DaemonSet();
-    let req = r.replace("myds").unwrap();
+    let pp = PostParams { dry_run: true, ..Default::default() };
+    let req = r.replace("myds", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=true");
-}
-#[test]
-fn patch_status_path(){
-    let r = Api::v1Node();
-    let data = serde_json::to_vec("{}").unwrap();
-    let req = r.patch_status("mynode", &data).unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status");
-    assert_eq!(req.method(), "PATCH");
-}
-#[test]
-fn replace_status_path(){
-    let r = Api::v1Node();
-    let req = r.replace_status("mynode").unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status");
-    assert_eq!(req.method(), "PUT");
 }
 #[test]
 fn create_path() {
     let r = Api::v1ReplicaSet().within("ns");
-    let req = r.create().unwrap();
-    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets?&dryRun=true");
+    let pp = PostParams::default();
+    let req = r.create(&pp, vec![]).unwrap();
+    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets?");
 }
 
 #[test]
@@ -337,10 +341,29 @@ fn namespace_path() { // weird object compared to other v1
     let req = r.list(&gp).unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces")
 }
+
+// subresources TODO: version accuracy!
+#[test]
+fn patch_status_path(){
+    let r = Api::v1Node();
+    let pp = PostParams::default();
+    let req = r.patch_status("mynode", &pp, vec![]).unwrap();
+    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status");
+    assert_eq!(req.method(), "PATCH");
+}
+#[test]
+fn replace_status_path(){
+    let r = Api::v1Node();
+    let pp = PostParams::default();
+    let req = r.replace_status("mynode", &pp, vec![]).unwrap();
+    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status");
+    assert_eq!(req.method(), "PUT");
+}
 #[test]
 fn replace_status() {
     let r = Api::v1beta1CustomResourceDefinition();
-    let req = r.replace_status("mycrd.domain.io").unwrap();
+    let pp = PostParams::default();
+    let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
     assert_eq!(req.uri(),
         "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/mycrd.domain.io/status"
     );
