@@ -8,6 +8,7 @@
     - `ApiResource` -> `Api`
   * `ResourceType` has been removed in favour of `Api::v1Pod()` say
   * `Object::status` now wrapped in an `Option` (not present everywhere)
+  * `ObjectList` exposed
   * Major API overhaul to support generic operations on `Object`
   * Api can be used to perform generic actions on resources:
     - `create`
@@ -24,6 +25,10 @@
     - `patch_status` (ditto)
     - `replace_status` (ditto)
   * crd_api example added to track the action api
+  * Bunch of generic parameter structs exposed for common operations:
+    - `ListParams` exposed
+    - `DeleteParams` exposed
+    - `PostParams` exposed
 
 0.6.0 / 2019-05-12
 ==================
