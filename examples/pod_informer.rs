@@ -37,7 +37,7 @@ fn handle_node(_c: &APIClient, ev: WatchEvent<PodSpec, PodStatus>) -> Result<(),
             info!("Added Pod: {} (containers={:?})", o.metadata.name, containers);
         },
         WatchEvent::Modified(o) => {
-            let phase = o.status.phase.unwrap();
+            let phase = o.status.unwrap().phase.unwrap();
             info!("Modified Pod: {} (phase={})", o.metadata.name, phase);
         },
         WatchEvent::Deleted(o) => {

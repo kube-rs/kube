@@ -20,7 +20,7 @@ fn main() -> Result<(), failure::Error> {
     rf.read()?.into_iter().for_each(|(name, p)| {
         info!("Found pod {} ({}) with {:?}",
             name,
-            p.status.phase.unwrap(),
+            p.status.unwrap().phase.unwrap(),
             p.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>(),
         );
     });

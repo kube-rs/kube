@@ -1,17 +1,14 @@
 #[macro_use] extern crate log;
-#[macro_use] extern crate failure;
 #[macro_use] extern crate serde_derive;
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostResponse, PostParams, DeleteParams, Object, PropagationPolicy, Void},
+    api::{Api, PostParams, DeleteParams, Object, Void},
     client::APIClient,
     config,
 };
 
-//use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
-    //CustomResourceDefinition as Crd,
     CustomResourceDefinitionSpec as CrdSpec,
     CustomResourceDefinitionStatus as CrdStatus,
 };
@@ -43,18 +40,14 @@ fn main() -> Result<(), failure::Error> {
     let crds = Api::v1beta1CustomResourceDefinition();
 
     // Delete any old versions of it first:
-    let dp = DeleteParams {
-        propagation_policy: Some(PropagationPolicy::Foreground),
-        ..Default::default()
-    };
-    //let req = crds.delete("foos.clux.dev", &dp)?;
-    //if let Ok(res) = client.request::<FullCrd>(req) {
-    //    info!("Deleted {}: ({:?})", res.metadata.name, res.status.conditions.unwrap().last());
-    //    use std::{thread, time};
-    //    let five_secs = time::Duration::from_millis(5000);
-    //    thread::sleep(five_secs);
-    //    // even foreground policy doesn't seem to block here..
-    //}
+    let dp = DeleteParams::default();
+    let req = crds.delete("foos.clux.dev", &dp)?;
+    if let Ok(res) = client.request::<FullCrd>(req) {
+        info!("Deleted {}: ({:?})", res.metadata.name,
+            res.status.unwrap().conditions.unwrap().last());
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+        // even PropagationPolicy::Foreground doesn't seem to block here..
+    }
 
     // Create the CRD so we can create Foos in kube
     let foocrd = json!({
@@ -97,21 +90,38 @@ fn main() -> Result<(), failure::Error> {
     let f1 = json!({
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
-        "metadata": { "name": "baz", "info": "old" },
+        "metadata": { "name": "baz" },
+        "spec": { "name": "baz", "info": "old baz" },
     });
     let req = foos.create(&pp, serde_json::to_vec(&f1)?)?;
     let o = client.request::<FooMeta>(req)?;
     info!("Created {}", o.metadata.name);
 
-    // Modify a Foo baz with a Patch
-    info!("Patch Foo instance baz");
-    let patch = json!({
-        "spec": { "info": "patched baz" }
-    });
-    let req = foos.patch("baz", &pp, serde_json::to_vec(&patch)?)?;
-    let o = client.request::<Foo>(req)?;
-    info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
+    // Verify we can get it
+    info!("Get Foo baz");
+    let f1cpy = client.request::<Foo>(foos.get("baz")?)?;
+    assert_eq!(f1cpy.spec.info, "old baz");
 
+    // Replace its spec
+    info!("Replace Foo baz");
+    let foo_replace = json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "metadata": {
+            "name": "baz",
+            // Need to provide our last observed version:
+            "resourceVersion": f1cpy.metadata.resourceVersion,
+        },
+        "spec": { "name": "baz", "info": "new baz" },
+    });
+    let req = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?)?;
+    let f1_replaced = client.request::<Foo>(req)?;
+    assert_eq!(f1_replaced.spec.name, "baz");
+    assert_eq!(f1_replaced.spec.info, "new baz");
+    assert!(f1_replaced.status.is_none());
+
+
+    // Create Foo qux with status
     info!("Create Foo instance qux");
     let f2 = json!({
         "apiVersion": "clux.dev/v1",
@@ -121,29 +131,33 @@ fn main() -> Result<(), failure::Error> {
         "status": FooStatus::default(),
     });
     let req = foos.create(&pp, serde_json::to_vec(&f2)?)?;
-    let o = client.request::<FooMeta>(req)?;
+    let o = client.request::<Foo>(req)?;
     info!("Created {}", o.metadata.name);
 
+    // Update status on qux - TODO: better cluster
+    if o.status.is_some() {
+        info!("Replace Status on Foo instance qux");
+        let fs = json!({
+            "status": FooStatus { is_bad: true }
+        });
+        let req = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+        let res = client.request::<Foo>(req)?;
+        info!("Replaced status {:?} for {}", res.status, res.metadata.name);
+    } else {
+        warn!("Not doing status replace - does the cluster support sub-resources?");
+    }
 
-    // Update status on -qux
-    info!("Replace Status on Foo instance qux");
-    let fs = json!({
-        "status": FooStatus { is_bad: true }
+    // Modify a Foo qux with a Patch
+    info!("Patch Foo instance qux");
+    let patch = json!({
+        "spec": { "info": "patched qux" }
     });
-    let req = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
-    let res = client.request::<Foo>(req)?;
-    info!("Replaced status {:?} for {}", res.status, res.metadata.name);
+    let req = foos.patch("qux", &pp, serde_json::to_vec(&patch)?)?;
+    let o = client.request::<Foo>(req)?;
+    info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
+    assert_eq!(o.spec.info, "patched qux");
+    assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
-
-    // Verify we can get it
-    let req = foos.get("baz")?;
-    let f2cpy = client.request::<Foo>(req)?;
-    assert_eq!(f2cpy.spec.info, "patched baz");
-
-    // The other one has no status:
-    let req = foos.get("qux")?;
-    let f2 = client.request::<Foo>(req)?;
-    assert_eq!(f2.spec.info, "unpatched qux");
 
     Ok(())
 }

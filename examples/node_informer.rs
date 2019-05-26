@@ -38,7 +38,7 @@ fn handle_nodes(client: &APIClient, ev: WatchEvent<NodeSpec, NodeStatus>) -> Res
         WatchEvent::Modified(o) => {
             // Nodes often modify a lot - only print broken nodes
             if let Some(true) = o.spec.unschedulable {
-                let failed = o.status.conditions.unwrap().into_iter().filter(|c| {
+                let failed = o.status.unwrap().conditions.unwrap().into_iter().filter(|c| {
                     // In a failed state either some of the extra conditions are not False
                     // Or the Ready state is False
                     (c.status == "True" && c.type_ != "Ready") ||
@@ -62,7 +62,7 @@ fn handle_nodes(client: &APIClient, ev: WatchEvent<NodeSpec, NodeStatus>) -> Res
         WatchEvent::Deleted(o) => {
             warn!("Deleted node: {} ({:?}) running {:?} with labels: {:?}",
                 o.metadata.name, o.spec.provider_id.unwrap(),
-                o.status.conditions.unwrap(),
+                o.status.unwrap().conditions.unwrap(),
                 o.metadata.labels,
             );
         },

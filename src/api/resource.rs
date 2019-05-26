@@ -32,7 +32,7 @@ pub struct ApiError {
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<T, U> where
-  T: Clone, U: Clone
+  T: Clone, U: Clone + Default,
 {
     Added(Object<T, U>),
     Modified(Object<T, U>),
@@ -41,7 +41,7 @@ pub enum WatchEvent<T, U> where
 }
 
 impl<T, U> Debug for WatchEvent<T, U> where
-   T: Clone, U: Clone
+   T: Clone, U: Clone + Default
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
@@ -102,7 +102,8 @@ pub struct Object<T, U> where
     ///
     /// This publishes the state of the Resource as observed by the controller.
     /// Internally passed as `Option<()>` when a status does not exist.
-    pub status: U,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<U>,
 }
 
 
@@ -131,7 +132,7 @@ pub struct ObjectList<T> where
     pub items: Vec<T>,
 }
 
-/// Generic post response object
+/*/// Generic post response object
 ///
 /// Returned from patch / replace (incl. status)
 #[derive(Deserialize, Serialize, Clone)]
@@ -178,4 +179,4 @@ pub enum Response<T> where
 //    OkValue(crate::v1_13::api::apps::v1::Deployment),
 //    Unauthorized,
 //    Other,
-//}
+//}*/

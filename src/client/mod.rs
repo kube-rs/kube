@@ -48,7 +48,7 @@ impl APIClient {
                 return Err(Error::from(format_err!("Invalid method: {}", other)));
             }
         }.headers(parts.headers).body(body).build()?;
-        trace!("Request Headers: {:?}", req.headers());
+        //trace!("Request Headers: {:?}", req.headers());
         Ok(self.configuration.client.execute(req)?)
     }
 
@@ -59,7 +59,7 @@ impl APIClient {
     {
         let mut res : reqwest::Response = self.send(request)?;
         trace!("{} {}", res.status().as_str(), res.url());
-        trace!("Response Headers: {:?}", res.headers());
+        //trace!("Response Headers: {:?}", res.headers());
         if !res.status().is_success() {
             let text = res.text()?;
             // Print better debug when things do fail
@@ -87,6 +87,8 @@ impl APIClient {
         T: DeserializeOwned,
     {
         let mut res : reqwest::Response = self.send(request)?;
+        trace!("{} {}", res.status().as_str(), res.url());
+        //trace!("Response Headers: {:?}", res.headers());
         if !res.status().is_success() {
             let text = res.text()?;
             // Print better debug when things do fail

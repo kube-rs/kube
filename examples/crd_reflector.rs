@@ -23,7 +23,7 @@ fn main() -> Result<(), failure::Error> {
     // This example requires `kubectl apply -f examples/foo.yaml` run first
     let resource = Api::customResource("foos")
         .group("clux.dev")
-        .within("kube-system");
+        .within("dev");
 
     let rf : Reflector<Foo, Void> = Reflector::new(client, resource)
         .init()?;

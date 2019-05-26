@@ -30,7 +30,7 @@ type WatchQueue<P, U> = VecDeque<WatchEvent<P, U>>;
 #[derive(Clone)]
 pub struct Informer<P, U> where
     P: Clone + DeserializeOwned,
-    U: Clone + DeserializeOwned
+    U: Clone + DeserializeOwned + Default,
 {
     events: Arc<RwLock<WatchQueue<P, U>>>,
     version: Arc<RwLock<String>>,
@@ -41,7 +41,7 @@ pub struct Informer<P, U> where
 
 impl<P, U> Informer<P, U> where
     P: Clone + DeserializeOwned,
-    U: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned + Default,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn new(client: APIClient, r: Api) -> Self {

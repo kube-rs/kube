@@ -21,7 +21,7 @@ fn main() -> Result<(), failure::Error> {
     // Output is Map of name -> Deployment
     rf.read()?.into_iter().for_each(|(name, d)| {
         info!("Found deployment for {} - {} replicas running {:?}",
-            name, d.status.replicas.unwrap(),
+            name, d.status.unwrap().replicas.unwrap(),
             d.spec.template.spec.unwrap().containers
                 .into_iter().map(|c| c.image.unwrap()).collect::<Vec<_>>()
         );

@@ -20,12 +20,12 @@ One of the main abstractions exposed from `kube::api` is `Reflector<T, U>`. This
 
 It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
 
-To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.NodeSpec.html):
+To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
-use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
-let api = Api::v1Node();
-let rf : Reflector<NodeSpec, NodeStatus> = Reflector::new(client, api)?
+use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
+let api = Api::v1Pod().within(&namespace);
+let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client, api)?
     .timeout(10)
     .init();
 ```
@@ -39,7 +39,7 @@ rf.poll()?; // watches + updates state
 rf.read()?.into_iter().for_each(|(name, p)| {
     println!("Found pod {} ({}) with {:?}",
         name,
-        p.status.phase.unwrap(),
+        p.status.unwrap().phase.unwrap(),
         p.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>(),
     );
 });
@@ -123,7 +123,7 @@ cargo run --example crd_reflector
 then you can `kubectl apply -f crd-baz.yaml -n kube-system`, or `kubectl delete -f crd-baz.yaml -n kube-system`, or `kubectl edit foos baz -n kube-system` to verify that the events are being picked up.
 
 ## Timing
-All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can call `.poll()` less often. But the kube api holds for the full timeout value anyway and you can set it with `.timeout(n)`.
+All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can either call `.poll()` less often and the events will collect on the kube side (if you don't wait too long and get a Gone). You can configure the timeout with `.timeout(n)` on the `Informer` or `Reflector`.
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.

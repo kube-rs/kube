@@ -43,7 +43,7 @@ pub struct Reflector<P, U> where
 
 impl<P, U> Reflector<P, U> where
     P: Clone + DeserializeOwned,
-    U: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned + Default,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn new(client: APIClient, r: Api) -> Self {

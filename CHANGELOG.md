@@ -7,7 +7,23 @@
     - `ResourceList` -> `ObjectList`
     - `ApiResource` -> `Api`
   * `ResourceType` has been removed in favour of `Api::v1Pod()` say
-  * Major API overhaul to support generic operations on Object
+  * `Object::status` now wrapped in an `Option` (not present everywhere)
+  * Major API overhaul to support generic operations on `Object`
+  * Api can be used to perform generic actions on resources:
+    - `create`
+    - `get`
+    - `delete`
+    - `watch`
+    - `list`
+    - `patch`
+    - `replace`
+    - `get_scale` (when scale subresource exists)
+    - `patch_scale` (ditto)
+    - `replace_scale` (ditto)
+    - `get_status` (when status subresource exists)
+    - `patch_status` (ditto)
+    - `replace_status` (ditto)
+  * crd_api example added to track the action api
 
 0.6.0 / 2019-05-12
 ==================

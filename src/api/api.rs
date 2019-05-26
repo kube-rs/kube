@@ -352,8 +352,10 @@ impl Api {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let mut req = http::Request::patch(urlstr);
-        req.body(patch).map_err(Error::from)
+        http::Request::patch(urlstr)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/merge-patch+json")
+            .body(patch).map_err(Error::from)
     }
     fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
@@ -366,6 +368,14 @@ impl Api {
         req.body(data).map_err(Error::from)
     }
 
+    fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        let urlstr = qp.finish();
+        let mut req = http::Request::get(urlstr);
+        req.body(vec![]).map_err(Error::from)
+    }
+
     pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -373,8 +383,10 @@ impl Api {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let mut req = http::Request::patch(urlstr);
-        req.body(patch).map_err(Error::from)
+        http::Request::patch(urlstr)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/merge-patch+json")
+            .body(patch).map_err(Error::from)
     }
 
     pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
