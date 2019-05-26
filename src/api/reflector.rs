@@ -1,6 +1,6 @@
 use crate::api::{
     Api,
-    GetParams,
+    ListParams,
 };
 use crate::api::resource::{
     ObjectList,
@@ -38,7 +38,7 @@ pub struct Reflector<P, U> where
     version: Arc<RwLock<String>>,
     client: APIClient,
     resource: Api,
-    params: GetParams,
+    params: ListParams,
 }
 
 impl<P, U> Reflector<P, U> where
@@ -50,13 +50,13 @@ impl<P, U> Reflector<P, U> where
         Reflector {
             client,
             resource: r,
-            params: GetParams::default(),
+            params: ListParams::default(),
             data: Arc::new(RwLock::new(BTreeMap::new())),
             version: Arc::new(RwLock::new(0.to_string())),
         }
     }
 
-    // builders for GetParams - TODO: defer to internal informer in future?
+    // builders for ListParams - TODO: defer to internal informer in future?
     // for now, copy paste of informer's methods.
 
     /// Configure the timeout for the list/watch call.

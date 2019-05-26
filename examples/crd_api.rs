@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, Object, Void},
+    api::{Api, PostParams, DeleteParams, ListParams, Object, ObjectList, Void},
     client::APIClient,
     config,
 };
@@ -158,6 +158,12 @@ fn main() -> Result<(), failure::Error> {
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
+    // Cleanup the full colleciton
+    let lp = ListParams::default();
+    let req = foos.delete_collection(&lp)?;
+    let res = client.request::<ObjectList<Foo>>(req)?;
+    let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
+    info!("Deleted collection of foos: {:?}", deleted);
 
     Ok(())
 }

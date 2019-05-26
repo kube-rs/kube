@@ -20,7 +20,7 @@ pub use self::informer::{
 mod api;
 pub use api::{
     Api,
-    GetParams,
+    ListParams,
     PostParams,
     DeleteParams,
     PropagationPolicy,
@@ -29,6 +29,7 @@ pub use api::{
 mod resource;
 pub use self::resource::{
     Object,
+    ObjectList,
     WatchEvent,
     ApiError,
     //PostResponse,

@@ -168,12 +168,12 @@ impl Api {
     }
 }
 
-/// Common query parameters used in watch/list calls
+/// Common query parameters used in watch/list/delete calls on collections
 ///
 /// Constructed internally with a builder on Informer and Reflector,
 /// but can be passed to the helper function of Api.
 #[derive(Default, Clone)]
-pub struct GetParams {
+pub struct ListParams {
     pub field_selector: Option<String>,
     pub include_uninitialized: bool,
     pub label_selector: Option<String>,
@@ -219,17 +219,17 @@ pub enum PropagationPolicy {
 
 impl Api {
     /// Create a list request to fully re-fetch the state
-    pub fn list(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
-        if let Some(fields) = &par.field_selector {
+        if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", &fields);
         }
-        if par.include_uninitialized {
+        if lp.include_uninitialized {
             qp.append_pair("includeUninitialized", "true");
         }
-        if let Some(labels) = &par.label_selector {
+        if let Some(labels) = &lp.label_selector {
             qp.append_pair("labelSelector", &labels);
         }
 
@@ -239,35 +239,35 @@ impl Api {
     }
 
     /// Create a minimial list request to seed an initial resourceVersion
-    pub(crate) fn list_zero_resource_entries(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
+    pub(crate) fn list_zero_resource_entries(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         qp.append_pair("limit", "1"); // can't have 0..
-        if par.include_uninitialized {
+        if lp.include_uninitialized {
             qp.append_pair("includeUninitialized", "true");
         }
-        // rest of par doesn't matter here - we just need a resourceVersion
+        // rest of lp doesn't matter here - we just need a resourceVersion
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::from)
     }
 
     /// Create watch request for a Api at a given version
-    pub(crate) fn watch(&self, par: &GetParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
+    pub(crate) fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
 
-        qp.append_pair("timeoutSeconds", &par.timeout.unwrap_or(10).to_string());
-        if let Some(fields) = &par.field_selector {
+        qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(10).to_string());
+        if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", &fields);
         }
-        if par.include_uninitialized {
+        if lp.include_uninitialized {
             qp.append_pair("includeUninitialized", "true");
         }
-        if let Some(labels) = &par.label_selector {
+        if let Some(labels) = &lp.label_selector {
             qp.append_pair("labelSelector", &labels);
         }
 
@@ -306,6 +306,23 @@ impl Api {
         }
         if let Some(ref prop) = dp.propagation_policy {
             qp.append_pair("propagationPolicy", &format!("{:?}", prop));
+        }
+        let urlstr = qp.finish();
+        let mut req = http::Request::delete(urlstr);
+        req.body(vec![]).map_err(Error::from)
+    }
+
+    pub fn delete_collection(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if let Some(fields) = &lp.field_selector {
+            qp.append_pair("fieldSelector", &fields);
+        }
+        if lp.include_uninitialized {
+            qp.append_pair("includeUninitialized", "true");
+        }
+        if let Some(labels) = &lp.label_selector {
+            qp.append_pair("labelSelector", &labels);
         }
         let urlstr = qp.finish();
         let mut req = http::Request::delete(urlstr);
@@ -405,14 +422,14 @@ impl Api {
 #[test]
 fn list_path(){
     let r = Api::v1Deployment().within("ns");
-    let gp = GetParams::default();
+    let gp = ListParams::default();
     let req = r.list(&gp).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
 }
 #[test]
 fn watch_path() {
     let r = Api::v1Pod().within("ns");
-    let gp = GetParams::default();
+    let gp = ListParams::default();
     let req = r.watch(&gp, "0").unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=10");
 }
@@ -440,9 +457,18 @@ fn delete_path() {
 }
 
 #[test]
+fn delete_collection_path() {
+    let r = Api::v1ReplicaSet().within("ns");
+    let lp = ListParams::default();
+    let req = r.delete_collection(&lp).unwrap();
+    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets");
+    assert_eq!(req.method(), "DELETE")
+}
+
+#[test]
 fn namespace_path() { // weird object compared to other v1
     let r = Api::v1Namespace();
-    let gp = GetParams::default();
+    let gp = ListParams::default();
     let req = r.list(&gp).unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces")
 }

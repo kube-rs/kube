@@ -113,9 +113,7 @@ pub struct Object<T, U> where
 /// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
 ///
 /// Note that this is only used internally within reflectors and informers,
-/// and is generally produced from list queries on an `Api`.
-///
-/// It should not be exposed outside this crate
+/// and is generally produced from list/watch/delete collection queries on an `Api`.
 #[derive(Deserialize)]
 pub struct ObjectList<T> where
   T: Clone

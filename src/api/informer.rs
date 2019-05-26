@@ -1,6 +1,6 @@
 use crate::api::{
     Api,
-    GetParams,
+    ListParams,
     Void,
 };
 use crate::api::resource::{
@@ -36,7 +36,7 @@ pub struct Informer<P, U> where
     version: Arc<RwLock<String>>,
     client: APIClient,
     resource: Api,
-    params: GetParams,
+    params: ListParams,
 }
 
 impl<P, U> Informer<P, U> where
@@ -48,7 +48,7 @@ impl<P, U> Informer<P, U> where
         Informer {
             client,
             resource: r,
-            params: GetParams::default(),
+            params: ListParams::default(),
             events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(0.to_string())),
         }
