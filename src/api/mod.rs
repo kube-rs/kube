@@ -22,6 +22,8 @@ pub use api::{
     Api,
     GetParams,
     PostParams,
+    DeleteParams,
+    PropagationPolicy,
 };
 
 mod resource;

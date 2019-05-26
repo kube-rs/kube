@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use crate::{Result, Error};
 
 
@@ -16,11 +15,14 @@ pub struct Api {
     pub namespace: Option<String>,
     /// API version of the resource
     pub version: String,
-    /// Subresource version of scale (takes precedence)
-    pub scale_version: String,
     /// Name of the api prefix (api or apis typically)
     pub prefix: String,
+    // extra properties for sub resources
 
+    /// Version of status subresource (takes precedence)
+    pub status_version: String,
+    /// Version of scale subresource (takes precedence)
+    pub scale_version: String,
 }
 
 impl Default for Api {
@@ -30,7 +32,8 @@ impl Default for Api {
             namespace: None,
             group: "".into(),
             version: "v1".into(),
-            scale_version: "v1beta2".into(), // not stable yet
+            scale_version: "v1beta2".into(),
+            status_version: "v1beta2".into(),
             prefix: "apis".into(), // seems most common
         }
     }
@@ -138,27 +141,20 @@ impl Api {
 
 // -------------------------------------------------------
 
-// TODO: set these..
-enum SubResource {
+enum UrlVersion {
+    Default,
     Scale,
     Status,
 }
-impl SubResource {
-    fn version(&self) -> String {
-        match self {
-            SubResource::Scale => "v1beta2".into(),
-            SubResource::Status => "v1beta2".into(),
-        }
-    }
-}
 
 impl Api {
-    fn make_url(&self, sub: Option<SubResource>) -> String {
+    fn make_url(&self, r: UrlVersion) -> String {
         let pref = if self.prefix == "" { "".into() } else { format!("{}/", self.prefix) };
         let g = if self.group == "" { "".into() } else { format!("{}/", self.group) };
-        let v = match sub {
-            Some(s) => format!("{}/", s.version()),
-            None => format!("{}/", self.version)
+        let v = match r {
+            UrlVersion::Scale => format!("{}/", self.scale_version),
+            UrlVersion::Status => format!("{}/", self.status_version),
+            UrlVersion::Default => format!("{}/", self.version)
         };
         let n = if let Some(ns) = &self.namespace { format!("namespaces/{}/", ns) } else { "".into() };
 
@@ -190,10 +186,42 @@ pub struct PostParams {
     pub dry_run: bool,
 }
 
+/// Common query parameters for delete calls
+#[derive(Default, Clone)]
+pub struct DeleteParams {
+    /// When present, indicates that modifications should not be persisted.
+    ///
+    /// An invalid or unrecognized dryRun directive will result in an error response
+    /// and no further processing of the request.
+    pub dry_run: bool,
+    /// The duration in seconds before the object should be deleted.
+    ///
+    /// Value must be non-negative integer. The value zero indicates delete immediately.
+    /// If this value is None, the default grace period for the specified type will be used.
+    /// Defaults to a per object value if not specified. Zero means delete immediately.
+    pub grace_period_seconds: Option<u32>,
+    /// Whether or how garbage collection is performed.
+    ///
+    /// The default policy is decided by the existing finalizer set in
+    /// metadata.finalizers, and the resource-specific default policy.
+    pub propagation_policy: Option<PropagationPolicy>,
+}
+
+#[derive(Clone, Debug)]
+pub enum PropagationPolicy {
+    /// Orphan dependents
+    Orphan,
+    /// Allow the garbage collector to delete the dependents in the background
+    Background,
+    /// A cascading policy that deletes all dependents in the foreground
+    Foreground,
+}
+
 impl Api {
     /// Create a list request to fully re-fetch the state
     pub fn list(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "?");
+        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
         if let Some(fields) = &par.field_selector {
             qp.append_pair("fieldSelector", &fields);
@@ -212,7 +240,8 @@ impl Api {
 
     /// Create a minimial list request to seed an initial resourceVersion
     pub(crate) fn list_zero_resource_entries(&self, par: &GetParams) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "?");
+        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
         qp.append_pair("limit", "1"); // can't have 0..
         if par.include_uninitialized {
             qp.append_pair("includeUninitialized", "true");
@@ -225,7 +254,8 @@ impl Api {
 
     /// Create watch request for a Api at a given version
     pub(crate) fn watch(&self, par: &GetParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "?");
+        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
@@ -248,56 +278,99 @@ impl Api {
 
     /// Get a single instance
     pub fn get(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "/" + name);
+        let base_url = self.make_url(UrlVersion::Default) + "/" + name;
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::from)
     }
 
     pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let mut qp = url::form_urlencoded::Serializer::new(self.make_url(None) + "?");
+        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
-            qp.append_pair("dryRun", "true");
+            qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
         let mut req = http::Request::post(urlstr);
         req.body(data).map_err(Error::from)
     }
-    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(None) + "/" + name + "?";
+    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Default) + "/"+ name + "?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if dp.dry_run {
+            qp.append_pair("dryRun", "All");
+        }
+        if let Some(grace) = dp.grace_period_seconds {
+            qp.append_pair("gracePeriodSeconds", &grace.to_string());
+        }
+        if let Some(ref prop) = dp.propagation_policy {
+            qp.append_pair("propagationPolicy", &format!("{:?}", prop));
+        }
+        let urlstr = qp.finish();
+        let mut req = http::Request::delete(urlstr);
+        req.body(vec![]).map_err(Error::from)
+    }
+
+    pub fn patch(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Default) + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
-            qp.append_pair("dryRun", "true");
+            qp.append_pair("dryRun", "All");
+        }
+        let urlstr = qp.finish();
+
+        http::Request::patch(urlstr)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/merge-patch+json")
+            .body(patch).map_err(Error::from)
+    }
+
+    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Default) + "/" + name + "?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if pp.dry_run {
+            qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
         req.body(data).map_err(Error::from)
     }
 
+    fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        let urlstr = qp.finish();
+        let mut req = http::Request::get(urlstr);
+        req.body(vec![]).map_err(Error::from)
+    }
 
-    // scale subresource is not v1...
-    //fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-    //    let base_url = self.to_string() + "/" + name +"/scale";
-    //    let mut qp = url::form_urlencoded::Serializer::new(base_url);
-    //    let urlstr = qp.finish();
-    //    let mut req = http::Request::get(urlstr);
-    //    req.body(vec![]).map_err(Error::from)
-    //}
-
-    // SCALE IS NOT v1 yet
-    //fn update_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-    //    let base_url = self.to_string() + "/" + name + "?";
-    //    let mut qp = url::form_urlencoded::Serializer::new(base_url);
-    //    let urlstr = qp.finish();
-    //    let mut req = http::Request::patch(urlstr);
-    //    req.body(vec![]).map_err(Error::from)
-    //}
-
-    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(Some(SubResource::Status)) + "/" + name + "/status";
+    fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
-            qp.append_pair("dryRun", "true");
+            qp.append_pair("dryRun", "All");
+        }
+        let urlstr = qp.finish();
+        let mut req = http::Request::patch(urlstr);
+        req.body(patch).map_err(Error::from)
+    }
+    fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if pp.dry_run {
+            qp.append_pair("dryRun", "All");
+        }
+        let urlstr = qp.finish();
+        let mut req = http::Request::put(urlstr);
+        req.body(data).map_err(Error::from)
+    }
+
+    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if pp.dry_run {
+            qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
         let mut req = http::Request::patch(urlstr);
@@ -305,10 +378,10 @@ impl Api {
     }
 
     pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(Some(SubResource::Status)) + "/" + name + "/status";
+        let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
-            qp.append_pair("dryRun", "true");
+            qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
@@ -336,7 +409,7 @@ fn replace_path(){
     let r = Api::v1DaemonSet();
     let pp = PostParams { dry_run: true, ..Default::default() };
     let req = r.replace("myds", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=true");
+    assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
 }
 #[test]
 fn create_path() {
@@ -344,6 +417,14 @@ fn create_path() {
     let pp = PostParams::default();
     let req = r.create(&pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets?");
+}
+#[test]
+fn delete_path() {
+    let r = Api::v1ReplicaSet().within("ns");
+    let dp = DeleteParams::default();
+    let req = r.delete("myrs", &dp).unwrap();
+    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets/myrs");
+    assert_eq!(req.method(), "DELETE")
 }
 
 #[test]
@@ -354,13 +435,13 @@ fn namespace_path() { // weird object compared to other v1
     assert_eq!(req.uri(), "/api/v1/namespaces")
 }
 
-// subresources TODO: version accuracy!
+// subresources with weird version accuracy
 #[test]
 fn patch_status_path(){
     let r = Api::v1Node();
     let pp = PostParams::default();
     let req = r.patch_status("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/status");
+    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/status?");
     assert_eq!(req.method(), "PATCH");
 }
 #[test]
@@ -368,15 +449,48 @@ fn replace_status_path(){
     let r = Api::v1Node();
     let pp = PostParams::default();
     let req = r.replace_status("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status");
+    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/status?");
     assert_eq!(req.method(), "PUT");
 }
+
+#[test]
+fn create_custom_resource() {
+    let r = Api::customResource("foos")
+        .group("clux.dev").version("v1")
+        .within("myns");
+    let pp = PostParams::default();
+    let req = r.create(&pp, vec![]).unwrap();
+    assert_eq!(req.uri(),
+        "/apis/clux.dev/v1/namespaces/myns/foos?"
+    );
+    let req = r.patch("baz", &pp, vec![]).unwrap();
+    assert_eq!(req.uri(),
+        "/apis/clux.dev/v1/namespaces/myns/foos/baz?"
+    );
+}
+
 #[test]
 fn replace_status() {
     let r = Api::v1beta1CustomResourceDefinition();
     let pp = PostParams::default();
     let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
     assert_eq!(req.uri(),
-        "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/mycrd.domain.io/status"
+        "/apis/apiextensions.k8s.io/v1beta2/customresourcedefinitions/mycrd.domain.io/status?"
     );
+}
+#[test]
+fn patch_scale_path(){
+    let r = Api::v1Node();
+    let pp = PostParams::default();
+    let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
+    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale?");
+    assert_eq!(req.method(), "PATCH");
+}
+#[test]
+fn replace_scale_path(){
+    let r = Api::v1Node();
+    let pp = PostParams::default();
+    let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
+    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale?");
+    assert_eq!(req.method(), "PUT");
 }
