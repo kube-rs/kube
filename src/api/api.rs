@@ -391,7 +391,7 @@ impl Api {
     }
 
     /// Get an instance of the scale subresource
-    fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
@@ -400,7 +400,7 @@ impl Api {
     }
 
     /// Patch an instance of the scale subresource
-    fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
@@ -414,7 +414,7 @@ impl Api {
     }
 
     /// Replace an instance of the scale subresource
-    fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
@@ -426,7 +426,7 @@ impl Api {
     }
 
     /// Get an instance of the status subresource
-    fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();

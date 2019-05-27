@@ -26,6 +26,11 @@ openssl = "0.10.12"
 http = "0.1.17"
 url = "1.7.2"
 log = "0.4.6"
+k8s-openapi = { version = "0.4.0", features = ["v1_13"], optional = true }
+
+[features]
+default = []
+openapi = ["k8s-openapi"]
 
 [dev-dependencies]
 k8s-openapi = { version = "0.4.0", features = ["v1_13"] }

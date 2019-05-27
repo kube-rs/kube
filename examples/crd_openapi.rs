@@ -3,14 +3,9 @@
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, ListParams, Object, ObjectList, Void},
+    api::{OpenApi, PostParams, DeleteParams, ListParams},
     client::APIClient,
     config,
-};
-
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
-    CustomResourceDefinitionSpec as CrdSpec,
-    CustomResourceDefinitionStatus as CrdStatus,
 };
 
 // Own custom resource
@@ -26,9 +21,9 @@ pub struct FooStatus {
 }
 
 // shorthands
-type Foo = Object<FooSpec, FooStatus>;
-type FooMeta = Object<Void, Void>;
-type FullCrd = Object<CrdSpec, CrdStatus>;
+//type Foo = Object<FooSpec, FooStatus>;
+//type FooMeta = Object<Void, Void>;
+//type FullCrd = Object<CrdSpec, CrdStatus>;
 
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
@@ -37,12 +32,11 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     // Manage the CRD
-    let crds = Api::v1beta1CustomResourceDefinition();
+    let crds = OpenApi::v1beta1CustomResourceDefinition(client.clone());
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
-    let req = crds.delete("foos.clux.dev", &dp)?;
-    if let Ok((res, _)) = client.request::<FullCrd>(req) {
+    if let Ok((res, _)) = crds.delete("foos.clux.dev", &dp) {
         info!("Deleted {}: ({:?})", res.metadata.name,
             res.status.unwrap().conditions.unwrap().last());
         std::thread::sleep(std::time::Duration::from_millis(1000));
@@ -71,8 +65,7 @@ fn main() -> Result<(), failure::Error> {
 
     info!("Creating CRD foos.clux.dev");
     let pp = PostParams::default();
-    let req = crds.create(&pp, serde_json::to_vec(&foocrd)?)?;
-    match client.request::<FullCrd>(req) {
+    match crds.create(&pp, serde_json::to_vec(&foocrd)?) {
         Ok((o, s)) => {
             info!("Created {} ({})", o.metadata.name, s);
             debug!("Created CRD: {:?}", o.spec);
@@ -87,7 +80,7 @@ fn main() -> Result<(), failure::Error> {
     }
 
     // Manage the Foo CR
-    let foos = Api::customResource("foos")
+    let foos : OpenApi<FooSpec, FooStatus> = OpenApi::customResource(client, "foos")
         .version("v1")
         .group("clux.dev")
         .within("dev");
@@ -100,13 +93,12 @@ fn main() -> Result<(), failure::Error> {
         "metadata": { "name": "baz" },
         "spec": { "name": "baz", "info": "old baz" },
     });
-    let req = foos.create(&pp, serde_json::to_vec(&f1)?)?;
-    let (o, _) = client.request::<FooMeta>(req)?;
+    let (o, _) = foos.create(&pp, serde_json::to_vec(&f1)?)?;
     info!("Created {}", o.metadata.name);
 
     // Verify we can get it
     info!("Get Foo baz");
-    let (f1cpy, _) = client.request::<Foo>(foos.get("baz")?)?;
+    let (f1cpy, _) = foos.get("baz")?;
     assert_eq!(f1cpy.spec.info, "old baz");
 
     // Replace its spec
@@ -121,8 +113,7 @@ fn main() -> Result<(), failure::Error> {
         },
         "spec": { "name": "baz", "info": "new baz" },
     });
-    let req = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?)?;
-    let (f1_replaced, _) = client.request::<Foo>(req)?;
+    let (f1_replaced, _) = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?)?;
     assert_eq!(f1_replaced.spec.name, "baz");
     assert_eq!(f1_replaced.spec.info, "new baz");
     assert!(f1_replaced.status.is_none());
@@ -137,8 +128,7 @@ fn main() -> Result<(), failure::Error> {
         "spec": FooSpec { name: "qux".into(), info: "unpatched qux".into() },
         "status": FooStatus::default(),
     });
-    let req = foos.create(&pp, serde_json::to_vec(&f2)?)?;
-    let (o, _) = client.request::<Foo>(req)?;
+    let (o, _) = foos.create(&pp, serde_json::to_vec(&f2)?)?;
     info!("Created {}", o.metadata.name);
 
     // Update status on qux - TODO: better cluster
@@ -147,8 +137,7 @@ fn main() -> Result<(), failure::Error> {
     //    let fs = json!({
     //        "status": FooStatus { is_bad: true }
     //    });
-    //    let req = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
-    //    let (res, _) = client.request::<Foo>(req)?;
+    //    let (res, _) = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
     //    info!("Replaced status {:?} for {}", res.status, res.metadata.name);
     //} else {
     //    warn!("Not doing status replace - does the cluster support sub-resources?");
@@ -159,21 +148,18 @@ fn main() -> Result<(), failure::Error> {
     let patch = json!({
         "spec": { "info": "patched qux" }
     });
-    let req = foos.patch("qux", &pp, serde_json::to_vec(&patch)?)?;
-    let (o, _) = client.request::<Foo>(req)?;
+    let (o, _) = foos.patch("qux", &pp, serde_json::to_vec(&patch)?)?;
     info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
     // Check we have too instances
     let lp = ListParams::default();
-    let req = foos.list(&lp)?;
-    let (res, _) = client.request::<ObjectList<Foo>>(req)?;
+    let (res, _) = foos.list(&lp)?;
     assert_eq!(res.items.len(), 2);
 
     // Cleanup the full colleciton
-    let req = foos.delete_collection(&lp)?;
-    let (res, _) = client.request::<ObjectList<Foo>>(req)?;
+    let (res, _) = foos.delete_collection(&lp)?;
     let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
     info!("Deleted collection of foos: {:?}", deleted);
 

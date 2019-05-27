@@ -24,6 +24,11 @@ pub use api::{
     PropagationPolicy,
 };
 
+#[cfg(feature = "openapi")]
+mod typed;
+#[cfg(feature = "openapi")]
+pub use typed::OpenApi;
+
 mod resource;
 pub use self::resource::{
     Object,
