@@ -159,7 +159,7 @@ impl<P, U> Informer<P, U> where
         let req = self.resource.list_zero_resource_entries(&self.params)?;
 
         // parse to void a ResourceList into void except for Metadata
-        let res = self.client.request::<ObjectList<Void>>(req)?;
+        let (res, _) = self.client.request::<ObjectList<Void>>(req)?;
 
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "0".into());
         debug!("Got fresh resourceVersion={} for {}", version, self.resource.resource);

@@ -1,5 +1,6 @@
 //! A basic API client with standard kube error handling
 
+use reqwest::StatusCode;
 use http;
 use serde::de::DeserializeOwned;
 use serde_json;
@@ -37,7 +38,7 @@ impl APIClient {
     }
 
 
-    pub fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
+    pub fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<(T, StatusCode)>
     where
         T: DeserializeOwned,
     {
@@ -68,10 +69,11 @@ impl APIClient {
                 Err(ErrorKind::Api(ae))?
             },
             Ok(_res) => {
-                serde_json::from_str(&text).map_err(|e| {
+                let parsed = serde_json::from_str(&text).map_err(|e| {
                     warn!("{}, {:?}", text, e);
                     Error::from(ErrorKind::SerdeParse)
-                })
+                })?;
+                Ok((parsed, s))
             }
         }
     }

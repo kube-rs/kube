@@ -42,7 +42,7 @@ fn main() -> Result<(), failure::Error> {
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
     let req = crds.delete("foos.clux.dev", &dp)?;
-    if let Ok(res) = client.request::<FullCrd>(req) {
+    if let Ok((res, _)) = client.request::<FullCrd>(req) {
         info!("Deleted {}: ({:?})", res.metadata.name,
             res.status.unwrap().conditions.unwrap().last());
         std::thread::sleep(std::time::Duration::from_millis(1000));
@@ -73,8 +73,8 @@ fn main() -> Result<(), failure::Error> {
     let pp = PostParams::default();
     let req = crds.create(&pp, serde_json::to_vec(&foocrd)?)?;
     match client.request::<FullCrd>(req) {
-        Ok(o) => {
-            info!("Created {}", o.metadata.name);
+        Ok((o, s)) => {
+            info!("Created {} ({})", o.metadata.name, s);
             debug!("Created CRD: {:?}", o.spec);
         },
         Err(e) => {
@@ -101,12 +101,12 @@ fn main() -> Result<(), failure::Error> {
         "spec": { "name": "baz", "info": "old baz" },
     });
     let req = foos.create(&pp, serde_json::to_vec(&f1)?)?;
-    let o = client.request::<FooMeta>(req)?;
+    let (o, _) = client.request::<FooMeta>(req)?;
     info!("Created {}", o.metadata.name);
 
     // Verify we can get it
     info!("Get Foo baz");
-    let f1cpy = client.request::<Foo>(foos.get("baz")?)?;
+    let (f1cpy, _) = client.request::<Foo>(foos.get("baz")?)?;
     assert_eq!(f1cpy.spec.info, "old baz");
 
     // Replace its spec
@@ -122,7 +122,7 @@ fn main() -> Result<(), failure::Error> {
         "spec": { "name": "baz", "info": "new baz" },
     });
     let req = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?)?;
-    let f1_replaced = client.request::<Foo>(req)?;
+    let (f1_replaced, _) = client.request::<Foo>(req)?;
     assert_eq!(f1_replaced.spec.name, "baz");
     assert_eq!(f1_replaced.spec.info, "new baz");
     assert!(f1_replaced.status.is_none());
@@ -138,7 +138,7 @@ fn main() -> Result<(), failure::Error> {
         "status": FooStatus::default(),
     });
     let req = foos.create(&pp, serde_json::to_vec(&f2)?)?;
-    let o = client.request::<Foo>(req)?;
+    let (o, _) = client.request::<Foo>(req)?;
     info!("Created {}", o.metadata.name);
 
     // Update status on qux - TODO: better cluster
@@ -148,7 +148,7 @@ fn main() -> Result<(), failure::Error> {
             "status": FooStatus { is_bad: true }
         });
         let req = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
-        let res = client.request::<Foo>(req)?;
+        let (res, _) = client.request::<Foo>(req)?;
         info!("Replaced status {:?} for {}", res.status, res.metadata.name);
     } else {
         warn!("Not doing status replace - does the cluster support sub-resources?");
@@ -160,7 +160,7 @@ fn main() -> Result<(), failure::Error> {
         "spec": { "info": "patched qux" }
     });
     let req = foos.patch("qux", &pp, serde_json::to_vec(&patch)?)?;
-    let o = client.request::<Foo>(req)?;
+    let (o, _) = client.request::<Foo>(req)?;
     info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
@@ -168,7 +168,7 @@ fn main() -> Result<(), failure::Error> {
     // Cleanup the full colleciton
     let lp = ListParams::default();
     let req = foos.delete_collection(&lp)?;
-    let res = client.request::<ObjectList<Foo>>(req)?;
+    let (res, _) = client.request::<ObjectList<Foo>>(req)?;
     let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
     info!("Deleted collection of foos: {:?}", deleted);
 
