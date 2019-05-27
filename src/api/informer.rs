@@ -181,7 +181,7 @@ impl<P, U> Informer<P, U> where
                 WatchEvent::Deleted(o) => o.metadata.resourceVersion.clone(),
                 _ => None
             }
-        }).last().unwrap_or_else(|| oldver.into());
+        }).last().unwrap_or(oldver);
         debug!("Got {} {} events, resourceVersion={}", events.len(), self.resource.resource, newver);
 
         Ok((events, newver))
