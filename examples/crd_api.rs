@@ -147,8 +147,7 @@ fn main() -> Result<(), failure::Error> {
     //    let fs = json!({
     //        "status": FooStatus { is_bad: true }
     //    });
-    //    let req = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
-    //    let (res, _) = client.request::<Foo>(req)?;
+    //    let (res, _) = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
     //    info!("Replaced status {:?} for {}", res.status, res.metadata.name);
     //} else {
     //    warn!("Not doing status replace - does the cluster support sub-resources?");

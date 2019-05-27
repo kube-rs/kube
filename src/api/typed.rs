@@ -67,6 +67,8 @@ impl<P, U> OpenApi<P, U> where
     }
 }
 
+// TODO: all the k8s_openapi maps to constructors...
+
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<P, U> OpenApi<P, U> {
