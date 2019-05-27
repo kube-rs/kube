@@ -1,10 +1,8 @@
-//! API helpers to make use of k8s-openapi easier
+//! API helpers
 
-/// Empty struct for Void
+/// Empty struct for when no Spec is required
 #[derive(Clone, Deserialize, Default)]
 pub struct Void {}
-// Shortcut type for discarding one type parameter option
-//pub type Void = Option<Discard>;
 
 mod reflector;
 pub use self::reflector::{
