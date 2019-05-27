@@ -3,7 +3,7 @@ rust:
   - stable
 script:
   - cargo build
-  - cargo test -v
+  - cargo test -v --all-features
 notifications:
   email:
     on_success: change

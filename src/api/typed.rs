@@ -14,7 +14,7 @@ use crate::api::resource::{
 use crate::client::{
     APIClient,
 };
-use crate::{Error, Result};
+use crate::{Result};
 
 /// A typed Api variant that does not expose request internals
 ///

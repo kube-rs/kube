@@ -20,11 +20,6 @@ pub struct FooStatus {
     is_bad: bool,
 }
 
-// shorthands
-//type Foo = Object<FooSpec, FooStatus>;
-//type FooMeta = Object<Void, Void>;
-//type FullCrd = Object<CrdSpec, CrdStatus>;
-
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
