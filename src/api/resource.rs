@@ -6,25 +6,9 @@ use serde::{Deserialize};
 use crate::api::{
     metadata::Metadata,
 };
+use crate::ApiError;
 //use crate::{Result, Error};
 
-
-
-// -------------------------------------------------------
-
-/// ApiError for when things fail
-///
-/// This can be parsed into as an error handling fallback. Needed for `WatchEvent`;
-/// It's quite commont to get a `410 Gone` when the resourceVersion is too old.
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct ApiError {
-    pub status: String,
-    #[serde(default)]
-    pub message: Option<String>,
-    #[serde(default)]
-    pub reason: Option<String>,
-    code: u16,
-}
 
 /// A raw event returned from a watch query
 ///

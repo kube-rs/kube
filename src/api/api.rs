@@ -1,5 +1,5 @@
-use crate::{Result, Error};
-
+use crate::{Result, ErrorKind};
+use failure::ResultExt;
 
 /// Api generation data
 ///
@@ -261,7 +261,7 @@ impl Api {
 
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
 
     /// Create a minimial list request to seed an initial resourceVersion
@@ -275,7 +275,7 @@ impl Api {
         // rest of lp doesn't matter here - we just need a resourceVersion
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
 
     /// Watch a resource at a given version
@@ -299,7 +299,7 @@ impl Api {
 
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
 
     /// Get a single instance
@@ -308,7 +308,7 @@ impl Api {
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
 
     /// Create an instance of a resource
@@ -320,7 +320,7 @@ impl Api {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::post(urlstr);
-        req.body(data).map_err(Error::from)
+        Ok(req.body(data).context(ErrorKind::RequestBuild)?)
     }
 
     /// Delete an instance of a resource
@@ -338,7 +338,7 @@ impl Api {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::delete(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
 
     /// Delete a collection of a resource
@@ -356,7 +356,7 @@ impl Api {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::delete(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
 
     /// Patch an instance of a resource
@@ -370,10 +370,10 @@ impl Api {
         }
         let urlstr = qp.finish();
 
-        http::Request::patch(urlstr)
+        Ok(http::Request::patch(urlstr)
             .header("Accept", "application/json")
             .header("Content-Type", "application/merge-patch+json")
-            .body(patch).map_err(Error::from)
+            .body(patch).context(ErrorKind::RequestBuild)?)
     }
 
     /// Replace an instance of a resource
@@ -387,7 +387,7 @@ impl Api {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
-        req.body(data).map_err(Error::from)
+        Ok(req.body(data).context(ErrorKind::RequestBuild)?)
     }
 
     /// Get an instance of the scale subresource
@@ -396,7 +396,7 @@ impl Api {
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
 
     /// Patch an instance of the scale subresource
@@ -407,10 +407,10 @@ impl Api {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        http::Request::patch(urlstr)
+        Ok(http::Request::patch(urlstr)
             .header("Accept", "application/json")
             .header("Content-Type", "application/merge-patch+json")
-            .body(patch).map_err(Error::from)
+            .body(patch).context(ErrorKind::RequestBuild)?)
     }
 
     /// Replace an instance of the scale subresource
@@ -422,7 +422,7 @@ impl Api {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
-        req.body(data).map_err(Error::from)
+        Ok(req.body(data).context(ErrorKind::RequestBuild)?)
     }
 
     /// Get an instance of the status subresource
@@ -431,7 +431,7 @@ impl Api {
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::from)
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
 
     /// Patch an instance of the status subresource
@@ -442,10 +442,10 @@ impl Api {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        http::Request::patch(urlstr)
+        Ok(http::Request::patch(urlstr)
             .header("Accept", "application/json")
             .header("Content-Type", "application/merge-patch+json")
-            .body(patch).map_err(Error::from)
+            .body(patch).context(ErrorKind::RequestBuild)?)
     }
 
     /// Replace an instance of the status subresource
@@ -457,7 +457,7 @@ impl Api {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
-        req.body(data).map_err(Error::from)
+        Ok(req.body(data).context(ErrorKind::RequestBuild)?)
     }
 
 }

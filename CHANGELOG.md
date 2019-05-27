@@ -29,6 +29,9 @@
     - `ListParams` exposed
     - `DeleteParams` exposed
     - `PostParams` exposed
+  * Errors from `Api` exposed in `kube::Error`:
+    - `Error::api_error -> Option<ApiError>` exposed
+    - Various other error types also in there (but awkward setup atm)
 
 0.6.0 / 2019-05-12
 ==================

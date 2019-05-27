@@ -10,7 +10,7 @@ use crate::api::resource::{
 use serde::de::DeserializeOwned;
 
 use crate::client::APIClient;
-use crate::Result;
+use crate::{Result, ErrorKind};
 
 use std::{
     collections::BTreeMap,
@@ -201,7 +201,7 @@ impl<P, U> Reflector<P, U> where
                 }
                 WatchEvent::Error(e) => {
                     warn!("Failed to watch {}: {:?}", rg.resource, e);
-                    bail!("Failed to watch {}: {:?} - {:?}", rg.resource, e.message, e.reason)
+                    Err(ErrorKind::Api(e))?
                 }
             }
         }

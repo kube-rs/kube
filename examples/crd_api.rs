@@ -72,11 +72,18 @@ fn main() -> Result<(), failure::Error> {
     info!("Creating CRD foos.clux.dev");
     let pp = PostParams::default();
     let req = crds.create(&pp, serde_json::to_vec(&foocrd)?)?;
-    if let Ok(res) = client.request::<FullCrd>(req) {
-        info!("Created {}", res.metadata.name);
-        debug!("Created CRD: {:?}", res.spec);
-    } else {
-        // TODO: need error code here for ease - 409 common
+    match client.request::<FullCrd>(req) {
+        Ok(o) => {
+            info!("Created {}", o.metadata.name);
+            debug!("Created CRD: {:?}", o.spec);
+        },
+        Err(e) => {
+            if let Some(ae) = e.api_error() {
+                assert_eq!(ae.code, 409); // if you skipped delete, for instance
+            } else {
+                return Err(e.into()) // any other case is probably bad
+            }
+        },
     }
 
     // Manage the Foo CR

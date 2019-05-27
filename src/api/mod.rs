@@ -29,7 +29,6 @@ pub use self::resource::{
     Object,
     ObjectList,
     WatchEvent,
-    ApiError,
     //PostResponse,
     //CreateResponse,
     //Response,
