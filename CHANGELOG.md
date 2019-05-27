@@ -1,4 +1,4 @@
-0.7.0 / UNRELEASED
+0.7.0 / 2019-05-27
 ==================
   * Expose list/watch parameters #11
   * Many API struct renames:
@@ -32,6 +32,7 @@
   * Errors from `Api` exposed in `kube::Error`:
     - `Error::api_error -> Option<ApiError>` exposed
     - Various other error types also in there (but awkward setup atm)
+  * `client.request` now returns a tuple `(T, StatusCode)` (before only `T`)
 
 0.6.0 / 2019-05-12
 ==================
