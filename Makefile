@@ -15,3 +15,9 @@ push-docs:
 	git push -qf "git@github.com:clux/kube-rs.git" gh-pages
 
 .PHONY: doc build
+
+test:
+	cargo test
+
+readme:
+	rustdoc README.md --test --edition=2018

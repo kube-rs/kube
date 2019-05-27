@@ -23,11 +23,10 @@ It handles the api mechanics for watching kube resources, tracking resourceVersi
 To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
-use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 let api = Api::v1Pod().within(&namespace);
-let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client, api)?
+let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client, api)
     .timeout(10)
-    .init();
+    .init()?;
 ```
 
 then you can `poll()` the reflector, and `read()` to get the current cached state:
@@ -50,10 +49,9 @@ The reflector itself is responsible for acquiring the write lock and update the 
 ## Informer
 The other main abstraction from `kube::api` is `Informer<P, U>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with `resourceVersion`.
 
-You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
+You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. For instance, using the complete structs from [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
-use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 let api = Api::v1Pod();
 let inf : Informer<PodSpec, PodStatus> = Informer::new(client, api)
     .init()?;
@@ -73,20 +71,20 @@ How you handle them is up to you, you could build your own state, you can call a
 
 ```rust
 fn handle_event(c: &APIClient, event: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
-    match ev {
+    match event {
         WatchEvent::Added(o) => {
             let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
-            info!("Added Pod: {} (containers={:?})", o.metadata.name, containers);
+            println!("Added Pod: {} (containers={:?})", o.metadata.name, containers);
         },
         WatchEvent::Modified(o) => {
             let phase = o.status.phase.unwrap();
-            info!("Modified Pod: {} (phase={})", o.metadata.name, phase);
+            println!("Modified Pod: {} (phase={})", o.metadata.name, phase);
         },
         WatchEvent::Deleted(o) => {
-            info!("Deleted Pod: {}", o.metadata.name);
+            println!("Deleted Pod: {}", o.metadata.name);
         },
         WatchEvent::Error(e) => {
-            warn!("Error event: {:?}", e);
+            println!("Error event: {:?}", e);
         }
     }
     Ok(())
@@ -107,7 +105,7 @@ cargo run --example node_informer
 
 or for the reflectors:
 
-```rust
+```sh
 cargo run --example pod_reflector
 cargo run --example node_reflector
 cargo run --example deployment_reflector
