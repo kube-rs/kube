@@ -31,17 +31,17 @@ pub struct ApiError {
 /// Note that a watch query returns many of these as newline separated json.
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
-pub enum WatchEvent<T, U> where
-  T: Clone, U: Clone + Default,
+pub enum WatchEvent<P, U> where
+  P: Clone, U: Clone + Default,
 {
-    Added(Object<T, U>),
-    Modified(Object<T, U>),
-    Deleted(Object<T, U>),
+    Added(Object<P, U>),
+    Modified(Object<P, U>),
+    Deleted(Object<P, U>),
     Error(ApiError),
 }
 
-impl<T, U> Debug for WatchEvent<T, U> where
-   T: Clone, U: Clone + Default
+impl<P, U> Debug for WatchEvent<P, U> where
+   P: Clone, U: Clone + Default
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
@@ -59,7 +59,7 @@ impl<T, U> Debug for WatchEvent<T, U> where
 ///
 /// This is used instead of a full struct for `Deployment`, `Pod`, `Node`, `CRD`, ...
 /// Kubernetes' API generally exposes core structs in this manner, but sometimes the
-/// status, `U`, is not always present, and is occasionally passed as `Option<()>`.
+/// status, `U`, is not always present, and is therefore wrapped in `Option`.
 ///
 /// The reasons we use this wrapper rather than the actual structs are:
 /// - generic requirements on fields (need metadata) is impossible
@@ -72,8 +72,8 @@ impl<T, U> Debug for WatchEvent<T, U> where
 /// This struct appears in `ObjectList` and `WatchEvent`, and when using a `Reflector`,
 /// and is exposed as the values in `ObjectMap`.
 #[derive(Deserialize, Serialize, Clone)]
-pub struct Object<T, U> where
-  T: Clone, U: Clone
+pub struct Object<P, U> where
+  P: Clone, U: Clone
 {
     /// The version of the API
     ///
@@ -96,7 +96,7 @@ pub struct Object<T, U> where
     /// The Spec struct of a resource. I.e. `PodSpec`, `DeploymentSpec`, etc.
     ///
     /// This defines the desired state of the Resource as specified by the user.
-    pub spec: T,
+    pub spec: P,
 
     /// The Status of a resource. I.e. `PotStatus`, `DeploymentStatus`, etc.
     ///

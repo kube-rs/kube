@@ -16,7 +16,7 @@ See [controller-rs](https://github.com/clux/controller-rs) for a full example wi
 **[API Docs](https://clux.github.io/kube-rs/kube/)**
 
 ## Reflector
-One of the main abstractions exposed from `kube::api` is `Reflector<T, U>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
+One of the main abstractions exposed from `kube::api` is `Reflector<P, U>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
 
 It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
 
@@ -48,7 +48,7 @@ rf.read()?.into_iter().for_each(|(name, p)| {
 The reflector itself is responsible for acquiring the write lock and update the state as long as you call `poll()` periodically.
 
 ## Informer
-The other main abstraction from `kube::api` is `Informer<T, U>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with `resourceVersion`.
+The other main abstraction from `kube::api` is `Informer<P, U>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with `resourceVersion`.
 
 You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
@@ -59,7 +59,7 @@ let inf : Informer<PodSpec, PodStatus> = Informer::new(client, api)
     .init()?;
 ```
 
-The main feature of `Informer<T, U>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
+The main feature of `Informer<P, U>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
 
 ```rust
 inf.poll()?; // watches + queues events

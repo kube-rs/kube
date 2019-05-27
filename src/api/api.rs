@@ -1,10 +1,13 @@
 use crate::{Result, Error};
 
 
-/// Resource representation from an API perspective
+/// Api generation data
 ///
-/// Used to construct requests from url conventions.
-/// When data is PUT/POST/PATCH'd this struct requires raw bytes.
+/// This data defines the urls used by kubernetes' APIs.
+/// This struct is client agnostic, and can be passed to an Informer or a Reflector.
+///
+/// Can be used directly with a client.
+/// When data is PUT/POST/PATCH'd this struct requires serialized raw bytes.
 #[derive(Clone, Debug)]
 pub struct Api {
     /// API Resource name
@@ -19,9 +22,9 @@ pub struct Api {
     pub prefix: String,
     // extra properties for sub resources
 
-    /// Version of status subresource (takes precedence)
+    /// Version of status subresource (takes precedence on version and beta atm)
     pub status_version: String,
-    /// Version of scale subresource (takes precedence)
+    /// Version of scale subresource (takes precedence on version and beta atm)
     pub scale_version: String,
 }
 
@@ -39,26 +42,37 @@ impl Default for Api {
     }
 }
 
+/// Constructors for most kubernetes objects
+///
+/// Don't see all objects in here? Please submit a PR.
+/// You can extract the data needed from the [openapi spec](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/).
 #[allow(non_snake_case)]
 impl Api {
+    /// Set as namespaced resource within a specified namespace
     pub fn within(mut self, ns: &str) -> Self {
-        //match &self.resource {
-        //    "nodes" | "namespaces" | "customresourcedefinitions" =>
-        //        panic!("{} is not a namespaced resource", self.resource),
-        //    _ => {},
-        //}
+        match self.resource.as_ref() {
+            "nodes" | "namespaces" | "customresourcedefinitions" =>
+                panic!("{} is not a namespace scoped resource", self.resource),
+            _ => {},
+        }
         self.namespace = Some(ns.to_string());
         self
     }
+    /// Set the api group of a resource manually
+    ///
+    /// Can be used to set legacy versions like "extensions" for old Deployments
     pub fn group(mut self, group: &str) -> Self {
         self.group = group.to_string();
         self
     }
+    /// Set the version of an api group manually
+    ///
+    /// Can be used to set legacy versions like "v1beta1" for old Deployments
     pub fn version(mut self, version: &str) -> Self {
         self.version = version.to_string();
         self
     }
-
+    /// Stable namespace resource constructor
     pub fn v1Namespace() -> Self {
         Self {
             group: "".into(),
@@ -67,7 +81,7 @@ impl Api {
             ..Default::default()
         }
     }
-
+    /// Stable deployment resource constructor
     pub fn v1Deployment() -> Self {
         Self {
             group: "apps".into(),
@@ -76,6 +90,7 @@ impl Api {
             ..Default::default()
         }
     }
+    /// Stable pod resource constructor
     pub fn v1Pod() -> Self {
         Self {
             group: "".into(),
@@ -84,6 +99,7 @@ impl Api {
             ..Default::default()
         }
     }
+    /// Stable daemonset resource constructor
     pub fn v1DaemonSet() -> Self {
         Self {
             group: "apps".into(),
@@ -92,6 +108,7 @@ impl Api {
             ..Default::default()
         }
     }
+    /// Stable replicaset resource constructor
     pub fn v1ReplicaSet() -> Self {
         Self {
             group: "apps".into(),
@@ -100,6 +117,7 @@ impl Api {
             ..Default::default()
         }
     }
+    /// Stable node resource constructor
     pub fn v1Node() -> Self {
         Self {
             group: "".into(),
@@ -108,6 +126,7 @@ impl Api {
             ..Default::default()
         }
     }
+    /// Stable statefulset resource constructor
     pub fn v1Statefulset() -> Self {
         Self {
             group: "apps".into(),
@@ -116,9 +135,7 @@ impl Api {
             ..Default::default()
         }
     }
-    /// The definition of a customResource
-    ///
-    /// Its name MUST be in the format <.spec.name>.<.spec.group>.
+    /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {
             group: "apiextensions.k8s.io".into(),
@@ -130,7 +147,14 @@ impl Api {
     }
     /// Instance of a CRD
     ///
-    /// The version, and group must be set by the user.
+    /// The version, and group must be set by the user:
+    ///
+    /// ```
+    /// use kube::api::Api;
+    /// let foos = Api::customResource("foos") // <.spec.name>
+    ///    .group("clux.dev") // <.spec.group>
+    ///    .version("v1");
+    /// ```
     pub fn customResource(name: &str) -> Self {
         Self {
             resource: name.into(),
@@ -207,6 +231,7 @@ pub struct DeleteParams {
     pub propagation_policy: Option<PropagationPolicy>,
 }
 
+/// Propagation policy when deleting single objects
 #[derive(Clone, Debug)]
 pub enum PropagationPolicy {
     /// Orphan dependents
@@ -217,8 +242,9 @@ pub enum PropagationPolicy {
     Foreground,
 }
 
+/// Convenience methods found from API conventions
 impl Api {
-    /// Create a list request to fully re-fetch the state
+    /// List a collection of a resource
     pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -252,7 +278,7 @@ impl Api {
         req.body(vec![]).map_err(Error::from)
     }
 
-    /// Create watch request for a Api at a given version
+    /// Watch a resource at a given version
     pub(crate) fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -285,6 +311,7 @@ impl Api {
         req.body(vec![]).map_err(Error::from)
     }
 
+    /// Create an instance of a resource
     pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -295,6 +322,8 @@ impl Api {
         let mut req = http::Request::post(urlstr);
         req.body(data).map_err(Error::from)
     }
+
+    /// Delete an instance of a resource
     pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "/"+ name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -312,6 +341,7 @@ impl Api {
         req.body(vec![]).map_err(Error::from)
     }
 
+    /// Delete a collection of a resource
     pub fn delete_collection(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -329,6 +359,9 @@ impl Api {
         req.body(vec![]).map_err(Error::from)
     }
 
+    /// Patch an instance of a resource
+    ///
+    /// Requires a serialized merge-patch+json at the moment.
     pub fn patch(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -343,6 +376,9 @@ impl Api {
             .body(patch).map_err(Error::from)
     }
 
+    /// Replace an instance of a resource
+    ///
+    /// Requires metadata.resourceVersion set in data
     pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -354,6 +390,7 @@ impl Api {
         req.body(data).map_err(Error::from)
     }
 
+    /// Get an instance of the scale subresource
     fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -362,6 +399,7 @@ impl Api {
         req.body(vec![]).map_err(Error::from)
     }
 
+    /// Patch an instance of the scale subresource
     fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -374,6 +412,8 @@ impl Api {
             .header("Content-Type", "application/merge-patch+json")
             .body(patch).map_err(Error::from)
     }
+
+    /// Replace an instance of the scale subresource
     fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -385,6 +425,7 @@ impl Api {
         req.body(data).map_err(Error::from)
     }
 
+    /// Get an instance of the status subresource
     fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -393,6 +434,7 @@ impl Api {
         req.body(vec![]).map_err(Error::from)
     }
 
+    /// Patch an instance of the status subresource
     pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -406,6 +448,7 @@ impl Api {
             .body(patch).map_err(Error::from)
     }
 
+    /// Replace an instance of the status subresource
     pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -517,6 +560,13 @@ fn replace_status() {
     );
 }
 #[test]
+fn get_scale_path(){
+    let r = Api::v1Node();
+    let req = r.get_scale("mynode").unwrap();
+    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale");
+    assert_eq!(req.method(), "GET");
+}
+#[test]
 fn patch_scale_path(){
     let r = Api::v1Node();
     let pp = PostParams::default();
@@ -531,4 +581,10 @@ fn replace_scale_path(){
     let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale?");
     assert_eq!(req.method(), "PUT");
+}
+
+#[test]
+#[should_panic]
+fn global_resources_not_namespaceable(){
+    Api::v1Node().within("ns");
 }
