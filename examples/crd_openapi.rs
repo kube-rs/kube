@@ -4,7 +4,7 @@ use serde_json::json;
 
 use kube::{
     api::{OpenApi, PostParams, DeleteParams, ListParams},
-    client::APIClient,
+    client::{APIClient, StatusCode},
     config,
 };
 
@@ -88,7 +88,9 @@ fn main() -> Result<(), failure::Error> {
         "metadata": { "name": "baz" },
         "spec": { "name": "baz", "info": "old baz" },
     });
-    let (o, _) = foos.create(&pp, serde_json::to_vec(&f1)?)?;
+    let (o, c) = foos.create(&pp, serde_json::to_vec(&f1)?)?;
+    assert_eq!(f1["metadata"]["name"], o.metadata.name);
+    assert_eq!(c, StatusCode::CREATED);
     info!("Created {}", o.metadata.name);
 
     // Verify we can get it

@@ -67,8 +67,18 @@ impl<P, U> OpenApi<P, U> where
     }
 }
 
-// TODO: all the k8s_openapi maps to constructors...
+use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
+impl OpenApi<PodSpec, PodStatus> {
+    pub fn v1Pod(client: APIClient) -> Self {
+        Self {
+            api: Api::v1Pod(),
+            client,
+            phantom: (PhantomData, PhantomData)
+        }
+    }
+}
 
+// TODO: all the k8s_openapi maps to constructors...
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<P, U> OpenApi<P, U> {

@@ -1,7 +1,7 @@
 //! A basic API client with standard kube error handling
 
-use reqwest::StatusCode;
 use http;
+pub use http::StatusCode;
 use serde::de::DeserializeOwned;
 use serde_json;
 use failure::ResultExt;
