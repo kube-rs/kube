@@ -1,3 +1,9 @@
+0.8.0 / 2019-05-XX
+==================
+  * Typed `Api` variant called `OpenApi` introduced (see crd_openapi example)
+  * Revert `client.request` return type change (back to response only from pre-0.7.0 #28)
+  * TODO: FIX BUG #32
+
 0.7.0 / 2019-05-27
 ==================
   * Expose list/watch parameters #11

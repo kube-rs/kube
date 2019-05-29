@@ -147,7 +147,7 @@ impl<P, U> Reflector<P, U> where
     fn get_full_resource_entries(&self) -> Result<(Cache<P, U>, String)> {
         let req = self.resource.list(&self.params)?;
         // NB: Object isn't general enough here
-        let (res, _) = self.client.request::<ObjectList<Object<P, U>>>(req)?;
+        let res = self.client.request::<ObjectList<Object<P, U>>>(req)?;
         let mut data = BTreeMap::new();
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
 

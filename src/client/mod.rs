@@ -38,7 +38,7 @@ impl APIClient {
     }
 
 
-    pub fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<(T, StatusCode)>
+    pub fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
@@ -69,11 +69,10 @@ impl APIClient {
                 Err(ErrorKind::Api(ae))?
             },
             Ok(_res) => {
-                let parsed = serde_json::from_str(&text).map_err(|e| {
+                serde_json::from_str(&text).map_err(|e| {
                     warn!("{}, {:?}", text, e);
                     Error::from(ErrorKind::SerdeParse)
-                })?;
-                Ok((parsed, s))
+                })
             }
         }
     }

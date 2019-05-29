@@ -4,7 +4,7 @@ use serde_json::json;
 
 use kube::{
     api::{OpenApi, PostParams, DeleteParams, ListParams},
-    client::{APIClient, StatusCode},
+    client::{APIClient},
     config,
 };
 
@@ -31,7 +31,7 @@ fn main() -> Result<(), failure::Error> {
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
-    if let Ok((res, _)) = crds.delete("foos.clux.dev", &dp) {
+    if let Ok(res) = crds.delete("foos.clux.dev", &dp) {
         info!("Deleted {}: ({:?})", res.metadata.name,
             res.status.unwrap().conditions.unwrap().last());
         std::thread::sleep(std::time::Duration::from_millis(1000));
@@ -61,8 +61,8 @@ fn main() -> Result<(), failure::Error> {
     info!("Creating CRD foos.clux.dev");
     let pp = PostParams::default();
     match crds.create(&pp, serde_json::to_vec(&foocrd)?) {
-        Ok((o, s)) => {
-            info!("Created {} ({})", o.metadata.name, s);
+        Ok(o) => {
+            info!("Created {} ({:?})", o.metadata.name, o.status);
             debug!("Created CRD: {:?}", o.spec);
         },
         Err(e) => {
@@ -88,15 +88,18 @@ fn main() -> Result<(), failure::Error> {
         "metadata": { "name": "baz" },
         "spec": { "name": "baz", "info": "old baz" },
     });
-    let (o, c) = foos.create(&pp, serde_json::to_vec(&f1)?)?;
+    let o = foos.create(&pp, serde_json::to_vec(&f1)?)?;
     assert_eq!(f1["metadata"]["name"], o.metadata.name);
-    assert_eq!(c, StatusCode::CREATED);
     info!("Created {}", o.metadata.name);
 
     // Verify we can get it
     info!("Get Foo baz");
-    let (f1cpy, _) = foos.get("baz")?;
+    let f1cpy = foos.get("baz")?;
     assert_eq!(f1cpy.spec.info, "old baz");
+
+    // Delete it
+    let f1del = foos.delete("baz", &dp)?;
+    assert_eq!(f1del.spec.info, "old baz");
 
     // Replace its spec
     info!("Replace Foo baz");
@@ -110,7 +113,7 @@ fn main() -> Result<(), failure::Error> {
         },
         "spec": { "name": "baz", "info": "new baz" },
     });
-    let (f1_replaced, _) = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?)?;
+    let f1_replaced = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?)?;
     assert_eq!(f1_replaced.spec.name, "baz");
     assert_eq!(f1_replaced.spec.info, "new baz");
     assert!(f1_replaced.status.is_none());
@@ -125,7 +128,7 @@ fn main() -> Result<(), failure::Error> {
         "spec": FooSpec { name: "qux".into(), info: "unpatched qux".into() },
         "status": FooStatus::default(),
     });
-    let (o, _) = foos.create(&pp, serde_json::to_vec(&f2)?)?;
+    let o = foos.create(&pp, serde_json::to_vec(&f2)?)?;
     info!("Created {}", o.metadata.name);
 
     // Update status on qux - TODO: better cluster
@@ -134,7 +137,7 @@ fn main() -> Result<(), failure::Error> {
     //    let fs = json!({
     //        "status": FooStatus { is_bad: true }
     //    });
-    //    let (res, _) = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    //    let res = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
     //    info!("Replaced status {:?} for {}", res.status, res.metadata.name);
     //} else {
     //    warn!("Not doing status replace - does the cluster support sub-resources?");
@@ -145,18 +148,18 @@ fn main() -> Result<(), failure::Error> {
     let patch = json!({
         "spec": { "info": "patched qux" }
     });
-    let (o, _) = foos.patch("qux", &pp, serde_json::to_vec(&patch)?)?;
+    let o = foos.patch("qux", &pp, serde_json::to_vec(&patch)?)?;
     info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
     // Check we have too instances
     let lp = ListParams::default();
-    let (res, _) = foos.list(&lp)?;
+    let res = foos.list(&lp)?;
     assert_eq!(res.items.len(), 2);
 
     // Cleanup the full colleciton
-    let (res, _) = foos.delete_collection(&lp)?;
+    let res = foos.delete_collection(&lp)?;
     let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
     info!("Deleted collection of foos: {:?}", deleted);
 

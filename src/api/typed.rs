@@ -1,5 +1,6 @@
+#![allow(non_snake_case)]
+
 use serde::de::DeserializeOwned;
-use reqwest::StatusCode;
 use std::marker::PhantomData;
 
 use crate::api::api::{
@@ -9,7 +10,7 @@ use crate::api::api::{
     ListParams,
 };
 use crate::api::resource::{
-    ObjectList, Object,
+    ObjectList, Object, WatchEvent,
 };
 use crate::client::{
     APIClient,
@@ -53,7 +54,6 @@ impl OpenApi<CrdSpec, CrdStatus> {
 }
 
 /// CRDs still need user structs
-#[allow(non_snake_case)]
 impl<P, U> OpenApi<P, U> where
     P: Clone + DeserializeOwned,
     U: Clone + DeserializeOwned + Default,
@@ -96,57 +96,59 @@ impl<P, U> OpenApi<P, U> {
     }
 }
 
-
-//type ObjectWithStatus<P, U> = Result<(Object<P, U>, StatusCode)>;
-//type ObjectListWithStatus<P, U> = Result<(ObjectList<Object<P, U>>, StatusCode)>
-
 /// PUSH/PUT/POST/GET abstractions
 impl<P, U> OpenApi<P, U> where
     P: Clone + DeserializeOwned,
     U: Clone + DeserializeOwned + Default,
 {
-    pub fn get(&self, name: &str) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn get(&self, name: &str) -> Result<Object<P, U>> {
         let req = self.api.get(name)?;
         self.client.request::<Object<P, U>>(req)
     }
-    pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
         let req = self.api.create(&pp, data)?;
         self.client.request::<Object<P, U>>(req)
     }
-    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<(Object<P, U>, StatusCode)> {
+    // TODO: fix return type
+    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Object<P, U>> {
         let req = self.api.delete(name, &dp)?;
         self.client.request::<Object<P, U>>(req)
     }
-    pub fn list(&self, lp: &ListParams) -> Result<(ObjectList<Object<P, U>>, StatusCode)> {
+    pub fn list(&self, lp: &ListParams) -> Result<ObjectList<Object<P, U>>> {
         let req = self.api.list(&lp)?;
         self.client.request::<ObjectList<Object<P, U>>>(req)
     }
-    pub fn delete_collection(&self, lp: &ListParams) -> Result<(ObjectList<Object<P, U>>, StatusCode)> {
+    // TODO: fix return type
+    pub fn delete_collection(&self, lp: &ListParams) -> Result<ObjectList<Object<P, U>>> {
         let req = self.api.delete_collection(&lp)?;
         self.client.request::<ObjectList<Object<P, U>>>(req)
     }
-    pub fn patch(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn patch(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Object<P, U>> {
         let req = self.api.patch(name, &pp, patch)?;
         self.client.request::<Object<P, U>>(req)
     }
-    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
         let req = self.api.replace(name, &pp, data)?;
         self.client.request::<Object<P, U>>(req)
+    }
+    pub fn watch(&self, lp: &ListParams, version: &str) -> Result<Vec<WatchEvent<P, U>>> {
+        let req = self.api.watch(&lp, &version)?;
+        self.client.request_events::<WatchEvent<P, U>>(req)
     }
 
 
 /*
-    pub fn get_scale(&self, name: &str) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn get_scale(&self, name: &str) -> Result<Object<P, U>> {
     }
-    pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Object<P, U>> {
     }
-    pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
     }
-    pub fn get_status(&self, name: &str) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn get_status(&self, name: &str) -> Result<Object<P, U>> {
     }
-    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Object<P, U>> {
     }
-    pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<(Object<P, U>, StatusCode)> {
+    pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
     }
 */
 
