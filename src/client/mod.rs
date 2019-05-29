@@ -1,12 +1,58 @@
 //! A basic API client with standard kube error handling
 
 use http;
-pub use http::StatusCode;
 use serde::de::DeserializeOwned;
 use serde_json;
 use failure::ResultExt;
 use crate::{ApiError, Error, ErrorKind, Result};
 use crate::config::Configuration;
+
+
+#[derive(Deserialize)]
+pub struct StatusDetails {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub group: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub uid: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub causes: Vec<StatusCause>,
+    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
+    pub retryAfterSeconds: u32
+}
+
+#[derive(Deserialize)]
+pub struct StatusCause {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub message: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub field: String,
+}
+
+#[derive(Deserialize)]
+pub struct ApiStatus {
+    // TODO: typemeta
+    // TODO: metadata that can be completely empty (listmeta...)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub status: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub message: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reason: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<StatusDetails>,
+
+    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
+    pub code: u16,
+}
+
+
 
 /// APIClient requires `config::Configuration` includes client to connect with kubernetes cluster.
 #[derive(Clone)]
