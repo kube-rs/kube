@@ -1,5 +1,6 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
+use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
@@ -31,12 +32,16 @@ fn main() -> Result<(), failure::Error> {
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
-    if let Ok(res) = crds.delete("foos.clux.dev", &dp) {
-        info!("Deleted {}: ({:?})", res.metadata.name,
-            res.status.unwrap().conditions.unwrap().last());
+    crds.delete("foos.clux.dev", &dp)?.map_left(|o| {
+        info!("Deleted {}: ({:?})", o.metadata.name,
+            o.status.unwrap().conditions.unwrap().last());
+        // even PropagationPolicy::Foreground doesn't cause us to block here
+        // need to wait for it to actually go away
         std::thread::sleep(std::time::Duration::from_millis(1000));
-        // even PropagationPolicy::Foreground doesn't seem to block here..
-    }
+    }).map_right(|s| {
+        // it's gone.
+        info!("Deleted foos.clux.dev: ({:?})", s);
+    });
 
     // Create the CRD so we can create Foos in kube
     let foocrd = json!({
@@ -97,10 +102,6 @@ fn main() -> Result<(), failure::Error> {
     let f1cpy = foos.get("baz")?;
     assert_eq!(f1cpy.spec.info, "old baz");
 
-    // Delete it
-    let f1del = foos.delete("baz", &dp)?;
-    assert_eq!(f1del.spec.info, "old baz");
-
     // Replace its spec
     info!("Replace Foo baz");
     let foo_replace = json!({
@@ -117,6 +118,11 @@ fn main() -> Result<(), failure::Error> {
     assert_eq!(f1_replaced.spec.name, "baz");
     assert_eq!(f1_replaced.spec.info, "new baz");
     assert!(f1_replaced.status.is_none());
+
+    // Delete it
+    foos.delete("baz", &dp)?.map_left(|f1del| {
+        assert_eq!(f1del.spec.info, "old baz");
+    });
 
 
     // Create Foo qux with status
@@ -153,15 +159,23 @@ fn main() -> Result<(), failure::Error> {
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
-    // Check we have too instances
+    // Check we have 1 remaining instance
     let lp = ListParams::default();
     let res = foos.list(&lp)?;
-    assert_eq!(res.items.len(), 2);
+    assert_eq!(res.items.len(), 1);
 
-    // Cleanup the full colleciton
-    let res = foos.delete_collection(&lp)?;
-    let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
-    info!("Deleted collection of foos: {:?}", deleted);
+    // Delete the last - expect a status back (instant delete)
+    assert!(foos.delete("qux", &dp)?.is_right());
 
+    // Cleanup the full collection - expect a wait
+    match foos.delete_collection(&lp)? {
+        Left(list) => {
+            let deleted = list.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
+            info!("Deleted collection of foos: {:?}", deleted);
+        },
+        Right(status) => {
+            info!("Deleted collection of crds: status={:?}", status);
+        }
+    }
     Ok(())
 }

@@ -17,7 +17,7 @@ push-docs:
 .PHONY: doc build
 
 test:
-	cargo test
+	cargo test --all-features
 
 readme:
 	rustdoc README.md --test --edition=2018

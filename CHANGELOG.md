@@ -2,7 +2,8 @@
 ==================
   * Typed `Api` variant called `OpenApi` introduced (see crd_openapi example)
   * Revert `client.request` return type change (back to response only from pre-0.7.0 #28)
-  * TODO: FIX BUG #32
+  * `delete` now returns `Either<Object<P, U>, ApiStatus> - for bug#32
+  * `delete_collection` now returns `Either<ObjectList<Object<P, U>>, ApiStatus> - for bug#32
 
 0.7.0 / 2019-05-27
 ==================

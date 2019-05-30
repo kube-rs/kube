@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use either::{Either};
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
@@ -14,6 +15,7 @@ use crate::api::resource::{
 };
 use crate::client::{
     APIClient,
+    ApiStatus,
 };
 use crate::{Result};
 
@@ -109,19 +111,17 @@ impl<P, U> OpenApi<P, U> where
         let req = self.api.create(&pp, data)?;
         self.client.request::<Object<P, U>>(req)
     }
-    // TODO: fix return type
-    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Object<P, U>> {
+    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<Object<P, U>, ApiStatus>> {
         let req = self.api.delete(name, &dp)?;
-        self.client.request::<Object<P, U>>(req)
+        self.client.request_status::<Object<P, U>>(req)
     }
     pub fn list(&self, lp: &ListParams) -> Result<ObjectList<Object<P, U>>> {
         let req = self.api.list(&lp)?;
         self.client.request::<ObjectList<Object<P, U>>>(req)
     }
-    // TODO: fix return type
-    pub fn delete_collection(&self, lp: &ListParams) -> Result<ObjectList<Object<P, U>>> {
+    pub fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<Object<P, U>>, ApiStatus>> {
         let req = self.api.delete_collection(&lp)?;
-        self.client.request::<ObjectList<Object<P, U>>>(req)
+        self.client.request_status::<ObjectList<Object<P, U>>>(req)
     }
     pub fn patch(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Object<P, U>> {
         let req = self.api.patch(name, &pp, patch)?;

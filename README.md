@@ -4,9 +4,9 @@
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-alpha-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 
-Rust client for [Kubernetes](http://kubernetes.io) with reinterpretations of the `Reflector` and `Informer` abstractions from the go client.
+Rust client for [Kubernetes](http://kubernetes.io) in the style of [client-go](https://github.com/kubernetes/client-go). Contains rust reinterpretations of the `Reflector` and `Informer` abstractions (but without all the factories) to allow writing kubernetes controllers/operators easily.
 
-This client aims cater to the more common controller/operator case, but allows you sticking in dependencies like [k8s-openapi](https://github.com/Arnavion/k8s-openapi) for accurate struct representations.
+This client caters to the more common controller/operator case, but allows you to compile with the `openapi` feature to get automatic objects using the more accurate struct representations from [k8s-openapi](https://github.com/Arnavion/k8s-openapi).
 
 ## Usage
 See the [examples directory](./examples) for how to watch over resources in a simplistic way.
@@ -14,6 +14,21 @@ See the [examples directory](./examples) for how to watch over resources in a si
 See [controller-rs](https://github.com/clux/controller-rs) for a full example with [actix](https://actix.rs/).
 
 **[API Docs](https://clux.github.io/kube-rs/kube/)**
+
+## Typed Api
+It's recommended to compile with the "openapi" feature if you want accurate native object structs.
+
+```rust
+//TODO: (see examples for now)
+```
+
+## Raw Api
+It's completely fine to not depend on `k8s-openapi` if you only are working with CRDs or you are happy to supply partial definitions of the native objects you are working with:
+
+```rust
+//TODO: (see examples for now)
+```
+
 
 ## Reflector
 One of the main abstractions exposed from `kube::api` is `Reflector<P, U>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
