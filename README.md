@@ -6,7 +6,7 @@
 
 Rust client for [Kubernetes](http://kubernetes.io) in the style of [client-go](https://github.com/kubernetes/client-go). Contains rust reinterpretations of the `Reflector` and `Informer` abstractions (but without all the factories) to allow writing kubernetes controllers/operators easily.
 
-This client caters to the more common controller/operator case, but allows you to compile with the `openapi` feature to get automatic objects using the more accurate struct representations from [k8s-openapi](https://github.com/Arnavion/k8s-openapi).
+This client caters to the more common controller/operator case, but allows you to compile with the `openapi` feature to get accurate struct representations via [k8s-openapi](https://github.com/Arnavion/k8s-openapi).
 
 ## Usage
 See the [examples directory](./examples) for how to watch over resources in a simplistic way.
@@ -16,19 +16,24 @@ See [controller-rs](https://github.com/clux/controller-rs) for a full example wi
 **[API Docs](https://clux.github.io/kube-rs/kube/)**
 
 ## Typed Api
-It's recommended to compile with the "openapi" feature if you want accurate native object structs.
+It's recommended to compile with the "openapi" feature if you want an easy experience, and accurate native object structs:
 
 ```rust
-//TODO: (see examples for now)
+let pods = OpenApi::v1Pod(client).within("default");
+
+let p = pods.get("blog")?;
+println!("Got blog pod with containers: {:?}", p.spec.containers);
+
+let patch = json!({"spec": {
+    "activeDeadlineSeconds": 5
+}});
+let patched = pods.patch("blog", &pp, serde_json::to_vec(&patch)?)?;
+assert_eq!(patched.spec.active_deadline_seconds, Some(5));
+
+pods.delete("blog", &DeleteParams::default())?;
 ```
 
-## Raw Api
-It's completely fine to not depend on `k8s-openapi` if you only are working with CRDs or you are happy to supply partial definitions of the native objects you are working with:
-
-```rust
-//TODO: (see examples for now)
-```
-
+See the `pod_openapi` or `crd_openapi` examples for more uses.
 
 ## Reflector
 One of the main abstractions exposed from `kube::api` is `Reflector<P, U>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
@@ -137,6 +142,35 @@ then you can `kubectl apply -f crd-baz.yaml -n kube-system`, or `kubectl delete 
 
 ## Timing
 All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can either call `.poll()` less often and the events will collect on the kube side (if you don't wait too long and get a Gone). You can configure the timeout with `.timeout(n)` on the `Informer` or `Reflector`.
+
+## Raw Api
+You can not use `k8s-openapi` if you only are working with Informers/Reflectors, or you are happy to supply partial definitions of the native objects you are working with. You will have to specify the complete expected output type to serialize as however:
+
+```rust
+#[derive(Deserialize, Serialize, Clone)]
+pub struct FooSpec {
+    name: String,
+    info: String,
+}
+let foos = Api::customResource("foos")
+    .version("v1")
+    .group("clux.dev")
+    .within("dev");
+
+let fdata = json!({
+    "apiVersion": "clux.dev/v1",
+    "kind": "Foo",
+    "metadata": { "name": "baz" },
+    "spec": { "name": "baz", "info": "old baz" },
+});
+let req = foos.create(&PostParams::default(), serde_json::to_vec(&fdata)?)?;
+let o = client.request::<FooMeta>(req)?;
+
+let fbaz = client.request::<bject<FooSpec, Void>>(foos.get("baz")?)?;
+assert_eq!(fbaz.spec.info, "old baz");
+```
+
+Most of the informer/reflector examples does this at the moment (but imports k8s_openapi manually to do it anyway). See the `crd_api` example for more info.
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.
