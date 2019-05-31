@@ -141,7 +141,7 @@ then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f c
 All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can either call `.poll()` less often and the events will collect on the kube side (if you don't wait too long and get a Gone). You can configure the timeout with `.timeout(n)` on the `Informer` or `Reflector`.
 
 ## Raw Api
-You can not use `k8s-openapi` if you only are working with Informers/Reflectors, or you are happy to supply partial definitions of the native objects you are working with. You will have to specify the complete expected output type to serialize as however:
+You can elide the large `k8s-openapi` dependency if you only are working with Informers/Reflectors, or you are happy to supply partial definitions of the native objects you are working with. You will have to specify the complete expected output type to serialize as however:
 
 ```rust
 #[derive(Deserialize, Serialize, Clone)]
@@ -154,6 +154,8 @@ let foos = RawApi::customResource("foos")
     .group("clux.dev")
     .within("default");
 
+let rf : Reflector<FooSpec, Void> = Reflector::raw(client, resource).init()?;
+
 let fdata = json!({
     "apiVersion": "clux.dev/v1",
     "kind": "Foo",
@@ -163,7 +165,7 @@ let fdata = json!({
 let req = foos.create(&PostParams::default(), serde_json::to_vec(&fdata)?)?;
 let o = client.request::<FooMeta>(req)?;
 
-let fbaz = client.request::<bject<FooSpec, Void>>(foos.get("baz")?)?;
+let fbaz = client.request::<Object<FooSpec, Void>>(foos.get("baz")?)?;
 assert_eq!(fbaz.spec.info, "old baz");
 ```
 
