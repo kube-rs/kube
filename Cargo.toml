@@ -9,7 +9,7 @@ authors = [
 license-file = "LICENSE"
 repository = "https://github.com/clux/kube-rs"
 readme = "README.md"
-keywords = ["kubernetes", "client-go", "client-rust", "openapi", "reflector", "informer"]
+keywords = ["kubernetes", "reflector", "informer", "client-go", "client-rust"]
 categories = ["web-programming::http-client"]
 edition = "2018"
 
