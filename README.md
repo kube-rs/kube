@@ -114,7 +114,7 @@ The [node_informer example](./examples/node_informer.rs) has an example of using
 Examples that show a little common flows. These all have logging of this library set up to `trace`:
 
 ```sh
-# watch pod events in kube-system
+# watch pod events
 cargo run --example pod_informer
 # watch for broken nodes
 cargo run --example node_informer
@@ -135,7 +135,7 @@ kubectl apply -f examples/foo.yaml
 cargo run --example crd_reflector
 ```
 
-then you can `kubectl apply -f crd-baz.yaml -n kube-system`, or `kubectl delete -f crd-baz.yaml -n kube-system`, or `kubectl edit foos baz -n kube-system` to verify that the events are being picked up.
+then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
 
 ## Timing
 All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can either call `.poll()` less often and the events will collect on the kube side (if you don't wait too long and get a Gone). You can configure the timeout with `.timeout(n)` on the `Informer` or `Reflector`.
@@ -152,7 +152,7 @@ pub struct FooSpec {
 let foos = RawApi::customResource("foos")
     .version("v1")
     .group("clux.dev")
-    .within("dev");
+    .within("default");
 
 let fdata = json!({
     "apiVersion": "clux.dev/v1",

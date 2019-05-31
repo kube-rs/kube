@@ -1,5 +1,6 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
+use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
@@ -35,6 +36,7 @@ fn main() -> Result<(), failure::Error> {
     env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
+    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Manage the CRD
     let crds = RawApi::v1beta1CustomResourceDefinition();
@@ -42,11 +44,16 @@ fn main() -> Result<(), failure::Error> {
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
     let req = crds.delete("foos.clux.dev", &dp)?;
-    if let Ok(res) = client.request::<FullCrd>(req) {
-        info!("Deleted {}: ({:?})", res.metadata.name,
-            res.status.unwrap().conditions.unwrap().last());
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-        // even PropagationPolicy::Foreground doesn't seem to block here..
+    match client.request_status::<FullCrd>(req)? {
+        Left(res) => {
+            info!("Deleted {}: ({:?})", res.metadata.name,
+                res.status.unwrap().conditions.unwrap().last());
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+            // even PropagationPolicy::Foreground doesn't seem to block here..
+        },
+        Right(status) => {
+            info!("Deleted foos.clux.dev: {:?}", status)
+        }
     }
 
     // Create the CRD so we can create Foos in kube
@@ -90,7 +97,7 @@ fn main() -> Result<(), failure::Error> {
     let foos = RawApi::customResource("foos")
         .version("v1")
         .group("clux.dev")
-        .within("dev");
+        .within(&namespace);
 
     // Create Foo baz
     info!("Creating Foo instance baz");
@@ -108,10 +115,6 @@ fn main() -> Result<(), failure::Error> {
     info!("Get Foo baz");
     let f1cpy = client.request::<Foo>(foos.get("baz")?)?;
     assert_eq!(f1cpy.spec.info, "old baz");
-
-    // Delete it
-    let f1del = client.request::<Foo>(foos.delete("baz", &dp)?)?;;
-    assert_eq!(f1del.spec.info, "old baz");
 
     // Replace its spec
     info!("Replace Foo baz");
@@ -168,17 +171,27 @@ fn main() -> Result<(), failure::Error> {
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
-    // Check we have too instances
+    // Delete it
+    client.request_status::<Foo>(foos.delete("baz", &dp)?)?.map_left(|f1del| {
+        assert_eq!(f1del.spec.info, "old baz");
+    });
+
+    // Check we have one remaining instance
     let lp = ListParams::default();
     let req = foos.list(&lp)?;
     let res = client.request::<ObjectList<Foo>>(req)?;
-    assert_eq!(res.items.len(), 2);
+    assert_eq!(res.items.len(), 1);
 
     // Cleanup the full colleciton
     let req = foos.delete_collection(&lp)?;
-    let res = client.request::<ObjectList<Foo>>(req)?;
-    let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
-    info!("Deleted collection of foos: {:?}", deleted);
-
+    match client.request_status::<ObjectList<Foo>>(req)? {
+        Left(res) => {
+            let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
+            info!("Deleted collection of foos: {:?}", deleted);
+        },
+        Right(status) => {
+            info!("Deleted collection: {:?}", status)
+        }
+    }
     Ok(())
 }

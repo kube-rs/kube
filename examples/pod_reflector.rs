@@ -10,7 +10,7 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let resource = Api::v1Pod(client).within("kube-system");
+    let resource = Api::v1Pod(client).within("default");
     let rf = Reflector::new(resource).init()?;
 
     // Can read initial state now:

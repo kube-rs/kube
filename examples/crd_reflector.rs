@@ -19,14 +19,14 @@ fn main() -> Result<(), failure::Error> {
     env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
+    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
     let resource = RawApi::customResource("foos")
         .group("clux.dev")
-        .within("dev");
+        .within(&namespace);
 
-    let rf : Reflector<Foo, Void> = Reflector::raw(client, resource)
-        .init()?;
+    let rf : Reflector<Foo, Void> = Reflector::raw(client, resource).init()?;
 
     loop {
         // Update internal state by calling watch (blocks):

@@ -83,7 +83,7 @@ fn main() -> Result<(), failure::Error> {
     let foos : Api<FooSpec, FooStatus> = Api::customResource(client, "foos")
         .version("v1")
         .group("clux.dev")
-        .within("dev");
+        .within("default");
 
     // Create Foo baz
     info!("Creating Foo instance baz");

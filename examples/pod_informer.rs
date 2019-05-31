@@ -12,7 +12,7 @@ fn main() -> Result<(), failure::Error> {
     env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
-    let namespace = env::var("NAMESPACE").unwrap_or("kube-system".into());
+    let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Pod(client.clone()).within(&namespace);
     let inf = Informer::new(resource).init()?;
