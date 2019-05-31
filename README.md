@@ -15,8 +15,8 @@ See [controller-rs](https://github.com/clux/controller-rs) for a full example wi
 
 **[API Docs](https://clux.github.io/kube-rs/kube/)**
 
-## Typed Api
-It's recommended to compile with the "openapi" feature if you want an easy experience, and accurate native object structs:
+## Api
+It's currently recommended to compile with the "openapi" feature if you want an easy experience with accurate native object representations:
 
 ```rust
 let pods = Api::v1Pod(client).within("default");
@@ -115,7 +115,7 @@ Examples that show a little common flows. These all have logging of this library
 
 ```sh
 # watch pod events
-cargo run --example pod_informer
+cargo run --example pod_informer --features=openapi
 # watch for broken nodes
 cargo run --example node_informer
 ```
@@ -123,9 +123,9 @@ cargo run --example node_informer
 or for the reflectors:
 
 ```sh
-cargo run --example pod_reflector
-cargo run --example node_reflector
-cargo run --example deployment_reflector
+cargo run --example pod_reflector --features=openapi
+cargo run --example node_reflector --features=openapi
+cargo run --example deployment_reflector --features=openapi
 ```
 
 for one based on a CRD, you need to create the CRD first:
@@ -136,6 +136,14 @@ cargo run --example crd_reflector
 ```
 
 then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
+
+For straight API use examples, try:
+
+```sh
+cargo run --example crd_api
+cargo run --example crd_openapi --features=openapi
+cargo run --example pod_openapi --features=openapi
+```
 
 ## Timing
 All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can either call `.poll()` less often and the events will collect on the kube side (if you don't wait too long and get a Gone). You can configure the timeout with `.timeout(n)` on the `Informer` or `Reflector`.
@@ -169,7 +177,8 @@ let fbaz = client.request::<Object<FooSpec, Void>>(foos.get("baz")?)?;
 assert_eq!(fbaz.spec.info, "old baz");
 ```
 
-Most of the informer/reflector examples does this at the moment (but imports k8s_openapi manually to do it anyway). See the `crd_api` example for more info.
+The `node_informer` and `crd_reflector` examples uses this at the moment
+, but some cheating in there by importing k8s_openapi structs manually to do it anyway. You normally would define a struct and derive `Deserialize` + `Clone` yourself - but this makes for long examples. See the `crd_api` example for more info.
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.
