@@ -1,4 +1,4 @@
-0.8.0 / 2019-05-XX
+0.8.0 / 2019-05-31
 ==================
   * Typed `Api` variant called `OpenApi` introduced (see crd_openapi example)
   * Revert `client.request` return type change (back to response only from pre-0.7.0 #28)
