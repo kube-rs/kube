@@ -37,79 +37,8 @@ pub struct Api<P, U> {
     /// The client to use (from this library)
     pub(in crate::api) client: APIClient,
     /// sPec and statUs structs
-    phantom: (PhantomData<P>, PhantomData<U>),
+    pub(in crate::api) phantom: (PhantomData<P>, PhantomData<U>),
 }
-
-#[cfg(feature = "openapi")]
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
-    CustomResourceDefinitionSpec as CrdSpec,
-    CustomResourceDefinitionStatus as CrdStatus,
-};
-#[cfg(feature = "openapi")]
-impl Api<CrdSpec, CrdStatus> {
-    pub fn v1beta1CustomResourceDefinition(client: APIClient) -> Self {
-        Self {
-            api: RawApi::v1beta1CustomResourceDefinition(),
-            client,
-            phantom: (PhantomData, PhantomData)
-        }
-    }
-}
-
-#[cfg(feature = "openapi")]
-use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
-#[cfg(feature = "openapi")]
-impl Api<NodeSpec, NodeStatus> {
-    pub fn v1Node(client: APIClient) -> Self {
-        Self {
-            api: RawApi::v1Node(),
-            client,
-            phantom: (PhantomData, PhantomData)
-        }
-    }
-}
-
-#[cfg(feature = "openapi")]
-use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStatus};
-#[cfg(feature = "openapi")]
-impl Api<DeploymentSpec, DeploymentStatus> {
-    pub fn v1Deployment(client: APIClient) -> Self {
-        Self {
-            api: RawApi::v1Deployment(),
-            client,
-            phantom: (PhantomData, PhantomData)
-        }
-    }
-}
-
-/// CRDs still need user structs
-impl<P, U> Api<P, U> where
-    P: Clone + DeserializeOwned,
-    U: Clone + DeserializeOwned + Default,
-{
-    pub fn customResource(client: APIClient, name: &str) -> Self {
-        Self {
-            api: RawApi::customResource(name),
-            client,
-            phantom: (PhantomData, PhantomData)
-        }
-    }
-}
-
-#[cfg(feature = "openapi")]
-use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
-#[cfg(feature = "openapi")]
-impl Api<PodSpec, PodStatus> {
-    pub fn v1Pod(client: APIClient) -> Self {
-        Self {
-            api: RawApi::v1Pod(),
-            client,
-            phantom: (PhantomData, PhantomData)
-        }
-    }
-}
-
-// TODO: all the k8s_openapi maps to constructors...
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<P, U> Api<P, U> {
@@ -180,5 +109,24 @@ impl<P, U> Api<P, U> where
     pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
     }
 */
-
 }
+
+
+/// Api Constructor for CRDs
+///
+/// This is the only native object that does not rely on openapi.
+/// But that's only because it's still generic and relies on user definitions.
+impl<P, U> Api<P, U> where
+    P: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned + Default,
+{
+    pub fn customResource(client: APIClient, name: &str) -> Self {
+        Self {
+            api: RawApi::customResource(name),
+            client,
+            phantom: (PhantomData, PhantomData)
+        }
+    }
+}
+
+// all other native impls in openapi.rs

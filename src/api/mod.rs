@@ -37,6 +37,9 @@ pub use self::resource::{
     //Response,
 };
 
+#[cfg(feature = "openapi")]
+mod openapi;
+
 mod metadata;
 pub use self::metadata::{
     Metadata,
