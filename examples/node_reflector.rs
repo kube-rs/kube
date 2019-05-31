@@ -4,7 +4,6 @@ use kube::{
     client::APIClient,
     config,
 };
-use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
@@ -12,8 +11,8 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let resource = Api::v1Node();
-    let rf : Reflector<NodeSpec, NodeStatus> = Reflector::new(client, resource.into())
+    let resource = Api::v1Node(client);
+    let rf = Reflector::new(resource)
         .labels("role=master")
         .init()?;
 

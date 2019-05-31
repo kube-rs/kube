@@ -4,17 +4,14 @@ use kube::{
     client::APIClient,
     config,
 };
-use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
-
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let resource = Api::v1Pod().within("kube-system");
-    let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client.clone(), resource)
-        .init()?;
+    let resource = Api::v1Pod(client).within("kube-system");
+    let rf = Reflector::new(resource).init()?;
 
     // Can read initial state now:
     rf.read()?.into_iter().for_each(|(name, p)| {

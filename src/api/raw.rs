@@ -1,7 +1,7 @@
 use crate::{Result, ErrorKind};
 use failure::ResultExt;
 
-/// Api generation data
+/// RawRawApi generation data
 ///
 /// This data defines the urls used by kubernetes' APIs.
 /// This struct is client agnostic, and can be passed to an Informer or a Reflector.
@@ -9,7 +9,7 @@ use failure::ResultExt;
 /// Can be used directly with a client.
 /// When data is PUT/POST/PATCH'd this struct requires serialized raw bytes.
 #[derive(Clone, Debug)]
-pub struct Api {
+pub struct RawApi {
     /// API Resource name
     pub resource: String,
     /// API Group
@@ -28,7 +28,7 @@ pub struct Api {
     pub scale_version: String,
 }
 
-impl Default for Api {
+impl Default for RawApi {
     fn default() -> Self {
         Self {
             resource: "pods".into(), // had to pick something here
@@ -47,7 +47,7 @@ impl Default for Api {
 /// Don't see all objects in here? Please submit a PR.
 /// You can extract the data needed from the [openapi spec](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/).
 #[allow(non_snake_case)]
-impl Api {
+impl RawApi {
     /// Set as namespaced resource within a specified namespace
     pub fn within(mut self, ns: &str) -> Self {
         match self.resource.as_ref() {
@@ -150,8 +150,8 @@ impl Api {
     /// The version, and group must be set by the user:
     ///
     /// ```
-    /// use kube::api::Api;
-    /// let foos = Api::customResource("foos") // <.spec.name>
+    /// use kube::api::RawApi;
+    /// let foos = RawApi::customResource("foos") // <.spec.name>
     ///    .group("clux.dev") // <.spec.group>
     ///    .version("v1");
     /// ```
@@ -171,7 +171,7 @@ enum UrlVersion {
     Status,
 }
 
-impl Api {
+impl RawApi {
     fn make_url(&self, r: UrlVersion) -> String {
         let pref = if self.prefix == "" { "".into() } else { format!("{}/", self.prefix) };
         let g = if self.group == "" { "".into() } else { format!("{}/", self.group) };
@@ -195,7 +195,7 @@ impl Api {
 /// Common query parameters used in watch/list/delete calls on collections
 ///
 /// Constructed internally with a builder on Informer and Reflector,
-/// but can be passed to the helper function of Api.
+/// but can be passed to the helper function of RawRawApi.
 #[derive(Default, Clone)]
 pub struct ListParams {
     pub field_selector: Option<String>,
@@ -243,7 +243,7 @@ pub enum PropagationPolicy {
 }
 
 /// Convenience methods found from API conventions
-impl Api {
+impl RawApi {
     /// List a collection of a resource
     pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url(UrlVersion::Default) + "?";
@@ -464,35 +464,35 @@ impl Api {
 
 #[test]
 fn list_path(){
-    let r = Api::v1Deployment().within("ns");
+    let r = RawApi::v1Deployment().within("ns");
     let gp = ListParams::default();
     let req = r.list(&gp).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
 }
 #[test]
 fn watch_path() {
-    let r = Api::v1Pod().within("ns");
+    let r = RawApi::v1Pod().within("ns");
     let gp = ListParams::default();
     let req = r.watch(&gp, "0").unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=10");
 }
 #[test]
 fn replace_path(){
-    let r = Api::v1DaemonSet();
+    let r = RawApi::v1DaemonSet();
     let pp = PostParams { dry_run: true, ..Default::default() };
     let req = r.replace("myds", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
 }
 #[test]
 fn create_path() {
-    let r = Api::v1ReplicaSet().within("ns");
+    let r = RawApi::v1ReplicaSet().within("ns");
     let pp = PostParams::default();
     let req = r.create(&pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets?");
 }
 #[test]
 fn delete_path() {
-    let r = Api::v1ReplicaSet().within("ns");
+    let r = RawApi::v1ReplicaSet().within("ns");
     let dp = DeleteParams::default();
     let req = r.delete("myrs", &dp).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets/myrs");
@@ -501,7 +501,7 @@ fn delete_path() {
 
 #[test]
 fn delete_collection_path() {
-    let r = Api::v1ReplicaSet().within("ns");
+    let r = RawApi::v1ReplicaSet().within("ns");
     let lp = ListParams::default();
     let req = r.delete_collection(&lp).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets");
@@ -510,7 +510,7 @@ fn delete_collection_path() {
 
 #[test]
 fn namespace_path() { // weird object compared to other v1
-    let r = Api::v1Namespace();
+    let r = RawApi::v1Namespace();
     let gp = ListParams::default();
     let req = r.list(&gp).unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces")
@@ -519,7 +519,7 @@ fn namespace_path() { // weird object compared to other v1
 // subresources with weird version accuracy
 #[test]
 fn patch_status_path(){
-    let r = Api::v1Node();
+    let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.patch_status("mynode", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/status?");
@@ -527,7 +527,7 @@ fn patch_status_path(){
 }
 #[test]
 fn replace_status_path(){
-    let r = Api::v1Node();
+    let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.replace_status("mynode", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/status?");
@@ -536,7 +536,7 @@ fn replace_status_path(){
 
 #[test]
 fn create_custom_resource() {
-    let r = Api::customResource("foos")
+    let r = RawApi::customResource("foos")
         .group("clux.dev").version("v1")
         .within("myns");
     let pp = PostParams::default();
@@ -552,7 +552,7 @@ fn create_custom_resource() {
 
 #[test]
 fn replace_status() {
-    let r = Api::v1beta1CustomResourceDefinition();
+    let r = RawApi::v1beta1CustomResourceDefinition();
     let pp = PostParams::default();
     let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
     assert_eq!(req.uri(),
@@ -561,14 +561,14 @@ fn replace_status() {
 }
 #[test]
 fn get_scale_path(){
-    let r = Api::v1Node();
+    let r = RawApi::v1Node();
     let req = r.get_scale("mynode").unwrap();
     assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale");
     assert_eq!(req.method(), "GET");
 }
 #[test]
 fn patch_scale_path(){
-    let r = Api::v1Node();
+    let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale?");
@@ -576,7 +576,7 @@ fn patch_scale_path(){
 }
 #[test]
 fn replace_scale_path(){
-    let r = Api::v1Node();
+    let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale?");
@@ -586,5 +586,5 @@ fn replace_scale_path(){
 #[test]
 #[should_panic]
 fn global_resources_not_namespaceable(){
-    Api::v1Node().within("ns");
+    RawApi::v1Node().within("ns");
 }

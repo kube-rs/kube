@@ -1,4 +1,5 @@
 use crate::api::{
+    RawApi,
     Api,
     ListParams,
 };
@@ -37,7 +38,7 @@ pub struct Reflector<P, U> where
     data: Arc<RwLock<Cache<P, U>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
-    resource: Api,
+    resource: RawApi,
     params: ListParams,
 }
 
@@ -46,7 +47,24 @@ impl<P, U> Reflector<P, U> where
     U: Clone + DeserializeOwned + Default,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: APIClient, r: Api) -> Self {
+    pub fn new(r: Api<P, U>) -> Self {
+        Reflector {
+            client: r.client,
+            resource: r.api,
+            params: ListParams::default(),
+            data: Arc::new(RwLock::new(BTreeMap::new())),
+            version: Arc::new(RwLock::new(0.to_string())),
+        }
+    }
+}
+
+
+impl<P, U> Reflector<P, U> where
+    P: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned + Default,
+{
+    /// Create a reflector with a kube client on a kube resource
+    pub fn raw(client: APIClient, r: RawApi) -> Self {
         Reflector {
             client,
             resource: r,

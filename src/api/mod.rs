@@ -15,19 +15,17 @@ pub use self::informer::{
     Informer,
 };
 
-mod api;
-pub use api::{
-    Api,
+mod raw;
+pub use raw::{
+    RawApi,
     ListParams,
     PostParams,
     DeleteParams,
     PropagationPolicy,
 };
 
-#[cfg(feature = "openapi")]
 mod typed;
-#[cfg(feature = "openapi")]
-pub use typed::OpenApi;
+pub use typed::Api;
 
 mod resource;
 pub use self::resource::{

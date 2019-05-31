@@ -1,6 +1,6 @@
 #[macro_use] extern crate log;
 use kube::{
-    api::{Api, Informer, WatchEvent},
+    api::{RawApi, Informer, WatchEvent},
     client::APIClient,
     config,
 };
@@ -15,8 +15,8 @@ fn main() -> Result<(), failure::Error> {
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
 
-    let nodes = Api::v1Node();
-    let ni = Informer::new(client.clone(), nodes)
+    let nodes = RawApi::v1Node();
+    let ni = Informer::raw(client.clone(), nodes)
         .labels("role=worker")
         .init()?;
 

@@ -2,7 +2,7 @@
 #[macro_use] extern crate serde_derive;
 
 use kube::{
-    api::{Api, Reflector, Void},
+    api::{RawApi, Reflector, Void},
     client::APIClient,
     config,
 };
@@ -21,11 +21,11 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
-    let resource = Api::customResource("foos")
+    let resource = RawApi::customResource("foos")
         .group("clux.dev")
         .within("dev");
 
-    let rf : Reflector<Foo, Void> = Reflector::new(client, resource)
+    let rf : Reflector<Foo, Void> = Reflector::raw(client, resource)
         .init()?;
 
     loop {

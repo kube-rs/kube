@@ -14,8 +14,8 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
     let namespace = env::var("NAMESPACE").unwrap_or("kube-system".into());
 
-    let resource = Api::v1Pod().within(&namespace);
-    let inf = Informer::new(client.clone(), resource).init()?;
+    let resource = Api::v1Pod(client.clone()).within(&namespace);
+    let inf = Informer::new(resource).init()?;
 
     // Here we both poll and reconcile based on events from the main thread
     // If you run this next to actix-web (say), spawn a thread and pass `inf` as app state

@@ -19,7 +19,7 @@ See [controller-rs](https://github.com/clux/controller-rs) for a full example wi
 It's recommended to compile with the "openapi" feature if you want an easy experience, and accurate native object structs:
 
 ```rust
-let pods = OpenApi::v1Pod(client).within("default");
+let pods = Api::v1Pod(client).within("default");
 
 let p = pods.get("blog")?;
 println!("Got blog pod with containers: {:?}", p.spec.containers);
@@ -43,10 +43,8 @@ It handles the api mechanics for watching kube resources, tracking resourceVersi
 To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
-let api = Api::v1Pod().within(&namespace);
-let rf : Reflector<PodSpec, PodStatus> = Reflector::new(client, api)
-    .timeout(10)
-    .init()?;
+let api = Api::v1Pod(client).within(&namespace);
+let rf = Reflector::new(api).timeout(10).init()?;
 ```
 
 then you can `poll()` the reflector, and `read()` to get the current cached state:
@@ -72,9 +70,8 @@ The other main abstraction from `kube::api` is `Informer<P, U>`. This is a struc
 You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. For instance, using the complete structs from [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
-let api = Api::v1Pod();
-let inf : Informer<PodSpec, PodStatus> = Informer::new(client, api)
-    .init()?;
+let api = Api::v1Pod(client);
+let inf = Informer::new(api).init()?;
 ```
 
 The main feature of `Informer<P, U>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
@@ -152,7 +149,7 @@ pub struct FooSpec {
     name: String,
     info: String,
 }
-let foos = Api::customResource("foos")
+let foos = RawApi::customResource("foos")
     .version("v1")
     .group("clux.dev")
     .within("dev");

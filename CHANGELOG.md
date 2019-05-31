@@ -4,6 +4,9 @@
   * Revert `client.request` return type change (back to response only from pre-0.7.0 #28)
   * `delete` now returns `Either<Object<P, U>, ApiStatus> - for bug#32
   * `delete_collection` now returns `Either<ObjectList<Object<P, U>>, ApiStatus> - for bug#32
+  * `Informer::new` renamed to `Informer::raw`
+  * `Reflector::new` renamed to `Reflector::raw`
+  * `Reflector::new` + `Informer::new` added for "openapi" compile time feature (does not require specifying the generic types)
 
 0.7.0 / 2019-05-27
 ==================

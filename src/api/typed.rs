@@ -4,8 +4,8 @@ use either::{Either};
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
-use crate::api::api::{
-    Api,
+use crate::api::{
+    RawApi,
     PostParams,
     DeleteParams,
     ListParams,
@@ -31,24 +31,51 @@ use crate::{Result};
 /// - memory intensive structs because they contain the full data
 /// - no control over requests (opinionated)
 #[derive(Clone)]
-pub struct OpenApi<P, U> {
+pub struct Api<P, U> {
     /// The request creator object
-    api: Api,
+    pub(in crate::api) api: RawApi,
     /// The client to use (from this library)
-    client: APIClient,
+    pub(in crate::api) client: APIClient,
     /// sPec and statUs structs
     phantom: (PhantomData<P>, PhantomData<U>),
 }
 
+#[cfg(feature = "openapi")]
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
     CustomResourceDefinitionSpec as CrdSpec,
     CustomResourceDefinitionStatus as CrdStatus,
 };
-
-impl OpenApi<CrdSpec, CrdStatus> {
+#[cfg(feature = "openapi")]
+impl Api<CrdSpec, CrdStatus> {
     pub fn v1beta1CustomResourceDefinition(client: APIClient) -> Self {
         Self {
-            api: Api::v1beta1CustomResourceDefinition(),
+            api: RawApi::v1beta1CustomResourceDefinition(),
+            client,
+            phantom: (PhantomData, PhantomData)
+        }
+    }
+}
+
+#[cfg(feature = "openapi")]
+use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
+#[cfg(feature = "openapi")]
+impl Api<NodeSpec, NodeStatus> {
+    pub fn v1Node(client: APIClient) -> Self {
+        Self {
+            api: RawApi::v1Node(),
+            client,
+            phantom: (PhantomData, PhantomData)
+        }
+    }
+}
+
+#[cfg(feature = "openapi")]
+use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStatus};
+#[cfg(feature = "openapi")]
+impl Api<DeploymentSpec, DeploymentStatus> {
+    pub fn v1Deployment(client: APIClient) -> Self {
+        Self {
+            api: RawApi::v1Deployment(),
             client,
             phantom: (PhantomData, PhantomData)
         }
@@ -56,24 +83,26 @@ impl OpenApi<CrdSpec, CrdStatus> {
 }
 
 /// CRDs still need user structs
-impl<P, U> OpenApi<P, U> where
+impl<P, U> Api<P, U> where
     P: Clone + DeserializeOwned,
     U: Clone + DeserializeOwned + Default,
 {
     pub fn customResource(client: APIClient, name: &str) -> Self {
         Self {
-            api: Api::customResource(name),
+            api: RawApi::customResource(name),
             client,
             phantom: (PhantomData, PhantomData)
         }
     }
 }
 
+#[cfg(feature = "openapi")]
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
-impl OpenApi<PodSpec, PodStatus> {
+#[cfg(feature = "openapi")]
+impl Api<PodSpec, PodStatus> {
     pub fn v1Pod(client: APIClient) -> Self {
         Self {
-            api: Api::v1Pod(),
+            api: RawApi::v1Pod(),
             client,
             phantom: (PhantomData, PhantomData)
         }
@@ -83,7 +112,7 @@ impl OpenApi<PodSpec, PodStatus> {
 // TODO: all the k8s_openapi maps to constructors...
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
-impl<P, U> OpenApi<P, U> {
+impl<P, U> Api<P, U> {
     pub fn within(mut self, ns: &str) -> Self {
         self.api = self.api.within(ns);
         self
@@ -99,7 +128,7 @@ impl<P, U> OpenApi<P, U> {
 }
 
 /// PUSH/PUT/POST/GET abstractions
-impl<P, U> OpenApi<P, U> where
+impl<P, U> Api<P, U> where
     P: Clone + DeserializeOwned,
     U: Clone + DeserializeOwned + Default,
 {

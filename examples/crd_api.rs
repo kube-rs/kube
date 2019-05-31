@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, ListParams, Object, ObjectList, Void},
+    api::{RawApi, PostParams, DeleteParams, ListParams, Object, ObjectList, Void},
     client::APIClient,
     config,
 };
@@ -37,7 +37,7 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     // Manage the CRD
-    let crds = Api::v1beta1CustomResourceDefinition();
+    let crds = RawApi::v1beta1CustomResourceDefinition();
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
@@ -87,7 +87,7 @@ fn main() -> Result<(), failure::Error> {
     }
 
     // Manage the Foo CR
-    let foos = Api::customResource("foos")
+    let foos = RawApi::customResource("foos")
         .version("v1")
         .group("clux.dev")
         .within("dev");

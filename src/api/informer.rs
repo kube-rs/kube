@@ -1,4 +1,5 @@
 use crate::api::{
+    RawApi,
     Api,
     ListParams,
     Void,
@@ -35,7 +36,7 @@ pub struct Informer<P, U> where
     events: Arc<RwLock<WatchQueue<P, U>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
-    resource: Api,
+    resource: RawApi,
     params: ListParams,
 }
 
@@ -44,7 +45,23 @@ impl<P, U> Informer<P, U> where
     U: Clone + DeserializeOwned + Default,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: APIClient, r: Api) -> Self {
+    pub fn new(r: Api<P, U>) -> Self {
+        Informer {
+            client: r.client,
+            resource: r.api,
+            params: ListParams::default(),
+            events: Arc::new(RwLock::new(VecDeque::new())),
+            version: Arc::new(RwLock::new(0.to_string())),
+        }
+    }
+}
+
+impl<P, U> Informer<P, U> where
+    P: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned + Default,
+{
+    /// Create a reflector with a kube client on a kube resource
+    pub fn raw(client: APIClient, r: RawApi) -> Self {
         Informer {
             client,
             resource: r,

@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use kube::{
-    api::{OpenApi, PostParams, DeleteParams},
+    api::{Api, PostParams, DeleteParams},
     client::{APIClient},
     config,
 };
@@ -15,7 +15,7 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
 
     // Manage pods
-    let pods = OpenApi::v1Pod(client.clone()).within("default");
+    let pods = Api::v1Pod(client).within("default");
 
     // Create Pod blog
     info!("Creating Pod instance blog");
