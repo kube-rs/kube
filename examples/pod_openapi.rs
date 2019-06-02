@@ -1,5 +1,4 @@
 #[macro_use] extern crate log;
-//use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{

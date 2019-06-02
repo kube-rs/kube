@@ -175,9 +175,9 @@ fn main() -> Result<(), failure::Error> {
     assert!(!o.status.unwrap().is_bad);
 
     info!("Get Status on Foo instance qux");
-    let req = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    let req = foos.get_status("qux")?;
     let o = client.request::<Foo>(req)?;
-    info!("Patched status {:?} for {}", o.status, o.metadata.name);
+    info!("Got status {:?} for {}", o.status, o.metadata.name);
     assert!(!o.status.unwrap().is_bad);
 
 

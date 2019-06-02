@@ -4,7 +4,12 @@
     - `patch_status`
     - `get_status`
     - `replace_status`
-  * See crd_*api.rs examples
+  ^ See `crd_openapi` or `crd_api` examples
+  * Scale subresource commands added to `Api`:
+    - `patch_scale`
+    - `get_scale`
+    - `replace_scale`
+  ^ See `crd_openapi` example
 
 0.8.0 / 2019-05-31
 ==================

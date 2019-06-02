@@ -15,7 +15,7 @@ fn main() -> Result<(), failure::Error> {
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Pod(client.clone()).within(&namespace);
-    let inf = Informer::new(resource).init()?;
+    let inf = Informer::new(resource.clone()).init()?;
 
     // Here we both poll and reconcile based on events from the main thread
     // If you run this next to actix-web (say), spawn a thread and pass `inf` as app state
@@ -24,13 +24,13 @@ fn main() -> Result<(), failure::Error> {
 
         // Handle events one by one, draining the informer
         while let Some(event) = inf.pop() {
-            handle_node(&client, event)?;
+            handle_node(&resource, event)?;
         }
     }
 }
 
 // This function lets the app handle an event from kube
-fn handle_node(_c: &APIClient, ev: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
+fn handle_node(_pods: &Api<PodSpec, PodStatus>, ev: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
     match ev {
         WatchEvent::Added(o) => {
             let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();

@@ -538,7 +538,7 @@ fn replace_status() {
     let pp = PostParams::default();
     let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
     assert_eq!(req.uri(),
-        "/apis/apiextensions.k8s.io/v1/customresourcedefinitions/mycrd.domain.io/status?"
+        "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/mycrd.domain.io/status?"
     );
 }
 #[test]

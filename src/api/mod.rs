@@ -25,7 +25,13 @@ pub use raw::{
 };
 
 mod typed;
-pub use typed::Api;
+pub use typed::{
+    Api,
+    // well, ok:
+    Scale,
+    ScaleSpec,
+    ScaleStatus,
+};
 
 mod resource;
 pub use self::resource::{

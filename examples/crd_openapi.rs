@@ -14,11 +14,13 @@ use kube::{
 pub struct FooSpec {
     name: String,
     info: String,
+    replicas: i32,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct FooStatus {
     is_bad: bool,
+    replicas: i32,
 }
 
 fn main() -> Result<(), failure::Error> {
@@ -37,8 +39,9 @@ fn main() -> Result<(), failure::Error> {
         res.map_left(|o| {
             info!("Deleted {}: ({:?})", o.metadata.name,
                 o.status.unwrap().conditions.unwrap().last());
-            // even PropagationPolicy::Foreground doesn't cause us to block here
-            // need to wait for it to actually go away
+            // NB: PropagationPolicy::Foreground doesn't cause us to block here
+            // we have to watch for Established condition using field selector
+            // but this is a demo:
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }).map_right(|s| {
             // it's gone.
@@ -61,8 +64,12 @@ fn main() -> Result<(), failure::Error> {
                 "kind": "Foo",
             },
             "subresources": {
-                "status": {}
-            },
+                "status": {},
+                "scale": {
+                    "specReplicasPath": ".spec.replicas",
+                    "statusReplicasPath": ".status.replicas",
+                }
+            }
         },
     });
 
@@ -94,7 +101,7 @@ fn main() -> Result<(), failure::Error> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "metadata": { "name": "baz" },
-        "spec": { "name": "baz", "info": "old baz" },
+        "spec": { "name": "baz", "info": "old baz", "replicas": 1 },
     });
     let o = foos.create(&pp, serde_json::to_vec(&f1)?)?;
     assert_eq!(f1["metadata"]["name"], o.metadata.name);
@@ -115,7 +122,7 @@ fn main() -> Result<(), failure::Error> {
             // Updates need to provide our last observed version:
             "resourceVersion": f1cpy.metadata.resourceVersion,
         },
-        "spec": { "name": "baz", "info": "new baz" },
+        "spec": { "name": "baz", "info": "new baz", "replicas": 1 },
     });
     let f1_replaced = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?)?;
     assert_eq!(f1_replaced.spec.name, "baz");
@@ -134,7 +141,7 @@ fn main() -> Result<(), failure::Error> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "metadata": { "name": "qux" },
-        "spec": FooSpec { name: "qux".into(), info: "unpatched qux".into() },
+        "spec": FooSpec { name: "qux".into(), replicas: 0, info: "unpatched qux".into() },
         "status": FooStatus::default(),
     });
     let o = foos.create(&pp, serde_json::to_vec(&f2)?)?;
@@ -150,7 +157,7 @@ fn main() -> Result<(), failure::Error> {
             // Updates need to provide our last observed version:
             "resourceVersion": o.metadata.resourceVersion,
         },
-        "status": FooStatus { is_bad: true }
+        "status": FooStatus { is_bad: true, replicas: 0 }
     });
     let o = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
     info!("Replaced status {:?} for {}", o.status, o.metadata.name);
@@ -158,16 +165,31 @@ fn main() -> Result<(), failure::Error> {
 
     info!("Patch Status on Foo instance qux");
     let fs = json!({
-        "status": FooStatus { is_bad: false }
+        "status": FooStatus { is_bad: false, replicas: 1 }
     });
     let o = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
     info!("Patched status {:?} for {}", o.status, o.metadata.name);
     assert!(!o.status.unwrap().is_bad);
 
     info!("Get Status on Foo instance qux");
-    let o = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
-    info!("Patched status {:?} for {}", o.status, o.metadata.name);
+    let o = foos.get_status("qux")?;
+    info!("Got status {:?} for {}", o.status, o.metadata.name);
     assert!(!o.status.unwrap().is_bad);
+
+    // Check scale subresource:
+    info!("Get Scale on Foo instance qux");
+    let scale = foos.get_scale("qux")?;
+    info!("Got scale {:?} - {:?}", scale.spec, scale.status);
+    assert_eq!(scale.status.unwrap().replicas, 1);
+
+    // Scale up
+    let fs = json!({
+        "spec": { "replicas": 2 }
+    });
+    let o = foos.patch_scale("qux", &pp, serde_json::to_vec(&fs)?)?;
+    info!("Patched scale {:?} for {}", o.spec, o.metadata.name);
+    assert_eq!(o.status.unwrap().replicas, 1);
+    assert_eq!(o.spec.replicas.unwrap(), 2); // we only asked for more
 
     // Modify a Foo qux with a Patch
     info!("Patch Foo instance qux");

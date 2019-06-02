@@ -71,7 +71,7 @@ You tell it what type parameters correspond to; `T` should be a `Spec` struct, a
 
 ```rust
 let api = Api::v1Pod(client);
-let inf = Informer::new(api).init()?;
+let inf = Informer::new(api.clone()).init()?;
 ```
 
 The main feature of `Informer<P, U>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
@@ -80,14 +80,14 @@ The main feature of `Informer<P, U>` is that after calling `.poll()` you handle 
 inf.poll()?; // watches + queues events
 
 while let Some(event) = inf.pop() {
-    handle_event(&client, event)?;
+    handle_event(&api, event)?;
 }
 ```
 
 How you handle them is up to you, you could build your own state, you can call a kube client, or you can simply print events. Here's a sketch of how such a handler would look:
 
 ```rust
-fn handle_event(c: &APIClient, event: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
+fn handle_event(pods: &Api<PodSpec, PodStatus>, event: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
     match event {
         WatchEvent::Added(o) => {
             let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
@@ -117,7 +117,7 @@ Examples that show a little common flows. These all have logging of this library
 # watch pod events
 cargo run --example pod_informer --features=openapi
 # watch for broken nodes
-cargo run --example node_informer
+cargo run --example node_informer --no-default-features
 ```
 
 or for the reflectors:
@@ -132,7 +132,7 @@ for one based on a CRD, you need to create the CRD first:
 
 ```sh
 kubectl apply -f examples/foo.yaml
-cargo run --example crd_reflector
+cargo run --example crd_reflector --no-default-features
 ```
 
 then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
@@ -140,7 +140,7 @@ then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f c
 For straight API use examples, try:
 
 ```sh
-cargo run --example crd_api
+cargo run --example crd_api --no-default-features
 cargo run --example crd_openapi --features=openapi
 cargo run --example pod_openapi --features=openapi
 ```

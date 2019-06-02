@@ -105,17 +105,41 @@ impl<P, U> Api<P, U> where
         let req = self.api.replace_status(name, &pp, data)?;
         self.client.request::<Object<P, U>>(req)
     }
-
-/*
-    pub fn get_scale(&self, name: &str) -> Result<Object<P, U>> {
-    }
-    pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Object<P, U>> {
-    }
-    pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
-    }
-*/
 }
 
+/// Scale spec from api::autoscaling::v1
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct ScaleSpec {
+    pub replicas: Option<i32>,
+}
+/// Scale status from api::autoscaling::v1
+#[derive(Deserialize, Serialize, Clone, Default, Debug)]
+pub struct ScaleStatus {
+    pub replicas: i32,
+    pub selector: Option<String>,
+}
+pub type Scale = Object<ScaleSpec, ScaleStatus>;
+
+/// Scale subresource
+///
+/// https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource
+impl<P, U> Api<P, U> where
+    P: Clone + DeserializeOwned,
+    U: Clone + DeserializeOwned + Default,
+{
+    pub fn get_scale(&self, name: &str) -> Result<Scale> {
+        let req = self.api.get_scale(name)?;
+        self.client.request::<Scale>(req)
+    }
+    pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Scale> {
+        let req = self.api.patch_scale(name, &pp, patch)?;
+        self.client.request::<Scale>(req)
+    }
+    pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
+        let req = self.api.replace_scale(name, &pp, data)?;
+        self.client.request::<Scale>(req)
+    }
+}
 
 /// Api Constructor for CRDs
 ///

@@ -13,6 +13,9 @@ spec:
   version: v1
   subresources:
     status: {}
+    scale:
+      specReplicasPath: .spec.replicas
+      statusReplicasPath: .status.replicas
   versions:
   - name: v1
     served: true
