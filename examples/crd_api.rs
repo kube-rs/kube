@@ -44,7 +44,7 @@ fn main() -> Result<(), failure::Error> {
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
     let req = crds.delete("foos.clux.dev", &dp)?;
-    match client.request_status::<FullCrd>(req)? {
+    let _ = client.request_status::<FullCrd>(req).map(|res| match res {
         Left(res) => {
             info!("Deleted {}: ({:?})", res.metadata.name,
                 res.status.unwrap().conditions.unwrap().last());
@@ -54,7 +54,7 @@ fn main() -> Result<(), failure::Error> {
         Right(status) => {
             info!("Deleted foos.clux.dev: {:?}", status)
         }
-    }
+    });
 
     // Create the CRD so we can create Foos in kube
     let foocrd = json!({
@@ -148,17 +148,38 @@ fn main() -> Result<(), failure::Error> {
     let o = client.request::<Foo>(req)?;
     info!("Created {}", o.metadata.name);
 
-    // Update status on qux - TODO: better cluster
-    //if o.status.is_some() {
-    //    info!("Replace Status on Foo instance qux");
-    //    let fs = json!({
-    //        "status": FooStatus { is_bad: true }
-    //    });
-    //    let (res, _) = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
-    //    info!("Replaced status {:?} for {}", res.status, res.metadata.name);
-    //} else {
-    //    warn!("Not doing status replace - does the cluster support sub-resources?");
-    //}
+    // Try all subresource operations:
+    info!("Replace Status on Foo instance qux");
+    let fs = json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "metadata": {
+            "name": "qux",
+            // Updates need to provide our last observed version:
+            "resourceVersion": o.metadata.resourceVersion,
+        },
+        "status": FooStatus { is_bad: true }
+    });
+    let req = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    let o = client.request::<Foo>(req)?;
+    info!("Replaced status {:?} for {}", o.status, o.metadata.name);
+    assert!(o.status.unwrap().is_bad);
+
+    info!("Patch Status on Foo instance qux");
+    let fs = json!({
+        "status": FooStatus { is_bad: false }
+    });
+    let req = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    let o = client.request::<Foo>(req)?;
+    info!("Patched status {:?} for {}", o.status, o.metadata.name);
+    assert!(!o.status.unwrap().is_bad);
+
+    info!("Get Status on Foo instance qux");
+    let req = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    let o = client.request::<Foo>(req)?;
+    info!("Patched status {:?} for {}", o.status, o.metadata.name);
+    assert!(!o.status.unwrap().is_bad);
+
 
     // Modify a Foo qux with a Patch
     info!("Patch Foo instance qux");

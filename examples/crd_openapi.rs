@@ -32,15 +32,18 @@ fn main() -> Result<(), failure::Error> {
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
-    crds.delete("foos.clux.dev", &dp)?.map_left(|o| {
-        info!("Deleted {}: ({:?})", o.metadata.name,
-            o.status.unwrap().conditions.unwrap().last());
-        // even PropagationPolicy::Foreground doesn't cause us to block here
-        // need to wait for it to actually go away
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-    }).map_right(|s| {
-        // it's gone.
-        info!("Deleted foos.clux.dev: ({:?})", s);
+    // but ignore delete err if not exists
+    let _ = crds.delete("foos.clux.dev", &dp).map(|res| {
+        res.map_left(|o| {
+            info!("Deleted {}: ({:?})", o.metadata.name,
+                o.status.unwrap().conditions.unwrap().last());
+            // even PropagationPolicy::Foreground doesn't cause us to block here
+            // need to wait for it to actually go away
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+        }).map_right(|s| {
+            // it's gone.
+            info!("Deleted foos.clux.dev: ({:?})", s);
+        })
     });
 
     // Create the CRD so we can create Foos in kube
@@ -109,7 +112,7 @@ fn main() -> Result<(), failure::Error> {
         "kind": "Foo",
         "metadata": {
             "name": "baz",
-            // Need to provide our last observed version:
+            // Updates need to provide our last observed version:
             "resourceVersion": f1cpy.metadata.resourceVersion,
         },
         "spec": { "name": "baz", "info": "new baz" },
@@ -137,17 +140,34 @@ fn main() -> Result<(), failure::Error> {
     let o = foos.create(&pp, serde_json::to_vec(&f2)?)?;
     info!("Created {}", o.metadata.name);
 
-    // Update status on qux - TODO: better cluster
-    //if o.status.is_some() {
-    //    info!("Replace Status on Foo instance qux");
-    //    let fs = json!({
-    //        "status": FooStatus { is_bad: true }
-    //    });
-    //    let res = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
-    //    info!("Replaced status {:?} for {}", res.status, res.metadata.name);
-    //} else {
-    //    warn!("Not doing status replace - does the cluster support sub-resources?");
-    //}
+    // Update status on qux
+    info!("Replace Status on Foo instance qux");
+    let fs = json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "metadata": {
+            "name": "qux",
+            // Updates need to provide our last observed version:
+            "resourceVersion": o.metadata.resourceVersion,
+        },
+        "status": FooStatus { is_bad: true }
+    });
+    let o = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    info!("Replaced status {:?} for {}", o.status, o.metadata.name);
+    assert!(o.status.unwrap().is_bad);
+
+    info!("Patch Status on Foo instance qux");
+    let fs = json!({
+        "status": FooStatus { is_bad: false }
+    });
+    let o = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    info!("Patched status {:?} for {}", o.status, o.metadata.name);
+    assert!(!o.status.unwrap().is_bad);
+
+    info!("Get Status on Foo instance qux");
+    let o = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    info!("Patched status {:?} for {}", o.status, o.metadata.name);
+    assert!(!o.status.unwrap().is_bad);
 
     // Modify a Foo qux with a Patch
     info!("Patch Foo instance qux");

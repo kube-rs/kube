@@ -1,3 +1,11 @@
+0.9.0 / 2019-06-02
+==================
+  * Status subresource api commands added to `Api`:
+    - `patch_status`
+    - `get_status`
+    - `replace_status`
+  * See crd_*api.rs examples
+
 0.8.0 / 2019-05-31
 ==================
   * Typed `Api` variant called `OpenApi` introduced (see crd_openapi example)

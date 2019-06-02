@@ -93,7 +93,18 @@ impl<P, U> Api<P, U> where
         let req = self.api.watch(&lp, &version)?;
         self.client.request_events::<WatchEvent<P, U>>(req)
     }
-
+    pub fn get_status(&self, name: &str) -> Result<Object<P, U>> {
+        let req = self.api.get_status(name)?;
+        self.client.request::<Object<P, U>>(req)
+    }
+    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Object<P, U>> {
+        let req = self.api.patch_status(name, &pp, patch)?;
+        self.client.request::<Object<P, U>>(req)
+    }
+    pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
+        let req = self.api.replace_status(name, &pp, data)?;
+        self.client.request::<Object<P, U>>(req)
+    }
 
 /*
     pub fn get_scale(&self, name: &str) -> Result<Object<P, U>> {
@@ -101,12 +112,6 @@ impl<P, U> Api<P, U> where
     pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Object<P, U>> {
     }
     pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
-    }
-    pub fn get_status(&self, name: &str) -> Result<Object<P, U>> {
-    }
-    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Object<P, U>> {
-    }
-    pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Object<P, U>> {
     }
 */
 }

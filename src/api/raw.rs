@@ -21,11 +21,6 @@ pub struct RawApi {
     /// Name of the api prefix (api or apis typically)
     pub prefix: String,
     // extra properties for sub resources
-
-    /// Version of status subresource (takes precedence on version and beta atm)
-    pub status_version: String,
-    /// Version of scale subresource (takes precedence on version and beta atm)
-    pub scale_version: String,
 }
 
 impl Default for RawApi {
@@ -35,8 +30,6 @@ impl Default for RawApi {
             namespace: None,
             group: "".into(),
             version: "v1".into(),
-            scale_version: "v1beta2".into(),
-            status_version: "v1beta2".into(),
             prefix: "apis".into(), // seems most common
         }
     }
@@ -165,27 +158,16 @@ impl RawApi {
 
 // -------------------------------------------------------
 
-enum UrlVersion {
-    Default,
-    Scale,
-    Status,
-}
-
 impl RawApi {
-    fn make_url(&self, r: UrlVersion) -> String {
+    fn make_url(&self) -> String {
         let pref = if self.prefix == "" { "".into() } else { format!("{}/", self.prefix) };
         let g = if self.group == "" { "".into() } else { format!("{}/", self.group) };
-        let v = match r {
-            UrlVersion::Scale => format!("{}/", self.scale_version),
-            UrlVersion::Status => format!("{}/", self.status_version),
-            UrlVersion::Default => format!("{}/", self.version)
-        };
         let n = if let Some(ns) = &self.namespace { format!("namespaces/{}/", ns) } else { "".into() };
 
-        format!("/{prefix}{group}{version}{namespaces}{resource}",
+        format!("/{prefix}{group}{version}/{namespaces}{resource}",
             prefix = pref,
             group = g,
-            version = v,
+            version = self.version,
             namespaces = n,
             resource = self.resource,
         )
@@ -246,7 +228,7 @@ pub enum PropagationPolicy {
 impl RawApi {
     /// List a collection of a resource
     pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
         if let Some(fields) = &lp.field_selector {
@@ -266,7 +248,7 @@ impl RawApi {
 
     /// Create a minimial list request to seed an initial resourceVersion
     pub(crate) fn list_zero_resource_entries(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         qp.append_pair("limit", "1"); // can't have 0..
         if lp.include_uninitialized {
@@ -279,8 +261,8 @@ impl RawApi {
     }
 
     /// Watch a resource at a given version
-    pub(crate) fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "?";
+    pub fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
         qp.append_pair("watch", "true");
@@ -304,7 +286,7 @@ impl RawApi {
 
     /// Get a single instance
     pub fn get(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "/" + name;
+        let base_url = self.make_url() + "/" + name;
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
@@ -313,7 +295,7 @@ impl RawApi {
 
     /// Create an instance of a resource
     pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -325,7 +307,7 @@ impl RawApi {
 
     /// Delete an instance of a resource
     pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "/"+ name + "?";
+        let base_url = self.make_url() + "/"+ name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if dp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -343,7 +325,7 @@ impl RawApi {
 
     /// Delete a collection of a resource
     pub fn delete_collection(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "?";
+        let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", &fields);
@@ -363,7 +345,7 @@ impl RawApi {
     ///
     /// Requires a serialized merge-patch+json at the moment.
     pub fn patch(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "/" + name + "?";
+        let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -380,7 +362,7 @@ impl RawApi {
     ///
     /// Requires metadata.resourceVersion set in data
     pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Default) + "/" + name + "?";
+        let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -392,7 +374,7 @@ impl RawApi {
 
     /// Get an instance of the scale subresource
     pub fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale";
+        let base_url = self.make_url() + "/" + name + "/scale";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
@@ -401,7 +383,7 @@ impl RawApi {
 
     /// Patch an instance of the scale subresource
     pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
+        let base_url = self.make_url() + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -415,7 +397,7 @@ impl RawApi {
 
     /// Replace an instance of the scale subresource
     pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Scale) + "/" + name + "/scale?";
+        let base_url = self.make_url() + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -427,7 +409,7 @@ impl RawApi {
 
     /// Get an instance of the status subresource
     pub fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status";
+        let base_url = self.make_url() + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
@@ -436,7 +418,7 @@ impl RawApi {
 
     /// Patch an instance of the status subresource
     pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status?";
+        let base_url = self.make_url() + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -450,7 +432,7 @@ impl RawApi {
 
     /// Replace an instance of the status subresource
     pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url(UrlVersion::Status) + "/" + name + "/status?";
+        let base_url = self.make_url() + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -522,7 +504,7 @@ fn patch_status_path(){
     let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.patch_status("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/status?");
+    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
     assert_eq!(req.method(), "PATCH");
 }
 #[test]
@@ -530,7 +512,7 @@ fn replace_status_path(){
     let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.replace_status("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/status?");
+    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
     assert_eq!(req.method(), "PUT");
 }
 
@@ -556,14 +538,14 @@ fn replace_status() {
     let pp = PostParams::default();
     let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
     assert_eq!(req.uri(),
-        "/apis/apiextensions.k8s.io/v1beta2/customresourcedefinitions/mycrd.domain.io/status?"
+        "/apis/apiextensions.k8s.io/v1/customresourcedefinitions/mycrd.domain.io/status?"
     );
 }
 #[test]
 fn get_scale_path(){
     let r = RawApi::v1Node();
     let req = r.get_scale("mynode").unwrap();
-    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale");
+    assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale");
     assert_eq!(req.method(), "GET");
 }
 #[test]
@@ -571,7 +553,7 @@ fn patch_scale_path(){
     let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale?");
+    assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
     assert_eq!(req.method(), "PATCH");
 }
 #[test]
@@ -579,7 +561,7 @@ fn replace_scale_path(){
     let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1beta2/nodes/mynode/scale?");
+    assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
     assert_eq!(req.method(), "PUT");
 }
 
