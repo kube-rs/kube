@@ -2,13 +2,20 @@
 
 use std::collections::BTreeMap;
 
+#[derive(Deserialize, Serialize, Clone, Default)]
+pub struct ListMeta {
+    pub continue_: Option<String>,
+    pub resourceVersion: Option<String>,
+    pub selfLink: Option<String>,
+}
+
 /// Metadata that all persisted resources must have
 ///
 /// This parses the relevant fields from `[ObjectMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html)`
 /// Generally maps and vecs are moved out of their Options to avoid unnecessary boxing
 /// because `xs.is_none()` is often functionally equivalent to `xs.is_empty()`.
 #[derive(Deserialize, Serialize, Clone, Default)]
-pub struct Metadata {
+pub struct ObjectMeta {
     /// The unique name (within namespace) for a resource
     ///
     /// This output from this from ResourceList calls is the empty string.

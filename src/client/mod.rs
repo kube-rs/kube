@@ -40,7 +40,7 @@ pub struct StatusCause {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct ApiStatus {
+pub struct Status {
     // TODO: typemeta
     // TODO: metadata that can be completely empty (listmeta...)
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -102,7 +102,7 @@ impl APIClient {
         })
     }
 
-    pub fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, ApiStatus>>
+    pub fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
@@ -116,8 +116,8 @@ impl APIClient {
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text).context(ErrorKind::SerdeParse)?;;
         if v["kind"] == "Status" {
-            trace!("ApiStatus from {}", text);
-            Ok(Right(serde_json::from_str::<ApiStatus>(&text).map_err(|e| {
+            trace!("Status from {}", text);
+            Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
                 warn!("{}, {:?}", text, e);
                 Error::from(ErrorKind::SerdeParse)
             })?))

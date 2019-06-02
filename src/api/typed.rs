@@ -15,7 +15,7 @@ use crate::api::resource::{
 };
 use crate::client::{
     APIClient,
-    ApiStatus,
+    Status,
 };
 use crate::{Result};
 
@@ -69,7 +69,7 @@ impl<P, U> Api<P, U> where
         let req = self.api.create(&pp, data)?;
         self.client.request::<Object<P, U>>(req)
     }
-    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<Object<P, U>, ApiStatus>> {
+    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<Object<P, U>, Status>> {
         let req = self.api.delete(name, &dp)?;
         self.client.request_status::<Object<P, U>>(req)
     }
@@ -77,7 +77,7 @@ impl<P, U> Api<P, U> where
         let req = self.api.list(&lp)?;
         self.client.request::<ObjectList<Object<P, U>>>(req)
     }
-    pub fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<Object<P, U>>, ApiStatus>> {
+    pub fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<Object<P, U>>, Status>> {
         let req = self.api.delete_collection(&lp)?;
         self.client.request_status::<ObjectList<Object<P, U>>>(req)
     }

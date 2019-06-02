@@ -1,3 +1,12 @@
+0.10.0 / 2019-06-XX
+==================
+  * `ApiStatus` renamed to `Status` to match kube api conventions
+  * Rename `Metadata` to `ObjectMeta`
+  * Added `ListMeta` for `ObjectList` and `Status`
+  * Meta objects are now flattened into objects so you need:
+    - `o.typemeta.kind` rather than `o.kind`
+    - `o.typemeta.version` rather than `o.version`
+
 0.9.0 / 2019-06-02
 ==================
   * Status subresource api commands added to `Api`:

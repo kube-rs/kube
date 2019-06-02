@@ -48,6 +48,6 @@ mod openapi;
 
 mod metadata;
 pub use self::metadata::{
-    Metadata,
+    ObjectMeta,
     Initializers,
 };

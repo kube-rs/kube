@@ -3,11 +3,8 @@
 use std::fmt::Debug;
 use serde::{Deserialize};
 
-use crate::api::{
-    metadata::Metadata,
-};
+use crate::api::metadata::{ObjectMeta, ListMeta};
 use crate::ApiError;
-//use crate::{Result, Error};
 
 
 /// A raw event returned from a watch query
@@ -75,7 +72,7 @@ pub struct Object<P, U> where
     ///
     /// Contains information common to most resources about the Resource,
     /// including the object name, annotations, labels and more.
-    pub metadata: Metadata,
+    pub metadata: ObjectMeta,
 
     /// The Spec struct of a resource. I.e. `PodSpec`, `DeploymentSpec`, etc.
     ///
@@ -107,7 +104,7 @@ pub struct ObjectList<T> where
     /// ListMeta - only really used for its resourceVersion
     ///
     /// See [ListMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ListMeta.html)
-    pub metadata: Metadata,
+    pub metadata: ListMeta,
 
     /// The items we are actually interested in. In practice; T:= Resource<T,U>.
     #[serde(bound(deserialize = "Vec<T>: Deserialize<'de>"))]
