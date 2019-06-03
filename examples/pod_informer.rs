@@ -1,11 +1,12 @@
 #[macro_use] extern crate log;
 use std::env;
 use kube::{
-    api::{Api, Informer, WatchEvent},
+    api::{Api, Informer, WatchEvent, Object},
     client::APIClient,
     config,
 };
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
+type Pod = Object<PodSpec, PodStatus>;
 
 fn main() -> Result<(), failure::Error> {
     env::set_var("RUST_LOG", "info,kube=trace");
@@ -30,7 +31,7 @@ fn main() -> Result<(), failure::Error> {
 }
 
 // This function lets the app handle an event from kube
-fn handle_node(_pods: &Api<PodSpec, PodStatus>, ev: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
+fn handle_node(_pods: &Api<Pod>, ev: WatchEvent<Pod>) -> Result<(), failure::Error> {
     match ev {
         WatchEvent::Added(o) => {
             let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();

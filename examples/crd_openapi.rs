@@ -4,7 +4,7 @@ use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, ListParams},
+    api::{Api, PostParams, DeleteParams, ListParams, Object},
     client::{APIClient},
     config,
 };
@@ -22,6 +22,8 @@ pub struct FooStatus {
     is_bad: bool,
     replicas: i32,
 }
+
+type Foo = Object<FooSpec, FooStatus>;
 
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
@@ -90,7 +92,7 @@ fn main() -> Result<(), failure::Error> {
     }
 
     // Manage the Foo CR
-    let foos : Api<FooSpec, FooStatus> = Api::customResource(client, "foos")
+    let foos : Api<Foo> = Api::customResource(client, "foos")
         .version("v1")
         .group("clux.dev")
         .within("default");

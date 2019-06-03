@@ -38,16 +38,19 @@ pub use self::resource::{
     Object,
     ObjectList,
     WatchEvent,
-    //PostResponse,
-    //CreateResponse,
-    //Response,
+    KubeObject,
 };
 
 #[cfg(feature = "openapi")]
 mod openapi;
+#[cfg(feature = "openapi")]
+mod snowflake;
+#[cfg(feature = "openapi")]
+pub use snowflake::Event;
 
 mod metadata;
 pub use self::metadata::{
     ObjectMeta,
+    TypeMeta,
     Initializers,
 };

@@ -10,8 +10,9 @@ fn main() -> Result<(), failure::Error> {
     env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
+    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Api::v1Deployment(client).within("default");
+    let resource = Api::v1Deployment(client).within(&namespace);
     let rf = Reflector::new(resource).init()?;
 
     // rf is initialized with full state, which can be extracted on demand.
