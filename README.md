@@ -36,7 +36,7 @@ pods.delete("blog", &DeleteParams::default())?;
 See the `pod_openapi` or `crd_openapi` examples for more uses.
 
 ## Reflector
-One of the main abstractions exposed from `kube::api` is `Reflector<P, U>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
+One of the main abstractions exposed from `kube::api` is `Reflector<K>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
 
 It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
 
@@ -65,16 +65,19 @@ rf.read()?.into_iter().for_each(|(name, p)| {
 The reflector itself is responsible for acquiring the write lock and update the state as long as you call `poll()` periodically.
 
 ## Informer
-The other main abstraction from `kube::api` is `Informer<P, U>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with `resourceVersion`.
+The other main abstraction from `kube::api` is `Informer<K>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with the last seen `resourceVersion`.
 
-You tell it what type parameters correspond to; `T` should be a `Spec` struct, and `U` should be a `Status` struct. Again, these can be as complete or incomplete as you like. For instance, using the complete structs from [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
+You tell it what type `KubeObject` implementing object you want to use. You can use `Object<P, U>` to get an automatic implementation by using `Object<PodSpec, PodStatus>`.`
+
+The spec and status structs can be as complete or incomplete as you like. For instance, using the complete structs from [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
+type Pod = Object<PodSpec, PodStatus>;
 let api = Api::v1Pod(client);
 let inf = Informer::new(api.clone()).init()?;
 ```
 
-The main feature of `Informer<P, U>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
+The main feature of `Informer<K>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
 
 ```rust
 inf.poll()?; // watches + queues events
@@ -164,7 +167,8 @@ let foos = RawApi::customResource("foos")
     .group("clux.dev")
     .within("default");
 
-let rf : Reflector<FooSpec, Void> = Reflector::raw(client, resource).init()?;
+type Foo = Object<FooSpec, Void>;
+let rf : Reflector<Foo> = Reflector::raw(client, resource).init()?;
 
 let fdata = json!({
     "apiVersion": "clux.dev/v1",
@@ -173,9 +177,9 @@ let fdata = json!({
     "spec": { "name": "baz", "info": "old baz" },
 });
 let req = foos.create(&PostParams::default(), serde_json::to_vec(&fdata)?)?;
-let o = client.request::<FooMeta>(req)?;
+let o = client.request::<Foo>(req)?;
 
-let fbaz = client.request::<Object<FooSpec, Void>>(foos.get("baz")?)?;
+let fbaz = client.request::<Foo>(foos.get("baz")?)?;
 assert_eq!(fbaz.spec.info, "old baz");
 ```
 
