@@ -6,6 +6,11 @@ use serde::{Deserialize};
 use crate::api::metadata::{ObjectMeta, ListMeta};
 use crate::ApiError;
 
+/// Accessors ever kubernetes object must have
+pub trait KubeObject {
+    fn meta(&self) -> &ObjectMeta;
+}
+
 
 /// A raw event returned from a watch query
 ///
@@ -21,8 +26,8 @@ pub enum WatchEvent<K> where
     Error(ApiError),
 }
 
-impl<T> Debug for WatchEvent<T> where
-   T: Clone
+impl<K> Debug for WatchEvent<K> where
+    K: Clone + KubeObject
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
@@ -88,6 +93,13 @@ pub struct Object<P, U> where
     pub status: Option<U>,
 }
 
+
+// Blanked implementation of KubeObject for any Object
+impl<P, U> KubeObject for Object<P, U> where
+    P: Clone, U: Clone,
+{
+    fn meta(&self) -> &ObjectMeta { &self.metadata }
+}
 
 /// A generic kubernetes object list
 ///

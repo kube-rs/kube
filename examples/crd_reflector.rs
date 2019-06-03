@@ -2,17 +2,19 @@
 #[macro_use] extern crate serde_derive;
 
 use kube::{
-    api::{RawApi, Reflector, Void},
+    api::{RawApi, Reflector, Void, Object},
     client::APIClient,
     config,
 };
 
-// Own custom resource
+// Own custom resource spec
 #[derive(Deserialize, Serialize, Clone)]
-pub struct Foo {
+pub struct FooSpec {
     name: String,
     info: String,
 }
+// The kubernetes generic object with our spec and no status
+type Foo = Object<FooSpec, Void>;
 
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
@@ -26,7 +28,7 @@ fn main() -> Result<(), failure::Error> {
         .group("clux.dev")
         .within(&namespace);
 
-    let rf : Reflector<Foo, Void> = Reflector::raw(client, resource).init()?;
+    let rf : Reflector<Foo> = Reflector::raw(client, resource).init()?;
 
     loop {
         // Update internal state by calling watch (blocks):

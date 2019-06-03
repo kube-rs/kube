@@ -7,6 +7,7 @@ use crate::api::{
 use crate::api::resource::{
     ObjectList,
     WatchEvent,
+    KubeObject,
 };
 use crate::client::APIClient;
 use crate::{Result};
@@ -17,33 +18,33 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-type WatchQueue<T> = VecDeque<WatchEvent<T>>;
+type WatchQueue<K> = VecDeque<WatchEvent<K>>;
 
 /// An event informer for a `Resource`
 ///
-/// This watches a `Resource<T>`, by:
+/// This watches a `Resource<K>`, by:
 /// - seeding the intial resourceVersion with a list call (optional)
 /// - keeping track of resourceVersions after every poll
 /// - recovering when resourceVersions get desynced
 ///
-/// It caches WatchEvent<T> internally in a queue when polling.
+/// It caches WatchEvent<K> internally in a queue when polling.
 /// A user should drain this queue periodically.
 #[derive(Clone)]
-pub struct Informer<T> where
-    T: Clone + DeserializeOwned,
+pub struct Informer<K> where
+    K: Clone + DeserializeOwned + KubeObject
 {
-    events: Arc<RwLock<WatchQueue<T>>>,
+    events: Arc<RwLock<WatchQueue<K>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
     resource: RawApi,
     params: ListParams,
 }
 
-impl<T> Informer<T> where
-    T: Clone + DeserializeOwned,
+impl<K> Informer<K> where
+    K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(r: Api<T>) -> Self {
+    pub fn new(r: Api<K>) -> Self {
         Informer {
             client: r.client,
             resource: r.api,
@@ -54,8 +55,8 @@ impl<T> Informer<T> where
     }
 }
 
-impl<T> Informer<T> where
-    P: Clone + DeserializeOwned,
+impl<K> Informer<K> where
+    K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn raw(client: APIClient, r: RawApi) -> Self {
@@ -149,7 +150,7 @@ impl<T> Informer<T> where
     }
 
     /// Pop an event from the front of the WatchQueue
-    pub fn pop(&self) -> Option<WatchEvent<T>> {
+    pub fn pop(&self) -> Option<WatchEvent<K>> {
         self.events.write().unwrap().pop_front()
     }
 
@@ -181,18 +182,18 @@ impl<T> Informer<T> where
     }
 
     /// Watch helper
-    fn single_watch(&self) -> Result<(Vec<WatchEvent<T>>, String)> {
+    fn single_watch(&self) -> Result<(Vec<WatchEvent<K>>, String)> {
         let oldver = self.version();
         let req = self.resource.watch(&self.params, &oldver)?;
-        let events = self.client.request_events::<WatchEvent<T>>(req)?;
+        let events = self.client.request_events::<WatchEvent<K>>(req)?;
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
         let newver = events.iter().filter_map(|e| {
             match e {
-                WatchEvent::Added(o) => o.metadata.resourceVersion.clone(),
-                WatchEvent::Modified(o) => o.metadata.resourceVersion.clone(),
-                WatchEvent::Deleted(o) => o.metadata.resourceVersion.clone(),
+                WatchEvent::Added(o) => o.meta().resourceVersion.clone(),
+                WatchEvent::Modified(o) => o.meta().resourceVersion.clone(),
+                WatchEvent::Deleted(o) => o.meta().resourceVersion.clone(),
                 _ => None
             }
         }).last().unwrap_or(oldver);

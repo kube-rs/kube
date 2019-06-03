@@ -1,6 +1,6 @@
 #[macro_use] extern crate log;
 use kube::{
-    api::{RawApi, Informer, WatchEvent},
+    api::{RawApi, Informer, WatchEvent, Object},
     client::APIClient,
     config,
 };
@@ -8,6 +8,8 @@ use k8s_openapi::api::core::v1::{
     NodeSpec, NodeStatus,
     Event, ListEventForAllNamespacesOptional,
 };
+
+type Node = Object<NodeSpec, NodeStatus>;
 
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
@@ -30,7 +32,7 @@ fn main() -> Result<(), failure::Error> {
 }
 
 // This function lets the app handle an event from kube
-fn handle_nodes(client: &APIClient, ev: WatchEvent<NodeSpec, NodeStatus>) -> Result<(), failure::Error> {
+fn handle_nodes(client: &APIClient, ev: WatchEvent<Node>) -> Result<(), failure::Error> {
     match ev {
         WatchEvent::Added(o) => {
             info!("New Node: {}", o.spec.provider_id.unwrap());
