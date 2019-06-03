@@ -116,6 +116,8 @@ Examples that show a little common flows. These all have logging of this library
 ```sh
 # watch pod events
 cargo run --example pod_informer --features=openapi
+# watch event events
+cargo run --example event_informer --features=openapi
 # watch for broken nodes
 cargo run --example node_informer --no-default-features
 ```

@@ -128,6 +128,16 @@ impl RawApi {
             ..Default::default()
         }
     }
+    // Stable event resource constructor
+    pub fn v1Event() -> Self {
+        Self {
+            group: "".into(),
+            resource: "events".into(),
+            prefix: "api".into(),
+            ..Default::default()
+        }
+    }
+
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {

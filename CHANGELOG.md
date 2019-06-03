@@ -1,11 +1,17 @@
-0.10.0 / 2019-06-XX
+0.10.0 / 2019-06-03
 ==================
-  * `ApiStatus` renamed to `Status` to match kube api conventions
-  * Rename `Metadata` to `ObjectMeta`
-  * Added `ListMeta` for `ObjectList` and `Status`
-  * Meta objects are now flattened into objects so you need:
-    - `o.typemeta.kind` rather than `o.kind`
-    - `o.typemeta.version` rather than `o.version`
+  * `Api<P, U>` is now `Api<K>` for some `KubeObject` K:
+    - Big change to allow snowflake objects (#35) - but also slightly nicer
+    - You want aliases `type Pod = Object<PodSpec, PodStatus>`
+    - This gives you the required `KubeObject` trait impl for free
+  * Added `Event` native type to prove snowflakes can be handled - #35
+
+  * `ApiStatus` renamed to `Status` to match kube api conventions #36
+  * Rename `Metadata` to `ObjectMeta` #36
+  * Added `ListMeta` for `ObjectList` and `Status` #36
+  * Added `TypeMeta` object which is flattened onto `Object`, so:
+    - `o.types.kind` rather than `o.kind`
+    - `o.types.version` rather than `o.version`
 
 0.9.0 / 2019-06-02
 ==================

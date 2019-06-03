@@ -1,6 +1,6 @@
 #[macro_use] extern crate log;
 use kube::{
-    api::{RawApi, Informer, WatchEvent, Object},
+    api::{RawApi, Informer, WatchEvent, ObjectList, Object},
     client::APIClient,
     config,
 };
@@ -54,8 +54,10 @@ fn handle_nodes(client: &APIClient, ev: WatchEvent<Node>) -> Result<(), failure:
                     ..Default::default()
                 };
                 let req = Event::list_event_for_all_namespaces(opts)?.0;
-                let res = client.request::<Event>(req)?;
-                warn!("Node events: {:?}", res);
+                let res = client.request::<ObjectList<Event>>(req)?;
+                for e in res.items {
+                    warn!("Node event: {:?}", e);
+                }
             } else {
                 // Turn up logging above to see
                 debug!("Normal node: {}", o.metadata.name);

@@ -3,7 +3,7 @@
 use std::fmt::Debug;
 use serde::{Deserialize};
 
-use crate::api::metadata::{ObjectMeta, ListMeta};
+use crate::api::metadata::{ObjectMeta, ListMeta, TypeMeta};
 use crate::ApiError;
 
 /// Accessors ever kubernetes object must have
@@ -51,10 +51,6 @@ impl<K> Debug for WatchEvent<K> where
 /// - generic requirements on fields (need metadata) is impossible
 /// - you cannot implement traits for objects you don't own => no addon traits to k8s-openapi
 ///
-/// Thankfully, this generic setup works regardless, and the user is generally
-/// unaware of the deception. Now it does require the user to pass explicit an Spec
-/// and Status structs, which is slightly awkward.
-///
 /// This struct appears in `ObjectList` and `WatchEvent`, and when using a `Reflector`,
 /// and is exposed as the values in `ObjectMap`.
 #[derive(Deserialize, Serialize, Clone)]
@@ -62,17 +58,8 @@ pub struct Object<P, U> where
     P: Clone,
     U: Clone,
 {
-    /// The version of the API
-    ///
-    /// Marked optional because it's not always present for items in a `ResourceList`
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub apiVersion: Option<String>,
-
-    /// The name of the API
-    ///
-    /// Marked optional because it's not always present for items in a `ResourceList`
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub kind: Option<String>,
+    #[serde(flatten)]
+    pub types: TypeMeta,
 
     /// Resource metadata
     ///
@@ -93,11 +80,8 @@ pub struct Object<P, U> where
     pub status: Option<U>,
 }
 
-
-// Blanked implementation of KubeObject for any Object
-impl<P, U> KubeObject for Object<P, U> where
-    P: Clone, U: Clone,
-{
+/// Blanked implementation for standard objects that can use Object
+impl<P, U> KubeObject for Object<P, U> where P: Clone, U: Clone {
     fn meta(&self) -> &ObjectMeta { &self.metadata }
 }
 
@@ -123,52 +107,3 @@ pub struct ObjectList<T> where
     #[serde(bound(deserialize = "Vec<T>: Deserialize<'de>"))]
     pub items: Vec<T>,
 }
-
-/*/// Generic post response object
-///
-/// Returned from patch / replace (incl. status)
-#[derive(Deserialize, Serialize, Clone)]
-//#[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
-pub enum PostResponse<T> where
-    T: Clone
-{
-    Ok(T), // StatusCode::OK
-    Created(T), // StatusCode::CREATED
-    Error, // Unauthorized or other
-}
-
-
-/// Generic post response object
-///
-/// Returned from create new
-#[derive(Deserialize, Serialize, Clone)]
-pub enum CreateResponse<T> where
-    T: Clone
-{
-    Ok(T), // StatusCode::OK
-    Created(T), // StatusCode::CREATED
-    Accepted(T), // StatusCode::ACCEPTED
-    Error, // Unauthorized or other
-}
-// NB: 409 CONFLICT returned when already exists..
-
-
-/// Generic response object
-///
-/// Returned from patch, get, watch style requests
-#[derive(Deserialize, Serialize, Clone)]
-//#[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
-pub enum Response<T> where
-    T: Clone
-{
-    Ok(T),
-    Error, // Unauthorized or other
-}
-
-// TODO: delete collection is weird - why would it give you meta::v1::Status?
-//pub enum DeleteCollectionNamespacedDeploymentResponse {
-//    OkStatus(crate::v1_13::apimachinery::pkg::apis::meta::v1::Status),
-//    OkValue(crate::v1_13::api::apps::v1::Deployment),
-//    Unauthorized,
-//    Other,
-//}*/

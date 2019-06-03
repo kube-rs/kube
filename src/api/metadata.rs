@@ -3,6 +3,22 @@
 use std::collections::BTreeMap;
 
 #[derive(Deserialize, Serialize, Clone, Default)]
+pub struct TypeMeta {
+    /// The version of the API
+    ///
+    /// Marked optional because it's not always present for items in a `ResourceList`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub apiVersion: Option<String>,
+
+    /// The name of the API
+    ///
+    /// Marked optional because it's not always present for items in a `ResourceList`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
+
+
+#[derive(Deserialize, Serialize, Clone, Default)]
 pub struct ListMeta {
     pub continue_: Option<String>,
     pub resourceVersion: Option<String>,
