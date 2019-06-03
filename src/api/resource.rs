@@ -12,17 +12,17 @@ use crate::ApiError;
 /// Note that a watch query returns many of these as newline separated json.
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
-pub enum WatchEvent<P, U> where
-  P: Clone, U: Clone + Default,
+pub enum WatchEvent<K> where
+    K: Clone + KubeObject
 {
-    Added(Object<P, U>),
-    Modified(Object<P, U>),
-    Deleted(Object<P, U>),
+    Added(K),
+    Modified(K),
+    Deleted(K),
     Error(ApiError),
 }
 
-impl<P, U> Debug for WatchEvent<P, U> where
-   P: Clone, U: Clone + Default
+impl<T> Debug for WatchEvent<T> where
+   T: Clone
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
@@ -54,7 +54,8 @@ impl<P, U> Debug for WatchEvent<P, U> where
 /// and is exposed as the values in `ObjectMap`.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Object<P, U> where
-  P: Clone, U: Clone
+    P: Clone,
+    U: Clone,
 {
     /// The version of the API
     ///
