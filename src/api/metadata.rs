@@ -24,7 +24,7 @@ pub struct ObjectMeta {
 
     /// The namespace (when it's namespaced) of the resouce where "" => "default"
     #[serde(skip_serializing_if = "Option::is_none")]
-    namespace: Option<String>,
+    pub namespace: Option<String>,
 
     /// [Resource labels](http://kubernetes.io/docs/user-guide/labels)
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
