@@ -21,8 +21,8 @@ use crate::{Result};
 
 /// A typed Api variant that does not expose request internals
 ///
-/// The upsides of working with this rather than `Api` direct are:
-/// - super easy interface (no figuring out return types)
+/// The upsides of working with this rather than `RawApi` direct are:
+/// - easiers interface (no figuring out return types)
 /// - openapi types for free
 ///
 /// But the downsides are:
@@ -141,8 +141,7 @@ impl<K> Api<K> where
 
 /// Api Constructor for CRDs
 ///
-/// This is the only native object that does not rely on openapi.
-/// But that's only because it's still generic and relies on user definitions.
+/// Because it relies entirely on user definitions, this ctor does not rely on openapi.
 impl<K> Api<K> where
     K: Clone + DeserializeOwned,
 {

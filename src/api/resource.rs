@@ -6,9 +6,11 @@ use serde::{Deserialize};
 use crate::api::metadata::{ObjectMeta, ListMeta, TypeMeta};
 use crate::ApiError;
 
-/// Accessors ever kubernetes object must have
+/// Accessor trait needed to build higher level abstractions on kubernetes objects
 pub trait KubeObject {
+    /// Every object must have ObjectMeta
     fn meta(&self) -> &ObjectMeta;
+    // NB: TypeMeta also required, but not used by abstractions yet
 }
 
 
@@ -41,14 +43,14 @@ impl<K> Debug for WatchEvent<K> where
 
 // -------------------------------------------------------
 
-/// A generic kubernetes object
+/// A standard kubernetes object with .spec and .status
 ///
 /// This is used instead of a full struct for `Deployment`, `Pod`, `Node`, `CRD`, ...
 /// Kubernetes' API generally exposes core structs in this manner, but sometimes the
-/// status, `U`, is not always present, and is therefore wrapped in `Option`.
+/// status, `U`, is missing, and is therefore wrapped in `Option`.
 ///
 /// The reasons we use this wrapper rather than the actual structs are:
-/// - generic requirements on fields (need metadata) is impossible
+/// - metadata field requirement for generic Informers is impossible (no field level traits)
 /// - you cannot implement traits for objects you don't own => no addon traits to k8s-openapi
 ///
 /// This struct appears in `ObjectList` and `WatchEvent`, and when using a `Reflector`,
@@ -91,7 +93,7 @@ impl<P, U> KubeObject for Object<P, U> where P: Clone, U: Clone {
 /// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
 ///
 /// Note that this is only used internally within reflectors and informers,
-/// and is generally produced from list/watch/delete collection queries on an `Api`.
+/// and is generally produced from list/watch/delete collection queries on an `RawApi`.
 #[derive(Deserialize)]
 pub struct ObjectList<T> where
   T: Clone
