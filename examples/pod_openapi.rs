@@ -2,7 +2,7 @@
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams},
+    api::{Api, PostParams, DeleteParams, ListParams},
     client::{APIClient},
     config,
 };
@@ -65,6 +65,10 @@ fn main() -> Result<(), failure::Error> {
     });
     let p_patched = pods.patch("blog", &pp, serde_json::to_vec(&patch)?)?;
     assert_eq!(p_patched.spec.active_deadline_seconds, Some(5));
+
+    for p in pods.list(&ListParams::default())?.items {
+        println!("Got Pod: {}", p.metadata.name);
+    }
 
     // Delete it
     let dp = DeleteParams::default();
