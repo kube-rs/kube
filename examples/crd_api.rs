@@ -48,8 +48,9 @@ fn main() -> Result<(), failure::Error> {
         Left(res) => {
             info!("Deleted {}: ({:?})", res.metadata.name,
                 res.status.unwrap().conditions.unwrap().last());
+            // NB: PropagationPolicy::Foreground doesn't cause us to block here
+            // we have to watch for it explicitly.. but this is a demo:
             std::thread::sleep(std::time::Duration::from_millis(1000));
-            // even PropagationPolicy::Foreground doesn't seem to block here..
         },
         Right(status) => {
             info!("Deleted foos.clux.dev: {:?}", status)

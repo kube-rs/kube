@@ -42,8 +42,7 @@ fn main() -> Result<(), failure::Error> {
             info!("Deleted {}: ({:?})", o.metadata.name,
                 o.status.unwrap().conditions.unwrap().last());
             // NB: PropagationPolicy::Foreground doesn't cause us to block here
-            // we have to watch for Established condition using field selector
-            // but this is a demo:
+            // we have to watch for it explicitly.. but this is a demo:
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }).map_right(|s| {
             // it's gone.
