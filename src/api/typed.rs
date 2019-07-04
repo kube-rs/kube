@@ -9,6 +9,7 @@ use crate::api::{
     PostParams,
     DeleteParams,
     ListParams,
+    PatchParams
 };
 use crate::api::resource::{
     ObjectList, Object, WatchEvent, KubeObject,
@@ -80,7 +81,7 @@ impl<K> Api<K> where
         let req = self.api.delete_collection(&lp)?;
         self.client.request_status::<ObjectList<K>>(req)
     }
-    pub fn patch(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<K> {
+    pub fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.api.patch(name, &pp, patch)?;
         self.client.request::<K>(req)
     }
@@ -96,7 +97,7 @@ impl<K> Api<K> where
         let req = self.api.get_status(name)?;
         self.client.request::<K>(req)
     }
-    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<K> {
+    pub fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.api.patch_status(name, &pp, patch)?;
         self.client.request::<K>(req)
     }
@@ -129,7 +130,7 @@ impl<K> Api<K> where
         let req = self.api.get_scale(name)?;
         self.client.request::<Scale>(req)
     }
-    pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<Scale> {
+    pub fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
         let req = self.api.patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req)
     }

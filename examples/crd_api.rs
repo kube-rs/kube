@@ -4,7 +4,7 @@ use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
-    api::{RawApi, PostParams, DeleteParams, ListParams, Object, ObjectList, Void},
+    api::{RawApi, PostParams, DeleteParams, ListParams, Object, ObjectList, Void, PatchParams},
     client::APIClient,
     config,
 };
@@ -79,6 +79,7 @@ fn main() -> Result<(), failure::Error> {
 
     info!("Creating CRD foos.clux.dev");
     let pp = PostParams::default();
+    let patch_params = PatchParams::default();
     let req = crds.create(&pp, serde_json::to_vec(&foocrd)?)?;
     match client.request::<FullCrd>(req) {
         Ok(o) => {
@@ -170,7 +171,7 @@ fn main() -> Result<(), failure::Error> {
     let fs = json!({
         "status": FooStatus { is_bad: false }
     });
-    let req = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    let req = foos.patch_status("qux", &patch_params, serde_json::to_vec(&fs)?)?;
     let o = client.request::<Foo>(req)?;
     info!("Patched status {:?} for {}", o.status, o.metadata.name);
     assert!(!o.status.unwrap().is_bad);
@@ -187,7 +188,7 @@ fn main() -> Result<(), failure::Error> {
     let patch = json!({
         "spec": { "info": "patched qux" }
     });
-    let req = foos.patch("qux", &pp, serde_json::to_vec(&patch)?)?;
+    let req = foos.patch("qux", &patch_params, serde_json::to_vec(&patch)?)?;
     let o = client.request::<Foo>(req)?;
     info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
     assert_eq!(o.spec.info, "patched qux");

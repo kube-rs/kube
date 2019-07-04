@@ -38,7 +38,9 @@ pub enum ErrorKind {
     #[fail(display = "Error parsing response")]
     RequestParse,
     #[fail(display = "Invalid API method {}", _0)]
-    InvalidMethod(String)
+    InvalidMethod(String),
+    #[fail(display = "Request validation failed with {}", _0)]
+    RequestValidation(String),
 }
 
 use std::fmt::{self, Display};
