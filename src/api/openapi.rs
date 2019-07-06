@@ -57,3 +57,14 @@ impl Api<Object<PodSpec, PodStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::core::v1::{ServiceSpec, ServiceStatus};
+impl Api<Object<ServiceSpec, ServiceStatus>> {
+    pub fn v1Service(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1Service(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
