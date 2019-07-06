@@ -138,6 +138,16 @@ impl RawApi {
         }
     }
 
+    // Statble Service resource constructor
+    pub fn v1Service -> Self {
+        Self {
+            group: "".into(),
+            resource: "services".into(),
+            prefix: "api".into(),
+            ..Default::default()
+        }
+    }
+
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {
