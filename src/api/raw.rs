@@ -139,7 +139,7 @@ impl RawApi {
     }
 
     // Statble Service resource constructor
-    pub fn v1Service -> Self {
+    pub fn v1Service() -> Self {
         Self {
             group: "".into(),
             resource: "services".into(),
