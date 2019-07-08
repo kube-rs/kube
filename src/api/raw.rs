@@ -218,9 +218,9 @@ pub struct PatchParams {
 impl PatchParams {
     fn validate(&self) -> Result<()> {
         if let Some(field_manager) = &self.field_manager {
-            // that's not complete, go reference code does list all Unicode printable characters as valid, 
-            // this validation is a bit stricter 
-            if field_manager.len() > 128 || !field_manager.chars().all(|f| f.is_alphanumeric() || f == ' ') {
+            // Implement the easy part of validation, in future this may be extended to provide validation as in go code
+            // For now it's fine, because k8s API server will return an error 
+            if field_manager.len() > 128 {
             return Err(ErrorKind::RequestValidation("Failed to validate PatchParameters::field_manager!".to_owned()).into())
             }
         }
