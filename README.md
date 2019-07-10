@@ -8,6 +8,22 @@ Rust client for [Kubernetes](http://kubernetes.io) in the style of [client-go](h
 
 This client caters to the more common controller/operator case, but allows you to compile with the `openapi` feature to get accurate struct representations via [k8s-openapi](https://github.com/Arnavion/k8s-openapi).
 
+## Installation
+To use the openapi generated types:
+
+```toml
+kube = { version = "0.11.0", features = ["openapi"] }
+k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
+```
+
+otherwise:
+
+```toml
+kube = "0.11.0"
+```
+
+The latter is fine in a CRD-only use case.
+
 ## Usage
 See the [examples directory](./examples) for how to watch over resources in a simplistic way.
 
@@ -131,6 +147,7 @@ or for the reflectors:
 cargo run --example pod_reflector --features=openapi
 cargo run --example node_reflector --features=openapi
 cargo run --example deployment_reflector --features=openapi
+cargo run --example secret_reflector --features=openapi
 ```
 
 for one based on a CRD, you need to create the CRD first:
