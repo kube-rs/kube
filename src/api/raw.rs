@@ -138,7 +138,7 @@ impl RawApi {
         }
     }
 
-    // Statble Service resource constructor
+    // Stable Service resource constructor
     pub fn v1Service() -> Self {
         Self {
             group: "".into(),
@@ -147,6 +147,17 @@ impl RawApi {
             ..Default::default()
         }
     }
+
+    // Stable Secret resource constructor
+    pub fn v1Secret() -> Self {
+        Self {
+            group: "".into(),
+            resource: "secrets".into(),
+            prefix: "api".into(),
+            ..Default::default()
+        }
+    }
+
 
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
@@ -229,12 +240,12 @@ impl PatchParams {
     fn validate(&self) -> Result<()> {
         if let Some(field_manager) = &self.field_manager {
             // Implement the easy part of validation, in future this may be extended to provide validation as in go code
-            // For now it's fine, because k8s API server will return an error 
+            // For now it's fine, because k8s API server will return an error
             if field_manager.len() > 128 {
             return Err(ErrorKind::RequestValidation("Failed to validate PatchParameters::field_manager!".to_owned()).into())
             }
         }
-        
+
         if self.patch_strategy != PatchStrategy::Apply && self.force {
              // if not force, all other fields are valid for all types of patch requests
             Err(ErrorKind::RequestValidation("Force is applicable only for Apply strategy!".to_owned()).into())

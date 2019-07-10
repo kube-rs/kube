@@ -1,6 +1,7 @@
 //! Snowflake types that do not follow the Object<P, U> kube standard
-#![allow(non_snake_case)]
+#![allow(non_snake_case, non_camel_case_types)]
 
+use std::collections::BTreeMap;
 use core::marker::PhantomData;
 use crate::client::APIClient;
 use crate::api::{
@@ -14,10 +15,9 @@ use k8s_openapi::api::core::v1::{EventSeries, ObjectReference, EventSource};
 
 /// Janky Event object
 ///
-/// This thing doesn't even seem to have TypeMeta set..
 /// https://kubernetes.io/docs/reference/federation/v1/definitions/#_v1_event
 #[derive(Deserialize, Serialize, Clone)]
-pub struct Event {
+pub struct v1Event {
 
     pub metadata: ObjectMeta,
 
@@ -57,14 +57,48 @@ pub struct Event {
 }
 
 // Special case implementation so we can make Informer<Event> etc.
-impl KubeObject for Event {
+impl KubeObject for v1Event {
     fn meta(&self) -> &ObjectMeta { &self.metadata }
 }
 
-impl Api<Event> {
+impl Api<v1Event> {
     pub fn v1Event(client: APIClient) -> Self {
         Api {
             api: RawApi::v1Event(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::ByteString;
+/// Secret object
+///
+/// https://kubernetes.io/docs/reference/federation/v1/definitions/#_v1_secret
+#[derive(Deserialize, Serialize, Clone)]
+pub struct v1Secret {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub data: BTreeMap<String, ByteString>,
+
+    pub metadata: ObjectMeta,
+
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub stringData: BTreeMap<String, String>,
+
+    #[serde(default, rename = "type")]
+    pub type_: Option<String>,
+}
+
+
+// Special case implementation so we can make Informer<v1Secret> etc.
+impl KubeObject for v1Secret {
+    fn meta(&self) -> &ObjectMeta { &self.metadata }
+}
+
+impl Api<v1Secret> {
+    pub fn v1Secret(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1Secret(),
             client,
             phantom: PhantomData,
         }

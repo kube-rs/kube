@@ -48,7 +48,7 @@ mod openapi;
 #[cfg(feature = "openapi")]
 mod snowflake;
 #[cfg(feature = "openapi")]
-pub use snowflake::Event;
+pub use snowflake::{v1Event, v1Secret};
 
 mod metadata;
 pub use self::metadata::{
