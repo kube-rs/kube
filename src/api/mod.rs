@@ -20,8 +20,10 @@ pub use raw::{
     RawApi,
     ListParams,
     PostParams,
+    PatchParams,
     DeleteParams,
     PropagationPolicy,
+    PatchStrategy
 };
 
 mod typed;

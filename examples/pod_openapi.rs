@@ -2,7 +2,7 @@
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, ListParams},
+    api::{Api, PostParams, DeleteParams, ListParams, PatchParams},
     client::{APIClient},
     config,
 };
@@ -63,7 +63,8 @@ fn main() -> Result<(), failure::Error> {
             "activeDeadlineSeconds": 5
         }
     });
-    let p_patched = pods.patch("blog", &pp, serde_json::to_vec(&patch)?)?;
+    let patch_params = PatchParams::default();
+    let p_patched = pods.patch("blog", &patch_params, serde_json::to_vec(&patch)?)?;
     assert_eq!(p_patched.spec.active_deadline_seconds, Some(5));
 
     for p in pods.list(&ListParams::default())?.items {

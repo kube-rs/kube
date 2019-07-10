@@ -206,10 +206,84 @@ pub struct ListParams {
     pub timeout: Option<u32>
 }
 
-/// Common query parameters for put/post/patch calls
+/// Common query parameters for put/post calls
 #[derive(Default, Clone)]
 pub struct PostParams {
     pub dry_run: bool,
+}
+
+/// Common query parameters for patch calls
+#[derive(Default, Clone)]
+pub struct PatchParams {
+    pub dry_run: bool,
+    /// Strategy which will be used. Defaults to `PatchStrategy::Strategic`
+    pub patch_strategy: PatchStrategy,
+    /// force Apply requests. Applicable only to `PatchStrategy::Apply`
+    pub force: bool,
+    /// fieldManager is a name of the actor that is making changes. Required for `PatchStrategy::Apply`
+    /// optional for everything else
+    pub field_manager: Option<String>
+}
+
+impl PatchParams {
+    fn validate(&self) -> Result<()> {
+        if let Some(field_manager) = &self.field_manager {
+            // Implement the easy part of validation, in future this may be extended to provide validation as in go code
+            // For now it's fine, because k8s API server will return an error 
+            if field_manager.len() > 128 {
+            return Err(ErrorKind::RequestValidation("Failed to validate PatchParameters::field_manager!".to_owned()).into())
+            }
+        }
+        
+        if self.patch_strategy != PatchStrategy::Apply && self.force {
+             // if not force, all other fields are valid for all types of patch requests
+            Err(ErrorKind::RequestValidation("Force is applicable only for Apply strategy!".to_owned()).into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn populate_qp(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
+        if self.dry_run {
+            qp.append_pair("dryRun", "true");
+        }
+        if self.force {
+            qp.append_pair("force", "true");
+        }
+        if let Some(ref field_manager) = self.field_manager {
+            qp.append_pair("fieldManager", &field_manager);
+        }
+    }
+}
+
+
+/// For patch different patch types are supported. See https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment
+/// Apply strategy is kinda special
+#[derive(Clone, PartialEq)]
+pub enum PatchStrategy {
+    Apply,
+    JSON,
+    Merge,
+    Strategic
+}
+
+impl std::fmt::Display for PatchStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let content_type = match &self {
+            PatchStrategy::Apply => "application/apply-patch+yaml",
+            PatchStrategy::JSON => "application/json-patch+json",
+            PatchStrategy::Merge => "application/merge-patch+json",
+            PatchStrategy::Strategic => "application/strategic-merge-patch+json"
+        };
+        f.write_str(content_type)
+    }
+}
+
+// Kubectl defaults to Strategic strategy, but doing so will break existing consumers
+// so, currently we still default to Merge it may change in future versions
+// Strategic merge doesn't work with CRD types https://github.com/kubernetes/kubernetes/issues/52772
+impl Default for PatchStrategy {
+    fn default() -> Self { PatchStrategy::Merge }
 }
 
 /// Common query parameters for delete calls
@@ -364,17 +438,16 @@ impl RawApi {
     /// Patch an instance of a resource
     ///
     /// Requires a serialized merge-patch+json at the moment.
-    pub fn patch(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        pp.validate()?;
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
 
         Ok(http::Request::patch(urlstr)
             .header("Accept", "application/json")
-            .header("Content-Type", "application/merge-patch+json")
+            .header("Content-Type", pp.patch_strategy.to_string())
             .body(patch).context(ErrorKind::RequestBuild)?)
     }
 
@@ -402,16 +475,15 @@ impl RawApi {
     }
 
     /// Patch an instance of the scale subresource
-    pub fn patch_scale(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        pp.validate()?;
         let base_url = self.make_url() + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         Ok(http::Request::patch(urlstr)
             .header("Accept", "application/json")
-            .header("Content-Type", "application/merge-patch+json")
+            .header("Content-Type", pp.patch_strategy.to_string())
             .body(patch).context(ErrorKind::RequestBuild)?)
     }
 
@@ -437,16 +509,15 @@ impl RawApi {
     }
 
     /// Patch an instance of the status subresource
-    pub fn patch_status(&self, name: &str, pp: &PostParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        pp.validate()?;
         let base_url = self.make_url() + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         Ok(http::Request::patch(urlstr)
             .header("Accept", "application/json")
-            .header("Content-Type", "application/merge-patch+json")
+            .header("Content-Type", pp.patch_strategy.to_string())
             .body(patch).context(ErrorKind::RequestBuild)?)
     }
 
@@ -518,13 +589,27 @@ fn namespace_path() { // weird object compared to other v1
     assert_eq!(req.uri(), "/api/v1/namespaces")
 }
 
+#[test]
+fn patch_params_validation() {
+    let pp = PatchParams::default();
+    assert!(pp.validate().is_ok(), "default params should always be valid");
+
+    let patch_strategy_apply_true = PatchParams {
+        patch_strategy: PatchStrategy::Merge,
+        force: true,
+        ..Default::default()
+    };
+    assert!(patch_strategy_apply_true.validate().is_err(), "Merge strategy shouldn't be valid if `force` set to true");
+}
+
 // subresources with weird version accuracy
 #[test]
 fn patch_status_path(){
     let r = RawApi::v1Node();
-    let pp = PostParams::default();
+    let pp = PatchParams::default();
     let req = r.patch_status("mynode", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
+    assert_eq!(req.headers().get("Content-Type").unwrap().to_str().unwrap(), format!("{}", PatchStrategy::Merge));
     assert_eq!(req.method(), "PATCH");
 }
 #[test]
@@ -546,10 +631,12 @@ fn create_custom_resource() {
     assert_eq!(req.uri(),
         "/apis/clux.dev/v1/namespaces/myns/foos?"
     );
-    let req = r.patch("baz", &pp, vec![]).unwrap();
+    let patch_params = PatchParams::default();
+    let req = r.patch("baz", &patch_params, vec![]).unwrap();
     assert_eq!(req.uri(),
         "/apis/clux.dev/v1/namespaces/myns/foos/baz?"
     );
+    assert_eq!(req.method(), "PATCH");
 }
 
 #[test]
@@ -571,7 +658,7 @@ fn get_scale_path(){
 #[test]
 fn patch_scale_path(){
     let r = RawApi::v1Node();
-    let pp = PostParams::default();
+    let pp = PatchParams::default();
     let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
     assert_eq!(req.method(), "PATCH");

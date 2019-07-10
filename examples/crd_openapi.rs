@@ -4,7 +4,7 @@ use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, ListParams, Object},
+    api::{Api, PostParams, DeleteParams, ListParams, Object, PatchParams},
     client::{APIClient},
     config,
 };
@@ -76,6 +76,7 @@ fn main() -> Result<(), failure::Error> {
 
     info!("Creating CRD foos.clux.dev");
     let pp = PostParams::default();
+    let patch_params = PatchParams::default();
     match crds.create(&pp, serde_json::to_vec(&foocrd)?) {
         Ok(o) => {
             info!("Created {} ({:?})", o.metadata.name, o.status);
@@ -168,7 +169,7 @@ fn main() -> Result<(), failure::Error> {
     let fs = json!({
         "status": FooStatus { is_bad: false, replicas: 1 }
     });
-    let o = foos.patch_status("qux", &pp, serde_json::to_vec(&fs)?)?;
+    let o = foos.patch_status("qux", &patch_params, serde_json::to_vec(&fs)?)?;
     info!("Patched status {:?} for {}", o.status, o.metadata.name);
     assert!(!o.status.unwrap().is_bad);
 
@@ -187,7 +188,7 @@ fn main() -> Result<(), failure::Error> {
     let fs = json!({
         "spec": { "replicas": 2 }
     });
-    let o = foos.patch_scale("qux", &pp, serde_json::to_vec(&fs)?)?;
+    let o = foos.patch_scale("qux", &patch_params, serde_json::to_vec(&fs)?)?;
     info!("Patched scale {:?} for {}", o.spec, o.metadata.name);
     assert_eq!(o.status.unwrap().replicas, 1);
     assert_eq!(o.spec.replicas.unwrap(), 2); // we only asked for more
@@ -197,7 +198,7 @@ fn main() -> Result<(), failure::Error> {
     let patch = json!({
         "spec": { "info": "patched qux" }
     });
-    let o = foos.patch("qux", &pp, serde_json::to_vec(&patch)?)?;
+    let o = foos.patch("qux", &patch_params, serde_json::to_vec(&patch)?)?;
     info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
