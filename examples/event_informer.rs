@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use kube::{
     api::{Api, Informer, WatchEvent},
-    api::Event,
+    api::v1Event,
     client::APIClient,
     config,
 };
@@ -27,7 +27,7 @@ fn main() -> Result<(), failure::Error> {
 }
 
 // This function lets the app handle an event from kube
-fn handle_events(ev: WatchEvent<Event>) -> Result<(), failure::Error> {
+fn handle_events(ev: WatchEvent<v1Event>) -> Result<(), failure::Error> {
     match ev {
         WatchEvent::Added(o) => {
             info!("New Event: {}, {}", o.type_, o.message);
