@@ -1,3 +1,10 @@
+0.11.0 / 2019-07-10
+==================
+  * Added `PatchParams` with `PatchStrategy` to allow arbitrary patch types - #24 via @ragne
+  * `Event` renamed to `v1Event` to match non-slowflake type names
+  * `v1Service` support added
+  * Added `v1Secret` snowflake type and a `secret_reflector` example
+
 0.10.0 / 2019-06-03
 ==================
   * `Api<P, U>` is now `Api<K>` for some `KubeObject` K:
