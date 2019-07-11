@@ -148,6 +148,7 @@ cargo run --example pod_reflector --features=openapi
 cargo run --example node_reflector --features=openapi
 cargo run --example deployment_reflector --features=openapi
 cargo run --example secret_reflector --features=openapi
+cargo run --example configmap_reflector --features=openapi
 ```
 
 for one based on a CRD, you need to create the CRD first:
