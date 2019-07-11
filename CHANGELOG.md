@@ -1,3 +1,7 @@
+0.12.0 / 2019-07-XX
+==================
+  * Added support for `v1ConfigMap` with example - via #49
+
 0.11.0 / 2019-07-10
 ==================
   * Added `PatchParams` with `PatchStrategy` to allow arbitrary patch types - #24 via @ragne

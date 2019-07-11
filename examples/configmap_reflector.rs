@@ -1,6 +1,4 @@
 #[macro_use] extern crate log;
-use std::collections::BTreeMap;
-
 use kube::{
     api::{Api, Reflector},
     client::APIClient,
@@ -20,15 +18,7 @@ fn main() -> Result<(), failure::Error> {
 
     // Can read initial state now:
     rf.read()?.into_iter().for_each(|(name, d)| {
-        info!("try to read configmap");
-        let mut res = BTreeMap::new();
-        for (k, v) in d.data {
-            res.insert(k, v);
-        }
-        info!("Found configmap {} with data: {:?}",
-            name,
-            res,
-        );
+        info!("Found configmap {} with data: {:?}", name, d.data);
     });
 
     // Poll to keep data up to date:
