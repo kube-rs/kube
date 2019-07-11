@@ -104,3 +104,29 @@ impl Api<v1Secret> {
         }
     }
 }
+
+/// ConfigMap object
+#[derive(Deserialize, Serialize, Clone)]
+pub struct v1ConfigMap {
+    pub metadata: ObjectMeta,
+
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub binaryData: BTreeMap<String, ByteString>,
+
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub data: BTreeMap<String, String>
+}
+
+impl KubeObject for v1ConfigMap {
+    fn meta(&self) -> &ObjectMeta { &self.metadata }
+}
+
+impl Api<v1ConfigMap> {
+    pub fn v1ConfigMap(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ConfigMap(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
