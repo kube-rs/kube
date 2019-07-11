@@ -158,6 +158,15 @@ impl RawApi {
         }
     }
 
+    // Stable ConfigMap resource constructor
+    pub fn v1ConfigMap() -> Self {
+        Self {
+            group: "".into(),
+            resource: "configmaps".into(),
+            prefix: "api".into(),
+            ..Default::default()
+        }
+    }
 
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
