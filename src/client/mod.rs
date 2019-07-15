@@ -102,6 +102,18 @@ impl APIClient {
         })
     }
 
+    pub fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String>
+    {
+        let mut res : reqwest::Response = self.send(request)?;
+        trace!("{} {}", res.status().as_str(), res.url());
+        //trace!("Response Headers: {:?}", res.headers());
+        let s = res.status();
+        let text = res.text().context(ErrorKind::RequestParse)?;
+        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+
+        Ok(text)
+    }
+
     pub fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
