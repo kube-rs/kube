@@ -23,7 +23,8 @@ pub use raw::{
     PatchParams,
     DeleteParams,
     PropagationPolicy,
-    PatchStrategy
+    PatchStrategy,
+    LogParams
 };
 
 mod typed;
@@ -33,6 +34,7 @@ pub use typed::{
     Scale,
     ScaleSpec,
     ScaleStatus,
+    Log
 };
 
 mod resource;
