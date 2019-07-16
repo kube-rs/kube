@@ -338,6 +338,30 @@ pub enum PropagationPolicy {
     Foreground,
 }
 
+#[derive(Default, Clone, Debug)]
+pub struct LogParams {
+    /// The container for which to stream logs. Defaults to only container if there is one container in the pod.
+    pub container: Option<String>,
+    /// Follow the log stream of the pod. Defaults to false.
+    pub follow: bool,
+    /// If set, the number of bytes to read from the server before terminating the log output.
+    /// This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.
+    pub limit_bytes: Option<i64>,
+    /// If 'true', then the output is pretty printed.
+    pub pretty: bool,
+    /// Return previous terminated container logs. Defaults to false.
+    pub previous: bool,
+    /// A relative time in seconds before the current time from which to show logs.
+    /// If this value precedes the time a pod was started, only logs since the pod start will be returned.
+    /// If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.
+    pub since_seconds: Option<i64>,
+    /// If set, the number of lines from the end of the logs to show.
+    /// If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime
+    pub tail_lines: Option<i64>,
+    /// If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.
+    pub timestamps: bool,
+}
+
 /// Convenience methods found from API conventions
 impl RawApi {
     /// List a collection of a resource
@@ -552,7 +576,50 @@ impl RawApi {
         let mut req = http::Request::put(urlstr);
         Ok(req.body(data).context(ErrorKind::RequestBuild)?)
     }
+}
 
+impl RawApi {
+    /// Get a pod logs
+    pub fn log(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url() + "/" + name + "/" + "log";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+
+        if let Some(container) = &lp.container {
+            qp.append_pair("container", &container);
+        }
+
+        if lp.follow {
+            qp.append_pair("follow", "true");
+        }
+
+        if let Some(limitBytes) = &lp.limit_bytes {
+            qp.append_pair("limitBytes", &limitBytes.to_string());
+        }
+
+        if lp.pretty {
+            qp.append_pair("pretty", "true");
+        }
+
+        if lp.previous {
+            qp.append_pair("previous", "true");
+        }
+
+        if let Some(sinceSeconds) = &lp.since_seconds {
+            qp.append_pair("sinceSeconds", &sinceSeconds.to_string());
+        }
+
+        if let Some(tailLines) = &lp.tail_lines {
+            qp.append_pair("tailLines", &tailLines.to_string());
+        }
+
+        if lp.timestamps {
+            qp.append_pair("timestamps", "true");
+        }
+
+        let urlstr = qp.finish();
+        let mut req = http::Request::get(urlstr);
+        Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
+    }
 }
 
 #[test]

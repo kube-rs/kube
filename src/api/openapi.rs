@@ -5,6 +5,7 @@ use crate::api::{
     RawApi,
     Api,
     Object,
+    Log
 };
 use crate::client::{
     APIClient,
@@ -57,6 +58,8 @@ impl Api<Object<PodSpec, PodStatus>> {
         }
     }
 }
+
+impl Log for Api<Object<PodSpec, PodStatus>> {}
 
 use k8s_openapi::api::core::v1::{ServiceSpec, ServiceStatus};
 impl Api<Object<ServiceSpec, ServiceStatus>> {

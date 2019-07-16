@@ -9,7 +9,8 @@ use crate::api::{
     PostParams,
     DeleteParams,
     ListParams,
-    PatchParams
+    PatchParams,
+    LogParams
 };
 use crate::api::resource::{
     ObjectList, Object, WatchEvent, KubeObject,
@@ -39,6 +40,16 @@ pub struct Api<K> {
     pub(in crate::api) client: APIClient,
     /// sPec and statUs structs
     pub(in crate::api) phantom: PhantomData<K>,
+}
+
+pub trait LogOperation {
+    fn log_operation(&self, name: &str, lp: &LogParams) -> Result<String>;
+}
+
+pub trait Log: LogOperation {
+    fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
+        Ok(self.log_operation(name, lp)?)
+    }
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
@@ -104,6 +115,15 @@ impl<K> Api<K> where
     pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.api.replace_status(name, &pp, data)?;
         self.client.request::<K>(req)
+    }
+}
+
+impl<K> LogOperation for Api<K> where
+    K: Clone + DeserializeOwned + KubeObject
+{
+    fn log_operation(&self, name: &str, lp: &LogParams) -> Result<String> {
+        let req = self.api.log(name, lp)?;
+        self.client.request_text(req)
     }
 }
 
