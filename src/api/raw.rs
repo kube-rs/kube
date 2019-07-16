@@ -576,7 +576,9 @@ impl RawApi {
         let mut req = http::Request::put(urlstr);
         Ok(req.body(data).context(ErrorKind::RequestBuild)?)
     }
+}
 
+impl RawApi {
     /// Get a pod logs
     pub fn log(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "log";
@@ -618,7 +620,6 @@ impl RawApi {
         let mut req = http::Request::get(urlstr);
         Ok(req.body(vec![]).context(ErrorKind::RequestBuild)?)
     }
-
 }
 
 #[test]
