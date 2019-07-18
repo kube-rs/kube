@@ -1,10 +1,8 @@
-//! API helpers to make use of k8s-openapi easier
+//! API helpers
 
-/// Empty struct for Void
-#[derive(Clone, Deserialize)]
-pub struct Discard {}
-/// Shortcut type for discarding one type parameter option
-pub type Void = Option<Discard>;
+/// Empty struct for when no Spec is required
+#[derive(Clone, Deserialize, Default)]
+pub struct Void {}
 
 mod reflector;
 pub use self::reflector::{
@@ -17,25 +15,46 @@ pub use self::informer::{
     Informer,
 };
 
-mod api;
-pub use api::{
-    Api,
-    GetParams,
+mod raw;
+pub use raw::{
+    RawApi,
+    ListParams,
     PostParams,
+    PatchParams,
+    DeleteParams,
+    PropagationPolicy,
+    PatchStrategy,
+    LogParams
+};
+
+mod typed;
+pub use typed::{
+    Api,
+    // well, ok:
+    Scale,
+    ScaleSpec,
+    ScaleStatus,
+    Log
 };
 
 mod resource;
 pub use self::resource::{
     Object,
+    ObjectList,
     WatchEvent,
-    ApiError,
-    PostResponse,
-    CreateResponse,
-    Response,
+    KubeObject,
 };
+
+#[cfg(feature = "openapi")]
+mod openapi;
+#[cfg(feature = "openapi")]
+mod snowflake;
+#[cfg(feature = "openapi")]
+pub use snowflake::{v1Event, v1Secret, v1ConfigMap};
 
 mod metadata;
 pub use self::metadata::{
-    Metadata,
+    ObjectMeta,
+    TypeMeta,
     Initializers,
 };

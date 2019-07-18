@@ -23,7 +23,7 @@ impl Configuration {
     pub fn new(base_path: String, client: Client) -> Self {
         Configuration {
             base_path: base_path.to_owned(),
-            client: client,
+            client,
         }
     }
 }

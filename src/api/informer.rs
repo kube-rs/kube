@@ -1,11 +1,13 @@
 use crate::api::{
+    RawApi,
     Api,
-    GetParams,
+    ListParams,
     Void,
 };
 use crate::api::resource::{
     ObjectList,
     WatchEvent,
+    KubeObject,
 };
 use crate::client::APIClient;
 use crate::{Result};
@@ -16,39 +18,52 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-type WatchQueue<P, U> = VecDeque<WatchEvent<P, U>>;
+type WatchQueue<K> = VecDeque<WatchEvent<K>>;
 
 /// An event informer for a `Resource`
 ///
-/// This watches a `Resource<P, U>`, by:
+/// This watches a `Resource<K>`, by:
 /// - seeding the intial resourceVersion with a list call (optional)
 /// - keeping track of resourceVersions after every poll
 /// - recovering when resourceVersions get desynced
 ///
-/// It caches WatchEvent<P, U> internally in a queue when polling.
+/// It caches WatchEvent<K> internally in a queue when polling.
 /// A user should drain this queue periodically.
 #[derive(Clone)]
-pub struct Informer<P, U> where
-    P: Clone + DeserializeOwned,
-    U: Clone + DeserializeOwned
+pub struct Informer<K> where
+    K: Clone + DeserializeOwned + KubeObject
 {
-    events: Arc<RwLock<WatchQueue<P, U>>>,
+    events: Arc<RwLock<WatchQueue<K>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
-    resource: Api,
-    params: GetParams,
+    resource: RawApi,
+    params: ListParams,
 }
 
-impl<P, U> Informer<P, U> where
-    P: Clone + DeserializeOwned,
-    U: Clone + DeserializeOwned,
+impl<K> Informer<K> where
+    K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: APIClient, r: Api) -> Self {
+    pub fn new(r: Api<K>) -> Self {
+        Informer {
+            client: r.client,
+            resource: r.api,
+            params: ListParams::default(),
+            events: Arc::new(RwLock::new(VecDeque::new())),
+            version: Arc::new(RwLock::new(0.to_string())),
+        }
+    }
+}
+
+impl<K> Informer<K> where
+    K: Clone + DeserializeOwned + KubeObject,
+{
+    /// Create a reflector with a kube client on a kube resource
+    pub fn raw(client: APIClient, r: RawApi) -> Self {
         Informer {
             client,
             resource: r,
-            params: GetParams::default(),
+            params: ListParams::default(),
             events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(0.to_string())),
         }
@@ -135,7 +150,7 @@ impl<P, U> Informer<P, U> where
     }
 
     /// Pop an event from the front of the WatchQueue
-    pub fn pop(&self) -> Option<WatchEvent<P, U>> {
+    pub fn pop(&self) -> Option<WatchEvent<K>> {
         self.events.write().unwrap().pop_front()
     }
 
@@ -167,21 +182,21 @@ impl<P, U> Informer<P, U> where
     }
 
     /// Watch helper
-    fn single_watch(&self) -> Result<(Vec<WatchEvent<P, U>>, String)> {
+    fn single_watch(&self) -> Result<(Vec<WatchEvent<K>>, String)> {
         let oldver = self.version();
         let req = self.resource.watch(&self.params, &oldver)?;
-        let events = self.client.request_events::<WatchEvent<P, U>>(req)?;
+        let events = self.client.request_events::<WatchEvent<K>>(req)?;
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
         let newver = events.iter().filter_map(|e| {
             match e {
-                WatchEvent::Added(o) => o.metadata.resourceVersion.clone(),
-                WatchEvent::Modified(o) => o.metadata.resourceVersion.clone(),
-                WatchEvent::Deleted(o) => o.metadata.resourceVersion.clone(),
+                WatchEvent::Added(o) => o.meta().resourceVersion.clone(),
+                WatchEvent::Modified(o) => o.meta().resourceVersion.clone(),
+                WatchEvent::Deleted(o) => o.meta().resourceVersion.clone(),
                 _ => None
             }
-        }).last().unwrap_or_else(|| oldver.into());
+        }).last().unwrap_or(oldver);
         debug!("Got {} {} events, resourceVersion={}", events.len(), self.resource.resource, newver);
 
         Ok((events, newver))

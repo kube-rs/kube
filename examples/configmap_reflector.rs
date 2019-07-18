@@ -4,6 +4,8 @@ use kube::{
     client::APIClient,
     config,
 };
+
+/// Example way to read secrets
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
@@ -11,16 +13,12 @@ fn main() -> Result<(), failure::Error> {
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Api::v1Pod(client).within(&namespace);
+    let resource = Api::v1ConfigMap(client).within(&namespace);
     let rf = Reflector::new(resource).init()?;
 
     // Can read initial state now:
-    rf.read()?.into_iter().for_each(|(name, p)| {
-        info!("Found pod {} ({}) with {:?}",
-            name,
-            p.status.unwrap().phase.unwrap(),
-            p.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>(),
-        );
+    rf.read()?.into_iter().for_each(|(name, d)| {
+        info!("Found configmap {} with data: {:?}", name, d.data);
     });
 
     // Poll to keep data up to date:
@@ -29,6 +27,6 @@ fn main() -> Result<(), failure::Error> {
 
         // up to date state:
         let pods = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
-        info!("Current pods: {:?}", pods);
+        info!("Current configmaps: {:?}", pods);
     }
 }

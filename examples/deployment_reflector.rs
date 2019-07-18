@@ -4,24 +4,22 @@ use kube::{
     client::APIClient,
     config,
 };
-use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStatus};
 
 fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
     let config = config::load_kube_config().expect("failed to load kubeconfig");
     let client = APIClient::new(config);
+    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Api::v1Deployment().within("kube-system");
-    let rf : Reflector<DeploymentSpec, DeploymentStatus> =
-        Reflector::new(client, resource)
-        .init()?;
+    let resource = Api::v1Deployment(client).within(&namespace);
+    let rf = Reflector::new(resource).init()?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Deployment
     rf.read()?.into_iter().for_each(|(name, d)| {
         info!("Found deployment for {} - {} replicas running {:?}",
-            name, d.status.replicas.unwrap(),
+            name, d.status.unwrap().replicas.unwrap(),
             d.spec.template.spec.unwrap().containers
                 .into_iter().map(|c| c.image.unwrap()).collect::<Vec<_>>()
         );
