@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.11.1"
+version = "0.12.0"
 description = "Kubernetes client in the style of client-go"
 authors = [
   "clux <sszynrae@gmail.com>",
