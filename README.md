@@ -12,14 +12,14 @@ This client caters to the more common controller/operator case, but allows you t
 To use the openapi generated types:
 
 ```toml
-kube = { version = "0.12.0", features = ["openapi"] }
+kube = { version = "0.13.0", features = ["openapi"] }
 k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
 ```
 
 otherwise:
 
 ```toml
-kube = "0.12.0"
+kube = "0.13.0"
 ```
 
 The latter is fine in a CRD-only use case.
