@@ -151,7 +151,7 @@ impl<K> Reflector<K> where
     ///
     /// Same as what is done in `State::new`.
     pub fn reset(&self) -> Result<()> {
-        debug!("Refreshing {:?}", self.resource);
+        trace!("Refreshing {:?}", self.resource);
         let (data, version) = self.get_full_resource_entries()?;
         *self.data.write().unwrap() = data;
         *self.version.write().unwrap() = version;
@@ -166,13 +166,13 @@ impl<K> Reflector<K> where
         let mut data = BTreeMap::new();
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
 
-        debug!("Got {} {} at resourceVersion={:?}", res.items.len(), self.resource.resource, version);
+        trace!("Got {} {} at resourceVersion={:?}", res.items.len(), self.resource.resource, version);
         for i in res.items {
             // The non-generic parts we care about are spec + status
             data.insert(i.meta().name.clone(), i);
         }
         let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
-        trace!("Initialized with: {}", keys);
+        debug!("Initialized with: {}", keys);
         Ok((data, version))
     }
 
@@ -192,7 +192,7 @@ impl<K> Reflector<K> where
         for ev in res {
             match ev {
                 WatchEvent::Added(o) => {
-                    info!("Adding {} to {}", o.meta().name, rg.resource);
+                    debug!("Adding {} to {}", o.meta().name, rg.resource);
                     data.entry(o.meta().name.clone())
                         .or_insert_with(|| o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
@@ -200,7 +200,7 @@ impl<K> Reflector<K> where
                     }
                 },
                 WatchEvent::Modified(o) => {
-                    info!("Modifying {} in {}", o.meta().name, rg.resource);
+                    debug!("Modifying {} in {}", o.meta().name, rg.resource);
                     data.entry(o.meta().name.clone())
                         .and_modify(|e| *e = o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
@@ -208,7 +208,7 @@ impl<K> Reflector<K> where
                     }
                 },
                 WatchEvent::Deleted(o) => {
-                    info!("Removing {} from {}", o.meta().name, rg.resource);
+                    debug!("Removing {} from {}", o.meta().name, rg.resource);
                     data.remove(&o.meta().name);
                     if let Some(v) = &o.meta().resourceVersion {
                          *ver = v.to_string();

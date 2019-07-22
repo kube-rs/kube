@@ -12,14 +12,14 @@ This client caters to the more common controller/operator case, but allows you t
 To use the openapi generated types:
 
 ```toml
-kube = { version = "0.11.0", features = ["openapi"] }
+kube = { version = "0.12.0", features = ["openapi"] }
 k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
 ```
 
 otherwise:
 
 ```toml
-kube = "0.11.0"
+kube = "0.12.0"
 ```
 
 The latter is fine in a CRD-only use case.
@@ -27,7 +27,9 @@ The latter is fine in a CRD-only use case.
 ## Usage
 See the [examples directory](./examples) for how to watch over resources in a simplistic way.
 
-See [controller-rs](https://github.com/clux/controller-rs) for a full example with [actix](https://actix.rs/).
+See [version-rs](https://github.com/clux/version-rs) for a super light (~100 lines), actix, prometheus, deployment api setup.
+
+See [controller-rs](https://github.com/clux/controller-rs) for a full actix example, with circleci, and kube yaml.
 
 **[API Docs](https://clux.github.io/kube-rs/kube/)**
 

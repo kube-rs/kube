@@ -1,6 +1,8 @@
-0.12.0 / 2019-07-XX
+0.12.0 / 2019-07-18
 ==================
+  * Added support for `Log` subresource - via #50
   * Added support for `v1ConfigMap` with example - via #49
+  * Demoted some spammy info messages from Reflector
 
 0.11.0 / 2019-07-10
 ==================
