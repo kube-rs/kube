@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use chrono::Utc;
 use failure::ResultExt;
-use crate::{Result, Error, ErrorKind};
+use crate::{Result, ErrorKind};
 use openssl::pkey::{PKey, Private};
 use openssl::sign::Signer;
 use openssl::rsa::Padding;

@@ -3,7 +3,7 @@ use std::fs::File;
 use std::path::Path;
 
 use failure::ResultExt;
-use crate::{Result, Error, ErrorKind};
+use crate::{Result, ErrorKind};
 use crate::config::utils;
 use crate::oauth2;
 
