@@ -1,10 +1,11 @@
 use std::path::Path;
-
-use failure::Error;
-use openssl::pkcs12::Pkcs12;
-use openssl::pkey::PKey;
-use openssl::x509::X509;
-
+use openssl::{
+    pkcs12::Pkcs12,
+    pkey::PKey,
+    x509::X509,
+};
+use failure::ResultExt;
+use crate::{Result, Error, ErrorKind};
 use crate::config::apis::{AuthInfo, Cluster, Config, Context};
 
 /// KubeConfigLoader loads current context, cluster, and authentication information.
@@ -16,26 +17,40 @@ pub struct KubeConfigLoader {
 }
 
 impl KubeConfigLoader {
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<KubeConfigLoader, Error> {
+    pub fn load<P: AsRef<Path>>(
+        path: P,
+        context: Option<String>,
+        cluster: Option<String>,
+        user: Option<String>,
+    ) -> Result<KubeConfigLoader> {
         let config = Config::load_config(path)?;
+        let context_name = context.as_ref().unwrap_or(&config.current_context);
         let current_context = config
             .contexts
             .iter()
-            .find(|named_context| named_context.name == config.current_context)
+            .find(|named_context| &named_context.name == context_name)
             .map(|named_context| &named_context.context)
-            .ok_or(format_err!("Unable to load current context"))?;
+            .ok_or_else(|| ErrorKind::KubeConfig("Unable to load current context".into()))?;
+        let cluster_name = cluster.as_ref().unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
             .iter()
-            .find(|named_cluster| named_cluster.name == current_context.cluster)
+            .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
-            .ok_or(format_err!("Unable to load cluster of current context"))?;
+            .ok_or_else(|| ErrorKind::KubeConfig("Unable to load cluster of context".into()))?;
+        let user_name = user.as_ref().unwrap_or(&current_context.user);
         let user = config
             .auth_infos
             .iter()
-            .find(|named_user| named_user.name == current_context.user)
-            .map(|named_user| &named_user.auth_info)
-            .ok_or(format_err!("Unable to load user of current context"))?;
+            .find(|named_user| &named_user.name == user_name)
+            .map(|named_user| {
+                let mut user = named_user.auth_info.clone();
+                match user.load_gcp() {
+                    Ok(_) => Ok(user),
+                    Err(e) => Err(e),
+                }
+            })
+            .ok_or_else(|| ErrorKind::KubeConfig("Unable to load user of context".into()))??;
         Ok(KubeConfigLoader {
             current_context: current_context.clone(),
             cluster: cluster.clone(),
@@ -43,20 +58,20 @@ impl KubeConfigLoader {
         })
     }
 
-    pub fn p12(&self, password: &str) -> Result<Pkcs12, Error> {
+    pub fn p12(&self, password: &str) -> Result<Pkcs12> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
-        let x509 = X509::from_pem(&client_cert)?;
-        let pkey = PKey::private_key_from_pem(&client_key)?;
+        let x509 = X509::from_pem(&client_cert).context(ErrorKind::SslError)?;
+        let pkey = PKey::private_key_from_pem(&client_key).context(ErrorKind::SslError)?;
 
-        Pkcs12::builder()
+        Ok(Pkcs12::builder()
             .build(password, "kubeconfig", &pkey, &x509)
-            .map_err(Error::from)
+            .context(ErrorKind::SslError)?)
     }
 
-    pub fn ca(&self) -> Result<X509, Error> {
-        let ca = &self.cluster.load_certificate_authority()?;
-        X509::from_pem(&ca).map_err(Error::from)
+    pub fn ca(&self) -> Option<Result<X509>> {
+        let ca = self.cluster.load_certificate_authority().ok()?;
+        Some(X509::from_pem(&ca).map_err(|_| Error::from(ErrorKind::SslError)))
     }
 }
