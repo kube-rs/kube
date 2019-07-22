@@ -3,7 +3,8 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use chrono::Utc;
-use failure::Error;
+use failure::ResultExt;
+use crate::{Result, Error, ErrorKind};
 use openssl::pkey::{PKey, Private};
 use openssl::sign::Signer;
 use openssl::rsa::Padding;
@@ -65,15 +66,14 @@ pub struct Credentials {
 }
 
 impl Credentials {
-    pub fn load() -> Result<Credentials, Error> {
+    pub fn load() -> Result<Credentials> {
         let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
             .map(PathBuf::from)
-            .ok_or(format_err!(
-                "Missing {} env",
-                GOOGLE_APPLICATION_CREDENTIALS
-            ))?;
-        let f = File::open(path)?;
-        let config = serde_json::from_reader(f)?;
+            .ok_or_else(|| ErrorKind::KubeConfig("Missing GOOGLE_APPLICATION_CREDENTIALS env".into()))?;
+        let f = File::open(path)
+            .context(ErrorKind::KubeConfig("Unable to load credentials file".into()))?;
+        let config = serde_json::from_reader(f)
+            .context(ErrorKind::KubeConfig("Unable to parse credentials file".into()))?;
         Ok(config)
     }
 }
@@ -112,14 +112,15 @@ pub struct Token {
 }
 
 impl CredentialsClient {
-    pub fn new() -> Result<CredentialsClient, Error> {
+    pub fn new() -> Result<CredentialsClient> {
         Ok(CredentialsClient {
             credentials: Credentials::load()?,
             client: Client::new(),
         })
     }
-    pub fn request_token(&self, scopes: &Vec<String>) -> Result<Token, Error> {
-        let private_key = PKey::private_key_from_pem(&self.credentials.private_key.as_bytes())?;
+    pub fn request_token(&self, scopes: &Vec<String>) -> Result<Token> {
+        let private_key = PKey::private_key_from_pem(&self.credentials.private_key.as_bytes())
+            .context(ErrorKind::SslError)?;
         let encoded = &self.jws_encode(
             &Claim::new(&self.credentials, scopes),
             &Header{
@@ -137,19 +138,25 @@ impl CredentialsClient {
             .post(&self.credentials.token_uri)
             .body(body)
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .send()?
-            .json()?;
+            .send()
+            .context(ErrorKind::KubeConfig("Unable to request token".into()))?
+            .json()
+            .context(ErrorKind::KubeConfig("Unable to parse request token".into()))?;
         Ok(token_response.to_token())
     }
 
-    fn jws_encode(&self, claim: &Claim, header: &Header, key: PKey<Private>) -> Result<String, Error> {
+    fn jws_encode(&self, claim: &Claim, header: &Header, key: PKey<Private>) -> Result<String> {
         let encoded_header = self.base64_encode(serde_json::to_string(&header).unwrap().as_bytes());
         let encoded_claims = self.base64_encode(serde_json::to_string(&claim).unwrap().as_bytes());
         let signature_base = format!("{}.{}", encoded_header, encoded_claims);
-        let mut signer = Signer::new(MessageDigest::sha256(), &key)?;
-        signer.set_rsa_padding(Padding::PKCS1)?;
-        signer.update(signature_base.as_bytes())?;
-        let signature = signer.sign_to_vec()?;
+        let mut signer = Signer::new(MessageDigest::sha256(), &key)
+            .context(ErrorKind::SslError)?;
+        signer.set_rsa_padding(Padding::PKCS1)
+            .context(ErrorKind::SslError)?;
+        signer.update(signature_base.as_bytes())
+            .context(ErrorKind::SslError)?;
+        let signature = signer.sign_to_vec()
+            .context(ErrorKind::SslError)?;
         Ok(format!("{}.{}", signature_base, self.base64_encode(&signature)))
     }
 

@@ -4,7 +4,7 @@ use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
-    api::{RawApi, PostParams, DeleteParams, ListParams, Object, ObjectList, Void, PatchParams},
+    api::{RawApi, PostParams, DeleteParams, ListParams, Object, ObjectList, PatchParams},
     client::APIClient,
     config,
 };

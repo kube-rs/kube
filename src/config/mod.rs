@@ -7,7 +7,8 @@ mod kube_config;
 mod utils;
 
 use base64;
-use failure::Error;
+use failure::ResultExt;
+use crate::{Error, ErrorKind, Result};
 use reqwest::{header, Certificate, Client, Identity};
 
 use self::kube_config::KubeConfigLoader;
@@ -37,7 +38,7 @@ impl Configuration {
 /// let kubeconfig = config::load_kube_config()
 ///     .expect("failed to load kubeconfig");
 /// ```
-pub fn load_kube_config() -> Result<Configuration, Error> {
+pub fn load_kube_config() -> Result<Configuration> {
     load_kube_config_with(Default::default())
 }
 
@@ -53,15 +54,15 @@ pub struct ConfigOptions {
 ///
 /// # Example
 /// ```no_run
-/// use kubernetes::config;
+/// use kube::config;
 ///
 /// let kubeconfig = config::load_kube_config()
 ///     .expect("failed to load kubeconfig");
 /// ```
-pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration, Error> {
+pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
     let kubeconfig = utils::kubeconfig_path()
         .or_else(utils::default_kube_path)
-        .ok_or(format_err!("Unable to load kubeconfig"))?;
+        .ok_or_else(|| ErrorKind::KubeConfig("Unable to load file".into()))?;
 
     let loader =
         KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user)?;
@@ -72,7 +73,7 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration, Er
                 let creds = exec::auth_exec(exec)?;
                 let status = creds
                     .status
-                    .ok_or(format_err!("exec-plugin response did not contain a status"))?;
+                    .ok_or_else(|| ErrorKind::KubeConfig("exec-plugin response did not contain a status".into()))?;
                 status.token
             } else {
                 None
@@ -83,12 +84,14 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration, Er
     let mut client_builder = Client::builder();
 
     if let Some(ca) = loader.ca() {
-        let req_ca = Certificate::from_der(&ca?.to_der()?)?;
+        let req_ca = Certificate::from_der(&ca?.to_der().context(ErrorKind::SslError)?)
+            .context(ErrorKind::SslError)?;
         client_builder = client_builder.add_root_certificate(req_ca);
     }
     match loader.p12(" ") {
         Ok(p12) => {
-            let req_p12 = Identity::from_pkcs12_der(&p12.to_der()?, " ")?;
+            let req_p12 = Identity::from_pkcs12_der(&p12.to_der().context(ErrorKind::SslError)?, " ")
+                .context(ErrorKind::SslError)?;
             client_builder = client_builder.identity(req_p12);
         }
         Err(_) => {
@@ -108,14 +111,16 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration, Er
         (Ok(token), _) => {
             headers.insert(
                 header::AUTHORIZATION,
-                header::HeaderValue::from_str(&format!("Bearer {}", token))?,
+                header::HeaderValue::from_str(&format!("Bearer {}", token))
+                    .context(ErrorKind::KubeConfig("Invalid bearer token".to_string()))?,
             );
         }
         (_, (Some(u), Some(p))) => {
             let encoded = base64::encode(&format!("{}:{}", u, p));
             headers.insert(
                 header::AUTHORIZATION,
-                header::HeaderValue::from_str(&format!("Basic {}", encoded))?,
+                header::HeaderValue::from_str(&format!("Basic {}", encoded))
+                    .context(ErrorKind::KubeConfig("Invalid bearer token".to_string()))?,
             );
         }
         _ => {}
@@ -125,7 +130,8 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration, Er
 
     Ok(Configuration::new(
         loader.cluster.server,
-        client_builder.build()?,
+        client_builder.build()
+            .context(ErrorKind::KubeConfig("Unable to build client".to_string()))?,
     ))
 }
 
@@ -139,26 +145,35 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration, Er
 /// let kubeconfig = config::incluster_config()
 ///     .expect("failed to load incluster config");
 /// ```
-pub fn incluster_config() -> Result<Configuration, Error> {
-    let server = incluster_config::kube_server().ok_or(format_err!(
-        "Unable to load incluster config, {} and {} must be defined",
-        incluster_config::SERVICE_HOSTENV,
-        incluster_config::SERVICE_PORTENV
-    ))?;
+pub fn incluster_config() -> Result<Configuration> {
+    let server = incluster_config::kube_server().ok_or_else(||
+        Error::from(ErrorKind::KubeConfig(format!(
+            "Unable to load incluster config, {} and {} must be defined",
+            incluster_config::SERVICE_HOSTENV,
+            incluster_config::SERVICE_PORTENV
+    ))))?;
 
-    let ca = incluster_config::load_cert()?;
-    let req_ca = Certificate::from_der(&ca.to_der()?)?;
+    let ca = incluster_config::load_cert().context(ErrorKind::SslError)?;
+    let req_ca = Certificate::from_der(&ca.to_der().context(ErrorKind::SslError)?)
+        .context(ErrorKind::SslError)?;
 
-    let token = incluster_config::load_token()?;
+    let token = incluster_config::load_token()
+        .context(ErrorKind::KubeConfig("Unable to load in cluster token".to_string()))?;
+
     let mut headers = header::HeaderMap::new();
     headers.insert(
         header::AUTHORIZATION,
-        header::HeaderValue::from_str(&format!("Bearer {}", token))?,
+        header::HeaderValue::from_str(&format!("Bearer {}", token))
+            .context(ErrorKind::KubeConfig("Invalid bearer token".to_string()))?,
     );
 
     let client_builder = Client::builder()
         .add_root_certificate(req_ca)
         .default_headers(headers);
 
-    Ok(Configuration::new(server, client_builder.build()?))
+    Ok(Configuration::new(
+        server,
+        client_builder.build()
+            .context(ErrorKind::KubeConfig("Unable to build client".to_string()))?
+    ))
 }

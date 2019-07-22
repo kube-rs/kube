@@ -41,6 +41,13 @@ pub enum ErrorKind {
     InvalidMethod(String),
     #[fail(display = "Request validation failed with {}", _0)]
     RequestValidation(String),
+
+    /// Configuration error
+    #[fail(display = "Error loading kube config: {}", _0)]
+    KubeConfig(String),
+
+    #[fail(display = "Error deserializing response")]
+    SslError,
 }
 
 use std::fmt::{self, Display};
