@@ -1,3 +1,9 @@
+0.13.0 / 2019-07-22
+==================
+  * Experimental oauth2 support for some providers - via #44 :
+    - a big cherry-pick from various prs upstream originally for GCP
+    - EKS works with setup in https://github.com/clux/kube-rs/pull/20#issuecomment-511767551
+
 0.12.0 / 2019-07-18
 ==================
   * Added support for `Log` subresource - via #50
