@@ -12,6 +12,7 @@ This client caters to the more common controller/operator case, but allows you t
 To use the openapi generated types:
 
 ```toml
+[dependencies]
 kube = { version = "0.13.0", features = ["openapi"] }
 k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
 ```
@@ -19,6 +20,7 @@ k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
 otherwise:
 
 ```toml
+[dependencies]
 kube = "0.13.0"
 ```
 
@@ -174,7 +176,7 @@ cargo run --example pod_openapi --features=openapi
 All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can either call `.poll()` less often and the events will collect on the kube side (if you don't wait too long and get a Gone). You can configure the timeout with `.timeout(n)` on the `Informer` or `Reflector`.
 
 ## Raw Api
-You can elide the large `k8s-openapi` dependency if you only are working with Informers/Reflectors, or you are happy to supply partial definitions of the native objects you are working with. You will have to specify the complete expected output type to serialize as however:
+You can elide the large `k8s-openapi` dependency if you only are working with Informers/Reflectors, or you are happy to supply partial or complete definitions of the native objects you are working with:
 
 ```rust
 #[derive(Deserialize, Serialize, Clone)]
@@ -203,8 +205,10 @@ let fbaz = client.request::<Foo>(foos.get("baz")?)?;
 assert_eq!(fbaz.spec.info, "old baz");
 ```
 
+If you supply a partial definition of native objects then you can save on reflector memory usage.
+
 The `node_informer` and `crd_reflector` examples uses this at the moment
-, but some cheating in there by importing k8s_openapi structs manually to do it anyway. You normally would define a struct and derive `Deserialize` + `Clone` yourself - but this makes for long examples. See the `crd_api` example for more info.
+, (although `node_informer` is cheating by supplying k8s_openapi structs manually anyway). The `crd_api` example also shows how to do it for CRDs.
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.
