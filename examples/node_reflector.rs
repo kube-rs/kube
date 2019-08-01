@@ -18,18 +18,19 @@ fn main() -> Result<(), failure::Error> {
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Node
-    rf.read()?.into_iter().for_each(|(name, n)| {
+    rf.read()?.into_iter().for_each(|object| {
         info!("Found node {} ({:?}) running {:?} with labels: {:?}",
-            name, n.spec.provider_id.unwrap(),
-            n.status.unwrap().conditions.unwrap(),
-            n.metadata.labels,
+            object.metadata.name,
+            object.spec.provider_id.unwrap(),
+            object.status.unwrap().conditions.unwrap(),
+            object.metadata.labels,
         );
     });
 
     // r needs to have `r.poll()?` called continuosly to keep state up to date:
     loop {
         rf.poll()?;
-        let deploys = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
+        let deploys = rf.read()?.into_iter().map(|object| object.metadata.name).collect::<Vec<_>>();
         info!("Current nodes: {:?}", deploys);
     }
 }

@@ -2,7 +2,7 @@
 #[macro_use] extern crate serde_derive;
 
 use kube::{
-    api::{RawApi, Reflector, Void, Object},
+    api::{Object, RawApi, Reflector, Void},
     client::APIClient,
     config,
 };
@@ -35,8 +35,8 @@ fn main() -> Result<(), failure::Error> {
         rf.poll()?;
 
         // Read updated internal state (instant):
-        rf.read()?.into_iter().for_each(|(name, crd)| {
-            info!("foo {}: {}", name, crd.spec.info);
+        rf.read()?.into_iter().for_each(|crd| {
+            info!("foo {}: {}", crd.metadata.name, crd.spec.info);
         });
     }
 }
