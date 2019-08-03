@@ -1,8 +1,4 @@
-use crate::api::{
-    RawApi,
-    Api,
-    ListParams,
-};
+use crate::api::{RawApi, Api, ListParams, ObjectMeta};
 use crate::api::resource::{
     ObjectList,
     WatchEvent,
@@ -19,8 +15,8 @@ use std::{
     time::{Duration},
 };
 
-/// Cache resource map exposed by the Reflector
-pub type Cache<K> = BTreeMap<String, K>;
+/// Internal representation for Reflector
+type Cache<K> = BTreeMap<ObjectId, K>;
 
 /// A reflection of `Resource` state in kubernetes
 ///
@@ -135,7 +131,7 @@ impl<K> Reflector<K> where
     }
 
     /// Read data for users of the reflector
-    pub fn read(&self) -> Result<Cache<K>> {
+    pub fn read(&self) -> Result<Vec<K>> {
         // unwrap for users because Poison errors are not great to deal with atm.
         // If a read fails, you've probably failed to parse the Resource into a T
         // this likely implies versioning issues between:
@@ -143,8 +139,13 @@ impl<K> Reflector<K> where
         // - current applied kube state (used to parse into T)
         //
         // Very little that can be done in this case. Upgrade your app / resource.
-        let data = self.data.read().unwrap().clone();
-        Ok(data)
+        let cache = self.data.read().unwrap();
+
+        Ok(cache
+            .values()
+            .cloned()
+            .collect::<Vec<K>>()
+        )
     }
 
     /// Reset the state with a full LIST call
@@ -169,9 +170,9 @@ impl<K> Reflector<K> where
         trace!("Got {} {} at resourceVersion={:?}", res.items.len(), self.resource.resource, version);
         for i in res.items {
             // The non-generic parts we care about are spec + status
-            data.insert(i.meta().name.clone(), i);
+            data.insert(i.meta().into(), i);
         }
-        let keys = data.keys().cloned().collect::<Vec<_>>().join(", ");
+        let keys = data.keys().map(|key: &ObjectId| key.to_string()).collect::<Vec<_>>().join(", ");
         debug!("Initialized with: {}", keys);
         Ok((data, version))
     }
@@ -193,7 +194,7 @@ impl<K> Reflector<K> where
             match ev {
                 WatchEvent::Added(o) => {
                     debug!("Adding {} to {}", o.meta().name, rg.resource);
-                    data.entry(o.meta().name.clone())
+                    data.entry(o.meta().into())
                         .or_insert_with(|| o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         *ver = v.to_string();
@@ -201,7 +202,7 @@ impl<K> Reflector<K> where
                 },
                 WatchEvent::Modified(o) => {
                     debug!("Modifying {} in {}", o.meta().name, rg.resource);
-                    data.entry(o.meta().name.clone())
+                    data.entry(o.meta().into())
                         .and_modify(|e| *e = o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         *ver = v.to_string();
@@ -209,7 +210,7 @@ impl<K> Reflector<K> where
                 },
                 WatchEvent::Deleted(o) => {
                     debug!("Removing {} from {}", o.meta().name, rg.resource);
-                    data.remove(&o.meta().name);
+                    data.remove(&o.meta().into());
                     if let Some(v) = &o.meta().resourceVersion {
                          *ver = v.to_string();
                     }
@@ -221,5 +222,34 @@ impl<K> Reflector<K> where
             }
         }
         Ok(())
+    }
+}
+
+/// ObjectId represents an object by name and namespace (if any)
+#[derive(Ord, PartialOrd, Hash, Eq, PartialEq, Clone)]
+struct ObjectId {
+    name: String,
+    namespace: Option<String>,
+}
+
+impl ToString for ObjectId {
+    fn to_string(&self) -> String {
+        match &self.namespace {
+            Some(ns) => {
+                format!("{} [{}]", self.name, ns)
+            },
+            None => {
+                self.name.clone()
+            }
+        }
+    }
+}
+
+impl From<&ObjectMeta> for ObjectId {
+    fn from(object_meta: &ObjectMeta) -> Self {
+        ObjectId {
+            name: object_meta.name.clone(),
+            namespace: object_meta.namespace.clone(),
+        }
     }
 }

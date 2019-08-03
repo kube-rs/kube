@@ -27,9 +27,9 @@ fn main() -> Result<(), failure::Error> {
     let rf = Reflector::new(resource).init()?;
 
     // Can read initial state now:
-    rf.read()?.into_iter().for_each(|(name, d)| {
+    rf.read()?.into_iter().for_each(|secret| {
         let mut res = BTreeMap::new();
-        for (k, v) in d.data {
+        for (k, v) in secret.data {
             if let Ok(b) = std::str::from_utf8(&v.0) {
                 res.insert(k, Decoded::Utf8(b.to_string()));
             }
@@ -38,7 +38,7 @@ fn main() -> Result<(), failure::Error> {
             }
         }
         info!("Found secret {} with data: {:?}",
-            name,
+            secret.metadata.name,
             res,
         );
     });
@@ -48,7 +48,7 @@ fn main() -> Result<(), failure::Error> {
         rf.poll()?;
 
         // up to date state:
-        let pods = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
+        let pods = rf.read()?.into_iter().map(|secret| secret.metadata.name).collect::<Vec<_>>();
         info!("Current pods: {:?}", pods);
     }
 }

@@ -17,10 +17,11 @@ fn main() -> Result<(), failure::Error> {
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Deployment
-    rf.read()?.into_iter().for_each(|(name, d)| {
+    rf.read()?.into_iter().for_each(|deployment| {
         info!("Found deployment for {} - {} replicas running {:?}",
-            name, d.status.unwrap().replicas.unwrap(),
-            d.spec.template.spec.unwrap().containers
+            deployment.metadata.name,
+            deployment.status.unwrap().replicas.unwrap(),
+            deployment.spec.template.spec.unwrap().containers
                 .into_iter().map(|c| c.image.unwrap()).collect::<Vec<_>>()
         );
     });
@@ -28,7 +29,7 @@ fn main() -> Result<(), failure::Error> {
     // r needs to have `r.poll()?` called continuosly to keep state up to date:
     loop {
         rf.poll()?;
-        let deploys = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
+        let deploys = rf.read()?.into_iter().map(|deployment| deployment.metadata.name).collect::<Vec<_>>();
         info!("Current deploys: {:?}", deploys);
     }
 }

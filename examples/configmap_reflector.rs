@@ -17,8 +17,8 @@ fn main() -> Result<(), failure::Error> {
     let rf = Reflector::new(resource).init()?;
 
     // Can read initial state now:
-    rf.read()?.into_iter().for_each(|(name, d)| {
-        info!("Found configmap {} with data: {:?}", name, d.data);
+    rf.read()?.into_iter().for_each(|config_map| {
+        info!("Found configmap {} with data: {:?}", config_map.metadata.name, config_map.data);
     });
 
     // Poll to keep data up to date:
@@ -26,7 +26,10 @@ fn main() -> Result<(), failure::Error> {
         rf.poll()?;
 
         // up to date state:
-        let pods = rf.read()?.into_iter().map(|(name, _)| name).collect::<Vec<_>>();
+        let pods = rf.read()?.into_iter()
+            .map(|config_map| config_map.metadata.name)
+            .collect::<Vec<_>>();
+
         info!("Current configmaps: {:?}", pods);
     }
 }
