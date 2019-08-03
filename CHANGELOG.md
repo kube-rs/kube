@@ -1,3 +1,8 @@
+0.14.0 / 2019-08-03
+==================
+  * `Reflector::read` now returns a `Vec<K>`` rather than a `Vec<(name, K)>`:
+    This fixes an unsoundness bug internally - #56 via @gnieto
+
 0.13.0 / 2019-07-22
 ==================
   * Experimental oauth2 support for some providers - via #44 :
