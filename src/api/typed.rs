@@ -54,6 +54,14 @@ pub trait Log: LogOperation {
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K> Api<K> {
+    pub fn new(api: RawApi, client: APIClient) -> Api<K> {
+        Api {
+            api,
+            client,
+            phantom: PhantomData,
+        }
+    }
+
     pub fn within(mut self, ns: &str) -> Self {
         self.api = self.api.within(ns);
         self
