@@ -71,3 +71,14 @@ impl Api<Object<ServiceSpec, ServiceStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::batch::v1::{JobSpec, JobStatus};
+impl Api<Object<JobSpec, JobStatus>> {
+    pub fn v1Job(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1Job(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}

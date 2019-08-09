@@ -168,6 +168,16 @@ impl RawApi {
         }
     }
 
+    pub fn v1Job() -> Self {
+        Self {
+            group: "batch".into(),
+            resource: "jobs".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {
