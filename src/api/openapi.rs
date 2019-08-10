@@ -104,3 +104,14 @@ impl Api<Object<DaemonSetSpec, DaemonSetStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::apps::v1::{StatefulSetSpec, StatefulSetStatus};
+impl Api<Object<StatefulSetSpec, StatefulSetStatus>> {
+    pub fn v1StatefulSet(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1Statefulset(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
