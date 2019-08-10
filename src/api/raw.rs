@@ -200,6 +200,17 @@ impl RawApi {
         }
     }
 
+    // Stable NetworkPolicy resource constructor
+    pub fn v1NetworkPolicy() -> Self {
+        Self {
+            group: "networking.k8s.io".into(),
+            resource: "networkpolicies".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     // Stable HorizontalPodAutoscaler resource constructor
     pub fn v1HorizontalPodAutoscaler() -> Self {
         Self {

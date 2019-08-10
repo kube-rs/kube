@@ -159,3 +159,14 @@ impl Api<Object<HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::autoscaling::v1::{NetworkPolicySpec, NetworkPolicyStatus};
+impl Api<Object<NetworkPolicySpec, NetworkPolicyStatus>> {
+    pub fn v1NetworkPolicy(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1NetworkPolicy(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
