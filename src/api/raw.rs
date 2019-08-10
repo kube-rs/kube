@@ -189,6 +189,17 @@ impl RawApi {
         }
     }
 
+    // Stable HorizontalPodAutoscaler resource constructor
+    pub fn v1HorizontalPodAutoscaler() -> Self {
+        Self {
+            group: "autoscaling".into(),
+            resource: "horizontalpodautoscalers".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {
