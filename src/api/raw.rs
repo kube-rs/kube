@@ -1,7 +1,7 @@
 use crate::{Result, ErrorKind};
 use failure::ResultExt;
 
-/// RawRawApi generation data
+/// RawApi generation data
 ///
 /// This data defines the urls used by kubernetes' APIs.
 /// This struct is client agnostic, and can be passed to an Informer or a Reflector.
