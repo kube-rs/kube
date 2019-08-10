@@ -138,6 +138,17 @@ impl Api<Object<PersistentVolumeClaimSpec, PersistentVolumeClaimStatus>> {
     }
 }
 
+use k8s_openapi::api::core::v1::{PersistentVolumeSpec, PersistentVolumeStatus};
+impl Api<Object<PersistentVolumeSpec, PersistentVolumeStatus>> {
+    pub fn v1PersistentVolume(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1PersistentVolume(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
 use k8s_openapi::api::autoscaling::v1::{HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus};
 impl Api<Object<HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus>> {
     pub fn v1HorizontalPodAutoscaler(client: APIClient) -> Self {

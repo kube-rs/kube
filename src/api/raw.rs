@@ -189,6 +189,17 @@ impl RawApi {
         }
     }
 
+    // Stable PersistentVolume resource constructor
+    pub fn v1PersistentVolume() -> Self {
+        Self {
+            group: "".into(),
+            resource: "persistentvolumes".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     // Stable HorizontalPodAutoscaler resource constructor
     pub fn v1HorizontalPodAutoscaler() -> Self {
         Self {
