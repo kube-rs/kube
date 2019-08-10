@@ -82,3 +82,14 @@ impl Api<Object<JobSpec, JobStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::core::v1::{NamespaceSpec, NamespaceStatus};
+impl Api<Object<NamespaceSpec, NamespaceStatus>> {
+    pub fn v1Namespace(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1Namespace(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
