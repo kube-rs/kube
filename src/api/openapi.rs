@@ -115,3 +115,14 @@ impl Api<Object<StatefulSetSpec, StatefulSetStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::apps::v1::{ReplicaSetSpec, ReplicaSetStatus};
+impl Api<Object<ReplicaSetSpec, ReplicaSetStatus>> {
+    pub fn v1ReplicaSet(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ReplicaSet(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
