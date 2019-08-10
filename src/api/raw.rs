@@ -179,7 +179,7 @@ impl RawApi {
     }
 
     // Stable PersistentVolumeClaim resource constructor
-    pub fn v1PersistenVolumeClaim() -> Self {
+    pub fn v1PersistentVolumeClaim() -> Self {
         Self {
             group: "".into(),
             resource: "persistentvolumeclaims".into(),

@@ -131,7 +131,7 @@ use k8s_openapi::api::core::v1::{PersistentVolumeClaimSpec, PersistentVolumeClai
 impl Api<Object<PersistentVolumeClaimSpec, PersistentVolumeClaimStatus>> {
     pub fn v1PersistentVolumeClaim(client: APIClient) -> Self {
         Api {
-            api: RawApi::v1PersistenVolumeClaim(),
+            api: RawApi::v1PersistentVolumeClaim(),
             client,
             phantom: PhantomData,
         }
