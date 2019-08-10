@@ -178,6 +178,17 @@ impl RawApi {
         }
     }
 
+    // Stable PersistentVolumeClaim resource constructor
+    pub fn v1PersistenVolumeClaim() -> Self {
+        Self {
+            group: "".into(),
+            resource: "persistentvolumeclaims".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {
