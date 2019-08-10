@@ -93,3 +93,14 @@ impl Api<Object<NamespaceSpec, NamespaceStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
+impl Api<Object<DaemonSetSpec, DaemonSetStatus>> {
+    pub fn v1DaemonSet(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1DaemonSet(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
