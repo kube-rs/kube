@@ -149,6 +149,17 @@ impl Api<Object<PersistentVolumeSpec, PersistentVolumeStatus>> {
     }
 }
 
+use k8s_openapi::api::core::v1::{ResourceQuotaSpec, ResourceQuotaStatus};
+impl Api<Object<ResourceQuotaSpec, ResourceQuotaStatus>> {
+    pub fn v1ResourceQuota(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ResourceQuota(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
 use k8s_openapi::api::autoscaling::v1::{HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus};
 impl Api<Object<HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus>> {
     pub fn v1HorizontalPodAutoscaler(client: APIClient) -> Self {

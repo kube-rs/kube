@@ -211,6 +211,17 @@ impl RawApi {
         }
     }
 
+    // Stable ResourceQuota resource constructor
+    pub fn v1ResourceQuota() -> Self {
+        Self {
+            group: "".into(),
+            resource: "resourcequotas".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     // Stable HorizontalPodAutoscaler resource constructor
     pub fn v1HorizontalPodAutoscaler() -> Self {
         Self {
