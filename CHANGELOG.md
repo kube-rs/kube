@@ -1,3 +1,9 @@
+0.15.0 / 2019-08-XX (SOON)
+==================
+  * Added support for `v1Job` resources - via #58
+  * Added support for `v1Namespace`, `v1DaemonSet`, `v1ReplicaSet`, `v1PersistentVolumeClaim`, `v1PersistentVolume`, `v1ResourceQuota`, `v1HorizontalPodAutoscaler` - via #59
+  * `k8s-openapi` optional dependency bumped to `0.5.0` (for kube 1.14 structs)
+
 0.14.0 / 2019-08-03
 ==================
   * `Reflector::read` now returns a `Vec<K>`` rather than a `Vec<(name, K)>`:
