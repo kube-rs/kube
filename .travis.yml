@@ -1,10 +1,11 @@
 language: rust
+cache: cargo
 rust:
   - stable
-cache: cargo
+before_script:
+  - rustup component add clippy
 script:
-  - cargo build
-  - cargo test -v --all-features
+  - cargo clippy -- -D warnings
 notifications:
   email:
     on_success: change

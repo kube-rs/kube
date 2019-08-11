@@ -15,7 +15,8 @@ jobs:
       # Cache is based on whether we changed dependencies:
       - grep "\[dependencies\]" -A 999 Cargo.toml > deps_checksum
       - restore_cache:
-          keys: [cache-{{ checksum "deps_checksum" }}]
+          keys:
+          - cache-{{ checksum "deps_checksum" }}
       - run: cargo test -v --all-features
       #- run: cargo doc --no-deps --lib --all
       - save_cache:
