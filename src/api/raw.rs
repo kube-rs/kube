@@ -1,7 +1,7 @@
 use crate::{Result, ErrorKind};
 use failure::ResultExt;
 
-/// RawRawApi generation data
+/// RawApi generation data
 ///
 /// This data defines the urls used by kubernetes' APIs.
 /// This struct is client agnostic, and can be passed to an Informer or a Reflector.
@@ -172,6 +172,61 @@ impl RawApi {
         Self {
             group: "batch".into(),
             resource: "jobs".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable PersistentVolumeClaim resource constructor
+    pub fn v1PersistentVolumeClaim() -> Self {
+        Self {
+            group: "".into(),
+            resource: "persistentvolumeclaims".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable PersistentVolume resource constructor
+    pub fn v1PersistentVolume() -> Self {
+        Self {
+            group: "".into(),
+            resource: "persistentvolumes".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable NetworkPolicy resource constructor
+    pub fn v1NetworkPolicy() -> Self {
+        Self {
+            group: "networking.k8s.io".into(),
+            resource: "networkpolicies".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable ResourceQuota resource constructor
+    pub fn v1ResourceQuota() -> Self {
+        Self {
+            group: "".into(),
+            resource: "resourcequotas".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable HorizontalPodAutoscaler resource constructor
+    pub fn v1HorizontalPodAutoscaler() -> Self {
+        Self {
+            group: "autoscaling".into(),
+            resource: "horizontalpodautoscalers".into(),
             prefix: "apis".into(),
             version: "v1".into(),
             ..Default::default()

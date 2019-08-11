@@ -82,3 +82,91 @@ impl Api<Object<JobSpec, JobStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::core::v1::{NamespaceSpec, NamespaceStatus};
+impl Api<Object<NamespaceSpec, NamespaceStatus>> {
+    pub fn v1Namespace(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1Namespace(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
+impl Api<Object<DaemonSetSpec, DaemonSetStatus>> {
+    pub fn v1DaemonSet(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1DaemonSet(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::apps::v1::{StatefulSetSpec, StatefulSetStatus};
+impl Api<Object<StatefulSetSpec, StatefulSetStatus>> {
+    pub fn v1StatefulSet(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1Statefulset(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::apps::v1::{ReplicaSetSpec, ReplicaSetStatus};
+impl Api<Object<ReplicaSetSpec, ReplicaSetStatus>> {
+    pub fn v1ReplicaSet(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ReplicaSet(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::core::v1::{PersistentVolumeClaimSpec, PersistentVolumeClaimStatus};
+impl Api<Object<PersistentVolumeClaimSpec, PersistentVolumeClaimStatus>> {
+    pub fn v1PersistentVolumeClaim(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1PersistentVolumeClaim(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::core::v1::{PersistentVolumeSpec, PersistentVolumeStatus};
+impl Api<Object<PersistentVolumeSpec, PersistentVolumeStatus>> {
+    pub fn v1PersistentVolume(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1PersistentVolume(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::core::v1::{ResourceQuotaSpec, ResourceQuotaStatus};
+impl Api<Object<ResourceQuotaSpec, ResourceQuotaStatus>> {
+    pub fn v1ResourceQuota(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ResourceQuota(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::autoscaling::v1::{HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus};
+impl Api<Object<HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus>> {
+    pub fn v1HorizontalPodAutoscaler(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1HorizontalPodAutoscaler(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
