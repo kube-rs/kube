@@ -28,7 +28,7 @@ http = "0.1.17"
 url = "1.7.2"
 log = "0.4.6"
 time = "0.1.42"
-k8s-openapi = { version = "0.4.0", optional = true }
+k8s-openapi = { version = "0.5.0", optional = true }
 either = "1.5.2"
 
 [features]
@@ -36,6 +36,6 @@ default = []
 openapi = ["k8s-openapi"]
 
 [dev-dependencies]
-k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
+k8s-openapi = { version = "0.5.0", features = ["v1_14"] }
 tempfile = "3.0.7"
 env_logger = "0.6.1"
