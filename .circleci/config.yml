@@ -2,7 +2,7 @@ version: 2
 
 workflows:
   version: 2
-  shipcat_flow:
+  CLICK_FOR_OVERVIEW:
     jobs:
       - cargo_test
       #- cargo_clippy
@@ -10,6 +10,7 @@ jobs:
   cargo_test:
     docker:
       - image: circleci/rust:1.36-buster-node
+    parallelism: 2
     steps:
       - checkout
       # Cache is based on whether we changed dependencies:
