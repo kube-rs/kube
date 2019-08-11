@@ -1,0 +1,12 @@
+jobs:
+- job: test
+  pool:
+    vmImage: 'ubuntu-16.04'
+  steps:
+  - bash: bash ./ci/build.sh
+
+- job: clippy
+  pool:
+    vmImage: 'ubuntu-16.04'
+  steps:
+  - bash: bash ./ci/clippy.rs
