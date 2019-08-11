@@ -1,0 +1,27 @@
+version: 2
+
+workflows:
+  version: 2
+  shipcat_flow:
+    jobs:
+      - cargo_test
+      #- cargo_clippy
+jobs:
+  cargo_test:
+    docker:
+      - image: circleci/rust:1.36-buster-node
+    steps:
+      - checkout
+      # Cache is based on whether we changed dependencies:
+      - grep "\[dependencies\]" -A 999 Cargo.toml > deps_checksum
+      - restore_cache:
+          keys: [cache-{{ checksum "deps_checksum" }}]
+      - run: cargo test -v --all-features
+      #- run: cargo doc --no-deps --lib --all
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target/debug/.fingerprint
+            - target/debug/build
+            - target/debug/deps
+          key: cache-{{ checksum "deps_checksum" }}
