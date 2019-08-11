@@ -20,6 +20,16 @@ impl Api<Object<CrdSpec, CrdStatus>> {
     }
 }
 
+use k8s_openapi::api::batch::v1beta1::{CronJobSpec, CronJobStatus};
+impl Api<Object<CronJobSpec, CronJobStatus>> {
+    pub fn v1beta1CronJob(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1beta1CronJob(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
 
 use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 impl Api<Object<NodeSpec, NodeStatus>> {

@@ -233,6 +233,17 @@ impl RawApi {
         }
     }
 
+    /// CronJob constructor
+    pub fn v1beta1CronJob() -> Self {
+        Self {
+            group: "batch".into(),
+            resource: "cronjobs".into(),
+            prefix: "apis".into(),
+            version: "v1beta1".into(), // latest available in 1.14.0
+            ..Default::default()
+        }
+    }
+
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {
