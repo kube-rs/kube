@@ -23,4 +23,4 @@ cargo test --all-features --no-run
 export RUST_BACKTRACE=full
 cargo test --all-features
 
-cargo doc --no-deps --features --all-features
+cargo doc --no-deps --all-features
