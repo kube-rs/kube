@@ -14,7 +14,7 @@ To use the openapi generated types:
 ```toml
 [dependencies]
 kube = { version = "0.13.0", features = ["openapi"] }
-k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
+k8s-openapi = { version = "0.5.0", features = ["v1_14"] }
 ```
 
 otherwise:
@@ -142,7 +142,7 @@ cargo run --example pod_informer --features=openapi
 # watch event events
 cargo run --example event_informer --features=openapi
 # watch for broken nodes
-cargo run --example node_informer --no-default-features
+cargo run --example node_informer --features=openapi
 ```
 
 or for the reflectors:
