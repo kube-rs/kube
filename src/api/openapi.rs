@@ -132,6 +132,17 @@ impl Api<Object<ReplicaSetSpec, ReplicaSetStatus>> {
     }
 }
 
+use k8s_openapi::api::core::v1::{ReplicationControllerSpec, ReplicationControllerStatus};
+impl Api<Object<ReplicationControllerSpec, ReplicationControllerStatus>> {
+    pub fn v1ReplicationController(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ReplicationController(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
 use k8s_openapi::api::core::v1::{PersistentVolumeClaimSpec, PersistentVolumeClaimStatus};
 impl Api<Object<PersistentVolumeClaimSpec, PersistentVolumeClaimStatus>> {
     pub fn v1PersistentVolumeClaim(client: APIClient) -> Self {

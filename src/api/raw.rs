@@ -110,6 +110,16 @@ impl RawApi {
             ..Default::default()
         }
     }
+    /// Stable ReplicationController resource constructor
+    pub fn v1ReplicationController() -> Self {
+        Self {
+            group: "".into(),
+            resource: "replicationcontrollers".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
     /// Stable node resource constructor
     pub fn v1Node() -> Self {
         Self {
