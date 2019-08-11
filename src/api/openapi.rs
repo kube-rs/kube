@@ -1,12 +1,7 @@
 #![allow(non_snake_case)]
 use std::marker::PhantomData;
 
-use crate::api::{
-    RawApi,
-    Api,
-    Object,
-    Log
-};
+use crate::api::{RawApi, Api, Object, Log, Void};
 use crate::client::{
     APIClient,
 };
@@ -154,6 +149,17 @@ impl Api<Object<ResourceQuotaSpec, ResourceQuotaStatus>> {
     pub fn v1ResourceQuota(client: APIClient) -> Self {
         Api {
             api: RawApi::v1ResourceQuota(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::networking::v1::{NetworkPolicySpec};
+impl Api<Object<NetworkPolicySpec, Void>> {
+    pub fn v1NetworkPolicy(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1NetworkPolicy(),
             client,
             phantom: PhantomData,
         }
