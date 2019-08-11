@@ -12,7 +12,7 @@ jobs:
       - image: circleci/rust:1.36-buster-node
     parallelism: 2
     # this doesn't work on the free account :(
-    resource_class: xlarge
+    resource_class: large
     steps:
       - checkout
       # Cache is based on whether we changed dependencies:
@@ -20,8 +20,8 @@ jobs:
       - restore_cache:
           keys:
           - cache-{{ checksum "deps_checksum" }}
-      - run: cargo build --all-features
-      - run: cargo test -v --lib
+      - run: cargo build
+      - run: cargo test --lib
       - run: cargo test --example crd_api crd_reflector
       # Memory limit blocks --all-features linking (see #62)
       - save_cache:
