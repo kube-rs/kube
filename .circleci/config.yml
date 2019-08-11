@@ -13,7 +13,7 @@ jobs:
     steps:
       - checkout
       # Cache is based on whether we changed dependencies:
-      - grep "\[dependencies\]" -A 999 Cargo.toml > deps_checksum
+      - run: grep "\[dependencies\]" -A 999 Cargo.toml > deps_checksum
       - restore_cache:
           keys:
           - cache-{{ checksum "deps_checksum" }}
