@@ -210,6 +210,17 @@ impl RawApi {
         }
     }
 
+    // Stable VolumeAttachment resource constructor
+    pub fn v1VolumeAttachment() -> Self {
+        Self {
+            group: "storage.k8s.io".into(),
+            resource: "volumeattachments".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     // Stable NetworkPolicy resource constructor
     pub fn v1NetworkPolicy() -> Self {
         Self {

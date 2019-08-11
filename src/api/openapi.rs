@@ -165,6 +165,17 @@ impl Api<Object<PersistentVolumeSpec, PersistentVolumeStatus>> {
     }
 }
 
+use k8s_openapi::api::storage::v1::{VolumeAttachmentSpec, VolumeAttachmentStatus};
+impl Api<Object<VolumeAttachmentSpec, VolumeAttachmentStatus>> {
+    pub fn v1VolumeAttachment(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1VolumeAttachment(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
 use k8s_openapi::api::core::v1::{ResourceQuotaSpec, ResourceQuotaStatus};
 impl Api<Object<ResourceQuotaSpec, ResourceQuotaStatus>> {
     pub fn v1ResourceQuota(client: APIClient) -> Self {
