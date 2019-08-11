@@ -36,6 +36,6 @@ default = []
 openapi = ["k8s-openapi"]
 
 [dev-dependencies]
-k8s-openapi = { version = "0.5.0", features = ["v1_14"] }
+k8s-openapi = { version = "0.5.0", features = ["v1_15"] }
 tempfile = "3.0.7"
 env_logger = "0.6.1"

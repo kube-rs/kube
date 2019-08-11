@@ -130,3 +130,27 @@ impl Api<v1ConfigMap> {
         }
     }
 }
+
+use k8s_openapi::api::admissionregistration::v1beta1::ValidatingWebhook;
+
+/// ValidatingWebhookConfiguration object
+#[derive(Deserialize, Serialize, Clone)]
+pub struct v1beta1ValidatingWebhookConfiguration {
+    pub metadata: ObjectMeta,
+
+    pub webhooks: Vec<ValidatingWebhook>
+}
+
+impl KubeObject for v1beta1ValidatingWebhookConfiguration {
+    fn meta(&self) -> &ObjectMeta { &self.metadata }
+}
+
+impl Api<v1beta1ValidatingWebhookConfiguration> {
+    pub fn v1beta1ValidatingWebhookConfiguration(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1beta1ValidatingWebhookConfiguration(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}

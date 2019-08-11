@@ -110,6 +110,16 @@ impl RawApi {
             ..Default::default()
         }
     }
+    /// Stable ReplicationController resource constructor
+    pub fn v1ReplicationController() -> Self {
+        Self {
+            group: "".into(),
+            resource: "replicationcontrollers".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
     /// Stable node resource constructor
     pub fn v1Node() -> Self {
         Self {
@@ -200,6 +210,17 @@ impl RawApi {
         }
     }
 
+    // Stable VolumeAttachment resource constructor
+    pub fn v1VolumeAttachment() -> Self {
+        Self {
+            group: "storage.k8s.io".into(),
+            resource: "volumeattachments".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     // Stable NetworkPolicy resource constructor
     pub fn v1NetworkPolicy() -> Self {
         Self {
@@ -229,6 +250,28 @@ impl RawApi {
             resource: "horizontalpodautoscalers".into(),
             prefix: "apis".into(),
             version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    /// CronJob constructor
+    pub fn v1beta1CronJob() -> Self {
+        Self {
+            group: "batch".into(),
+            resource: "cronjobs".into(),
+            prefix: "apis".into(),
+            version: "v1beta1".into(), // latest available in 1.14.0
+            ..Default::default()
+        }
+    }
+
+    /// ValidatingWebhookConfiguration constructor
+    pub fn v1beta1ValidatingWebhookConfiguration() -> Self {
+        Self {
+            group: "admissionregistration.k8s.io".into(),
+            resource: "validatingwebhookconfigurations".into(),
+            prefix: "apis".into(),
+            version: "v1beta1".into(), // latest available in 1.14.0
             ..Default::default()
         }
     }

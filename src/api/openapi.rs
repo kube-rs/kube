@@ -1,12 +1,7 @@
 #![allow(non_snake_case)]
 use std::marker::PhantomData;
 
-use crate::api::{
-    RawApi,
-    Api,
-    Object,
-    Log
-};
+use crate::api::{RawApi, Api, Object, Log, Void};
 use crate::client::{
     APIClient,
 };
@@ -25,6 +20,16 @@ impl Api<Object<CrdSpec, CrdStatus>> {
     }
 }
 
+use k8s_openapi::api::batch::v1beta1::{CronJobSpec, CronJobStatus};
+impl Api<Object<CronJobSpec, CronJobStatus>> {
+    pub fn v1beta1CronJob(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1beta1CronJob(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
 
 use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 impl Api<Object<NodeSpec, NodeStatus>> {
@@ -127,6 +132,17 @@ impl Api<Object<ReplicaSetSpec, ReplicaSetStatus>> {
     }
 }
 
+use k8s_openapi::api::core::v1::{ReplicationControllerSpec, ReplicationControllerStatus};
+impl Api<Object<ReplicationControllerSpec, ReplicationControllerStatus>> {
+    pub fn v1ReplicationController(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ReplicationController(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
 use k8s_openapi::api::core::v1::{PersistentVolumeClaimSpec, PersistentVolumeClaimStatus};
 impl Api<Object<PersistentVolumeClaimSpec, PersistentVolumeClaimStatus>> {
     pub fn v1PersistentVolumeClaim(client: APIClient) -> Self {
@@ -149,11 +165,33 @@ impl Api<Object<PersistentVolumeSpec, PersistentVolumeStatus>> {
     }
 }
 
+use k8s_openapi::api::storage::v1::{VolumeAttachmentSpec, VolumeAttachmentStatus};
+impl Api<Object<VolumeAttachmentSpec, VolumeAttachmentStatus>> {
+    pub fn v1VolumeAttachment(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1VolumeAttachment(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
 use k8s_openapi::api::core::v1::{ResourceQuotaSpec, ResourceQuotaStatus};
 impl Api<Object<ResourceQuotaSpec, ResourceQuotaStatus>> {
     pub fn v1ResourceQuota(client: APIClient) -> Self {
         Api {
             api: RawApi::v1ResourceQuota(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::networking::v1::{NetworkPolicySpec};
+impl Api<Object<NetworkPolicySpec, Void>> {
+    pub fn v1NetworkPolicy(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1NetworkPolicy(),
             client,
             phantom: PhantomData,
         }
