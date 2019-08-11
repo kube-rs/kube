@@ -265,6 +265,17 @@ impl RawApi {
         }
     }
 
+    /// ValidatingWebhookConfiguration constructor
+    pub fn v1beta1ValidatingWebhookConfiguration() -> Self {
+        Self {
+            group: "admissionregistration.k8s.io".into(),
+            resource: "validatingwebhookconfigurations".into(),
+            prefix: "apis".into(),
+            version: "v1beta1".into(), // latest available in 1.14.0
+            ..Default::default()
+        }
+    }
+
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {
