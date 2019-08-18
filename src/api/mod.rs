@@ -1,7 +1,7 @@
 //! API helpers
 
 /// Empty struct for when no Spec is required
-#[derive(Clone, Deserialize, Default)]
+#[derive(Clone, Deserialize, Serialize, Default)]
 pub struct Void {}
 
 mod reflector;

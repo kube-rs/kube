@@ -1,6 +1,7 @@
 0.15.1 / 2019-08-18
 ==================
-  * Fix compile issue on 1.37.0 with Chrono serialization
+  * Fix compile issue on `1.37.0` with `Utc` serialization
+  * Fix `Void` not having `Serialize` derive
 
 0.15.0 / 2019-08-11
 ==================
