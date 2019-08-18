@@ -1,3 +1,7 @@
+0.15.1 / 2019-08-18
+==================
+  * Fix compile issue on 1.37.0 with Chrono serialization
+
 0.15.0 / 2019-08-11
 ==================
   * Added support for `v1Job` resources - via #58

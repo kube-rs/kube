@@ -24,7 +24,7 @@ pub struct ExecCredentialSpec {}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecCredentialStatus {
     #[serde(rename = "expirationTimestamp")]
-    pub expiration_timestamp: Option<chrono::DateTime<chrono::Utc>>,
+    pub expiration_timestamp: Option<String>,
     pub token: Option<String>,
     #[serde(rename = "clientCertificateData")]
     pub client_certificate_data: Option<String>,
