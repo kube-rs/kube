@@ -700,8 +700,8 @@ impl RawApi {
             qp.append_pair("follow", "true");
         }
 
-        if let Some(limitBytes) = &lp.limit_bytes {
-            qp.append_pair("limitBytes", &limitBytes.to_string());
+        if let Some(lb) = &lp.limit_bytes {
+            qp.append_pair("limitBytes", &lb.to_string());
         }
 
         if lp.pretty {
@@ -712,12 +712,12 @@ impl RawApi {
             qp.append_pair("previous", "true");
         }
 
-        if let Some(sinceSeconds) = &lp.since_seconds {
-            qp.append_pair("sinceSeconds", &sinceSeconds.to_string());
+        if let Some(ss) = &lp.since_seconds {
+            qp.append_pair("sinceSeconds", &ss.to_string());
         }
 
-        if let Some(tailLines) = &lp.tail_lines {
-            qp.append_pair("tailLines", &tailLines.to_string());
+        if let Some(tl) = &lp.tail_lines {
+            qp.append_pair("tailLines", &tl.to_string());
         }
 
         if lp.timestamps {
