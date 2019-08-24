@@ -398,10 +398,10 @@ pub enum PatchStrategy {
 impl std::fmt::Display for PatchStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let content_type = match &self {
-            PatchStrategy::Apply => "application/apply-patch+yaml",
-            PatchStrategy::JSON => "application/json-patch+json",
-            PatchStrategy::Merge => "application/merge-patch+json",
-            PatchStrategy::Strategic => "application/strategic-merge-patch+json"
+            Self::Apply => "application/apply-patch+yaml",
+            Self::JSON => "application/json-patch+json",
+            Self::Merge => "application/merge-patch+json",
+            Self::Strategic => "application/strategic-merge-patch+json"
         };
         f.write_str(content_type)
     }
