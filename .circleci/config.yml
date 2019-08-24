@@ -24,7 +24,7 @@ jobs:
       - run: cargo build
       - run: cargo test --lib
       - run: cargo test --example crd_api crd_reflector
-      - run: cargo test --all-features
+      - run: cargo test --all-features -j4
       - save_cache:
           paths:
             - /usr/local/cargo/registry
