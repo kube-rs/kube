@@ -1,3 +1,8 @@
+0.16.0 / 2019-08-XX
+==================
+  * Add `Reflector::get` and `Reflector::get_within` as cheaper getters
+  * TODO
+
 0.15.1 / 2019-08-18
 ==================
   * Fix compile issue on `1.37.0` with `Utc` serialization
