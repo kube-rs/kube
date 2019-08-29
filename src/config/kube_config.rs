@@ -70,11 +70,6 @@ impl KubeConfigLoader {
             .context(ErrorKind::SslError)?)
     }
 
-    pub fn ca(&self) -> Option<Result<X509>> {
-        let ca = self.cluster.load_certificate_authority().ok()?;
-        Some(X509::from_pem(&ca).map_err(|_| Error::from(ErrorKind::SslError)))
-    }
-
     pub fn ca_bundle(&self) -> Option<Result<Vec<X509>>> {
         let bundle = self.cluster.load_certificate_authority().ok()?;
         Some(X509::stack_from_pem(&bundle).map_err(|_| Error::from(ErrorKind::SslError)))
