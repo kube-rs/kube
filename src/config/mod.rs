@@ -83,10 +83,12 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
 
     let mut client_builder = Client::builder();
 
-    if let Some(ca) = loader.ca() {
-        let req_ca = Certificate::from_der(&ca?.to_der().context(ErrorKind::SslError)?)
-            .context(ErrorKind::SslError)?;
-        client_builder = client_builder.add_root_certificate(req_ca);
+    if let Some(bundle) = loader.ca_bundle() {
+        for ca in bundle? {
+            let cert = Certificate::from_der(&ca.to_der().context(ErrorKind::SslError)?)
+                .context(ErrorKind::SslError)?;
+            client_builder = client_builder.add_root_certificate(cert);
+        }
     }
     match loader.p12(" ") {
         Ok(p12) => {
