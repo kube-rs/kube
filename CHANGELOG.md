@@ -1,6 +1,7 @@
 0.16.0 / 2019-08-XX
 ==================
   * Add `Reflector::get` and `Reflector::get_within` as cheaper getters
+  * Add support for OpenShift kube configs with multiple CAs - via #64
   * TODO
 
 0.15.1 / 2019-08-18
