@@ -14,7 +14,7 @@ To use the openapi generated types:
 ```toml
 [dependencies]
 kube = { version = "0.15.0", features = ["openapi"] }
-k8s-openapi = { version = "0.5.0", features = ["v1_14"] }
+k8s-openapi = { version = "0.5.0", features = ["v1_15"] }
 ```
 
 otherwise:
