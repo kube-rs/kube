@@ -1,4 +1,9 @@
 //! In cluster or out of cluster kubeconfig to be used by an api client
+//!
+//! You primarily want to interact with `Configuration`,
+//! and its associated load functions.
+//!
+//! The full `Config` and child-objects are exposed here for convenience only.
 
 mod apis;
 mod exec;
@@ -179,3 +184,18 @@ pub fn incluster_config() -> Result<Configuration> {
             .context(ErrorKind::KubeConfig("Unable to build client".to_string()))?
     ))
 }
+
+
+// Expose raw config structs
+pub use apis::{
+    Config,
+    Preferences,
+    NamedExtension,
+    NamedCluster,
+    Cluster,
+    AuthInfo,
+    AuthProviderConfig,
+    ExecConfig,
+    NamedContext,
+    Context,
+};
