@@ -1,8 +1,9 @@
-0.16.0 / 2019-08-09
+0.16.0 / 2019-08-XX
 ==================
   * Add `Reflector::get` and `Reflector::get_within` as cheaper getters
   * Add support for OpenShift kube configs with multiple CAs - via #64
   * Add missing `ObjectMeta::ownerReferences`
+  * TODO: will be published when k8s-openapi@0.5.1 is available
 
 0.15.1 / 2019-08-18
 ==================
