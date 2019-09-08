@@ -1,9 +1,8 @@
-0.16.0 / 2019-08-XX
+0.16.0 / 2019-08-09
 ==================
   * Add `Reflector::get` and `Reflector::get_within` as cheaper getters
   * Add support for OpenShift kube configs with multiple CAs - via #64
   * Add missing `ObjectMeta::ownerReferences`
-  * TODO
 
 0.15.1 / 2019-08-18
 ==================

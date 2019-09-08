@@ -56,7 +56,7 @@ pub struct ObjectMeta {
 
     /// [Owner References](https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/#owners-and-dependents)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    ownerReferences: Vec<OwnerReference>,
+    pub ownerReferences: Vec<OwnerReference>,
 
     /// [Kubernetes generated UID](http://kubernetes.io/docs/user-guide/identifiers#uids)
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -81,7 +81,7 @@ pub struct ObjectMeta {
 
 /// OwnerReference contains enough information to let you identify an owning object
 #[derive(Deserialize, Serialize, Clone, Default)]
-struct OwnerReference {
+pub struct OwnerReference {
     /// Whether the reference points to a managing controller
     #[serde(default)]
     pub controller: bool,

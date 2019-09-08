@@ -39,7 +39,8 @@ fn handle_node(_pods: &Api<Pod>, ev: WatchEvent<Pod>) -> Result<(), failure::Err
         },
         WatchEvent::Modified(o) => {
             let phase = o.status.unwrap().phase.unwrap();
-            info!("Modified Pod: {} (phase={})", o.metadata.name, phase);
+            let owner = &o.metadata.ownerReferences[0];
+            info!("Modified Pod: {} (phase={}, owner={})", o.metadata.name, phase, owner.name);
         },
         WatchEvent::Deleted(o) => {
             info!("Deleted Pod: {}", o.metadata.name);

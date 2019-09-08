@@ -54,4 +54,5 @@ pub use self::metadata::{
     ObjectMeta,
     TypeMeta,
     Initializers,
+    OwnerReference,
 };
