@@ -54,6 +54,10 @@ pub struct ObjectMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resourceVersion: Option<String>,
 
+    /// [Owner References](https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/#owners-and-dependents)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ownerReferences: Vec<OwnerReference>,
+
     /// [Kubernetes generated UID](http://kubernetes.io/docs/user-guide/identifiers#uids)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
