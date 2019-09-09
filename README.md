@@ -13,7 +13,7 @@ To use the openapi generated types:
 
 ```toml
 [dependencies]
-kube = { version = "0.16.0", features = ["openapi"] }
+kube = { version = "0.16.1", features = ["openapi"] }
 k8s-openapi = { version = "0.5.1", default-features = false, features = ["v1_15"] }
 ```
 

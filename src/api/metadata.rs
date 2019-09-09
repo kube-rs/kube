@@ -80,6 +80,8 @@ pub struct ObjectMeta {
 }
 
 /// OwnerReference contains enough information to let you identify an owning object
+///
+/// [OwnerReference godoc](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#OwnerReference)
 #[derive(Deserialize, Serialize, Clone, Default)]
 pub struct OwnerReference {
     /// Whether the reference points to a managing controller
@@ -94,6 +96,8 @@ pub struct OwnerReference {
     pub apiVersion: String,
     /// Kind of the referent
     pub kind: String,
+    /// [UID of the referent](http://kubernetes.io/docs/user-guide/identifiers#uids)
+    pub uid: String,
 }
 
 /// Initializers tracks the progress of initialization

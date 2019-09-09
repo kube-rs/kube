@@ -1,3 +1,7 @@
+0.16.1 / 2019-08-09
+==================
+  * Add missing `uid` field on `ObjectMeta::ownerReferences`
+
 0.16.0 / 2019-08-09
 ==================
   * Add `Reflector::get` and `Reflector::get_within` as cheaper getters
