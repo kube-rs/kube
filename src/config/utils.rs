@@ -10,6 +10,13 @@ use failure::Error;
 
 const KUBECONFIG: &str = "KUBECONFIG";
 
+/// Search the kubeconfig file
+pub fn find_kubeconfig() -> Result<PathBuf, Error> {
+    kubeconfig_path()
+        .or_else(default_kube_path)
+        .ok_or_else(|| format_err!("Failed to find path of kubeconfig"))
+}
+
 /// Returns kubeconfig path from specified environment variable.
 pub fn kubeconfig_path() -> Option<PathBuf> {
     env::var_os(KUBECONFIG).map(PathBuf::from)
@@ -27,8 +34,20 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(
     match (data, file) {
         (Some(d), _) => base64::decode(&d).map_err(Error::from),
         (_, Some(f)) => {
+            let f = (*f).as_ref();
+            let abs_file = if f.is_absolute() {
+                f.to_path_buf()
+            } else {
+                find_kubeconfig()
+                .and_then(|cfg|
+                    cfg.parent()
+                    .map(|kubedir| kubedir.join(f))
+                    .ok_or_else(|| format_err!("Failed to compute the absolute path of '{:?}'", f))
+                )?
+            };
+            dbg!(&abs_file);
+            let mut ff = File::open(&abs_file)?;
             let mut b = vec![];
-            let mut ff = File::open(f)?;
             ff.read_to_end(&mut b)?;
             Ok(b)
         }
@@ -58,18 +77,19 @@ pub fn is_expired(timestamp: &str) -> bool {
     ts < now
 }
 
-#[test]
-fn test_kubeconfig_path() {
-    let expect_str = "/fake/.kube/config";
-    env::set_var(KUBECONFIG, expect_str);
-    assert_eq!(PathBuf::from(expect_str), kubeconfig_path().unwrap());
-}
-
 #[cfg(test)]
 mod tests {
     extern crate tempfile;
+    use super::*;
     use crate::config::utils;
     use std::io::Write;
+
+    #[test]
+    fn test_kubeconfig_path() {
+        let expect_str = "/fake/.kube/config";
+        env::set_var(KUBECONFIG, expect_str);
+        assert_eq!(PathBuf::from(expect_str), kubeconfig_path().unwrap());
+    }
 
     #[test]
     fn test_data_or_file() {
