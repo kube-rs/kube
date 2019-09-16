@@ -65,9 +65,8 @@ pub struct ConfigOptions {
 ///     .expect("failed to load kubeconfig");
 /// ```
 pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
-    let kubeconfig = utils::kubeconfig_path()
-        .or_else(utils::default_kube_path)
-        .ok_or_else(|| ErrorKind::KubeConfig("Unable to load file".into()))?;
+    let kubeconfig = utils::find_kubeconfig()
+        .context(ErrorKind::KubeConfig("Unable to load file".into()))?;
 
     let loader =
         KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user)?;

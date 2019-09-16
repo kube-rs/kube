@@ -155,13 +155,18 @@ impl AuthInfo {
     pub(crate) fn load_gcp(&mut self) -> Result<bool> {
         match &self.auth_provider {
             Some(provider) => {
-                self.token = Some(provider.config["access-token"].clone());
-                if utils::is_expired(&provider.config["expiry"]) {
-                    let client = oauth2::CredentialsClient::new()?;
-                    let token = client.request_token(&vec![
-                        "https://www.googleapis.com/auth/cloud-platform".to_string(),
-                    ])?;
-                    self.token = Some(token.access_token);
+                if let Some(access_token) = provider.config.get("access-token") {
+                    self.token = Some(access_token.clone());
+                    if utils::is_expired(&provider.config["expiry"]) {
+                        let client = oauth2::CredentialsClient::new()?;
+                        let token = client.request_token(&vec![
+                            "https://www.googleapis.com/auth/cloud-platform".to_string(),
+                        ])?;
+                        self.token = Some(token.access_token);
+                    }
+                }
+                if let Some(id_token) = provider.config.get("id-token") {
+                    self.token = Some(id_token.clone());
                 }
             }
             None => {}
