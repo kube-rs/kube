@@ -1,3 +1,7 @@
+0.17.0 / 2019-08-XX
+==================
+  * Add support for oidc providerss with `auth-provider` w/o `access-token` - #70
+
 0.16.1 / 2019-08-09
 ==================
   * Add missing `uid` field on `ObjectMeta::ownerReferences`
