@@ -208,3 +208,14 @@ impl Api<Object<HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::extensions::v1beta1::{IngressSpec, IngressStatus};
+impl Api<Object<IngressSpec, IngressStatus>> {
+    pub fn v1beta1Ingress(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1beta1Ingress(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}

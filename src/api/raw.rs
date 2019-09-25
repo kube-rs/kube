@@ -265,6 +265,17 @@ impl RawApi {
         }
     }
 
+    /// Ingress constructor
+    pub fn v1beta1Ingress() -> Self {
+        Self {
+            group: "extensions".into(),
+            resource: "ingresses".into(),
+            prefix: "apis".into(),
+            version: "v1beta1".into(),
+            ..Default::default()
+        }
+    }
+
     /// ValidatingWebhookConfiguration constructor
     pub fn v1beta1ValidatingWebhookConfiguration() -> Self {
         Self {
@@ -830,6 +841,22 @@ fn create_custom_resource() {
     let req = r.patch("baz", &patch_params, vec![]).unwrap();
     assert_eq!(req.uri(),
         "/apis/clux.dev/v1/namespaces/myns/foos/baz?"
+    );
+    assert_eq!(req.method(), "PATCH");
+}
+
+#[test]
+fn create_ingress() {
+    let r = RawApi::v1beta1Ingress().within("bleep");
+    let pp = PostParams::default();
+    let req = r.create(&pp, vec![]).unwrap();
+    assert_eq!(req.uri(),
+               "/apis/extensions/v1beta1/namespaces/bleep/ingress?"
+    );
+    let patch_params = PatchParams::default();
+    let req = r.patch("baz", &patch_params, vec![]).unwrap();
+    assert_eq!(req.uri(),
+               "/apis/extensions/v1beta1/namespaces/bleep/ingress/baz?"
     );
     assert_eq!(req.method(), "PATCH");
 }
