@@ -9,7 +9,7 @@ use crate::{Result, Error, ErrorKind};
 use crate::config::apis::{AuthInfo, Cluster, Config, Context};
 
 /// KubeConfigLoader loads current context, cluster, and authentication information.
-#[derive(Debug)]
+#[derive(Clone,Debug)]
 pub struct KubeConfigLoader {
     pub current_context: Context,
     pub cluster: Cluster,

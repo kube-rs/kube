@@ -14,7 +14,7 @@ mod utils;
 use base64;
 use failure::ResultExt;
 use crate::{Error, ErrorKind, Result};
-use reqwest::{header, Certificate, Client, Identity};
+use reqwest::{header, Certificate, Client, ClientBuilder, Identity};
 
 use self::kube_config::KubeConfigLoader;
 
@@ -64,7 +64,7 @@ pub struct ConfigOptions {
     pub user: Option<String>,
 }
 
-/// Returns a config includes authentication and cluster information from kubeconfig file.
+/// Returns a config which includes authentication and cluster information from kubeconfig file.
 ///
 /// # Example
 /// ```no_run
@@ -74,11 +74,36 @@ pub struct ConfigOptions {
 ///     .expect("failed to load kubeconfig");
 /// ```
 pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
+
+    let result = create_client_builder(options)?;
+
+    Ok(Configuration::new(
+        result.1.cluster.server,
+        result.0.build()
+            .context(ErrorKind::KubeConfig("Unable to build client".to_string()))?,
+    ))
+}
+
+/// Returns a client builder and config loader, based on the cluster information from the kubeconfig file.
+///
+/// This allows to create your custom reqwest client for using with the cluster API.
+///
+/// # Example
+/// ```no_run
+/// use kube::config;
+///
+/// let client_builder_result = config::create_client_builder(Default::default())
+///     .expect("failed to load kubeconfig");
+/// let client_builder = client_builder_result.0;
+/// let loader = client_builder_result.1;
+/// ```
+pub fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder,KubeConfigLoader)> {
     let kubeconfig = utils::find_kubeconfig()
         .context(ErrorKind::KubeConfig("Unable to load file".into()))?;
 
     let loader =
         KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user)?;
+
     let token = match &loader.user.token {
         Some(token) => Some(token.clone()),
         None => {
@@ -121,7 +146,7 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
 
     match (
         utils::data_or_file(&token, &loader.user.token_file),
-        (loader.user.username, loader.user.password),
+        (&loader.user.username, &loader.user.password),
     ) {
         (Ok(token), _) => {
             headers.insert(
@@ -141,13 +166,8 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
         _ => {}
     }
 
-    let client_builder = client_builder.default_headers(headers);
+    Ok((client_builder.default_headers(headers), loader))
 
-    Ok(Configuration::new(
-        loader.cluster.server,
-        client_builder.build()
-            .context(ErrorKind::KubeConfig("Unable to build client".to_string()))?,
-    ))
 }
 
 /// Returns a config which is used by clients within pods on kubernetes.
