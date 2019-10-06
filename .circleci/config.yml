@@ -1,0 +1,34 @@
+version: 2
+
+workflows:
+  version: 2
+  all_jobs:
+    jobs:
+      - cargo_test
+      #- cargo_clippy
+jobs:
+  cargo_test:
+    docker:
+      - image: circleci/rust:latest
+    # this doesn't work on the free account :(
+    resource_class: large
+    environment:
+      - CARGO_INCREMENTAL: 0
+    steps:
+      - checkout
+      # Cache is based on whether we changed dependencies:
+      - run: grep "\[dependencies\]" -A 999 Cargo.toml > deps_checksum
+      - restore_cache:
+          keys:
+          - cache-{{ checksum "deps_checksum" }}
+      - run: cargo build
+      - run: cargo test --lib
+      - run: cargo test --example crd_api crd_reflector
+      - run: cargo test --all-features -j4
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target/debug/.fingerprint
+            - target/debug/build
+            - target/debug/deps
+          key: cache-{{ checksum "deps_checksum" }}

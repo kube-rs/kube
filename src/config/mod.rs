@@ -1,4 +1,9 @@
 //! In cluster or out of cluster kubeconfig to be used by an api client
+//!
+//! You primarily want to interact with `Configuration`,
+//! and its associated load functions.
+//!
+//! The full `Config` and child-objects are exposed here for convenience only.
 
 mod apis;
 mod exec;
@@ -69,9 +74,8 @@ pub struct ConfigOptions {
 ///     .expect("failed to load kubeconfig");
 /// ```
 pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
-    let kubeconfig = utils::kubeconfig_path()
-        .or_else(utils::default_kube_path)
-        .ok_or_else(|| ErrorKind::KubeConfig("Unable to load file".into()))?;
+    let kubeconfig = utils::find_kubeconfig()
+        .context(ErrorKind::KubeConfig("Unable to load file".into()))?;
 
     let loader =
         KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user)?;
@@ -92,10 +96,12 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
 
     let mut client_builder = Client::builder();
 
-    if let Some(ca) = loader.ca() {
-        let req_ca = Certificate::from_der(&ca?.to_der().context(ErrorKind::SslError)?)
-            .context(ErrorKind::SslError)?;
-        client_builder = client_builder.add_root_certificate(req_ca);
+    if let Some(bundle) = loader.ca_bundle() {
+        for ca in bundle? {
+            let cert = Certificate::from_der(&ca.to_der().context(ErrorKind::SslError)?)
+                .context(ErrorKind::SslError)?;
+            client_builder = client_builder.add_root_certificate(cert);
+        }
     }
     match loader.p12(" ") {
         Ok(p12) => {
@@ -191,3 +197,18 @@ pub fn incluster_config() -> Result<Configuration> {
         default_ns,
     ))
 }
+
+
+// Expose raw config structs
+pub use apis::{
+    Config,
+    Preferences,
+    NamedExtension,
+    NamedCluster,
+    Cluster,
+    AuthInfo,
+    AuthProviderConfig,
+    ExecConfig,
+    NamedContext,
+    Context,
+};

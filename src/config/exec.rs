@@ -2,7 +2,7 @@ use std::process::Command;
 
 use failure::ResultExt;
 use crate::{Error, Result, ErrorKind};
-use crate::config::apis;
+use crate::config::{ExecConfig};
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
 /// HTTP transports.
@@ -24,7 +24,7 @@ pub struct ExecCredentialSpec {}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecCredentialStatus {
     #[serde(rename = "expirationTimestamp")]
-    pub expiration_timestamp: Option<chrono::DateTime<chrono::Utc>>,
+    pub expiration_timestamp: Option<String>,
     pub token: Option<String>,
     #[serde(rename = "clientCertificateData")]
     pub client_certificate_data: Option<String>,
@@ -32,7 +32,7 @@ pub struct ExecCredentialStatus {
     pub client_key_data: Option<String>,
 }
 
-pub fn auth_exec(auth: &apis::ExecConfig) -> Result<ExecCredential> {
+pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential> {
     let mut cmd = Command::new(&auth.command);
     if let Some(args) = &auth.args {
         cmd.args(args);

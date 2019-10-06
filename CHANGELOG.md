@@ -1,3 +1,30 @@
+0.17.0 / 2019-08-XX
+==================
+  * Add support for oidc providerss with `auth-provider` w/o `access-token` - #70
+
+0.16.1 / 2019-08-09
+==================
+  * Add missing `uid` field on `ObjectMeta::ownerReferences`
+
+0.16.0 / 2019-08-09
+==================
+  * Add `Reflector::get` and `Reflector::get_within` as cheaper getters
+  * Add support for OpenShift kube configs with multiple CAs - via #64
+  * Add missing `ObjectMeta::ownerReferences`
+  * Reduced memory consumption during compile with `k8s-openapi@0.5.1` - #62
+
+0.15.1 / 2019-08-18
+==================
+  * Fix compile issue on `1.37.0` with `Utc` serialization
+  * Fix `Void` not having `Serialize` derive
+
+0.15.0 / 2019-08-11
+==================
+  * Added support for `v1Job` resources - via #58
+  * Added support for `v1Namespace`, `v1DaemonSet`, `v1ReplicaSet`, `v1PersistentVolumeClaim`, `v1PersistentVolume`, `v1ResourceQuota`, `v1HorizontalPodAutoscaler` - via #59
+  * Added support for `v1beta1CronJob`, `v1ReplicationController`, `v1VolumeAttachment`, `v1NetworkPolicy` - via #60
+  * `k8s-openapi` optional dependency bumped to `0.5.0` (for kube 1.14 structs)
+
 0.14.0 / 2019-08-03
 ==================
   * `Reflector::read` now returns a `Vec<K>`` rather than a `Vec<(name, K)>`:

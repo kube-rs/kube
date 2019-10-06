@@ -1,7 +1,7 @@
 use crate::{Result, ErrorKind};
 use failure::ResultExt;
 
-/// RawRawApi generation data
+/// RawApi generation data
 ///
 /// This data defines the urls used by kubernetes' APIs.
 /// This struct is client agnostic, and can be passed to an Informer or a Reflector.
@@ -110,6 +110,16 @@ impl RawApi {
             ..Default::default()
         }
     }
+    /// Stable ReplicationController resource constructor
+    pub fn v1ReplicationController() -> Self {
+        Self {
+            group: "".into(),
+            resource: "replicationcontrollers".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
     /// Stable node resource constructor
     pub fn v1Node() -> Self {
         Self {
@@ -164,6 +174,104 @@ impl RawApi {
             group: "".into(),
             resource: "configmaps".into(),
             prefix: "api".into(),
+            ..Default::default()
+        }
+    }
+
+    pub fn v1Job() -> Self {
+        Self {
+            group: "batch".into(),
+            resource: "jobs".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable PersistentVolumeClaim resource constructor
+    pub fn v1PersistentVolumeClaim() -> Self {
+        Self {
+            group: "".into(),
+            resource: "persistentvolumeclaims".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable PersistentVolume resource constructor
+    pub fn v1PersistentVolume() -> Self {
+        Self {
+            group: "".into(),
+            resource: "persistentvolumes".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable VolumeAttachment resource constructor
+    pub fn v1VolumeAttachment() -> Self {
+        Self {
+            group: "storage.k8s.io".into(),
+            resource: "volumeattachments".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable NetworkPolicy resource constructor
+    pub fn v1NetworkPolicy() -> Self {
+        Self {
+            group: "networking.k8s.io".into(),
+            resource: "networkpolicies".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable ResourceQuota resource constructor
+    pub fn v1ResourceQuota() -> Self {
+        Self {
+            group: "".into(),
+            resource: "resourcequotas".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable HorizontalPodAutoscaler resource constructor
+    pub fn v1HorizontalPodAutoscaler() -> Self {
+        Self {
+            group: "autoscaling".into(),
+            resource: "horizontalpodautoscalers".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    /// CronJob constructor
+    pub fn v1beta1CronJob() -> Self {
+        Self {
+            group: "batch".into(),
+            resource: "cronjobs".into(),
+            prefix: "apis".into(),
+            version: "v1beta1".into(), // latest available in 1.14.0
+            ..Default::default()
+        }
+    }
+
+    /// ValidatingWebhookConfiguration constructor
+    pub fn v1beta1ValidatingWebhookConfiguration() -> Self {
+        Self {
+            group: "admissionregistration.k8s.io".into(),
+            resource: "validatingwebhookconfigurations".into(),
+            prefix: "apis".into(),
+            version: "v1beta1".into(), // latest available in 1.14.0
             ..Default::default()
         }
     }
@@ -290,10 +398,10 @@ pub enum PatchStrategy {
 impl std::fmt::Display for PatchStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let content_type = match &self {
-            PatchStrategy::Apply => "application/apply-patch+yaml",
-            PatchStrategy::JSON => "application/json-patch+json",
-            PatchStrategy::Merge => "application/merge-patch+json",
-            PatchStrategy::Strategic => "application/strategic-merge-patch+json"
+            Self::Apply => "application/apply-patch+yaml",
+            Self::JSON => "application/json-patch+json",
+            Self::Merge => "application/merge-patch+json",
+            Self::Strategic => "application/strategic-merge-patch+json"
         };
         f.write_str(content_type)
     }
@@ -592,8 +700,8 @@ impl RawApi {
             qp.append_pair("follow", "true");
         }
 
-        if let Some(limitBytes) = &lp.limit_bytes {
-            qp.append_pair("limitBytes", &limitBytes.to_string());
+        if let Some(lb) = &lp.limit_bytes {
+            qp.append_pair("limitBytes", &lb.to_string());
         }
 
         if lp.pretty {
@@ -604,12 +712,12 @@ impl RawApi {
             qp.append_pair("previous", "true");
         }
 
-        if let Some(sinceSeconds) = &lp.since_seconds {
-            qp.append_pair("sinceSeconds", &sinceSeconds.to_string());
+        if let Some(ss) = &lp.since_seconds {
+            qp.append_pair("sinceSeconds", &ss.to_string());
         }
 
-        if let Some(tailLines) = &lp.tail_lines {
-            qp.append_pair("tailLines", &tailLines.to_string());
+        if let Some(tl) = &lp.tail_lines {
+            qp.append_pair("tailLines", &tl.to_string());
         }
 
         if lp.timestamps {

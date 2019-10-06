@@ -8,6 +8,9 @@ use crate::config::utils;
 use crate::oauth2;
 
 /// Config stores information to connect remote kubernetes cluster.
+///
+/// This type (and its children) are exposed for convenience only.
+/// Please load a `Configuration` object for use with a `kube::Client`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub kind: Option<String>,
@@ -129,7 +132,7 @@ pub struct Context {
 }
 
 impl Config {
-    pub fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
+    pub(crate) fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
         let f = File::open(path)
             .context(ErrorKind::KubeConfig("Unable to open config file".into()))?;
         let config = serde_yaml::from_reader(f)
@@ -139,7 +142,7 @@ impl Config {
 }
 
 impl Cluster {
-    pub fn load_certificate_authority(&self) -> Result<Vec<u8>> {
+    pub(crate) fn load_certificate_authority(&self) -> Result<Vec<u8>> {
         let res = utils::data_or_file_with_base64(
             &self.certificate_authority_data,
             &self.certificate_authority,
@@ -149,16 +152,21 @@ impl Cluster {
 }
 
 impl AuthInfo {
-    pub fn load_gcp(&mut self) -> Result<bool> {
+    pub(crate) fn load_gcp(&mut self) -> Result<bool> {
         match &self.auth_provider {
             Some(provider) => {
-                self.token = Some(provider.config["access-token"].clone());
-                if utils::is_expired(&provider.config["expiry"]) {
-                    let client = oauth2::CredentialsClient::new()?;
-                    let token = client.request_token(&vec![
-                        "https://www.googleapis.com/auth/cloud-platform".to_string(),
-                    ])?;
-                    self.token = Some(token.access_token);
+                if let Some(access_token) = provider.config.get("access-token") {
+                    self.token = Some(access_token.clone());
+                    if utils::is_expired(&provider.config["expiry"]) {
+                        let client = oauth2::CredentialsClient::new()?;
+                        let token = client.request_token(&vec![
+                            "https://www.googleapis.com/auth/cloud-platform".to_string(),
+                        ])?;
+                        self.token = Some(token.access_token);
+                    }
+                }
+                if let Some(id_token) = provider.config.get("id-token") {
+                    self.token = Some(id_token.clone());
                 }
             }
             None => {}
@@ -166,12 +174,12 @@ impl AuthInfo {
         Ok(true)
     }
 
-    pub fn load_client_certificate(&self) -> Result<Vec<u8>> {
+    pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>> {
         Ok(utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
             .context(ErrorKind::KubeConfig("Unable to decode base64 client cert".into()))?)
     }
 
-    pub fn load_client_key(&self) -> Result<Vec<u8>> {
+    pub(crate) fn load_client_key(&self) -> Result<Vec<u8>> {
         Ok(utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
             .context(ErrorKind::KubeConfig("Unable to decode base64 client key".into()))?)
     }

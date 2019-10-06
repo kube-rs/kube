@@ -1,5 +1,5 @@
 # kube-rs
-[![Build Status](https://travis-ci.org/clux/kube-rs.svg?branch=master)](https://travis-ci.org/clux/kube-rs)
+[![CircleCI](https://circleci.com/gh/clux/kube-rs.svg?style=shield)](https://circleci.com/gh/clux/kube-rs)
 [![Client Capabilities](https://img.shields.io/badge/Kubernetes%20client-Silver-blue.svg?style=plastic&colorB=C0C0C0&colorA=306CE8)](http://bit.ly/kubernetes-client-capabilities-badge)
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-alpha-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
@@ -13,15 +13,15 @@ To use the openapi generated types:
 
 ```toml
 [dependencies]
-kube = { version = "0.13.0", features = ["openapi"] }
-k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
+kube = { version = "0.16.1", features = ["openapi"] }
+k8s-openapi = { version = "0.5.1", default-features = false, features = ["v1_15"] }
 ```
 
 otherwise:
 
 ```toml
 [dependencies]
-kube = "0.13.0"
+kube = "0.15.0"
 ```
 
 The latter is fine in a CRD-only use case.
@@ -60,7 +60,7 @@ One of the main abstractions exposed from `kube::api` is `Reflector<K>`. This is
 
 It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
 
-To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
+To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.5.1/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
 let api = Api::v1Pod(client).within(&namespace);
@@ -89,7 +89,7 @@ The other main abstraction from `kube::api` is `Informer<K>`. This is a struct w
 
 You tell it what type `KubeObject` implementing object you want to use. You can use `Object<P, U>` to get an automatic implementation by using `Object<PodSpec, PodStatus>`.`
 
-The spec and status structs can be as complete or incomplete as you like. For instance, using the complete structs from [k8s-openapi](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/core/v1/struct.PodSpec.html):
+The spec and status structs can be as complete or incomplete as you like. For instance, using the complete structs from [k8s-openapi](https://docs.rs/k8s-openapi/0.5.1/k8s_openapi/api/core/v1/struct.PodSpec.html):
 
 ```rust
 type Pod = Object<PodSpec, PodStatus>;
@@ -142,7 +142,7 @@ cargo run --example pod_informer --features=openapi
 # watch event events
 cargo run --example event_informer --features=openapi
 # watch for broken nodes
-cargo run --example node_informer --no-default-features
+cargo run --example node_informer --features=openapi
 ```
 
 or for the reflectors:

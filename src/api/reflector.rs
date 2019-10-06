@@ -148,6 +148,31 @@ impl<K> Reflector<K> where
         )
     }
 
+    /// Read a single entry by name
+    ///
+    /// Will read in the configured namsepace, or globally on non-namespaced reflectors.
+    /// If you are using a non-namespaced resources with name clashes,
+    /// Try `Reflector::get_within` instead.
+    pub fn get(&self, name: &str) -> Result<Option<K>> {
+        let id = ObjectId {
+          name: name.into(),
+          namespace: self.resource.namespace.clone()
+        };
+        Ok(self.data.read().unwrap().get(&id).map(Clone::clone))
+    }
+
+    /// Read a single entry by name within a specific namespace
+    ///
+    /// This is a more specific version of `Reflector::get`.
+    /// This is only useful if your reflector is configured to poll across namsepaces.
+    pub fn get_within(&self, name: &str, ns: &str) -> Result<Option<K>> {
+        let id = ObjectId {
+          name: name.into(),
+          namespace: Some(ns.into())
+        };
+        Ok(self.data.read().unwrap().get(&id).map(Clone::clone))
+    }
+
     /// Reset the state with a full LIST call
     ///
     /// Same as what is done in `State::new`.
@@ -235,12 +260,8 @@ struct ObjectId {
 impl ToString for ObjectId {
     fn to_string(&self) -> String {
         match &self.namespace {
-            Some(ns) => {
-                format!("{} [{}]", self.name, ns)
-            },
-            None => {
-                self.name.clone()
-            }
+            Some(ns) => format!("{} [{}]", self.name, ns),
+            None => self.name.clone(),
         }
     }
 }

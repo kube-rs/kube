@@ -54,6 +54,10 @@ pub struct ObjectMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resourceVersion: Option<String>,
 
+    /// [Owner References](https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/#owners-and-dependents)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ownerReferences: Vec<OwnerReference>,
+
     /// [Kubernetes generated UID](http://kubernetes.io/docs/user-guide/identifiers#uids)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
@@ -76,8 +80,10 @@ pub struct ObjectMeta {
 }
 
 /// OwnerReference contains enough information to let you identify an owning object
+///
+/// [OwnerReference godoc](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#OwnerReference)
 #[derive(Deserialize, Serialize, Clone, Default)]
-struct OwnerReference {
+pub struct OwnerReference {
     /// Whether the reference points to a managing controller
     #[serde(default)]
     pub controller: bool,
@@ -90,6 +96,8 @@ struct OwnerReference {
     pub apiVersion: String,
     /// Kind of the referent
     pub kind: String,
+    /// [UID of the referent](http://kubernetes.io/docs/user-guide/identifiers#uids)
+    pub uid: String,
 }
 
 /// Initializers tracks the progress of initialization
