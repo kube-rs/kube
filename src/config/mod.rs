@@ -23,13 +23,22 @@ use self::kube_config::KubeConfigLoader;
 pub struct Configuration {
     pub base_path: String,
     pub client: Client,
+
+    /// The current default namespace. This will be "default" while running outside of a cluster,
+    /// and will be the namespace of the pod while running inside a cluster.
+    pub default_ns: String,
 }
 
 impl Configuration {
     pub fn new(base_path: String, client: Client) -> Self {
+        Self::with_default_ns(base_path, client, "default".to_string())
+    }
+
+    pub fn with_default_ns(base_path: String, client: Client, default_ns: String) -> Self {
         Configuration {
             base_path: base_path.to_owned(),
             client,
+            default_ns,
         }
     }
 }
@@ -166,6 +175,10 @@ pub fn incluster_config() -> Result<Configuration> {
     let token = incluster_config::load_token()
         .context(ErrorKind::KubeConfig("Unable to load in cluster token".to_string()))?;
 
+    let default_ns = incluster_config::load_default_ns().context(ErrorKind::KubeConfig(
+        "Unable to load incluster default namespace".to_string(),
+    ))?;
+
     let mut headers = header::HeaderMap::new();
     headers.insert(
         header::AUTHORIZATION,
@@ -177,10 +190,11 @@ pub fn incluster_config() -> Result<Configuration> {
         .add_root_certificate(req_ca)
         .default_headers(headers);
 
-    Ok(Configuration::new(
+    Ok(Configuration::with_default_ns(
         server,
         client_builder.build()
-            .context(ErrorKind::KubeConfig("Unable to build client".to_string()))?
+            .context(ErrorKind::KubeConfig("Unable to build client".to_string()))?,
+        default_ns,
     ))
 }
 
