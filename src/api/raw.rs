@@ -851,12 +851,12 @@ fn create_ingress() {
     let pp = PostParams::default();
     let req = r.create(&pp, vec![]).unwrap();
     assert_eq!(req.uri(),
-               "/apis/extensions/v1beta1/namespaces/bleep/ingress?"
+               "/apis/extensions/v1beta1/namespaces/bleep/ingresses?"
     );
     let patch_params = PatchParams::default();
     let req = r.patch("baz", &patch_params, vec![]).unwrap();
     assert_eq!(req.uri(),
-               "/apis/extensions/v1beta1/namespaces/bleep/ingress/baz?"
+               "/apis/extensions/v1beta1/namespaces/bleep/ingresses/baz?"
     );
     assert_eq!(req.method(), "PATCH");
 }
