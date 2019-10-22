@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.16.1"
+version = "0.17.0"
 description = "Kubernetes client in the style of client-go"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -14,37 +14,37 @@ categories = ["web-programming::http-client"]
 edition = "2018"
 
 [dependencies]
-base64 = "0.9.3"
-chrono = "0.4.6"
+base64 = "0.10.1"
+chrono = "0.4.9"
 dirs = "1.0.4"
-failure = "0.1.2"
-reqwest = "0.9.17"
-serde = "1.0.90"
-serde_derive = "1.0.90"
-serde_json = "1.0.39"
-serde_yaml = "0.8.8"
-openssl = "0.10.12"
-http = "0.1.17"
-url = "1.7.2"
-log = "0.4.6"
+failure = "0.1.6"
+reqwest = "0.9.22"
+serde = "1.0.101"
+serde_derive = "1.0.101"
+serde_json = "1.0.41"
+serde_yaml = "0.8.11"
+openssl = "0.10.25"
+http = "0.1.19"
+url = "2.1.0"
+log = "0.4.8"
 time = "0.1.42"
-either = "1.5.2"
+either = "1.5.3"
 
 [features]
 default = []
 openapi = ["k8s-openapi"]
 
 [dev-dependencies]
-tempfile = "3.0.7"
-env_logger = "0.6.1"
+tempfile = "3.1.0"
+env_logger = "0.7.1"
 
 [dev-dependencies.k8s-openapi]
-version = "0.5.1"
+version = "0.6.0"
 default-features = false
 features = ["v1_15"]
 
 [dependencies.k8s-openapi]
-version = "0.5.1"
+version = "0.6.0"
 default-features = false
 features = ["v1_15"]
 optional = true

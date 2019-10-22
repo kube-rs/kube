@@ -10,14 +10,12 @@ jobs:
   cargo_test:
     docker:
       - image: circleci/rust:latest
-    # this doesn't work on the free account :(
-    resource_class: large
     environment:
       - CARGO_INCREMENTAL: 0
     steps:
       - checkout
       # Cache is based on whether we changed dependencies:
-      - run: grep "\[dependencies\]" -A 999 Cargo.toml > deps_checksum
+      - run: grep "\[dependencies\]" -A 9000 Cargo.toml > deps_checksum
       - restore_cache:
           keys:
           - cache-{{ checksum "deps_checksum" }}

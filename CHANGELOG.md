@@ -1,6 +1,7 @@
-0.17.0 / 2019-08-XX
+0.17.0 / 2019-10-22
 ==================
   * Add support for oidc providerss with `auth-provider` w/o `access-token` - #70
+  * Bump most dependencies to more recent versions
 
 0.16.1 / 2019-08-09
 ==================
