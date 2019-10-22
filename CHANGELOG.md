@@ -2,6 +2,9 @@
 ==================
   * Add support for oidc providerss with `auth-provider` w/o `access-token` - #70
   * Bump most dependencies to more recent versions
+  * Expose custom client creation
+  * Added support for `v1beta1Ingress`
+  * Expose incluster_config::load_default_ns - #74
 
 0.16.1 / 2019-08-09
 ==================
