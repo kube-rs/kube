@@ -45,7 +45,7 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(
                     .ok_or_else(|| format_err!("Failed to compute the absolute path of '{:?}'", f))
                 )?
             };
-            dbg!(&abs_file);
+            // dbg!(&abs_file);
             let mut ff = File::open(&abs_file)?;
             let mut b = vec![];
             ff.read_to_end(&mut b)?;
