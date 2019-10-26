@@ -152,7 +152,7 @@ impl Cluster {
 }
 
 impl AuthInfo {
-    pub(crate) fn load_gcp(&mut self) -> Result<bool> {
+    pub(crate) async fn load_gcp(&mut self) -> Result<bool> {
         match &self.auth_provider {
             Some(provider) => {
                 if let Some(access_token) = provider.config.get("access-token") {
@@ -161,7 +161,7 @@ impl AuthInfo {
                         let client = oauth2::CredentialsClient::new()?;
                         let token = client.request_token(&vec![
                             "https://www.googleapis.com/auth/cloud-platform".to_string(),
-                        ])?;
+                        ]).await?;
                         self.token = Some(token.access_token);
                     }
                 }

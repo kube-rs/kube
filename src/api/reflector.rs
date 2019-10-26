@@ -107,9 +107,9 @@ impl<K> Reflector<K> where
     // finalizers:
 
     /// Initializes with a full list of data from a large initial LIST call
-    pub fn init(self) -> Result<Self> {
+    pub async fn init(self) -> Result<Self> {
         info!("Starting Reflector for {:?}", self.resource);
-        let (data, version) = self.get_full_resource_entries()?;
+        let (data, version) = self.get_full_resource_entries().await?;
         *self.data.write().unwrap() = data;
         *self.version.write().unwrap() = version;
         Ok(self)
@@ -119,18 +119,22 @@ impl<K> Reflector<K> where
     ///
     /// If this returns an error, it tries a full refresh.
     /// This is meant to be run continually in a thread. Spawn one.
-    pub fn poll(&self) -> Result<()> {
+    pub async fn poll(&self) -> Result<()> {
         trace!("Watching {:?}", self.resource);
-        if let Err(_e) = self.single_watch() {
+        if let Err(_e) = self.single_watch().await {
             // If desynched due to mismatching resourceVersion, retry in a bit
-            std::thread::sleep(Duration::from_secs(10));
-            self.reset()?; // propagate error if this failed..
+            // TODO: async sleep!?
+            //std::thread::sleep(Duration::from_secs(10));
+            self.reset().await?; // propagate error if this failed..
         }
 
         Ok(())
     }
 
+
     /// Read data for users of the reflector
+    ///
+    /// TODO: deprecate in favour of a stream returning fn..
     pub fn read(&self) -> Result<Vec<K>> {
         // unwrap for users because Poison errors are not great to deal with atm.
         // If a read fails, you've probably failed to parse the Resource into a T
@@ -176,19 +180,19 @@ impl<K> Reflector<K> where
     /// Reset the state with a full LIST call
     ///
     /// Same as what is done in `State::new`.
-    pub fn reset(&self) -> Result<()> {
+    pub async fn reset(&self) -> Result<()> {
         trace!("Refreshing {:?}", self.resource);
-        let (data, version) = self.get_full_resource_entries()?;
+        let (data, version) = self.get_full_resource_entries().await?;
         *self.data.write().unwrap() = data;
         *self.version.write().unwrap() = version;
         Ok(())
     }
 
 
-    fn get_full_resource_entries(&self) -> Result<(Cache<K>, String)> {
+    async fn get_full_resource_entries(&self) -> Result<(Cache<K>, String)> {
         let req = self.resource.list(&self.params)?;
         // NB: Object isn't general enough here
-        let res = self.client.request::<ObjectList<K>>(req)?;
+        let res = self.client.request::<ObjectList<K>>(req).await?;
         let mut data = BTreeMap::new();
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
 
@@ -203,11 +207,11 @@ impl<K> Reflector<K> where
     }
 
     // Watch helper
-    fn single_watch(&self) -> Result<()> {
+    async fn single_watch(&self) -> Result<()> {
         let rg = &self.resource;
         let oldver = { self.version.read().unwrap().clone() };
         let req = rg.watch(&self.params, &oldver)?;
-        let res = self.client.request_events::<WatchEvent<K>>(req)?;
+        let res = self.client.request_events::<WatchEvent<K>>(req).await?;
 
         // Update in place:
         let mut data = self.data.write().unwrap();

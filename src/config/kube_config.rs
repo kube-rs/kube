@@ -17,7 +17,7 @@ pub struct KubeConfigLoader {
 }
 
 impl KubeConfigLoader {
-    pub fn load<P: AsRef<Path>>(
+    pub async fn load<P: AsRef<Path>>(
         path: P,
         context: Option<String>,
         cluster: Option<String>,
@@ -39,18 +39,17 @@ impl KubeConfigLoader {
             .map(|named_cluster| &named_cluster.cluster)
             .ok_or_else(|| ErrorKind::KubeConfig("Unable to load cluster of context".into()))?;
         let user_name = user.as_ref().unwrap_or(&current_context.user);
-        let user = config
-            .auth_infos
-            .iter()
-            .find(|named_user| &named_user.name == user_name)
-            .map(|named_user| {
+
+        // NB: can't have async closures yet
+        let mut user_opt = None;
+        for named_user in config.auth_infos {
+            if &named_user.name == user_name {
                 let mut user = named_user.auth_info.clone();
-                match user.load_gcp() {
-                    Ok(_) => Ok(user),
-                    Err(e) => Err(e),
-                }
-            })
-            .ok_or_else(|| ErrorKind::KubeConfig("Unable to load user of context".into()))??;
+                user.load_gcp().await?;
+                user_opt = Some(user);
+            }
+        }
+        let user = user_opt.ok_or_else(|| ErrorKind::KubeConfig("Unable to find named user".into()))?;
         Ok(KubeConfigLoader {
             current_context: current_context.clone(),
             cluster: cluster.clone(),

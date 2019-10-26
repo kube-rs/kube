@@ -66,7 +66,7 @@ impl APIClient {
         APIClient { configuration }
     }
 
-    fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response>
+    async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response>
     {
         let (parts, body) = request.into_parts();
         let uri_str = format!("{}{}", self.configuration.base_path, parts.uri);
@@ -81,19 +81,20 @@ impl APIClient {
             other => Err(ErrorKind::InvalidMethod(other.to_string()))?
         }.headers(parts.headers).body(body).build().context(ErrorKind::RequestBuild)?;
         //trace!("Request Headers: {:?}", req.headers());
-        Ok(self.configuration.client.execute(req).context(ErrorKind::RequestSend)?)
+        let res = self.configuration.client.execute(req).await;
+        Ok(res.context(ErrorKind::RequestSend)?)
     }
 
 
-    pub fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
+    pub async fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
-        let mut res : reqwest::Response = self.send(request)?;
+        let res : reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
-        let text = res.text().context(ErrorKind::RequestParse)?;
+        let text = res.text().await.context(ErrorKind::RequestParse)?;
         res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
 
         serde_json::from_str(&text).map_err(|e| {
@@ -102,31 +103,31 @@ impl APIClient {
         })
     }
 
-    pub fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String>
+    pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String>
     {
-        let mut res : reqwest::Response = self.send(request)?;
+        let res : reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
-        let text = res.text().context(ErrorKind::RequestParse)?;
+        let text = res.text().await.context(ErrorKind::RequestParse)?;
         res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
 
         Ok(text)
     }
 
-    pub fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
+    pub async fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
-        let mut res : reqwest::Response = self.send(request)?;
+        let res : reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
-        let text = res.text().context(ErrorKind::RequestParse)?;
+        let text = res.text().await.context(ErrorKind::RequestParse)?;
         res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
 
         // It needs to be JSON:
-        let v: Value = serde_json::from_str(&text).context(ErrorKind::SerdeParse)?;;
+        let v: Value = serde_json::from_str(&text).context(ErrorKind::SerdeParse)?;
         if v["kind"] == "Status" {
             trace!("Status from {}", text);
             Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
@@ -141,15 +142,15 @@ impl APIClient {
         }
     }
 
-    pub fn request_events<T>(&self, request: http::Request<Vec<u8>>) -> Result<Vec<T>>
+    pub async fn request_events<T>(&self, request: http::Request<Vec<u8>>) -> Result<Vec<T>>
     where
         T: DeserializeOwned,
     {
-        let mut res : reqwest::Response = self.send(request)?;
+        let res : reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
-        let text = res.text().context(ErrorKind::RequestParse)?;
+        let text = res.text().await.context(ErrorKind::RequestParse)?;
         res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
 
         // Should be able to coerce result into Vec<T> at this point

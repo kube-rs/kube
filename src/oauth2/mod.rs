@@ -118,7 +118,7 @@ impl CredentialsClient {
             client: Client::new(),
         })
     }
-    pub fn request_token(&self, scopes: &Vec<String>) -> Result<Token> {
+    pub async fn request_token(&self, scopes: &Vec<String>) -> Result<Token> {
         let private_key = PKey::private_key_from_pem(&self.credentials.private_key.as_bytes())
             .context(ErrorKind::SslError)?;
         let encoded = &self.jws_encode(
@@ -139,8 +139,10 @@ impl CredentialsClient {
             .body(body)
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
             .send()
+            .await
             .context(ErrorKind::KubeConfig("Unable to request token".into()))?
-            .json()
+            .json::<TokenResponse>()
+            .await
             .context(ErrorKind::KubeConfig("Unable to parse request token".into()))?;
         Ok(token_response.to_token())
     }

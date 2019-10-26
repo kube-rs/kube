@@ -52,8 +52,8 @@ impl Configuration {
 /// let kubeconfig = config::load_kube_config()
 ///     .expect("failed to load kubeconfig");
 /// ```
-pub fn load_kube_config() -> Result<Configuration> {
-    load_kube_config_with(Default::default())
+pub async fn load_kube_config() -> Result<Configuration> {
+    load_kube_config_with(Default::default()).await
 }
 
 /// ConfigOptions stores options used when loading kubeconfig file.
@@ -73,9 +73,9 @@ pub struct ConfigOptions {
 /// let kubeconfig = config::load_kube_config()
 ///     .expect("failed to load kubeconfig");
 /// ```
-pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
+pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
 
-    let result = create_client_builder(options)?;
+    let result = create_client_builder(options).await?;
 
     Ok(Configuration::new(
         result.1.cluster.server,
@@ -97,12 +97,12 @@ pub fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
 /// let client_builder = client_builder_result.0;
 /// let loader = client_builder_result.1;
 /// ```
-pub fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder,KubeConfigLoader)> {
+pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder,KubeConfigLoader)> {
     let kubeconfig = utils::find_kubeconfig()
         .context(ErrorKind::KubeConfig("Unable to load file".into()))?;
 
     let loader =
-        KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user)?;
+        KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
 
     let token = match &loader.user.token {
         Some(token) => Some(token.clone()),

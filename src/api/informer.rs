@@ -110,8 +110,8 @@ impl<K> Informer<K> where
     /// Initialize without a prior version
     ///
     /// Will seed resourceVersion with a 1 limit list call to the resource
-    pub fn init(self) -> Result<Self> {
-        let initial = self.get_resource_version()?;
+    pub async fn init(self) -> Result<Self> {
+        let initial = self.get_resource_version().await?;
         info!("Starting Informer for {:?}", self.resource);
         *self.version.write().unwrap() = initial;
         Ok(self)
@@ -130,9 +130,9 @@ impl<K> Informer<K> where
     /// If this returns an error, it resets the resourceVersion.
     /// This is meant to be run continually and events are meant to be handled between.
     /// If handling all the events is too time consuming, you probably need a queue.
-    pub fn poll(&self) -> Result<()> {
+    pub async fn poll(&self) -> Result<()> {
         trace!("Watching {:?}", self.resource);
-        match self.single_watch() {
+        match self.single_watch().await {
             Ok((events, newver)) => {
                 *self.version.write().unwrap() = newver;
                 for e in events {
@@ -142,8 +142,9 @@ impl<K> Informer<K> where
             Err(e) => {
                 warn!("Poll error: {:?}", e);
                 // If desynched due to mismatching resourceVersion, retry in a bit
-                std::thread::sleep(std::time::Duration::from_secs(10));
-                self.reset()?;
+                // TODO: async sleep!
+                //std::thread::sleep(std::time::Duration::from_secs(10));
+                self.reset().await?;
             }
         };
         Ok(())
@@ -155,9 +156,9 @@ impl<K> Informer<K> where
     }
 
     /// Reset the resourceVersion to current and clear the event queue
-    pub fn reset(&self) -> Result<()> {
+    pub async fn reset(&self) -> Result<()> {
         // Fetch a new initial version:
-        let initial = self.get_resource_version()?;
+        let initial = self.get_resource_version().await?;
         *self.version.write().unwrap() = initial;
         self.events.write().unwrap().clear();
         Ok(())
@@ -170,11 +171,11 @@ impl<K> Informer<K> where
 
 
     /// Init helper
-    fn get_resource_version(&self) -> Result<String> {
+    async fn get_resource_version(&self) -> Result<String> {
         let req = self.resource.list_zero_resource_entries(&self.params)?;
 
         // parse to void a ResourceList into void except for Metadata
-        let res = self.client.request::<ObjectList<Void>>(req)?;
+        let res = self.client.request::<ObjectList<Void>>(req).await?;
 
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "0".into());
         debug!("Got fresh resourceVersion={} for {}", version, self.resource.resource);
@@ -182,10 +183,10 @@ impl<K> Informer<K> where
     }
 
     /// Watch helper
-    fn single_watch(&self) -> Result<(Vec<WatchEvent<K>>, String)> {
+    async fn single_watch(&self) -> Result<(Vec<WatchEvent<K>>, String)> {
         let oldver = self.version();
         let req = self.resource.watch(&self.params, &oldver)?;
-        let events = self.client.request_events::<WatchEvent<K>>(req)?;
+        let events = self.client.request_events::<WatchEvent<K>>(req).await?;
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
