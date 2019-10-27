@@ -9,29 +9,30 @@ use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 type Node = Object<NodeSpec, NodeStatus>;
 type Event = v1Event; // snowflake obj
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,node_informer=debug,kube=debug");
     env_logger::init();
-    let config = config::load_kube_config().expect("failed to load kubeconfig");
+    let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
 
     let nodes = RawApi::v1Node();
     let events = Api::v1Event(client.clone());
     let ni = Informer::raw(client.clone(), nodes)
-        .labels("role=worker")
-        .init()?;
+        .labels("beta.kubernetes.io/os=linux")
+        .init().await?;
 
     loop {
-        ni.poll()?;
+        ni.poll().await?;
 
         while let Some(ne) = ni.pop() {
-            handle_nodes(&events, ne)?;
+            handle_nodes(&events, ne).await?;
         }
     }
 }
 
 // This function lets the app handle an event from kube
-fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> Result<(), failure::Error> {
+async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> Result<(), failure::Error> {
     match ne {
         WatchEvent::Added(o) => {
             info!("New Node: {}", o.spec.provider_id.unwrap());
@@ -52,7 +53,7 @@ fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> Result<(), failure
                     field_selector: Some(sel),
                     ..Default::default()
                 };
-                let evlist = events.list(&opts)?;
+                let evlist = events.list(&opts).await?;
                 for e in evlist.items {
                     warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);
                 }

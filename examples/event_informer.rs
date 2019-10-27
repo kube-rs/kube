@@ -6,19 +6,19 @@ use kube::{
     config,
 };
 
-
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
-    let config = config::load_kube_config().expect("failed to load kubeconfig");
+    let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
 
     let events = Api::v1Event(client);
     let ei = Informer::new(events)
-        .init()?;
+        .init().await?;
 
     loop {
-        ei.poll()?;
+        ei.poll().await?;
 
         while let Some(event) = ei.pop() {
             handle_events(event)?;

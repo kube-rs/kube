@@ -31,10 +31,11 @@ type Foo = Object<FooSpec, FooStatus>;
 type FooMeta = Object<Void, Void>;
 type FullCrd = Object<CrdSpec, CrdStatus>;
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
-    let config = config::load_kube_config().expect("failed to load kubeconfig");
+    let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
@@ -44,7 +45,7 @@ fn main() -> Result<(), failure::Error> {
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
     let req = crds.delete("foos.clux.dev", &dp)?;
-    let _ = client.request_status::<FullCrd>(req).map(|res| match res {
+    let _ = client.request_status::<FullCrd>(req).await.map(|res| match res {
         Left(res) => {
             info!("Deleted {}: ({:?})", res.metadata.name,
                 res.status.unwrap().conditions.unwrap().last());
@@ -81,7 +82,7 @@ fn main() -> Result<(), failure::Error> {
     let pp = PostParams::default();
     let patch_params = PatchParams::default();
     let req = crds.create(&pp, serde_json::to_vec(&foocrd)?)?;
-    match client.request::<FullCrd>(req) {
+    match client.request::<FullCrd>(req).await {
         Ok(o) => {
             info!("Created {} ({:?})", o.metadata.name, o.status);
             debug!("Created CRD: {:?}", o.spec);
@@ -110,12 +111,12 @@ fn main() -> Result<(), failure::Error> {
         "spec": { "name": "baz", "info": "old baz" },
     });
     let req = foos.create(&pp, serde_json::to_vec(&f1)?)?;
-    let o = client.request::<FooMeta>(req)?;
+    let o = client.request::<FooMeta>(req).await?;
     info!("Created {}", o.metadata.name);
 
     // Verify we can get it
     info!("Get Foo baz");
-    let f1cpy = client.request::<Foo>(foos.get("baz")?)?;
+    let f1cpy = client.request::<Foo>(foos.get("baz")?).await?;
     assert_eq!(f1cpy.spec.info, "old baz");
 
     // Replace its spec
@@ -131,7 +132,7 @@ fn main() -> Result<(), failure::Error> {
         "spec": { "name": "baz", "info": "new baz" },
     });
     let req = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?)?;
-    let f1_replaced = client.request::<Foo>(req)?;
+    let f1_replaced = client.request::<Foo>(req).await?;
     assert_eq!(f1_replaced.spec.name, "baz");
     assert_eq!(f1_replaced.spec.info, "new baz");
     assert!(f1_replaced.status.is_none());
@@ -147,7 +148,7 @@ fn main() -> Result<(), failure::Error> {
         "status": FooStatus::default(),
     });
     let req = foos.create(&pp, serde_json::to_vec(&f2)?)?;
-    let o = client.request::<Foo>(req)?;
+    let o = client.request::<Foo>(req).await?;
     info!("Created {}", o.metadata.name);
 
     // Try all subresource operations:
@@ -163,7 +164,7 @@ fn main() -> Result<(), failure::Error> {
         "status": FooStatus { is_bad: true }
     });
     let req = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?)?;
-    let o = client.request::<Foo>(req)?;
+    let o = client.request::<Foo>(req).await?;
     info!("Replaced status {:?} for {}", o.status, o.metadata.name);
     assert!(o.status.unwrap().is_bad);
 
@@ -172,13 +173,13 @@ fn main() -> Result<(), failure::Error> {
         "status": FooStatus { is_bad: false }
     });
     let req = foos.patch_status("qux", &patch_params, serde_json::to_vec(&fs)?)?;
-    let o = client.request::<Foo>(req)?;
+    let o = client.request::<Foo>(req).await?;
     info!("Patched status {:?} for {}", o.status, o.metadata.name);
     assert!(!o.status.unwrap().is_bad);
 
     info!("Get Status on Foo instance qux");
     let req = foos.get_status("qux")?;
-    let o = client.request::<Foo>(req)?;
+    let o = client.request::<Foo>(req).await?;
     info!("Got status {:?} for {}", o.status, o.metadata.name);
     assert!(!o.status.unwrap().is_bad);
 
@@ -189,25 +190,25 @@ fn main() -> Result<(), failure::Error> {
         "spec": { "info": "patched qux" }
     });
     let req = foos.patch("qux", &patch_params, serde_json::to_vec(&patch)?)?;
-    let o = client.request::<Foo>(req)?;
+    let o = client.request::<Foo>(req).await?;
     info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
     // Delete it
-    client.request_status::<Foo>(foos.delete("baz", &dp)?)?.map_left(|f1del| {
+    client.request_status::<Foo>(foos.delete("baz", &dp)?).await?.map_left(|f1del| {
         assert_eq!(f1del.spec.info, "old baz");
     });
 
     // Check we have one remaining instance
     let lp = ListParams::default();
     let req = foos.list(&lp)?;
-    let res = client.request::<ObjectList<Foo>>(req)?;
+    let res = client.request::<ObjectList<Foo>>(req).await?;
     assert_eq!(res.items.len(), 1);
 
     // Cleanup the full colleciton
     let req = foos.delete_collection(&lp)?;
-    match client.request_status::<ObjectList<Foo>>(req)? {
+    match client.request_status::<ObjectList<Foo>>(req).await? {
         Left(res) => {
             let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
             info!("Deleted collection of foos: {:?}", deleted);

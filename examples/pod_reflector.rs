@@ -5,15 +5,16 @@ use kube::{
     config,
 };
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
-    let config = config::load_kube_config().expect("failed to load kubeconfig");
+    let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Pod(client).within(&namespace);
-    let rf = Reflector::new(resource).init()?;
+    let rf = Reflector::new(resource).init().await?;
 
     // Can read initial state now:
     rf.read()?.into_iter().for_each(|pod| {
@@ -26,7 +27,7 @@ fn main() -> Result<(), failure::Error> {
 
     // Poll to keep data up to date:
     loop {
-        rf.poll()?;
+        rf.poll().await?;
 
         // up to date state:
         let pods = rf.read()?.into_iter().map(|pod| pod.metadata.name).collect::<Vec<_>>();
