@@ -95,7 +95,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await.context(ErrorKind::RequestParse)?;
-        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+        api_error_guard(&text, &s)?;
 
         serde_json::from_str(&text).map_err(|e| {
             warn!("{}, {:?}", text, e);
@@ -110,7 +110,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await.context(ErrorKind::RequestParse)?;
-        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+        api_error_guard(&text, &s)?;
 
         Ok(text)
     }
@@ -124,7 +124,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await.context(ErrorKind::RequestParse)?;
-        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+        api_error_guard(&text, &s)?;
 
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text).context(ErrorKind::SerdeParse)?;
@@ -151,7 +151,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await.context(ErrorKind::RequestParse)?;
-        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+        api_error_guard(&text, &s)?;
 
         // Should be able to coerce result into Vec<T> at this point
         let mut xs : Vec<T> = vec![];
@@ -173,22 +173,26 @@ impl APIClient {
 ///
 /// In either case, present an ApiError upstream.
 /// The latter is probably a bug if encountered.
-fn make_api_error(text: &str, error: reqwest::Error, s: &StatusCode) -> ErrorKind {
-    // Print better debug when things do fail
-    //trace!("Parsing error: {}", text);
-    if let Ok(errdata) = serde_json::from_str::<ApiError>(text) {
-        debug!("Unsuccessful: {:?}", errdata);
-        ErrorKind::Api(errdata)
+fn api_error_guard(text: &str, s: &StatusCode) -> Result<()> {
+    if s.is_client_error() || s.is_server_error() {
+        // Print better debug when things do fail
+        //trace!("Parsing error: {}", text);
+        if let Ok(errdata) = serde_json::from_str::<ApiError>(text) {
+            debug!("Unsuccessful: {:?}", errdata);
+            Err(ErrorKind::Api(errdata).into())
+        } else {
+            warn!("Unsuccessful data error parse: {}", text);
+            // Propagate errors properly via reqwest
+            let ae = ApiError {
+                status: s.to_string(),
+                code: s.as_u16(),
+                message: format!("{:?}", text),
+                reason: "Failed to parse error data".into()
+            };
+            debug!("Unsuccessful: {:?} (reconstruct)", ae);
+            Err(ErrorKind::Api(ae).into())
+        }
     } else {
-        warn!("Unsuccessful data error parse: {}", text);
-        // Propagate errors properly via reqwest
-        let ae = ApiError {
-            status: s.to_string(),
-            code: s.as_u16(),
-            message: format!("{:?}", error),
-            reason: format!("{}", error),
-        };
-        debug!("Unsuccessful: {:?} (reconstruct)", ae);
-        ErrorKind::Api(ae)
+        Ok(())
     }
 }
