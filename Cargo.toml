@@ -28,6 +28,7 @@ url = "2.1.0"
 log = "0.4.8"
 time = "0.1.42"
 either = "1.5.3"
+tokio = { version = "=0.2.0-alpha.6", default-features = false, features = ["timer"] }
 
 [features]
 default = []

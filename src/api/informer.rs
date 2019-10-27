@@ -16,6 +16,7 @@ use serde::de::DeserializeOwned;
 use std::{
     collections::VecDeque,
     sync::{Arc, RwLock},
+    time::{Duration},
 };
 
 type WatchQueue<K> = VecDeque<WatchEvent<K>>;
@@ -142,8 +143,8 @@ impl<K> Informer<K> where
             Err(e) => {
                 warn!("Poll error: {:?}", e);
                 // If desynched due to mismatching resourceVersion, retry in a bit
-                // TODO: async sleep!
-                //std::thread::sleep(std::time::Duration::from_secs(10));
+                let when = tokio::clock::now() + Duration::from_secs(10);
+                tokio::timer::delay(when).await;
                 self.reset().await?;
             }
         };

@@ -123,8 +123,8 @@ impl<K> Reflector<K> where
         trace!("Watching {:?}", self.resource);
         if let Err(_e) = self.single_watch().await {
             // If desynched due to mismatching resourceVersion, retry in a bit
-            // TODO: async sleep!?
-            //std::thread::sleep(Duration::from_secs(10));
+            let when = tokio::clock::now() + Duration::from_secs(10);
+            tokio::timer::delay(when).await;
             self.reset().await?; // propagate error if this failed..
         }
 
