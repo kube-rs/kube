@@ -152,7 +152,7 @@ impl Cluster {
 }
 
 impl AuthInfo {
-    pub(crate) async fn load_gcp(&mut self) -> Result<bool> {
+    pub(crate) async fn load_gcp(&mut self) -> Result<()> {
         match &self.auth_provider {
             Some(provider) => {
                 if let Some(access_token) = provider.config.get("access-token") {
@@ -171,7 +171,7 @@ impl AuthInfo {
             }
             None => {}
         };
-        Ok(true)
+        Ok(())
     }
 
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>> {

@@ -1,6 +1,7 @@
 0.X.X / 2019-XX-XX
 ==================
   * api converted to use async/await with 1.39.0
+  * `Log` trait removed in favour of internal marker trait
 
 0.17.0 / 2019-10-22
 ==================

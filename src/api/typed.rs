@@ -42,16 +42,6 @@ pub struct Api<K> {
     pub(in crate::api) phantom: PhantomData<K>,
 }
 
-pub trait LogOperation {
-    fn log_operation(&self, name: &str, lp: &LogParams) -> Result<String>;
-}
-
-pub trait Log: LogOperation {
-    fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
-        Ok(self.log_operation(name, lp)?)
-    }
-}
-
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K> Api<K> {
     pub fn within(mut self, ns: &str) -> Self {
@@ -118,15 +108,18 @@ impl<K> Api<K> where
     }
 }
 
-// TODO: async trait functions?
-/*impl<K> LogOperation for Api<K> where
-    K: Clone + DeserializeOwned + KubeObject
+
+/// Marker trait for objects that has logs
+pub trait LoggingObject {}
+
+impl<K> Api<K> where
+    K: Clone + DeserializeOwned + KubeObject + LoggingObject
 {
-    fn log_operation(&self, name: &str, lp: &LogParams) -> Result<String> {
+    pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.api.log(name, lp)?;
-        self.client.request_text(req)
+        Ok(self.client.request_text(req).await?)
     }
-}*/
+}
 
 /// Scale spec from api::autoscaling::v1
 #[derive(Deserialize, Serialize, Clone, Debug)]

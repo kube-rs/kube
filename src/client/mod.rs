@@ -95,7 +95,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await.context(ErrorKind::RequestParse)?;
-        api_error_guard(&text, &s)?;
+        handle_api_errors(&text, &s)?;
 
         serde_json::from_str(&text).map_err(|e| {
             warn!("{}, {:?}", text, e);
@@ -110,7 +110,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await.context(ErrorKind::RequestParse)?;
-        api_error_guard(&text, &s)?;
+        handle_api_errors(&text, &s)?;
 
         Ok(text)
     }
@@ -124,7 +124,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await.context(ErrorKind::RequestParse)?;
-        api_error_guard(&text, &s)?;
+        handle_api_errors(&text, &s)?;
 
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text).context(ErrorKind::SerdeParse)?;
@@ -151,7 +151,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await.context(ErrorKind::RequestParse)?;
-        api_error_guard(&text, &s)?;
+        handle_api_errors(&text, &s)?;
 
         // Should be able to coerce result into Vec<T> at this point
         let mut xs : Vec<T> = vec![];
@@ -173,7 +173,7 @@ impl APIClient {
 ///
 /// In either case, present an ApiError upstream.
 /// The latter is probably a bug if encountered.
-fn api_error_guard(text: &str, s: &StatusCode) -> Result<()> {
+fn handle_api_errors(text: &str, s: &StatusCode) -> Result<()> {
     if s.is_client_error() || s.is_server_error() {
         // Print better debug when things do fail
         //trace!("Parsing error: {}", text);
