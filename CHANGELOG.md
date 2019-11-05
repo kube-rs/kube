@@ -1,4 +1,4 @@
-0.X.X / 2019-XX-XX
+0.18.0 / 2019-XX-XX
 ==================
   * api converted to use async/await with 1.39.0
   * `Log` trait removed in favour of internal marker trait
