@@ -44,14 +44,6 @@ impl Configuration {
 }
 
 /// Returns a config includes authentication and cluster infomation from kubeconfig file.
-///
-/// # Example
-/// ```no_run
-/// use kube::config;
-///
-/// let kubeconfig = config::load_kube_config()
-///     .expect("failed to load kubeconfig");
-/// ```
 pub async fn load_kube_config() -> Result<Configuration> {
     load_kube_config_with(Default::default()).await
 }
@@ -65,14 +57,6 @@ pub struct ConfigOptions {
 }
 
 /// Returns a config which includes authentication and cluster information from kubeconfig file.
-///
-/// # Example
-/// ```no_run
-/// use kube::config;
-///
-/// let kubeconfig = config::load_kube_config()
-///     .expect("failed to load kubeconfig");
-/// ```
 pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
 
     let result = create_client_builder(options).await?;
@@ -87,16 +71,6 @@ pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configurati
 /// Returns a client builder and config loader, based on the cluster information from the kubeconfig file.
 ///
 /// This allows to create your custom reqwest client for using with the cluster API.
-///
-/// # Example
-/// ```no_run
-/// use kube::config;
-///
-/// let client_builder_result = config::create_client_builder(Default::default())
-///     .expect("failed to load kubeconfig");
-/// let client_builder = client_builder_result.0;
-/// let loader = client_builder_result.1;
-/// ```
 pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder,KubeConfigLoader)> {
     let kubeconfig = utils::find_kubeconfig()
         .context(ErrorKind::KubeConfig("Unable to load file".into()))?;
@@ -171,15 +145,8 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
 }
 
 /// Returns a config which is used by clients within pods on kubernetes.
+///
 /// It will return an error if called from out of kubernetes cluster.
-///
-/// # Example
-/// ```no_run
-/// use kube::config;
-///
-/// let kubeconfig = config::incluster_config()
-///     .expect("failed to load incluster config");
-/// ```
 pub fn incluster_config() -> Result<Configuration> {
     let server = incluster_config::kube_server().ok_or_else(||
         Error::from(ErrorKind::KubeConfig(format!(
