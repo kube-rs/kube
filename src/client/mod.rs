@@ -8,6 +8,7 @@ use http;
 use serde::de::DeserializeOwned;
 use serde_json;
 use failure::ResultExt;
+use futures::Stream;
 use crate::{ApiError, Error, ErrorKind, Result};
 use crate::config::Configuration;
 
@@ -163,6 +164,31 @@ impl APIClient {
             xs.push(r);
         }
         Ok(xs)
+    }
+
+    pub fn unfold<T>(res: reqwest::Response) -> impl Stream<Item = Result<T>>
+    where
+        T: DeserializeOwned
+    {
+        futures::stream::unfold(res, |mut resp| async move {
+            match resp.chunk().await {
+                Ok(Some(l)) => {
+                    trace!("Chunk: {:?}", l);
+                    return match serde_json::from_slice(&l) {
+                        Ok(t) => Some((Ok(t), resp)),
+                        Err(e) => {
+                            warn!("{} {:?}",  String::from_utf8_lossy(&l), e);
+                            Some((Err(Error::from(ErrorKind::SerdeParse)), resp))
+                        },
+                    }
+                },
+                Ok(None) => None,
+                Err(e) => {
+                    warn!("{}: {:?}", e , e);
+                    Some((Err(Error::from(ErrorKind::RequestSend)), resp))
+                },
+            }
+        })
     }
 }
 
