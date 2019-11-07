@@ -16,10 +16,11 @@ pub struct FooSpec {
 // The kubernetes generic object with our spec and no status
 type Foo = Object<FooSpec, Void>;
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
-    let config = config::load_kube_config().expect("failed to load kubeconfig");
+    let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
@@ -28,11 +29,11 @@ fn main() -> Result<(), failure::Error> {
         .group("clux.dev")
         .within(&namespace);
 
-    let rf : Reflector<Foo> = Reflector::raw(client, resource).init()?;
+    let rf : Reflector<Foo> = Reflector::raw(client, resource).init().await?;
 
     loop {
         // Update internal state by calling watch (blocks):
-        rf.poll()?;
+        rf.poll().await?;
 
         // Read updated internal state (instant):
         rf.read()?.into_iter().for_each(|crd| {

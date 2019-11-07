@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 use std::marker::PhantomData;
 
-use crate::api::{RawApi, Api, Object, Log, Void};
+use crate::api::{RawApi, Api, Object, Void};
+use crate::api::typed::LoggingObject;
 use crate::client::{
     APIClient,
 };
@@ -52,6 +53,8 @@ impl Api<Object<DeploymentSpec, DeploymentStatus>> {
         }
     }
 }
+impl LoggingObject for Object<DeploymentSpec, DeploymentStatus> {}
+impl LoggingObject for Object<DeploymentSpec, Void> {}
 
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 impl Api<Object<PodSpec, PodStatus>> {
@@ -63,8 +66,8 @@ impl Api<Object<PodSpec, PodStatus>> {
         }
     }
 }
-
-impl Log for Api<Object<PodSpec, PodStatus>> {}
+impl LoggingObject for Object<PodSpec, PodStatus> {}
+impl LoggingObject for Object<PodSpec, Void> {}
 
 use k8s_openapi::api::core::v1::{ServiceSpec, ServiceStatus};
 impl Api<Object<ServiceSpec, ServiceStatus>> {

@@ -42,16 +42,6 @@ pub struct Api<K> {
     pub(in crate::api) phantom: PhantomData<K>,
 }
 
-pub trait LogOperation {
-    fn log_operation(&self, name: &str, lp: &LogParams) -> Result<String>;
-}
-
-pub trait Log: LogOperation {
-    fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
-        Ok(self.log_operation(name, lp)?)
-    }
-}
-
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K> Api<K> {
     pub fn within(mut self, ns: &str) -> Self {
@@ -72,58 +62,62 @@ impl<K> Api<K> {
 impl<K> Api<K> where
     K: Clone + DeserializeOwned + KubeObject,
 {
-    pub fn get(&self, name: &str) -> Result<K> {
+    pub async fn get(&self, name: &str) -> Result<K> {
         let req = self.api.get(name)?;
-        self.client.request::<K>(req)
+        self.client.request::<K>(req).await
     }
-    pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<K> {
+    pub async fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.api.create(&pp, data)?;
-        self.client.request::<K>(req)
+        self.client.request::<K>(req).await
     }
-    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
+    pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
         let req = self.api.delete(name, &dp)?;
-        self.client.request_status::<K>(req)
+        self.client.request_status::<K>(req).await
     }
-    pub fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
+    pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
         let req = self.api.list(&lp)?;
-        self.client.request::<ObjectList<K>>(req)
+        self.client.request::<ObjectList<K>>(req).await
     }
-    pub fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<K>, Status>> {
+    pub async fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<K>, Status>> {
         let req = self.api.delete_collection(&lp)?;
-        self.client.request_status::<ObjectList<K>>(req)
+        self.client.request_status::<ObjectList<K>>(req).await
     }
-    pub fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
+    pub async fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.api.patch(name, &pp, patch)?;
-        self.client.request::<K>(req)
+        self.client.request::<K>(req).await
     }
-    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
+    pub async fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.api.replace(name, &pp, data)?;
-        self.client.request::<K>(req)
+        self.client.request::<K>(req).await
     }
-    pub fn watch(&self, lp: &ListParams, version: &str) -> Result<Vec<WatchEvent<K>>> {
+    pub async fn watch(&self, lp: &ListParams, version: &str) -> Result<Vec<WatchEvent<K>>> {
         let req = self.api.watch(&lp, &version)?;
-        self.client.request_events::<WatchEvent<K>>(req)
+        self.client.request_events::<WatchEvent<K>>(req).await
     }
-    pub fn get_status(&self, name: &str) -> Result<K> {
+    pub async fn get_status(&self, name: &str) -> Result<K> {
         let req = self.api.get_status(name)?;
-        self.client.request::<K>(req)
+        self.client.request::<K>(req).await
     }
-    pub fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
+    pub async fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.api.patch_status(name, &pp, patch)?;
-        self.client.request::<K>(req)
+        self.client.request::<K>(req).await
     }
-    pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
+    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.api.replace_status(name, &pp, data)?;
-        self.client.request::<K>(req)
+        self.client.request::<K>(req).await
     }
 }
 
-impl<K> LogOperation for Api<K> where
-    K: Clone + DeserializeOwned + KubeObject
+
+/// Marker trait for objects that has logs
+pub trait LoggingObject {}
+
+impl<K> Api<K> where
+    K: Clone + DeserializeOwned + KubeObject + LoggingObject
 {
-    fn log_operation(&self, name: &str, lp: &LogParams) -> Result<String> {
+    pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.api.log(name, lp)?;
-        self.client.request_text(req)
+        Ok(self.client.request_text(req).await?)
     }
 }
 
@@ -146,17 +140,17 @@ pub type Scale = Object<ScaleSpec, ScaleStatus>;
 impl<K> Api<K> where
     K: Clone + DeserializeOwned,
 {
-    pub fn get_scale(&self, name: &str) -> Result<Scale> {
+    pub async fn get_scale(&self, name: &str) -> Result<Scale> {
         let req = self.api.get_scale(name)?;
-        self.client.request::<Scale>(req)
+        self.client.request::<Scale>(req).await
     }
-    pub fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
+    pub async fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
         let req = self.api.patch_scale(name, &pp, patch)?;
-        self.client.request::<Scale>(req)
+        self.client.request::<Scale>(req).await
     }
-    pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
+    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
         let req = self.api.replace_scale(name, &pp, data)?;
-        self.client.request::<Scale>(req)
+        self.client.request::<Scale>(req).await
     }
 }
 

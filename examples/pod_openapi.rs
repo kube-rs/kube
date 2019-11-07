@@ -7,10 +7,11 @@ use kube::{
     config,
 };
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
-    let config = config::load_kube_config().expect("failed to load kubeconfig");
+    let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
 
     // Manage pods
@@ -31,7 +32,7 @@ fn main() -> Result<(), failure::Error> {
     });
 
     let pp = PostParams::default();
-    match pods.create(&pp, serde_json::to_vec(&p)?) {
+    match pods.create(&pp, serde_json::to_vec(&p)?).await {
         Ok(o) => {
             assert_eq!(p["metadata"]["name"], o.metadata.name);
             info!("Created {}", o.metadata.name);
@@ -49,7 +50,7 @@ fn main() -> Result<(), failure::Error> {
 
     // Verify we can get it
     info!("Get Pod blog");
-    let p1cpy = pods.get("blog")?;
+    let p1cpy = pods.get("blog").await?;
     println!("Got blog pod with containers: {:?}", p1cpy.spec.containers);
     assert_eq!(p1cpy.spec.containers[0].name, "blog");
 
@@ -64,16 +65,16 @@ fn main() -> Result<(), failure::Error> {
         }
     });
     let patch_params = PatchParams::default();
-    let p_patched = pods.patch("blog", &patch_params, serde_json::to_vec(&patch)?)?;
+    let p_patched = pods.patch("blog", &patch_params, serde_json::to_vec(&patch)?).await?;
     assert_eq!(p_patched.spec.active_deadline_seconds, Some(5));
 
-    for p in pods.list(&ListParams::default())?.items {
+    for p in pods.list(&ListParams::default()).await?.items {
         println!("Got Pod: {}", p.metadata.name);
     }
 
     // Delete it
     let dp = DeleteParams::default();
-    pods.delete("blog", &dp)?.map_left(|pdel| {
+    pods.delete("blog", &dp).await?.map_left(|pdel| {
         assert_eq!(pdel.metadata.name, "blog");
         info!("Deleting blog pod started");
     });

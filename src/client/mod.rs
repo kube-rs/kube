@@ -66,7 +66,7 @@ impl APIClient {
         APIClient { configuration }
     }
 
-    fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response>
+    async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response>
     {
         let (parts, body) = request.into_parts();
         let uri_str = format!("{}{}", self.configuration.base_path, parts.uri);
@@ -81,20 +81,21 @@ impl APIClient {
             other => Err(ErrorKind::InvalidMethod(other.to_string()))?
         }.headers(parts.headers).body(body).build().context(ErrorKind::RequestBuild)?;
         //trace!("Request Headers: {:?}", req.headers());
-        Ok(self.configuration.client.execute(req).context(ErrorKind::RequestSend)?)
+        let res = self.configuration.client.execute(req).await;
+        Ok(res.context(ErrorKind::RequestSend)?)
     }
 
 
-    pub fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
+    pub async fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
-        let mut res : reqwest::Response = self.send(request)?;
+        let res : reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
-        let text = res.text().context(ErrorKind::RequestParse)?;
-        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+        let text = res.text().await.context(ErrorKind::RequestParse)?;
+        handle_api_errors(&text, &s)?;
 
         serde_json::from_str(&text).map_err(|e| {
             warn!("{}, {:?}", text, e);
@@ -102,31 +103,31 @@ impl APIClient {
         })
     }
 
-    pub fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String>
+    pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String>
     {
-        let mut res : reqwest::Response = self.send(request)?;
+        let res : reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
-        let text = res.text().context(ErrorKind::RequestParse)?;
-        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+        let text = res.text().await.context(ErrorKind::RequestParse)?;
+        handle_api_errors(&text, &s)?;
 
         Ok(text)
     }
 
-    pub fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
+    pub async fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
-        let mut res : reqwest::Response = self.send(request)?;
+        let res : reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
-        let text = res.text().context(ErrorKind::RequestParse)?;
-        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+        let text = res.text().await.context(ErrorKind::RequestParse)?;
+        handle_api_errors(&text, &s)?;
 
         // It needs to be JSON:
-        let v: Value = serde_json::from_str(&text).context(ErrorKind::SerdeParse)?;;
+        let v: Value = serde_json::from_str(&text).context(ErrorKind::SerdeParse)?;
         if v["kind"] == "Status" {
             trace!("Status from {}", text);
             Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
@@ -141,16 +142,16 @@ impl APIClient {
         }
     }
 
-    pub fn request_events<T>(&self, request: http::Request<Vec<u8>>) -> Result<Vec<T>>
+    pub async fn request_events<T>(&self, request: http::Request<Vec<u8>>) -> Result<Vec<T>>
     where
         T: DeserializeOwned,
     {
-        let mut res : reqwest::Response = self.send(request)?;
+        let res : reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
-        let text = res.text().context(ErrorKind::RequestParse)?;
-        res.error_for_status().map_err(|e| make_api_error(&text, e, &s))?;
+        let text = res.text().await.context(ErrorKind::RequestParse)?;
+        handle_api_errors(&text, &s)?;
 
         // Should be able to coerce result into Vec<T> at this point
         let mut xs : Vec<T> = vec![];
@@ -172,22 +173,26 @@ impl APIClient {
 ///
 /// In either case, present an ApiError upstream.
 /// The latter is probably a bug if encountered.
-fn make_api_error(text: &str, error: reqwest::Error, s: &StatusCode) -> ErrorKind {
-    // Print better debug when things do fail
-    //trace!("Parsing error: {}", text);
-    if let Ok(errdata) = serde_json::from_str::<ApiError>(text) {
-        debug!("Unsuccessful: {:?}", errdata);
-        ErrorKind::Api(errdata)
+fn handle_api_errors(text: &str, s: &StatusCode) -> Result<()> {
+    if s.is_client_error() || s.is_server_error() {
+        // Print better debug when things do fail
+        //trace!("Parsing error: {}", text);
+        if let Ok(errdata) = serde_json::from_str::<ApiError>(text) {
+            debug!("Unsuccessful: {:?}", errdata);
+            Err(ErrorKind::Api(errdata).into())
+        } else {
+            warn!("Unsuccessful data error parse: {}", text);
+            // Propagate errors properly via reqwest
+            let ae = ApiError {
+                status: s.to_string(),
+                code: s.as_u16(),
+                message: format!("{:?}", text),
+                reason: "Failed to parse error data".into()
+            };
+            debug!("Unsuccessful: {:?} (reconstruct)", ae);
+            Err(ErrorKind::Api(ae).into())
+        }
     } else {
-        warn!("Unsuccessful data error parse: {}", text);
-        // Propagate errors properly via reqwest
-        let ae = ApiError {
-            status: s.to_string(),
-            code: s.as_u16(),
-            message: format!("{:?}", error),
-            reason: format!("{}", error),
-        };
-        debug!("Unsuccessful: {:?} (reconstruct)", ae);
-        ErrorKind::Api(ae)
+        Ok(())
     }
 }

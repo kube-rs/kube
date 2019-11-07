@@ -8,20 +8,21 @@ use kube::{
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 type Pod = Object<PodSpec, PodStatus>;
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
-    let config = config::load_kube_config().expect("failed to load kubeconfig");
+    let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Pod(client.clone()).within(&namespace);
-    let inf = Informer::new(resource.clone()).init()?;
+    let inf = Informer::new(resource.clone()).init().await?;
 
     // Here we both poll and reconcile based on events from the main thread
     // If you run this next to actix-web (say), spawn a thread and pass `inf` as app state
     loop {
-        inf.poll()?;
+        inf.poll().await?;
 
         // Handle events one by one, draining the informer
         while let Some(event) = inf.pop() {

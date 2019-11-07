@@ -31,7 +31,6 @@ pub use typed::{
     Scale,
     ScaleSpec,
     ScaleStatus,
-    Log
 };
 
 mod resource;

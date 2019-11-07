@@ -7,10 +7,11 @@ use kube::{
     config,
 };
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
-    let config = config::load_kube_config().expect("failed to load kubeconfig");
+    let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
 
     // Create a Job
@@ -40,11 +41,11 @@ fn main() {
     let pp = PostParams::default();
 
     let data = serde_json::to_vec(&my_job).expect("failed to serialize job");
-    jobs.create(&pp, data).expect("failed to create job");
+    jobs.create(&pp, data).await.expect("failed to create job");
 
     // See if it ran to completion
     let lp = ListParams::default();
-    jobs.watch(&lp, "").and_then(|res| {
+    jobs.watch(&lp, "").await.and_then(|res| {
         for status in res {
             match status {
                 WatchEvent::Added(s) => {
@@ -68,12 +69,12 @@ fn main() {
                 }
             }
         }
-        
         Ok(())
     }).expect("Failed to watch");
 
     // Clean up the old job record..
     info!("Deleting the job record.");
     let dp = DeleteParams::default();
-    jobs.delete("empty-job", &dp).expect("failed to delete job");
+    jobs.delete("empty-job", &dp).await.expect("failed to delete job");
+    Ok(())
 }
