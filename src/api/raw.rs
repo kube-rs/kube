@@ -276,6 +276,17 @@ impl RawApi {
         }
     }
 
+    /// SelfSubjectRulesReview constructor
+    pub fn v1SelfSubjectRulesReview() -> Self {
+        Self {
+            group: "authorization.k8s.io".into(),
+            resource: "selfsubjectrulesreviews".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
     /// ValidatingWebhookConfiguration constructor
     pub fn v1beta1ValidatingWebhookConfiguration() -> Self {
         Self {

@@ -219,3 +219,14 @@ impl Api<Object<IngressSpec, IngressStatus>> {
         }
     }
 }
+
+use k8s_openapi::api::authorization::v1::{SelfSubjectRulesReviewSpec, SelfSubjectRulesReviewStatus};
+impl Api<Object<SelfSubjectRulesReviewSpec, SelfSubjectRulesReviewStatus>> {
+    pub fn v1SelfSubjectRulesReview(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1SelfSubjectRulesReview(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
