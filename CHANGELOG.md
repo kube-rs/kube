@@ -1,6 +1,8 @@
-0.18.0 / 2019-XX-XX
+0.18.0 / 2019-11-07
 ==================
-  * api converted to use async/await with 1.39.0
+  * api converted to use async/await with 1.39.0 (primitively)
+  * hyper upgraded to 0.10-alpha
+  * synchronous sleep replaced with tokio timer
   * `Log` trait removed in favour of internal marker trait
 
 0.17.0 / 2019-10-22
