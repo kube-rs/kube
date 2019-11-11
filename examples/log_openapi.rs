@@ -1,14 +1,14 @@
 #[macro_use] extern crate log;
-use failure::{err_msg, Error};
 use kube::{
     api::{Api, LogParams},
     client::APIClient,
     config,
 };
+use anyhow::{Result, anyhow};
 use std::env;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
     let config = config::load_kube_config().await?;
@@ -16,7 +16,7 @@ async fn main() -> Result<(), Error> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let mypod = env::args().nth(1).ok_or_else(|| {
-        err_msg("Usage: log_openapi <pod>")
+        anyhow!("Usage: log_openapi <pod>")
     })?;
 
     // Get the logs from the specified pod

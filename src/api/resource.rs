@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use serde::{Deserialize};
 
 use crate::api::metadata::{ObjectMeta, ListMeta, TypeMeta};
-use crate::ApiError;
+use crate::ErrorResponse;
 
 /// Accessor trait needed to build higher level abstractions on kubernetes objects
 pub trait KubeObject {
@@ -25,7 +25,7 @@ pub enum WatchEvent<K> where
     Added(K),
     Modified(K),
     Deleted(K),
-    Error(ApiError),
+    Error(ErrorResponse),
 }
 
 impl<K> Debug for WatchEvent<K> where

@@ -7,7 +7,7 @@ use kube::{
 };
 
 #[tokio::main]
-async fn main() -> Result<(), failure::Error> {
+async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
     let config = config::load_kube_config().await?;
@@ -27,7 +27,7 @@ async fn main() -> Result<(), failure::Error> {
 }
 
 // This function lets the app handle an event from kube
-fn handle_events(ev: WatchEvent<v1Event>) -> Result<(), failure::Error> {
+fn handle_events(ev: WatchEvent<v1Event>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
             info!("New Event: {}, {}", o.type_, o.message);
