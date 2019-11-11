@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 
-use failure::ResultExt;
-use crate::{Result, ErrorKind};
+use crate::{KubeError, Result};
 use crate::config::utils;
 use crate::oauth2;
 
@@ -133,10 +132,9 @@ pub struct Context {
 
 impl Config {
     pub(crate) fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
-        let f = File::open(path)
-            .context(ErrorKind::KubeConfig("Unable to open config file".into()))?;
+        let f = File::open(path).map_err(|e| KubeError::KubeConfig(format!("{}",e)))?;
         let config = serde_yaml::from_reader(f)
-            .context(ErrorKind::KubeConfig("Unable to parse config file as yaml".into()))?;
+            .map_err(|e| KubeError::KubeConfig(format!("{}",e)))?;
         Ok(config)
     }
 }
@@ -146,7 +144,7 @@ impl Cluster {
         let res = utils::data_or_file_with_base64(
             &self.certificate_authority_data,
             &self.certificate_authority,
-        ).context(ErrorKind::KubeConfig("Unable to decode base64 certificates".into()))?;
+        ).map_err(|e| KubeError::KubeConfig(format!("{}",e)))?;
         Ok(res)
     }
 }
@@ -175,12 +173,12 @@ impl AuthInfo {
     }
 
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>> {
-        Ok(utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
-            .context(ErrorKind::KubeConfig("Unable to decode base64 client cert".into()))?)
+        utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
+            .map_err(|e| KubeError::KubeConfig(format!("{}", e)))
     }
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>> {
-        Ok(utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
-            .context(ErrorKind::KubeConfig("Unable to decode base64 client key".into()))?)
+        utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
+            .map_err(|e| KubeError::KubeConfig(format!("{}", e)))
     }
 }

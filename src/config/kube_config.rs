@@ -4,8 +4,7 @@ use openssl::{
     pkey::PKey,
     x509::X509,
 };
-use failure::ResultExt;
-use crate::{Result, Error, ErrorKind};
+use crate::{KubeError, Result};
 use crate::config::apis::{AuthInfo, Cluster, Config, Context};
 
 /// KubeConfigLoader loads current context, cluster, and authentication information.
@@ -30,14 +29,14 @@ impl KubeConfigLoader {
             .iter()
             .find(|named_context| &named_context.name == context_name)
             .map(|named_context| &named_context.context)
-            .ok_or_else(|| ErrorKind::KubeConfig("Unable to load current context".into()))?;
+            .ok_or_else(|| KubeError::KubeConfig("Unable to load current context".into()))?;
         let cluster_name = cluster.as_ref().unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
-            .ok_or_else(|| ErrorKind::KubeConfig("Unable to load cluster of context".into()))?;
+            .ok_or_else(|| KubeError::KubeConfig("Unable to load cluster of context".into()))?;
         let user_name = user.as_ref().unwrap_or(&current_context.user);
 
         // NB: can't have async closures yet
@@ -49,7 +48,7 @@ impl KubeConfigLoader {
                 user_opt = Some(user);
             }
         }
-        let user = user_opt.ok_or_else(|| ErrorKind::KubeConfig("Unable to find named user".into()))?;
+        let user = user_opt.ok_or_else(|| KubeError::KubeConfig("Unable to find named user".into()))?;
         Ok(KubeConfigLoader {
             current_context: current_context.clone(),
             cluster: cluster.clone(),
@@ -61,16 +60,16 @@ impl KubeConfigLoader {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
-        let x509 = X509::from_pem(&client_cert).context(ErrorKind::SslError)?;
-        let pkey = PKey::private_key_from_pem(&client_key).context(ErrorKind::SslError)?;
+        let x509 = X509::from_pem(&client_cert).map_err(|e| KubeError::SslError(format!("{}", e)))?;
+        let pkey = PKey::private_key_from_pem(&client_key).map_err(|e| KubeError::SslError(format!("{}", e)))?;
 
-        Ok(Pkcs12::builder()
+        Pkcs12::builder()
             .build(password, "kubeconfig", &pkey, &x509)
-            .context(ErrorKind::SslError)?)
+            .map_err(|e| KubeError::SslError(format!("{}", e)))
     }
 
     pub fn ca_bundle(&self) -> Option<Result<Vec<X509>>> {
         let bundle = self.cluster.load_certificate_authority().ok()?;
-        Some(X509::stack_from_pem(&bundle).map_err(|_| Error::from(ErrorKind::SslError)))
+        Some(X509::stack_from_pem(&bundle).map_err(|e| KubeError::SslError(format!("{}", e))))
     }
 }

@@ -17,7 +17,6 @@ edition = "2018"
 base64 = "0.10.1"
 chrono = "0.4.9"
 dirs = "1.0.4"
-failure = "0.1.6"
 serde = "1.0.101"
 serde_derive = "1.0.101"
 serde_json = "1.0.41"
@@ -29,6 +28,7 @@ log = "0.4.8"
 time = "0.1.42"
 either = "1.5.3"
 tokio = { version = "=0.2.0-alpha.6", default-features = false, features = ["timer"] }
+thiserror = "1.0.5"
 
 [features]
 default = []

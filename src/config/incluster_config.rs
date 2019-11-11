@@ -1,6 +1,6 @@
 use std::env;
 
-use failure::Error;
+use crate::{Result, KubeError};
 use openssl::x509::X509;
 
 use crate::config::utils;
@@ -26,18 +26,18 @@ fn kube_port() -> Option<String> {
 }
 
 /// Returns token from specified path in cluster.
-pub fn load_token() -> Result<String, Error> {
+pub fn load_token() -> Result<String> {
     utils::data_or_file(&None, &Some(SERVICE_TOKENFILE))
 }
 
 /// Returns certification from specified path in cluster.
-pub fn load_cert() -> Result<X509, Error> {
+pub fn load_cert() -> Result<X509> {
     let ca = utils::data_or_file_with_base64(&None, &Some(SERVICE_CERTFILE))?;
-    X509::from_pem(&ca).map_err(Error::from)
+    X509::from_pem(&ca).map_err(|e| KubeError::KubeConfig(format!("{}", e)))
 }
 
 /// Returns the default namespace from specified path in cluster.
-pub fn load_default_ns() -> Result<String, Error> {
+pub fn load_default_ns() -> Result<String> {
     utils::data_or_file(&None, &Some(SERVICE_DEFAULT_NS))
 }
 
