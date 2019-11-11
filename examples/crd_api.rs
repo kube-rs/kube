@@ -32,7 +32,7 @@ type FooMeta = Object<Void, Void>;
 type FullCrd = Object<CrdSpec, CrdStatus>;
 
 #[tokio::main]
-async fn main() -> Result<(), failure::Error> {
+async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
     let config = config::load_kube_config().await?;
@@ -87,13 +87,8 @@ async fn main() -> Result<(), failure::Error> {
             info!("Created {} ({:?})", o.metadata.name, o.status);
             debug!("Created CRD: {:?}", o.spec);
         },
-        Err(e) => {
-            if let Some(ae) = e.api_error() {
-                assert_eq!(ae.code, 409); // if you skipped delete, for instance
-            } else {
-                return Err(e.into()) // any other case is probably bad
-            }
-        },
+        Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+        Err(e) =>return Err(e.into()), // any other case is probably bad
     }
 
     // Manage the Foo CR

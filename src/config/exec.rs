@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use crate::{KubeError, Result};
+use crate::{Error, Result};
 use crate::config::{ExecConfig};
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
@@ -46,13 +46,13 @@ pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential> {
         cmd.envs(envs);
     }
     let out = cmd.output()
-        .map_err(|e| KubeError::KubeConfig(format!("Unable to run auth exec: {}", e)))?;
+        .map_err(|e| Error::KubeConfig(format!("Unable to run auth exec: {}", e)))?;
     if !out.status.success() {
         let err = format!("command `{:?}` failed: {:?}", cmd, out);
-        return Err(KubeError::KubeConfig(err));
+        return Err(Error::KubeConfig(err));
     }
     let creds = serde_json::from_slice(&out.stdout)
-        .map_err(|e| KubeError::KubeConfig(format!("Unable to parse auth exec result: {}", e)))?;
+        .map_err(|e| Error::KubeConfig(format!("Unable to parse auth exec result: {}", e)))?;
 
     Ok(creds)
 }

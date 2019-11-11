@@ -7,7 +7,7 @@ use crate::api::resource::{
 use serde::de::DeserializeOwned;
 
 use crate::client::APIClient;
-use crate::{Result, KubeError};
+use crate::{Result, Error};
 
 use std::{
     collections::BTreeMap,
@@ -246,7 +246,7 @@ impl<K> Reflector<K> where
                 }
                 WatchEvent::Error(e) => {
                     warn!("Failed to watch {}: {:?}", rg.resource, e);
-                    Err(KubeError::Api(e))?
+                    Err(Error::Api(e))?
                 }
             }
         }

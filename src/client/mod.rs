@@ -7,7 +7,7 @@ use http::StatusCode;
 use http;
 use serde::de::DeserializeOwned;
 use serde_json;
-use crate::{KubeError, ErrorResponse, Result};
+use crate::{Error, ErrorResponse, Result};
 use crate::config::Configuration;
 
 
@@ -77,7 +77,7 @@ impl APIClient {
             http::Method::DELETE => self.configuration.client.delete(&uri_str),
             http::Method::PUT => self.configuration.client.put(&uri_str),
             http::Method::PATCH => self.configuration.client.patch(&uri_str),
-            other => Err(KubeError::InvalidMethod(other.to_string()))?
+            other => Err(Error::InvalidMethod(other.to_string()))?
         }.headers(parts.headers).body(body).build()?;
         //trace!("Request Headers: {:?}", req.headers());
         let res = self.configuration.client.execute(req).await?;
@@ -98,7 +98,7 @@ impl APIClient {
 
         serde_json::from_str(&text).map_err(|e| {
             warn!("{}, {:?}", text, e);
-            KubeError::SerdeError(e)
+            Error::SerdeError(e)
         })
     }
 
@@ -131,12 +131,12 @@ impl APIClient {
             trace!("Status from {}", text);
             Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
                 warn!("{}, {:?}", text, e);
-                KubeError::SerdeError(e)
+                Error::SerdeError(e)
             })?))
         } else {
             Ok(Left(serde_json::from_str::<T>(&text).map_err(|e| {
                 warn!("{}, {:?}", text, e);
-                KubeError::SerdeError(e)
+                Error::SerdeError(e)
             })?))
         }
     }
@@ -157,7 +157,7 @@ impl APIClient {
         for l in text.lines() {
             let r = serde_json::from_str(&l).map_err(|e| {
                 warn!("{} {:?}", l, e);
-                KubeError::SerdeError(e)
+                Error::SerdeError(e)
             })?;
             xs.push(r);
         }
@@ -178,7 +178,7 @@ fn handle_api_errors(text: &str, s: &StatusCode) -> Result<()> {
         //trace!("Parsing error: {}", text);
         if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(text) {
             debug!("Unsuccessful: {:?}", errdata);
-            Err(KubeError::Api(errdata))
+            Err(Error::Api(errdata))
         } else {
             warn!("Unsuccessful data error parse: {}", text);
             // Propagate errors properly via reqwest
@@ -189,7 +189,7 @@ fn handle_api_errors(text: &str, s: &StatusCode) -> Result<()> {
                 reason: "Failed to parse error data".into()
             };
             debug!("Unsuccessful: {:?} (reconstruct)", ae);
-            Err(KubeError::Api(ae))
+            Err(Error::Api(ae))
         }
     } else {
         Ok(())

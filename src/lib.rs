@@ -17,7 +17,7 @@ pub struct ErrorResponse {
 
 
 #[derive(Error, Debug)]
-pub enum KubeError {
+pub enum Error {
     /// ApiError for when things fail
     ///
     /// This can be parsed into as an error handling fallback.
@@ -58,7 +58,7 @@ pub enum KubeError {
     SslError(String),
 }
 
-pub type Result<T> = std::result::Result<T, KubeError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub mod client;
 pub mod config;

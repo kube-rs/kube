@@ -17,7 +17,7 @@ pub struct FooSpec {
 type Foo = Object<FooSpec, Void>;
 
 #[tokio::main]
-async fn main() -> Result<(), failure::Error> {
+async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
     env_logger::init();
     let config = config::load_kube_config().await?;

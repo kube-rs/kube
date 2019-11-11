@@ -12,7 +12,7 @@ mod kube_config;
 mod utils;
 
 use base64;
-use crate::{KubeError, Result};
+use crate::{Error, Result};
 use reqwest::{header, Certificate, Client, ClientBuilder, Identity};
 
 use self::kube_config::KubeConfigLoader;
@@ -61,7 +61,7 @@ pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configurati
     Ok(Configuration::new(
         result.1.cluster.server,
         result.0.build()
-            .map_err(|e| KubeError::KubeConfig(format!("Unable to build client: {}", e)))?,
+            .map_err(|e| Error::KubeConfig(format!("Unable to build client: {}", e)))?,
     ))
 }
 
@@ -70,7 +70,7 @@ pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configurati
 /// This allows to create your custom reqwest client for using with the cluster API.
 pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder,KubeConfigLoader)> {
     let kubeconfig = utils::find_kubeconfig()
-        .map_err(|e| KubeError::KubeConfig(format!("Unable to load file: {}", e)))?;
+        .map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
 
     let loader =
         KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
@@ -82,7 +82,7 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
                 let creds = exec::auth_exec(exec)?;
                 let status = creds
                     .status
-                    .ok_or_else(|| KubeError::KubeConfig("exec-plugin response did not contain a status".into()))?;
+                    .ok_or_else(|| Error::KubeConfig("exec-plugin response did not contain a status".into()))?;
                 status.token
             } else {
                 None
@@ -94,16 +94,16 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
 
     if let Some(bundle) = loader.ca_bundle() {
         for ca in bundle? {
-            let cert = Certificate::from_der(&ca.to_der().map_err(|e| KubeError::SslError(format!("{}", e)))?)
-                .map_err(KubeError::ReqwestError)?;
+            let cert = Certificate::from_der(&ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?)
+                .map_err(Error::ReqwestError)?;
             client_builder = client_builder.add_root_certificate(cert);
         }
     }
     match loader.p12(" ") {
         Ok(p12) => {
-            let der = p12.to_der().map_err(|e| KubeError::SslError(format!("{}", e)))?;
+            let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
             let req_p12 = Identity::from_pkcs12_der(&der, " ")
-                .map_err(KubeError::ReqwestError)?;
+                .map_err(Error::ReqwestError)?;
             client_builder = client_builder.identity(req_p12);
         }
         Err(_) => {
@@ -124,7 +124,7 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
             headers.insert(
                 header::AUTHORIZATION,
                 header::HeaderValue::from_str(&format!("Bearer {}", token))
-                    .map_err(|e| KubeError::KubeConfig(format!("Invalid bearer token: {}", e)))?,
+                    .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
             );
         }
         (_, (Some(u), Some(p))) => {
@@ -132,7 +132,7 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
             headers.insert(
                 header::AUTHORIZATION,
                 header::HeaderValue::from_str(&format!("Basic {}", encoded))
-                    .map_err(|e| KubeError::KubeConfig(format!("Invalid bearer token: {}", e)))?,
+                    .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
             );
         }
         _ => {}
@@ -147,22 +147,22 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
 /// It will return an error if called from out of kubernetes cluster.
 pub fn incluster_config() -> Result<Configuration> {
     let server = incluster_config::kube_server().ok_or_else(||
-        KubeError::KubeConfig(format!(
+        Error::KubeConfig(format!(
             "Unable to load incluster config, {} and {} must be defined",
             incluster_config::SERVICE_HOSTENV,
             incluster_config::SERVICE_PORTENV
     )))?;
 
     let ca = incluster_config::load_cert()
-        .map_err(|e| KubeError::SslError(format!("{}", e)))?;
-    let der = ca.to_der().map_err(|e| KubeError::SslError(format!("{}", e)))?;
+        .map_err(|e| Error::SslError(format!("{}", e)))?;
+    let der = ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
     let req_ca = Certificate::from_der(&der)
-        .map_err(|e| KubeError::SslError(format!("{}", e)))?;
+        .map_err(|e| Error::SslError(format!("{}", e)))?;
 
     let token = incluster_config::load_token()
-        .map_err(|e| KubeError::KubeConfig(format!("Unable to load in cluster token: {}", e)))?;
+        .map_err(|e| Error::KubeConfig(format!("Unable to load in cluster token: {}", e)))?;
 
-    let default_ns = incluster_config::load_default_ns().map_err(|e| KubeError::KubeConfig(
+    let default_ns = incluster_config::load_default_ns().map_err(|e| Error::KubeConfig(
         format!("Unable to load incluster default namespace: {}", e),
     ))?;
 
@@ -170,7 +170,7 @@ pub fn incluster_config() -> Result<Configuration> {
     headers.insert(
         header::AUTHORIZATION,
         header::HeaderValue::from_str(&format!("Bearer {}", token))
-            .map_err(|e| KubeError::KubeConfig(format!("Invalid bearer token: {}", e)))?,
+            .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
     );
 
     let client_builder = Client::builder()
@@ -180,7 +180,7 @@ pub fn incluster_config() -> Result<Configuration> {
     Ok(Configuration::with_default_ns(
         server,
         client_builder.build()
-            .map_err(|e| KubeError::KubeConfig(format!("Unable to build client: {}", e)))?,
+            .map_err(|e| Error::KubeConfig(format!("Unable to build client: {}", e)))?,
         default_ns,
     ))
 }

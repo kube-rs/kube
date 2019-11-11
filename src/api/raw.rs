@@ -1,4 +1,4 @@
-use crate::{Result, KubeError};
+use crate::{Result, Error};
 
 /// RawApi generation data
 ///
@@ -380,13 +380,13 @@ impl PatchParams {
             // Implement the easy part of validation, in future this may be extended to provide validation as in go code
             // For now it's fine, because k8s API server will return an error
             if field_manager.len() > 128 {
-                return Err(KubeError::RequestValidation("Failed to validate PatchParameters::field_manager!".into()))
+                return Err(Error::RequestValidation("Failed to validate PatchParameters::field_manager!".into()))
             }
         }
 
         if self.patch_strategy != PatchStrategy::Apply && self.force {
              // if not force, all other fields are valid for all types of patch requests
-            Err(KubeError::RequestValidation("Force is applicable only for Apply strategy!".into()))
+            Err(Error::RequestValidation("Force is applicable only for Apply strategy!".into()))
         } else {
             Ok(())
         }
@@ -510,7 +510,7 @@ impl RawApi {
 
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 
     /// Create a minimial list request to seed an initial resourceVersion
@@ -524,7 +524,7 @@ impl RawApi {
         // rest of lp doesn't matter here - we just need a resourceVersion
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 
     /// Watch a resource at a given version
@@ -548,7 +548,7 @@ impl RawApi {
 
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 
     /// Get a single instance
@@ -557,7 +557,7 @@ impl RawApi {
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 
     /// Create an instance of a resource
@@ -569,7 +569,7 @@ impl RawApi {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::post(urlstr);
-        req.body(data).map_err(KubeError::HttpError)
+        req.body(data).map_err(Error::HttpError)
     }
 
     /// Delete an instance of a resource
@@ -587,7 +587,7 @@ impl RawApi {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::delete(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 
     /// Delete a collection of a resource
@@ -605,7 +605,7 @@ impl RawApi {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::delete(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 
     /// Patch an instance of a resource
@@ -622,7 +622,7 @@ impl RawApi {
             .header("Accept", "application/json")
             .header("Content-Type", pp.patch_strategy.to_string())
             .body(patch)
-            .map_err(KubeError::HttpError)
+            .map_err(Error::HttpError)
     }
 
     /// Replace an instance of a resource
@@ -636,7 +636,7 @@ impl RawApi {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
-        req.body(data).map_err(KubeError::HttpError)
+        req.body(data).map_err(Error::HttpError)
     }
 
     /// Get an instance of the scale subresource
@@ -645,7 +645,7 @@ impl RawApi {
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 
     /// Patch an instance of the scale subresource
@@ -659,7 +659,7 @@ impl RawApi {
             .header("Accept", "application/json")
             .header("Content-Type", pp.patch_strategy.to_string())
             .body(patch)
-            .map_err(KubeError::HttpError)
+            .map_err(Error::HttpError)
     }
 
     /// Replace an instance of the scale subresource
@@ -671,7 +671,7 @@ impl RawApi {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
-        req.body(data).map_err(KubeError::HttpError)
+        req.body(data).map_err(Error::HttpError)
     }
 
     /// Get an instance of the status subresource
@@ -680,7 +680,7 @@ impl RawApi {
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 
     /// Patch an instance of the status subresource
@@ -694,7 +694,7 @@ impl RawApi {
             .header("Accept", "application/json")
             .header("Content-Type", pp.patch_strategy.to_string())
             .body(patch)
-            .map_err(KubeError::HttpError)
+            .map_err(Error::HttpError)
     }
 
     /// Replace an instance of the status subresource
@@ -706,7 +706,7 @@ impl RawApi {
         }
         let urlstr = qp.finish();
         let mut req = http::Request::put(urlstr);
-        req.body(data).map_err(KubeError::HttpError)
+        req.body(data).map_err(Error::HttpError)
     }
 }
 
@@ -750,7 +750,7 @@ impl RawApi {
 
         let urlstr = qp.finish();
         let mut req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(KubeError::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 }
 

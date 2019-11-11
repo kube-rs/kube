@@ -3,7 +3,7 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use chrono::Utc;
-use crate::{Result, KubeError};
+use crate::{Result, Error};
 use openssl::pkey::{PKey, Private};
 use openssl::sign::Signer;
 use openssl::rsa::Padding;
@@ -68,11 +68,11 @@ impl Credentials {
     pub fn load() -> Result<Credentials> {
         let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
             .map(PathBuf::from)
-            .ok_or_else(|| KubeError::KubeConfig("Missing GOOGLE_APPLICATION_CREDENTIALS env".into()))?;
+            .ok_or_else(|| Error::KubeConfig("Missing GOOGLE_APPLICATION_CREDENTIALS env".into()))?;
         let f = File::open(path)
-            .map_err(|e| KubeError::KubeConfig(format!("Unable to load credentials file: {}", e)))?;
+            .map_err(|e| Error::KubeConfig(format!("Unable to load credentials file: {}", e)))?;
         let config = serde_json::from_reader(f)
-            .map_err(|e| KubeError::KubeConfig(format!("Unable to parse credentials file: {}", e)))?;
+            .map_err(|e| Error::KubeConfig(format!("Unable to parse credentials file: {}", e)))?;
         Ok(config)
     }
 }
@@ -119,7 +119,7 @@ impl CredentialsClient {
     }
     pub async fn request_token(&self, scopes: &Vec<String>) -> Result<Token> {
         let private_key = PKey::private_key_from_pem(&self.credentials.private_key.as_bytes())
-            .map_err(|e| KubeError::SslError(format!("{}", e)))?;
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
         let encoded = &self.jws_encode(
             &Claim::new(&self.credentials, scopes),
             &Header{
@@ -139,10 +139,10 @@ impl CredentialsClient {
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
             .send()
             .await
-            .map_err(|e| KubeError::KubeConfig(format!("Unable to request token: {}", e)))?
+            .map_err(|e| Error::KubeConfig(format!("Unable to request token: {}", e)))?
             .json::<TokenResponse>()
             .await
-            .map_err(|e| KubeError::KubeConfig(format!("Unable to parse request token: {}", e)))?;
+            .map_err(|e| Error::KubeConfig(format!("Unable to parse request token: {}", e)))?;
         Ok(token_response.to_token())
     }
 
@@ -151,13 +151,13 @@ impl CredentialsClient {
         let encoded_claims = self.base64_encode(serde_json::to_string(&claim).unwrap().as_bytes());
         let signature_base = format!("{}.{}", encoded_header, encoded_claims);
         let mut signer = Signer::new(MessageDigest::sha256(), &key)
-            .map_err(|e| KubeError::SslError(format!("{}", e)))?;
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
         signer.set_rsa_padding(Padding::PKCS1)
-            .map_err(|e| KubeError::SslError(format!("{}", e)))?;
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
         signer.update(signature_base.as_bytes())
-            .map_err(|e| KubeError::SslError(format!("{}", e)))?;
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
         let signature = signer.sign_to_vec()
-            .map_err(|e| KubeError::SslError(format!("{}", e)))?;
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
         Ok(format!("{}.{}", signature_base, self.base64_encode(&signature)))
     }
 
