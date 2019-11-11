@@ -1,3 +1,7 @@
+0.18.1 / 2019-11-11
+==================
+  * Fix unpinned gzip dependency breakage - #87
+
 0.18.0 / 2019-11-07
 ==================
   * api converted to use async/await with 1.39.0 (primitively)

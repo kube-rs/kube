@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.18.0"
+version = "0.18.1"
 description = "Kubernetes client in the style of client-go"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -36,8 +36,8 @@ openapi = ["k8s-openapi"]
 
 [dependencies.reqwest]
 version = "0.10.0-alpha.1"
-features = ["gzip", "json"]
-# TODO: rustls
+features = ["json"]
+# TODO: rustls, gzip
 
 [dev-dependencies]
 tempfile = "3.1.0"
