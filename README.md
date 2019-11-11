@@ -13,7 +13,7 @@ To use the openapi generated types:
 
 ```toml
 [dependencies]
-kube = { version = "0.18.0", features = ["openapi"] }
+kube = { version = "0.18.1", features = ["openapi"] }
 k8s-openapi = { version = "0.6.0", default-features = false, features = ["v1_15"] }
 ```
 
@@ -21,7 +21,7 @@ otherwise:
 
 ```toml
 [dependencies]
-kube = "0.18.0"
+kube = "0.18.1"
 ```
 
 The latter is fine in a CRD-only use case.
@@ -41,16 +41,16 @@ It's currently recommended to compile with the "openapi" feature if you want an 
 ```rust
 let pods = Api::v1Pod(client).within("default");
 
-let p = pods.get("blog")?;
+let p = pods.get("blog").await?;
 println!("Got blog pod with containers: {:?}", p.spec.containers);
 
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
 }});
-let patched = pods.patch("blog", &pp, serde_json::to_vec(&patch)?)?;
+let patched = pods.patch("blog", &pp, serde_json::to_vec(&patch)?).await?;
 assert_eq!(patched.spec.active_deadline_seconds, Some(5));
 
-pods.delete("blog", &DeleteParams::default())?;
+pods.delete("blog", &DeleteParams::default()).await?;
 ```
 
 See the `pod_openapi` or `crd_openapi` examples for more uses.
@@ -64,13 +64,13 @@ To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct,
 
 ```rust
 let api = Api::v1Pod(client).within(&namespace);
-let rf = Reflector::new(api).timeout(10).init()?;
+let rf = Reflector::new(api).timeout(10).init().await?;
 ```
 
 then you can `poll()` the reflector, and `read()` to get the current cached state:
 
 ```rust
-rf.poll()?; // watches + updates state
+rf.poll().await?; // watches + updates state
 
 // read state and use it:
 rf.read()?.into_iter().for_each(|(name, p)| {
@@ -94,13 +94,13 @@ The spec and status structs can be as complete or incomplete as you like. For in
 ```rust
 type Pod = Object<PodSpec, PodStatus>;
 let api = Api::v1Pod(client);
-let inf = Informer::new(api.clone()).init()?;
+let inf = Informer::new(api.clone()).init().await?;
 ```
 
 The main feature of `Informer<K>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
 
 ```rust
-inf.poll()?; // watches + queues events
+inf.poll().await?; // watches + queues events
 
 while let Some(event) = inf.pop() {
     handle_event(&api, event)?;
@@ -190,7 +190,7 @@ let foos = RawApi::customResource("foos")
     .within("default");
 
 type Foo = Object<FooSpec, Void>;
-let rf : Reflector<Foo> = Reflector::raw(client, resource).init()?;
+let rf : Reflector<Foo> = Reflector::raw(client, resource).init().await?;
 
 let fdata = json!({
     "apiVersion": "clux.dev/v1",
@@ -199,9 +199,9 @@ let fdata = json!({
     "spec": { "name": "baz", "info": "old baz" },
 });
 let req = foos.create(&PostParams::default(), serde_json::to_vec(&fdata)?)?;
-let o = client.request::<Foo>(req)?;
+let o = client.request::<Foo>(req).await?;
 
-let fbaz = client.request::<Foo>(foos.get("baz")?)?;
+let fbaz = client.request::<Foo>(foos.get("baz")?).await?;
 assert_eq!(fbaz.spec.info, "old baz");
 ```
 

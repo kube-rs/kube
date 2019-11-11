@@ -1,3 +1,7 @@
+0.19.0 / 2019-XX-XX
+==================
+  * kube::Error is now a proper error enum and not a Fail impl (thiserror)
+
 0.18.1 / 2019-11-11
 ==================
   * Fix unpinned gzip dependency breakage - #87
