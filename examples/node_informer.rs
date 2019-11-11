@@ -10,7 +10,7 @@ type Node = Object<NodeSpec, NodeStatus>;
 type Event = v1Event; // snowflake obj
 
 #[tokio::main]
-async fn main() -> Result<(), failure::Error> {
+async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,node_informer=debug,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
@@ -32,7 +32,7 @@ async fn main() -> Result<(), failure::Error> {
 }
 
 // This function lets the app handle an event from kube
-async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> Result<(), failure::Error> {
+async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Result<()> {
     match ne {
         WatchEvent::Added(o) => {
             info!("New Node: {}", o.spec.provider_id.unwrap());
