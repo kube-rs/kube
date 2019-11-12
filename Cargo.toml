@@ -35,9 +35,9 @@ default = []
 openapi = ["k8s-openapi"]
 
 [dependencies.reqwest]
-version = "0.10.0-alpha.1"
-features = ["json"]
-# TODO: rustls, gzip
+version = "0.10.0-alpha.2"
+features = ["json", "gzip"]
+# TODO: rustls
 
 [dev-dependencies]
 tempfile = "3.1.0"
