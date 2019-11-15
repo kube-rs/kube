@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.18.1"
+version = "0.19.0"
 description = "Kubernetes client in the style of client-go"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -27,8 +27,8 @@ url = "2.1.0"
 log = "0.4.8"
 time = "0.1.42"
 either = "1.5.3"
-tokio = { version = "=0.2.0-alpha.6", default-features = false, features = ["timer"] }
 thiserror = "1.0.5"
+futures-timer = "2.0.0"
 
 [features]
 default = []

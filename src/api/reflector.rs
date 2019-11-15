@@ -5,7 +5,7 @@ use crate::api::resource::{
     KubeObject,
 };
 use serde::de::DeserializeOwned;
-
+use futures_timer::Delay;
 use crate::client::APIClient;
 use crate::{Result, Error};
 
@@ -123,8 +123,8 @@ impl<K> Reflector<K> where
         trace!("Watching {:?}", self.resource);
         if let Err(_e) = self.single_watch().await {
             // If desynched due to mismatching resourceVersion, retry in a bit
-            let when = tokio::clock::now() + Duration::from_secs(10);
-            tokio::timer::delay(when).await;
+            let dur = Duration::from_secs(10);
+            Delay::new(dur).await;
             self.reset().await?; // propagate error if this failed..
         }
 

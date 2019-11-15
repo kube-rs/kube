@@ -1,6 +1,8 @@
-0.19.0 / 2019-XX-XX
+0.19.0 / 2019-11-15
 ==================
   * kube::Error is now a proper error enum and not a Fail impl (thiserror)
+  * soft-tokio dependency removed for futures-timer
+  * gzip re-introduced
 
 0.18.1 / 2019-11-11
 ==================

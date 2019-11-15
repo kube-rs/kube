@@ -13,6 +13,7 @@ use crate::client::APIClient;
 use crate::{Result};
 
 use serde::de::DeserializeOwned;
+use futures_timer::Delay;
 use std::{
     collections::VecDeque,
     sync::{Arc, RwLock},
@@ -143,8 +144,8 @@ impl<K> Informer<K> where
             Err(e) => {
                 warn!("Poll error: {:?}", e);
                 // If desynched due to mismatching resourceVersion, retry in a bit
-                let when = tokio::clock::now() + Duration::from_secs(10);
-                tokio::timer::delay(when).await;
+                let dur = Duration::from_secs(10);
+                Delay::new(dur).await;
                 self.reset().await?;
             }
         };
