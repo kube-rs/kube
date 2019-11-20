@@ -1,9 +1,10 @@
 #![allow(non_snake_case)]
 
+use serde::Deserialize;
 use std::fmt::Debug;
-use serde::{Deserialize};
+use std::iter::{DoubleEndedIterator, ExactSizeIterator, FusedIterator};
 
-use crate::api::metadata::{ObjectMeta, ListMeta, TypeMeta};
+use crate::api::metadata::{ListMeta, ObjectMeta, TypeMeta};
 use crate::ErrorResponse;
 
 /// Accessor trait needed to build higher level abstractions on kubernetes objects
@@ -13,14 +14,14 @@ pub trait KubeObject {
     // NB: TypeMeta also required, but not used by abstractions yet
 }
 
-
 /// A raw event returned from a watch query
 ///
 /// Note that a watch query returns many of these as newline separated json.
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
-pub enum WatchEvent<K> where
-    K: Clone + KubeObject
+pub enum WatchEvent<K>
+where
+    K: Clone + KubeObject,
 {
     Added(K),
     Modified(K),
@@ -28,15 +29,16 @@ pub enum WatchEvent<K> where
     Error(ErrorResponse),
 }
 
-impl<K> Debug for WatchEvent<K> where
-    K: Clone + KubeObject
+impl<K> Debug for WatchEvent<K>
+where
+    K: Clone + KubeObject,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
-            WatchEvent::Added(_) =>  write!(f, "Added event"),
-            WatchEvent::Modified(_) =>  write!(f, "Modified event"),
-            WatchEvent::Deleted(_) =>  write!(f, "Deleted event"),
-            WatchEvent::Error(e) =>  write!(f, "Error event: {:?}", e),
+            WatchEvent::Added(_) => write!(f, "Added event"),
+            WatchEvent::Modified(_) => write!(f, "Modified event"),
+            WatchEvent::Deleted(_) => write!(f, "Deleted event"),
+            WatchEvent::Error(e) => write!(f, "Error event: {:?}", e),
         }
     }
 }
@@ -56,7 +58,8 @@ impl<K> Debug for WatchEvent<K> where
 /// This struct appears in `ObjectList` and `WatchEvent`, and when using a `Reflector`,
 /// and is exposed as the values in `ObjectMap`.
 #[derive(Deserialize, Serialize, Clone)]
-pub struct Object<P, U> where
+pub struct Object<P, U>
+where
     P: Clone,
     U: Clone,
 {
@@ -83,8 +86,14 @@ pub struct Object<P, U> where
 }
 
 /// Blanked implementation for standard objects that can use Object
-impl<P, U> KubeObject for Object<P, U> where P: Clone, U: Clone {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+impl<P, U> KubeObject for Object<P, U>
+where
+    P: Clone,
+    U: Clone,
+{
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 /// A generic kubernetes object list
@@ -95,11 +104,11 @@ impl<P, U> KubeObject for Object<P, U> where P: Clone, U: Clone {
 /// Note that this is only used internally within reflectors and informers,
 /// and is generally produced from list/watch/delete collection queries on an `RawApi`.
 #[derive(Deserialize)]
-pub struct ObjectList<T> where
-  T: Clone
+pub struct ObjectList<T>
+where
+    T: Clone,
 {
     // NB: kind and apiVersion can be set here, but no need for it atm
-
     /// ListMeta - only really used for its resourceVersion
     ///
     /// See [ListMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ListMeta.html)
@@ -109,3 +118,65 @@ pub struct ObjectList<T> where
     #[serde(bound(deserialize = "Vec<T>: Deserialize<'de>"))]
     pub items: Vec<T>,
 }
+
+impl<T: Clone> ObjectList<T> {
+    /// iter returns an ObjectListIter which implements the standard Iterator traits
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use kube::api::metadata::ListMeta;
+    /// use kube::api::resouce::ObjectList;
+    ///
+    /// let metadata: ListMeta = Default::default();
+    /// let items = vec![1, 2, 3];
+    /// let objectlist = ObjectList { metadata, items };
+    ///
+    /// let first = objectlist.iter().next();
+    /// println!("First element: {:?}", first); // prints "First element: Some(1)"
+    /// ```
+    pub fn iter(&self) -> ObjectListIter<'_, T> {
+        ObjectListIter {
+            iter: self.items.iter(),
+        }
+    }
+}
+
+impl<T: Clone> IntoIterator for ObjectList<T> {
+    type Item = T;
+    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
+/// A companion struct to ObjectList for getting an Iterator
+///
+/// An ObjectListIter is generally constructed from an ObjectList by calling `iter`
+pub struct ObjectListIter<'a, T: 'a> {
+    iter: std::slice::Iter<'a, T>,
+}
+
+impl<'a, T> Iterator for ObjectListIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for ObjectListIter<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter.next_back()
+    }
+}
+
+impl<T> AsRef<[T]> for ObjectListIter<'_, T> {
+    fn as_ref(&self) -> &[T] {
+        self.iter.as_slice()
+    }
+}
+
+impl<'a, T> ExactSizeIterator for ObjectListIter<'a, T> {}
+impl<'a, T> FusedIterator for ObjectListIter<'a, T> {}
