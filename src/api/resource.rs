@@ -1,11 +1,9 @@
 #![allow(non_snake_case)]
 
-use serde::Deserialize;
-use std::fmt::Debug;
-use std::iter::{DoubleEndedIterator, ExactSizeIterator, FusedIterator};
-
 use crate::api::metadata::{ListMeta, ObjectMeta, TypeMeta};
 use crate::ErrorResponse;
+use serde::Deserialize;
+use std::fmt::Debug;
 
 /// Accessor trait needed to build higher level abstractions on kubernetes objects
 pub trait KubeObject {
@@ -120,7 +118,7 @@ where
 }
 
 impl<T: Clone> ObjectList<T> {
-    /// iter returns an ObjectListIter which implements the standard Iterator traits
+    /// `iter` returns an Iterator over the elements of this ObjectList
     ///
     /// # Example
     ///
@@ -135,10 +133,31 @@ impl<T: Clone> ObjectList<T> {
     /// let first = objectlist.iter().next();
     /// println!("First element: {:?}", first); // prints "First element: Some(1)"
     /// ```
-    pub fn iter(&self) -> ObjectListIter<'_, T> {
-        ObjectListIter {
-            iter: self.items.iter(),
-        }
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &T> + 'a {
+        self.items.iter()
+    }
+
+    /// `iter_mut` returns an Iterator of mutable references to the elements of this ObjectList
+    ///
+    /// # Example
+    ///     
+    /// ```
+    /// use kube::api::metadata::ListMeta;
+    /// use kube::api::resouce::ObjectList;
+    ///
+    /// let metadata: ListMeta = Default::default();
+    /// let items = vec![1, 2, 3];
+    /// let mut objectlist = ObjectList { metadata, items };
+    ///
+    /// let mut first = objectlist.iter_mut().next();
+    ///
+    /// // Reassign the value in first
+    /// if let Some(elem) = first {
+    ///     *elem = 2;
+    /// }
+    /// println!("First element: {:?}", first); // prints "First element: Some(2)"
+    pub fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &mut T> + 'a {
+        self.items.iter_mut()
     }
 }
 
@@ -151,32 +170,20 @@ impl<T: Clone> IntoIterator for ObjectList<T> {
     }
 }
 
-/// A companion struct to ObjectList for getting an Iterator
-///
-/// An ObjectListIter is generally constructed from an ObjectList by calling `iter`
-pub struct ObjectListIter<'a, T: 'a> {
-    iter: std::slice::Iter<'a, T>,
-}
-
-impl<'a, T> Iterator for ObjectListIter<'a, T> {
+impl<'a, T: Clone> IntoIterator for &'a ObjectList<T> {
     type Item = &'a T;
+    type IntoIter = ::std::slice::Iter<'a, T>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter()
     }
 }
 
-impl<'a, T> DoubleEndedIterator for ObjectListIter<'a, T> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter.next_back()
+impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
+    type Item = &'a mut T;
+    type IntoIter = ::std::slice::IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter_mut()
     }
 }
-
-impl<T> AsRef<[T]> for ObjectListIter<'_, T> {
-    fn as_ref(&self) -> &[T] {
-        self.iter.as_slice()
-    }
-}
-
-impl<'a, T> ExactSizeIterator for ObjectListIter<'a, T> {}
-impl<'a, T> FusedIterator for ObjectListIter<'a, T> {}
