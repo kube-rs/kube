@@ -152,8 +152,9 @@ impl<T: Clone> ObjectList<T> {
     /// // Reassign the value in first
     /// if let Some(elem) = first {
     ///     *elem = 2;
+    ///     println!("First element: {:?}", elem); // prints "First element: 2"
     /// }
-    /// println!("First element: {:?}", first); // prints "First element: Some(2)"
+
     pub fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &mut T> + 'a {
         self.items.iter_mut()
     }
