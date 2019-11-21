@@ -54,5 +54,5 @@ features = ["v1_15"]
 [dependencies.k8s-openapi]
 version = "0.6.0"
 default-features = false
-features = ["v1_15"]
+features = []
 optional = true
