@@ -123,8 +123,7 @@ impl<T: Clone> ObjectList<T> {
     /// # Example
     ///
     /// ```
-    /// use kube::api::metadata::ListMeta;
-    /// use kube::api::resouce::ObjectList;
+    /// use kube::api::{ListMeta, ObjectList};
     ///
     /// let metadata: ListMeta = Default::default();
     /// let items = vec![1, 2, 3];
@@ -142,8 +141,7 @@ impl<T: Clone> ObjectList<T> {
     /// # Example
     ///     
     /// ```
-    /// use kube::api::metadata::ListMeta;
-    /// use kube::api::resouce::ObjectList;
+    /// use kube::api::{ObjectList, ListMeta};
     ///
     /// let metadata: ListMeta = Default::default();
     /// let items = vec![1, 2, 3];
