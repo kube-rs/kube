@@ -1,3 +1,8 @@
+0.20.0 / 2019-11-21
+===================
+  * ObjectList now implements Iterator - #91
+  * openapi feature no longer accidentally hardcoded to v1.15 feature - #90
+
 0.19.0 / 2019-11-15
 ==================
   * kube::Error is now a proper error enum and not a Fail impl (thiserror)
