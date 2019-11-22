@@ -162,7 +162,10 @@ impl APIClient {
                 match resp.chunk().await {
                     Ok(Some(chunk)) => match serde_json::from_slice(&chunk) {
                         Ok(parsed) => Some((Ok(parsed), resp)),
-                        Err(e) => Some((Err(Error::SerdeError(e)), resp)),
+                        Err(e) => {
+                            warn!("{} {:?}", String::from_utf8_lossy(&chunk), e);
+                            Some((Err(Error::SerdeError(e)), resp))
+                        }
                     },
                     Ok(None) => None,
                     Err(e) => Some((Err(Error::ReqwestError(e)), resp)),
