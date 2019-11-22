@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
-    let namespace = env::var("NAMESPACE").unwrap_or_else(|| "default".into());
+    let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Pod(client.clone()).within(&namespace);
     let inf = Informer::new(resource.clone()).init().await?;
