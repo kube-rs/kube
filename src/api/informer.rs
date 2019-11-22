@@ -125,37 +125,42 @@ where
     ///
     /// If this returns an error, it resets the resourceVersion.
     /// This is meant to be run continually and events are meant to be handled between.
-    /// If handling all the events is too time consuming, you probably need a queue.
-    pub async fn poll(&self) -> Result<()> {
+    /// poll returns a Stream so events can be handled asynchronously
+    pub async fn poll(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
         trace!("Watching {:?}", self.resource);
-        let events = self.single_watch().await.map(|stream| stream.boxed());
 
-        match events {
-            Ok(mut events) => {
-                let mut new_version = None;
+        // Create our watch request
+        let req = self.resource.watch(&self.params, &self.version())?;
 
-                // Stream over each event, updating new_version if necessary
-                // and enqueuing the event
-                while let Some(Ok(event)) = events.next().await {
-                    // check if we should consider the version
-                    if let WatchEvent::Added(o) = &event {
-                        new_version = o.meta().resourceVersion.clone();
-                    } else if let WatchEvent::Modified(o) = &event {
-                        new_version = o.meta().resourceVersion.clone();
-                    } else if let WatchEvent::Deleted(o) = &event {
-                        new_version = o.meta().resourceVersion.clone();
+        // Clone our version so we can move it into the Stream handling
+        // and avoid a 'static lifetime on self
+        let version = self.version.clone();
+
+        // Attempt to fetch our stream
+        let stream = self.client.request_events::<WatchEvent<K>>(req).await;
+
+        match stream {
+            Ok(events) => {
+                // Add a map stage to the stream which will update our version
+                // based on each incoming event
+                Ok(events.map(move |event| {
+                    // Check if we need to update our version based on the incoming events
+                    let new_version = match &event {
+                        Ok(WatchEvent::Added(o))
+                        | Ok(WatchEvent::Modified(o))
+                        | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
+                        _ => None,
+                    };
+
+                    // Update our version need be
+                    // Follow docs conventions and store the last resourceVersion
+                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+                    if let Some(nv) = new_version {
+                        *version.write().unwrap() = nv;
                     }
 
-                    // And enqueue it
-                    self.events.write().unwrap().push_back(event);
-                }
-
-                // Update our version need be
-                // Follow docs conventions and store the last resourceVersion
-                // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                if let Some(version) = new_version {
-                    *self.version.write().unwrap() = version;
-                }
+                    event
+                }))
             }
             Err(e) => {
                 warn!("Poll error: {:?}", e);
@@ -163,10 +168,9 @@ where
                 let dur = Duration::from_secs(10);
                 Delay::new(dur).await;
                 self.reset().await?;
+                Err(e)
             }
         }
-
-        Ok(())
     }
 
     /// Pop an event from the front of the WatchQueue
@@ -201,12 +205,5 @@ where
             version, self.resource.resource
         );
         Ok(version)
-    }
-
-    /// Watch helper
-    async fn single_watch(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let oldver = self.version();
-        let req = self.resource.watch(&self.params, &oldver)?;
-        Ok(self.client.request_events::<WatchEvent<K>>(req).await?)
     }
 }
