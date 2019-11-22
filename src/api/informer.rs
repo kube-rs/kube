@@ -1,23 +1,15 @@
-use crate::api::{
-    RawApi,
-    Api,
-    ListParams,
-    Void,
-};
-use crate::api::resource::{
-    ObjectList,
-    WatchEvent,
-    KubeObject,
-};
+use crate::api::resource::{KubeObject, ObjectList, WatchEvent};
+use crate::api::{Api, ListParams, RawApi, Void};
 use crate::client::APIClient;
-use crate::{Result};
+use crate::Result;
 
-use serde::de::DeserializeOwned;
+use futures::StreamExt;
 use futures_timer::Delay;
+use serde::de::DeserializeOwned;
 use std::{
     collections::VecDeque,
     sync::{Arc, RwLock},
-    time::{Duration},
+    time::Duration,
 };
 
 type WatchQueue<K> = VecDeque<WatchEvent<K>>;
@@ -32,8 +24,9 @@ type WatchQueue<K> = VecDeque<WatchEvent<K>>;
 /// It caches WatchEvent<K> internally in a queue when polling.
 /// A user should drain this queue periodically.
 #[derive(Clone)]
-pub struct Informer<K> where
-    K: Clone + DeserializeOwned + KubeObject
+pub struct Informer<K>
+where
+    K: Clone + DeserializeOwned + KubeObject,
 {
     events: Arc<RwLock<WatchQueue<K>>>,
     version: Arc<RwLock<String>>,
@@ -42,7 +35,8 @@ pub struct Informer<K> where
     params: ListParams,
 }
 
-impl<K> Informer<K> where
+impl<K> Informer<K>
+where
     K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
@@ -57,7 +51,8 @@ impl<K> Informer<K> where
     }
 }
 
-impl<K> Informer<K> where
+impl<K> Informer<K>
+where
     K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
@@ -126,7 +121,6 @@ impl<K> Informer<K> where
         self
     }
 
-
     /// Run a single watch poll
     ///
     /// If this returns an error, it resets the resourceVersion.
@@ -140,7 +134,7 @@ impl<K> Informer<K> where
                 for e in events {
                     self.events.write().unwrap().push_back(e);
                 }
-            },
+            }
             Err(e) => {
                 warn!("Poll error: {:?}", e);
                 // If desynched due to mismatching resourceVersion, retry in a bit
@@ -171,7 +165,6 @@ impl<K> Informer<K> where
         self.version.read().unwrap().clone()
     }
 
-
     /// Init helper
     async fn get_resource_version(&self) -> Result<String> {
         let req = self.resource.list_zero_resource_entries(&self.params)?;
@@ -180,27 +173,43 @@ impl<K> Informer<K> where
         let res = self.client.request::<ObjectList<Void>>(req).await?;
 
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "0".into());
-        debug!("Got fresh resourceVersion={} for {}", version, self.resource.resource);
-        Ok( version )
+        debug!(
+            "Got fresh resourceVersion={} for {}",
+            version, self.resource.resource
+        );
+        Ok(version)
     }
 
     /// Watch helper
     async fn single_watch(&self) -> Result<(Vec<WatchEvent<K>>, String)> {
         let oldver = self.version();
         let req = self.resource.watch(&self.params, &oldver)?;
-        let events = self.client.request_events::<WatchEvent<K>>(req).await?;
+        let events = self
+            .client
+            .request_events::<WatchEvent<K>>(req)
+            .await?
+            .filter_map(|e| async move { e.ok() })
+            .collect::<Vec<_>>()
+            .await;
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-        let newver = events.iter().filter_map(|e| {
-            match e {
+        let newver = events
+            .iter()
+            .filter_map(|e| match e {
                 WatchEvent::Added(o) => o.meta().resourceVersion.clone(),
                 WatchEvent::Modified(o) => o.meta().resourceVersion.clone(),
                 WatchEvent::Deleted(o) => o.meta().resourceVersion.clone(),
-                _ => None
-            }
-        }).last().unwrap_or(oldver);
-        debug!("Got {} {} events, resourceVersion={}", events.len(), self.resource.resource, newver);
+                _ => None,
+            })
+            .last()
+            .unwrap_or(oldver);
+        debug!(
+            "Got {} {} events, resourceVersion={}",
+            events.len(),
+            self.resource.resource,
+            newver
+        );
 
         Ok((events, newver))
     }
