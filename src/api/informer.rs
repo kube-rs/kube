@@ -3,7 +3,7 @@ use crate::api::{Api, ListParams, RawApi, Void};
 use crate::client::APIClient;
 use crate::Result;
 
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{
@@ -128,11 +128,33 @@ where
     /// If handling all the events is too time consuming, you probably need a queue.
     pub async fn poll(&self) -> Result<()> {
         trace!("Watching {:?}", self.resource);
-        match self.single_watch().await {
-            Ok((events, newver)) => {
-                *self.version.write().unwrap() = newver;
-                for e in events {
-                    self.events.write().unwrap().push_back(e);
+        let events = self.single_watch().await.map(|stream| stream.boxed());
+
+        match events {
+            Ok(mut events) => {
+                let mut new_version = None;
+
+                // Stream over each event, updating new_version if necessary
+                // and enqueuing the event
+                while let Some(Ok(event)) = events.next().await {
+                    // check if we should consider the version
+                    if let WatchEvent::Added(o) = &event {
+                        new_version = o.meta().resourceVersion.clone();
+                    } else if let WatchEvent::Modified(o) = &event {
+                        new_version = o.meta().resourceVersion.clone();
+                    } else if let WatchEvent::Deleted(o) = &event {
+                        new_version = o.meta().resourceVersion.clone();
+                    }
+
+                    // And enqueue it
+                    self.events.write().unwrap().push_back(event);
+                }
+
+                // Update our version need be
+                // Follow docs conventions and store the last resourceVersion
+                // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+                if let Some(version) = new_version {
+                    *self.version.write().unwrap() = version;
                 }
             }
             Err(e) => {
@@ -142,7 +164,8 @@ where
                 Delay::new(dur).await;
                 self.reset().await?;
             }
-        };
+        }
+
         Ok(())
     }
 
@@ -181,36 +204,9 @@ where
     }
 
     /// Watch helper
-    async fn single_watch(&self) -> Result<(Vec<WatchEvent<K>>, String)> {
+    async fn single_watch(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
         let oldver = self.version();
         let req = self.resource.watch(&self.params, &oldver)?;
-        let events = self
-            .client
-            .request_events::<WatchEvent<K>>(req)
-            .await?
-            .filter_map(|e| async move { e.ok() })
-            .collect::<Vec<_>>()
-            .await;
-
-        // Follow docs conventions and store the last resourceVersion
-        // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-        let newver = events
-            .iter()
-            .filter_map(|e| match e {
-                WatchEvent::Added(o) => o.meta().resourceVersion.clone(),
-                WatchEvent::Modified(o) => o.meta().resourceVersion.clone(),
-                WatchEvent::Deleted(o) => o.meta().resourceVersion.clone(),
-                _ => None,
-            })
-            .last()
-            .unwrap_or(oldver);
-        debug!(
-            "Got {} {} events, resourceVersion={}",
-            events.len(),
-            self.resource.resource,
-            newver
-        );
-
-        Ok((events, newver))
+        Ok(self.client.request_events::<WatchEvent<K>>(req).await?)
     }
 }
