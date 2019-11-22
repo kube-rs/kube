@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.19.0"
+version = "0.20.0"
 description = "Kubernetes client in the style of client-go"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -55,5 +55,5 @@ features = ["v1_15"]
 [dependencies.k8s-openapi]
 version = "0.6.0"
 default-features = false
-features = ["v1_15"]
+features = []
 optional = true

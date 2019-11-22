@@ -1,9 +1,10 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, ListParams, PatchParams},
-    client::{APIClient},
+    api::{Api, DeleteParams, ListParams, PatchParams, PostParams},
+    client::APIClient,
     config,
 };
 
@@ -38,9 +39,9 @@ async fn main() -> anyhow::Result<()> {
             info!("Created {}", o.metadata.name);
             // wait for it..
             std::thread::sleep(std::time::Duration::from_millis(5_000));
-        },
+        }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-        Err(e) =>return Err(e.into()), // any other case is probably bad
+        Err(e) => return Err(e.into()),                        // any other case is probably bad
     }
 
     // Verify we can get it
@@ -60,10 +61,12 @@ async fn main() -> anyhow::Result<()> {
         }
     });
     let patch_params = PatchParams::default();
-    let p_patched = pods.patch("blog", &patch_params, serde_json::to_vec(&patch)?).await?;
+    let p_patched = pods
+        .patch("blog", &patch_params, serde_json::to_vec(&patch)?)
+        .await?;
     assert_eq!(p_patched.spec.active_deadline_seconds, Some(5));
 
-    for p in pods.list(&ListParams::default()).await?.items {
+    for p in pods.list(&ListParams::default()).await? {
         println!("Got Pod: {}", p.metadata.name);
     }
 
