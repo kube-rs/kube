@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
-    let namespace = env::var("NAMESPACE").unwrap_or("default".into());
+    let namespace = env::var("NAMESPACE").unwrap_or_else(|| "default".into());
 
     let resource = Api::v1Pod(client.clone()).within(&namespace);
     let inf = Informer::new(resource.clone()).init().await?;
@@ -27,8 +27,8 @@ async fn main() -> anyhow::Result<()> {
         let mut pods = inf.poll().await?.boxed();
 
         // Handle events one by one, draining the informer
-        while let Some(Ok(event)) = pods.next().await {
-            handle_node(&resource, event)?;
+        while let Some(event) = pods.next().await {
+            handle_node(&resource, event?)?;
         }
     }
 }
