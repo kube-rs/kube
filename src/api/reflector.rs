@@ -213,13 +213,11 @@ where
         let rg = &self.resource;
         let oldver = { self.version.read().unwrap().clone() };
         let req = rg.watch(&self.params, &oldver)?;
-        let res = self
+        let mut events = self
             .client
             .request_events::<WatchEvent<K>>(req)
             .await?
-            .filter_map(|e| async move { e.ok() })
-            .collect::<Vec<_>>()
-            .await;
+            .boxed();
 
         // Update in place:
         let mut data = self.data.write().unwrap();
@@ -227,32 +225,36 @@ where
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-        for ev in res {
+        while let Some(ev) = events.next().await {
             match ev {
-                WatchEvent::Added(o) => {
+                Ok(WatchEvent::Added(o)) => {
                     debug!("Adding {} to {}", o.meta().name, rg.resource);
                     data.entry(o.meta().into()).or_insert_with(|| o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         *ver = v.to_string();
                     }
                 }
-                WatchEvent::Modified(o) => {
+                Ok(WatchEvent::Modified(o)) => {
                     debug!("Modifying {} in {}", o.meta().name, rg.resource);
                     data.entry(o.meta().into()).and_modify(|e| *e = o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         *ver = v.to_string();
                     }
                 }
-                WatchEvent::Deleted(o) => {
+                Ok(WatchEvent::Deleted(o)) => {
                     debug!("Removing {} from {}", o.meta().name, rg.resource);
                     data.remove(&o.meta().into());
                     if let Some(v) = &o.meta().resourceVersion {
                         *ver = v.to_string();
                     }
                 }
-                WatchEvent::Error(e) => {
+                Ok(WatchEvent::Error(e)) => {
                     warn!("Failed to watch {}: {:?}", rg.resource, e);
                     Err(Error::Api(e))?
+                }
+                Err(e) => {
+                    // Just log out the error, but don't stop our stream short
+                    warn!("Problem fetch event from server: {:?}", e);
                 }
             }
         }
