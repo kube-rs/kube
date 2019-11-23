@@ -169,23 +169,17 @@ impl APIClient {
                             // append it to our current buffer
                             buff.extend_from_slice(&chunk);
 
-                            // Attempt to parse it
+                            // If it ends with a newline, then it should be a complete resource
+                            // so we try to parse it.
                             // On success we yield this item
                             // otherwise we either continue looping or break and return an error
-                            // depending on the error
-                            let parsed = serde_json::from_slice::<T>(&buff);
-
-                            if let Ok(val) = parsed {
-                                return Some((Ok(val), resp));
-                            } else if let Err(e) = parsed {
-                                // If we did hit an error, and it's an EOF, we assume that that just means
-                                // we haven't finished buffering the first full response item,
-                                // so we loop.
-
-                                if !e.is_eof() {
-                                    // Thus if we're here we need to actually return the error as it matters
-                                    warn!("{} {:?}", String::from_utf8_lossy(&buff), e);
-                                    return Some((Err(Error::SerdeError(e)), resp));
+                            if buff.ends_with(b"\n") {
+                                match serde_json::from_slice::<T>(&buff) {
+                                    Ok(val) => return Some((Ok(val), resp));
+                                    Err(e) => {
+                                        warn!("{} {:?}", String::from_utf8_lossy(&buff), e);
+                                        return Some((Err(Error::SerdeError(e)), resp));
+                                    }
                                 }
                             }
                         }
