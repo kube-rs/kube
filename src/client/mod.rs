@@ -183,7 +183,7 @@ impl APIClient {
                                 // so we loop.
 
                                 if !e.is_eof() {
-                                    // Thus is we're here we need to actually return the error as it matters
+                                    // Thus if we're here we need to actually return the error as it matters
                                     warn!("{} {:?}", String::from_utf8_lossy(&buff), e);
                                     return Some((Err(Error::SerdeError(e)), resp));
                                 }
