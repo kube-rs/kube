@@ -198,13 +198,6 @@ impl APIClient {
     }
 }
 
-// match serde_json::from_slice(&chunk) {
-//     Ok(parsed) => Some((Ok(parsed), resp)),
-//     Err(e) => {
-//         warn!("{} {:?}", String::from_utf8_lossy(&chunk), e);
-//         Some((Err(Error::SerdeError(e)), resp))
-//     }
-
 /// Kubernetes returned error handling
 ///
 /// Either kube returned an explicit ApiError struct,
