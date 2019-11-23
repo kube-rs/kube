@@ -175,7 +175,7 @@ impl APIClient {
                             // otherwise we either continue looping or break and return an error
                             if buff.ends_with(b"\n") {
                                 match serde_json::from_slice::<T>(&buff) {
-                                    Ok(val) => return Some((Ok(val), resp));
+                                    Ok(val) => return Some((Ok(val), resp)),
                                     Err(e) => {
                                         warn!("{} {:?}", String::from_utf8_lossy(&buff), e);
                                         return Some((Err(Error::SerdeError(e)), resp));
