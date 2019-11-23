@@ -159,21 +159,51 @@ impl APIClient {
         // Now use `unfold` to convert the chunked responses into a Stream
         Ok(futures::stream::unfold(res, |mut resp| {
             async move {
-                match resp.chunk().await {
-                    Ok(Some(chunk)) => match serde_json::from_slice(&chunk) {
-                        Ok(parsed) => Some((Ok(parsed), resp)),
-                        Err(e) => {
-                            warn!("{} {:?}", String::from_utf8_lossy(&chunk), e);
-                            Some((Err(Error::SerdeError(e)), resp))
+                // A buffer to store our current object in
+                // as we stream it's entirety
+                let mut buff = Vec::new();
+
+                loop {
+                    match resp.chunk().await {
+                        Ok(Some(chunk)) => {
+                            // append it to our current buffer
+                            buff.extend_from_slice(&chunk);
+
+                            // Attempt to parse it
+                            // On success we yield this item
+                            // otherwise we either continue looping or break and return an error
+                            // depending on the error
+                            let parsed = serde_json::from_slice::<T>(&buff);
+
+                            if let Ok(val) = parsed {
+                                return Some((Ok(val), resp));
+                            } else if let Err(e) = parsed {
+                                // If we did hit an error, and it's an EOF, we assume that that just means
+                                // we haven't finished buffering the first full response item,
+                                // so we loop.
+
+                                if !e.is_eof() {
+                                    // Thus is we're here we need to actually return the error as it matters
+                                    warn!("{} {:?}", String::from_utf8_lossy(&buff), e);
+                                    return Some((Err(Error::SerdeError(e)), resp));
+                                }
+                            }
                         }
-                    },
-                    Ok(None) => None,
-                    Err(e) => Some((Err(Error::ReqwestError(e)), resp)),
+                        Ok(None) => return None,
+                        Err(e) => return Some((Err(Error::ReqwestError(e)), resp)),
+                    }
                 }
             }
         }))
     }
 }
+
+// match serde_json::from_slice(&chunk) {
+//     Ok(parsed) => Some((Ok(parsed), resp)),
+//     Err(e) => {
+//         warn!("{} {:?}", String::from_utf8_lossy(&chunk), e);
+//         Some((Err(Error::SerdeError(e)), resp))
+//     }
 
 /// Kubernetes returned error handling
 ///
