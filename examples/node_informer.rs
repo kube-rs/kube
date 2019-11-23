@@ -29,7 +29,8 @@ async fn main() -> anyhow::Result<()> {
         let mut nodes = ni.poll().await?.boxed();
 
         while let Some(ne) = nodes.next().await {
-            handle_nodes(&events, ne?).await?;
+            let ne = ne?;
+            handle_nodes(&events, ne).await?;
         }
     }
 }

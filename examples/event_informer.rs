@@ -23,7 +23,8 @@ async fn main() -> anyhow::Result<()> {
         let mut events = ei.poll().await?.boxed();
 
         while let Some(event) = events.next().await {
-            handle_events(event?)?;
+            let event = event?;
+            handle_events(event)?;
         }
     }
 }

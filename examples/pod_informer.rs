@@ -28,7 +28,8 @@ async fn main() -> anyhow::Result<()> {
 
         // Handle events one by one, draining the informer
         while let Some(event) = pods.next().await {
-            handle_node(&resource, event?)?;
+            let event = event?;
+            handle_node(&resource, event)?;
         }
     }
 }
