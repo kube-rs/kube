@@ -7,12 +7,9 @@ use futures::{Stream, StreamExt};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{
-    collections::VecDeque,
     sync::{Arc, RwLock},
     time::Duration,
 };
-
-type WatchQueue<K> = VecDeque<WatchEvent<K>>;
 
 /// An event informer for a `Resource`
 ///
@@ -28,11 +25,11 @@ pub struct Informer<K>
 where
     K: Clone + DeserializeOwned + KubeObject,
 {
-    events: Arc<RwLock<WatchQueue<K>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
     resource: RawApi,
     params: ListParams,
+    _object_type: std::marker::PhantomData<K>,
 }
 
 impl<K> Informer<K>
@@ -45,8 +42,8 @@ where
             client: r.client,
             resource: r.api,
             params: ListParams::default(),
-            events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(0.to_string())),
+            _object_type: std::marker::PhantomData,
         }
     }
 }
@@ -61,8 +58,8 @@ where
             client,
             resource: r,
             params: ListParams::default(),
-            events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(0.to_string())),
+            _object_type: std::marker::PhantomData,
         }
     }
 
@@ -182,17 +179,11 @@ where
         }
     }
 
-    /// Pop an event from the front of the WatchQueue
-    pub fn pop(&self) -> Option<WatchEvent<K>> {
-        self.events.write().unwrap().pop_front()
-    }
-
     /// Reset the resourceVersion to current and clear the event queue
     pub async fn reset(&self) -> Result<()> {
         // Fetch a new initial version:
         let initial = self.get_resource_version().await?;
         *self.version.write().unwrap() = initial;
-        self.events.write().unwrap().clear();
         Ok(())
     }
 
