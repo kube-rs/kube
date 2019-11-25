@@ -4,6 +4,7 @@ use crate::config::Configuration;
 use crate::{Error, ErrorResponse, Result};
 use either::Either;
 use either::{Left, Right};
+use futures::StreamExt;
 use futures::{self, Stream};
 use http;
 use http::StatusCode;
@@ -157,78 +158,55 @@ impl APIClient {
         trace!("{} {}", res.status().as_str(), res.url());
 
         // Now use `unfold` to convert the chunked responses into a Stream
-        //
-        // When sending events to a client, Kubernetes may send 1 event per HTTP flush, it may send
-        // 2, it may send 1.5, so we need to handle partial items per chunk.
-        // What this unfold does:
-        // Takes a mutable reqwest::Respose resp, a mutable Vec<u8> buff, and a mutable Vec<Result<T>> items
-        // At each function call we will:
-        // Check if items is not empty, if so pop the first element, yield it, and recurse
-        // If items is empty, we will await the next chunk of resp and add it to buff. If the current
-        // chunk contains a newline character, we will iterate over all the lines in buff,
-        // adding any parsed (successfully or not) values to items, and any left over partial lines to a new buffer,
-        // and recurse with these elements.
-        //
+        // We first construct a Stream of Vec<Result<T>> as we potentially might need to
+        // yield multiple objects per loop, then we flatten it to the Stream<Result<T>> as expected.
         // Any reqwest errors will terminate this stream early.
-        Ok(futures::stream::unfold(
-            (res, Vec::new(), Vec::new()),
-            |(mut resp, mut buff, mut items): (_, _, Vec<Result<T>>)| {
-                async {
-                    // If we have any items, pop off the first,
-                    // yield it, and then continue into the next iteration
-                    if !items.is_empty() {
-                        let current = items.pop().expect("items should not be empty"); // We know items is not empty so this is safe
-                        return Some((current, (resp, buff, items)));
-                    }
+        let stream = futures::stream::unfold((res, Vec::new()), |(mut resp, mut buff)| {
+            async {
+                loop {
+                    match resp.chunk().await {
+                        Ok(Some(chunk)) => {
+                            buff.extend_from_slice(&chunk);
 
-                    // Loop pulling in chunks of the response until we have
-                    // actionable values (something containing a newline)
-                    loop {
-                        match resp.chunk().await {
-                            Ok(Some(chunk)) => {
-                                // append it to our current buffer
-                                buff.extend_from_slice(&chunk);
+                            // If we've encountered a newline, see if we have any items to yield
+                            if chunk.contains(&b'\n') {
+                                let mut new_buff = Vec::new();
+                                let mut items = Vec::new();
 
-                                // If it contains a new line, we have a full item somewhere in our buffer
-                                // Note: It seems that the kube api escapes all new line characters excepting the ones that
-                                // separate distinct events.
-                                if chunk.contains(&b'\n') {
-                                    // Create a new buffer for our next iteration
-                                    // to move any partial lines to
-                                    // We an safely reuse the items vec as we know it's empty here.
-                                    let mut new_buff = Vec::new();
-
-                                    for line in buff.split(|x| x == &b'\n') {
-                                        match serde_json::from_slice(&line) {
-                                            Ok(val) => items.push(Ok(val)),
-                                            Err(e) if e.is_eof() => {
-                                                // If this is an EOF error then we do not have a complete
-                                                // kube object, so push the current line into our new buffer
-                                                // and add the newline character we stripped as part of the iterator.
-                                                new_buff.extend_from_slice(&line);
-                                                new_buff.push(b'\n');
-                                            }
-                                            Err(e) => items.push(Err(Error::SerdeError(e))),
+                                // Split on newlines
+                                for line in buff.split(|x| x == &b'\n') {
+                                    match serde_json::from_slice(&line) {
+                                        Ok(val) => items.push(Ok(val)),
+                                        Err(e) if e.is_eof() => {
+                                            // In this case we've received only a partial object
+                                            // so store it for use in the next iteration
+                                            new_buff.extend_from_slice(&line);
+                                        }
+                                        Err(e) => {
+                                            warn!(
+                                                "Failed to parse: {}",
+                                                String::from_utf8_lossy(line)
+                                            );
+                                            items.push(Err(Error::SerdeError(e)));
                                         }
                                     }
-
-                                    // This expect _should_ be safe, but if we panic this would be the first
-                                    // place I'd look.
-                                    // We could alternatively return some sort of error here if items is empty
-                                    // so that we continue iterating, rather than returning None.
-                                    let head = items.pop().expect("items should not be empty");
-                                    return Some((head, (resp, new_buff, items)));
                                 }
+
+                                // Now return our items and loop
+                                return Some((items, (resp, new_buff)));
                             }
-                            Ok(None) => return None,
-                            Err(e) => {
-                                return Some((Err(Error::ReqwestError(e)), (resp, buff, items)))
-                            }
+                        }
+                        Ok(None) => return None,
+                        Err(e) => {
+                            let err = vec![Err(Error::ReqwestError(e))];
+                            return Some((err, (resp, buff)));
                         }
                     }
                 }
-            },
-        ))
+            }
+        });
+
+        Ok(stream.map(futures::stream::iter).flatten())
     }
 }
 

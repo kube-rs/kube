@@ -136,6 +136,10 @@ where
         // and avoid a 'static lifetime on self
         let version = self.version.clone();
 
+        // Fetch an initial version as well to use for if we encounter
+        // a desync issue
+        let initial_version = self.get_resource_version().await?;
+
         // Attempt to fetch our stream
         let stream = self.client.request_events::<WatchEvent<K>>(req).await;
 
@@ -152,10 +156,15 @@ where
                         _ => None,
                     };
 
+                    // If we ran into an WatchError, log it and then reset our version
+                    if let Ok(WatchEvent::Error(e)) = &event {
+                        warn!("Poll error: {:?}", e);
+                        *version.write().unwrap() = initial_version.clone();
+                    }
                     // Update our version need be
                     // Follow docs conventions and store the last resourceVersion
                     // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                    if let Some(nv) = new_version {
+                    else if let Some(nv) = new_version {
                         *version.write().unwrap() = nv;
                     }
 

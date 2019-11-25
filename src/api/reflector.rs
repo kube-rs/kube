@@ -26,7 +26,7 @@ type Cache<K> = BTreeMap<ObjectId, K>;
 #[derive(Clone)]
 pub struct Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send,
+    K: Clone + DeserializeOwned,
 {
     data: Arc<RwLock<Cache<K>>>,
     version: Arc<RwLock<String>>,
@@ -37,7 +37,7 @@ where
 
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send,
+    K: Clone + DeserializeOwned,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn new(r: Api<K>) -> Self {
@@ -53,7 +53,7 @@ where
 
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned + KubeObject + Send,
+    K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn raw(client: APIClient, r: RawApi) -> Self {
@@ -217,7 +217,7 @@ where
             .client
             .request_events::<WatchEvent<K>>(req)
             .await?
-            .boxed();
+            .boxed_local(); // We use boxed_local to remove the Send requirement as we're not shipping this between threads
 
         // Update in place:
         let mut data = self.data.write().unwrap();
