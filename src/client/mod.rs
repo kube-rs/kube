@@ -7,7 +7,7 @@ use either::{Left, Right};
 use futures::{self, Stream};
 use http;
 use http::StatusCode;
-use serde::de::{DeserializeOwned, IgnoredAny};
+use serde::de::DeserializeOwned;
 use serde_json;
 use serde_json::Value;
 
@@ -157,41 +157,51 @@ impl APIClient {
         trace!("{} {}", res.status().as_str(), res.url());
 
         // Now use `unfold` to convert the chunked responses into a Stream
-        Ok(futures::stream::unfold(res, |mut resp| {
-            async move {
-                // A buffer to store our current object in
-                // as we stream it's entirety
-                let mut buff = Vec::new();
+        Ok(futures::stream::unfold(
+            (res, Vec::new(), Vec::new()),
+            |(mut resp, mut buff, mut items): (_, _, Vec<Result<T>>)| {
+                async {
+                    // If we have any items, pop off the first,
+                    // yield it, and then continue into the next iteration
+                    if !items.is_empty() {
+                        let current = items.pop().unwrap(); // We know items is not empty so this is safe
+                        return Some((current, (resp, buff, items)));
+                    }
 
-                loop {
-                    match resp.chunk().await {
-                        Ok(Some(chunk)) => {
-                            // append it to our current buffer
-                            buff.extend_from_slice(&chunk);
+                    loop {
+                        match resp.chunk().await {
+                            Ok(Some(chunk)) => {
+                                // append it to our current buffer
+                                buff.extend_from_slice(&chunk);
 
-                            // Check to see if we have valid JSON in our buffer,
-                            // and if so parse it fully and return.
-                            // Deserializing as serde::de::IgnoredAny is just a syntax check
-                            // and does not go through any of the memory intensity of constructing the actual
-                            // value.
-                            let valid = serde_json::from_slice::<IgnoredAny>(&buff);
+                                if chunk.contains(&b'\n') {
+                                    let mut new_buff = Vec::new();
+                                    let mut new_items = Vec::new();
 
-                            if valid.is_ok() {
-                                match serde_json::from_slice::<T>(&buff) {
-                                    Ok(val) => return Some((Ok(val), resp)),
-                                    Err(e) => {
-                                        warn!("{} {:?}", String::from_utf8_lossy(&buff), e);
-                                        return Some((Err(Error::SerdeError(e)), resp));
+                                    for line in buff.split(|x| x == &b'\n') {
+                                        match serde_json::from_slice(&line) {
+                                            Ok(val) => new_items.push(Ok(val)),
+                                            Err(e) if e.is_eof() => {
+                                                new_buff.extend_from_slice(&line);
+                                                new_buff.push(b'\n');
+                                            }
+                                            Err(e) => new_items.push(Err(Error::SerdeError(e))),
+                                        }
                                     }
+
+                                    let head = new_items.pop().unwrap();
+                                    return Some((head, (resp, new_buff, new_items)));
                                 }
                             }
+                            Ok(None) => return None,
+                            Err(e) => {
+                                return Some((Err(Error::ReqwestError(e)), (resp, buff, items)))
+                            }
                         }
-                        Ok(None) => return None,
-                        Err(e) => return Some((Err(Error::ReqwestError(e)), resp)),
                     }
                 }
-            }
-        }))
+            },
+        ))
     }
 }
 
