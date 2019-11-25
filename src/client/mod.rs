@@ -7,7 +7,7 @@ use either::{Left, Right};
 use futures::{self, Stream};
 use http;
 use http::StatusCode;
-use serde::de::DeserializeOwned;
+use serde::de::{DeserializeOwned, IgnoredAny};
 use serde_json;
 use serde_json::Value;
 
@@ -169,11 +169,14 @@ impl APIClient {
                             // append it to our current buffer
                             buff.extend_from_slice(&chunk);
 
-                            // If it ends with a newline, then it should be a complete resource
-                            // so we try to parse it.
-                            // On success we yield this item
-                            // otherwise we either continue looping or break and return an error
-                            if buff.ends_with(b"\n") {
+                            // Check to see if we have valid JSON in our buffer,
+                            // and if so parse it fully and return.
+                            // Deserializing as serde::de::IgnoredAny is just a syntax check
+                            // and does not go through any of the memory intensity of constructing the actual
+                            // value.
+                            let valid = serde_json::from_slice::<IgnoredAny>(&buff);
+
+                            if valid.is_ok() {
                                 match serde_json::from_slice::<T>(&buff) {
                                     Ok(val) => return Some((Ok(val), resp)),
                                     Err(e) => {
