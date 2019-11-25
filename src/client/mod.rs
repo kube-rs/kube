@@ -175,19 +175,29 @@ impl APIClient {
 
                                 // Split on newlines
                                 for line in buff.split(|x| x == &b'\n') {
-                                    match serde_json::from_slice(&line) {
-                                        Ok(val) => items.push(Ok(val)),
-                                        Err(e) if e.is_eof() => {
-                                            // In this case we've received only a partial object
-                                            // so store it for use in the next iteration
-                                            new_buff.extend_from_slice(&line);
+                                    new_buff.extend_from_slice(&line);
+
+                                    match serde_json::from_slice(&new_buff) {
+                                        Ok(val) => {
+                                            // on success clear our buffer
+                                            new_buff.clear();
+                                            items.push(Ok(val));
                                         }
                                         Err(e) => {
-                                            warn!(
-                                                "Failed to parse: {}",
-                                                String::from_utf8_lossy(line)
-                                            );
-                                            items.push(Err(Error::SerdeError(e)));
+                                            // If this is not an eof error it's a parse error
+                                            // so log it and store it
+                                            // Otherwise we don't do anything as we've already
+                                            // added in the current partial line to our buffer for
+                                            // use in the next loop
+                                            if !e.is_eof() {
+                                                warn!(
+                                                    "Failed to parse: {}",
+                                                    String::from_utf8_lossy(line)
+                                                );
+                                                // Clear the buffer as this was a valid object
+                                                new_buff.clear();
+                                                items.push(Err(Error::SerdeError(e)));
+                                            }
                                         }
                                     }
                                 }
