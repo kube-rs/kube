@@ -177,9 +177,9 @@ where
                         let err = match result {
                             Err(crate::Error::KubeDesyncError(e)) => {
                                 warn!("Poll error: {:?}", e);
-                                false
+                                true
                             }
-                            _ => true,
+                            _ => false,
                         };
 
                         async move {
@@ -190,7 +190,7 @@ where
                             }
 
                             // If err then we're done, otherwise continue to allow elements
-                            err
+                            !err
                         }
                     }))
             }
