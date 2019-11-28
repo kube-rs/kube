@@ -144,29 +144,55 @@ where
             Ok(events) => {
                 // Add a map stage to the stream which will update our version
                 // based on each incoming event
-                Ok(events.map(move |event| {
-                    // Check if we need to update our version based on the incoming events
-                    let new_version = match &event {
-                        Ok(WatchEvent::Added(o))
-                        | Ok(WatchEvent::Modified(o))
-                        | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
-                        _ => None,
-                    };
+                Ok(events
+                    .map(move |event| {
+                        // Check if we need to update our version based on the incoming events
+                        let new_version = match &event {
+                            Ok(WatchEvent::Added(o))
+                            | Ok(WatchEvent::Modified(o))
+                            | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
+                            Ok(WatchEvent::Error(e)) => {
+                                // Reset our version to the initial version
+                                // and then return a DesyncError.
+                                // This will terminate the stream early in the
+                                // following `take_while`
+                                *version.write().unwrap() = initial_version.clone();
+                                return Err(crate::Error::KubeDesyncError(e.clone()));
+                            }
+                            _ => None,
+                        };
 
-                    // If we ran into an WatchError, log it and then reset our version
-                    if let Ok(WatchEvent::Error(e)) = &event {
-                        warn!("Poll error: {:?}", e);
-                        *version.write().unwrap() = initial_version.clone();
-                    }
-                    // Update our version need be
-                    // Follow docs conventions and store the last resourceVersion
-                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                    else if let Some(nv) = new_version {
-                        *version.write().unwrap() = nv;
-                    }
+                        // Update our version need be
+                        // Follow docs conventions and store the last resourceVersion
+                        // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+                        if let Some(nv) = new_version {
+                            *version.write().unwrap() = nv;
+                        }
 
-                    event
-                }))
+                        event
+                    })
+                    .take_while(|result| {
+                        // If we've run into a KubeDesyncError due to mismatch resource versions
+                        // sleep for 10s before allowing another poll and then terminate the stream early
+                        let err = match result {
+                            Err(crate::Error::KubeDesyncError(e)) => {
+                                warn!("Poll error: {:?}", e);
+                                false
+                            }
+                            _ => true,
+                        };
+
+                        async move {
+                            if err {
+                                // Sleep for 10s before allowing a retry
+                                let dur = Duration::from_secs(10);
+                                Delay::new(dur).await;
+                            }
+
+                            // If err then we're done, otherwise continue to allow elements
+                            err
+                        }
+                    }))
             }
             Err(e) => {
                 warn!("Poll error: {:?}", e);
