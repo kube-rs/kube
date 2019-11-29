@@ -1,10 +1,13 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use kube::{
-    api::{Api, Informer, WatchEvent},
     api::v1Event,
+    api::{Api, Informer, WatchEvent},
     client::APIClient,
     config,
 };
+
+use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -14,13 +17,13 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
 
     let events = Api::v1Event(client);
-    let ei = Informer::new(events)
-        .init().await?;
+    let ei = Informer::new(events).init().await?;
 
     loop {
-        ei.poll().await?;
+        let mut events = ei.poll().await?.boxed();
 
-        while let Some(event) = ei.pop() {
+        while let Some(event) = events.next().await {
+            let event = event?;
             handle_events(event)?;
         }
     }
@@ -31,13 +34,13 @@ fn handle_events(ev: WatchEvent<v1Event>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
             info!("New Event: {}, {}", o.type_, o.message);
-        },
+        }
         WatchEvent::Modified(o) => {
             info!("Modified Event: {}", o.reason);
-        },
+        }
         WatchEvent::Deleted(o) => {
             info!("Deleted Event: {}", o.message);
-        },
+        }
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);
         }

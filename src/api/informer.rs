@@ -1,26 +1,15 @@
-use crate::api::{
-    RawApi,
-    Api,
-    ListParams,
-    Void,
-};
-use crate::api::resource::{
-    ObjectList,
-    WatchEvent,
-    KubeObject,
-};
+use crate::api::resource::{KubeObject, ObjectList, WatchEvent};
+use crate::api::{Api, ListParams, RawApi, Void};
 use crate::client::APIClient;
-use crate::{Result};
+use crate::Result;
 
-use serde::de::DeserializeOwned;
+use futures::{Stream, StreamExt};
 use futures_timer::Delay;
+use serde::de::DeserializeOwned;
 use std::{
-    collections::VecDeque,
     sync::{Arc, RwLock},
-    time::{Duration},
+    time::Duration,
 };
-
-type WatchQueue<K> = VecDeque<WatchEvent<K>>;
 
 /// An event informer for a `Resource`
 ///
@@ -32,17 +21,20 @@ type WatchQueue<K> = VecDeque<WatchEvent<K>>;
 /// It caches WatchEvent<K> internally in a queue when polling.
 /// A user should drain this queue periodically.
 #[derive(Clone)]
-pub struct Informer<K> where
-    K: Clone + DeserializeOwned + KubeObject
+pub struct Informer<K>
+where
+    K: Clone + DeserializeOwned + KubeObject,
 {
-    events: Arc<RwLock<WatchQueue<K>>>,
     version: Arc<RwLock<String>>,
     client: APIClient,
     resource: RawApi,
     params: ListParams,
+    needs_resync: Arc<RwLock<bool>>,
+    _object_type: std::marker::PhantomData<K>,
 }
 
-impl<K> Informer<K> where
+impl<K> Informer<K>
+where
     K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
@@ -51,13 +43,15 @@ impl<K> Informer<K> where
             client: r.client,
             resource: r.api,
             params: ListParams::default(),
-            events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(0.to_string())),
+            needs_resync: Arc::new(RwLock::new(false)),
+            _object_type: std::marker::PhantomData,
         }
     }
 }
 
-impl<K> Informer<K> where
+impl<K> Informer<K>
+where
     K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
@@ -66,8 +60,9 @@ impl<K> Informer<K> where
             client,
             resource: r,
             params: ListParams::default(),
-            events: Arc::new(RwLock::new(VecDeque::new())),
             version: Arc::new(RwLock::new(0.to_string())),
+            needs_resync: Arc::new(RwLock::new(false)),
+            _object_type: std::marker::PhantomData,
         }
     }
 
@@ -126,35 +121,82 @@ impl<K> Informer<K> where
         self
     }
 
-
     /// Run a single watch poll
     ///
     /// If this returns an error, it resets the resourceVersion.
     /// This is meant to be run continually and events are meant to be handled between.
-    /// If handling all the events is too time consuming, you probably need a queue.
-    pub async fn poll(&self) -> Result<()> {
+    /// poll returns a Stream so events can be handled asynchronously
+    pub async fn poll(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
         trace!("Watching {:?}", self.resource);
-        match self.single_watch().await {
-            Ok((events, newver)) => {
-                *self.version.write().unwrap() = newver;
-                for e in events {
-                    self.events.write().unwrap().push_back(e);
-                }
-            },
+
+        // First check if we need to resync, if so reset our resource version
+        // and wait a bit before proceeding.
+        // We take a read only lock here as most of the time it will not be necessary
+        // to take an exclusive lock.
+        if *self.needs_resync.read().unwrap() {
+            // If desynched due to mismatching resourceVersion, retry in a bit
+            let dur = Duration::from_secs(10);
+            Delay::new(dur).await;
+            self.reset().await?;
+            *self.needs_resync.write().unwrap() = false;
+        }
+
+        // Create our watch request
+        let req = self.resource.watch(&self.params, &self.version())?;
+
+        // Clone our version so we can move it into the Stream handling
+        // and avoid a 'static lifetime on self
+        let version = self.version.clone();
+
+        // Clone our resync flag similarly
+        let needs_resync = self.needs_resync.clone();
+
+        // Attempt to fetch our stream
+        let stream = self.client.request_events::<WatchEvent<K>>(req).await;
+
+        match stream {
+            Ok(events) => {
+                // Add a map stage to the stream which will update our version
+                // based on each incoming event
+                Ok(events.map(move |event| {
+                    // Check if we need to update our version based on the incoming events
+                    let new_version = match &event {
+                        Ok(WatchEvent::Added(o))
+                        | Ok(WatchEvent::Modified(o))
+                        | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
+                        Ok(WatchEvent::Error(e)) => {
+                            // If we hit a 410 desync error, mark that we need to resync on the next call
+                            if e.code == 410 {
+                                warn!("Stream desynced: {:?}", e);
+                                *needs_resync.write().unwrap() = true;
+                            }
+                            None
+                        }
+                        Err(e) => {
+                            warn!("Unexpected watch error: {:?}", e);
+                            None
+                        }
+                    };
+
+                    // Update our version need be
+                    // Follow docs conventions and store the last resourceVersion
+                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+                    if let Some(nv) = new_version {
+                        *version.write().unwrap() = nv;
+                    }
+
+                    event
+                }))
+            }
             Err(e) => {
                 warn!("Poll error: {:?}", e);
-                // If desynched due to mismatching resourceVersion, retry in a bit
-                let dur = Duration::from_secs(10);
-                Delay::new(dur).await;
-                self.reset().await?;
+                // Set that we need a resync for the next poll
+                // which will then reset our resource version and
+                // wait a bit
+                *self.needs_resync.write().unwrap() = false;
+                Err(e)
             }
-        };
-        Ok(())
-    }
-
-    /// Pop an event from the front of the WatchQueue
-    pub fn pop(&self) -> Option<WatchEvent<K>> {
-        self.events.write().unwrap().pop_front()
+        }
     }
 
     /// Reset the resourceVersion to current and clear the event queue
@@ -162,7 +204,6 @@ impl<K> Informer<K> where
         // Fetch a new initial version:
         let initial = self.get_resource_version().await?;
         *self.version.write().unwrap() = initial;
-        self.events.write().unwrap().clear();
         Ok(())
     }
 
@@ -170,7 +211,6 @@ impl<K> Informer<K> where
     pub fn version(&self) -> String {
         self.version.read().unwrap().clone()
     }
-
 
     /// Init helper
     async fn get_resource_version(&self) -> Result<String> {
@@ -180,28 +220,10 @@ impl<K> Informer<K> where
         let res = self.client.request::<ObjectList<Void>>(req).await?;
 
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "0".into());
-        debug!("Got fresh resourceVersion={} for {}", version, self.resource.resource);
-        Ok( version )
-    }
-
-    /// Watch helper
-    async fn single_watch(&self) -> Result<(Vec<WatchEvent<K>>, String)> {
-        let oldver = self.version();
-        let req = self.resource.watch(&self.params, &oldver)?;
-        let events = self.client.request_events::<WatchEvent<K>>(req).await?;
-
-        // Follow docs conventions and store the last resourceVersion
-        // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-        let newver = events.iter().filter_map(|e| {
-            match e {
-                WatchEvent::Added(o) => o.meta().resourceVersion.clone(),
-                WatchEvent::Modified(o) => o.meta().resourceVersion.clone(),
-                WatchEvent::Deleted(o) => o.meta().resourceVersion.clone(),
-                _ => None
-            }
-        }).last().unwrap_or(oldver);
-        debug!("Got {} {} events, resourceVersion={}", events.len(), self.resource.resource, newver);
-
-        Ok((events, newver))
+        debug!(
+            "Got fresh resourceVersion={} for {}",
+            version, self.resource.resource
+        );
+        Ok(version)
     }
 }

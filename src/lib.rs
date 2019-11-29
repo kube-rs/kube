@@ -1,7 +1,9 @@
 use thiserror::Error;
 
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate log;
 
 #[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[error("{message}: {reason}")]
@@ -13,8 +15,6 @@ pub struct ErrorResponse {
     pub reason: String,
     pub code: u16,
 }
-
-
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -60,7 +60,7 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub mod api;
 pub mod client;
 pub mod config;
-pub mod api;
 mod oauth2;

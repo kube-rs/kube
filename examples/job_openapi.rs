@@ -1,9 +1,11 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
+use futures::StreamExt;
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, ListParams, WatchEvent},
-    client::{APIClient},
+    api::{Api, DeleteParams, ListParams, PostParams, WatchEvent},
+    client::APIClient,
     config,
 };
 
@@ -45,36 +47,28 @@ async fn main() -> anyhow::Result<()> {
 
     // See if it ran to completion
     let lp = ListParams::default();
-    jobs.watch(&lp, "").await.and_then(|res| {
-        for status in res {
-            match status {
-                WatchEvent::Added(s) => {
-                    info!("Added {}", s.metadata.name);
-                },
-                WatchEvent::Modified(s) => {
-                    let current_status = s.status.clone().expect("Status is missing");
-                    current_status.completion_time.and_then(|_| {
-                        info!("Modified: {} is complete", s.metadata.name);
-                        Some(())
-                    }).or_else(|| {
-                        info!("Modified: {} is running", s.metadata.name);
-                        Some(())
-                    });
-                },
-                WatchEvent::Deleted(s) => {
-                    info!("Deleted {}", s.metadata.name);
-                }
-                WatchEvent::Error(s) => {
-                    error!("{}", s);
+    let mut stream = jobs.watch(&lp, "").await?.boxed();
+
+    while let Some(status) = stream.next().await {
+        match status {
+            WatchEvent::Added(s) => info!("Added {}", s.metadata.name),
+            WatchEvent::Modified(s) => {
+                let current_status = s.status.clone().expect("Status is missing");
+                match current_status.completion_time {
+                    Some(_) => info!("Modified: {} is complete", s.metadata.name),
+                    _ => info!("Modified: {} is running", s.metadata.name),
                 }
             }
+            WatchEvent::Deleted(s) => info!("Deleted {}", s.metadata.name),
+            WatchEvent::Error(s) => error!("{}", s),
         }
-        Ok(())
-    }).expect("Failed to watch");
+    }
 
     // Clean up the old job record..
     info!("Deleting the job record.");
     let dp = DeleteParams::default();
-    jobs.delete("empty-job", &dp).await.expect("failed to delete job");
+    jobs.delete("empty-job", &dp)
+        .await
+        .expect("failed to delete job");
     Ok(())
 }

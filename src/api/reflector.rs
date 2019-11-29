@@ -1,18 +1,15 @@
-use crate::api::{RawApi, Api, ListParams, ObjectMeta};
-use crate::api::resource::{
-    ObjectList,
-    WatchEvent,
-    KubeObject,
-};
-use serde::de::DeserializeOwned;
-use futures_timer::Delay;
+use crate::api::resource::{KubeObject, ObjectList, WatchEvent};
+use crate::api::{Api, ListParams, ObjectMeta, RawApi};
 use crate::client::APIClient;
-use crate::{Result, Error};
+use crate::{Error, Result};
+use futures::StreamExt;
+use futures_timer::Delay;
+use serde::de::DeserializeOwned;
 
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
-    time::{Duration},
+    time::Duration,
 };
 
 /// Internal representation for Reflector
@@ -27,7 +24,8 @@ type Cache<K> = BTreeMap<ObjectId, K>;
 ///
 /// It exposes it's internal state readably through a getter.
 #[derive(Clone)]
-pub struct Reflector<K> where
+pub struct Reflector<K>
+where
     K: Clone + DeserializeOwned,
 {
     data: Arc<RwLock<Cache<K>>>,
@@ -37,7 +35,8 @@ pub struct Reflector<K> where
     params: ListParams,
 }
 
-impl<K> Reflector<K> where
+impl<K> Reflector<K>
+where
     K: Clone + DeserializeOwned,
 {
     /// Create a reflector with a kube client on a kube resource
@@ -52,8 +51,8 @@ impl<K> Reflector<K> where
     }
 }
 
-
-impl<K> Reflector<K> where
+impl<K> Reflector<K>
+where
     K: Clone + DeserializeOwned + KubeObject,
 {
     /// Create a reflector with a kube client on a kube resource
@@ -131,7 +130,6 @@ impl<K> Reflector<K> where
         Ok(())
     }
 
-
     /// Read data for users of the reflector
     ///
     /// TODO: deprecate in favour of a stream returning fn..
@@ -145,11 +143,7 @@ impl<K> Reflector<K> where
         // Very little that can be done in this case. Upgrade your app / resource.
         let cache = self.data.read().unwrap();
 
-        Ok(cache
-            .values()
-            .cloned()
-            .collect::<Vec<K>>()
-        )
+        Ok(cache.values().cloned().collect::<Vec<K>>())
     }
 
     /// Read a single entry by name
@@ -159,8 +153,8 @@ impl<K> Reflector<K> where
     /// Try `Reflector::get_within` instead.
     pub fn get(&self, name: &str) -> Result<Option<K>> {
         let id = ObjectId {
-          name: name.into(),
-          namespace: self.resource.namespace.clone()
+            name: name.into(),
+            namespace: self.resource.namespace.clone(),
         };
         Ok(self.data.read().unwrap().get(&id).map(Clone::clone))
     }
@@ -171,8 +165,8 @@ impl<K> Reflector<K> where
     /// This is only useful if your reflector is configured to poll across namsepaces.
     pub fn get_within(&self, name: &str, ns: &str) -> Result<Option<K>> {
         let id = ObjectId {
-          name: name.into(),
-          namespace: Some(ns.into())
+            name: name.into(),
+            namespace: Some(ns.into()),
         };
         Ok(self.data.read().unwrap().get(&id).map(Clone::clone))
     }
@@ -188,7 +182,6 @@ impl<K> Reflector<K> where
         Ok(())
     }
 
-
     async fn get_full_resource_entries(&self) -> Result<(Cache<K>, String)> {
         let req = self.resource.list(&self.params)?;
         // NB: Object isn't general enough here
@@ -196,12 +189,21 @@ impl<K> Reflector<K> where
         let mut data = BTreeMap::new();
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
 
-        trace!("Got {} {} at resourceVersion={:?}", res.items.len(), self.resource.resource, version);
+        trace!(
+            "Got {} {} at resourceVersion={:?}",
+            res.items.len(),
+            self.resource.resource,
+            version
+        );
         for i in res.items {
             // The non-generic parts we care about are spec + status
             data.insert(i.meta().into(), i);
         }
-        let keys = data.keys().map(|key: &ObjectId| key.to_string()).collect::<Vec<_>>().join(", ");
+        let keys = data
+            .keys()
+            .map(|key: &ObjectId| key.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
         debug!("Initialized with: {}", keys);
         Ok((data, version))
     }
@@ -211,7 +213,11 @@ impl<K> Reflector<K> where
         let rg = &self.resource;
         let oldver = { self.version.read().unwrap().clone() };
         let req = rg.watch(&self.params, &oldver)?;
-        let res = self.client.request_events::<WatchEvent<K>>(req).await?;
+        let mut events = self
+            .client
+            .request_events::<WatchEvent<K>>(req)
+            .await?
+            .boxed_local(); // We use boxed_local to remove the Send requirement as we're not shipping this between threads
 
         // Update in place:
         let mut data = self.data.write().unwrap();
@@ -219,34 +225,36 @@ impl<K> Reflector<K> where
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-        for ev in res {
+        while let Some(ev) = events.next().await {
             match ev {
-                WatchEvent::Added(o) => {
+                Ok(WatchEvent::Added(o)) => {
                     debug!("Adding {} to {}", o.meta().name, rg.resource);
-                    data.entry(o.meta().into())
-                        .or_insert_with(|| o.clone());
+                    data.entry(o.meta().into()).or_insert_with(|| o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         *ver = v.to_string();
                     }
-                },
-                WatchEvent::Modified(o) => {
+                }
+                Ok(WatchEvent::Modified(o)) => {
                     debug!("Modifying {} in {}", o.meta().name, rg.resource);
-                    data.entry(o.meta().into())
-                        .and_modify(|e| *e = o.clone());
+                    data.entry(o.meta().into()).and_modify(|e| *e = o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         *ver = v.to_string();
                     }
-                },
-                WatchEvent::Deleted(o) => {
+                }
+                Ok(WatchEvent::Deleted(o)) => {
                     debug!("Removing {} from {}", o.meta().name, rg.resource);
                     data.remove(&o.meta().into());
                     if let Some(v) = &o.meta().resourceVersion {
-                         *ver = v.to_string();
+                        *ver = v.to_string();
                     }
                 }
-                WatchEvent::Error(e) => {
+                Ok(WatchEvent::Error(e)) => {
                     warn!("Failed to watch {}: {:?}", rg.resource, e);
                     Err(Error::Api(e))?
+                }
+                Err(e) => {
+                    // Just log out the error, but don't stop our stream short
+                    warn!("Problem fetch event from server: {:?}", e);
                 }
             }
         }

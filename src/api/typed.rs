@@ -1,25 +1,14 @@
 #![allow(non_snake_case)]
 
-use either::{Either};
+use either::Either;
+use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
-use crate::api::{
-    RawApi,
-    PostParams,
-    DeleteParams,
-    ListParams,
-    PatchParams,
-    LogParams
-};
-use crate::api::resource::{
-    ObjectList, Object, WatchEvent, KubeObject,
-};
-use crate::client::{
-    APIClient,
-    Status,
-};
-use crate::{Result};
+use crate::api::resource::{KubeObject, Object, ObjectList, WatchEvent};
+use crate::api::{DeleteParams, ListParams, LogParams, PatchParams, PostParams, RawApi};
+use crate::client::{APIClient, Status};
+use crate::Result;
 
 /// A typed Api variant that does not expose request internals
 ///
@@ -59,7 +48,8 @@ impl<K> Api<K> {
 }
 
 /// PUSH/PUT/POST/GET abstractions
-impl<K> Api<K> where
+impl<K> Api<K>
+where
     K: Clone + DeserializeOwned + KubeObject,
 {
     pub async fn get(&self, name: &str) -> Result<K> {
@@ -78,7 +68,10 @@ impl<K> Api<K> where
         let req = self.api.list(&lp)?;
         self.client.request::<ObjectList<K>>(req).await
     }
-    pub async fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<K>, Status>> {
+    pub async fn delete_collection(
+        &self,
+        lp: &ListParams,
+    ) -> Result<Either<ObjectList<K>, Status>> {
         let req = self.api.delete_collection(&lp)?;
         self.client.request_status::<ObjectList<K>>(req).await
     }
@@ -90,10 +83,18 @@ impl<K> Api<K> where
         let req = self.api.replace(name, &pp, data)?;
         self.client.request::<K>(req).await
     }
-    pub async fn watch(&self, lp: &ListParams, version: &str) -> Result<Vec<WatchEvent<K>>> {
+    pub async fn watch(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> Result<impl Stream<Item = WatchEvent<K>>> {
         let req = self.api.watch(&lp, &version)?;
-        self.client.request_events::<WatchEvent<K>>(req).await
+        self.client
+            .request_events::<WatchEvent<K>>(req)
+            .await
+            .map(|stream| stream.filter_map(|e| async move { e.ok() }))
     }
+
     pub async fn get_status(&self, name: &str) -> Result<K> {
         let req = self.api.get_status(name)?;
         self.client.request::<K>(req).await
@@ -108,12 +109,12 @@ impl<K> Api<K> where
     }
 }
 
-
 /// Marker trait for objects that has logs
 pub trait LoggingObject {}
 
-impl<K> Api<K> where
-    K: Clone + DeserializeOwned + KubeObject + LoggingObject
+impl<K> Api<K>
+where
+    K: Clone + DeserializeOwned + KubeObject + LoggingObject,
 {
     pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.api.log(name, lp)?;
@@ -137,7 +138,8 @@ pub type Scale = Object<ScaleSpec, ScaleStatus>;
 /// Scale subresource
 ///
 /// https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource
-impl<K> Api<K> where
+impl<K> Api<K>
+where
     K: Clone + DeserializeOwned,
 {
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
@@ -157,7 +159,8 @@ impl<K> Api<K> where
 /// Api Constructor for CRDs
 ///
 /// Because it relies entirely on user definitions, this ctor does not rely on openapi.
-impl<K> Api<K> where
+impl<K> Api<K>
+where
     K: Clone + DeserializeOwned,
 {
     pub fn customResource(client: APIClient, name: &str) -> Self {

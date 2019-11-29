@@ -1,10 +1,12 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
+use futures::StreamExt;
+use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 use kube::{
-    api::{RawApi, Api, v1Event, Informer, ListParams, WatchEvent, Object},
+    api::{v1Event, Api, Informer, ListParams, Object, RawApi, WatchEvent},
     client::APIClient,
     config,
 };
-use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 
 type Node = Object<NodeSpec, NodeStatus>;
 type Event = v1Event; // snowflake obj
@@ -20,12 +22,14 @@ async fn main() -> anyhow::Result<()> {
     let events = Api::v1Event(client.clone());
     let ni = Informer::raw(client.clone(), nodes)
         .labels("beta.kubernetes.io/os=linux")
-        .init().await?;
+        .init()
+        .await?;
 
     loop {
-        ni.poll().await?;
+        let mut nodes = ni.poll().await?.boxed();
 
-        while let Some(ne) = ni.pop() {
+        while let Some(ne) = nodes.next().await {
+            let ne = ne?;
             handle_nodes(&events, ne).await?;
         }
     }
@@ -36,19 +40,30 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
     match ne {
         WatchEvent::Added(o) => {
             info!("New Node: {}", o.spec.provider_id.unwrap());
-        },
+        }
         WatchEvent::Modified(o) => {
             // Nodes often modify a lot - only print broken nodes
             if let Some(true) = o.spec.unschedulable {
-                let failed = o.status.unwrap().conditions.unwrap().into_iter().filter(|c| {
-                    // In a failed state either some of the extra conditions are not False
-                    // Or the Ready state is False
-                    (c.status == "True" && c.type_ != "Ready") ||
-                    (c.status == "False" &&  c.type_ == "Ready")
-                }).map(|c| c.message).collect::<Vec<_>>(); // failed statuses
+                let failed = o
+                    .status
+                    .unwrap()
+                    .conditions
+                    .unwrap()
+                    .into_iter()
+                    .filter(|c| {
+                        // In a failed state either some of the extra conditions are not False
+                        // Or the Ready state is False
+                        (c.status == "True" && c.type_ != "Ready")
+                            || (c.status == "False" && c.type_ == "Ready")
+                    })
+                    .map(|c| c.message)
+                    .collect::<Vec<_>>(); // failed statuses
                 warn!("Unschedulable Node: {}, ({:?})", o.metadata.name, failed);
                 // Find events related to this node
-                let sel = format!("involvedObject.kind=Node,involvedObject.name={}", o.metadata.name);
+                let sel = format!(
+                    "involvedObject.kind=Node,involvedObject.name={}",
+                    o.metadata.name
+                );
                 let opts = ListParams {
                     field_selector: Some(sel),
                     ..Default::default()
@@ -61,14 +76,16 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
                 // Turn up logging above to see
                 debug!("Normal node: {}", o.metadata.name);
             }
-        },
+        }
         WatchEvent::Deleted(o) => {
-            warn!("Deleted node: {} ({:?}) running {:?} with labels: {:?}",
-                o.metadata.name, o.spec.provider_id.unwrap(),
+            warn!(
+                "Deleted node: {} ({:?}) running {:?} with labels: {:?}",
+                o.metadata.name,
+                o.spec.provider_id.unwrap(),
                 o.status.unwrap().conditions.unwrap(),
                 o.metadata.labels,
             );
-        },
+        }
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);
         }
