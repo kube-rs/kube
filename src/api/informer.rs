@@ -129,17 +129,16 @@ where
     pub async fn poll(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
         trace!("Watching {:?}", self.resource);
 
-
         // First check if we need to resync, if so reset our resource version
         // and wait a bit before proceeding.
         // We take a read only lock here as most of the time it will not be necessary
-        // to take an exclusive lock. 
+        // to take an exclusive lock.
         if *self.needs_resync.read().unwrap() {
-             // If desynched due to mismatching resourceVersion, retry in a bit 
-             let dur = Duration::from_secs(10);
-             Delay::new(dur).await;
-             self.reset().await?;
-             *self.needs_resync.write().unwrap() = false;
+            // If desynched due to mismatching resourceVersion, retry in a bit
+            let dur = Duration::from_secs(10);
+            Delay::new(dur).await;
+            self.reset().await?;
+            *self.needs_resync.write().unwrap() = false;
         }
 
         // Create our watch request
@@ -148,10 +147,9 @@ where
         // Clone our version so we can move it into the Stream handling
         // and avoid a 'static lifetime on self
         let version = self.version.clone();
-            
+
         // Clone our resync flag similarly
         let needs_resync = self.needs_resync.clone();
-
 
         // Attempt to fetch our stream
         let stream = self.client.request_events::<WatchEvent<K>>(req).await;
@@ -160,37 +158,34 @@ where
             Ok(events) => {
                 // Add a map stage to the stream which will update our version
                 // based on each incoming event
-                Ok(events
-                    .map(move |event| {
-                        // Check if we need to update our version based on the incoming events
-                        let new_version = match &event {
-                            Ok(WatchEvent::Added(o))
-                            | Ok(WatchEvent::Modified(o))
-                            | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(), 
-                            _ => None,
-                        };
+                Ok(events.map(move |event| {
+                    // Check if we need to update our version based on the incoming events
+                    let new_version = match &event {
+                        Ok(WatchEvent::Added(o))
+                        | Ok(WatchEvent::Modified(o))
+                        | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
+                        _ => None,
+                    };
 
-                        // If we hit an error, mark that we need to resync on the next call
-                        if let Err(e) = &event {
-                            warn!("Poll error: {:?}", e);
-                            *needs_resync.write().unwrap() = true;
-                        }
+                    // If we hit an error, mark that we need to resync on the next call
+                    if let Err(e) = &event {
+                        warn!("Poll error: {:?}", e);
+                        *needs_resync.write().unwrap() = true;
+                    }
+                    // Update our version need be
+                    // Follow docs conventions and store the last resourceVersion
+                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+                    else if let Some(nv) = new_version {
+                        *version.write().unwrap() = nv;
+                    }
 
-                        // Update our version need be
-                        // Follow docs conventions and store the last resourceVersion
-                        // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                        else if let Some(nv) = new_version {
-                            *version.write().unwrap() = nv;
-                        }
-
-                        event
-                    }))
-                    
+                    event
+                }))
             }
             Err(e) => {
                 warn!("Poll error: {:?}", e);
                 // Set that we need a resync for the next poll
-                // which will then reset our resource version and 
+                // which will then reset our resource version and
                 // wait a bit
                 *self.needs_resync.write().unwrap() = false;
                 Err(e)
@@ -226,4 +221,3 @@ where
         Ok(version)
     }
 }
-
