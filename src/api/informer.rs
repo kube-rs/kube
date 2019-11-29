@@ -29,6 +29,7 @@ where
     client: APIClient,
     resource: RawApi,
     params: ListParams,
+    needs_resync: Arc<RwLock<bool>>,
     _object_type: std::marker::PhantomData<K>,
 }
 
@@ -43,6 +44,7 @@ where
             resource: r.api,
             params: ListParams::default(),
             version: Arc::new(RwLock::new(0.to_string())),
+            needs_resync: Arc::new(RwLock::new(false)),
             _object_type: std::marker::PhantomData,
         }
     }
@@ -59,6 +61,7 @@ where
             resource: r,
             params: ListParams::default(),
             version: Arc::new(RwLock::new(0.to_string())),
+            needs_resync: Arc::new(RwLock::new(false)),
             _object_type: std::marker::PhantomData,
         }
     }
@@ -126,16 +129,29 @@ where
     pub async fn poll(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
         trace!("Watching {:?}", self.resource);
 
+
+        // First check if we need to resync, if so reset our resource version
+        // and wait a bit before proceeding.
+        // We take a read only lock here as most of the time it will not be necessary
+        // to take an exclusive lock. 
+        if *self.needs_resync.read().unwrap() {
+             // If desynched due to mismatching resourceVersion, retry in a bit 
+             let dur = Duration::from_secs(10);
+             Delay::new(dur).await;
+             self.reset().await?;
+             *self.needs_resync.write().unwrap() = false;
+        }
+
         // Create our watch request
         let req = self.resource.watch(&self.params, &self.version())?;
 
         // Clone our version so we can move it into the Stream handling
         // and avoid a 'static lifetime on self
         let version = self.version.clone();
+            
+        // Clone our resync flag similarly
+        let needs_resync = self.needs_resync.clone();
 
-        // Fetch an initial version as well to use for if we encounter
-        // a desync issue
-        let initial_version = self.get_resource_version().await?;
 
         // Attempt to fetch our stream
         let stream = self.client.request_events::<WatchEvent<K>>(req).await;
@@ -150,56 +166,33 @@ where
                         let new_version = match &event {
                             Ok(WatchEvent::Added(o))
                             | Ok(WatchEvent::Modified(o))
-                            | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
-                            Ok(WatchEvent::Error(e)) => {
-                                // Reset our version to the initial version
-                                // and then return a DesyncError.
-                                // This will terminate the stream early in the
-                                // following `take_while`
-                                *version.write().unwrap() = initial_version.clone();
-                                return Err(crate::Error::KubeDesyncError(e.clone()));
-                            }
+                            | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(), 
                             _ => None,
                         };
+
+                        // If we hit an error, mark that we need to resync on the next call
+                        if let Err(e) = &event {
+                            warn!("Poll error: {:?}", e);
+                            *needs_resync.write().unwrap() = true;
+                        }
 
                         // Update our version need be
                         // Follow docs conventions and store the last resourceVersion
                         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                        if let Some(nv) = new_version {
+                        else if let Some(nv) = new_version {
                             *version.write().unwrap() = nv;
                         }
 
                         event
-                    })
-                    .take_while(|result| {
-                        // If we've run into a KubeDesyncError due to mismatch resource versions
-                        // sleep for 10s before allowing another poll and then terminate the stream early
-                        let err = match result {
-                            Err(crate::Error::KubeDesyncError(e)) => {
-                                warn!("Poll error: {:?}", e);
-                                true
-                            }
-                            _ => false,
-                        };
-
-                        async move {
-                            if err {
-                                // Sleep for 10s before allowing a retry
-                                let dur = Duration::from_secs(10);
-                                Delay::new(dur).await;
-                            }
-
-                            // If err then we're done, otherwise continue to allow elements
-                            !err
-                        }
                     }))
+                    
             }
             Err(e) => {
                 warn!("Poll error: {:?}", e);
-                // If desynched due to mismatching resourceVersion, retry in a bit
-                let dur = Duration::from_secs(10);
-                Delay::new(dur).await;
-                self.reset().await?;
+                // Set that we need a resync for the next poll
+                // which will then reset our resource version and 
+                // wait a bit
+                *self.needs_resync.write().unwrap() = false;
                 Err(e)
             }
         }
@@ -233,3 +226,4 @@ where
         Ok(version)
     }
 }
+

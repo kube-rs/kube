@@ -34,8 +34,6 @@ pub enum Error {
     ReqwestError(#[from] reqwest::Error),
     #[error("HttpError: {0}")]
     HttpError(#[from] http::Error),
-    #[error("KubeDesyncError: {0} ({0:?})")]
-    KubeDesyncError(ErrorResponse),
 
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
