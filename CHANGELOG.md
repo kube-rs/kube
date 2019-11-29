@@ -1,4 +1,9 @@
-0.20.0 / 2019-11-21
+0.21.0 / 2019-11-29
+===================
+  * All watch calls returns a stream of `WatchEvent` - #92
+  * `Informer::poll` now returns a stream - #92
+
+0.20.1 / 2019-11-21
 ===================
   * ObjectList now implements Iterator - #91
   * openapi feature no longer accidentally hardcoded to v1.15 feature - #90

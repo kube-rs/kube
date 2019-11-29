@@ -13,7 +13,7 @@ To use the openapi generated types:
 
 ```toml
 [dependencies]
-kube = { version = "0.20.0", features = ["openapi"] }
+kube = { version = "0.21.0", features = ["openapi"] }
 k8s-openapi = { version = "0.6.0", default-features = false, features = ["v1_15"] }
 ```
 
@@ -21,7 +21,7 @@ otherwise:
 
 ```toml
 [dependencies]
-kube = "0.20.0"
+kube = "0.21.0"
 ```
 
 The latter is fine in a CRD-only use case.
@@ -33,7 +33,7 @@ See [version-rs](https://github.com/clux/version-rs) for a super light (~100 lin
 
 See [controller-rs](https://github.com/clux/controller-rs) for a full actix example, with circleci, and kube yaml.
 
-**[API Docs](https://clux.github.io/kube-rs/kube/)**
+**[API Docs](https://docs.rs/kube/)**
 
 ## Api
 It's currently recommended to compile with the "openapi" feature if you want an easy experience with accurate native object representations:
@@ -97,20 +97,20 @@ let api = Api::v1Pod(client);
 let inf = Informer::new(api.clone()).init().await?;
 ```
 
-The main feature of `Informer<K>` is that after calling `.poll()` you handle the events and decide what to do with them yourself:
+The main feature of `Informer<K>` is being able to subscribe to events while having a streaming `.poll()` open:
 
 ```rust
-inf.poll().await?; // watches + queues events
+let pods = inf.poll().await?.boxed(); // starts a watch and returns a stream
 
-while let Some(event) = inf.pop() {
-    handle_event(&api, event)?;
+while let Some(event) = pods.next().await { // await next event
+    handle_event(&api, event?).await?; // pass the WatchEvent to a handler
 }
 ```
 
 How you handle them is up to you, you could build your own state, you can call a kube client, or you can simply print events. Here's a sketch of how such a handler would look:
 
 ```rust
-fn handle_event(pods: &Api<PodSpec, PodStatus>, event: WatchEvent<PodSpec, PodStatus>) -> Result<(), failure::Error> {
+async fn handle_event(pods: &Api<PodSpec, PodStatus>, event: WatchEvent<PodSpec, PodStatus>) -> anyhow::Result<()> {
     match event {
         WatchEvent::Added(o) => {
             let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
