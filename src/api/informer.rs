@@ -164,18 +164,24 @@ where
                         Ok(WatchEvent::Added(o))
                         | Ok(WatchEvent::Modified(o))
                         | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
-                        _ => None,
+                        Ok(WatchEvent::Error(e)) => {
+                            // If we hit a 410 desync error, mark that we need to resync on the next call
+                            if e.code == 410 {
+                                warn!("Stream desynced: {:?}", e);
+                                *needs_resync.write().unwrap() = true;
+                            }
+                            None
+                        }
+                        Err(e) => {
+                            warn!("Unexpected watch error: {:?}", e);
+                            None
+                        }
                     };
 
-                    // If we hit an error, mark that we need to resync on the next call
-                    if let Err(e) = &event {
-                        warn!("Poll error: {:?}", e);
-                        *needs_resync.write().unwrap() = true;
-                    }
                     // Update our version need be
                     // Follow docs conventions and store the last resourceVersion
                     // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                    else if let Some(nv) = new_version {
+                    if let Some(nv) = new_version {
                         *version.write().unwrap() = nv;
                     }
 
