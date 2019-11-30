@@ -1,4 +1,4 @@
-0.22.0 / 2019-XX-XX
+0.22.0 / 2019-11-29
 ===================
   * Default watch timeouts changed to 300s everywhere
   * This increases efficiency of Informers and Reflectors by keeping the connection open longer.
