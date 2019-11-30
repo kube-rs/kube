@@ -3,13 +3,11 @@ use crate::api::{Api, ListParams, RawApi, Void};
 use crate::client::APIClient;
 use crate::Result;
 
+use futures::lock::Mutex;
 use futures::{Stream, StreamExt};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
-use std::{
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 /// An event informer for a `Resource`
 ///
@@ -25,11 +23,11 @@ pub struct Informer<K>
 where
     K: Clone + DeserializeOwned + KubeObject,
 {
-    version: Arc<RwLock<String>>,
+    version: Arc<Mutex<String>>,
     client: APIClient,
     resource: RawApi,
     params: ListParams,
-    needs_resync: Arc<RwLock<bool>>,
+    needs_resync: Arc<Mutex<bool>>,
     _object_type: std::marker::PhantomData<K>,
 }
 
@@ -43,8 +41,8 @@ where
             client: r.client,
             resource: r.api,
             params: ListParams::default(),
-            version: Arc::new(RwLock::new(0.to_string())),
-            needs_resync: Arc::new(RwLock::new(false)),
+            version: Arc::new(Mutex::new(0.to_string())),
+            needs_resync: Arc::new(Mutex::new(false)),
             _object_type: std::marker::PhantomData,
         }
     }
@@ -60,8 +58,8 @@ where
             client,
             resource: r,
             params: ListParams::default(),
-            version: Arc::new(RwLock::new(0.to_string())),
-            needs_resync: Arc::new(RwLock::new(false)),
+            version: Arc::new(Mutex::new(0.to_string())),
+            needs_resync: Arc::new(Mutex::new(false)),
             _object_type: std::marker::PhantomData,
         }
     }
@@ -110,14 +108,18 @@ where
     pub async fn init(self) -> Result<Self> {
         let initial = self.get_resource_version().await?;
         info!("Starting Informer for {:?}", self.resource);
-        *self.version.write().unwrap() = initial;
+        *self.version.lock().await = initial;
         Ok(self)
     }
 
     /// Initialize from a prior version
     pub fn init_from(self, v: String) -> Self {
         info!("Recreating Informer for {:?} at {}", self.resource, v);
-        *self.version.write().unwrap() = v;
+
+        // We need to block on this as our mutex needs go be async compatible
+        futures::executor::block_on(async {
+            *self.version.lock().await = v;
+        });
         self
     }
 
@@ -131,24 +133,25 @@ where
 
         // First check if we need to resync, if so reset our resource version
         // and wait a bit before proceeding.
-        // We take a read only lock here as most of the time it will not be necessary
-        // to take an exclusive lock.
-        if *self.needs_resync.read().unwrap() {
+        let mut needs_resync = self.needs_resync.lock().await;
+        if *needs_resync {
             // If desynched due to mismatching resourceVersion, retry in a bit
             let dur = Duration::from_secs(10);
             Delay::new(dur).await;
             self.reset().await?;
-            *self.needs_resync.write().unwrap() = false;
+            *needs_resync = false;
         }
 
         // Create our watch request
-        let req = self.resource.watch(&self.params, &self.version())?;
+        let resource_version = self.version.lock().await.clone();
+        let req = self.resource.watch(&self.params, &resource_version)?;
 
         // Clone our version so we can move it into the Stream handling
         // and avoid a 'static lifetime on self
         let version = self.version.clone();
 
         // Clone our resync flag similarly
+        // We shadow `needs_resync` here to drop the old lock
         let needs_resync = self.needs_resync.clone();
 
         // Attempt to fetch our stream
@@ -158,34 +161,39 @@ where
             Ok(events) => {
                 // Add a map stage to the stream which will update our version
                 // based on each incoming event
-                Ok(events.map(move |event| {
-                    // Check if we need to update our version based on the incoming events
-                    let new_version = match &event {
-                        Ok(WatchEvent::Added(o))
-                        | Ok(WatchEvent::Modified(o))
-                        | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
-                        Ok(WatchEvent::Error(e)) => {
-                            // If we hit a 410 desync error, mark that we need to resync on the next call
-                            if e.code == 410 {
-                                warn!("Stream desynced: {:?}", e);
-                                *needs_resync.write().unwrap() = true;
+                Ok(events.then(move |event| {
+                    // Need to clone our Arcs as they are consumed each loop
+                    let needs_resync = needs_resync.clone();
+                    let version = version.clone();
+                    async move {
+                        // Check if we need to update our version based on the incoming events
+                        let new_version = match &event {
+                            Ok(WatchEvent::Added(o))
+                            | Ok(WatchEvent::Modified(o))
+                            | Ok(WatchEvent::Deleted(o)) => o.meta().resourceVersion.clone(),
+                            Ok(WatchEvent::Error(e)) => {
+                                // If we hit a 410 desync error, mark that we need to resync on the next call
+                                if e.code == 410 {
+                                    warn!("Stream desynced: {:?}", e);
+                                    *needs_resync.lock().await = true;
+                                }
+                                None
                             }
-                            None
-                        }
-                        Err(e) => {
-                            warn!("Unexpected watch error: {:?}", e);
-                            None
-                        }
-                    };
+                            Err(e) => {
+                                warn!("Unexpected watch error: {:?}", e);
+                                None
+                            }
+                        };
 
-                    // Update our version need be
-                    // Follow docs conventions and store the last resourceVersion
-                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                    if let Some(nv) = new_version {
-                        *version.write().unwrap() = nv;
+                        // Update our version need be
+                        // Follow docs conventions and store the last resourceVersion
+                        // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+                        if let Some(nv) = new_version {
+                            *version.lock().await = nv;
+                        }
+
+                        event
                     }
-
-                    event
                 }))
             }
             Err(e) => {
@@ -193,7 +201,7 @@ where
                 // Set that we need a resync for the next poll
                 // which will then reset our resource version and
                 // wait a bit
-                *self.needs_resync.write().unwrap() = false;
+                *self.needs_resync.lock().await = false;
                 Err(e)
             }
         }
@@ -203,13 +211,15 @@ where
     pub async fn reset(&self) -> Result<()> {
         // Fetch a new initial version:
         let initial = self.get_resource_version().await?;
-        *self.version.write().unwrap() = initial;
+        *self.version.lock().await = initial;
         Ok(())
     }
 
     /// Return the current version
     pub fn version(&self) -> String {
-        self.version.read().unwrap().clone()
+        // We need to block on a future here quickly
+        // to get a lock on our version
+        futures::executor::block_on(async { self.version.lock().await.clone() })
     }
 
     /// Init helper

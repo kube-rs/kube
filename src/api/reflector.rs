@@ -2,15 +2,12 @@ use crate::api::resource::{KubeObject, ObjectList, WatchEvent};
 use crate::api::{Api, ListParams, ObjectMeta, RawApi};
 use crate::client::APIClient;
 use crate::{Error, Result};
+use futures::lock::Mutex;
 use futures::StreamExt;
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 /// Internal representation for Reflector
 type Cache<K> = BTreeMap<ObjectId, K>;
@@ -28,8 +25,8 @@ pub struct Reflector<K>
 where
     K: Clone + DeserializeOwned,
 {
-    data: Arc<RwLock<Cache<K>>>,
-    version: Arc<RwLock<String>>,
+    data: Arc<Mutex<Cache<K>>>,
+    version: Arc<Mutex<String>>,
     client: APIClient,
     resource: RawApi,
     params: ListParams,
@@ -45,8 +42,8 @@ where
             client: r.client,
             resource: r.api,
             params: ListParams::default(),
-            data: Arc::new(RwLock::new(BTreeMap::new())),
-            version: Arc::new(RwLock::new(0.to_string())),
+            data: Arc::new(Mutex::new(BTreeMap::new())),
+            version: Arc::new(Mutex::new(0.to_string())),
         }
     }
 }
@@ -61,8 +58,8 @@ where
             client,
             resource: r,
             params: ListParams::default(),
-            data: Arc::new(RwLock::new(BTreeMap::new())),
-            version: Arc::new(RwLock::new(0.to_string())),
+            data: Arc::new(Mutex::new(BTreeMap::new())),
+            version: Arc::new(Mutex::new(0.to_string())),
         }
     }
 
@@ -109,8 +106,8 @@ where
     pub async fn init(self) -> Result<Self> {
         info!("Starting Reflector for {:?}", self.resource);
         let (data, version) = self.get_full_resource_entries().await?;
-        *self.data.write().unwrap() = data;
-        *self.version.write().unwrap() = version;
+        *self.data.lock().await = data;
+        *self.version.lock().await = version;
         Ok(self)
     }
 
@@ -132,18 +129,15 @@ where
 
     /// Read data for users of the reflector
     ///
-    /// TODO: deprecate in favour of a stream returning fn..
+    /// TODO: deprecate in favour of a stream returning fn, this would also get rid of the
+    /// intermediate future
     pub fn read(&self) -> Result<Vec<K>> {
-        // unwrap for users because Poison errors are not great to deal with atm.
-        // If a read fails, you've probably failed to parse the Resource into a T
-        // this likely implies versioning issues between:
-        // - your definition of T (in code used to instantiate Reflector)
-        // - current applied kube state (used to parse into T)
-        //
-        // Very little that can be done in this case. Upgrade your app / resource.
-        let cache = self.data.read().unwrap();
-
-        Ok(cache.values().cloned().collect::<Vec<K>>())
+        // Unfortunately we need to spawn and block on a future here
+        // in order to get access to self.data
+        futures::executor::block_on(async {
+            let cache = self.data.lock().await;
+            Ok(cache.values().cloned().collect::<Vec<K>>())
+        })
     }
 
     /// Read a single entry by name
@@ -156,7 +150,8 @@ where
             name: name.into(),
             namespace: self.resource.namespace.clone(),
         };
-        Ok(self.data.read().unwrap().get(&id).map(Clone::clone))
+
+        futures::executor::block_on(async { Ok(self.data.lock().await.get(&id).map(Clone::clone)) })
     }
 
     /// Read a single entry by name within a specific namespace
@@ -168,7 +163,7 @@ where
             name: name.into(),
             namespace: Some(ns.into()),
         };
-        Ok(self.data.read().unwrap().get(&id).map(Clone::clone))
+        futures::executor::block_on(async { Ok(self.data.lock().await.get(&id).map(Clone::clone)) })
     }
 
     /// Reset the state with a full LIST call
@@ -177,8 +172,8 @@ where
     pub async fn reset(&self) -> Result<()> {
         trace!("Refreshing {:?}", self.resource);
         let (data, version) = self.get_full_resource_entries().await?;
-        *self.data.write().unwrap() = data;
-        *self.version.write().unwrap() = version;
+        *self.data.lock().await = data;
+        *self.version.lock().await = version;
         Ok(())
     }
 
@@ -211,7 +206,7 @@ where
     // Watch helper
     async fn single_watch(&self) -> Result<()> {
         let rg = &self.resource;
-        let oldver = { self.version.read().unwrap().clone() };
+        let oldver = self.version.lock().await.clone();
         let req = rg.watch(&self.params, &oldver)?;
         let mut events = self
             .client
@@ -220,8 +215,8 @@ where
             .boxed_local(); // We use boxed_local to remove the Send requirement as we're not shipping this between threads
 
         // Update in place:
-        let mut data = self.data.write().unwrap();
-        let mut ver = self.version.write().unwrap();
+        let mut data = self.data.lock().await;
+        let mut ver = self.version.lock().await;
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
