@@ -25,6 +25,10 @@ pub struct ListMeta {
     pub selfLink: Option<String>,
 }
 
+#[cfg(feature = "openapi")]
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
+
+
 /// Metadata that all persisted resources must have
 ///
 /// This parses the relevant fields from `[ObjectMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html)`
@@ -41,6 +45,22 @@ pub struct ObjectMeta {
     /// The namespace (when it's namespaced) of the resouce where "" => "default"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
+
+    /// CreationTimestamp is a timestamp representing the server time when this object was created.
+    ///
+    /// It is not guaranteed to be set in happens-before order across separate operations.
+    /// Clients may not set this value. It is represented in RFC3339 form and is in UTC.
+    /// Populated by the system. Read-only. [More info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata)
+    #[cfg(feature = "openapi")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creation_timestamp: Option<Time>,
+
+    /// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted.
+    ///
+    /// Populated by the system when a graceful deletion is requested. Read-only. [More info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata)
+    #[cfg(feature = "openapi")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deletion_timestamp: Option<Time>,
 
     /// [Resource labels](http://kubernetes.io/docs/user-guide/labels)
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
