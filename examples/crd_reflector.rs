@@ -29,14 +29,16 @@ async fn main() -> anyhow::Result<()> {
         .group("clux.dev")
         .within(&namespace);
 
-    let rf : Reflector<Foo> = Reflector::raw(client, resource).init().await?;
+    let rf : Reflector<Foo> = Reflector::raw(client, resource)
+        .timeout(10) // low timeout in this example
+        .init().await?;
 
     loop {
-        // Update internal state by calling watch (blocks):
-        rf.poll().await?;
+        // Update internal state by calling watch (waits the full timeout)
+        rf.poll().await?; // ideally call this from a thread/task
 
         // Read updated internal state (instant):
-        rf.read()?.into_iter().for_each(|crd| {
+        rf.state().await?.into_iter().for_each(|crd| {
             info!("foo {}: {}", crd.metadata.name, crd.spec.info);
         });
     }

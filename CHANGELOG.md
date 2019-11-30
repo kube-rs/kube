@@ -1,3 +1,12 @@
+0.22.0 / 2019-XX-XX
+===================
+  * Default watch timeouts changed to 300s everywhere
+  * This increases efficiency of Informers and Reflectors by keeping the connection open longer.
+  * However, if your Reflector relies on frequent polling you can set `timeout` or hide the `poll()` in a different context so it doesn't block your main work
+  * Internal `RwLock` changed to a `futures::Mutex` for soundness / proper non-blocking - #94
+  * blocking `Reflector::read()` renamed to `async Reflector::state()`
+  * Expose `metadata.creation_timestamp` and `.deletion_timestamp` (behind openapi flag) - #93
+
 0.21.0 / 2019-11-29
 ===================
   * All watch calls returns a stream of `WatchEvent` - #92

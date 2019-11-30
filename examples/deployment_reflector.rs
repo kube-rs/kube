@@ -14,11 +14,13 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Deployment(client).within(&namespace);
-    let rf = Reflector::new(resource).init().await?;
+    let rf = Reflector::new(resource)
+        .timeout(10) // low timeout in this example
+        .init().await?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Deployment
-    rf.read()?.into_iter().for_each(|deployment| {
+    rf.state().await?.into_iter().for_each(|deployment| {
         info!("Found deployment for {} - {} replicas running {:?}",
             deployment.metadata.name,
             deployment.status.unwrap().replicas.unwrap(),
@@ -27,10 +29,12 @@ async fn main() -> anyhow::Result<()> {
         );
     });
 
-    // r needs to have `r.poll()?` called continuosly to keep state up to date:
     loop {
+        // Update internal state by calling watch (waits the full timeout)
         rf.poll().await?;
-        let deploys = rf.read()?.into_iter().map(|deployment| deployment.metadata.name).collect::<Vec<_>>();
+
+        // Read the updated internal state (instant):
+        let deploys = rf.state().await?.into_iter().map(|deployment| deployment.metadata.name).collect::<Vec<_>>();
         info!("Current deploys: {:?}", deploys);
     }
 }

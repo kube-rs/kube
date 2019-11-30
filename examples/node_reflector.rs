@@ -15,11 +15,12 @@ async fn main() -> anyhow::Result<()> {
     let resource = Api::v1Node(client);
     let rf = Reflector::new(resource)
         .labels("kubernetes.io/lifecycle=spot")
+        .timeout(10) // low timeout in this example
         .init().await?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Node
-    rf.read()?.into_iter().for_each(|object| {
+    rf.state().await?.into_iter().for_each(|object| {
         info!("Found node {} ({:?}) running {:?} with labels: {:?}",
             object.metadata.name,
             object.spec.provider_id.unwrap(),
@@ -28,10 +29,12 @@ async fn main() -> anyhow::Result<()> {
         );
     });
 
-    // r needs to have `r.poll()?` called continuosly to keep state up to date:
     loop {
+        // Update internal state by calling watch (waits the full timeout)
         rf.poll().await?;
-        let deploys = rf.read()?.into_iter().map(|object| object.metadata.name).collect::<Vec<_>>();
+
+        // Read the internal state (instant):
+        let deploys = rf.state().await?.into_iter().map(|o| o.metadata.name).collect::<Vec<_>>();
         info!("Current nodes: {:?}", deploys);
     }
 }

@@ -14,10 +14,12 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Pod(client).within(&namespace);
-    let rf = Reflector::new(resource).init().await?;
+    let rf = Reflector::new(resource)
+//        .timeout(10) // low timeout in this example
+        .init().await?;
 
     // Can read initial state now:
-    rf.read()?.into_iter().for_each(|pod| {
+    rf.state().await?.into_iter().for_each(|pod| {
         info!("Found pod {} ({}) with {:?}",
             pod.metadata.name,
             pod.status.unwrap().phase.unwrap(),
@@ -25,12 +27,12 @@ async fn main() -> anyhow::Result<()> {
         );
     });
 
-    // Poll to keep data up to date:
     loop {
+        // Update internal state by calling watch (waits the full timeout)
         rf.poll().await?;
 
-        // up to date state:
-        let pods = rf.read()?.into_iter().map(|pod| pod.metadata.name).collect::<Vec<_>>();
+        // Read updated internal state (instant):
+        let pods = rf.state().await?.into_iter().map(|pod| pod.metadata.name).collect::<Vec<_>>();
         info!("Current pods: {:?}", pods);
     }
 }

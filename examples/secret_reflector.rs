@@ -25,10 +25,12 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Secret(client).within(&namespace);
-    let rf = Reflector::new(resource).init().await?;
+    let rf = Reflector::new(resource)
+        .timeout(10) // low timeout in this example
+        .init().await?;
 
     // Can read initial state now:
-    rf.read()?.into_iter().for_each(|secret| {
+    rf.state().await?.into_iter().for_each(|secret| {
         let mut res = BTreeMap::new();
         for (k, v) in secret.data {
             if let Ok(b) = std::str::from_utf8(&v.0) {
@@ -44,12 +46,12 @@ async fn main() -> anyhow::Result<()> {
         );
     });
 
-    // Poll to keep data up to date:
     loop {
-        rf.poll().await?;
+        // Update internal state by calling watch (waits the full timeout)
+        rf.poll().await?; // ideally call this from a thread/task
 
-        // up to date state:
-        let pods = rf.read()?.into_iter().map(|secret| secret.metadata.name).collect::<Vec<_>>();
+        // Read updated internal state (instant):
+        let pods = rf.state().await?.into_iter().map(|secret| secret.metadata.name).collect::<Vec<_>>();
         info!("Current pods: {:?}", pods);
     }
 }

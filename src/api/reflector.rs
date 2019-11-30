@@ -69,7 +69,7 @@ where
     /// Configure the timeout for the list/watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// Defaults to 10s
+    /// Defaults to 300s
     pub fn timeout(mut self, timeout_secs: u32) -> Self {
         self.params.timeout = Some(timeout_secs);
         self
@@ -114,7 +114,7 @@ where
     /// Run a single watch poll
     ///
     /// If this returns an error, it tries a full refresh.
-    /// This is meant to be run continually in a thread. Spawn one.
+    /// This is meant to be run continually in a thread/task. Spawn one.
     pub async fn poll(&self) -> Result<()> {
         trace!("Watching {:?}", self.resource);
         if let Err(_e) = self.single_watch().await {
@@ -129,15 +129,10 @@ where
 
     /// Read data for users of the reflector
     ///
-    /// TODO: deprecate in favour of a stream returning fn, this would also get rid of the
-    /// intermediate future
-    pub fn read(&self) -> Result<Vec<K>> {
-        // Unfortunately we need to spawn and block on a future here
-        // in order to get access to self.data
-        futures::executor::block_on(async {
-            let cache = self.data.lock().await;
-            Ok(cache.values().cloned().collect::<Vec<K>>())
-        })
+    /// This is instant if you are reading and writing from the same context.
+    pub async fn state(&self) -> Result<Vec<K>> {
+        let cache = self.data.lock().await;
+        Ok(cache.values().cloned().collect::<Vec<K>>())
     }
 
     /// Read a single entry by name

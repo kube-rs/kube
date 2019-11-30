@@ -535,7 +535,7 @@ impl RawApi {
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
 
-        qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(10).to_string());
+        qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(300).to_string());
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", &fields);
         }
@@ -766,7 +766,7 @@ fn watch_path() {
     let r = RawApi::v1Pod().within("ns");
     let gp = ListParams::default();
     let req = r.watch(&gp, "0").unwrap();
-    assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=10");
+    assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=300");
 }
 #[test]
 fn replace_path(){

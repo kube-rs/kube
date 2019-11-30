@@ -15,19 +15,21 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1ConfigMap(client).within(&namespace);
-    let rf = Reflector::new(resource).init().await?;
+    let rf = Reflector::new(resource)
+        .timeout(10) // low timeout in this example
+        .init().await?;
 
     // Can read initial state now:
-    rf.read()?.into_iter().for_each(|config_map| {
+    rf.state().await?.into_iter().for_each(|config_map| {
         info!("Found configmap {} with data: {:?}", config_map.metadata.name, config_map.data);
     });
 
-    // Poll to keep data up to date:
     loop {
-        rf.poll().await?;
+        // Update internal state by calling watch (waits the full timeout)
+        rf.poll().await?; // ideally call this from a thread/task
 
         // up to date state:
-        let pods = rf.read()?.into_iter()
+        let pods = rf.state().await?.into_iter()
             .map(|config_map| config_map.metadata.name)
             .collect::<Vec<_>>();
 
