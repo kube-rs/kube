@@ -29,9 +29,11 @@ The latter is fine in a CRD-only use case.
 ## Usage
 See the [examples directory](./examples) for how to watch over resources in a simplistic way.
 
-See [version-rs](https://github.com/clux/version-rs) for a super light (~100 lines), actix, prometheus, deployment api setup.
+See [version-rs](https://github.com/clux/version-rs) for a super light (~100 lines), actix*, prometheus, deployment api setup.
 
-See [controller-rs](https://github.com/clux/controller-rs) for a full actix example, with circleci, and kube yaml.
+See [controller-rs](https://github.com/clux/controller-rs) for a full actix* example, with circleci, and kube yaml.
+
+* <small>actix examples have not been updated to the async version of this library yet.</small>
 
 **[API Docs](https://docs.rs/kube/)**
 
