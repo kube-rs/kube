@@ -55,37 +55,8 @@ pods.delete("blog", &DeleteParams::default()).await?;
 
 See the `pod_openapi` or `crd_openapi` examples for more uses.
 
-## Reflector
-One of the main abstractions exposed from `kube::api` is `Reflector<K>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
-
-It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
-
-To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi](https://docs.rs/k8s-openapi/0.5.1/k8s_openapi/api/core/v1/struct.PodSpec.html):
-
-```rust
-let api = Api::v1Pod(client).within(&namespace);
-let rf = Reflector::new(api).timeout(10).init().await?;
-```
-
-then you can `poll()` the reflector, and `read()` to get the current cached state:
-
-```rust
-rf.poll().await?; // watches + updates state
-
-// read state and use it:
-rf.read()?.into_iter().for_each(|(name, p)| {
-    println!("Found pod {} ({}) with {:?}",
-        name,
-        p.status.unwrap().phase.unwrap(),
-        p.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>(),
-    );
-});
-```
-
-The reflector itself is responsible for acquiring the write lock and update the state as long as you call `poll()` periodically.
-
 ## Informer
-The other main abstraction from `kube::api` is `Informer<K>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with the last seen `resourceVersion`.
+The main abstraction from `kube::api` is `Informer<K>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with the last seen `resourceVersion`.
 
 You tell it what type `KubeObject` implementing object you want to use. You can use `Object<P, U>` to get an automatic implementation by using `Object<PodSpec, PodStatus>`.`
 
@@ -132,6 +103,37 @@ async fn handle_event(pods: &Api<PodSpec, PodStatus>, event: WatchEvent<PodSpec,
 ```
 
 The [node_informer example](./examples/node_informer.rs) has an example of using api calls from within event handlers.
+
+## Reflector
+The other big abstractions exposed from `kube::api` is `Reflector<K>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
+
+It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
+
+To use it, you just feed in `T` as a `Spec` struct and `U` as a `Status` struct, which can be as complete or incomplete as you like. Here, using the complete structs via [k8s-openapi's PodSpec](https://docs.rs/k8s-openapi/0.5.1/k8s_openapi/api/core/v1/struct.PodSpec.html):
+
+```rust
+let api = Api::v1Pod(client).within(&namespace);
+let rf = Reflector::new(api).timeout(10).init().await?;
+```
+
+then you should `poll()` the reflector, and `state()` to get the current cached state:
+
+```rust
+rf.poll().await?; // watches + updates state
+
+// Clone state and do something with it
+rf.state().await.into_iter().for_each(|(name, p)| {
+    println!("Found pod {} ({}) with {:?}",
+        name,
+        p.status.unwrap().phase.unwrap(),
+        p.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>(),
+    );
+});
+```
+
+Note that `poll` holds the future for 300s by default, but you can (and should) get `.state()` from another async context.
+
+If you need the details of just a single object, you can use the more efficient, `Reflector::get` and `Reflector::get_within`.
 
 ## Examples
 Examples that show a little common flows. These all have logging of this library set up to `trace`:
