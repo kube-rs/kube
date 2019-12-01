@@ -148,7 +148,9 @@ where
                 let dur = Duration::from_secs(10);
                 Delay::new(dur).await;
                 // If we are outside history, start over from latest
-                self.reset().await?;
+                if *needs_resync {
+                    self.reset().await?;
+                }
                 *needs_resync = false;
                 *needs_retry = false;
             }
@@ -208,11 +210,10 @@ where
         }
     }
 
-    /// Reset the resourceVersion to current and clear the event queue
+    /// Reset the resourceVersion to latest
     pub async fn reset(&self) -> Result<()> {
-        // Fetch a new initial version:
-        let initial = self.get_resource_version().await?;
-        *self.version.lock().await = initial;
+        let latest = self.get_resource_version().await?;
+        *self.version.lock().await = latest;
         Ok(())
     }
 
