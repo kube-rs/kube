@@ -35,7 +35,7 @@ See [version-rs](https://github.com/clux/version-rs) for a super light (~100 lin
 
 See [controller-rs](https://github.com/clux/controller-rs) for a full actix* example, with circleci, and kube yaml.
 
-<small>actix examples have not been updated to the async version of this library yet.</small>
+NB: actix examples have not been updated to the async version of this library yet.
 
 ## Api
 It's currently recommended to compile with the "openapi" feature if you want an easy experience with accurate native object representations:
