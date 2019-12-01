@@ -4,16 +4,16 @@
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-alpha-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 
-Rust client for [Kubernetes](http://kubernetes.io) in the style of [client-go](https://github.com/kubernetes/client-go). Contains rust reinterpretations of the `Reflector` and `Informer` abstractions (but without all the factories) to allow writing kubernetes controllers/operators easily.
+Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go). It makes certain assumptions about the kubernetes api to allow writing generic abstractions, and as such contains rust reinterpretations of `Reflector` and `Informer` to allow writing kubernetes controllers/watchers/operators easily.
 
-This client caters to the more common controller/operator case, but allows you to compile with the `openapi` feature to get accurate struct representations via [k8s-openapi](https://github.com/Arnavion/k8s-openapi).
+You can operate entirely without openapi definitions if you are operating on a `CustomResource`, but if you require the full definitions of native objects, it is easier to compile with the `openapi` feature to get accurate struct representations via [k8s-openapi](https://github.com/Arnavion/k8s-openapi).
 
 ## Installation
 To use the openapi generated types:
 
 ```toml
 [dependencies]
-kube = { version = "0.21.0", features = ["openapi"] }
+kube = { version = "0.21.1", features = ["openapi"] }
 k8s-openapi = { version = "0.6.0", default-features = false, features = ["v1_15"] }
 ```
 
@@ -21,7 +21,7 @@ otherwise:
 
 ```toml
 [dependencies]
-kube = "0.21.0"
+kube = "0.21.1"
 ```
 
 The latter is fine in a CRD-only use case.
