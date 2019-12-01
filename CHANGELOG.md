@@ -1,3 +1,7 @@
+0.22.1 / 2019-11-30
+===================
+  * Improve Reflector reset algorithm (clear history less)
+
 0.22.0 / 2019-11-29
 ===================
   * Default watch timeouts changed to 300s everywhere

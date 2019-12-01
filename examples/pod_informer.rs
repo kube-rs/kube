@@ -21,12 +21,9 @@ async fn main() -> anyhow::Result<()> {
     let resource = Api::v1Pod(client.clone()).within(&namespace);
     let inf = Informer::new(resource.clone()).init().await?;
 
-    // Here we both poll and reconcile based on events from the main thread
-    // If you run this next to actix-web (say), spawn a thread and pass `inf` as app state
     loop {
         let mut pods = inf.poll().await?.boxed();
 
-        // Handle events one by one, draining the informer
         while let Some(event) = pods.next().await {
             let event = event?;
             handle_node(&resource, event)?;

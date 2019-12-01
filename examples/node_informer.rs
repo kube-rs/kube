@@ -13,7 +13,7 @@ type Event = v1Event; // snowflake obj
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,node_informer=debug,kube=debug");
+    std::env::set_var("RUST_LOG", "info,node_informer=debug,kube=trace");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
