@@ -34,7 +34,7 @@ where
 
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned,
+    K: Clone + DeserializeOwned + Send,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn new(r: Api<K>) -> Self {
@@ -50,7 +50,7 @@ where
 
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + KubeObject + Send,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn raw(client: APIClient, r: RawApi) -> Self {

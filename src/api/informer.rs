@@ -1,3 +1,4 @@
+use futures::stream::LocalBoxStream;
 use crate::api::resource::{KubeObject, ObjectList, WatchEvent};
 use crate::api::{Api, ListParams, RawApi, Void};
 use crate::client::APIClient;
@@ -5,6 +6,7 @@ use crate::Result;
 
 use futures::lock::Mutex;
 use futures::{Stream, StreamExt};
+use futures::stream::BoxStream;
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
@@ -18,7 +20,7 @@ use std::{sync::Arc, time::Duration};
 #[derive(Clone)]
 pub struct Informer<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + KubeObject + Send,
 {
     version: Arc<Mutex<String>>,
     client: APIClient,
@@ -31,7 +33,7 @@ where
 
 impl<K> Informer<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + KubeObject + Send,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn new(r: Api<K>) -> Self {
@@ -49,7 +51,7 @@ where
 
 impl<K> Informer<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + KubeObject + Send + ?Sized,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn raw(client: APIClient, r: RawApi) -> Self {
@@ -136,7 +138,7 @@ where
     /// In the retry/reset cases we wait 10s between each attempt.
     ///
     /// If you need to track the `resourceVersion` you can use `Informer::version()`.
-    pub async fn poll(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
+    pub async fn poll(&self) -> Result<BoxStream<'_, Result<WatchEvent<K>>>> {
         trace!("Watching {:?}", self.resource);
 
         // First check if we need to backoff or reset our resourceVersion from last time
@@ -199,7 +201,7 @@ where
                         };
                         event
                     }
-                }))
+                }).boxed())
             }
             Err(e) => {
                 warn!("Poll error: {:?}", e);

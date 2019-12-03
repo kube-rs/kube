@@ -4,7 +4,7 @@ use crate::config::Configuration;
 use crate::{Error, ErrorResponse, Result};
 use either::Either;
 use either::{Left, Right};
-use futures::StreamExt;
+use futures::stream::{BoxStream, LocalBoxStream, StreamExt};
 use futures::{self, Stream};
 use http;
 use http::StatusCode;
@@ -89,7 +89,7 @@ impl APIClient {
 
     pub async fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
     where
-        T: DeserializeOwned,
+        T: DeserializeOwned
     {
         let res: reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
@@ -147,12 +147,12 @@ impl APIClient {
         }
     }
 
-    pub async fn request_events<T>(
+    pub async fn request_events<'a, T: 'a>(
         &self,
         request: http::Request<Vec<u8>>,
-    ) -> Result<impl Stream<Item = Result<T>>>
+    ) -> Result<BoxStream<'a, Result<T>>>
     where
-        T: DeserializeOwned,
+        T: 'a + DeserializeOwned + Send
     {
         let res: reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
@@ -216,7 +216,7 @@ impl APIClient {
             }
         });
 
-        Ok(stream.map(futures::stream::iter).flatten())
+        Ok(stream.map(futures::stream::iter).flatten().boxed())
     }
 }
 

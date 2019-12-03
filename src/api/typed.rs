@@ -2,6 +2,7 @@
 
 use either::Either;
 use futures::{Stream, StreamExt};
+use futures::stream::BoxStream;
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
@@ -50,7 +51,7 @@ impl<K> Api<K> {
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + KubeObject + Send,
 {
     pub async fn get(&self, name: &str) -> Result<K> {
         let req = self.api.get(name)?;
@@ -87,12 +88,12 @@ where
         &self,
         lp: &ListParams,
         version: &str,
-    ) -> Result<impl Stream<Item = WatchEvent<K>>> {
+    ) -> Result<BoxStream<'_, WatchEvent<K>>> {
         let req = self.api.watch(&lp, &version)?;
         self.client
             .request_events::<WatchEvent<K>>(req)
             .await
-            .map(|stream| stream.filter_map(|e| async move { e.ok() }))
+            .map(|stream| stream.filter_map(|e| async move { e.ok() }).boxed())
     }
 
     pub async fn get_status(&self, name: &str) -> Result<K> {
