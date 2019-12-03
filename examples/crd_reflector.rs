@@ -6,6 +6,8 @@ use kube::{
     client::APIClient,
     config,
 };
+use std::time::Duration;
+use futures_timer::Delay;
 
 // Own custom resource spec
 #[derive(Deserialize, Serialize, Clone)]
@@ -33,9 +35,15 @@ async fn main() -> anyhow::Result<()> {
         .timeout(10) // low timeout in this example
         .init().await?;
 
+    tokio::spawn(async {
+        // Continuously poll to keep state up to date
+        loop {
+            rf.poll().await.unwrap()
+        }
+    });
+
     loop {
-        // Update internal state by calling watch (waits the full timeout)
-        rf.poll().await?; // ideally call this from a thread/task
+        Delay::new(Duration::from_secs(5)).await;
 
         // Read updated internal state (instant):
         rf.state().await?.into_iter().for_each(|crd| {

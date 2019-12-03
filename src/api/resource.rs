@@ -58,8 +58,8 @@ where
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Object<P, U>
 where
-    P: Clone,
-    U: Clone,
+    P: Clone + Send,
+    U: Clone + Send,
 {
     #[serde(flatten)]
     pub types: TypeMeta,
@@ -86,8 +86,8 @@ where
 /// Blanked implementation for standard objects that can use Object
 impl<P, U> KubeObject for Object<P, U>
 where
-    P: Clone,
-    U: Clone,
+    P: Clone + Send,
+    U: Clone + Send,
 {
     fn meta(&self) -> &ObjectMeta {
         &self.metadata
@@ -139,7 +139,7 @@ impl<T: Clone> ObjectList<T> {
     /// `iter_mut` returns an Iterator of mutable references to the elements of this ObjectList
     ///
     /// # Example
-    ///     
+    ///
     /// ```
     /// use kube::api::{ObjectList, ListMeta};
     ///
