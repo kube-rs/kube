@@ -19,7 +19,7 @@ pub trait KubeObject {
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<K>
 where
-    K: Clone + KubeObject,
+    K: Clone + KubeObject + Send,
 {
     Added(K),
     Modified(K),
@@ -29,7 +29,7 @@ where
 
 impl<K> Debug for WatchEvent<K>
 where
-    K: Clone + KubeObject,
+    K: Clone + KubeObject + Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
