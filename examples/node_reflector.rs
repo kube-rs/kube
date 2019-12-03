@@ -4,6 +4,8 @@ use kube::{
     client::APIClient,
     config,
 };
+use futures_timer::Delay;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -29,11 +31,17 @@ async fn main() -> anyhow::Result<()> {
         );
     });
 
-    loop {
-        // Update internal state by calling watch (waits the full timeout)
-        rf.poll().await?;
+    tokio::spawn(async move {
+        // Continuously poll to keep state up to date
+        loop {
+            rf.poll().await.unwrap();
+        }
+    });
 
-        // Read the internal state (instant):
+    loop {
+        // Read state from somewhere else
+        Delay::new(Duration::from_secs(5)).await;
+
         let deploys = rf.state().await?.into_iter().map(|o| o.metadata.name).collect::<Vec<_>>();
         info!("Current nodes: {:?}", deploys);
     }
