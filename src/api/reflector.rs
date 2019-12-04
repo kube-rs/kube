@@ -209,13 +209,13 @@ where
             .await?
             .boxed(); // We use boxed_local to remove the Send requirement as we're not shipping this between threads
 
-        // Update in place:
-        let mut data = self.data.lock().await;
-        let mut ver = self.version.lock().await;
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
         while let Some(ev) = events.next().await {
+            // Update in place:
+            let mut data = self.data.lock().await;
+            let mut ver = self.version.lock().await;
             match ev {
                 Ok(WatchEvent::Added(o)) => {
                     debug!("Adding {} to {}", o.meta().name, rg.resource);
