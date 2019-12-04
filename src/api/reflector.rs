@@ -207,8 +207,7 @@ where
             .client
             .request_events::<WatchEvent<K>>(req)
             .await?
-            .boxed(); // We use boxed_local to remove the Send requirement as we're not shipping this between threads
-
+            .boxed();
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
