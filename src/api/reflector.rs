@@ -194,7 +194,7 @@ where
             .map(|key: &ObjectId| key.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        debug!("Initialized with: {}", keys);
+        debug!("Initialized with: [{}]", keys);
         Ok((data, version))
     }
 
