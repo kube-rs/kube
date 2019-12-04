@@ -13,7 +13,7 @@ To use the openapi generated types:
 
 ```toml
 [dependencies]
-kube = { version = "0.21.1", features = ["openapi"] }
+kube = { version = "0.21.2", features = ["openapi"] }
 k8s-openapi = { version = "0.6.0", default-features = false, features = ["v1_15"] }
 ```
 
@@ -21,7 +21,7 @@ otherwise:
 
 ```toml
 [dependencies]
-kube = "0.21.1"
+kube = "0.21.2"
 ```
 
 The latter is fine in a CRD-only use case.
