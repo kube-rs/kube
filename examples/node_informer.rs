@@ -21,16 +21,15 @@ async fn main() -> anyhow::Result<()> {
     let nodes = RawApi::v1Node();
     let events = Api::v1Event(client.clone());
     let ni = Informer::raw(client.clone(), nodes)
-        .labels("beta.kubernetes.io/os=linux")
+        //.labels("beta.kubernetes.io/os=linux")
         .init()
         .await?;
 
     loop {
-        let mut nodes = ni.poll().await?.boxed();
+        let mut events = ni.poll().await?.boxed();
 
-        while let Some(ne) = nodes.next().await {
-            let ne = ne?;
-            handle_nodes(&events, ne).await?;
+        while let Some(ne) = events.next().await {
+            handle_nodes(&events, ne?).await?;
         }
     }
 }
