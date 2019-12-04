@@ -1,3 +1,8 @@
+0.22.2 / 2019-12-04
+===================
+  * Allow sharing Reflectors between threads - #97
+  * Fix Reflector pararall lock issue (`poll` no longer blocks `state`)
+
 0.22.1 / 2019-11-30
 ===================
   * Improve Reflector reset algorithm (clear history less)
