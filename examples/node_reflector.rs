@@ -1,9 +1,13 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
+use futures_timer::Delay;
 use kube::{
     api::{Api, Reflector},
     client::APIClient,
     config,
 };
+use std::sync::Arc;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -13,15 +17,19 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
 
     let resource = Api::v1Node(client);
-    let rf = Reflector::new(resource)
-        .labels("kubernetes.io/lifecycle=spot")
-        .timeout(10) // low timeout in this example
-        .init().await?;
+    let rf = Arc::new(
+        Reflector::new(resource)
+            .labels("kubernetes.io/lifecycle=spot")
+            .timeout(10) // low timeout in this example
+            .init()
+            .await?,
+    );
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Node
     rf.state().await?.into_iter().for_each(|object| {
-        info!("Found node {} ({:?}) running {:?} with labels: {:?}",
+        info!(
+            "Found node {} ({:?}) running {:?} with labels: {:?}",
             object.metadata.name,
             object.spec.provider_id.unwrap(),
             object.status.unwrap().conditions.unwrap(),
@@ -29,12 +37,24 @@ async fn main() -> anyhow::Result<()> {
         );
     });
 
-    loop {
-        // Update internal state by calling watch (waits the full timeout)
-        rf.poll().await?;
+    let cloned = rf.clone();
 
-        // Read the internal state (instant):
-        let deploys = rf.state().await?.into_iter().map(|o| o.metadata.name).collect::<Vec<_>>();
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = cloned.poll().await {
+                warn!("Poll error: {:?}", e);
+            }
+        }
+    });
+
+    loop {
+        Delay::new(Duration::from_secs(5)).await;
+        let deploys = rf
+            .state()
+            .await?
+            .into_iter()
+            .map(|o| o.metadata.name)
+            .collect::<Vec<_>>();
         info!("Current nodes: {:?}", deploys);
     }
 }
