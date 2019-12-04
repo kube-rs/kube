@@ -133,7 +133,7 @@ rf.state().await.into_iter().for_each(|(name, p)| {
 });
 ```
 
-Note that `poll` holds the future for 300s by default, but you can (and should) get `.state()` from another async context.
+Note that `poll` holds the future for 300s by default, but you can (and should) get `.state()` from another async context (see reflector examples for how to spawn an async task to do this).
 
 If you need the details of just a single object, you can use the more efficient, `Reflector::get` and `Reflector::get_within`.
 
