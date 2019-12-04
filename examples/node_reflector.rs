@@ -6,7 +6,7 @@ use kube::{
     client::APIClient,
     config,
 };
-use std::sync::Arc;
+
 use std::time::Duration;
 
 #[tokio::main]
@@ -17,13 +17,11 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
 
     let resource = Api::v1Node(client);
-    let rf = Arc::new(
-        Reflector::new(resource)
-            .labels("kubernetes.io/lifecycle=spot")
+    let rf = Reflector::new(resource)
+            //.labels("kubernetes.io/lifecycle=spot")
             .timeout(10) // low timeout in this example
             .init()
-            .await?,
-    );
+            .await?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Node
@@ -38,7 +36,6 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let cloned = rf.clone();
-
     tokio::spawn(async move {
         loop {
             if let Err(e) = cloned.poll().await {

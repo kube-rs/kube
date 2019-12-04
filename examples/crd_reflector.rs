@@ -1,5 +1,7 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
+use std::time::Duration;
+use futures_timer::Delay;
 
 use kube::{
     api::{Object, RawApi, Reflector, Void},
@@ -30,16 +32,22 @@ async fn main() -> anyhow::Result<()> {
         .within(&namespace);
 
     let rf : Reflector<Foo> = Reflector::raw(client, resource)
-        .timeout(10) // low timeout in this example
+        .timeout(20) // low timeout in this example
         .init().await?;
 
-    loop {
-        // Update internal state by calling watch (waits the full timeout)
-        rf.poll().await?; // ideally call this from a thread/task
+    let cloned = rf.clone();
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = cloned.poll().await {
+                warn!("Poll error: {:?}", e);
+            }
+        }
+    });
 
+    loop {
+        Delay::new(Duration::from_secs(5)).await;
         // Read updated internal state (instant):
-        rf.state().await?.into_iter().for_each(|crd| {
-            info!("foo {}: {}", crd.metadata.name, crd.spec.info);
-        });
+        let crds = rf.state().await?.into_iter().map(|crd| crd.metadata.name).collect::<Vec<_>>();
+        info!("Current crds: {:?}", crds);
     }
 }

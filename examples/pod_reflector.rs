@@ -4,6 +4,8 @@ use kube::{
     client::APIClient,
     config,
 };
+use std::time::Duration;
+use futures_timer::Delay;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -15,23 +17,30 @@ async fn main() -> anyhow::Result<()> {
 
     let resource = Api::v1Pod(client).within(&namespace);
     let rf = Reflector::new(resource)
-//        .timeout(10) // low timeout in this example
+        .timeout(20) // low timeout in this example
         .init().await?;
 
     // Can read initial state now:
     rf.state().await?.into_iter().for_each(|pod| {
-        info!("Found pod {} ({}) with {:?}",
+        info!("Found initial pod {} ({}) with {:?}",
             pod.metadata.name,
             pod.status.unwrap().phase.unwrap(),
             pod.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>(),
         );
     });
 
-    loop {
-        // Update internal state by calling watch (waits the full timeout)
-        rf.poll().await?;
+    let cloned = rf.clone();
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = cloned.poll().await {
+                warn!("Poll error: {:?}", e);
+            }
+        }
+    });
 
-        // Read updated internal state (instant):
+
+    loop {
+        Delay::new(Duration::from_secs(5)).await;
         let pods = rf.state().await?.into_iter().map(|pod| pod.metadata.name).collect::<Vec<_>>();
         info!("Current pods: {:?}", pods);
     }
