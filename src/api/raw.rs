@@ -509,7 +509,7 @@ impl RawApi {
         }
 
         let urlstr = qp.finish();
-        let mut req = http::Request::get(urlstr);
+        let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
@@ -523,7 +523,7 @@ impl RawApi {
         }
         // rest of lp doesn't matter here - we just need a resourceVersion
         let urlstr = qp.finish();
-        let mut req = http::Request::get(urlstr);
+        let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
@@ -547,7 +547,7 @@ impl RawApi {
         }
 
         let urlstr = qp.finish();
-        let mut req = http::Request::get(urlstr);
+        let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
@@ -556,7 +556,7 @@ impl RawApi {
         let base_url = self.make_url() + "/" + name;
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
-        let mut req = http::Request::get(urlstr);
+        let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
@@ -568,7 +568,7 @@ impl RawApi {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let mut req = http::Request::post(urlstr);
+        let req = http::Request::post(urlstr);
         req.body(data).map_err(Error::HttpError)
     }
 
@@ -586,7 +586,7 @@ impl RawApi {
             qp.append_pair("propagationPolicy", &format!("{:?}", prop));
         }
         let urlstr = qp.finish();
-        let mut req = http::Request::delete(urlstr);
+        let req = http::Request::delete(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
@@ -604,7 +604,7 @@ impl RawApi {
             qp.append_pair("labelSelector", &labels);
         }
         let urlstr = qp.finish();
-        let mut req = http::Request::delete(urlstr);
+        let req = http::Request::delete(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
@@ -635,7 +635,7 @@ impl RawApi {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let mut req = http::Request::put(urlstr);
+        let req = http::Request::put(urlstr);
         req.body(data).map_err(Error::HttpError)
     }
 
@@ -644,7 +644,7 @@ impl RawApi {
         let base_url = self.make_url() + "/" + name + "/scale";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
-        let mut req = http::Request::get(urlstr);
+        let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
@@ -670,7 +670,7 @@ impl RawApi {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let mut req = http::Request::put(urlstr);
+        let req = http::Request::put(urlstr);
         req.body(data).map_err(Error::HttpError)
     }
 
@@ -679,7 +679,7 @@ impl RawApi {
         let base_url = self.make_url() + "/" + name + "/status";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         let urlstr = qp.finish();
-        let mut req = http::Request::get(urlstr);
+        let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
@@ -705,7 +705,7 @@ impl RawApi {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let mut req = http::Request::put(urlstr);
+        let req = http::Request::put(urlstr);
         req.body(data).map_err(Error::HttpError)
     }
 }
@@ -749,7 +749,7 @@ impl RawApi {
         }
 
         let urlstr = qp.finish();
-        let mut req = http::Request::get(urlstr);
+        let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 }

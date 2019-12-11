@@ -1,3 +1,8 @@
+0.23.0 / 2019-12-XX
+===================
+  * Bump tokio and reqwest to 0.2 and 0.10 (non-alpha releases)
+  * ^ awaiting formal reqwest release (using master)
+
 0.22.2 / 2019-12-04
 ===================
   * Allow sharing Reflectors between threads - #97
