@@ -8,6 +8,8 @@ Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generi
 
 You can operate entirely without openapi definitions if you are operating on a `CustomResource`, but if you require the full definitions of native objects, it is easier to compile with the `openapi` feature to get accurate struct representations via [k8s-openapi](https://github.com/Arnavion/k8s-openapi).
 
+NB: This library is currently undergoing a lot of changes with async/await stabilizing. Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
+
 ## Installation
 To use the openapi generated types:
 
@@ -35,7 +37,7 @@ See [version-rs](https://github.com/clux/version-rs) for a super light (~100 lin
 
 See [controller-rs](https://github.com/clux/controller-rs) for a full actix* example, with circleci, and kube yaml.
 
-NB: actix examples have not been updated to the async version of this library yet.
+NB: actix examples with futures are currently working with git/alpha dependencies.
 
 ## Api
 It's currently recommended to compile with the "openapi" feature if you want an easy experience with accurate native object representations:

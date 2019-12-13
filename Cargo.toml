@@ -46,7 +46,6 @@ features = ["json", "gzip"]
 tempfile = "3.1.0"
 env_logger = "0.7.1"
 tokio = { version = "0.2.4", features = ["full"] }
-#tokio-executor = "0.2.4"
 anyhow = "1.0.25"
 
 [dev-dependencies.k8s-openapi]
