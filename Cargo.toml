@@ -38,14 +38,14 @@ openapi = ["k8s-openapi"]
 [dependencies.reqwest]
 #version = "0.10.0"
 git = "https://github.com/seanmonstar/reqwest"
-rev = "7631c0390e90d539b825ed27693a7a0bb1e31dc8"
-features = ["json", "gzip"]
+rev = "24abf2fcbdabbc63136677bc440788271484d103"
+features = ["json", "gzip", "native-tls"]
 # TODO: rustls
 
 [dev-dependencies]
 tempfile = "3.1.0"
 env_logger = "0.7.1"
-tokio = { version = "0.2.4", features = ["full"] }
+tokio = { version = "0.2.6", features = ["full"] }
 anyhow = "1.0.25"
 
 [dev-dependencies.k8s-openapi]
