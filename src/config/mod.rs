@@ -35,7 +35,7 @@ impl Configuration {
 
     pub fn with_default_ns(base_path: String, client: Client, default_ns: String) -> Self {
         Configuration {
-            base_path: base_path.to_owned(),
+            base_path,
             client,
             default_ns,
         }
