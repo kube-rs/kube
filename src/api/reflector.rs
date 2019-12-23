@@ -239,7 +239,7 @@ where
                 }
                 Ok(WatchEvent::Error(e)) => {
                     warn!("Failed to watch {}: {:?}", rg.resource, e);
-                    Err(Error::Api(e))?
+                    return Err(Error::Api(e))
                 }
                 Err(e) => {
                     // Just log out the error, but don't stop our stream short

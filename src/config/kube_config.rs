@@ -52,7 +52,7 @@ impl KubeConfigLoader {
         Ok(KubeConfigLoader {
             current_context: current_context.clone(),
             cluster: cluster.clone(),
-            user: user.clone(),
+            user,
         })
     }
 

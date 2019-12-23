@@ -77,7 +77,7 @@ impl APIClient {
             http::Method::DELETE => self.configuration.client.delete(&uri_str),
             http::Method::PUT => self.configuration.client.put(&uri_str),
             http::Method::PATCH => self.configuration.client.patch(&uri_str),
-            other => Err(Error::InvalidMethod(other.to_string()))?,
+            other => return Err(Error::InvalidMethod(other.to_string())),
         }
         .headers(parts.headers)
         .body(body)
@@ -96,7 +96,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await?;
-        handle_api_errors(&text, &s)?;
+        handle_api_errors(&text, s)?;
 
         serde_json::from_str(&text).map_err(|e| {
             warn!("{}, {:?}", text, e);
@@ -110,7 +110,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await?;
-        handle_api_errors(&text, &s)?;
+        handle_api_errors(&text, s)?;
 
         Ok(text)
     }
@@ -127,7 +127,7 @@ impl APIClient {
         //trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await?;
-        handle_api_errors(&text, &s)?;
+        handle_api_errors(&text, s)?;
 
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text)?;
@@ -227,7 +227,7 @@ impl APIClient {
 ///
 /// In either case, present an ApiError upstream.
 /// The latter is probably a bug if encountered.
-fn handle_api_errors(text: &str, s: &StatusCode) -> Result<()> {
+fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
     if s.is_client_error() || s.is_server_error() {
         // Print better debug when things do fail
         //trace!("Parsing error: {}", text);
