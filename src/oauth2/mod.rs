@@ -34,7 +34,7 @@ struct Claim {
 }
 
 impl Claim {
-    fn new(c: &Credentials, scope: &Vec<String>) -> Claim {
+    fn new(c: &Credentials, scope: &[String]) -> Claim {
         let iat = Utc::now();
         // The access token is available for 1 hour.
         // https://github.com/golang/oauth2/blob/c85d3e98c914e3a33234ad863dcbff5dbc425bb8/jws/jws.go#L63
@@ -91,7 +91,7 @@ struct TokenResponse {
 }
 
 impl TokenResponse {
-    pub fn to_token(self) -> Token {
+    pub fn into_token(self) -> Token {
         Token {
             access_token: self.access_token.unwrap(),
             token_type: self.token_type.unwrap(),
@@ -117,7 +117,7 @@ impl CredentialsClient {
             client: Client::new(),
         })
     }
-    pub async fn request_token(&self, scopes: &Vec<String>) -> Result<Token> {
+    pub async fn request_token(&self, scopes: &[String]) -> Result<Token> {
         let private_key = PKey::private_key_from_pem(&self.credentials.private_key.as_bytes())
             .map_err(|e| Error::SslError(format!("{}", e)))?;
         let encoded = &self.jws_encode(
@@ -143,7 +143,7 @@ impl CredentialsClient {
             .json::<TokenResponse>()
             .await
             .map_err(|e| Error::KubeConfig(format!("Unable to parse request token: {}", e)))?;
-        Ok(token_response.to_token())
+        Ok(token_response.into_token())
     }
 
     fn jws_encode(&self, claim: &Claim, header: &Header, key: PKey<Private>) -> Result<String> {
