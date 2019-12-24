@@ -97,6 +97,16 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
             let cert = Certificate::from_der(&ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?)
                 .map_err(Error::ReqwestError)?;
             client_builder = client_builder.add_root_certificate(cert);
+            if std::env::consts::OS == "macos"
+                && ca
+                    .as_ref()
+                    .not_before()
+                    .diff(ca.not_after())
+                    .map(|d| d.days.abs() > 824)
+                    .unwrap_or(false)
+            {
+                client_builder = client_builder.danger_accept_invalid_certs(true);
+            }
         }
     }
     match loader.p12(" ") {
