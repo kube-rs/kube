@@ -713,7 +713,7 @@ impl RawApi {
 impl RawApi {
     /// Get a pod logs
     pub fn log(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url() + "/" + name + "/" + "log";
+        let base_url = self.make_url() + "/" + name + "/" + "log?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
         if let Some(container) = &lp.container {
