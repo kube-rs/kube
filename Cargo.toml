@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.22.2"
+version = "0.23.0"
 description = "Kubernetes client in the style of client-go"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -36,9 +36,7 @@ default = []
 openapi = ["k8s-openapi"]
 
 [dependencies.reqwest]
-#version = "0.10.0"
-git = "https://github.com/seanmonstar/reqwest"
-rev = "24abf2fcbdabbc63136677bc440788271484d103"
+version = "0.10.0"
 features = ["json", "gzip", "native-tls"]
 # TODO: rustls
 

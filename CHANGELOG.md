@@ -1,7 +1,8 @@
-0.23.0 / 2019-12-XX
+0.23.0 / 2019-12-31
 ===================
-  * Bump tokio and reqwest to 0.2 and 0.10 (non-alpha releases)
-  * ^ awaiting formal reqwest release (using master)
+  * Bump tokio and reqwest to 0.2 and 0.10
+  * Fix bug in `log` fetcher - #107
+  * Temporarily allow invalid certs when testing on macosx - #105
 
 0.22.2 / 2019-12-04
 ===================
