@@ -178,9 +178,6 @@ cargo run --example crd_openapi --features=openapi
 cargo run --example pod_openapi --features=openapi
 ```
 
-## Timing
-All watch calls have timeouts set to `10` seconds as a default (and kube always waits that long regardless of activity). If you like to hammer the API less, you can either call `.poll()` less often and the events will collect on the kube side (if you don't wait too long and get a Gone). You can configure the timeout with `.timeout(n)` on the `Informer` or `Reflector`.
-
 ## Raw Api
 You can elide the large `k8s-openapi` dependency if you only are working with Informers/Reflectors, or you are happy to supply partial or complete definitions of the native objects you are working with:
 
