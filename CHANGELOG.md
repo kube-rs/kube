@@ -1,3 +1,8 @@
+0.24.0 / 2020-01-26
+===================
+  * Add support for ServiceAccount, Role, ClusterRole, RoleBinding, Endpoint - #113 + #111
+  * Upgrade k8s-openapi to 0.7 => breaking changes: https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v070-2020-01-23
+
 0.23.0 / 2019-12-31
 ===================
   * Bump tokio and reqwest to 0.2 and 0.10
