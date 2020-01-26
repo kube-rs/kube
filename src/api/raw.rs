@@ -297,6 +297,16 @@ impl RawApi {
         }
     }
 
+    /// ValidatingWebhookConfiguration constructor
+    pub fn v1Endpoint() -> Self {
+        Self {
+            group: "".into(),
+            resource: "endpoints".into(),
+            prefix: "api".into(),
+            ..Default::default()
+        }
+    }
+
     /// Custom resource definition constructor
     pub fn v1beta1CustomResourceDefinition() -> Self {
         Self {
