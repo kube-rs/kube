@@ -197,8 +197,7 @@ impl Api<v1ClusterRole> {
     }
 }
 
-use k8s_openapi::api::rbac::v1::RoleRef;
-use k8s_openapi::api::rbac::v1::Subject;
+use k8s_openapi::api::rbac::v1::{RoleRef, Subject};
 /// Role Binding object
 #[derive(Deserialize, Serialize, Clone)]
 pub struct v1RoleBinding {
@@ -221,10 +220,14 @@ impl Api<v1RoleBinding> {
     }
 }
 /// Service Account object
-/// TODO: incomplete, only contains metadata to allow listing. Need to add the rest of the fields.
+///
+/// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#serviceaccount-v1-core
+/// https://arnavion.github.io/k8s-openapi/v0.7.x/k8s_openapi/api/core/v1/struct.ServiceAccount.html
 #[derive(Deserialize, Serialize, Clone)]
 pub struct v1ServiceAccount {
     pub metadata: ObjectMeta,
+    pub automountServiceAccountToken: bool,
+    /// TODO: add remaining fields incomplete - atm, only here to allow listing
 }
 
 impl KubeObject for v1ServiceAccount {
@@ -235,6 +238,11 @@ impl Api<v1ServiceAccount> {
     pub fn v1ServiceAccount(client: APIClient) -> Self {
         Api {
             api: RawApi::v1ServiceAccount(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
 
 use k8s_openapi::api::core::v1::{EndpointSubset};
 
