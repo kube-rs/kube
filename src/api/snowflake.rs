@@ -227,7 +227,7 @@ impl Api<v1RoleBinding> {
 pub struct v1ServiceAccount {
     pub metadata: ObjectMeta,
     pub automountServiceAccountToken: bool,
-    /// TODO: add remaining fields incomplete - atm, only here to allow listing
+    // TODO: add remaining fields incomplete - atm, only here to allow listing
 }
 
 impl KubeObject for v1ServiceAccount {

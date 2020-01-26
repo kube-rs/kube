@@ -10,7 +10,7 @@ use openssl::rsa::Padding;
 use openssl::hash::MessageDigest;
 use reqwest::Client;
 use reqwest::header::CONTENT_TYPE;
-use time::Duration;
+//use time::Duration;
 use url::form_urlencoded::Serializer;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
@@ -29,7 +29,7 @@ struct Claim {
     iss: String,
     scope: String,
     aud: String,
-    exp: i64,
+    //exp: i64,
     iat: i64,
 }
 
@@ -38,12 +38,12 @@ impl Claim {
         let iat = Utc::now();
         // The access token is available for 1 hour.
         // https://github.com/golang/oauth2/blob/c85d3e98c914e3a33234ad863dcbff5dbc425bb8/jws/jws.go#L63
-        let exp = iat + Duration::hours(1);
+        //let exp = iat + Duration::hours(1);
         Claim {
             iss: c.client_email.clone(),
             scope: scope.join(" "),
             aud: c.token_uri.clone(),
-            exp: exp.timestamp(),
+            //exp: exp.timestamp(),
             iat: iat.timestamp(),
         }
     }

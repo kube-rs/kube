@@ -17,15 +17,15 @@ edition = "2018"
 base64 = "0.11.0"
 chrono = "0.4.10"
 dirs = "2.0.2"
-serde = "1.0.103"
-serde_derive = "1.0.103"
-serde_json = "1.0.44"
+serde = "1.0.104"
+serde_derive = "1.0.104"
+serde_json = "1.0.45"
 serde_yaml = "0.8.11"
 openssl = "0.10.26"
 http = "0.2.0"
-url = "2.1.0"
+url = "2.1.1"
 log = "0.4.8"
-time = "0.1.42"
+time = "0.2.4"
 either = "1.5.3"
 thiserror = "1.0.9"
 futures-timer = "2.0.0"
@@ -36,7 +36,7 @@ default = []
 openapi = ["k8s-openapi"]
 
 [dependencies.reqwest]
-version = "0.10.0"
+version = "0.10.1"
 features = ["json", "gzip", "native-tls"]
 # TODO: rustls
 
@@ -44,15 +44,15 @@ features = ["json", "gzip", "native-tls"]
 tempfile = "3.1.0"
 env_logger = "0.7.1"
 tokio = { version = "0.2.6", features = ["full"] }
-anyhow = "1.0.25"
+anyhow = "1.0.26"
 
 [dev-dependencies.k8s-openapi]
-version = "0.6.0"
+version = "0.7.1"
 default-features = false
 features = ["v1_15"]
 
 [dependencies.k8s-openapi]
-version = "0.6.0"
+version = "0.7.1"
 default-features = false
 features = []
 optional = true
