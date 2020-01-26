@@ -155,6 +155,86 @@ impl Api<v1beta1ValidatingWebhookConfiguration> {
     }
 }
 
+use k8s_openapi::api::rbac::v1::PolicyRule;
+/// Role object
+#[derive(Deserialize, Serialize, Clone)]
+pub struct v1Role {
+    pub metadata: ObjectMeta,
+    pub rules: Vec<PolicyRule>,
+}
+
+impl KubeObject for v1Role {
+    fn meta(&self) -> &ObjectMeta { &self.metadata }
+}
+
+impl Api<v1Role> {
+    pub fn v1Role(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1Role(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+/// ClusterRole object
+#[derive(Deserialize, Serialize, Clone)]
+pub struct v1ClusterRole {
+    pub metadata: ObjectMeta,
+    pub rules: Vec<PolicyRule>,
+}
+
+impl KubeObject for v1ClusterRole {
+    fn meta(&self) -> &ObjectMeta { &self.metadata }
+}
+
+impl Api<v1ClusterRole> {
+    pub fn v1ClusterRole(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ClusterRole(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+
+use k8s_openapi::api::rbac::v1::RoleRef;
+use k8s_openapi::api::rbac::v1::Subject;
+/// Role Binding object
+#[derive(Deserialize, Serialize, Clone)]
+pub struct v1RoleBinding {
+    pub metadata: ObjectMeta,
+    pub roleRef: RoleRef,
+    pub subjects: Vec<Subject>,
+}
+
+impl KubeObject for v1RoleBinding {
+    fn meta(&self) -> &ObjectMeta { &self.metadata }
+}
+
+impl Api<v1RoleBinding> {
+    pub fn v1RoleBinding(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1RoleBinding(),
+            client,
+            phantom: PhantomData,
+        }
+    }
+}
+/// Service Account object
+/// TODO: incomplete, only contains metadata to allow listing. Need to add the rest of the fields.
+#[derive(Deserialize, Serialize, Clone)]
+pub struct v1ServiceAccount {
+    pub metadata: ObjectMeta,
+}
+
+impl KubeObject for v1ServiceAccount {
+    fn meta(&self) -> &ObjectMeta { &self.metadata }
+}
+
+impl Api<v1ServiceAccount> {
+    pub fn v1ServiceAccount(client: APIClient) -> Self {
+        Api {
+            api: RawApi::v1ServiceAccount(),
 
 use k8s_openapi::api::core::v1::{EndpointSubset};
 

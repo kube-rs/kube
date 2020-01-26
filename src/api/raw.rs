@@ -43,7 +43,7 @@ impl RawApi {
     /// Set as namespaced resource within a specified namespace
     pub fn within(mut self, ns: &str) -> Self {
         match self.resource.as_ref() {
-            "nodes" | "namespaces" | "customresourcedefinitions" =>
+            "nodes" | "namespaces" | "clusterroles" | "customresourcedefinitions" =>
                 panic!("{} is not a namespace scoped resource", self.resource),
             _ => {},
         }
@@ -330,6 +330,50 @@ impl RawApi {
     pub fn customResource(name: &str) -> Self {
         Self {
             resource: name.into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable Role resource constructor
+    pub fn v1Role() -> Self {
+        Self {
+            group: "rbac.authorization.k8s.io".into(),
+            resource: "roles".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable ClusterRole resource constructor
+    pub fn v1ClusterRole() -> Self {
+        Self {
+            group: "rbac.authorization.k8s.io".into(),
+            resource: "clusterroles".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable Role resource constructor
+    pub fn v1RoleBinding() -> Self {
+        Self {
+            group: "rbac.authorization.k8s.io".into(),
+            resource: "rolebindings".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    // Stable Service Account resource constructor
+    pub fn v1ServiceAccount() -> Self {
+        Self {
+            group: "".into(),
+            resource: "serviceaccounts".into(),
+            prefix: "api".into(),
+            version: "v1".into(),
             ..Default::default()
         }
     }
