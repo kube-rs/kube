@@ -163,11 +163,7 @@ pub fn incluster_config() -> Result<Configuration> {
             incluster_config::SERVICE_PORTENV
     )))?;
 
-    let ca = incluster_config::load_cert()
-        .map_err(|e| Error::SslError(format!("{}", e)))?;
-    let der = ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
-    let req_ca = Certificate::from_der(&der)
-        .map_err(|e| Error::SslError(format!("{}", e)))?;
+    let cert = incluster_config::load_cert()?;
 
     let token = incluster_config::load_token()
         .map_err(|e| Error::KubeConfig(format!("Unable to load in cluster token: {}", e)))?;
@@ -184,7 +180,7 @@ pub fn incluster_config() -> Result<Configuration> {
     );
 
     let client_builder = Client::builder()
-        .add_root_certificate(req_ca)
+        .add_root_certificate(cert)
         .default_headers(headers);
 
     Ok(Configuration::with_default_ns(
