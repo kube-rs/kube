@@ -7,7 +7,7 @@ use openssl::{
     x509::X509,
 };
 
-use reqwest::Identity;
+use reqwest::{Identity, Certificate};
 
 use crate::{Error, Result};
 use crate::config::apis::{AuthInfo, Cluster, Config, Context};
@@ -44,7 +44,6 @@ impl KubeConfigLoader {
             .ok_or_else(|| Error::KubeConfig("Unable to load cluster of context".into()))?;
         let user_name = user.as_ref().unwrap_or(&current_context.user);
 
-        // NB: can't have async closures yet
         let mut user_opt = None;
         for named_user in config.auth_infos {
             if &named_user.name == user_name {
@@ -78,19 +77,57 @@ impl KubeConfigLoader {
     }
 
     #[cfg(feature="rustls-tls")]
-    pub fn identity(&self) -> Result<reqwest::Identity> {
+    pub fn identity(&self, password: &str) -> Result<Identity> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
         let mut buffer = client_key.clone();
         buffer.extend(client_cert);
 
-        Identity::from_pem(buffer.as_slice()).map_err(|_|Error::from(ErrorKind::SslError))
+        let id = Identity::from_pem(buffer.as_slice())
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
+        Ok(id)
     }
 
-    #[cfg(feature = "native-tls")]
-    pub fn ca_bundle(&self) -> Option<Result<Vec<X509>>> {
-        let bundle = self.cluster.load_certificate_authority().ok()?;
-        Some(X509::stack_from_pem(&bundle).map_err(|e| Error::SslError(format!("{}", e))))
+    #[cfg(feature="native-tls")]
+    pub fn ca_bundle(&self) -> Result<Vec<Certificate>> {
+        let bundle = self.cluster.load_certificate_authority()
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
+        let bundle = X509::stack_from_pem(&bundle).map_err(|e| Error::SslError(format!("{}", e)))?;
+        let mut cert_bundle = vec![];
+        for ca in bundle {
+            let der = ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
+            let cert = Certificate::from_der(&der)
+                .map_err(Error::ReqwestError)?;
+            cert_bundle.push(cert);
+        }
+        Ok(cert_bundle)
+    }
+
+    #[cfg(feature = "rustls-tls")]
+    pub fn ca_bundle(&self) -> Result<Vec<Certificate>> {
+        let bundle = self.cluster.load_certificate_authority()?;
+        let mut bundle_slice : &[u8] = &bundle;
+        rustls::internal::pemfile::certs(&mut bundle_slice)
+            .map_err(|e| Error::SslError(format!("{:?}", e)))?
+            .into_iter()
+            .map(|der| Certificate::from_der(&der.0)
+                .map_err(|e| Error::SslError(format!("{:?}", e))))
+            .collect()
+
     }
 }
+
+// HACKS
+#[cfg(feature = "native-tls")]
+pub fn will_catalina_fail_on_this_cert(_der: &Vec<u8>) -> bool {
+    true
+    //std::env::consts::OS == "macos" && der
+    //    .not_before()
+    //    .diff(der.not_after())
+    //    .map(|d| d.days.abs() > 824)
+    //    .unwrap_or(false)
+}
+
+#[cfg(feature = "rustls-tls")]
+pub fn will_catalina_fail_on_this_cert(cert: &Certificate) -> bool { true }

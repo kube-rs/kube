@@ -45,7 +45,7 @@ optional = true
 [features]
 default = ["native-tls"]
 native-tls = ["openssl", "reqwest/native-tls"]
-rustls-tls = ["rustls", "reqwest/rustls"]
+rustls-tls = ["rustls", "reqwest/rustls-tls"]
 openapi = ["k8s-openapi"]
 
 [dev-dependencies]

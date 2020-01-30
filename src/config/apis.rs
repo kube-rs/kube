@@ -150,18 +150,20 @@ impl Cluster {
 }
 
 impl AuthInfo {
-    #[cfg(feature = "native-tls")]
     pub(crate) async fn load_gcp(&mut self) -> Result<()> {
         match &self.auth_provider {
             Some(provider) => {
                 if let Some(access_token) = provider.config.get("access-token") {
                     self.token = Some(access_token.clone());
-                    if utils::is_expired(&provider.config["expiry"]) {
-                        let client = oauth2::CredentialsClient::new()?;
-                        let token = client.request_token(&[
-                            "https://www.googleapis.com/auth/cloud-platform".to_string(),
-                        ]).await?;
-                        self.token = Some(token.access_token);
+                    #[cfg(feature = "native-tls")]
+                    { // TODO: allow rusttls with this auth provider bs
+                        if utils::is_expired(&provider.config["expiry"]) {
+                            let client = oauth2::CredentialsClient::new()?;
+                            let token = client.request_token(&[
+                                "https://www.googleapis.com/auth/cloud-platform".to_string(),
+                            ]).await?;
+                            self.token = Some(token.access_token);
+                        }
                     }
                 }
                 if let Some(id_token) = provider.config.get("id-token") {
