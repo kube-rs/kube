@@ -1,4 +1,6 @@
 use std::path::Path;
+
+#[cfg(feature = "native-tls")]
 use openssl::{
     pkcs12::Pkcs12,
     pkey::PKey,

@@ -4,10 +4,14 @@ use std::path::PathBuf;
 
 use chrono::Utc;
 use crate::{Result, Error};
-use openssl::pkey::{PKey, Private};
-use openssl::sign::Signer;
-use openssl::rsa::Padding;
-use openssl::hash::MessageDigest;
+
+#[cfg(feature = "native-tls")]
+use openssl::{
+    pkey::{PKey, Private},
+    sign::Signer,
+    rsa::Padding,
+    hash::MessageDigest,
+};
 use reqwest::Client;
 use reqwest::header::CONTENT_TYPE;
 //use time::Duration;

@@ -21,7 +21,6 @@ serde = "1.0.104"
 serde_derive = "1.0.104"
 serde_json = "1.0.45"
 serde_yaml = "0.8.11"
-openssl = "0.10.26"
 http = "0.2.0"
 url = "2.1.1"
 log = "0.4.8"
@@ -30,15 +29,24 @@ either = "1.5.3"
 thiserror = "1.0.9"
 futures-timer = "2.0.0"
 futures = "0.3.1"
-
-[features]
-default = []
-openapi = ["k8s-openapi"]
+openssl = { version = "0.10.27", optional = true }
+rustls = { version = "0.16.0", optional = true }
 
 [dependencies.reqwest]
 version = "0.10.1"
-features = ["json", "gzip", "native-tls"]
-# TODO: rustls
+features = ["json", "gzip"]
+
+[dependencies.k8s-openapi]
+version = "0.7.1"
+default-features = false
+features = []
+optional = true
+
+[features]
+default = ["native-tls"]
+native-tls = ["openssl", "reqwest/native-tls"]
+rustls-tls = ["rustls", "reqwest/rustls"]
+openapi = ["k8s-openapi"]
 
 [dev-dependencies]
 tempfile = "3.1.0"
@@ -50,9 +58,3 @@ anyhow = "1.0.26"
 version = "0.7.1"
 default-features = false
 features = ["v1_15"]
-
-[dependencies.k8s-openapi]
-version = "0.7.1"
-default-features = false
-features = []
-optional = true

@@ -1,6 +1,7 @@
 use std::env;
 
 use crate::{Result, Error};
+#[cfg(feature = "native-tls")]
 use openssl::x509::X509;
 
 use crate::config::utils;
