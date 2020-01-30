@@ -150,6 +150,7 @@ impl Cluster {
 }
 
 impl AuthInfo {
+    #[cfg(feature = "native-tls")]
     pub(crate) async fn load_gcp(&mut self) -> Result<()> {
         match &self.auth_provider {
             Some(provider) => {

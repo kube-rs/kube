@@ -6,6 +6,9 @@ use openssl::{
     pkey::PKey,
     x509::X509,
 };
+
+use reqwest::Identity;
+
 use crate::{Error, Result};
 use crate::config::apis::{AuthInfo, Cluster, Config, Context};
 
@@ -58,18 +61,34 @@ impl KubeConfigLoader {
         })
     }
 
-    pub fn p12(&self, password: &str) -> Result<Pkcs12> {
+    #[cfg(feature="native-tls")]
+    pub fn identity(&self, password: &str) -> Result<Identity> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
         let x509 = X509::from_pem(&client_cert).map_err(|e| Error::SslError(format!("{}", e)))?;
         let pkey = PKey::private_key_from_pem(&client_key).map_err(|e| Error::SslError(format!("{}", e)))?;
 
-        Pkcs12::builder()
+        let p12 = Pkcs12::builder()
             .build(password, "kubeconfig", &pkey, &x509)
-            .map_err(|e| Error::SslError(format!("{}", e)))
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
+
+        let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
+        Ok(Identity::from_pkcs12_der(&der, password)?)
     }
 
+    #[cfg(feature="rustls-tls")]
+    pub fn identity(&self) -> Result<reqwest::Identity> {
+        let client_cert = &self.user.load_client_certificate()?;
+        let client_key = &self.user.load_client_key()?;
+
+        let mut buffer = client_key.clone();
+        buffer.extend(client_cert);
+
+        Identity::from_pem(buffer.as_slice()).map_err(|_|Error::from(ErrorKind::SslError))
+    }
+
+    #[cfg(feature = "native-tls")]
     pub fn ca_bundle(&self) -> Option<Result<Vec<X509>>> {
         let bundle = self.cluster.load_certificate_authority().ok()?;
         Some(X509::stack_from_pem(&bundle).map_err(|e| Error::SslError(format!("{}", e))))

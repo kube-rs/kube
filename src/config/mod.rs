@@ -13,7 +13,7 @@ mod utils;
 
 use base64;
 use crate::{Error, Result};
-use reqwest::{header, Certificate, Client, ClientBuilder, Identity};
+use reqwest::{header, Certificate, Client, ClientBuilder};
 
 use self::kube_config::KubeConfigLoader;
 
@@ -109,12 +109,11 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
             }
         }
     }
-    match loader.p12(" ") {
-        Ok(p12) => {
-            let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
-            let req_p12 = Identity::from_pkcs12_der(&der, " ")
-                .map_err(Error::ReqwestError)?;
-            client_builder = client_builder.identity(req_p12);
+
+
+    match loader.identity(" ") {
+        Ok(id) => {
+            client_builder = client_builder.identity(id);
         }
         Err(_) => {
             // last resort only if configs ask for it, and no client certs
@@ -149,7 +148,6 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
     }
 
     Ok((client_builder.default_headers(headers), loader))
-
 }
 
 /// Returns a config which is used by clients within pods on kubernetes.

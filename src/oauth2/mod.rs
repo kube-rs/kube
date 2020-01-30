@@ -121,6 +121,8 @@ impl CredentialsClient {
             client: Client::new(),
         })
     }
+
+    #[cfg(feature = "native-tls")]
     pub async fn request_token(&self, scopes: &[String]) -> Result<Token> {
         let private_key = PKey::private_key_from_pem(&self.credentials.private_key.as_bytes())
             .map_err(|e| Error::SslError(format!("{}", e)))?;
@@ -150,6 +152,7 @@ impl CredentialsClient {
         Ok(token_response.into_token())
     }
 
+    #[cfg(feature = "native-tls")]
     fn jws_encode(&self, claim: &Claim, header: &Header, key: PKey<Private>) -> Result<String> {
         let encoded_header = self.base64_encode(serde_json::to_string(&header).unwrap().as_bytes());
         let encoded_claims = self.base64_encode(serde_json::to_string(&claim).unwrap().as_bytes());
