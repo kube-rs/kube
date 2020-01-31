@@ -11,9 +11,12 @@ mod incluster_config;
 mod kube_config;
 mod utils;
 
-use base64;
 use crate::{Error, Result};
-use reqwest::{header, Certificate, Client, ClientBuilder};
+use base64;
+#[cfg(feature = "native-tls")]
+use openssl::x509::X509;
+use reqwest::{header, Certificate, Client, ClientBuilder, Identity};
+
 
 use self::kube_config::KubeConfigLoader;
 
@@ -67,13 +70,12 @@ pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configurati
 // TODO: reinstate the catalina hack.
 /*
 #[cfg(target_os = "macos")]
-fn platform_cfg_client_builder(client_builder: ClientBuilder) -> ClientBuilder {
+fn platform_cfg_client_builder(client_builder: ClientBuilder, ca: &X509) -> ClientBuilder {
     if ca
-            .as_ref()
-            .not_before()
-            .diff(ca.not_after())
-            .map(|d| d.days.abs() > 824)
-            .unwrap_or(false)
+        .not_before()
+        .diff(ca.not_after())
+        .map(|d| d.days.abs() > 824)
+        .unwrap_or(false)
     {
         client_builder.danger_accept_invalid_certs(true)
     } else {
@@ -82,7 +84,7 @@ fn platform_cfg_client_builder(client_builder: ClientBuilder) -> ClientBuilder {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn platform_cfg_client_builder(client_builder: ClientBuilder) -> ClientBuilder {
+fn platform_cfg_client_builder(client_builder: ClientBuilder, _: &X509) -> ClientBuilder {
     client_builder
 }*/
 
@@ -115,9 +117,9 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
 
     for cert in loader.ca_bundle()? {
         client_builder = client_builder.add_root_certificate(cert);
-        // client_builder = platform_cfg_client_builder(client_builder);
+        // TODO: reinstate
+        //client_builder = platform_cfg_client_builder(client_builder, &ca);
     }
-
 
     match loader.identity(" ") {
         Ok(id) => {
