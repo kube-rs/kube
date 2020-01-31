@@ -65,6 +65,26 @@ pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configurati
     ))
 }
 
+#[cfg(target_os = "macos")]
+fn platform_cfg_client_builder(client_builder: ClientBuilder) -> ClientBuilder {
+    if ca
+            .as_ref()
+            .not_before()
+            .diff(ca.not_after())
+            .map(|d| d.days.abs() > 824)
+            .unwrap_or(false)
+    {
+        client_builder.danger_accept_invalid_certs(true)
+    } else {
+        client_builder
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn platform_cfg_client_builder(client_builder: ClientBuilder) -> ClientBuilder {
+    client_builder
+}
+
 /// Returns a client builder and config loader, based on the cluster information from the kubeconfig file.
 ///
 /// This allows to create your custom reqwest client for using with the cluster API.
@@ -97,16 +117,7 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
             let cert = Certificate::from_der(&ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?)
                 .map_err(Error::ReqwestError)?;
             client_builder = client_builder.add_root_certificate(cert);
-            if std::env::consts::OS == "macos"
-                && ca
-                    .as_ref()
-                    .not_before()
-                    .diff(ca.not_after())
-                    .map(|d| d.days.abs() > 824)
-                    .unwrap_or(false)
-            {
-                client_builder = client_builder.danger_accept_invalid_certs(true);
-            }
+            client_builder = platform_cfg_client_builder(client_builder);
         }
     }
     match loader.p12(" ") {
