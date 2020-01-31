@@ -12,6 +12,27 @@ use reqwest::{Identity, Certificate};
 use crate::{Error, Result};
 use crate::config::apis::{AuthInfo, Cluster, Config, Context};
 
+/// Regardless of tls type, a Certificate Der is always a byte array
+pub struct Der(pub Vec<u8>);
+
+use std::convert::TryFrom;
+impl TryFrom<Der> for Certificate {
+    type Error = Error;
+    fn try_from(val: Der) -> Result<Certificate> {
+        Certificate::from_der(&val.0)
+            .map_err(Error::ReqwestError)
+    }
+}
+// use std::convert::TryInto;
+// impl TryInto<Certificate> for Der {
+//     fn try_into<Der>(&self.0) -> Result<Certificate> {
+//         Certificate::from_der(self)
+//             .map_err(Error::ReqwestError)
+//     }
+// }
+
+
+
 /// KubeConfigLoader loads current context, cluster, and authentication information.
 #[derive(Clone,Debug)]
 pub struct KubeConfigLoader {
@@ -86,46 +107,37 @@ impl KubeConfigLoader {
 
         let mut buffer = client_key.clone();
         buffer.extend_from_slice(client_cert);
-
-        //unsafe { println!("Using PEM FILE: \n{}", std::str::from_utf8_unchecked(&buffer)); }
-
-        let id = Identity::from_pem(&buffer.as_slice())
-            .map_err(|e| Error::SslError(format!("{}", e)))?;
-        Ok(id)
+        Identity::from_pem(&buffer.as_slice())
+            .map_err(|e| Error::SslError(format!("{}", e)))
     }
 
     #[cfg(feature="native-tls")]
-    pub fn ca_bundle(&self) -> Result<Vec<Certificate>> {
+    pub fn ca_bundle(&self) -> Result<Vec<Der>> {
         let bundle = self.cluster.load_certificate_authority()
             .map_err(|e| Error::SslError(format!("{}", e)))?;
         let bundle = X509::stack_from_pem(&bundle)
             .map_err(|e| Error::SslError(format!("{}", e)))?;
-        let mut cert_bundle = vec![];
+
+        let mut stack = vec![];
         for ca in bundle {
-            let der = ca.to_der()
-                .map_err(|e| Error::SslError(format!("{}", e)))?;
-            //unsafe { println!("Got cert der: {}", std::str::from_utf8_unchecked(&der)); }
-            let cert = Certificate::from_der(&der)
-                .map_err(Error::ReqwestError)?;
-            cert_bundle.push(cert);
+            let der = ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
+            stack.push(Der(der))
         }
-        Ok(cert_bundle)
+        Ok(stack)
     }
 
     #[cfg(feature = "rustls-tls")]
-    pub fn ca_bundle(&self) -> Result<Vec<Certificate>> {
+    pub fn ca_bundle(&self) -> Result<Vec<Der>> {
         use rustls::internal::pemfile;
         use std::io::Cursor;
         let bundle = self.cluster.load_certificate_authority()?;
         let mut pem = Cursor::new(bundle);
         pem.set_position(0);
-        let mut cert_bundle = vec![];
-        for der in pemfile::certs(&mut pem).map_err(|e| Error::SslError(format!("{:?}", e)))? {
-            //unsafe { println!("Got cert der: {}", std::str::from_utf8_unchecked(&der.0)); }
-            let cert = Certificate::from_der(&der.0)
-                .map_err(|e| Error::SslError(format!("{:?}", e)))?;
-            cert_bundle.push(cert)
+
+        let mut stack = vec![];
+        for ca in pemfile::certs(&mut pem).map_err(|e| Error::SslError(format!("{:?}", e)))? {
+            stack.push(Der(ca.0))
         }
-        Ok(cert_bundle)
+        Ok(stack)
     }
 }

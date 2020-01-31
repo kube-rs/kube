@@ -11,10 +11,10 @@ mod incluster_config;
 mod kube_config;
 mod utils;
 
+use crate::config::kube_config::{Der};
 use crate::{Error, Result};
+use std::convert::TryInto;
 use base64;
-#[cfg(feature = "native-tls")]
-use openssl::x509::X509;
 use reqwest::{header, Certificate, Client, ClientBuilder, Identity};
 
 
@@ -67,10 +67,12 @@ pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configurati
             .map_err(|e| Error::KubeConfig(format!("Unable to build client: {}", e)))?,
     ))
 }
-// TODO: reinstate the catalina hack.
-/*
-#[cfg(target_os = "macos")]
-fn platform_cfg_client_builder(client_builder: ClientBuilder, ca: &X509) -> ClientBuilder {
+
+// temporary catalina hack for openssl only
+#[cfg(all(target_os = "macos", feature="native-tls"))]
+fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, ca_: &Der) -> ClientBuilder {
+    use openssl::x509::X509;
+    let ca = X509::from_der(&ca_.0).expect("valid der is a der");
     if ca
         .not_before()
         .diff(ca.not_after())
@@ -83,10 +85,10 @@ fn platform_cfg_client_builder(client_builder: ClientBuilder, ca: &X509) -> Clie
     }
 }
 
-#[cfg(not(target_os = "macos"))]
-fn platform_cfg_client_builder(client_builder: ClientBuilder, _: &X509) -> ClientBuilder {
+#[cfg(any(not(target_os = "macos"), not(feature="native-tls")))]
+fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, _: &Der) -> ClientBuilder {
     client_builder
-}*/
+}
 
 /// Returns a client builder and config loader, based on the cluster information from the kubeconfig file.
 ///
@@ -115,10 +117,9 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
 
     let mut client_builder = Client::builder();
 
-    for cert in loader.ca_bundle()? {
-        client_builder = client_builder.add_root_certificate(cert);
-        // TODO: reinstate
-        //client_builder = platform_cfg_client_builder(client_builder, &ca);
+    for ca in loader.ca_bundle()? {
+        client_builder = hacky_cert_lifetime_for_macos(client_builder, &ca);
+        client_builder = client_builder.add_root_certificate(ca.try_into()?);
     }
 
     match loader.identity(" ") {
