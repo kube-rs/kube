@@ -1,4 +1,4 @@
-use crate::{Result, Error};
+use crate::{Error, Result};
 
 /// RawApi generation data
 ///
@@ -43,9 +43,10 @@ impl RawApi {
     /// Set as namespaced resource within a specified namespace
     pub fn within(mut self, ns: &str) -> Self {
         match self.resource.as_ref() {
-            "nodes" | "namespaces" | "clusterroles" | "customresourcedefinitions" =>
-                panic!("{} is not a namespace scoped resource", self.resource),
-            _ => {},
+            "nodes" | "namespaces" | "clusterroles" | "customresourcedefinitions" => {
+                panic!("{} is not a namespace scoped resource", self.resource)
+            }
+            _ => {}
         }
         self.namespace = Some(ns.to_string());
         self
@@ -383,11 +384,24 @@ impl RawApi {
 
 impl RawApi {
     fn make_url(&self) -> String {
-        let pref = if self.prefix == "" { "".into() } else { format!("{}/", self.prefix) };
-        let g = if self.group == "" { "".into() } else { format!("{}/", self.group) };
-        let n = if let Some(ns) = &self.namespace { format!("namespaces/{}/", ns) } else { "".into() };
+        let pref = if self.prefix == "" {
+            "".into()
+        } else {
+            format!("{}/", self.prefix)
+        };
+        let g = if self.group == "" {
+            "".into()
+        } else {
+            format!("{}/", self.group)
+        };
+        let n = if let Some(ns) = &self.namespace {
+            format!("namespaces/{}/", ns)
+        } else {
+            "".into()
+        };
 
-        format!("/{prefix}{group}{version}/{namespaces}{resource}",
+        format!(
+            "/{prefix}{group}{version}/{namespaces}{resource}",
             prefix = pref,
             group = g,
             version = self.version,
@@ -406,7 +420,7 @@ pub struct ListParams {
     pub field_selector: Option<String>,
     pub include_uninitialized: bool,
     pub label_selector: Option<String>,
-    pub timeout: Option<u32>
+    pub timeout: Option<u32>,
 }
 
 /// Common query parameters for put/post calls
@@ -425,7 +439,7 @@ pub struct PatchParams {
     pub force: bool,
     /// fieldManager is a name of the actor that is making changes. Required for `PatchStrategy::Apply`
     /// optional for everything else
-    pub field_manager: Option<String>
+    pub field_manager: Option<String>,
 }
 
 impl PatchParams {
@@ -434,13 +448,17 @@ impl PatchParams {
             // Implement the easy part of validation, in future this may be extended to provide validation as in go code
             // For now it's fine, because k8s API server will return an error
             if field_manager.len() > 128 {
-                return Err(Error::RequestValidation("Failed to validate PatchParameters::field_manager!".into()))
+                return Err(Error::RequestValidation(
+                    "Failed to validate PatchParameters::field_manager!".into(),
+                ));
             }
         }
 
         if self.patch_strategy != PatchStrategy::Apply && self.force {
-             // if not force, all other fields are valid for all types of patch requests
-            Err(Error::RequestValidation("Force is applicable only for Apply strategy!".into()))
+            // if not force, all other fields are valid for all types of patch requests
+            Err(Error::RequestValidation(
+                "Force is applicable only for Apply strategy!".into(),
+            ))
         } else {
             Ok(())
         }
@@ -459,7 +477,6 @@ impl PatchParams {
     }
 }
 
-
 /// For patch different patch types are supported. See https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment
 /// Apply strategy is kinda special
 #[derive(Clone, PartialEq)]
@@ -467,7 +484,7 @@ pub enum PatchStrategy {
     Apply,
     JSON,
     Merge,
-    Strategic
+    Strategic,
 }
 
 impl std::fmt::Display for PatchStrategy {
@@ -476,7 +493,7 @@ impl std::fmt::Display for PatchStrategy {
             Self::Apply => "application/apply-patch+yaml",
             Self::JSON => "application/json-patch+json",
             Self::Merge => "application/merge-patch+json",
-            Self::Strategic => "application/strategic-merge-patch+json"
+            Self::Strategic => "application/strategic-merge-patch+json",
         };
         f.write_str(content_type)
     }
@@ -486,7 +503,9 @@ impl std::fmt::Display for PatchStrategy {
 // so, currently we still default to Merge it may change in future versions
 // Strategic merge doesn't work with CRD types https://github.com/kubernetes/kubernetes/issues/52772
 impl Default for PatchStrategy {
-    fn default() -> Self { PatchStrategy::Merge }
+    fn default() -> Self {
+        PatchStrategy::Merge
+    }
 }
 
 /// Common query parameters for delete calls
@@ -568,7 +587,10 @@ impl RawApi {
     }
 
     /// Create a minimial list request to seed an initial resourceVersion
-    pub(crate) fn list_zero_resource_entries(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
+    pub(crate) fn list_zero_resource_entries(
+        &self,
+        lp: &ListParams,
+    ) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         qp.append_pair("limit", "1"); // can't have 0..
@@ -628,7 +650,7 @@ impl RawApi {
 
     /// Delete an instance of a resource
     pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url() + "/"+ name + "?";
+        let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if dp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -665,7 +687,12 @@ impl RawApi {
     /// Patch an instance of a resource
     ///
     /// Requires a serialized merge-patch+json at the moment.
-    pub fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>> {
         pp.validate()?;
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -682,7 +709,12 @@ impl RawApi {
     /// Replace an instance of a resource
     ///
     /// Requires metadata.resourceVersion set in data
-    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn replace(
+        &self,
+        name: &str,
+        pp: &PostParams,
+        data: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
@@ -703,7 +735,12 @@ impl RawApi {
     }
 
     /// Patch an instance of the scale subresource
-    pub fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch_scale(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>> {
         pp.validate()?;
         let base_url = self.make_url() + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -717,7 +754,12 @@ impl RawApi {
     }
 
     /// Replace an instance of the scale subresource
-    pub fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn replace_scale(
+        &self,
+        name: &str,
+        pp: &PostParams,
+        data: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
@@ -738,7 +780,12 @@ impl RawApi {
     }
 
     /// Patch an instance of the status subresource
-    pub fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch_status(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>> {
         pp.validate()?;
         let base_url = self.make_url() + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -752,7 +799,12 @@ impl RawApi {
     }
 
     /// Replace an instance of the status subresource
-    pub fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn replace_status(
+        &self,
+        name: &str,
+        pp: &PostParams,
+        data: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
@@ -809,7 +861,7 @@ impl RawApi {
 }
 
 #[test]
-fn list_path(){
+fn list_path() {
     let r = RawApi::v1Deployment().within("ns");
     let gp = ListParams::default();
     let req = r.list(&gp).unwrap();
@@ -820,12 +872,18 @@ fn watch_path() {
     let r = RawApi::v1Pod().within("ns");
     let gp = ListParams::default();
     let req = r.watch(&gp, "0").unwrap();
-    assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=300");
+    assert_eq!(
+        req.uri(),
+        "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=300"
+    );
 }
 #[test]
-fn replace_path(){
+fn replace_path() {
     let r = RawApi::v1DaemonSet();
-    let pp = PostParams { dry_run: true, ..Default::default() };
+    let pp = PostParams {
+        dry_run: true,
+        ..Default::default()
+    };
     let req = r.replace("myds", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
 }
@@ -855,7 +913,8 @@ fn delete_collection_path() {
 }
 
 #[test]
-fn namespace_path() { // weird object compared to other v1
+fn namespace_path() {
+    // weird object compared to other v1
     let r = RawApi::v1Namespace();
     let gp = ListParams::default();
     let req = r.list(&gp).unwrap();
@@ -865,28 +924,37 @@ fn namespace_path() { // weird object compared to other v1
 #[test]
 fn patch_params_validation() {
     let pp = PatchParams::default();
-    assert!(pp.validate().is_ok(), "default params should always be valid");
+    assert!(
+        pp.validate().is_ok(),
+        "default params should always be valid"
+    );
 
     let patch_strategy_apply_true = PatchParams {
         patch_strategy: PatchStrategy::Merge,
         force: true,
         ..Default::default()
     };
-    assert!(patch_strategy_apply_true.validate().is_err(), "Merge strategy shouldn't be valid if `force` set to true");
+    assert!(
+        patch_strategy_apply_true.validate().is_err(),
+        "Merge strategy shouldn't be valid if `force` set to true"
+    );
 }
 
 // subresources with weird version accuracy
 #[test]
-fn patch_status_path(){
+fn patch_status_path() {
     let r = RawApi::v1Node();
     let pp = PatchParams::default();
     let req = r.patch_status("mynode", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
-    assert_eq!(req.headers().get("Content-Type").unwrap().to_str().unwrap(), format!("{}", PatchStrategy::Merge));
+    assert_eq!(
+        req.headers().get("Content-Type").unwrap().to_str().unwrap(),
+        format!("{}", PatchStrategy::Merge)
+    );
     assert_eq!(req.method(), "PATCH");
 }
 #[test]
-fn replace_status_path(){
+fn replace_status_path() {
     let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.replace_status("mynode", &pp, vec![]).unwrap();
@@ -897,18 +965,15 @@ fn replace_status_path(){
 #[test]
 fn create_custom_resource() {
     let r = RawApi::customResource("foos")
-        .group("clux.dev").version("v1")
+        .group("clux.dev")
+        .version("v1")
         .within("myns");
     let pp = PostParams::default();
     let req = r.create(&pp, vec![]).unwrap();
-    assert_eq!(req.uri(),
-        "/apis/clux.dev/v1/namespaces/myns/foos?"
-    );
+    assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");
     let patch_params = PatchParams::default();
     let req = r.patch("baz", &patch_params, vec![]).unwrap();
-    assert_eq!(req.uri(),
-        "/apis/clux.dev/v1/namespaces/myns/foos/baz?"
-    );
+    assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos/baz?");
     assert_eq!(req.method(), "PATCH");
 }
 
@@ -917,13 +982,15 @@ fn create_ingress() {
     let r = RawApi::v1beta1Ingress().within("bleep");
     let pp = PostParams::default();
     let req = r.create(&pp, vec![]).unwrap();
-    assert_eq!(req.uri(),
-               "/apis/extensions/v1beta1/namespaces/bleep/ingresses?"
+    assert_eq!(
+        req.uri(),
+        "/apis/extensions/v1beta1/namespaces/bleep/ingresses?"
     );
     let patch_params = PatchParams::default();
     let req = r.patch("baz", &patch_params, vec![]).unwrap();
-    assert_eq!(req.uri(),
-               "/apis/extensions/v1beta1/namespaces/bleep/ingresses/baz?"
+    assert_eq!(
+        req.uri(),
+        "/apis/extensions/v1beta1/namespaces/bleep/ingresses/baz?"
     );
     assert_eq!(req.method(), "PATCH");
 }
@@ -933,19 +1000,20 @@ fn replace_status() {
     let r = RawApi::v1beta1CustomResourceDefinition();
     let pp = PostParams::default();
     let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(),
+    assert_eq!(
+        req.uri(),
         "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/mycrd.domain.io/status?"
     );
 }
 #[test]
-fn get_scale_path(){
+fn get_scale_path() {
     let r = RawApi::v1Node();
     let req = r.get_scale("mynode").unwrap();
     assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale");
     assert_eq!(req.method(), "GET");
 }
 #[test]
-fn patch_scale_path(){
+fn patch_scale_path() {
     let r = RawApi::v1Node();
     let pp = PatchParams::default();
     let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
@@ -953,7 +1021,7 @@ fn patch_scale_path(){
     assert_eq!(req.method(), "PATCH");
 }
 #[test]
-fn replace_scale_path(){
+fn replace_scale_path() {
     let r = RawApi::v1Node();
     let pp = PostParams::default();
     let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
@@ -963,6 +1031,6 @@ fn replace_scale_path(){
 
 #[test]
 #[should_panic]
-fn global_resources_not_namespaceable(){
+fn global_resources_not_namespaceable() {
     RawApi::v1Node().within("ns");
 }
