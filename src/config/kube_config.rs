@@ -65,14 +65,17 @@ impl KubeConfigLoader {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
-        let x509 = X509::from_pem(&client_cert).map_err(|e| Error::SslError(format!("{}", e)))?;
-        let pkey = PKey::private_key_from_pem(&client_key).map_err(|e| Error::SslError(format!("{}", e)))?;
+        let x509 = X509::from_pem(&client_cert)
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
+        let pkey = PKey::private_key_from_pem(&client_key)
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
 
         let p12 = Pkcs12::builder()
             .build(password, "kubeconfig", &pkey, &x509)
             .map_err(|e| Error::SslError(format!("{}", e)))?;
 
-        let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
+        let der = p12.to_der()
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
         Ok(Identity::from_pkcs12_der(&der, password)?)
     }
 
@@ -82,9 +85,11 @@ impl KubeConfigLoader {
         let client_key = &self.user.load_client_key()?;
 
         let mut buffer = client_key.clone();
-        buffer.extend(client_cert);
+        buffer.extend_from_slice(client_cert);
 
-        let id = Identity::from_pem(buffer.as_slice())
+        //unsafe { println!("Using PEM FILE: \n{}", std::str::from_utf8_unchecked(&buffer)); }
+
+        let id = Identity::from_pem(&buffer.as_slice())
             .map_err(|e| Error::SslError(format!("{}", e)))?;
         Ok(id)
     }
@@ -93,10 +98,13 @@ impl KubeConfigLoader {
     pub fn ca_bundle(&self) -> Result<Vec<Certificate>> {
         let bundle = self.cluster.load_certificate_authority()
             .map_err(|e| Error::SslError(format!("{}", e)))?;
-        let bundle = X509::stack_from_pem(&bundle).map_err(|e| Error::SslError(format!("{}", e)))?;
+        let bundle = X509::stack_from_pem(&bundle)
+            .map_err(|e| Error::SslError(format!("{}", e)))?;
         let mut cert_bundle = vec![];
         for ca in bundle {
-            let der = ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
+            let der = ca.to_der()
+                .map_err(|e| Error::SslError(format!("{}", e)))?;
+            //unsafe { println!("Got cert der: {}", std::str::from_utf8_unchecked(&der)); }
             let cert = Certificate::from_der(&der)
                 .map_err(Error::ReqwestError)?;
             cert_bundle.push(cert);
@@ -106,19 +114,23 @@ impl KubeConfigLoader {
 
     #[cfg(feature = "rustls-tls")]
     pub fn ca_bundle(&self) -> Result<Vec<Certificate>> {
+        use rustls::internal::pemfile;
+        use std::io::Cursor;
         let bundle = self.cluster.load_certificate_authority()?;
-        let mut bundle_slice : &[u8] = &bundle;
-        rustls::internal::pemfile::certs(&mut bundle_slice)
-            .map_err(|e| Error::SslError(format!("{:?}", e)))?
-            .into_iter()
-            .map(|der| Certificate::from_der(&der.0)
-                .map_err(|e| Error::SslError(format!("{:?}", e))))
-            .collect()
-
+        let mut pem = Cursor::new(bundle);
+        pem.set_position(0);
+        let mut cert_bundle = vec![];
+        for der in pemfile::certs(&mut pem).map_err(|e| Error::SslError(format!("{:?}", e)))? {
+            //unsafe { println!("Got cert der: {}", std::str::from_utf8_unchecked(&der.0)); }
+            let cert = Certificate::from_der(&der.0)
+                .map_err(|e| Error::SslError(format!("{:?}", e)))?;
+            cert_bundle.push(cert)
+        }
+        Ok(cert_bundle)
     }
 }
 
-// HACKS
+/*// HACKS
 #[cfg(feature = "native-tls")]
 pub fn will_catalina_fail_on_this_cert(_der: &Vec<u8>) -> bool {
     true
@@ -130,4 +142,4 @@ pub fn will_catalina_fail_on_this_cert(_der: &Vec<u8>) -> bool {
 }
 
 #[cfg(feature = "rustls-tls")]
-pub fn will_catalina_fail_on_this_cert(cert: &Certificate) -> bool { true }
+pub fn will_catalina_fail_on_this_cert(cert: &Certificate) -> bool { true }*/
