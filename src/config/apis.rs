@@ -165,6 +165,10 @@ impl AuthInfo {
                             self.token = Some(token.access_token);
                         }
                     }
+                    #[cfg(feature = "rustls-tls")]
+                    {
+                        error!("kube-rs does not support auth_provider setup with rustls atm")
+                    }
                 }
                 if let Some(id_token) = provider.config.get("id-token") {
                     self.token = Some(id_token.clone());
