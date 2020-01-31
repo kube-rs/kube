@@ -23,15 +23,6 @@ impl TryFrom<Der> for Certificate {
             .map_err(Error::ReqwestError)
     }
 }
-// use std::convert::TryInto;
-// impl TryInto<Certificate> for Der {
-//     fn try_into<Der>(&self.0) -> Result<Certificate> {
-//         Certificate::from_der(self)
-//             .map_err(Error::ReqwestError)
-//     }
-// }
-
-
 
 /// KubeConfigLoader loads current context, cluster, and authentication information.
 #[derive(Clone,Debug)]
@@ -101,7 +92,7 @@ impl KubeConfigLoader {
     }
 
     #[cfg(feature="rustls-tls")]
-    pub fn identity(&self, password: &str) -> Result<Identity> {
+    pub fn identity(&self, _password: &str) -> Result<Identity> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 

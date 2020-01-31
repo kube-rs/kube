@@ -15,8 +15,7 @@ use crate::config::kube_config::{Der};
 use crate::{Error, Result};
 use std::convert::TryInto;
 use base64;
-use reqwest::{header, Certificate, Client, ClientBuilder, Identity};
-
+use reqwest::{header, Client, ClientBuilder};
 
 use self::kube_config::KubeConfigLoader;
 
