@@ -129,17 +129,3 @@ impl KubeConfigLoader {
         Ok(cert_bundle)
     }
 }
-
-/*// HACKS
-#[cfg(feature = "native-tls")]
-pub fn will_catalina_fail_on_this_cert(_der: &Vec<u8>) -> bool {
-    true
-    //std::env::consts::OS == "macos" && der
-    //    .not_before()
-    //    .diff(der.not_after())
-    //    .map(|d| d.days.abs() > 824)
-    //    .unwrap_or(false)
-}
-
-#[cfg(feature = "rustls-tls")]
-pub fn will_catalina_fail_on_this_cert(cert: &Certificate) -> bool { true }*/
