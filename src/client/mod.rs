@@ -154,8 +154,12 @@ impl APIClient {
                         }
                         Ok(None) => return None,
                         Err(e) => {
-                            let err = vec![Err(Error::ReqwestError(e))];
-                            return Some((err, (resp, buff)));
+                            warn!(
+                                "Failed to parse chunk, {}",
+                                &e,
+                            );
+                            buff.clear();
+                            return Some((Vec::new(), (resp, buff)));
                         }
                     }
                 }
