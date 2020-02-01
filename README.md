@@ -29,7 +29,7 @@ kube = "0.24.0"
 The latter is fine in a CRD-only use case.
 
 ## Usage
-See the [examples directory](./examples) for how to watch over resources in a simplistic way.
+See the [examples directory](./examples) for how to watch over resources in a simplistic way. **NB: ** [Running the examples](#examples) rely on the non-default `--features=openapi` feature flag.
 
 **[API Docs](https://docs.rs/kube/)**
 
@@ -140,7 +140,7 @@ Note that `poll` holds the future for 300s by default, but you can (and should) 
 If you need the details of just a single object, you can use the more efficient, `Reflector::get` and `Reflector::get_within`.
 
 ## Examples
-Examples that show a little common flows. These all have logging of this library set up to `trace`:
+Examples that show a little common flows. These all have logging of this library set up to `trace`. Note that most of the examples require the `openapi` feature to be enabled in order to compile. The openapi feature is not on by default.
 
 ```sh
 # watch pod events
