@@ -19,18 +19,17 @@ async fn main() -> Result<()> {
     let mypod = env::args().nth(1).ok_or_else(|| {
         anyhow!("Usage: log_follow <pod>")
     })?;
-    
+
     info!("My pod is {:?}", mypod);
-    
+
     let pods = Api::v1Pod(client).within(&namespace);
     let mut lp = LogParams::default();
-    lp.follow = true;
     lp.tail_lines = Some(1);
     let mut logs = pods.log_follow(&mypod, &lp).await?.boxed();
-    
+
     while let Some(line) = logs.next().await {
         let l = line.unwrap();
         println!("{:?}", String::from_utf8_lossy(&l));
-    } 
+    }
     Ok(())
 }

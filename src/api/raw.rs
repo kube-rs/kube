@@ -544,8 +544,6 @@ pub enum PropagationPolicy {
 pub struct LogParams {
     /// The container for which to stream logs. Defaults to only container if there is one container in the pod.
     pub container: Option<String>,
-    /// Follow the log stream of the pod. Defaults to false.
-    pub follow: bool,
     /// If set, the number of bytes to read from the server before terminating the log output.
     /// This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.
     pub limit_bytes: Option<i64>,
@@ -818,7 +816,7 @@ impl RawApi {
 
 impl RawApi {
     /// Get a pod logs
-    pub fn log(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn log(&self, name: &str, lp: &LogParams, follow: bool) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "log?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
@@ -826,7 +824,7 @@ impl RawApi {
             qp.append_pair("container", &container);
         }
 
-        if lp.follow {
+        if follow {
             qp.append_pair("follow", "true");
         }
 
