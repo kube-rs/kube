@@ -131,30 +131,32 @@ impl Api<v1ConfigMap> {
     }
 }
 
-use k8s_openapi::api::admissionregistration::v1beta1::ValidatingWebhook;
 
-/// ValidatingWebhookConfiguration object
-#[derive(Deserialize, Serialize, Clone)]
-pub struct v1beta1ValidatingWebhookConfiguration {
-    pub metadata: ObjectMeta,
+k8s_openapi::k8s_if_ge_1_14! {
+    use k8s_openapi::api::admissionregistration::v1beta1::ValidatingWebhook;
 
-    pub webhooks: Vec<ValidatingWebhook>
-}
+    /// ValidatingWebhookConfiguration object
+    #[derive(Deserialize, Serialize, Clone)]
+    pub struct v1beta1ValidatingWebhookConfiguration {
+        pub metadata: ObjectMeta,
 
-impl KubeObject for v1beta1ValidatingWebhookConfiguration {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
-}
+        pub webhooks: Vec<ValidatingWebhook>
+    }
 
-impl Api<v1beta1ValidatingWebhookConfiguration> {
-    pub fn v1beta1ValidatingWebhookConfiguration(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1beta1ValidatingWebhookConfiguration(),
-            client,
-            phantom: PhantomData,
+    impl KubeObject for v1beta1ValidatingWebhookConfiguration {
+        fn meta(&self) -> &ObjectMeta { &self.metadata }
+    }
+
+    impl Api<v1beta1ValidatingWebhookConfiguration> {
+        pub fn v1beta1ValidatingWebhookConfiguration(client: APIClient) -> Self {
+            Api {
+                api: RawApi::v1beta1ValidatingWebhookConfiguration(),
+                client,
+                phantom: PhantomData,
+            }
         }
     }
 }
-
 use k8s_openapi::api::rbac::v1::PolicyRule;
 /// Role object
 #[derive(Deserialize, Serialize, Clone)]

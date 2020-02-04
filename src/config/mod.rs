@@ -11,9 +11,11 @@ mod incluster_config;
 mod kube_config;
 mod utils;
 
-use base64;
+use crate::config::kube_config::{Der};
 use crate::{Error, Result};
-use reqwest::{header, Certificate, Client, ClientBuilder, Identity};
+use std::convert::TryInto;
+use base64;
+use reqwest::{header, Client, ClientBuilder};
 
 use self::kube_config::KubeConfigLoader;
 
@@ -65,6 +67,28 @@ pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configurati
     ))
 }
 
+// temporary catalina hack for openssl only
+#[cfg(all(target_os = "macos", feature="native-tls"))]
+fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, ca_: &Der) -> ClientBuilder {
+    use openssl::x509::X509;
+    let ca = X509::from_der(&ca_.0).expect("valid der is a der");
+    if ca
+        .not_before()
+        .diff(ca.not_after())
+        .map(|d| d.days.abs() > 824)
+        .unwrap_or(false)
+    {
+        client_builder.danger_accept_invalid_certs(true)
+    } else {
+        client_builder
+    }
+}
+
+#[cfg(any(not(target_os = "macos"), not(feature="native-tls")))]
+fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, _: &Der) -> ClientBuilder {
+    client_builder
+}
+
 /// Returns a client builder and config loader, based on the cluster information from the kubeconfig file.
 ///
 /// This allows to create your custom reqwest client for using with the cluster API.
@@ -92,31 +116,17 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
 
     let mut client_builder = Client::builder();
 
-    if let Some(bundle) = loader.ca_bundle() {
-        for ca in bundle? {
-            let cert = Certificate::from_der(&ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?)
-                .map_err(Error::ReqwestError)?;
-            client_builder = client_builder.add_root_certificate(cert);
-            if std::env::consts::OS == "macos"
-                && ca
-                    .as_ref()
-                    .not_before()
-                    .diff(ca.not_after())
-                    .map(|d| d.days.abs() > 824)
-                    .unwrap_or(false)
-            {
-                client_builder = client_builder.danger_accept_invalid_certs(true);
-            }
-        }
+    for ca in loader.ca_bundle()? {
+        client_builder = hacky_cert_lifetime_for_macos(client_builder, &ca);
+        client_builder = client_builder.add_root_certificate(ca.try_into()?);
     }
-    match loader.p12(" ") {
-        Ok(p12) => {
-            let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
-            let req_p12 = Identity::from_pkcs12_der(&der, " ")
-                .map_err(Error::ReqwestError)?;
-            client_builder = client_builder.identity(req_p12);
+
+    match loader.identity(" ") {
+        Ok(id) => {
+            client_builder = client_builder.identity(id);
         }
-        Err(_) => {
+        Err(e) => {
+            warn!("failed to load client identity from kube config: {}", e);
             // last resort only if configs ask for it, and no client certs
             if let Some(true) = loader.cluster.insecure_skip_tls_verify {
                 client_builder = client_builder.danger_accept_invalid_certs(true);
@@ -149,7 +159,6 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
     }
 
     Ok((client_builder.default_headers(headers), loader))
-
 }
 
 /// Returns a config which is used by clients within pods on kubernetes.
@@ -163,11 +172,7 @@ pub fn incluster_config() -> Result<Configuration> {
             incluster_config::SERVICE_PORTENV
     )))?;
 
-    let ca = incluster_config::load_cert()
-        .map_err(|e| Error::SslError(format!("{}", e)))?;
-    let der = ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
-    let req_ca = Certificate::from_der(&der)
-        .map_err(|e| Error::SslError(format!("{}", e)))?;
+    let cert = incluster_config::load_cert()?;
 
     let token = incluster_config::load_token()
         .map_err(|e| Error::KubeConfig(format!("Unable to load in cluster token: {}", e)))?;
@@ -184,7 +189,7 @@ pub fn incluster_config() -> Result<Configuration> {
     );
 
     let client_builder = Client::builder()
-        .add_root_certificate(req_ca)
+        .add_root_certificate(cert)
         .default_headers(headers);
 
     Ok(Configuration::with_default_ns(

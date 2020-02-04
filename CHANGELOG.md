@@ -1,3 +1,8 @@
+0.25.0 / 2020-02-XX
+===================
+  * initial rustls support #114 (some local kube config issues know #120)
+  * crate does better version checking against openapi features - #106
+
 0.24.0 / 2020-01-26
 ===================
   * Add support for ServiceAccount, Role, ClusterRole, RoleBinding, Endpoint - #113 + #111
