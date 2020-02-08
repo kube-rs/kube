@@ -117,12 +117,12 @@ where
     K: Clone + DeserializeOwned + KubeObject + LoggingObject,
 {
     pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
-        let req = self.api.log(name, lp, false)?;
+        let req = self.api.log(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
 
-    pub async fn log_follow(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Vec<u8>>>> {
-        let req = self.api.log(name, lp, true)?;
+    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Vec<u8>>>> {
+        let req = self.api.log(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
     }
 }

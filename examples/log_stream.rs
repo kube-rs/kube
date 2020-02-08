@@ -24,8 +24,9 @@ async fn main() -> Result<()> {
 
     let pods = Api::v1Pod(client).within(&namespace);
     let mut lp = LogParams::default();
+    lp.follow = true;
     lp.tail_lines = Some(1);
-    let mut logs = pods.log_follow(&mypod, &lp).await?.boxed();
+    let mut logs = pods.log_stream(&mypod, &lp).await?.boxed();
 
     while let Some(line) = logs.next().await {
         let l = line.unwrap();
