@@ -155,19 +155,12 @@ impl AuthInfo {
             Some(provider) => {
                 if let Some(access_token) = provider.config.get("access-token") {
                     self.token = Some(access_token.clone());
-                    #[cfg(feature = "native-tls")]
-                    { // TODO: allow rusttls with this auth provider bs
-                        if utils::is_expired(&provider.config["expiry"]) {
-                            let client = oauth2::CredentialsClient::new()?;
-                            let token = client.request_token(&[
-                                "https://www.googleapis.com/auth/cloud-platform".to_string(),
-                            ]).await?;
-                            self.token = Some(token.access_token);
-                        }
-                    }
-                    #[cfg(feature = "rustls-tls")]
-                    {
-                        error!("kube-rs does not support auth_provider setup with rustls atm")
+                    if utils::is_expired(&provider.config["expiry"]) {
+                        let client = oauth2::CredentialsClient::new()?;
+                        let token = client.request_token(&[
+                            "https://www.googleapis.com/auth/cloud-platform".to_string(),
+                        ]).await?;
+                        self.token = Some(token.access_token);
                     }
                 }
                 if let Some(id_token) = provider.config.get("id-token") {
