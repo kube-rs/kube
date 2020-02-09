@@ -1,12 +1,12 @@
 #[macro_use] extern crate log;
+use anyhow::{anyhow, Result};
+use futures::StreamExt;
 use kube::{
     api::{Api, LogParams},
     client::APIClient,
     config,
 };
-use anyhow::{Result, anyhow};
 use std::env;
-use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -16,9 +16,9 @@ async fn main() -> Result<()> {
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let mypod = env::args().nth(1).ok_or_else(|| {
-        anyhow!("Usage: log_follow <pod>")
-    })?;
+    let mypod = env::args()
+        .nth(1)
+        .ok_or_else(|| anyhow!("Usage: log_follow <pod>"))?;
 
     info!("My pod is {:?}", mypod);
 

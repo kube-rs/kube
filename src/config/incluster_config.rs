@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::{Result, Error};
+use crate::{Error, Result};
 use reqwest::Certificate;
 
 use crate::config::utils;

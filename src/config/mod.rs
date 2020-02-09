@@ -11,11 +11,9 @@ mod incluster_config;
 mod kube_config;
 mod utils;
 
-use crate::config::kube_config::{Der};
-use crate::{Error, Result};
-use std::convert::TryInto;
-use base64;
+use crate::{config::kube_config::Der, Error, Result};
 use reqwest::{header, Client, ClientBuilder};
+use std::convert::TryInto;
 
 use self::kube_config::KubeConfigLoader;
 
@@ -62,13 +60,15 @@ pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configurati
     let result = create_client_builder(options).await?;
     Ok(Configuration::new(
         result.1.cluster.server,
-        result.0.build()
+        result
+            .0
+            .build()
             .map_err(|e| Error::KubeConfig(format!("Unable to build client: {}", e)))?,
     ))
 }
 
 // temporary catalina hack for openssl only
-#[cfg(all(target_os = "macos", feature="native-tls"))]
+#[cfg(all(target_os = "macos", feature = "native-tls"))]
 fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, ca_: &Der) -> ClientBuilder {
     use openssl::x509::X509;
     let ca = X509::from_der(&ca_.0).expect("valid der is a der");
@@ -84,7 +84,7 @@ fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, ca_: &Der) -> Cl
     }
 }
 
-#[cfg(any(not(target_os = "macos"), not(feature="native-tls")))]
+#[cfg(any(not(target_os = "macos"), not(feature = "native-tls")))]
 fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, _: &Der) -> ClientBuilder {
     client_builder
 }
@@ -92,21 +92,20 @@ fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, _: &Der) -> Clie
 /// Returns a client builder and config loader, based on the cluster information from the kubeconfig file.
 ///
 /// This allows to create your custom reqwest client for using with the cluster API.
-pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder,KubeConfigLoader)> {
-    let kubeconfig = utils::find_kubeconfig()
-        .map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
+pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder, KubeConfigLoader)> {
+    let kubeconfig =
+        utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
 
-    let loader =
-        KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
+    let loader = KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
 
     let token = match &loader.user.token {
         Some(token) => Some(token.clone()),
         None => {
             if let Some(exec) = &loader.user.exec {
                 let creds = exec::auth_exec(exec)?;
-                let status = creds
-                    .status
-                    .ok_or_else(|| Error::KubeConfig("exec-plugin response did not contain a status".into()))?;
+                let status = creds.status.ok_or_else(|| {
+                    Error::KubeConfig("exec-plugin response did not contain a status".into())
+                })?;
                 status.token
             } else {
                 None
@@ -165,21 +164,21 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
 ///
 /// It will return an error if called from out of kubernetes cluster.
 pub fn incluster_config() -> Result<Configuration> {
-    let server = incluster_config::kube_server().ok_or_else(||
+    let server = incluster_config::kube_server().ok_or_else(|| {
         Error::KubeConfig(format!(
             "Unable to load incluster config, {} and {} must be defined",
             incluster_config::SERVICE_HOSTENV,
             incluster_config::SERVICE_PORTENV
-    )))?;
+        ))
+    })?;
 
     let cert = incluster_config::load_cert()?;
 
     let token = incluster_config::load_token()
         .map_err(|e| Error::KubeConfig(format!("Unable to load in cluster token: {}", e)))?;
 
-    let default_ns = incluster_config::load_default_ns().map_err(|e| Error::KubeConfig(
-        format!("Unable to load incluster default namespace: {}", e),
-    ))?;
+    let default_ns = incluster_config::load_default_ns()
+        .map_err(|e| Error::KubeConfig(format!("Unable to load incluster default namespace: {}", e)))?;
 
     let mut headers = header::HeaderMap::new();
     headers.insert(
@@ -194,7 +193,8 @@ pub fn incluster_config() -> Result<Configuration> {
 
     Ok(Configuration::with_default_ns(
         server,
-        client_builder.build()
+        client_builder
+            .build()
             .map_err(|e| Error::KubeConfig(format!("Unable to build client: {}", e)))?,
         default_ns,
     ))
@@ -203,14 +203,6 @@ pub fn incluster_config() -> Result<Configuration> {
 
 // Expose raw config structs
 pub use apis::{
-    Config,
-    Preferences,
-    NamedExtension,
-    NamedCluster,
-    Cluster,
-    AuthInfo,
-    AuthProviderConfig,
-    ExecConfig,
-    NamedContext,
-    Context,
+    AuthInfo, AuthProviderConfig, Cluster, Config, Context, ExecConfig, NamedCluster, NamedContext,
+    NamedExtension, Preferences,
 };

@@ -4,14 +4,13 @@ use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
-    api::{RawApi, PostParams, DeleteParams, ListParams, Object, ObjectList, PatchParams, Void},
+    api::{DeleteParams, ListParams, Object, ObjectList, PatchParams, PostParams, RawApi, Void},
     client::APIClient,
     config,
 };
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
-    CustomResourceDefinitionSpec as CrdSpec,
-    CustomResourceDefinitionStatus as CrdStatus,
+    CustomResourceDefinitionSpec as CrdSpec, CustomResourceDefinitionStatus as CrdStatus,
 };
 
 // Own custom resource
@@ -47,15 +46,16 @@ async fn main() -> anyhow::Result<()> {
     let req = crds.delete("foos.clux.dev", &dp)?;
     let _ = client.request_status::<FullCrd>(req).await.map(|res| match res {
         Left(res) => {
-            info!("Deleted {}: ({:?})", res.metadata.name,
-                res.status.unwrap().conditions.unwrap().last());
+            info!(
+                "Deleted {}: ({:?})",
+                res.metadata.name,
+                res.status.unwrap().conditions.unwrap().last()
+            );
             // NB: PropagationPolicy::Foreground doesn't cause us to block here
             // we have to watch for it explicitly.. but this is a demo:
             std::thread::sleep(std::time::Duration::from_millis(1000));
-        },
-        Right(status) => {
-            info!("Deleted foos.clux.dev: {:?}", status)
         }
+        Right(status) => info!("Deleted foos.clux.dev: {:?}", status),
     });
 
     // Create the CRD so we can create Foos in kube
@@ -86,9 +86,9 @@ async fn main() -> anyhow::Result<()> {
         Ok(o) => {
             info!("Created {} ({:?})", o.metadata.name, o.status);
             debug!("Created CRD: {:?}", o.spec);
-        },
+        }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-        Err(e) =>return Err(e.into()), // any other case is probably bad
+        Err(e) => return Err(e.into()),                        // any other case is probably bad
     }
 
     // Manage the Foo CR
@@ -191,9 +191,12 @@ async fn main() -> anyhow::Result<()> {
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
     // Delete it
-    client.request_status::<Foo>(foos.delete("baz", &dp)?).await?.map_left(|f1del| {
-        assert_eq!(f1del.spec.info, "old baz");
-    });
+    client
+        .request_status::<Foo>(foos.delete("baz", &dp)?)
+        .await?
+        .map_left(|f1del| {
+            assert_eq!(f1del.spec.info, "old baz");
+        });
 
     // Check we have one remaining instance
     let lp = ListParams::default();
@@ -207,10 +210,8 @@ async fn main() -> anyhow::Result<()> {
         Left(res) => {
             let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
             info!("Deleted collection of foos: {:?}", deleted);
-        },
-        Right(status) => {
-            info!("Deleted collection: {:?}", status)
         }
+        Right(status) => info!("Deleted collection: {:?}", status),
     }
     Ok(())
 }

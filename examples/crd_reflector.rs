@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
-use std::time::Duration;
 use futures_timer::Delay;
+use std::time::Duration;
 
 use kube::{
     api::{Object, RawApi, Reflector, Void},
@@ -31,9 +31,10 @@ async fn main() -> anyhow::Result<()> {
         .group("clux.dev")
         .within(&namespace);
 
-    let rf : Reflector<Foo> = Reflector::raw(client, resource)
+    let rf: Reflector<Foo> = Reflector::raw(client, resource)
         .timeout(20) // low timeout in this example
-        .init().await?;
+        .init()
+        .await?;
 
     let cloned = rf.clone();
     tokio::spawn(async move {
@@ -47,7 +48,12 @@ async fn main() -> anyhow::Result<()> {
     loop {
         Delay::new(Duration::from_secs(5)).await;
         // Read updated internal state (instant):
-        let crds = rf.state().await?.into_iter().map(|crd| crd.metadata.name).collect::<Vec<_>>();
+        let crds = rf
+            .state()
+            .await?
+            .into_iter()
+            .map(|crd| crd.metadata.name)
+            .collect::<Vec<_>>();
         info!("Current crds: {:?}", crds);
     }
 }

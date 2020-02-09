@@ -1,16 +1,14 @@
 use std::path::Path;
 
 #[cfg(feature = "native-tls")]
-use openssl::{
-    pkcs12::Pkcs12,
-    pkey::PKey,
-    x509::X509,
+use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
+
+use reqwest::{Certificate, Identity};
+
+use crate::{
+    config::apis::{AuthInfo, Cluster, Config, Context},
+    Error, Result,
 };
-
-use reqwest::{Identity, Certificate};
-
-use crate::{Error, Result};
-use crate::config::apis::{AuthInfo, Cluster, Config, Context};
 
 /// Regardless of tls type, a Certificate Der is always a byte array
 pub struct Der(pub Vec<u8>);
@@ -18,14 +16,14 @@ pub struct Der(pub Vec<u8>);
 use std::convert::TryFrom;
 impl TryFrom<Der> for Certificate {
     type Error = Error;
+
     fn try_from(val: Der) -> Result<Certificate> {
-        Certificate::from_der(&val.0)
-            .map_err(Error::ReqwestError)
+        Certificate::from_der(&val.0).map_err(Error::ReqwestError)
     }
 }
 
 /// KubeConfigLoader loads current context, cluster, and authentication information.
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct KubeConfigLoader {
     pub current_context: Context,
     pub cluster: Cluster,
@@ -72,42 +70,39 @@ impl KubeConfigLoader {
         })
     }
 
-    #[cfg(feature="native-tls")]
+    #[cfg(feature = "native-tls")]
     pub fn identity(&self, password: &str) -> Result<Identity> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
-        let x509 = X509::from_pem(&client_cert)
-            .map_err(|e| Error::SslError(format!("{}", e)))?;
-        let pkey = PKey::private_key_from_pem(&client_key)
-            .map_err(|e| Error::SslError(format!("{}", e)))?;
+        let x509 = X509::from_pem(&client_cert).map_err(|e| Error::SslError(format!("{}", e)))?;
+        let pkey = PKey::private_key_from_pem(&client_key).map_err(|e| Error::SslError(format!("{}", e)))?;
 
         let p12 = Pkcs12::builder()
             .build(password, "kubeconfig", &pkey, &x509)
             .map_err(|e| Error::SslError(format!("{}", e)))?;
 
-        let der = p12.to_der()
-            .map_err(|e| Error::SslError(format!("{}", e)))?;
+        let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
         Ok(Identity::from_pkcs12_der(&der, password)?)
     }
 
-    #[cfg(feature="rustls-tls")]
+    #[cfg(feature = "rustls-tls")]
     pub fn identity(&self, _password: &str) -> Result<Identity> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
         let mut buffer = client_key.clone();
         buffer.extend_from_slice(client_cert);
-        Identity::from_pem(&buffer.as_slice())
-            .map_err(|e| Error::SslError(format!("{}", e)))
+        Identity::from_pem(&buffer.as_slice()).map_err(|e| Error::SslError(format!("{}", e)))
     }
 
-    #[cfg(feature="native-tls")]
+    #[cfg(feature = "native-tls")]
     pub fn ca_bundle(&self) -> Result<Vec<Der>> {
-        let bundle = self.cluster.load_certificate_authority()
+        let bundle = self
+            .cluster
+            .load_certificate_authority()
             .map_err(|e| Error::SslError(format!("{}", e)))?;
-        let bundle = X509::stack_from_pem(&bundle)
-            .map_err(|e| Error::SslError(format!("{}", e)))?;
+        let bundle = X509::stack_from_pem(&bundle).map_err(|e| Error::SslError(format!("{}", e)))?;
 
         let mut stack = vec![];
         for ca in bundle {

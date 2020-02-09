@@ -1,11 +1,11 @@
-version: 2
+version: 2.1
 
 workflows:
   version: 2
   all_jobs:
     jobs:
       - cargo_test
-      #- cargo_clippy
+
 jobs:
   cargo_test:
     docker:

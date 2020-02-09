@@ -1,7 +1,9 @@
 #![allow(non_snake_case)]
 
-use crate::api::metadata::{ListMeta, ObjectMeta, TypeMeta};
-use crate::ErrorResponse;
+use crate::{
+    api::metadata::{ListMeta, ObjectMeta, TypeMeta},
+    ErrorResponse,
+};
 use serde::Deserialize;
 use std::fmt::Debug;
 
@@ -161,8 +163,8 @@ impl<T: Clone> ObjectList<T> {
 }
 
 impl<T: Clone> IntoIterator for ObjectList<T> {
-    type Item = T;
     type IntoIter = ::std::vec::IntoIter<Self::Item>;
+    type Item = T;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
@@ -170,8 +172,8 @@ impl<T: Clone> IntoIterator for ObjectList<T> {
 }
 
 impl<'a, T: Clone> IntoIterator for &'a ObjectList<T> {
-    type Item = &'a T;
     type IntoIter = ::std::slice::Iter<'a, T>;
+    type Item = &'a T;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.iter()
@@ -179,8 +181,8 @@ impl<'a, T: Clone> IntoIterator for &'a ObjectList<T> {
 }
 
 impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
-    type Item = &'a mut T;
     type IntoIter = ::std::slice::IterMut<'a, T>;
+    type Item = &'a mut T;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.iter_mut()

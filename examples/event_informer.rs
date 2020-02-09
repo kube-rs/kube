@@ -1,8 +1,6 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use kube::{
-    api::v1Event,
-    api::{Api, Informer, WatchEvent},
+    api::{v1Event, Api, Informer, WatchEvent},
     client::APIClient,
     config,
 };

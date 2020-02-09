@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use futures_timer::Delay;
 use kube::{
     api::{Api, Reflector},
@@ -18,10 +17,10 @@ async fn main() -> anyhow::Result<()> {
 
     let resource = Api::v1Node(client);
     let rf = Reflector::new(resource)
-            //.labels("kubernetes.io/lifecycle=spot")
-            .timeout(10) // low timeout in this example
-            .init()
-            .await?;
+        //.labels("kubernetes.io/lifecycle=spot")
+        .timeout(10) // low timeout in this example
+        .init()
+        .await?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Node

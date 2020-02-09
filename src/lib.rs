@@ -1,9 +1,7 @@
 use thiserror::Error;
 
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate serde_derive;
+#[macro_use] extern crate log;
 
 #[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[error("{message}: {reason}")]

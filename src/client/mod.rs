@@ -1,18 +1,13 @@
 //! A basic API client with standard kube error handling
 
-use crate::config::Configuration;
+use crate::{config::Configuration, Error, ErrorResponse, Result};
 use bytes::Bytes;
-use crate::{Error, ErrorResponse, Result};
-use either::Either;
-use either::{Left, Right};
-use futures::StreamExt;
+use either::{Either, Left, Right};
+use futures::{self, Stream, StreamExt};
 use futures_util::TryStreamExt;
-use futures::{self, Stream};
-use http;
-use http::StatusCode;
+use http::{self, StatusCode};
 use serde::de::DeserializeOwned;
-use serde_json;
-use serde_json::Value;
+use serde_json::{self, Value};
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, Debug)]
@@ -72,7 +67,7 @@ impl APIClient {
         let (parts, body) = request.into_parts();
         let uri_str = format!("{}{}", self.configuration.base_path, parts.uri);
         trace!("{} {}", parts.method, uri_str);
-        //trace!("Request body: {:?}", String::from_utf8_lossy(&body));
+        // trace!("Request body: {:?}", String::from_utf8_lossy(&body));
         let req = match parts.method {
             http::Method::GET => self.configuration.client.get(&uri_str),
             http::Method::POST => self.configuration.client.post(&uri_str),
@@ -84,7 +79,7 @@ impl APIClient {
         .headers(parts.headers)
         .body(body)
         .build()?;
-        //trace!("Request Headers: {:?}", req.headers());
+        // trace!("Request Headers: {:?}", req.headers());
         let res = self.configuration.client.execute(req).await?;
         Ok(res)
     }
@@ -95,7 +90,7 @@ impl APIClient {
     {
         let res: reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
-        //trace!("Response Headers: {:?}", res.headers());
+        // trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await?;
         handle_api_errors(&text, s)?;
@@ -109,7 +104,7 @@ impl APIClient {
     pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String> {
         let res: reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
-        //trace!("Response Headers: {:?}", res.headers());
+        // trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await?;
         handle_api_errors(&text, s)?;
@@ -120,24 +115,20 @@ impl APIClient {
     pub async fn request_text_stream(
         &self,
         request: http::Request<Vec<u8>>,
-    ) -> Result<impl Stream<Item = Result<Bytes>>>
-    {
+    ) -> Result<impl Stream<Item = Result<Bytes>>> {
         let res: reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
 
         Ok(res.bytes_stream().map_err(Error::ReqwestError))
     }
 
-    pub async fn request_status<T>(
-        &self,
-        request: http::Request<Vec<u8>>,
-    ) -> Result<Either<T, Status>>
+    pub async fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
         let res: reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
-        //trace!("Response Headers: {:?}", res.headers());
+        // trace!("Response Headers: {:?}", res.headers());
         let s = res.status();
         let text = res.text().await?;
         handle_api_errors(&text, s)?;
@@ -146,12 +137,10 @@ impl APIClient {
         let v: Value = serde_json::from_str(&text)?;
         if v["kind"] == "Status" {
             trace!("Status from {}", text);
-            Ok(Right(serde_json::from_str::<Status>(&text).map_err(
-                |e| {
-                    warn!("{}, {:?}", text, e);
-                    Error::SerdeError(e)
-                },
-            )?))
+            Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
+                warn!("{}, {:?}", text, e);
+                Error::SerdeError(e)
+            })?))
         } else {
             Ok(Left(serde_json::from_str::<T>(&text).map_err(|e| {
                 warn!("{}, {:?}", text, e);
@@ -203,10 +192,7 @@ impl APIClient {
                                             // added in the current partial line to our buffer for
                                             // use in the next loop
                                             if !e.is_eof() {
-                                                warn!(
-                                                    "Failed to parse: {}",
-                                                    String::from_utf8_lossy(line)
-                                                );
+                                                warn!("Failed to parse: {}", String::from_utf8_lossy(line));
                                                 // Clear the buffer as this was a valid object
                                                 new_buff.clear();
                                                 items.push(Err(Error::SerdeError(e)));
@@ -243,7 +229,7 @@ impl APIClient {
 fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
     if s.is_client_error() || s.is_server_error() {
         // Print better debug when things do fail
-        //trace!("Parsing error: {}", text);
+        // trace!("Parsing error: {}", text);
         if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(text) {
             debug!("Unsuccessful: {:?}", errdata);
             Err(Error::Api(errdata))
