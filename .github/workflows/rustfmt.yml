@@ -18,7 +18,6 @@ jobs:
 
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
-        continue-on-error: true  # WARNING: only for this example, remove it!
         with:
           command: fmt
           args: --all -- --check
