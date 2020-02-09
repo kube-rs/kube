@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use futures::StreamExt;
 use serde_json::json;
 
@@ -67,8 +66,6 @@ async fn main() -> anyhow::Result<()> {
     // Clean up the old job record..
     info!("Deleting the job record.");
     let dp = DeleteParams::default();
-    jobs.delete("empty-job", &dp)
-        .await
-        .expect("failed to delete job");
+    jobs.delete("empty-job", &dp).await.expect("failed to delete job");
     Ok(())
 }

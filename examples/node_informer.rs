@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 use kube::{
@@ -60,10 +59,7 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
                     .collect::<Vec<_>>(); // failed statuses
                 warn!("Unschedulable Node: {}, ({:?})", o.metadata.name, failed);
                 // Find events related to this node
-                let sel = format!(
-                    "involvedObject.kind=Node,involvedObject.name={}",
-                    o.metadata.name
-                );
+                let sel = format!("involvedObject.kind=Node,involvedObject.name={}", o.metadata.name);
                 let opts = ListParams {
                     field_selector: Some(sel),
                     ..Default::default()

@@ -6,7 +6,6 @@ normalize_comments = true
 fn_single_line = false
 blank_lines_upper_bound = 2
 ignore = [
-  "examples/*",
   "src/api/*",
   "src/config/*",
 ]

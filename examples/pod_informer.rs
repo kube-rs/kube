@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
@@ -35,16 +34,8 @@ async fn main() -> anyhow::Result<()> {
 fn handle_node(_pods: &Api<Pod>, ev: WatchEvent<Pod>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
-            let containers = o
-                .spec
-                .containers
-                .into_iter()
-                .map(|c| c.name)
-                .collect::<Vec<_>>();
-            info!(
-                "Added Pod: {} (containers={:?})",
-                o.metadata.name, containers
-            );
+            let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
+            info!("Added Pod: {} (containers={:?})", o.metadata.name, containers);
         }
         WatchEvent::Modified(o) => {
             let phase = o.status.unwrap().phase.unwrap();

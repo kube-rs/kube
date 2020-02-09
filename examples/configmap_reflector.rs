@@ -17,11 +17,12 @@ async fn main() -> anyhow::Result<()> {
     let resource = Api::v1ConfigMap(client).within(&namespace);
     let rf = Reflector::new(resource)
         .timeout(10) // low timeout in this example
-        .init().await?;
+        .init()
+        .await?;
 
     // Can read initial state now:
-    rf.state().await?.into_iter().for_each(|config_map| {
-        info!("Found configmap {} with data: {:?}", config_map.metadata.name, config_map.data);
+    rf.state().await?.into_iter().for_each(|cm| {
+        info!("Found configmap {} with data: {:?}", cm.metadata.name, cm.data);
     });
 
     loop {
@@ -29,8 +30,11 @@ async fn main() -> anyhow::Result<()> {
         rf.poll().await?; // ideally call this from a thread/task
 
         // up to date state:
-        let pods = rf.state().await?.into_iter()
-            .map(|config_map| config_map.metadata.name)
+        let pods = rf
+            .state()
+            .await?
+            .into_iter()
+            .map(|cm| cm.metadata.name)
             .collect::<Vec<_>>();
 
         info!("Current configmaps: {:?}", pods);

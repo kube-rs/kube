@@ -16,16 +16,25 @@ async fn main() -> anyhow::Result<()> {
     let resource = Api::v1Deployment(client).within(&namespace);
     let rf = Reflector::new(resource)
         .timeout(10) // low timeout in this example
-        .init().await?;
+        .init()
+        .await?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Deployment
     rf.state().await?.into_iter().for_each(|deployment| {
-        info!("Found deployment for {} - {} replicas running {:?}",
+        info!(
+            "Found deployment for {} - {} replicas running {:?}",
             deployment.metadata.name,
             deployment.status.unwrap().replicas.unwrap(),
-            deployment.spec.template.spec.unwrap().containers
-                .into_iter().map(|c| c.image.unwrap()).collect::<Vec<_>>()
+            deployment
+                .spec
+                .template
+                .spec
+                .unwrap()
+                .containers
+                .into_iter()
+                .map(|c| c.image.unwrap())
+                .collect::<Vec<_>>()
         );
     });
 
@@ -34,7 +43,12 @@ async fn main() -> anyhow::Result<()> {
         rf.poll().await?;
 
         // Read the updated internal state (instant):
-        let deploys = rf.state().await?.into_iter().map(|deployment| deployment.metadata.name).collect::<Vec<_>>();
+        let deploys = rf
+            .state()
+            .await?
+            .into_iter()
+            .map(|deployment| deployment.metadata.name)
+            .collect::<Vec<_>>();
         info!("Current deploys: {:?}", deploys);
     }
 }

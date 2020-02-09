@@ -4,8 +4,8 @@ use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
-    api::{Api, PostParams, DeleteParams, ListParams, Object, PatchParams},
-    client::{APIClient},
+    api::{Api, DeleteParams, ListParams, Object, PatchParams, PostParams},
+    client::APIClient,
     config,
 };
 
@@ -40,12 +40,16 @@ async fn main() -> anyhow::Result<()> {
     // but ignore delete err if not exists
     let _ = crds.delete("foos.clux.dev", &dp).await.map(|res| {
         res.map_left(|o| {
-            info!("Deleted {}: ({:?})", o.metadata.name,
-                o.status.unwrap().conditions.unwrap().last());
+            info!(
+                "Deleted {}: ({:?})",
+                o.metadata.name,
+                o.status.unwrap().conditions.unwrap().last()
+            );
             // NB: PropagationPolicy::Foreground doesn't cause us to block here
             // we have to watch for it explicitly.. but this is a demo:
             std::thread::sleep(std::time::Duration::from_millis(1000));
-        }).map_right(|s| {
+        })
+        .map_right(|s| {
             // it's gone.
             info!("Deleted foos.clux.dev: ({:?})", s);
         })
@@ -82,13 +86,13 @@ async fn main() -> anyhow::Result<()> {
         Ok(o) => {
             info!("Created {} ({:?})", o.metadata.name, o.status);
             debug!("Created CRD: {:?}", o.spec);
-        },
+        }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-        Err(e) =>return Err(e.into()), // any other case is probably bad
+        Err(e) => return Err(e.into()),                        // any other case is probably bad
     }
 
     // Manage the Foo CR
-    let foos : Api<Foo> = Api::customResource(client, "foos")
+    let foos: Api<Foo> = Api::customResource(client, "foos")
         .version("v1")
         .group("clux.dev")
         .within("default");
@@ -122,7 +126,9 @@ async fn main() -> anyhow::Result<()> {
         },
         "spec": { "name": "baz", "info": "new baz", "replicas": 1 },
     });
-    let f1_replaced = foos.replace("baz", &pp, serde_json::to_vec(&foo_replace)?).await?;
+    let f1_replaced = foos
+        .replace("baz", &pp, serde_json::to_vec(&foo_replace)?)
+        .await?;
     assert_eq!(f1_replaced.spec.name, "baz");
     assert_eq!(f1_replaced.spec.info, "new baz");
     assert!(f1_replaced.status.is_none());
@@ -165,7 +171,9 @@ async fn main() -> anyhow::Result<()> {
     let fs = json!({
         "status": FooStatus { is_bad: false, replicas: 1 }
     });
-    let o = foos.patch_status("qux", &patch_params, serde_json::to_vec(&fs)?).await?;
+    let o = foos
+        .patch_status("qux", &patch_params, serde_json::to_vec(&fs)?)
+        .await?;
     info!("Patched status {:?} for {}", o.status, o.metadata.name);
     assert!(!o.status.unwrap().is_bad);
 
@@ -184,7 +192,9 @@ async fn main() -> anyhow::Result<()> {
     let fs = json!({
         "spec": { "replicas": 2 }
     });
-    let o = foos.patch_scale("qux", &patch_params, serde_json::to_vec(&fs)?).await?;
+    let o = foos
+        .patch_scale("qux", &patch_params, serde_json::to_vec(&fs)?)
+        .await?;
     info!("Patched scale {:?} for {}", o.spec, o.metadata.name);
     assert_eq!(o.status.unwrap().replicas, 1);
     assert_eq!(o.spec.replicas.unwrap(), 2); // we only asked for more
@@ -194,7 +204,9 @@ async fn main() -> anyhow::Result<()> {
     let patch = json!({
         "spec": { "info": "patched qux" }
     });
-    let o = foos.patch("qux", &patch_params, serde_json::to_vec(&patch)?).await?;
+    let o = foos
+        .patch("qux", &patch_params, serde_json::to_vec(&patch)?)
+        .await?;
     info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
@@ -210,9 +222,13 @@ async fn main() -> anyhow::Result<()> {
     // Cleanup the full collection - expect a wait
     match foos.delete_collection(&lp).await? {
         Left(list) => {
-            let deleted = list.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
+            let deleted = list
+                .items
+                .into_iter()
+                .map(|i| i.metadata.name)
+                .collect::<Vec<_>>();
             info!("Deleted collection of foos: {:?}", deleted);
-        },
+        }
         Right(status) => {
             info!("Deleted collection of crds: status={:?}", status);
         }
