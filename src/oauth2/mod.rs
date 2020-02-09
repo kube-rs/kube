@@ -187,7 +187,7 @@ fn sign(signature_base: &str, private_key: &str) -> Result<Vec<u8>> {
         sign::{RSASigningKey, SigningKey},
     };
 
-    let keys = pemfile::pkcs8_private_keys(&mut private_key.as_bytes().clone())
+    let keys = pemfile::pkcs8_private_keys(&mut private_key.as_bytes())
         .map_err(|_| Error::SslError("fail to parse private key".into()))?;
     let key = keys
         .get(0)

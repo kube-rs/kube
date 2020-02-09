@@ -6,7 +6,6 @@ use std::{
 };
 
 use crate::{Error, Result};
-use base64;
 use chrono::{DateTime, Utc};
 use dirs::home_dir;
 
