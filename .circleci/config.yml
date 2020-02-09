@@ -1,24 +1,12 @@
 version: 2.1
-orbs:
-  rust: glotrade/rust@0.1.3
 
 workflows:
   version: 2
   all_jobs:
     jobs:
       - cargo_test
-      - fmt_nightly
-      #- cargo_clippy
-jobs:
-  fmt_nightly:
-    description: Run rustfmt on nightly
-    executor: rust/default
-    steps:
-      - checkout
-      - rust/update_toolchain:
-          toolchain: nightly
-      - rust/fmt
 
+jobs:
   cargo_test:
     docker:
       - image: circleci/rust:latest
