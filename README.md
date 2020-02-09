@@ -176,7 +176,7 @@ For straight API use examples, try:
 cargo run --example crd_api --no-default-features
 cargo run --example crd_openapi --features=openapi
 cargo run --example pod_openapi --features=openapi
-NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
+NAMESPACE=dev cargo run --example log_stream --features=openapi -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
 ## Raw Api
