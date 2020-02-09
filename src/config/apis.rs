@@ -143,10 +143,7 @@ impl Config {
     /// Read a Config from the default location
     pub fn read() -> Result<Config> {
         let path = utils::find_kubeconfig()?;
-        let f = File::open(path).map_err(|e| Error::KubeConfig(format!("{}",e)))?;
-        let config = serde_yaml::from_reader(f)
-            .map_err(|e| Error::KubeConfig(format!("{}",e)))?;
-        Ok(config)
+        Self::read_from(path)
     }
 }
 
