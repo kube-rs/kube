@@ -16,7 +16,7 @@ jobs:
           override: true
           components: rustfmt
 
-      - name: Run cargo fmt
+      - name: Run cargo +nightly fmt
         uses: actions-rs/cargo@v1
         with:
           command: fmt
