@@ -115,6 +115,60 @@ impl APIClient {
         Ok(text)
     }
 
+    pub async fn request_text_stream(
+        &self,
+        request: http::Request<Vec<u8>>,
+    ) -> Result<impl Stream<Item = Result<Vec<u8>>>>
+    {
+        let res: reqwest::Response = self.send(request).await?;
+        trace!("{} {}", res.status().as_str(), res.url());
+
+        // Now use `unfold` to convert the chunked responses into a Stream
+        // We first construct a Stream of Vec<u8> as we potentially might need to
+        // yield multiple objects per loop, then we flatten it to the Stream<Result<u8>> as expected.
+        // Any reqwest errors will terminate this stream early.
+        let stream = futures::stream::unfold((res, Vec::new()), |(mut resp, mut buff)| {
+            async {
+                loop {
+                    match resp.chunk().await {
+                        Ok(Some(chunk)) => {
+                            buff.extend_from_slice(&chunk);
+
+                            if chunk.contains(&b'\n') {
+                                let mut new_buff = Vec::new();
+                                let mut items = Vec::new();
+
+                                // Split on newlines
+                                // new buff is container for items
+                                for line in buff.split(|x| x == &b'\n') {
+                                    if line.is_empty() {
+                                        continue
+                                    }
+                                    new_buff.extend_from_slice(&line);
+                                }
+                                items.push(Ok(new_buff.clone()));
+                                new_buff.clear();
+                                // Now return our items and loop
+                                return Some((items, (resp, new_buff)));
+                            }
+                        }
+                        Ok(None) => return None,
+                        Err(e) => {
+                            warn!(
+                                "Failed to parse chunk, {}",
+                                &e,
+                            );
+                            buff.clear();
+                            return Some((Vec::new(), (resp, buff)));
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(stream.map(futures::stream::iter).flatten())
+    }
+
     pub async fn request_status<T>(
         &self,
         request: http::Request<Vec<u8>>,
