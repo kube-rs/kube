@@ -15,7 +15,7 @@ To use the openapi generated types:
 
 ```toml
 [dependencies]
-kube = { version = "0.24.0", features = ["openapi"] }
+kube = { version = "0.25.0", features = ["openapi"] }
 k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
 ```
 
@@ -23,7 +23,7 @@ otherwise:
 
 ```toml
 [dependencies]
-kube = "0.24.0"
+kube = "0.25.0"
 ```
 
 The latter is fine in a CRD-only use case.
@@ -176,6 +176,7 @@ For straight API use examples, try:
 cargo run --example crd_api --no-default-features
 cargo run --example crd_openapi --features=openapi
 cargo run --example pod_openapi --features=openapi
+NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
 ## Raw Api
@@ -212,6 +213,23 @@ If you supply a partial definition of native objects then you can save on reflec
 
 The `node_informer` and `crd_reflector` examples uses this at the moment
 , (although `node_informer` is cheating by supplying k8s_openapi structs manually anyway). The `crd_api` example also shows how to do it for CRDs.
+
+## Rustls
+Kube has basic support for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
+
+```sh
+cargo run --example pod_informer --no-default-features --features=openapi,rustls-tls
+```
+
+or in `Cargo.toml`:
+
+```toml
+[dependencies]
+kube = { version = "0.25.0", default-features = false, features = ["openapi", "rustls-tls"] }
+k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
+```
+
+This will pull in the variant of `reqwest` that also uses its `rustls-tls` feature.
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.

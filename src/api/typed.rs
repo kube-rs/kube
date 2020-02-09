@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use bytes::Bytes;
 use either::Either;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
@@ -121,7 +122,7 @@ where
         Ok(self.client.request_text(req).await?)
     }
 
-    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Vec<u8>>>> {
+    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
         let req = self.api.log(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
     }

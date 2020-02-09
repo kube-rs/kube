@@ -2,6 +2,7 @@
 ===================
   * initial rustls support #114 (some local kube config issues know #120)
   * crate does better version checking against openapi features - #106
+  * initial `log_stream` support - #109
 
 0.24.0 / 2020-01-26
 ===================
