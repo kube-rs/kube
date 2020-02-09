@@ -1,0 +1,17 @@
+overflow_delimited_expr = true
+newline_style = "Unix"
+merge_imports = true
+reorder_impl_items = true
+normalize_comments = true
+fn_single_line = false
+blank_lines_upper_bound = 2
+ignore = [
+  "examples/*",
+  "src/api/*",
+  "src/client/*",
+  "src/config/*",
+  #"src/oauth2/*",
+]
+comment_width = 110
+max_width = 110
+inline_attribute_width = 80

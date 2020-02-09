@@ -1,13 +1,10 @@
-use std::env;
-use std::fs::File;
-use std::path::PathBuf;
+use std::{env, fs::File, path::PathBuf};
 
+use crate::{Error, Result};
 use chrono::Utc;
-use crate::{Result, Error};
 
-use reqwest::Client;
-use reqwest::header::CONTENT_TYPE;
-//use time::Duration;
+use reqwest::{header::CONTENT_TYPE, Client};
+// use time::Duration;
 use url::form_urlencoded::Serializer;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
@@ -26,7 +23,7 @@ struct Claim {
     iss: String,
     scope: String,
     aud: String,
-    //exp: i64,
+    // exp: i64,
     iat: i64,
 }
 
@@ -35,12 +32,12 @@ impl Claim {
         let iat = Utc::now();
         // The access token is available for 1 hour.
         // https://github.com/golang/oauth2/blob/c85d3e98c914e3a33234ad863dcbff5dbc425bb8/jws/jws.go#L63
-        //let exp = iat + Duration::hours(1);
+        // let exp = iat + Duration::hours(1);
         Claim {
             iss: c.client_email.clone(),
             scope: scope.join(" "),
             aud: c.token_uri.clone(),
-            //exp: exp.timestamp(),
+            // exp: exp.timestamp(),
             iat: iat.timestamp(),
         }
     }
@@ -118,18 +115,21 @@ impl CredentialsClient {
     pub async fn request_token(&self, scopes: &[String]) -> Result<Token> {
         let encoded = jws_encode(
             &Claim::new(&self.credentials, scopes),
-            &Header{
+            &Header {
                 alg: "RS256".to_string(),
                 typ: "JWT".to_string(),
             },
-            &self.credentials.private_key)?;
+            &self.credentials.private_key,
+        )?;
 
         let body = Serializer::new(String::new())
             .extend_pairs(vec![
                 ("grant_type".to_string(), DEFAULT_GRANT_TYPE.to_string()),
                 ("assertion".to_string(), encoded.to_string()),
-            ]).finish();
-            let token_response: TokenResponse = self.client
+            ])
+            .finish();
+        let token_response: TokenResponse = self
+            .client
             .post(&self.credentials.token_uri)
             .body(body)
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
@@ -138,11 +138,15 @@ impl CredentialsClient {
             .map_err(|e| Error::KubeConfig(format!("Unable to request token: {}", e)))
             .and_then(|response| {
                 if response.status() != reqwest::StatusCode::OK {
-                    Err(Error::KubeConfig(format!("Fail to retrieve new credential {:#?}", response)))
+                    Err(Error::KubeConfig(format!(
+                        "Fail to retrieve new credential {:#?}",
+                        response
+                    )))
                 } else {
                     Ok(response)
                 }
-            })?.json::<TokenResponse>()
+            })?
+            .json::<TokenResponse>()
             .await
             .map_err(|e| Error::KubeConfig(format!("Unable to parse request token: {}", e)))?;
         Ok(token_response.into_token())
@@ -160,39 +164,42 @@ fn jws_encode(claim: &Claim, header: &Header, private_key: &str) -> Result<Strin
 
 #[cfg(feature = "native-tls")]
 fn sign(signature_base: &str, private_key: &str) -> Result<Vec<u8>> {
-    use openssl::{
-        pkey::PKey,
-        sign::Signer,
-        rsa::Padding,
-        hash::MessageDigest,
-    };
-    let key = PKey::private_key_from_pem(private_key.as_bytes())
-    .map_err(|e| Error::SslError(format!("{}", e)))?;
-    let mut signer = Signer::new(MessageDigest::sha256(), &key)
+    use openssl::{hash::MessageDigest, pkey::PKey, rsa::Padding, sign::Signer};
+    let key =
+        PKey::private_key_from_pem(private_key.as_bytes()).map_err(|e| Error::SslError(format!("{}", e)))?;
+    let mut signer =
+        Signer::new(MessageDigest::sha256(), &key).map_err(|e| Error::SslError(format!("{}", e)))?;
+    signer
+        .set_rsa_padding(Padding::PKCS1)
         .map_err(|e| Error::SslError(format!("{}", e)))?;
-    signer.set_rsa_padding(Padding::PKCS1)
+    signer
+        .update(signature_base.as_bytes())
         .map_err(|e| Error::SslError(format!("{}", e)))?;
-    signer.update(signature_base.as_bytes())
-        .map_err(|e| Error::SslError(format!("{}", e)))?;
-    signer.sign_to_vec()
+    signer
+        .sign_to_vec()
         .map_err(|e| Error::SslError(format!("{}", e)))
 }
 
 #[cfg(feature = "rustls-tls")]
 fn sign(signature_base: &str, private_key: &str) -> Result<Vec<u8>> {
-    use rustls::internal::pemfile;
-    use rustls::sign::RSASigningKey;
-    use rustls::sign::SigningKey;
+    use rustls::{
+        internal::pemfile,
+        sign::{RSASigningKey, SigningKey},
+    };
 
     let keys = pemfile::pkcs8_private_keys(&mut private_key.as_bytes().clone())
         .map_err(|_| Error::SslError("fail to parse private key".into()))?;
-    let key = keys.get(0)
+    let key = keys
+        .get(0)
         .ok_or_else(|| Error::SslError("no usable private key found to sign with RS256".into()))?;
-    let signing_key = RSASigningKey::new(key)
-        .map_err(|_| Error::SslError("fail to make RSA signing key".into()))?;
-    let signer = signing_key.choose_scheme(&[rustls::SignatureScheme::RSA_PKCS1_SHA256])
+    let signing_key =
+        RSASigningKey::new(key).map_err(|_| Error::SslError("fail to make RSA signing key".into()))?;
+    let signer = signing_key
+        .choose_scheme(&[rustls::SignatureScheme::RSA_PKCS1_SHA256])
         .ok_or_else(|| Error::SslError("scheme RSA_PKCS1_SHA256 not found into private key".into()))?;
-    signer.sign(signature_base.as_bytes()).map_err(|e| Error::SslError(format!("{}", e)))
+    signer
+        .sign(signature_base.as_bytes())
+        .map_err(|e| Error::SslError(format!("{}", e)))
 }
 
 fn base64_encode(bytes: &[u8]) -> String {

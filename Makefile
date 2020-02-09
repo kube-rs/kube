@@ -8,16 +8,14 @@ doc:
 	cargo doc --lib
 	xdg-open target/doc/kube/index.html
 
-push-docs:
-	cargo doc --lib -p kube
-	echo "<meta http-equiv=refresh content=0;url=kube/index.html>" > target/doc/index.html
-	ghp-import -n target/doc
-	git push -qf "git@github.com:clux/kube-rs.git" gh-pages
-
-.PHONY: doc build
+fmt:
+	#rustup component add rustfmt --toolchain nightly
+	cargo +nightly fmt
 
 test:
 	cargo test --all-features
 
 readme:
 	rustdoc README.md --test --edition=2018
+
+.PHONY: doc build fmt clippy test readme
