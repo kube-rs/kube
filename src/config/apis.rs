@@ -131,7 +131,7 @@ pub struct Context {
 }
 
 impl Config {
-    pub(crate) fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<Config> {
         let f = File::open(path).map_err(|e| Error::KubeConfig(format!("{}",e)))?;
         let config = serde_yaml::from_reader(f)
             .map_err(|e| Error::KubeConfig(format!("{}",e)))?;
