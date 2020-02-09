@@ -125,7 +125,7 @@ impl APIClient {
         let res: reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
 
-        Ok(res.bytes_stream().map_err(|e| Error::ReqwestError(e)))
+        Ok(res.bytes_stream().map_err(Error::ReqwestError))
     }
 
     pub async fn request_status<T>(
