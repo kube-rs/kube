@@ -1,7 +1,6 @@
 use std::process::Command;
 
-use crate::{Error, Result};
-use crate::config::{ExecConfig};
+use crate::{config::ExecConfig, Error, Result};
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
 /// HTTP transports.
@@ -45,7 +44,8 @@ pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential> {
             });
         cmd.envs(envs);
     }
-    let out = cmd.output()
+    let out = cmd
+        .output()
         .map_err(|e| Error::KubeConfig(format!("Unable to run auth exec: {}", e)))?;
     if !out.status.success() {
         let err = format!("command `{:?}` failed: {:?}", cmd, out);

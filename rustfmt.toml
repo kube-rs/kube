@@ -7,7 +7,6 @@ fn_single_line = false
 blank_lines_upper_bound = 2
 ignore = [
   "src/api/*",
-  "src/config/*",
 ]
 comment_width = 110
 max_width = 110

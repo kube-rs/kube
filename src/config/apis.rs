@@ -1,10 +1,6 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::path::Path;
+use std::{collections::HashMap, fs::File, path::Path};
 
-use crate::{Error, Result};
-use crate::config::utils;
-use crate::oauth2;
+use crate::{config::utils, oauth2, Error, Result};
 
 /// Config stores information to connect remote kubernetes cluster.
 ///
@@ -134,9 +130,8 @@ pub struct Context {
 impl Config {
     /// Read a Config from an arbitrary location
     pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Config> {
-        let f = File::open(path).map_err(|e| Error::KubeConfig(format!("{}",e)))?;
-        let config = serde_yaml::from_reader(f)
-            .map_err(|e| Error::KubeConfig(format!("{}",e)))?;
+        let f = File::open(path).map_err(|e| Error::KubeConfig(format!("{}", e)))?;
+        let config = serde_yaml::from_reader(f).map_err(|e| Error::KubeConfig(format!("{}", e)))?;
         Ok(config)
     }
 
@@ -149,10 +144,9 @@ impl Config {
 
 impl Cluster {
     pub(crate) fn load_certificate_authority(&self) -> Result<Vec<u8>> {
-        let res = utils::data_or_file_with_base64(
-            &self.certificate_authority_data,
-            &self.certificate_authority,
-        ).map_err(|e| Error::KubeConfig(format!("{}",e)))?;
+        let res =
+            utils::data_or_file_with_base64(&self.certificate_authority_data, &self.certificate_authority)
+                .map_err(|e| Error::KubeConfig(format!("{}", e)))?;
         Ok(res)
     }
 }
@@ -165,9 +159,9 @@ impl AuthInfo {
                     self.token = Some(access_token.clone());
                     if utils::is_expired(&provider.config["expiry"]) {
                         let client = oauth2::CredentialsClient::new()?;
-                        let token = client.request_token(&[
-                            "https://www.googleapis.com/auth/cloud-platform".to_string(),
-                        ]).await?;
+                        let token = client
+                            .request_token(&["https://www.googleapis.com/auth/cloud-platform".to_string()])
+                            .await?;
                         self.token = Some(token.access_token);
                     }
                 }
