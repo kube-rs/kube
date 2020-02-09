@@ -130,12 +130,20 @@ pub struct Context {
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
+/// Some helpers on the raw Config object are exposed for people needing to parse it
 impl Config {
-    pub(crate) fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
+    /// Read a Config from an arbitrary location
+    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Config> {
         let f = File::open(path).map_err(|e| Error::KubeConfig(format!("{}",e)))?;
         let config = serde_yaml::from_reader(f)
             .map_err(|e| Error::KubeConfig(format!("{}",e)))?;
         Ok(config)
+    }
+
+    /// Read a Config from the default location
+    pub fn read() -> Result<Config> {
+        let path = utils::find_kubeconfig()?;
+        Self::read_from(path)
     }
 }
 
