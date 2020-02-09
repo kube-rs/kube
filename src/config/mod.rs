@@ -12,7 +12,6 @@ mod kube_config;
 mod utils;
 
 use crate::{config::kube_config::Der, Error, Result};
-use base64;
 use reqwest::{header, Client, ClientBuilder};
 use std::convert::TryInto;
 
