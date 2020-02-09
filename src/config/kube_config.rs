@@ -39,7 +39,7 @@ impl KubeConfigLoader {
         cluster: Option<String>,
         user: Option<String>,
     ) -> Result<KubeConfigLoader> {
-        let config = Config::load(path)?;
+        let config = Config::read_from(path)?;
         let context_name = context.as_ref().unwrap_or(&config.current_context);
         let current_context = config
             .contexts
