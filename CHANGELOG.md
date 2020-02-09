@@ -1,4 +1,4 @@
-0.25.0 / 2020-02-XX
+0.25.0 / 2020-02-09
 ===================
   * initial rustls support #114 (some local kube config issues know #120)
   * crate does better version checking against openapi features - #106
