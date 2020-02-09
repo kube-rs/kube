@@ -1,3 +1,7 @@
+0.26.0 / 2020-02-XX
+===================
+  * Exposed `Config::read` and `Config::read_from` - #124
+
 0.25.0 / 2020-02-09
 ===================
   * initial rustls support #114 (some local kube config issues know #120)
