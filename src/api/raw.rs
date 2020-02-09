@@ -51,6 +51,7 @@ impl RawApi {
         self.namespace = Some(ns.to_string());
         self
     }
+
     /// Set the api group of a resource manually
     ///
     /// Can be used to set legacy versions like "extensions" for old Deployments
@@ -58,6 +59,7 @@ impl RawApi {
         self.group = group.to_string();
         self
     }
+
     /// Set the version of an api group manually
     ///
     /// Can be used to set legacy versions like "v1beta1" for old Deployments
@@ -65,6 +67,7 @@ impl RawApi {
         self.version = version.to_string();
         self
     }
+
     /// Stable namespace resource constructor
     pub fn v1Namespace() -> Self {
         Self {
@@ -74,6 +77,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     /// Stable deployment resource constructor
     pub fn v1Deployment() -> Self {
         Self {
@@ -83,6 +87,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     /// Stable pod resource constructor
     pub fn v1Pod() -> Self {
         Self {
@@ -92,6 +97,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     /// Stable daemonset resource constructor
     pub fn v1DaemonSet() -> Self {
         Self {
@@ -101,6 +107,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     /// Stable replicaset resource constructor
     pub fn v1ReplicaSet() -> Self {
         Self {
@@ -110,6 +117,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     /// Stable ReplicationController resource constructor
     pub fn v1ReplicationController() -> Self {
         Self {
@@ -120,6 +128,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     /// Stable node resource constructor
     pub fn v1Node() -> Self {
         Self {
@@ -129,6 +138,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     /// Stable statefulset resource constructor
     pub fn v1Statefulset() -> Self {
         Self {
@@ -138,6 +148,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     // Stable event resource constructor
     pub fn v1Event() -> Self {
         Self {
@@ -318,6 +329,7 @@ impl RawApi {
             ..Default::default()
         }
     }
+
     /// Instance of a CRD
     ///
     /// The version, and group must be set by the user:
@@ -587,10 +599,7 @@ impl RawApi {
     }
 
     /// Create a minimial list request to seed an initial resourceVersion
-    pub(crate) fn list_zero_resource_entries(
-        &self,
-        lp: &ListParams,
-    ) -> Result<http::Request<Vec<u8>>> {
+    pub(crate) fn list_zero_resource_entries(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         qp.append_pair("limit", "1"); // can't have 0..
@@ -687,12 +696,7 @@ impl RawApi {
     /// Patch an instance of a resource
     ///
     /// Requires a serialized merge-patch+json at the moment.
-    pub fn patch(
-        &self,
-        name: &str,
-        pp: &PatchParams,
-        patch: Vec<u8>,
-    ) -> Result<http::Request<Vec<u8>>> {
+    pub fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         pp.validate()?;
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
@@ -709,12 +713,7 @@ impl RawApi {
     /// Replace an instance of a resource
     ///
     /// Requires metadata.resourceVersion set in data
-    pub fn replace(
-        &self,
-        name: &str,
-        pp: &PostParams,
-        data: Vec<u8>,
-    ) -> Result<http::Request<Vec<u8>>> {
+    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
@@ -924,10 +923,7 @@ fn namespace_path() {
 #[test]
 fn patch_params_validation() {
     let pp = PatchParams::default();
-    assert!(
-        pp.validate().is_ok(),
-        "default params should always be valid"
-    );
+    assert!(pp.validate().is_ok(), "default params should always be valid");
 
     let patch_strategy_apply_true = PatchParams {
         patch_strategy: PatchStrategy::Merge,
@@ -982,10 +978,7 @@ fn create_ingress() {
     let r = RawApi::v1beta1Ingress().within("bleep");
     let pp = PostParams::default();
     let req = r.create(&pp, vec![]).unwrap();
-    assert_eq!(
-        req.uri(),
-        "/apis/extensions/v1beta1/namespaces/bleep/ingresses?"
-    );
+    assert_eq!(req.uri(), "/apis/extensions/v1beta1/namespaces/bleep/ingresses?");
     let patch_params = PatchParams::default();
     let req = r.patch("baz", &patch_params, vec![]).unwrap();
     assert_eq!(

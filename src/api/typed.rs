@@ -6,10 +6,14 @@ use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
-use crate::api::resource::{KubeObject, Object, ObjectList, WatchEvent};
-use crate::api::{DeleteParams, ListParams, LogParams, PatchParams, PostParams, RawApi};
-use crate::client::{APIClient, Status};
-use crate::Result;
+use crate::{
+    api::{
+        resource::{KubeObject, Object, ObjectList, WatchEvent},
+        DeleteParams, ListParams, LogParams, PatchParams, PostParams, RawApi,
+    },
+    client::{APIClient, Status},
+    Result,
+};
 
 /// A typed Api variant that does not expose request internals
 ///
@@ -38,10 +42,12 @@ impl<K> Api<K> {
         self.api = self.api.within(ns);
         self
     }
+
     pub fn group(mut self, group: &str) -> Self {
         self.api = self.api.group(group);
         self
     }
+
     pub fn version(mut self, version: &str) -> Self {
         self.api = self.api.version(version);
         self
@@ -57,38 +63,38 @@ where
         let req = self.api.get(name)?;
         self.client.request::<K>(req).await
     }
+
     pub async fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.api.create(&pp, data)?;
         self.client.request::<K>(req).await
     }
+
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
         let req = self.api.delete(name, &dp)?;
         self.client.request_status::<K>(req).await
     }
+
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
         let req = self.api.list(&lp)?;
         self.client.request::<ObjectList<K>>(req).await
     }
-    pub async fn delete_collection(
-        &self,
-        lp: &ListParams,
-    ) -> Result<Either<ObjectList<K>, Status>> {
+
+    pub async fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<K>, Status>> {
         let req = self.api.delete_collection(&lp)?;
         self.client.request_status::<ObjectList<K>>(req).await
     }
+
     pub async fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.api.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
+
     pub async fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.api.replace(name, &pp, data)?;
         self.client.request::<K>(req).await
     }
-    pub async fn watch(
-        &self,
-        lp: &ListParams,
-        version: &str,
-    ) -> Result<impl Stream<Item = WatchEvent<K>>> {
+
+    pub async fn watch(&self, lp: &ListParams, version: &str) -> Result<impl Stream<Item = WatchEvent<K>>> {
         let req = self.api.watch(&lp, &version)?;
         self.client
             .request_events::<WatchEvent<K>>(req)
@@ -100,10 +106,12 @@ where
         let req = self.api.get_status(name)?;
         self.client.request::<K>(req).await
     }
+
     pub async fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.api.patch_status(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
+
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.api.replace_status(name, &pp, data)?;
         self.client.request::<K>(req).await
@@ -152,10 +160,12 @@ where
         let req = self.api.get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
+
     pub async fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
         let req = self.api.patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
+
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
         let req = self.api.replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await

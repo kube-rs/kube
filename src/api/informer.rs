@@ -1,10 +1,13 @@
-use crate::api::resource::{KubeObject, ObjectList, WatchEvent};
-use crate::api::{Api, ListParams, RawApi, Void};
-use crate::client::APIClient;
-use crate::Result;
+use crate::{
+    api::{
+        resource::{KubeObject, ObjectList, WatchEvent},
+        Api, ListParams, RawApi, Void,
+    },
+    client::APIClient,
+    Result,
+};
 
-use futures::lock::Mutex;
-use futures::{Stream, StreamExt};
+use futures::{lock::Mutex, Stream, StreamExt};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
@@ -185,7 +188,7 @@ where
                                 if let Some(nv) = &o.meta().resourceVersion {
                                     *version.lock().await = nv.clone();
                                 }
-                            },
+                            }
                             Ok(WatchEvent::Error(e)) => {
                                 // 410 Gone => we need to restart from latest next call
                                 if e.code == 410 {

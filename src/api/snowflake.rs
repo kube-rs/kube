@@ -1,24 +1,24 @@
 //! Snowflake types that do not follow the Object<P, U> kube standard
 #![allow(non_snake_case, non_camel_case_types)]
 
-use std::collections::BTreeMap;
-use core::marker::PhantomData;
-use crate::client::APIClient;
-use crate::api::{
-    RawApi, Api, KubeObject,
-    ObjectMeta
+use crate::{
+    api::{Api, KubeObject, ObjectMeta, RawApi},
+    client::APIClient,
 };
+use core::marker::PhantomData;
+use std::collections::BTreeMap;
 
 
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, Time};
-use k8s_openapi::api::core::v1::{EventSeries, ObjectReference, EventSource};
+use k8s_openapi::{
+    api::core::v1::{EventSeries, EventSource, ObjectReference},
+    apimachinery::pkg::apis::meta::v1::{MicroTime, Time},
+};
 
 /// Janky Event object
 ///
 /// https://kubernetes.io/docs/reference/federation/v1/definitions/#_v1_event
 #[derive(Deserialize, Serialize, Clone)]
 pub struct v1Event {
-
     pub metadata: ObjectMeta,
 
     // Require properties
@@ -31,7 +31,6 @@ pub struct v1Event {
     pub reportingInstance: String,
 
     // Properties that always seem present but arent required:
-
     #[serde(default)]
     pub message: String,
 
@@ -44,7 +43,6 @@ pub struct v1Event {
     #[serde(default, rename = "type")]
     pub type_: String,
 
-
     // Mist optionals gunk from openapi
     pub action: Option<String>,
     pub eventTime: Option<MicroTime>,
@@ -53,12 +51,13 @@ pub struct v1Event {
     pub related: Option<ObjectReference>,
     pub series: Option<EventSeries>,
     pub source: Option<EventSource>,
-
 }
 
 // Special case implementation so we can make Informer<Event> etc.
 impl KubeObject for v1Event {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 impl Api<v1Event> {
@@ -92,7 +91,9 @@ pub struct v1Secret {
 
 // Special case implementation so we can make Informer<v1Secret> etc.
 impl KubeObject for v1Secret {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 impl Api<v1Secret> {
@@ -114,11 +115,13 @@ pub struct v1ConfigMap {
     pub binaryData: BTreeMap<String, ByteString>,
 
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub data: BTreeMap<String, String>
+    pub data: BTreeMap<String, String>,
 }
 
 impl KubeObject for v1ConfigMap {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 impl Api<v1ConfigMap> {
@@ -166,7 +169,9 @@ pub struct v1Role {
 }
 
 impl KubeObject for v1Role {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 impl Api<v1Role> {
@@ -186,7 +191,9 @@ pub struct v1ClusterRole {
 }
 
 impl KubeObject for v1ClusterRole {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 impl Api<v1ClusterRole> {
@@ -209,7 +216,9 @@ pub struct v1RoleBinding {
 }
 
 impl KubeObject for v1RoleBinding {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 impl Api<v1RoleBinding> {
@@ -233,7 +242,9 @@ pub struct v1ServiceAccount {
 }
 
 impl KubeObject for v1ServiceAccount {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 impl Api<v1ServiceAccount> {
@@ -246,13 +257,12 @@ impl Api<v1ServiceAccount> {
     }
 }
 
-use k8s_openapi::api::core::v1::{EndpointSubset};
+use k8s_openapi::api::core::v1::EndpointSubset;
 
 /// Endpoint
 /// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#endpoints-v1-core
 #[derive(Deserialize, Serialize, Clone)]
 pub struct v1Endpoint {
-
     pub metadata: ObjectMeta,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -260,7 +270,9 @@ pub struct v1Endpoint {
 }
 
 impl KubeObject for v1Endpoint {
-    fn meta(&self) -> &ObjectMeta { &self.metadata }
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
 }
 
 impl Api<v1Endpoint> {

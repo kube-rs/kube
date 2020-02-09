@@ -1,15 +1,13 @@
 #![allow(non_snake_case)]
 use std::marker::PhantomData;
 
-use crate::api::{RawApi, Api, Object, Void};
-use crate::api::typed::LoggingObject;
-use crate::client::{
-    APIClient,
+use crate::{
+    api::{typed::LoggingObject, Api, Object, RawApi, Void},
+    client::APIClient,
 };
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
-    CustomResourceDefinitionSpec as CrdSpec,
-    CustomResourceDefinitionStatus as CrdStatus,
+    CustomResourceDefinitionSpec as CrdSpec, CustomResourceDefinitionStatus as CrdStatus,
 };
 impl Api<Object<CrdSpec, CrdStatus>> {
     pub fn v1beta1CustomResourceDefinition(client: APIClient) -> Self {
@@ -190,7 +188,7 @@ impl Api<Object<ResourceQuotaSpec, ResourceQuotaStatus>> {
     }
 }
 
-use k8s_openapi::api::networking::v1::{NetworkPolicySpec};
+use k8s_openapi::api::networking::v1::NetworkPolicySpec;
 impl Api<Object<NetworkPolicySpec, Void>> {
     pub fn v1NetworkPolicy(client: APIClient) -> Self {
         Api {

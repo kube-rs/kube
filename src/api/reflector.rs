@@ -1,9 +1,12 @@
-use crate::api::resource::{KubeObject, ObjectList, WatchEvent};
-use crate::api::{Api, ListParams, ObjectMeta, RawApi};
-use crate::client::APIClient;
-use crate::{Error, Result};
-use futures::lock::Mutex;
-use futures::StreamExt;
+use crate::{
+    api::{
+        resource::{KubeObject, ObjectList, WatchEvent},
+        Api, ListParams, ObjectMeta, RawApi,
+    },
+    client::APIClient,
+    Error, Result,
+};
+use futures::{lock::Mutex, StreamExt};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 
@@ -203,11 +206,7 @@ where
         let rg = &self.resource;
         let oldver = self.version.lock().await.clone();
         let req = rg.watch(&self.params, &oldver)?;
-        let mut events = self
-            .client
-            .request_events::<WatchEvent<K>>(req)
-            .await?
-            .boxed();
+        let mut events = self.client.request_events::<WatchEvent<K>>(req).await?.boxed();
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
@@ -239,7 +238,7 @@ where
                 }
                 Ok(WatchEvent::Error(e)) => {
                     warn!("Failed to watch {}: {:?}", rg.resource, e);
-                    return Err(Error::Api(e))
+                    return Err(Error::Api(e));
                 }
                 Err(e) => {
                     // Just log out the error, but don't stop our stream short
