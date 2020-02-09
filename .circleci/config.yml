@@ -17,7 +17,7 @@ jobs:
       - checkout
       - rust/update_toolchain:
           toolchain: nightly
-      - rust/clippy
+      - rust/fmt
 
   cargo_test:
     docker:
