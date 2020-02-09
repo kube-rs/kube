@@ -1,8 +1,7 @@
 on: [push]
 name: rustfmt
 jobs:
-  rustfmt:
-    name: Format
+  rustfmt_nightly:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
