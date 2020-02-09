@@ -8,9 +8,7 @@ blank_lines_upper_bound = 2
 ignore = [
   "examples/*",
   "src/api/*",
-  "src/client/*",
   "src/config/*",
-  #"src/oauth2/*",
 ]
 comment_width = 110
 max_width = 110
