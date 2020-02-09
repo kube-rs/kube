@@ -9,7 +9,7 @@ ignore = [
   "examples/*",
   "src/api/*",
   "src/client/*",
-  #"src/config/*",
+  "src/config/*",
   #"src/oauth2/*",
 ]
 comment_width = 110
