@@ -11,12 +11,13 @@ mod informer;
 pub use self::informer::Informer;
 
 mod raw;
-pub use raw::{
-    DeleteParams, ListParams, LogParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, RawApi,
-};
+pub use raw::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, RawApi};
 
 mod typed;
-pub use typed::{Api, Scale, ScaleSpec, ScaleStatus};
+pub use typed::Api;
+
+mod subresource;
+pub use subresource::{LogParams, Scale, ScaleSpec, ScaleStatus};
 
 mod resource;
 pub use self::resource::{KubeObject, Object, ObjectList, WatchEvent};

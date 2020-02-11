@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-use bytes::Bytes;
 use either::Either;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
@@ -8,8 +7,8 @@ use std::marker::PhantomData;
 
 use crate::{
     api::{
-        resource::{KubeObject, Object, ObjectList, WatchEvent},
-        DeleteParams, ListParams, LogParams, PatchParams, PostParams, RawApi,
+        resource::{KubeObject, ObjectList, WatchEvent},
+        DeleteParams, ListParams, PatchParams, PostParams, RawApi,
     },
     client::{APIClient, Status},
     Result,
@@ -100,75 +99,6 @@ where
             .request_events::<WatchEvent<K>>(req)
             .await
             .map(|stream| stream.filter_map(|e| async move { e.ok() }))
-    }
-
-    pub async fn get_status(&self, name: &str) -> Result<K> {
-        let req = self.api.get_status(name)?;
-        self.client.request::<K>(req).await
-    }
-
-    pub async fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
-        let req = self.api.patch_status(name, &pp, patch)?;
-        self.client.request::<K>(req).await
-    }
-
-    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = self.api.replace_status(name, &pp, data)?;
-        self.client.request::<K>(req).await
-    }
-}
-
-/// Marker trait for objects that has logs
-pub trait LoggingObject {}
-
-impl<K> Api<K>
-where
-    K: Clone + DeserializeOwned + KubeObject + LoggingObject,
-{
-    pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
-        let req = self.api.log(name, lp)?;
-        Ok(self.client.request_text(req).await?)
-    }
-
-    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let req = self.api.log(name, lp)?;
-        Ok(self.client.request_text_stream(req).await?)
-    }
-}
-
-/// Scale spec from api::autoscaling::v1
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct ScaleSpec {
-    pub replicas: Option<i32>,
-}
-/// Scale status from api::autoscaling::v1
-#[derive(Deserialize, Serialize, Clone, Default, Debug)]
-pub struct ScaleStatus {
-    pub replicas: i32,
-    pub selector: Option<String>,
-}
-pub type Scale = Object<ScaleSpec, ScaleStatus>;
-
-/// Scale subresource
-///
-/// https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource
-impl<K> Api<K>
-where
-    K: Clone + DeserializeOwned,
-{
-    pub async fn get_scale(&self, name: &str) -> Result<Scale> {
-        let req = self.api.get_scale(name)?;
-        self.client.request::<Scale>(req).await
-    }
-
-    pub async fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
-        let req = self.api.patch_scale(name, &pp, patch)?;
-        self.client.request::<Scale>(req).await
-    }
-
-    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
-        let req = self.api.replace_scale(name, &pp, data)?;
-        self.client.request::<Scale>(req).await
     }
 }
 
