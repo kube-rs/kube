@@ -208,7 +208,7 @@ async fn main() -> anyhow::Result<()> {
     let req = foos.delete_collection(&lp)?;
     match client.request_status::<ObjectList<Foo>>(req).await? {
         Left(res) => {
-            let deleted = res.items.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
+            let deleted = res.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
             info!("Deleted collection of foos: {:?}", deleted);
         }
         Right(status) => info!("Deleted collection: {:?}", status),

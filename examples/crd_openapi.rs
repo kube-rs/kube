@@ -222,11 +222,7 @@ async fn main() -> anyhow::Result<()> {
     // Cleanup the full collection - expect a wait
     match foos.delete_collection(&lp).await? {
         Left(list) => {
-            let deleted = list
-                .items
-                .into_iter()
-                .map(|i| i.metadata.name)
-                .collect::<Vec<_>>();
+            let deleted = list.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
             info!("Deleted collection of foos: {:?}", deleted);
         }
         Right(status) => {
