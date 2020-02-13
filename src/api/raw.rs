@@ -140,7 +140,7 @@ impl RawApi {
     }
 
     /// Stable statefulset resource constructor
-    pub fn v1Statefulset() -> Self {
+    pub fn v1StatefulSet() -> Self {
         Self {
             group: "apps".into(),
             resource: "statefulsets".into(),
