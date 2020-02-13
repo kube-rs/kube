@@ -150,10 +150,11 @@ impl RawApi {
 
 #[test]
 fn log_path() {
-    let r = RawApi::v1Deployment().within("ns");
-    let lp = LogParams::default();
+    let r = RawApi::v1Pod().within("ns");
+    let mut lp = LogParams::default();
+    lp.container = Some("blah".into());
     let req = r.logs("foo", &lp).unwrap();
-    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments/foo/log?");
+    assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/log?&container=blah");
 }
 
 /// Marker trait for objects that has logs

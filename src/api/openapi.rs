@@ -36,9 +36,6 @@ api_ctor!(v1Node, NodeSpec, NodeStatus);
 use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStatus};
 api_ctor!(v1Deployment, DeploymentSpec, DeploymentStatus);
 
-impl LoggingObject for Object<DeploymentSpec, DeploymentStatus> {}
-impl LoggingObject for Object<DeploymentSpec, Void> {}
-
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 api_ctor!(v1Pod, PodSpec, PodStatus);
 
@@ -51,29 +48,17 @@ api_ctor!(v1Service, ServiceSpec, ServiceStatus);
 use k8s_openapi::api::batch::v1::{JobSpec, JobStatus};
 api_ctor!(v1Job, JobSpec, JobStatus);
 
-impl LoggingObject for Object<JobSpec, JobStatus> {}
-impl LoggingObject for Object<JobSpec, Void> {}
-
 use k8s_openapi::api::core::v1::{NamespaceSpec, NamespaceStatus};
 api_ctor!(v1Namespace, NamespaceSpec, NamespaceStatus);
 
 use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
 api_ctor!(v1DaemonSet, DaemonSetSpec, DaemonSetStatus);
 
-impl LoggingObject for Object<DaemonSetSpec, DaemonSetStatus> {}
-impl LoggingObject for Object<DaemonSetSpec, Void> {}
-
 use k8s_openapi::api::apps::v1::{StatefulSetSpec, StatefulSetStatus};
 api_ctor!(v1StatefulSet, StatefulSetSpec, StatefulSetStatus);
 
-impl LoggingObject for Object<StatefulSetSpec, StatefulSetStatus> {}
-impl LoggingObject for Object<StatefulSetSpec, Void> {}
-
 use k8s_openapi::api::apps::v1::{ReplicaSetSpec, ReplicaSetStatus};
 api_ctor!(v1ReplicaSet, ReplicaSetSpec, ReplicaSetStatus);
-
-impl LoggingObject for Object<ReplicaSetSpec, ReplicaSetStatus> {}
-impl LoggingObject for Object<ReplicaSetSpec, Void> {}
 
 use k8s_openapi::api::core::v1::{ReplicationControllerSpec, ReplicationControllerStatus};
 api_ctor!(
