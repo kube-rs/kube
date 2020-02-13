@@ -19,7 +19,7 @@ macro_rules! api_ctor {
                 }
             }
         }
-    }
+    };
 }
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
@@ -76,10 +76,18 @@ impl LoggingObject for Object<ReplicaSetSpec, ReplicaSetStatus> {}
 impl LoggingObject for Object<ReplicaSetSpec, Void> {}
 
 use k8s_openapi::api::core::v1::{ReplicationControllerSpec, ReplicationControllerStatus};
-api_ctor!(v1ReplicationController, ReplicationControllerSpec, ReplicationControllerStatus);
+api_ctor!(
+    v1ReplicationController,
+    ReplicationControllerSpec,
+    ReplicationControllerStatus
+);
 
 use k8s_openapi::api::core::v1::{PersistentVolumeClaimSpec, PersistentVolumeClaimStatus};
-api_ctor!(v1PersistentVolumeClaim, PersistentVolumeClaimSpec, PersistentVolumeClaimStatus);
+api_ctor!(
+    v1PersistentVolumeClaim,
+    PersistentVolumeClaimSpec,
+    PersistentVolumeClaimStatus
+);
 
 use k8s_openapi::api::core::v1::{PersistentVolumeSpec, PersistentVolumeStatus};
 api_ctor!(v1PersistentVolume, PersistentVolumeSpec, PersistentVolumeStatus);
@@ -94,10 +102,18 @@ use k8s_openapi::api::networking::v1::NetworkPolicySpec;
 api_ctor!(v1NetworkPolicy, NetworkPolicySpec, Void); // has no Status
 
 use k8s_openapi::api::autoscaling::v1::{HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus};
-api_ctor!(v1HorizontalPodAutoscaler, HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus);
+api_ctor!(
+    v1HorizontalPodAutoscaler,
+    HorizontalPodAutoscalerSpec,
+    HorizontalPodAutoscalerStatus
+);
 
 use k8s_openapi::api::extensions::v1beta1::{IngressSpec, IngressStatus};
 api_ctor!(v1beta1Ingress, IngressSpec, IngressStatus);
 
 use k8s_openapi::api::authorization::v1::{SelfSubjectRulesReviewSpec, SubjectRulesReviewStatus};
-api_ctor!(v1SelfSubjectRulesReview, SelfSubjectRulesReviewSpec, SubjectRulesReviewStatus);
+api_ctor!(
+    v1SelfSubjectRulesReview,
+    SelfSubjectRulesReviewSpec,
+    SubjectRulesReviewStatus
+);
