@@ -65,7 +65,7 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
                     ..Default::default()
                 };
                 let evlist = events.list(&opts).await?;
-                for e in evlist.items {
+                for e in evlist {
                     warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);
                 }
             } else {

@@ -2,232 +2,118 @@
 use std::marker::PhantomData;
 
 use crate::{
-    api::{typed::LoggingObject, Api, Object, RawApi, Void},
+    api::{subresource::LoggingObject, Api, Object, RawApi, Void},
     client::APIClient,
 };
+
+
+/// Implement a named constructor on Api, with Spec and Status types
+macro_rules! api_ctor {
+    ( $name:tt, $Spec:ty, $Status:ty ) => {
+        impl Api<Object<$Spec, $Status>> {
+            pub fn $name(client: APIClient) -> Self {
+                Api {
+                    api: RawApi::$name(),
+                    client,
+                    phantom: PhantomData,
+                }
+            }
+        }
+    };
+}
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::{
     CustomResourceDefinitionSpec as CrdSpec, CustomResourceDefinitionStatus as CrdStatus,
 };
-impl Api<Object<CrdSpec, CrdStatus>> {
-    pub fn v1beta1CustomResourceDefinition(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1beta1CustomResourceDefinition(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1beta1CustomResourceDefinition, CrdSpec, CrdStatus);
 
 use k8s_openapi::api::batch::v1beta1::{CronJobSpec, CronJobStatus};
-impl Api<Object<CronJobSpec, CronJobStatus>> {
-    pub fn v1beta1CronJob(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1beta1CronJob(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1beta1CronJob, CronJobSpec, CronJobStatus);
 
 use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
-impl Api<Object<NodeSpec, NodeStatus>> {
-    pub fn v1Node(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1Node(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1Node, NodeSpec, NodeStatus);
 
 use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStatus};
-impl Api<Object<DeploymentSpec, DeploymentStatus>> {
-    pub fn v1Deployment(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1Deployment(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1Deployment, DeploymentSpec, DeploymentStatus);
+
 impl LoggingObject for Object<DeploymentSpec, DeploymentStatus> {}
 impl LoggingObject for Object<DeploymentSpec, Void> {}
 
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
-impl Api<Object<PodSpec, PodStatus>> {
-    pub fn v1Pod(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1Pod(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1Pod, PodSpec, PodStatus);
+
 impl LoggingObject for Object<PodSpec, PodStatus> {}
 impl LoggingObject for Object<PodSpec, Void> {}
 
 use k8s_openapi::api::core::v1::{ServiceSpec, ServiceStatus};
-impl Api<Object<ServiceSpec, ServiceStatus>> {
-    pub fn v1Service(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1Service(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1Service, ServiceSpec, ServiceStatus);
 
 use k8s_openapi::api::batch::v1::{JobSpec, JobStatus};
-impl Api<Object<JobSpec, JobStatus>> {
-    pub fn v1Job(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1Job(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1Job, JobSpec, JobStatus);
+
+impl LoggingObject for Object<JobSpec, JobStatus> {}
+impl LoggingObject for Object<JobSpec, Void> {}
 
 use k8s_openapi::api::core::v1::{NamespaceSpec, NamespaceStatus};
-impl Api<Object<NamespaceSpec, NamespaceStatus>> {
-    pub fn v1Namespace(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1Namespace(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1Namespace, NamespaceSpec, NamespaceStatus);
 
 use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
-impl Api<Object<DaemonSetSpec, DaemonSetStatus>> {
-    pub fn v1DaemonSet(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1DaemonSet(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1DaemonSet, DaemonSetSpec, DaemonSetStatus);
+
+impl LoggingObject for Object<DaemonSetSpec, DaemonSetStatus> {}
+impl LoggingObject for Object<DaemonSetSpec, Void> {}
 
 use k8s_openapi::api::apps::v1::{StatefulSetSpec, StatefulSetStatus};
-impl Api<Object<StatefulSetSpec, StatefulSetStatus>> {
-    pub fn v1StatefulSet(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1Statefulset(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1StatefulSet, StatefulSetSpec, StatefulSetStatus);
+
+impl LoggingObject for Object<StatefulSetSpec, StatefulSetStatus> {}
+impl LoggingObject for Object<StatefulSetSpec, Void> {}
 
 use k8s_openapi::api::apps::v1::{ReplicaSetSpec, ReplicaSetStatus};
-impl Api<Object<ReplicaSetSpec, ReplicaSetStatus>> {
-    pub fn v1ReplicaSet(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1ReplicaSet(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1ReplicaSet, ReplicaSetSpec, ReplicaSetStatus);
+
+impl LoggingObject for Object<ReplicaSetSpec, ReplicaSetStatus> {}
+impl LoggingObject for Object<ReplicaSetSpec, Void> {}
 
 use k8s_openapi::api::core::v1::{ReplicationControllerSpec, ReplicationControllerStatus};
-impl Api<Object<ReplicationControllerSpec, ReplicationControllerStatus>> {
-    pub fn v1ReplicationController(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1ReplicationController(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(
+    v1ReplicationController,
+    ReplicationControllerSpec,
+    ReplicationControllerStatus
+);
 
 use k8s_openapi::api::core::v1::{PersistentVolumeClaimSpec, PersistentVolumeClaimStatus};
-impl Api<Object<PersistentVolumeClaimSpec, PersistentVolumeClaimStatus>> {
-    pub fn v1PersistentVolumeClaim(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1PersistentVolumeClaim(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(
+    v1PersistentVolumeClaim,
+    PersistentVolumeClaimSpec,
+    PersistentVolumeClaimStatus
+);
 
 use k8s_openapi::api::core::v1::{PersistentVolumeSpec, PersistentVolumeStatus};
-impl Api<Object<PersistentVolumeSpec, PersistentVolumeStatus>> {
-    pub fn v1PersistentVolume(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1PersistentVolume(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1PersistentVolume, PersistentVolumeSpec, PersistentVolumeStatus);
 
 use k8s_openapi::api::storage::v1::{VolumeAttachmentSpec, VolumeAttachmentStatus};
-impl Api<Object<VolumeAttachmentSpec, VolumeAttachmentStatus>> {
-    pub fn v1VolumeAttachment(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1VolumeAttachment(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1VolumeAttachment, VolumeAttachmentSpec, VolumeAttachmentStatus);
 
 use k8s_openapi::api::core::v1::{ResourceQuotaSpec, ResourceQuotaStatus};
-impl Api<Object<ResourceQuotaSpec, ResourceQuotaStatus>> {
-    pub fn v1ResourceQuota(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1ResourceQuota(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1ResourceQuota, ResourceQuotaSpec, ResourceQuotaStatus);
 
 use k8s_openapi::api::networking::v1::NetworkPolicySpec;
-impl Api<Object<NetworkPolicySpec, Void>> {
-    pub fn v1NetworkPolicy(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1NetworkPolicy(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1NetworkPolicy, NetworkPolicySpec, Void); // has no Status
 
 use k8s_openapi::api::autoscaling::v1::{HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus};
-impl Api<Object<HorizontalPodAutoscalerSpec, HorizontalPodAutoscalerStatus>> {
-    pub fn v1HorizontalPodAutoscaler(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1HorizontalPodAutoscaler(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(
+    v1HorizontalPodAutoscaler,
+    HorizontalPodAutoscalerSpec,
+    HorizontalPodAutoscalerStatus
+);
 
 use k8s_openapi::api::extensions::v1beta1::{IngressSpec, IngressStatus};
-impl Api<Object<IngressSpec, IngressStatus>> {
-    pub fn v1beta1Ingress(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1beta1Ingress(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(v1beta1Ingress, IngressSpec, IngressStatus);
 
 use k8s_openapi::api::authorization::v1::{SelfSubjectRulesReviewSpec, SubjectRulesReviewStatus};
-impl Api<Object<SelfSubjectRulesReviewSpec, SubjectRulesReviewStatus>> {
-    pub fn v1SelfSubjectRulesReview(client: APIClient) -> Self {
-        Api {
-            api: RawApi::v1SelfSubjectRulesReview(),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
+api_ctor!(
+    v1SelfSubjectRulesReview,
+    SelfSubjectRulesReviewSpec,
+    SubjectRulesReviewStatus
+);
