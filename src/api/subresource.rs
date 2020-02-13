@@ -148,6 +148,14 @@ impl RawApi {
     }
 }
 
+#[test]
+fn log_path() {
+    let r = RawApi::v1Deployment().within("ns");
+    let lp = LogParams::default();
+    let req = r.logs("foo", &lp).unwrap();
+    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments/foo/log?");
+}
+
 /// Marker trait for objects that has logs
 pub trait LoggingObject {}
 
