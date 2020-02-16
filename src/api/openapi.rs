@@ -46,7 +46,10 @@ macro_rules! k8s_ctor {
     ( $name:ident, $version:expr, $openapi:path) => {
         #[cfg(feature = "openapi")]
         paste::item! {
-            type [<Obj $version $name>] = Object<$openapi::[<$version>]::[<$name Spec>], $openapi::[<$version>]::[<$name Status>]>;
+            type [<Obj $version $name>] = Object<
+                $openapi::[<$version>]::[<$name Spec>],
+                $openapi::[<$version>]::[<$name Status>]
+                >;
             impl Api<[<Obj $version $name>]> {
                 pub fn [<$version $name>](client: APIClient) -> Self {
                     Self {
