@@ -41,8 +41,8 @@ macro_rules! k8s_obj {
 /// Bind a k8s_openapi resource struct to Api
 ///
 /// Binds Api::vxObjectName to the RawApi
+/// This uses the standard openapi path with consistent Spec and Status suffixed structs
 macro_rules! k8s_ctor {
-    // using a standard openapi path with consistent Spec and Status suffixed structs
     ( $name:ident, $version:expr, $openapi:path) => {
         #[cfg(feature = "openapi")]
         paste::item! {
@@ -64,9 +64,10 @@ macro_rules! k8s_ctor {
 }
 
 /// Binds an arbitrary Object type to a verioned name on Api
+///
+/// Good for when there are api inconsistencies
 #[cfg_attr(not(feature = "openapi"), allow(unused_macros))]
 macro_rules! k8s_custom_ctor {
-    // using a non-standard manual Object (for api inconsistencies)
     ( $versioned_name:ident, $obj:ty) => {
         paste::item! {
             impl Api<$obj> {
