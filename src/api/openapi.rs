@@ -1,15 +1,14 @@
 #![allow(non_snake_case)]
 
-#[cfg(feature = "openapi")]
-use std::marker::PhantomData;
+use crate::api::RawApi;
 #[cfg(feature = "openapi")]
 use crate::{
     api::subresource::LoggingObject,
     api::{Api, Object, Void},
     client::APIClient,
 };
-use crate::api::RawApi;
 use inflector::string::pluralize::to_plural;
+#[cfg(feature = "openapi")] use std::marker::PhantomData;
 
 /// Bind typemeta properties for a k8s_openapi resource to RawApi
 ///
@@ -102,7 +101,12 @@ k8s_obj!("HorizontalPodAutoscaler", "v1", "autoscaling", "apis");
 k8s_ctor!(HorizontalPodAutoscaler, "v1", k8s_openapi::api::autoscaling);
 
 // api::admissionregistration
-k8s_obj!("ValidatingWebhookConfiguration", "v1beta1", "admissionregistration.k8s.io", "apis"); // snowflake
+k8s_obj!(
+    "ValidatingWebhookConfiguration",
+    "v1beta1",
+    "admissionregistration.k8s.io",
+    "apis"
+); // snowflake
 
 
 // api::core
@@ -128,7 +132,7 @@ k8s_obj!("Event", "v1", "api");
 k8s_obj!("ConfigMap", "v1", "api");
 k8s_obj!("ServiceAccount", "v1", "api");
 k8s_obj!("Endpoints", "v1", "api"); // yup plural!
-// subresources
+                                    // subresources
 #[cfg(feature = "openapi")]
 impl LoggingObject for Object<k8s_openapi::api::core::v1::PodSpec, k8s_openapi::api::core::v1::PodStatus> {}
 #[cfg(feature = "openapi")]
@@ -148,8 +152,17 @@ k8s_ctor!(Ingress, "v1beta1", k8s_openapi::api::extensions);
 
 
 // apiextensions_apiserver::pkg::apis::apiextensions
-k8s_obj!("CustomResourceDefinition", "v1beta1", "apiextensions.k8s.io", "apis");
-k8s_ctor!(CustomResourceDefinition, "v1beta1", k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions);
+k8s_obj!(
+    "CustomResourceDefinition",
+    "v1beta1",
+    "apiextensions.k8s.io",
+    "apis"
+);
+k8s_ctor!(
+    CustomResourceDefinition,
+    "v1beta1",
+    k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions
+);
 
 
 // api::rbac (snowflake objects in snowflake.rs)
@@ -172,7 +185,7 @@ k8s_custom_ctor!(v1NetworkPolicy, Object<k8s_openapi::api::networking::v1::Netwo
 // Macro insanity needs some sanity here..
 // There should be at least one test for each api group here to ensure no path typos
 mod test {
-    //use crate::api::{RawApi, PostParams};
+    // use crate::api::{RawApi, PostParams};
     // TODO: fixturize these tests
     // these are sanity tests for macros that create the RawApi::v1Ctors
     #[test]
@@ -191,7 +204,10 @@ mod test {
     fn api_url_role() {
         let r = RawApi::v1Role().within("ns");
         let req = r.create(&PostParams::default(), vec![]).unwrap();
-        assert_eq!(req.uri(), "/apis/rbac.authorization.k8s.io/v1/namespaces/ns/roles?");
+        assert_eq!(
+            req.uri(),
+            "/apis/rbac.authorization.k8s.io/v1/namespaces/ns/roles?"
+        );
     }
     #[test]
     fn api_url_cj() {
@@ -203,13 +219,19 @@ mod test {
     fn api_url_hpa() {
         let r = RawApi::v1HorizontalPodAutoscaler().within("ns");
         let req = r.create(&PostParams::default(), vec![]).unwrap();
-        assert_eq!(req.uri(), "/apis/autoscaling/v1/namespaces/ns/horizontalpodautoscalers?");
+        assert_eq!(
+            req.uri(),
+            "/apis/autoscaling/v1/namespaces/ns/horizontalpodautoscalers?"
+        );
     }
     #[test]
     fn api_url_np() {
         let r = RawApi::v1NetworkPolicy().within("ns");
         let req = r.create(&PostParams::default(), vec![]).unwrap();
-        assert_eq!(req.uri(), "/apis/networking.k8s.io/v1/namespaces/ns/networkpolicies?");
+        assert_eq!(
+            req.uri(),
+            "/apis/networking.k8s.io/v1/namespaces/ns/networkpolicies?"
+        );
     }
     #[test]
     fn api_url_ingress() {
@@ -227,7 +249,10 @@ mod test {
     fn api_url_admission() {
         let r = RawApi::v1beta1ValidatingWebhookConfiguration();
         let req = r.create(&PostParams::default(), vec![]).unwrap();
-        assert_eq!(req.uri(), "/apis/admissionregistration.k8s.io/v1beta1/validatingwebhookconfigurations?");
+        assert_eq!(
+            req.uri(),
+            "/apis/admissionregistration.k8s.io/v1beta1/validatingwebhookconfigurations?"
+        );
     }
 
     #[test]
