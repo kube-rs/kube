@@ -46,8 +46,8 @@ macro_rules! k8s_ctor {
     ( $name:ident, $version:expr, $openapi:path) => {
         #[cfg(feature = "openapi")]
         paste::item! {
-            type [<Obj $name>] = Object<$openapi::[<$version>]::[<$name Spec>], $openapi::[<$version>]::[<$name Status>]>;
-            impl Api<[<Obj $name>]> {
+            type [<Obj $version $name>] = Object<$openapi::[<$version>]::[<$name Spec>], $openapi::[<$version>]::[<$name Status>]>;
+            impl Api<[<Obj $version $name>]> {
                 pub fn [<$version $name>](client: APIClient) -> Self {
                     Self {
                         api: RawApi::[<$version $name>](),
@@ -163,6 +163,21 @@ k8s_ctor!(
     "v1beta1",
     k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions
 );
+
+#[cfg(feature = "openapi")]
+k8s_openapi::k8s_if_ge_1_17! {
+    k8s_obj!(
+        "CustomResourceDefinition",
+        "v1",
+        "apiextensions.k8s.io",
+        "apis"
+    );
+    k8s_ctor!(
+        CustomResourceDefinition,
+        "v1",
+        k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions
+    );
+}
 
 
 // api::rbac (snowflake objects in snowflake.rs)
