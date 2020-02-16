@@ -34,10 +34,10 @@ impl Default for RawApi {
     }
 }
 
-/// Constructors for most kubernetes objects
+/// RawApi root implementations
 ///
-/// Don't see all objects in here? Please submit a PR.
-/// You can extract the data needed from the [openapi spec](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/api/).
+/// Note: constructors such as RawApi::v1Deployment are implemented via the k8s_obj macro
+/// Find those invocations to see how to add more objects (not fully automated yet)
 #[allow(non_snake_case)]
 impl RawApi {
     /// Set as namespaced resource within a specified namespace
@@ -68,102 +68,11 @@ impl RawApi {
         self
     }
 
-    /// Stable namespace resource constructor
-    pub fn v1Namespace() -> Self {
-        Self {
-            group: "".into(),
-            resource: "namespaces".into(),
-            prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    /// Stable deployment resource constructor
-    pub fn v1Deployment() -> Self {
-        Self {
-            group: "apps".into(),
-            resource: "deployments".into(),
-            prefix: "apis".into(),
-            ..Default::default()
-        }
-    }
-
-    /// Stable pod resource constructor
-    pub fn v1Pod() -> Self {
-        Self {
-            group: "".into(),
-            resource: "pods".into(),
-            prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    /// Stable daemonset resource constructor
-    pub fn v1DaemonSet() -> Self {
-        Self {
-            group: "apps".into(),
-            resource: "daemonsets".into(),
-            prefix: "apis".into(),
-            ..Default::default()
-        }
-    }
-
-    /// Stable replicaset resource constructor
-    pub fn v1ReplicaSet() -> Self {
-        Self {
-            group: "apps".into(),
-            resource: "replicasets".into(),
-            prefix: "apis".into(),
-            ..Default::default()
-        }
-    }
-
-    /// Stable ReplicationController resource constructor
-    pub fn v1ReplicationController() -> Self {
-        Self {
-            group: "".into(),
-            resource: "replicationcontrollers".into(),
-            prefix: "api".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    /// Stable node resource constructor
-    pub fn v1Node() -> Self {
-        Self {
-            group: "".into(),
-            resource: "nodes".into(),
-            prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    /// Stable statefulset resource constructor
-    pub fn v1StatefulSet() -> Self {
-        Self {
-            group: "apps".into(),
-            resource: "statefulsets".into(),
-            prefix: "apis".into(),
-            ..Default::default()
-        }
-    }
-
     // Stable event resource constructor
     pub fn v1Event() -> Self {
         Self {
             group: "".into(),
             resource: "events".into(),
-            prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable Service resource constructor
-    pub fn v1Service() -> Self {
-        Self {
-            group: "".into(),
-            resource: "services".into(),
             prefix: "api".into(),
             ..Default::default()
         }
@@ -185,38 +94,6 @@ impl RawApi {
             group: "".into(),
             resource: "configmaps".into(),
             prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    pub fn v1Job() -> Self {
-        Self {
-            group: "batch".into(),
-            resource: "jobs".into(),
-            prefix: "apis".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable PersistentVolumeClaim resource constructor
-    pub fn v1PersistentVolumeClaim() -> Self {
-        Self {
-            group: "".into(),
-            resource: "persistentvolumeclaims".into(),
-            prefix: "api".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable PersistentVolume resource constructor
-    pub fn v1PersistentVolume() -> Self {
-        Self {
-            group: "".into(),
-            resource: "persistentvolumes".into(),
-            prefix: "api".into(),
-            version: "v1".into(),
             ..Default::default()
         }
     }
@@ -243,61 +120,6 @@ impl RawApi {
         }
     }
 
-    // Stable ResourceQuota resource constructor
-    pub fn v1ResourceQuota() -> Self {
-        Self {
-            group: "".into(),
-            resource: "resourcequotas".into(),
-            prefix: "api".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable HorizontalPodAutoscaler resource constructor
-    pub fn v1HorizontalPodAutoscaler() -> Self {
-        Self {
-            group: "autoscaling".into(),
-            resource: "horizontalpodautoscalers".into(),
-            prefix: "apis".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    /// CronJob constructor
-    pub fn v1beta1CronJob() -> Self {
-        Self {
-            group: "batch".into(),
-            resource: "cronjobs".into(),
-            prefix: "apis".into(),
-            version: "v1beta1".into(), // latest available in 1.14.0
-            ..Default::default()
-        }
-    }
-
-    /// Ingress constructor
-    pub fn v1beta1Ingress() -> Self {
-        Self {
-            group: "extensions".into(),
-            resource: "ingresses".into(),
-            prefix: "apis".into(),
-            version: "v1beta1".into(),
-            ..Default::default()
-        }
-    }
-
-    /// SelfSubjectRulesReview constructor
-    pub fn v1SelfSubjectRulesReview() -> Self {
-        Self {
-            group: "authorization.k8s.io".into(),
-            resource: "selfsubjectrulesreviews".into(),
-            prefix: "apis".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
     /// ValidatingWebhookConfiguration constructor
     pub fn v1beta1ValidatingWebhookConfiguration() -> Self {
         Self {
@@ -315,17 +137,6 @@ impl RawApi {
             group: "".into(),
             resource: "endpoints".into(),
             prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    /// Custom resource definition constructor
-    pub fn v1beta1CustomResourceDefinition() -> Self {
-        Self {
-            group: "apiextensions.k8s.io".into(),
-            resource: "customresourcedefinitions".into(),
-            prefix: "apis".into(),
-            version: "v1beta1".into(), // latest available in 1.14.0
             ..Default::default()
         }
     }
@@ -825,11 +636,28 @@ fn replace_path() {
     assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
 }
 #[test]
-fn create_path() {
+fn create_path_rs() {
     let r = RawApi::v1ReplicaSet().within("ns");
-    let pp = PostParams::default();
-    let req = r.create(&pp, vec![]).unwrap();
+    let req = r.create(&PostParams::default(), vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets?");
+}
+#[test]
+fn create_path_cj() {
+    let r = RawApi::v1beta1CronJob().within("ns");
+    let req = r.create(&PostParams::default(), vec![]).unwrap();
+    assert_eq!(req.uri(), "/apis/batch/v1beta1/namespaces/ns/cronjobs?");
+}
+#[test]
+fn create_path_hpa() {
+    let r = RawApi::v1HorizontalPodAutoscaler().within("ns");
+    let req = r.create(&PostParams::default(), vec![]).unwrap();
+    assert_eq!(req.uri(), "/apis/autoscaling/v1/namespaces/ns/horizontalpodautoscalers?");
+}
+#[test]
+fn create_path_ingress() {
+    let r = RawApi::v1beta1Ingress().within("ns");
+    let req = r.create(&PostParams::default(), vec![]).unwrap();
+    assert_eq!(req.uri(), "/apis/extensions/v1beta1/namespaces/ns/ingresses?");
 }
 #[test]
 fn delete_path() {
