@@ -185,7 +185,7 @@ k8s_custom_ctor!(v1NetworkPolicy, Object<k8s_openapi::api::networking::v1::Netwo
 // Macro insanity needs some sanity here..
 // There should be at least one test for each api group here to ensure no path typos
 mod test {
-    // use crate::api::{RawApi, PostParams};
+     use crate::api::{RawApi, PostParams};
     // TODO: fixturize these tests
     // these are sanity tests for macros that create the RawApi::v1Ctors
     #[test]
