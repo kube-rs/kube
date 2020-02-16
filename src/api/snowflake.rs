@@ -262,23 +262,23 @@ use k8s_openapi::api::core::v1::EndpointSubset;
 /// Endpoint
 /// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#endpoints-v1-core
 #[derive(Deserialize, Serialize, Clone)]
-pub struct v1Endpoint {
+pub struct v1Endpoints {
     pub metadata: ObjectMeta,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub subsets: Vec<EndpointSubset>,
 }
 
-impl KubeObject for v1Endpoint {
+impl KubeObject for v1Endpoints {
     fn meta(&self) -> &ObjectMeta {
         &self.metadata
     }
 }
 
-impl Api<v1Endpoint> {
-    pub fn v1Endpoint(client: APIClient) -> Self {
+impl Api<v1Endpoints> {
+    pub fn v1Endpoints(client: APIClient) -> Self {
         Api {
-            api: RawApi::v1Endpoint(),
+            api: RawApi::v1Endpoints(),
             client,
             phantom: PhantomData,
         }

@@ -5,13 +5,13 @@ clippy:
 	touch src/lib.rs
 	cargo +nightly clippy --no-default-features --features=openapi,rustls-tls
 
-doc:
-	cargo doc --lib
-	xdg-open target/doc/kube/index.html
-
 fmt:
 	#rustup component add rustfmt --toolchain nightly
 	cargo +nightly fmt
+
+doc:
+	cargo doc --lib
+	xdg-open target/doc/kube/index.html
 
 test:
 	cargo test --lib
