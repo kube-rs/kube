@@ -2,6 +2,7 @@
 ===================
   * Exposed `Config::read` and `Config::read_from` - #124
   * Fix typo on `Api::StatefulSet`
+  * Fix typo on `Api::Endpoints`
 
 0.25.0 / 2020-02-09
 ===================

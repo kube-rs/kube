@@ -22,7 +22,7 @@ pub use subresource::{LogParams, Scale, ScaleSpec, ScaleStatus};
 mod resource;
 pub use self::resource::{KubeObject, Object, ObjectList, WatchEvent};
 
-#[cfg(feature = "openapi")] mod openapi;
+mod openapi;
 #[cfg(feature = "openapi")] mod snowflake;
 #[cfg(feature = "openapi")] pub use snowflake::{v1ConfigMap, v1Event, v1Secret};
 

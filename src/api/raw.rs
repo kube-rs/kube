@@ -38,7 +38,6 @@ impl Default for RawApi {
 ///
 /// Note: constructors such as RawApi::v1Deployment are implemented via the k8s_obj macro
 /// Find those invocations to see how to add more objects (not fully automated yet)
-#[allow(non_snake_case)]
 impl RawApi {
     /// Set as namespaced resource within a specified namespace
     pub fn within(mut self, ns: &str) -> Self {
@@ -68,79 +67,6 @@ impl RawApi {
         self
     }
 
-    // Stable event resource constructor
-    pub fn v1Event() -> Self {
-        Self {
-            group: "".into(),
-            resource: "events".into(),
-            prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable Secret resource constructor
-    pub fn v1Secret() -> Self {
-        Self {
-            group: "".into(),
-            resource: "secrets".into(),
-            prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable ConfigMap resource constructor
-    pub fn v1ConfigMap() -> Self {
-        Self {
-            group: "".into(),
-            resource: "configmaps".into(),
-            prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable VolumeAttachment resource constructor
-    pub fn v1VolumeAttachment() -> Self {
-        Self {
-            group: "storage.k8s.io".into(),
-            resource: "volumeattachments".into(),
-            prefix: "apis".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable NetworkPolicy resource constructor
-    pub fn v1NetworkPolicy() -> Self {
-        Self {
-            group: "networking.k8s.io".into(),
-            resource: "networkpolicies".into(),
-            prefix: "apis".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    /// ValidatingWebhookConfiguration constructor
-    pub fn v1beta1ValidatingWebhookConfiguration() -> Self {
-        Self {
-            group: "admissionregistration.k8s.io".into(),
-            resource: "validatingwebhookconfigurations".into(),
-            prefix: "apis".into(),
-            version: "v1beta1".into(), // latest available in 1.14.0
-            ..Default::default()
-        }
-    }
-
-    /// ValidatingWebhookConfiguration constructor
-    pub fn v1Endpoint() -> Self {
-        Self {
-            group: "".into(),
-            resource: "endpoints".into(),
-            prefix: "api".into(),
-            ..Default::default()
-        }
-    }
-
     /// Instance of a CRD
     ///
     /// The version, and group must be set by the user:
@@ -151,53 +77,10 @@ impl RawApi {
     ///    .group("clux.dev") // <.spec.group>
     ///    .version("v1");
     /// ```
+    #[allow(non_snake_case)]
     pub fn customResource(name: &str) -> Self {
         Self {
             resource: name.into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable Role resource constructor
-    pub fn v1Role() -> Self {
-        Self {
-            group: "rbac.authorization.k8s.io".into(),
-            resource: "roles".into(),
-            prefix: "apis".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable ClusterRole resource constructor
-    pub fn v1ClusterRole() -> Self {
-        Self {
-            group: "rbac.authorization.k8s.io".into(),
-            resource: "clusterroles".into(),
-            prefix: "apis".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable Role resource constructor
-    pub fn v1RoleBinding() -> Self {
-        Self {
-            group: "rbac.authorization.k8s.io".into(),
-            resource: "rolebindings".into(),
-            prefix: "apis".into(),
-            version: "v1".into(),
-            ..Default::default()
-        }
-    }
-
-    // Stable Service Account resource constructor
-    pub fn v1ServiceAccount() -> Self {
-        Self {
-            group: "".into(),
-            resource: "serviceaccounts".into(),
-            prefix: "api".into(),
-            version: "v1".into(),
             ..Default::default()
         }
     }
@@ -635,30 +518,7 @@ fn replace_path() {
     let req = r.replace("myds", &pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
 }
-#[test]
-fn create_path_rs() {
-    let r = RawApi::v1ReplicaSet().within("ns");
-    let req = r.create(&PostParams::default(), vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets?");
-}
-#[test]
-fn create_path_cj() {
-    let r = RawApi::v1beta1CronJob().within("ns");
-    let req = r.create(&PostParams::default(), vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/batch/v1beta1/namespaces/ns/cronjobs?");
-}
-#[test]
-fn create_path_hpa() {
-    let r = RawApi::v1HorizontalPodAutoscaler().within("ns");
-    let req = r.create(&PostParams::default(), vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/autoscaling/v1/namespaces/ns/horizontalpodautoscalers?");
-}
-#[test]
-fn create_path_ingress() {
-    let r = RawApi::v1beta1Ingress().within("ns");
-    let req = r.create(&PostParams::default(), vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/extensions/v1beta1/namespaces/ns/ingresses?");
-}
+
 #[test]
 fn delete_path() {
     let r = RawApi::v1ReplicaSet().within("ns");
