@@ -1,5 +1,3 @@
-#![allow(non_snake_case)]
-
 use crate::api::RawApi;
 #[cfg(feature = "openapi")]
 use crate::{
@@ -14,8 +12,8 @@ use inflector::string::pluralize::to_plural;
 ///
 /// Constructs a RawApi::vxObjectName constructor with correct names, versions
 macro_rules! k8s_obj {
-    // 4 argument ver
-    ( $name:expr, $version:expr, $group:expr, $prefix:expr) => {
+    // 4 argument ver (allows customizing prefix)
+    ( $name:expr, $version:expr, $prefix:expr, $group:expr) => {
         impl RawApi {
             paste::item! {
                 #[allow(non_snake_case)]
@@ -31,10 +29,16 @@ macro_rules! k8s_obj {
             }
         }
     };
-    // 3 argument version for empty prefix (lots of api::apps stuff has this)
-    // TODO: maybe apis should be default and  fix api::apps?
+    // 3 argument ver (for normal apis in the apis prefix)
     ( $name:expr, $version:expr, $group:expr) => {
-        k8s_obj!($name, $version, $group, "");
+        k8s_obj!($name, $version, "apis", $group);
+    };
+}
+
+/// Special case k8s_obj invocation where we are in the special core empty prefix
+macro_rules! k8s_core_obj {
+    ( $name:expr, $version:expr, $group:expr) => {
+        k8s_obj!($name, $version, "", $group);
     };
 }
 
@@ -46,11 +50,11 @@ macro_rules! k8s_ctor {
     ( $name:ident, $version:expr, $openapi:path) => {
         #[cfg(feature = "openapi")]
         paste::item! {
-            type [<Obj $version $name>] = Object<
+            impl Api<Object<
                 $openapi::[<$version>]::[<$name Spec>],
                 $openapi::[<$version>]::[<$name Status>]
-                >;
-            impl Api<[<Obj $version $name>]> {
+                >> {
+                #![allow(non_snake_case)]
                 pub fn [<$version $name>](client: APIClient) -> Self {
                     Self {
                         api: RawApi::[<$version $name>](),
@@ -71,6 +75,7 @@ macro_rules! k8s_custom_ctor {
     ( $versioned_name:ident, $obj:ty) => {
         paste::item! {
             impl Api<$obj> {
+                #![allow(non_snake_case)]
                 pub fn [<$versioned_name>](client: APIClient) -> Self {
                     Self {
                         api: RawApi::[<$versioned_name>](),
@@ -85,58 +90,59 @@ macro_rules! k8s_custom_ctor {
 
 
 // api::apps
-k8s_obj!("Deployment", "v1", "apps", "apis");
+k8s_obj!("Deployment", "v1", "apps");
 k8s_ctor!(Deployment, "v1", k8s_openapi::api::apps);
-k8s_obj!("DaemonSet", "v1", "apps", "apis");
+k8s_obj!("DaemonSet", "v1", "apps");
 k8s_ctor!(DaemonSet, "v1", k8s_openapi::api::apps);
-k8s_obj!("ReplicaSet", "v1", "apps", "apis");
+k8s_obj!("ReplicaSet", "v1", "apps");
 k8s_ctor!(ReplicaSet, "v1", k8s_openapi::api::apps);
-k8s_obj!("StatefulSet", "v1", "apps", "apis");
+k8s_obj!("StatefulSet", "v1", "apps");
 k8s_ctor!(StatefulSet, "v1", k8s_openapi::api::apps);
 
 
 // api::authorization
-k8s_obj!("SelfSubjectRulesReview", "v1", "authorization.k8s.io", "apis");
+k8s_obj!("SelfSubjectRulesReview", "v1", "authorization.k8s.io");
 #[cfg(feature = "openapi")]
 k8s_custom_ctor!(v1SelfSubjectRulesReview, Object<k8s_openapi::api::authorization::v1::SelfSubjectRulesReviewSpec, k8s_openapi::api::authorization::v1::SubjectRulesReviewStatus>);
 
 // api::autoscaling
-k8s_obj!("HorizontalPodAutoscaler", "v1", "autoscaling", "apis");
+k8s_obj!("HorizontalPodAutoscaler", "v1", "autoscaling");
 k8s_ctor!(HorizontalPodAutoscaler, "v1", k8s_openapi::api::autoscaling);
 
 // api::admissionregistration
 k8s_obj!(
     "ValidatingWebhookConfiguration",
     "v1beta1",
-    "admissionregistration.k8s.io",
-    "apis"
+    "admissionregistration.k8s.io"
 ); // snowflake
 
 
 // api::core
-k8s_obj!("Pod", "v1", "api");
+k8s_core_obj!("Pod", "v1", "api");
 k8s_ctor!(Pod, "v1", k8s_openapi::api::core);
-k8s_obj!("Node", "v1", "api");
+k8s_core_obj!("Node", "v1", "api");
 k8s_ctor!(Node, "v1", k8s_openapi::api::core);
-k8s_obj!("Service", "v1", "api");
+k8s_core_obj!("Service", "v1", "api");
 k8s_ctor!(Service, "v1", k8s_openapi::api::core);
-k8s_obj!("Namespace", "v1", "api");
+k8s_core_obj!("Namespace", "v1", "api");
 k8s_ctor!(Namespace, "v1", k8s_openapi::api::core);
-k8s_obj!("PersistentVolume", "v1", "api");
+k8s_core_obj!("PersistentVolume", "v1", "api");
 k8s_ctor!(PersistentVolume, "v1", k8s_openapi::api::core);
-k8s_obj!("ResourceQuota", "v1", "api");
+k8s_core_obj!("ResourceQuota", "v1", "api");
 k8s_ctor!(ResourceQuota, "v1", k8s_openapi::api::core);
-k8s_obj!("PersistentVolumeClaim", "v1", "api");
+k8s_core_obj!("PersistentVolumeClaim", "v1", "api");
 k8s_ctor!(PersistentVolumeClaim, "v1", k8s_openapi::api::core);
-k8s_obj!("ReplicationController", "v1", "api");
+k8s_core_obj!("ReplicationController", "v1", "api");
 k8s_ctor!(ReplicationController, "v1", k8s_openapi::api::core);
+
 // snowflakes in api::core
-k8s_obj!("Secret", "v1", "api");
-k8s_obj!("Event", "v1", "api");
-k8s_obj!("ConfigMap", "v1", "api");
-k8s_obj!("ServiceAccount", "v1", "api");
-k8s_obj!("Endpoints", "v1", "api"); // yup plural!
-                                    // subresources
+k8s_core_obj!("Secret", "v1", "api");
+k8s_core_obj!("Event", "v1", "api");
+k8s_core_obj!("ConfigMap", "v1", "api");
+k8s_core_obj!("ServiceAccount", "v1", "api");
+k8s_core_obj!("Endpoints", "v1", "api"); // yup plural!
+
+// subresources
 #[cfg(feature = "openapi")]
 impl LoggingObject for Object<k8s_openapi::api::core::v1::PodSpec, k8s_openapi::api::core::v1::PodStatus> {}
 #[cfg(feature = "openapi")]
@@ -144,24 +150,19 @@ impl LoggingObject for Object<k8s_openapi::api::core::v1::PodSpec, Void> {}
 
 
 // api::batch
-k8s_obj!("CronJob", "v1beta1", "batch", "apis");
+k8s_obj!("CronJob", "v1beta1", "batch");
 k8s_ctor!(CronJob, "v1beta1", k8s_openapi::api::batch);
-k8s_obj!("Job", "v1", "batch", "apis");
+k8s_obj!("Job", "v1", "batch");
 k8s_ctor!(Job, "v1", k8s_openapi::api::batch);
 
 
 // api::extensions
-k8s_obj!("Ingress", "v1beta1", "extensions", "apis");
+k8s_obj!("Ingress", "v1beta1", "extensions");
 k8s_ctor!(Ingress, "v1beta1", k8s_openapi::api::extensions);
 
 
 // apiextensions_apiserver::pkg::apis::apiextensions
-k8s_obj!(
-    "CustomResourceDefinition",
-    "v1beta1",
-    "apiextensions.k8s.io",
-    "apis"
-);
+k8s_obj!("CustomResourceDefinition", "v1beta1", "apiextensions.k8s.io");
 k8s_ctor!(
     CustomResourceDefinition,
     "v1beta1",
@@ -173,8 +174,7 @@ k8s_openapi::k8s_if_ge_1_17! {
     k8s_obj!(
         "CustomResourceDefinition",
         "v1",
-        "apiextensions.k8s.io",
-        "apis"
+        "apiextensions.k8s.io"
     );
     k8s_ctor!(
         CustomResourceDefinition,
@@ -185,24 +185,25 @@ k8s_openapi::k8s_if_ge_1_17! {
 
 
 // api::rbac (snowflake objects in snowflake.rs)
-k8s_obj!("Role", "v1", "rbac.authorization.k8s.io", "apis");
-k8s_obj!("ClusterRole", "v1", "rbac.authorization.k8s.io", "apis");
-k8s_obj!("RoleBinding", "v1", "rbac.authorization.k8s.io", "apis");
+k8s_obj!("Role", "v1", "rbac.authorization.k8s.io");
+k8s_obj!("ClusterRole", "v1", "rbac.authorization.k8s.io");
+k8s_obj!("RoleBinding", "v1", "rbac.authorization.k8s.io");
 
 
 // api::storage::v1
-k8s_obj!("VolumeAttachment", "v1", "storage.k8s.io", "apis");
+k8s_obj!("VolumeAttachment", "v1", "storage.k8s.io");
 k8s_ctor!(VolumeAttachment, "v1", k8s_openapi::api::storage);
 
 
 // api::networking::v1
-k8s_obj!("NetworkPolicy", "v1", "networking.k8s.io", "apis");
+k8s_obj!("NetworkPolicy", "v1", "networking.k8s.io");
 #[cfg(feature = "openapi")]
 k8s_custom_ctor!(v1NetworkPolicy, Object<k8s_openapi::api::networking::v1::NetworkPolicySpec, Void>); // no status
 
 
 // Macro insanity needs some sanity here..
 // There should be at least one test for each api group here to ensure no path typos
+#[cfg(test)]
 mod test {
     use crate::api::{PostParams, RawApi};
     // TODO: fixturize these tests
