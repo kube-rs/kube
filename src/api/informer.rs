@@ -109,9 +109,8 @@ where
     ///
     /// Will seed resourceVersion with a 1 limit list call to the resource
     pub async fn init(self) -> Result<Self> {
-        let initial = self.get_resource_version().await?;
         info!("Starting Informer for {:?}", self.resource);
-        *self.version.lock().await = initial;
+        self.reset().await?;
         Ok(self)
     }
 
