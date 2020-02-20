@@ -4,6 +4,7 @@
   * Fix typo on `Api::StatefulSet`
   * Fix typo on `Api::Endpoints`
   * Add `Api::v1CustomResourceDefinition` when on k8s >= 1.17
+  * Renamed `Void` to `NotUsed`
 
 0.25.0 / 2020-02-09
 ===================

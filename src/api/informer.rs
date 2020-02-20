@@ -1,7 +1,7 @@
 use crate::{
     api::{
         resource::{KubeObject, ObjectList, WatchEvent},
-        Api, ListParams, RawApi, Void,
+        Api, ListParams, RawApi, NotUsed,
     },
     client::APIClient,
     Result,
@@ -231,7 +231,7 @@ where
         let req = self.resource.list_zero_resource_entries(&self.params)?;
 
         // parse to void a ResourceList into void except for Metadata
-        let res = self.client.request::<ObjectList<Void>>(req).await?;
+        let res = self.client.request::<ObjectList<NotUsed>>(req).await?;
 
         let version = res.metadata.resourceVersion.unwrap_or_else(|| "0".into());
         debug!(
