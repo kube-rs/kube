@@ -2,7 +2,7 @@ use crate::api::RawApi;
 #[cfg(feature = "openapi")]
 use crate::{
     api::subresource::LoggingObject,
-    api::{Api, Object, Void},
+    api::{Api, Object, NotUsed},
     client::APIClient,
 };
 use inflector::string::pluralize::to_plural;
@@ -146,7 +146,7 @@ k8s_core_obj!("Endpoints", "v1", "api"); // yup plural!
 #[cfg(feature = "openapi")]
 impl LoggingObject for Object<k8s_openapi::api::core::v1::PodSpec, k8s_openapi::api::core::v1::PodStatus> {}
 #[cfg(feature = "openapi")]
-impl LoggingObject for Object<k8s_openapi::api::core::v1::PodSpec, Void> {}
+impl LoggingObject for Object<k8s_openapi::api::core::v1::PodSpec, NotUsed> {}
 
 
 // api::batch
@@ -198,7 +198,7 @@ k8s_ctor!(VolumeAttachment, "v1", k8s_openapi::api::storage);
 // api::networking::v1
 k8s_obj!("NetworkPolicy", "v1", "networking.k8s.io");
 #[cfg(feature = "openapi")]
-k8s_custom_ctor!(v1NetworkPolicy, Object<k8s_openapi::api::networking::v1::NetworkPolicySpec, Void>); // no status
+k8s_custom_ctor!(v1NetworkPolicy, Object<k8s_openapi::api::networking::v1::NetworkPolicySpec, NotUsed>); // no status
 
 
 // Macro insanity needs some sanity here..

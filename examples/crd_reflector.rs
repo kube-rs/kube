@@ -4,7 +4,7 @@ use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{Object, RawApi, Reflector, Void},
+    api::{Object, RawApi, Reflector, NotUsed},
     client::APIClient,
     config,
 };
@@ -16,7 +16,7 @@ pub struct FooSpec {
     info: String,
 }
 // The kubernetes generic object with our spec and no status
-type Foo = Object<FooSpec, Void>;
+type Foo = Object<FooSpec, NotUsed>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

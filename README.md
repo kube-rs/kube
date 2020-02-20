@@ -193,7 +193,7 @@ let foos = RawApi::customResource("foos")
     .group("clux.dev")
     .within("default");
 
-type Foo = Object<FooSpec, Void>;
+type Foo = Object<FooSpec, NotUsed>;
 let rf : Reflector<Foo> = Reflector::raw(client, resource).init().await?;
 
 let fdata = json!({

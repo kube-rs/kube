@@ -4,7 +4,7 @@ use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
-    api::{DeleteParams, ListParams, Object, ObjectList, PatchParams, PostParams, RawApi, Void},
+    api::{DeleteParams, ListParams, Object, ObjectList, PatchParams, PostParams, RawApi, NotUsed},
     client::APIClient,
     config,
 };
@@ -27,7 +27,7 @@ pub struct FooStatus {
 
 // shorthands
 type Foo = Object<FooSpec, FooStatus>;
-type FooMeta = Object<Void, Void>;
+type FooMeta = Object<NotUsed, NotUsed>;
 type FullCrd = Object<CrdSpec, CrdStatus>;
 
 #[tokio::main]
