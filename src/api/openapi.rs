@@ -2,7 +2,7 @@ use crate::api::RawApi;
 #[cfg(feature = "openapi")]
 use crate::{
     api::subresource::LoggingObject,
-    api::{Api, Object, NotUsed},
+    api::{Api, NotUsed, Object},
     client::APIClient,
 };
 use inflector::string::pluralize::to_plural;

@@ -4,7 +4,7 @@ use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{Object, RawApi, Reflector, NotUsed},
+    api::{NotUsed, Object, RawApi, Reflector},
     client::APIClient,
     config,
 };

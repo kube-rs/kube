@@ -1,7 +1,7 @@
 use crate::{
     api::{
         resource::{KubeObject, ObjectList, WatchEvent},
-        Api, ListParams, RawApi, NotUsed,
+        Api, ListParams, NotUsed, RawApi,
     },
     client::APIClient,
     Result,
