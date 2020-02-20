@@ -15,6 +15,21 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 /// Internal representation for Reflector
 type Cache<K> = BTreeMap<ObjectId, K>;
 
+/// Internal shared state of Reflector
+struct State<K> {
+    data: Cache<K>,
+    version: String,
+}
+
+impl<K> Default for State<K> {
+    fn default() -> Self {
+        State {
+            data: Default::default(),
+            version: 0.to_string(),
+        }
+    }
+}
+
 /// A reflection of `Resource` state in kubernetes
 ///
 /// This watches and caches a `Resource<K>` by:
@@ -28,8 +43,7 @@ pub struct Reflector<K>
 where
     K: Clone + DeserializeOwned + Send,
 {
-    data: Arc<Mutex<Cache<K>>>,
-    version: Arc<Mutex<String>>,
+    state: Arc<Mutex<State<K>>>,
     client: APIClient,
     resource: RawApi,
     params: ListParams,
@@ -45,8 +59,7 @@ where
             client: r.client,
             resource: r.api,
             params: ListParams::default(),
-            data: Arc::new(Mutex::new(BTreeMap::new())),
-            version: Arc::new(Mutex::new(0.to_string())),
+            state: Default::default(),
         }
     }
 }
@@ -61,8 +74,7 @@ where
             client,
             resource: r,
             params: ListParams::default(),
-            data: Arc::new(Mutex::new(BTreeMap::new())),
-            version: Arc::new(Mutex::new(0.to_string())),
+            state: Default::default(),
         }
     }
 
@@ -132,8 +144,8 @@ where
     ///
     /// This is instant if you are reading and writing from the same context.
     pub async fn state(&self) -> Result<Vec<K>> {
-        let cache = self.data.lock().await;
-        Ok(cache.values().cloned().collect::<Vec<K>>())
+        let state = self.state.lock().await;
+        Ok(state.data.values().cloned().collect::<Vec<K>>())
     }
 
     /// Read a single entry by name
@@ -147,7 +159,7 @@ where
             namespace: self.resource.namespace.clone(),
         };
 
-        futures::executor::block_on(async { Ok(self.data.lock().await.get(&id).map(Clone::clone)) })
+        futures::executor::block_on(async { Ok(self.state.lock().await.data.get(&id).map(Clone::clone)) })
     }
 
     /// Read a single entry by name within a specific namespace
@@ -159,7 +171,7 @@ where
             name: name.into(),
             namespace: Some(ns.into()),
         };
-        futures::executor::block_on(async { Ok(self.data.lock().await.get(&id).map(Clone::clone)) })
+        futures::executor::block_on(async { Ok(self.state.lock().await.data.get(&id).map(Clone::clone)) })
     }
 
     /// Reset the state with a full LIST call
@@ -168,8 +180,7 @@ where
     pub async fn reset(&self) -> Result<()> {
         trace!("Refreshing {:?}", self.resource);
         let (data, version) = self.get_full_resource_entries().await?;
-        *self.data.lock().await = data;
-        *self.version.lock().await = version;
+        *self.state.lock().await = State { data, version };
         Ok(())
     }
 
@@ -202,7 +213,7 @@ where
     // Watch helper
     async fn single_watch(&self) -> Result<()> {
         let rg = &self.resource;
-        let oldver = self.version.lock().await.clone();
+        let oldver = self.state.lock().await.version.clone();
         let req = rg.watch(&self.params, &oldver)?;
         let mut events = self.client.request_events::<WatchEvent<K>>(req).await?.boxed();
 
@@ -210,28 +221,27 @@ where
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
         while let Some(ev) = events.next().await {
             // Update in place:
-            let mut data = self.data.lock().await;
-            let mut ver = self.version.lock().await;
+            let mut state = self.state.lock().await;
             match ev {
                 Ok(WatchEvent::Added(o)) => {
                     debug!("Adding {} to {}", o.meta().name, rg.resource);
-                    data.entry(o.meta().into()).or_insert_with(|| o.clone());
+                    state.data.entry(o.meta().into()).or_insert_with(|| o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
-                        *ver = v.to_string();
+                        state.version = v.to_string();
                     }
                 }
                 Ok(WatchEvent::Modified(o)) => {
                     debug!("Modifying {} in {}", o.meta().name, rg.resource);
-                    data.entry(o.meta().into()).and_modify(|e| *e = o.clone());
+                    state.data.entry(o.meta().into()).and_modify(|e| *e = o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
-                        *ver = v.to_string();
+                        state.version = v.to_string();
                     }
                 }
                 Ok(WatchEvent::Deleted(o)) => {
                     debug!("Removing {} from {}", o.meta().name, rg.resource);
-                    data.remove(&o.meta().into());
+                    state.data.remove(&o.meta().into());
                     if let Some(v) = &o.meta().resourceVersion {
-                        *ver = v.to_string();
+                        state.version = v.to_string();
                     }
                 }
                 Ok(WatchEvent::Error(e)) => {
