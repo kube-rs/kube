@@ -108,9 +108,7 @@ where
     /// Initializes with a full list of data from a large initial LIST call
     pub async fn init(self) -> Result<Self> {
         info!("Starting Reflector for {:?}", self.resource);
-        let (data, version) = self.get_full_resource_entries().await?;
-        *self.data.lock().await = data;
-        *self.version.lock().await = version;
+        self.reset().await?;
         Ok(self)
     }
 
