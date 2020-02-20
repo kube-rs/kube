@@ -7,7 +7,7 @@
 #[derive(Clone, Deserialize, Serialize, Default)]
 pub struct NotUsed {}
 
-/// Use [`NotUsed`](notused.struct.html) instead. Renamed to avoid confusion with [`void::Void`](https://docs.rs/void/1.0.2/void/enum.Void.html).
+/// Use [`NotUsed`](struct.NotUsed.html) instead. Renamed to avoid confusion with [`void::Void`](https://docs.rs/void/1.0.2/void/enum.Void.html).
 #[deprecated]
 pub type Void = NotUsed;
 
