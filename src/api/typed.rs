@@ -2,7 +2,7 @@
 
 use either::Either;
 use futures::{Stream, StreamExt};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, ser::Serialize};
 use std::marker::PhantomData;
 
 use crate::{
@@ -13,6 +13,27 @@ use crate::{
     client::{APIClient, Status},
     Result,
 };
+
+/// Compatibility trait to allow posting both untyped (raw `Vec<u8>`) and typed objects
+///
+/// Should not be implemented or used by library consumers.
+pub trait SerializeKubeObject<K> {
+    fn serialize_kube_object(self) -> Result<Vec<u8>>;
+}
+
+/// Deprecated: Not type-safe. Use [`RawApi`](struct.RawApi.html) instead
+/// if you want to handle serialization yourself
+impl<K> SerializeKubeObject<K> for Vec<u8> {
+    fn serialize_kube_object(self) -> Result<Vec<u8>> {
+        Ok(self)
+    }
+}
+
+impl<K: KubeObject + Serialize> SerializeKubeObject<K> for &K {
+    fn serialize_kube_object(self) -> Result<Vec<u8>> {
+        Ok(serde_json::to_vec(self)?)
+    }
+}
 
 /// A typed Api variant that does not expose request internals
 ///
@@ -63,8 +84,8 @@ where
         self.client.request::<K>(req).await
     }
 
-    pub async fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = self.api.create(&pp, data)?;
+    pub async fn create<S: SerializeKubeObject<K>>(&self, pp: &PostParams, data: S) -> Result<K> {
+        let req = self.api.create(&pp, data.serialize_kube_object()?)?;
         self.client.request::<K>(req).await
     }
 
@@ -83,13 +104,20 @@ where
         self.client.request_status::<ObjectList<K>>(req).await
     }
 
+    /// Deprecated to make way for a type-safe variant
+    #[deprecated(note = "not type-safe, use `RawApi` instead for now")]
     pub async fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.api.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
 
-    pub async fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = self.api.replace(name, &pp, data)?;
+    pub async fn replace<S: SerializeKubeObject<K>>(
+        &self,
+        name: &str,
+        pp: &PostParams,
+        data: S,
+    ) -> Result<K> {
+        let req = self.api.replace(name, &pp, data.serialize_kube_object()?)?;
         self.client.request::<K>(req).await
     }
 

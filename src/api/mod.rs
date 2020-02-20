@@ -21,7 +21,7 @@ mod raw;
 pub use raw::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, RawApi};
 
 mod typed;
-pub use typed::Api;
+pub use typed::{Api, SerializeKubeObject};
 
 mod subresource;
 pub use subresource::{LogParams, Scale, ScaleSpec, ScaleStatus};
