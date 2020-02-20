@@ -63,3 +63,6 @@ anyhow = "1.0.26"
 version = "0.7.1"
 default-features = false
 features = ["v1_17"]
+
+[package.metadata.docs.rs]
+features = ["openapi"]
