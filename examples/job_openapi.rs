@@ -1,9 +1,15 @@
 #[macro_use] extern crate log;
 use futures::StreamExt;
-use serde_json::json;
+use k8s_openapi::{
+    api::{
+        batch::v1::JobSpec,
+        core::v1::{Container, PodSpec, PodTemplateSpec},
+    },
+    apimachinery::pkg::apis::meta::v1::ObjectMeta as OpenApiObjectMeta,
+};
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, WatchEvent},
+    api::{Api, DeleteParams, ListParams, Object, ObjectMeta, PostParams, TypeMeta, WatchEvent},
     client::APIClient,
     config,
 };
@@ -16,33 +22,40 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
 
     // Create a Job
-    let my_job = json!({
-        "apiVersion": "batch/v1",
-        "kind": "Job",
-        "metadata": {
-            "name": "empty-job"
+    let my_job = Object {
+        types: TypeMeta {
+            apiVersion: Some("batch/v1".to_string()),
+            kind: Some("Job".to_string()),
         },
-        "spec": {
-            "template": {
-                "metadata": {
-                    "name": "empty-job-pod"
-                },
-                "spec": {
-                    "containers": [{
-                        "name": "empty",
-                        "image": "alpine:latest"
+        metadata: ObjectMeta {
+            name: "empty-job".to_string(),
+            ..Default::default()
+        },
+        spec: JobSpec {
+            template: PodTemplateSpec {
+                metadata: Some(OpenApiObjectMeta {
+                    name: Some("empty-job-pod".to_string()),
+                    ..Default::default()
+                }),
+                spec: Some(PodSpec {
+                    containers: vec![Container {
+                        name: "empty".to_string(),
+                        image: Some("alpine:latest".to_string()),
+                        ..Default::default()
                     }],
-                    "restartPolicy": "Never",
-                }
-            }
-        }
-    });
+                    restart_policy: Some("Never".to_string()),
+                    ..Default::default()
+                }),
+            },
+            ..Default::default()
+        },
+        status: None,
+    };
 
     let jobs = Api::v1Job(client).within("default");
     let pp = PostParams::default();
 
-    let data = serde_json::to_vec(&my_job).expect("failed to serialize job");
-    jobs.create(&pp, data).await.expect("failed to create job");
+    jobs.create(&pp, &my_job).await.expect("failed to create job");
 
     // See if it ran to completion
     let lp = ListParams::default();
