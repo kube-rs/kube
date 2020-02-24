@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::{TryStreamExt, StreamExt};
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
     api::{Api, Informer, Object, WatchEvent},

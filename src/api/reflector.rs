@@ -6,7 +6,7 @@ use crate::{
     client::APIClient,
     Error, Result,
 };
-use futures::{lock::Mutex, TryStreamExt, StreamExt};
+use futures::{lock::Mutex, StreamExt, TryStreamExt};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 

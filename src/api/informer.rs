@@ -7,7 +7,7 @@ use crate::{
     Result,
 };
 
-use futures::{lock::Mutex, TryStream, StreamExt};
+use futures::{lock::Mutex, StreamExt, TryStream};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
