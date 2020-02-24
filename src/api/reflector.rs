@@ -130,7 +130,8 @@ where
     /// This is meant to be run continually in a thread/task. Spawn one.
     pub async fn poll(&self) -> Result<()> {
         trace!("Watching {:?}", self.resource);
-        if let Err(_e) = self.single_watch().await {
+        if let Err(e) = self.single_watch().await {
+            warn!("Poll error on {:?}: {}: {:?}", self.resource, e, e);
             // If desynched due to mismatching resourceVersion, retry in a bit
             let dur = Duration::from_secs(10);
             Delay::new(dur).await;
