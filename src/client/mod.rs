@@ -3,8 +3,7 @@
 use crate::{config::Configuration, Error, ErrorResponse, Result};
 use bytes::Bytes;
 use either::{Either, Left, Right};
-use futures::{self, Stream, StreamExt};
-use futures_util::TryStreamExt;
+use futures::{self, Stream, TryStream, TryStreamExt};
 use http::{self, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
@@ -152,19 +151,20 @@ impl APIClient {
     pub async fn request_events<T>(
         &self,
         request: http::Request<Vec<u8>>,
-    ) -> Result<impl Stream<Item = Result<T>>>
+    ) -> Result<impl TryStream<Item = Result<T>>>
     where
         T: DeserializeOwned,
     {
         let res: reqwest::Response = self.send(request).await?;
         trace!("{} {}", res.status().as_str(), res.url());
 
-        // Now use `unfold` to convert the chunked responses into a Stream
+        // Now unfold the chunked responses into a Stream
         // We first construct a Stream of Vec<Result<T>> as we potentially might need to
         // yield multiple objects per loop, then we flatten it to the Stream<Result<T>> as expected.
         // Any reqwest errors will terminate this stream early.
-        let stream = futures::stream::unfold((res, Vec::new()), |(mut resp, mut buff)| {
+        let stream = futures::stream::try_unfold((res, Vec::new()), |(mut resp, _buff)| {
             async {
+                let mut buff = _buff;
                 loop {
                     match resp.chunk().await {
                         Ok(Some(chunk)) => {
@@ -202,20 +202,19 @@ impl APIClient {
                                 }
 
                                 // Now return our items and loop
-                                return Some((items, (resp, new_buff)));
+                                return Ok(Some((items, (resp, new_buff))));
                             }
                         }
-                        Ok(None) => return None,
+                        Ok(None) => return Ok(None),
                         Err(e) => {
-                            let err = vec![Err(Error::ReqwestError(e))];
-                            return Some((err, (resp, buff)));
+                            return Err(Error::ReqwestError(e));
                         }
                     }
                 }
             }
         });
 
-        Ok(stream.map(futures::stream::iter).flatten())
+        Ok(stream.map_ok(futures::stream::iter).try_flatten())
     }
 }
 
