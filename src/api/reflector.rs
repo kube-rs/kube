@@ -6,7 +6,7 @@ use crate::{
     client::APIClient,
     Error, Result,
 };
-use futures::{lock::Mutex, StreamExt};
+use futures::{lock::Mutex, TryStreamExt, StreamExt};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 
@@ -219,38 +219,34 @@ where
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-        while let Some(ev) = events.next().await {
+        while let Some(ev) = events.try_next().await? {
             // Update in place:
             let mut state = self.state.lock().await;
             match ev {
-                Ok(WatchEvent::Added(o)) => {
+                WatchEvent::Added(o) => {
                     debug!("Adding {} to {}", o.meta().name, rg.resource);
                     state.data.entry(o.meta().into()).or_insert_with(|| o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
-                Ok(WatchEvent::Modified(o)) => {
+                WatchEvent::Modified(o) => {
                     debug!("Modifying {} in {}", o.meta().name, rg.resource);
                     state.data.entry(o.meta().into()).and_modify(|e| *e = o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
-                Ok(WatchEvent::Deleted(o)) => {
+                WatchEvent::Deleted(o) => {
                     debug!("Removing {} from {}", o.meta().name, rg.resource);
                     state.data.remove(&o.meta().into());
                     if let Some(v) = &o.meta().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
-                Ok(WatchEvent::Error(e)) => {
+                WatchEvent::Error(e) => {
                     warn!("Failed to watch {}: {:?}", rg.resource, e);
                     return Err(Error::Api(e));
-                }
-                Err(e) => {
-                    // Just log out the error, but don't stop our stream short
-                    warn!("Problem fetch event from server: {:?}", e);
                 }
             }
         }
