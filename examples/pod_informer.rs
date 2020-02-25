@@ -11,7 +11,7 @@ type Pod = Object<PodSpec, PodStatus>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env::set_var("RUST_LOG", "info,kube=trace");
+    env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
