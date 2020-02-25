@@ -72,7 +72,7 @@ where
     /// Configure the timeout for the list/watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// Defaults to 300s
+    /// Defaults to 290s
     pub fn timeout(mut self, timeout_secs: u32) -> Self {
         self.params.timeout = Some(timeout_secs);
         self

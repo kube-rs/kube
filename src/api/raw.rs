@@ -521,7 +521,7 @@ fn watch_path() {
     let req = r.watch(&gp, "0").unwrap();
     assert_eq!(
         req.uri(),
-        "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=300"
+        "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290"
     );
 }
 #[test]
