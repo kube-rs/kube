@@ -1,5 +1,9 @@
-0.26.0 / 2020-02-XX
+0.26.0 / 2020-02-25
 ===================
+  * Fix a large percentage of EOFs from watches #146
+  * => default timeout down to 290s from 300s
+  * => `Reflector` now re-lists a lot less #146
+  * `Informer::poll` can now be used with `TryStream`
   * Exposed `Config::read` and `Config::read_from` - #124
   * Fix typo on `Api::StatefulSet`
   * Fix typo on `Api::Endpoints`

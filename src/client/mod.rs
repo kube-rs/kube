@@ -3,8 +3,7 @@
 use crate::{config::Configuration, Error, ErrorResponse, Result};
 use bytes::Bytes;
 use either::{Either, Left, Right};
-use futures::{self, Stream, StreamExt};
-use futures_util::TryStreamExt;
+use futures::{self, Stream, TryStream, TryStreamExt};
 use http::{self, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
@@ -152,22 +151,26 @@ impl APIClient {
     pub async fn request_events<T>(
         &self,
         request: http::Request<Vec<u8>>,
-    ) -> Result<impl Stream<Item = Result<T>>>
+    ) -> Result<impl TryStream<Item = Result<T>>>
     where
         T: DeserializeOwned,
     {
         let res: reqwest::Response = self.send(request).await?;
-        trace!("{} {}", res.status().as_str(), res.url());
+        trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
+        trace!("headers: {:?}", res.headers());
 
-        // Now use `unfold` to convert the chunked responses into a Stream
+        // Now unfold the chunked responses into a Stream
         // We first construct a Stream of Vec<Result<T>> as we potentially might need to
         // yield multiple objects per loop, then we flatten it to the Stream<Result<T>> as expected.
         // Any reqwest errors will terminate this stream early.
-        let stream = futures::stream::unfold((res, Vec::new()), |(mut resp, mut buff)| {
+        let stream = futures::stream::try_unfold((res, Vec::new()), |(mut resp, _buff)| {
             async {
+                let mut buff = _buff; // can be avoided, see #145
                 loop {
+                    trace!("Await chunk");
                     match resp.chunk().await {
                         Ok(Some(chunk)) => {
+                            trace!("Some chunk of len {}", chunk.len());
                             buff.extend_from_slice(&chunk);
 
                             // If we've encountered a newline, see if we have any items to yield
@@ -202,20 +205,39 @@ impl APIClient {
                                 }
 
                                 // Now return our items and loop
-                                return Some((items, (resp, new_buff)));
+                                return Ok(Some((items, (resp, new_buff))));
                             }
                         }
-                        Ok(None) => return None,
+                        Ok(None) => {
+                            trace!("None chunk");
+                            return Ok(None);
+                        }
                         Err(e) => {
-                            let err = vec![Err(Error::ReqwestError(e))];
-                            return Some((err, (resp, buff)));
+                            if e.is_timeout() {
+                                warn!("timeout in poll: {}", e); // our client timeout
+                                return Ok(None);
+                            }
+                            let inner = e.to_string();
+                            if inner.contains("unexpected EOF during chunk") {
+                                // ^ catches reqwest::Error from hyper::Error
+                                // where the inner.kind == UnexpectedEof
+                                // and the inner.error == "unexpected EOF during chunk size line"
+                                warn!("eof in poll: {}", e);
+                                return Ok(None);
+                            } else {
+                                // There might be other errors worth ignoring here
+                                // For now, if they happen, we hard error up
+                                // This causes a full re-list for Reflector
+                                error!("err poll: {:?} - {}", e, inner);
+                                return Err(Error::ReqwestError(e));
+                            }
                         }
                     }
                 }
             }
         });
 
-        Ok(stream.map(futures::stream::iter).flatten())
+        Ok(stream.map_ok(futures::stream::iter).try_flatten())
     }
 }
 

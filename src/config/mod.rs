@@ -113,7 +113,9 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
         }
     };
 
-    let mut client_builder = Client::builder();
+    let mut client_builder = Client::builder()
+        // hard disallow more than 5 minute polls due to kubernetes limitations
+        .timeout(std::time::Duration::new(295, 0));
 
     for ca in loader.ca_bundle()? {
         client_builder = hacky_cert_lifetime_for_macos(client_builder, &ca);

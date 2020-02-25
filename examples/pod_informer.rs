@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
     api::{Api, Informer, Object, WatchEvent},
@@ -11,7 +11,7 @@ type Pod = Object<PodSpec, PodStatus>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env::set_var("RUST_LOG", "info,kube=trace");
+    env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
@@ -23,8 +23,7 @@ async fn main() -> anyhow::Result<()> {
     loop {
         let mut pods = inf.poll().await?.boxed();
 
-        while let Some(event) = pods.next().await {
-            let event = event?;
+        while let Some(event) = pods.try_next().await? {
             handle_node(&resource, event)?;
         }
     }

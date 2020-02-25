@@ -6,7 +6,7 @@ use crate::{
     client::APIClient,
     Error, Result,
 };
-use futures::{lock::Mutex, StreamExt};
+use futures::{lock::Mutex, StreamExt, TryStreamExt};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 
@@ -84,7 +84,7 @@ where
     /// Configure the timeout for the list/watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// Defaults to 300s
+    /// Defaults to 290s
     pub fn timeout(mut self, timeout_secs: u32) -> Self {
         self.params.timeout = Some(timeout_secs);
         self
@@ -130,7 +130,8 @@ where
     /// This is meant to be run continually in a thread/task. Spawn one.
     pub async fn poll(&self) -> Result<()> {
         trace!("Watching {:?}", self.resource);
-        if let Err(_e) = self.single_watch().await {
+        if let Err(e) = self.single_watch().await {
+            warn!("Poll error on {:?}: {}: {:?}", self.resource, e, e);
             // If desynched due to mismatching resourceVersion, retry in a bit
             let dur = Duration::from_secs(10);
             Delay::new(dur).await;
@@ -219,38 +220,34 @@ where
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-        while let Some(ev) = events.next().await {
+        while let Some(ev) = events.try_next().await? {
             // Update in place:
             let mut state = self.state.lock().await;
             match ev {
-                Ok(WatchEvent::Added(o)) => {
+                WatchEvent::Added(o) => {
                     debug!("Adding {} to {}", o.meta().name, rg.resource);
                     state.data.entry(o.meta().into()).or_insert_with(|| o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
-                Ok(WatchEvent::Modified(o)) => {
+                WatchEvent::Modified(o) => {
                     debug!("Modifying {} in {}", o.meta().name, rg.resource);
                     state.data.entry(o.meta().into()).and_modify(|e| *e = o.clone());
                     if let Some(v) = &o.meta().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
-                Ok(WatchEvent::Deleted(o)) => {
+                WatchEvent::Deleted(o) => {
                     debug!("Removing {} from {}", o.meta().name, rg.resource);
                     state.data.remove(&o.meta().into());
                     if let Some(v) = &o.meta().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
-                Ok(WatchEvent::Error(e)) => {
+                WatchEvent::Error(e) => {
                     warn!("Failed to watch {}: {:?}", rg.resource, e);
                     return Err(Error::Api(e));
-                }
-                Err(e) => {
-                    // Just log out the error, but don't stop our stream short
-                    warn!("Problem fetch event from server: {:?}", e);
                 }
             }
         }

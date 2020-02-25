@@ -7,7 +7,7 @@ use crate::{
     Result,
 };
 
-use futures::{lock::Mutex, Stream, StreamExt};
+use futures::{lock::Mutex, StreamExt, TryStream};
 use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
@@ -72,7 +72,7 @@ where
     /// Configure the timeout for the list/watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// Defaults to 300s
+    /// Defaults to 290s
     pub fn timeout(mut self, timeout_secs: u32) -> Self {
         self.params.timeout = Some(timeout_secs);
         self
@@ -138,7 +138,7 @@ where
     /// In the retry/reset cases we wait 10s between each attempt.
     ///
     /// If you need to track the `resourceVersion` you can use `Informer::version()`.
-    pub async fn poll(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
+    pub async fn poll(&self) -> Result<impl TryStream<Item = Result<WatchEvent<K>>>> {
         trace!("Watching {:?}", self.resource);
 
         // First check if we need to backoff or reset our resourceVersion from last time

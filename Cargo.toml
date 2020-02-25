@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.25.0"
+version = "0.26.0"
 description = "Kubernetes client in the style of client-go"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -37,7 +37,7 @@ paste = "0.1.6"
 Inflector = "0.11.4"
 
 [dependencies.reqwest]
-version = "0.10.1"
+version = "0.10.2"
 default-features = false
 features = ["json", "gzip", "stream"]
 
