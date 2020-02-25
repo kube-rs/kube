@@ -156,7 +156,7 @@ impl APIClient {
         T: DeserializeOwned,
     {
         let res: reqwest::Response = self.send(request).await?;
-        debug!("start stream {} {}", res.status().as_str(), res.url());
+        trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         trace!("headers: {:?}", res.headers());
 
         // Now unfold the chunked responses into a Stream
