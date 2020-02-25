@@ -129,6 +129,20 @@ pub struct ListParams {
     pub timeout: Option<u32>,
 }
 
+impl ListParams {
+    fn validate(&self) -> Result<()> {
+        if let Some(to) = &self.timeout {
+            // https://github.com/kubernetes/kubernetes/issues/6513
+            if *to >= 295 {
+                return Err(Error::RequestValidation(
+                    "ListParams::timeout must be < 295s".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Common query parameters for put/post calls
 #[derive(Default, Clone)]
 pub struct PostParams {
@@ -155,7 +169,7 @@ impl PatchParams {
             // For now it's fine, because k8s API server will return an error
             if field_manager.len() > 128 {
                 return Err(Error::RequestValidation(
-                    "Failed to validate PatchParameters::field_manager!".into(),
+                    "Failed to validate PatchParams::field_manager!".into(),
                 ));
             }
         }
@@ -286,11 +300,13 @@ impl RawApi {
     pub fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        lp.validate()?;
 
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
 
-        qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(300).to_string());
+        // https://github.com/kubernetes/kubernetes/issues/6513
+        qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(290).to_string());
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", &fields);
         }

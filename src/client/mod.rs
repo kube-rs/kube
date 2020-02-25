@@ -156,7 +156,8 @@ impl APIClient {
         T: DeserializeOwned,
     {
         let res: reqwest::Response = self.send(request).await?;
-        trace!("{} {}", res.status().as_str(), res.url());
+        debug!("start stream {} {}", res.status().as_str(), res.url());
+        trace!("headers: {:?}", res.headers());
 
         // Now unfold the chunked responses into a Stream
         // We first construct a Stream of Vec<Result<T>> as we potentially might need to
@@ -166,8 +167,10 @@ impl APIClient {
             async {
                 let mut buff = _buff;
                 loop {
+                    trace!("Await chunk");
                     match resp.chunk().await {
                         Ok(Some(chunk)) => {
+                            trace!("Some chunk of len {}", chunk.len());
                             buff.extend_from_slice(&chunk);
 
                             // If we've encountered a newline, see if we have any items to yield
@@ -205,9 +208,29 @@ impl APIClient {
                                 return Ok(Some((items, (resp, new_buff))));
                             }
                         }
-                        Ok(None) => return Ok(None),
+                        Ok(None) => {
+                            trace!("None chunk");
+                            return Ok(None);
+                        }
                         Err(e) => {
-                            return Err(Error::ReqwestError(e));
+                            if e.is_timeout() {
+                                warn!("timeout in poll: {}", e); // our client timeout
+                                return Ok(None);
+                            }
+                            let inner = e.to_string();
+                            if inner.contains("unexpected EOF during chunk") {
+                                // ^ catches reqwest::Error from hyper::Error
+                                // where the inner.kind == UnexpectedEof
+                                // and the inner.error == "unexpected EOF during chunk size line"
+                                warn!("eof in poll: {}", e);
+                                return Ok(None);
+                            } else {
+                                // There might be other errors worth ignoring here
+                                // For now, if they happen, we hard error up
+                                // This causes a full re-list for Reflector
+                                error!("err poll: {:?} - {}", e, inner);
+                                return Err(Error::ReqwestError(e));
+                            }
                         }
                     }
                 }
