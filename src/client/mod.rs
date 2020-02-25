@@ -165,7 +165,7 @@ impl APIClient {
         // Any reqwest errors will terminate this stream early.
         let stream = futures::stream::try_unfold((res, Vec::new()), |(mut resp, _buff)| {
             async {
-                let mut buff = _buff;
+                let mut buff = _buff; // can be avoided, see #145
                 loop {
                     trace!("Await chunk");
                     match resp.chunk().await {
