@@ -15,7 +15,7 @@ To use the openapi generated types:
 
 ```toml
 [dependencies]
-kube = { version = "0.25.0", features = ["openapi"] }
+kube = { version = "0.27.0", features = ["openapi"] }
 k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
 ```
 
@@ -23,7 +23,7 @@ otherwise:
 
 ```toml
 [dependencies]
-kube = "0.25.0"
+kube = "0.27.0"
 ```
 
 The latter is fine in a CRD-only use case.
@@ -60,7 +60,7 @@ pods.delete("blog", &DeleteParams::default()).await?;
 See the `pod_openapi` or `crd_openapi` examples for more uses.
 
 ## Informer
-The main abstraction from `kube::api` is `Informer<K>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with the last seen `resourceVersion`.
+The main abstraction from `kube::runtime` is `Informer<K>`. This is a struct with the internal behaviour for watching kube resources, but maintains only a queue of `WatchEvent` elements along with the last seen `resourceVersion`.
 
 You tell it what type `KubeObject` implementing object you want to use. You can use `Object<P, U>` to get an automatic implementation by using `Object<PodSpec, PodStatus>`.`
 
@@ -69,7 +69,7 @@ The spec and status structs can be as complete or incomplete as you like. For in
 ```rust
 type Pod = Object<PodSpec, PodStatus>;
 let api = Api::v1Pod(client);
-let inf = Informer::new(api.clone()).init().await?;
+let inf = Informer::new(api.clone());
 ```
 
 The main feature of `Informer<K>` is being able to subscribe to events while having a streaming `.poll()` open:
@@ -77,8 +77,8 @@ The main feature of `Informer<K>` is being able to subscribe to events while hav
 ```rust
 let pods = inf.poll().await?.boxed(); // starts a watch and returns a stream
 
-while let Some(event) = pods.next().await { // await next event
-    handle_event(&api, event?).await?; // pass the WatchEvent to a handler
+while let Some(event) = pods.try_next().await? { // await next event
+    handle_event(&api, event).await?; // pass the WatchEvent to a handler
 }
 ```
 
@@ -109,7 +109,7 @@ async fn handle_event(pods: &Api<PodSpec, PodStatus>, event: WatchEvent<PodSpec,
 The [node_informer example](./examples/node_informer.rs) has an example of using api calls from within event handlers.
 
 ## Reflector
-The other big abstractions exposed from `kube::api` is `Reflector<K>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
+The other big abstractions exposed from `kube::runtime` is `Reflector<K>`. This is a cache of a resource that's meant to "reflect the resource state in etcd".
 
 It handles the api mechanics for watching kube resources, tracking resourceVersions, and using watch events; it builds and maintains an internal map.
 
@@ -225,7 +225,7 @@ or in `Cargo.toml`:
 
 ```toml
 [dependencies]
-kube = { version = "0.25.0", default-features = false, features = ["openapi", "rustls-tls"] }
+kube = { version = "0.27.0", default-features = false, features = ["openapi", "rustls-tls"] }
 k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
 ```
 

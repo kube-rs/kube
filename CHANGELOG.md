@@ -1,8 +1,9 @@
-0.27.0 / 2020-02-XX
+0.27.0 / 2020-02-26
 ===================
  * `Reflector` + `Informer` moved from `kube::api` to `kube::runtime`
  * `Informer` now resets the version to 0 rather than dropping events - #134
    * Removed `Informer::init`, since it is now a no-op when building the `Informer`
+ * Downgrade spurious log message when using service account auth
 
 0.26.0 / 2020-02-25
 ===================
