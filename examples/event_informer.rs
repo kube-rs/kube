@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
 
     let events = Api::v1Event(client);
-    let ei = Informer::new(events).init().await?;
+    let ei = Informer::new(events);
 
     loop {
         let mut events = ei.poll().await?.boxed();
