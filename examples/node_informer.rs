@@ -2,9 +2,10 @@
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
 use kube::{
-    api::{v1Event, Api, Informer, ListParams, Object, RawApi, WatchEvent},
+    api::{v1Event, Api, ListParams, Object, RawApi, WatchEvent},
     client::APIClient,
     config,
+    runtime::Informer,
 };
 
 type Node = Object<NodeSpec, NodeStatus>;

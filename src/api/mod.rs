@@ -11,22 +11,16 @@ pub struct NotUsed {}
 #[deprecated]
 pub type Void = NotUsed;
 
-mod reflector;
-pub use self::reflector::Reflector;
-
-mod informer;
-pub use self::informer::Informer;
-
-mod raw;
+pub(crate) mod raw;
 pub use raw::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, RawApi};
 
-mod typed;
+pub(crate) mod typed;
 pub use typed::Api;
 
 mod subresource;
 pub use subresource::{LogParams, Scale, ScaleSpec, ScaleStatus};
 
-mod resource;
+pub(crate) mod resource;
 pub use self::resource::{KubeObject, Object, ObjectList, WatchEvent};
 
 mod openapi;

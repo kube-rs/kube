@@ -1,3 +1,7 @@
+0.27.0 / 2020-02-XX
+===================
+ * `Reflector` + `Informer` moved from `kube::api` to `kube::runtime`
+
 0.26.0 / 2020-02-25
 ===================
   * Fix a large percentage of EOFs from watches #146

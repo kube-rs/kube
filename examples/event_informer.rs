@@ -1,8 +1,9 @@
 #[macro_use] extern crate log;
 use kube::{
-    api::{v1Event, Api, Informer, WatchEvent},
+    api::{v1Event, Api, WatchEvent},
     client::APIClient,
     config,
+    runtime::Informer,
 };
 
 use futures::StreamExt;

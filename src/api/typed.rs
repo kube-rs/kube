@@ -28,11 +28,11 @@ use crate::{
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request creator object
-    pub(in crate::api) api: RawApi,
+    pub(crate) api: RawApi,
     /// The client to use (from this library)
-    pub(in crate::api) client: APIClient,
-    /// sPec and statUs structs
-    pub(in crate::api) phantom: PhantomData<K>,
+    pub(crate) client: APIClient,
+    /// Underlying Object unstored
+    pub(crate) phantom: PhantomData<K>,
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns

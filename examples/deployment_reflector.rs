@@ -1,9 +1,5 @@
 #[macro_use] extern crate log;
-use kube::{
-    api::{Api, Reflector},
-    client::APIClient,
-    config,
-};
+use kube::{api::Api, client::APIClient, config, runtime::Reflector};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

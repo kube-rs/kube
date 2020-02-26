@@ -2,9 +2,10 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
-    api::{Api, Informer, Object, WatchEvent},
+    api::{Api, Object, WatchEvent},
     client::APIClient,
     config,
+    runtime::Informer,
 };
 use std::env;
 type Pod = Object<PodSpec, PodStatus>;

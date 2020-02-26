@@ -1,11 +1,7 @@
 #[macro_use] extern crate log;
 use std::collections::BTreeMap;
 
-use kube::{
-    api::{Api, Reflector},
-    client::APIClient,
-    config,
-};
+use kube::{api::Api, client::APIClient, config, runtime::Reflector};
 
 /// Example way to read secrets
 #[derive(Debug)]

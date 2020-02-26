@@ -4,9 +4,10 @@ use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{NotUsed, Object, RawApi, Reflector},
+    api::{NotUsed, Object, RawApi},
     client::APIClient,
     config,
+    runtime::Reflector,
 };
 
 // Own custom resource spec

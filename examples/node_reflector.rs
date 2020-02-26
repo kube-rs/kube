@@ -1,10 +1,6 @@
 #[macro_use] extern crate log;
 use futures_timer::Delay;
-use kube::{
-    api::{Api, Reflector},
-    client::APIClient,
-    config,
-};
+use kube::{api::Api, client::APIClient, config, runtime::Reflector};
 
 use std::time::Duration;
 
