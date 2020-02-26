@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Api::v1Pod(client.clone()).within(&namespace);
-    let inf = Informer::new(resource.clone()).init().await?;
+    let inf = Informer::new(resource.clone());
 
     loop {
         let mut pods = inf.poll().await?.boxed();

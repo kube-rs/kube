@@ -1,7 +1,7 @@
 use crate::{
     api::{
-        resource::{KubeObject, ObjectList, WatchEvent},
-        Api, ListParams, NotUsed, RawApi,
+        resource::{KubeObject, WatchEvent},
+        Api, ListParams, RawApi,
     },
     client::APIClient,
     Result,
@@ -142,7 +142,7 @@ where
                 Delay::new(dur).await;
                 // If we are outside history, start over from latest
                 if *needs_resync {
-                    self.reset().await?;
+                    self.reset().await;
                 }
                 *needs_resync = false;
                 *needs_retry = false;
