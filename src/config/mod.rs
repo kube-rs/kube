@@ -127,7 +127,7 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
             client_builder = client_builder.identity(id);
         }
         Err(e) => {
-            warn!("failed to load client identity from kube config: {}", e);
+            debug!("failed to load client identity from kube config: {}", e);
             // last resort only if configs ask for it, and no client certs
             if let Some(true) = loader.cluster.insecure_skip_tls_verify {
                 client_builder = client_builder.danger_accept_invalid_certs(true);
