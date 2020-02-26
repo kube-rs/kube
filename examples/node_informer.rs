@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     let nodes = RawApi::v1Node();
     let events = Api::v1Event(client.clone());
     let ni = Informer::raw(client.clone(), nodes);
-        //.labels("beta.kubernetes.io/os=linux")
+    //.labels("beta.kubernetes.io/os=linux")
 
     loop {
         let mut nodes = ni.poll().await?.boxed();
