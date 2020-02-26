@@ -105,15 +105,6 @@ where
 
     // finalizers:
 
-    /// Initialize without a prior version
-    ///
-    /// Will seed resourceVersion with a 1 limit list call to the resource
-    pub async fn init(self) -> Result<Self> {
-        info!("Starting Informer for {:?}", self.resource);
-        self.reset().await?;
-        Ok(self)
-    }
-
     /// Initialize from a prior version
     pub fn init_from(self, v: String) -> Self {
         info!("Recreating Informer for {:?} at {}", self.resource, v);
@@ -212,11 +203,11 @@ where
         }
     }
 
-    /// Reset the resourceVersion to latest
-    pub async fn reset(&self) -> Result<()> {
-        let latest = self.get_resource_version().await?;
-        *self.version.lock().await = latest;
-        Ok(())
+    /// Reset the resourceVersion to 0
+    ///
+    /// Note: This will cause duplicate Added events for all existing resources
+    pub async fn reset(&self) {
+        *self.version.lock().await = 0.to_string();
     }
 
     /// Return the current version
@@ -224,20 +215,5 @@ where
         // We need to block on a future here quickly
         // to get a lock on our version
         futures::executor::block_on(async { self.version.lock().await.clone() })
-    }
-
-    /// Init helper
-    async fn get_resource_version(&self) -> Result<String> {
-        let req = self.resource.list_zero_resource_entries(&self.params)?;
-
-        // parse to void a ResourceList into void except for Metadata
-        let res = self.client.request::<ObjectList<NotUsed>>(req).await?;
-
-        let version = res.metadata.resourceVersion.unwrap_or_else(|| "0".into());
-        debug!(
-            "Got fresh resourceVersion={} for {}",
-            version, self.resource.resource
-        );
-        Ok(version)
     }
 }

@@ -1,6 +1,8 @@
 0.27.0 / 2020-02-XX
 ===================
  * `Reflector` + `Informer` moved from `kube::api` to `kube::runtime`
+ * `Informer` now resets the version to 0 rather than dropping events - #134
+   * Removed `Informer::init`, since it is now a no-op when building the `Informer`
 
 0.26.0 / 2020-02-25
 ===================
