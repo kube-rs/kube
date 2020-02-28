@@ -1,15 +1,17 @@
-use std::{env, fs::File, path::PathBuf};
+use std::{
+    env,
+    fs::File,
+    path::PathBuf,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use crate::{Error, Result};
-use chrono::Utc;
 
 use reqwest::{header::CONTENT_TYPE, Client};
-// use time::Duration;
 use url::form_urlencoded::Serializer;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 const DEFAULT_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:jwt-bearer";
-
 
 #[derive(Debug, Serialize)]
 struct Header {
@@ -23,22 +25,26 @@ struct Claim {
     iss: String,
     scope: String,
     aud: String,
-    // exp: i64,
-    iat: i64,
+    exp: u64,
+    iat: u64,
 }
 
 impl Claim {
     fn new(c: &Credentials, scope: &[String]) -> Claim {
-        let iat = Utc::now();
+        let iat = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time is before UNIX_EPOCH");
+
         // The access token is available for 1 hour.
         // https://github.com/golang/oauth2/blob/c85d3e98c914e3a33234ad863dcbff5dbc425bb8/jws/jws.go#L63
-        // let exp = iat + Duration::hours(1);
+        let exp = iat + Duration::from_secs(3600);
+
         Claim {
             iss: c.client_email.clone(),
             scope: scope.join(" "),
             aud: c.token_uri.clone(),
-            // exp: exp.timestamp(),
-            iat: iat.timestamp(),
+            exp: exp.as_secs(),
+            iat: iat.as_secs(),
         }
     }
 }
@@ -128,6 +134,7 @@ impl CredentialsClient {
                 ("assertion".to_string(), encoded.to_string()),
             ])
             .finish();
+
         let token_response: TokenResponse = self
             .client
             .post(&self.credentials.token_uri)
@@ -205,7 +212,6 @@ fn sign(signature_base: &str, private_key: &str) -> Result<Vec<u8>> {
 fn base64_encode(bytes: &[u8]) -> String {
     base64::encode_config(bytes, base64::URL_SAFE)
 }
-
 
 #[cfg(test)]
 mod tests {
