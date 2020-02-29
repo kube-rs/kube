@@ -19,8 +19,8 @@ pub struct CustomResource {
 
 impl CustomResource {
     /// Construct a CrBuilder
-    pub fn new(kind: &str) -> CrBuilder {
-        CrBuilder::new(kind)
+    pub fn kind(kind: &str) -> CrBuilder {
+        CrBuilder::kind(kind)
     }
 }
 
@@ -41,13 +41,13 @@ impl CrBuilder {
     ///     spec: FooSpec,
     ///     status: FooStatus,
     /// };
-    /// let foos : RawApi<Foo> = CustomResource::new("Foo") // <.spec.kind>
+    /// let foos : RawApi<Foo> = CustomResource::kind("Foo") // <.spec.kind>
     ///    .group("clux.dev") // <.spec.group>
     ///    .version("v1")
     ///    .build()
     ///    .into();
     /// ```
-    fn new(kind: &str) -> Self {
+    fn kind(kind: &str) -> Self {
         assert!(to_plural(kind) != kind); // no plural in kind
         assert!(is_pascal_case(&kind)); // PascalCase kind
         Self {
@@ -104,7 +104,7 @@ impl<K> From<CustomResource> for RawApi<K> {
 
 /// Make Api useable on CRDs without k8s_openapi
 impl CustomResource {
-    pub fn to_api<K>(self, client: APIClient) -> Api<K> {
+    pub fn into_api<K>(self, client: APIClient) -> Api<K> {
         Api {
             client,
             api: self.into(),
@@ -121,7 +121,7 @@ mod test {
     #[test]
     fn raw_custom_resource() {
         struct Foo {};
-        let r: RawApi<Foo> = CustomResource::new("Foo")
+        let r: RawApi<Foo> = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
@@ -144,11 +144,11 @@ mod test {
         struct Foo {};
         let config = config::load_kube_config().await.unwrap();
         let client = APIClient::new(config);
-        let _r: Api<Foo> = CustomResource::new("Foo")
+        let _r: Api<Foo> = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
             .build()
-            .to_api(client);
+            .into_api(client);
     }
 }

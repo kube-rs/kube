@@ -1,7 +1,7 @@
 use crate::{
     api::{
         object::{MetaContent, Metadata, WatchEvent},
-        Api, ListParams, RawApi,
+        ListParams, RawApi,
     },
     client::APIClient,
     Result,

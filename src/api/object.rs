@@ -141,12 +141,25 @@ where
 }
 
 /// Blanked implementation for standard objects that can use Object
+#[cfg(feature = "openapi")]
 impl<P, U> Metadata for Object<P, U>
 where
     P: Clone,
     U: Clone,
-    /* TODO: only require Resource if in openapi cfg
-     * Object<P, U>: k8s_openapi::Resource */
+    Object<P, U>: k8s_openapi::Resource,
+{
+    type Ty = ObjectMeta;
+
+    fn metadata(&self) -> Option<&ObjectMeta> {
+        Some(&self.metadata)
+    }
+}
+
+#[cfg(not(feature = "openapi"))]
+impl<P, U> Metadata for Object<P, U>
+where
+    P: Clone,
+    U: Clone,
 {
     type Ty = ObjectMeta;
 

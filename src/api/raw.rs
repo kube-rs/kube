@@ -313,20 +313,6 @@ impl<K> RawApi<K> {
         req.body(vec![]).map_err(Error::HttpError)
     }
 
-    /// Create a minimial list request to seed an initial resourceVersion
-    pub(crate) fn list_zero_resource_entries(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url() + "?";
-        let mut qp = url::form_urlencoded::Serializer::new(base_url);
-        qp.append_pair("limit", "1"); // can't have 0..
-        if lp.include_uninitialized {
-            qp.append_pair("includeUninitialized", "true");
-        }
-        // rest of lp doesn't matter here - we just need a resourceVersion
-        let urlstr = qp.finish();
-        let req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
-    }
-
     /// Watch a resource at a given version
     pub fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "?";

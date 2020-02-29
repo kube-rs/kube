@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
-    let resource: RawApi<Foo> = CustomResource::new("Foo")
+    let resource: RawApi<Foo> = CustomResource::kind("Foo")
         .group("clux.dev")
         .version("v1")
         .within(&namespace)

@@ -1,7 +1,7 @@
 use crate::{
     api::{
-        object::{MetaContent, Metadata, ObjectList, WatchEvent},
-        Api, ListParams, ObjectMeta, RawApi,
+        object::{MetaContent, ObjectList, WatchEvent},
+        ListParams, RawApi,
     },
     client::APIClient,
     Error, Result,
@@ -242,8 +242,8 @@ impl ToString for ObjectId {
 impl ObjectId {
     fn key_for<K: MetaContent>(o: &K) -> Self {
         ObjectId {
-            name: MetaContent::name(o).clone(),
-            namespace: MetaContent::namespace(o).clone(),
+            name: MetaContent::name(o),
+            namespace: MetaContent::namespace(o),
         }
     }
 }
