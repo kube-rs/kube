@@ -1,6 +1,6 @@
 use crate::{
     api::{
-        resource::{KubeObject, ObjectList, WatchEvent},
+        object::{Metadata, ObjectList, WatchEvent},
         Api, ListParams, ObjectMeta, RawApi,
     },
     client::APIClient,
@@ -41,35 +41,33 @@ impl<K> Default for State<K> {
 #[derive(Clone)]
 pub struct Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send,
+    K: Clone + DeserializeOwned + Send + Metadata,
 {
     state: Arc<Mutex<State<K>>>,
     client: APIClient,
-    resource: RawApi,
+    resource: RawApi<K>,
     params: ListParams,
 }
-
+// impl<K> Reflector<K>
+// where
+// K: Clone + DeserializeOwned + Send,
+// {
+// Create a reflector with a kube client on a kube resource
+// pub fn new(r: Api<K>) -> Self {
+// Reflector {
+// client: r.client,
+// resource: r.api,
+// params: ListParams::default(),
+// state: Default::default(),
+// }
+// }
+// }
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send,
+    K: Clone + DeserializeOwned + Metadata + Send,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(r: Api<K>) -> Self {
-        Reflector {
-            client: r.client,
-            resource: r.api,
-            params: ListParams::default(),
-            state: Default::default(),
-        }
-    }
-}
-
-impl<K> Reflector<K>
-where
-    K: Clone + DeserializeOwned + KubeObject + Send,
-{
-    /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, r: RawApi) -> Self {
+    pub fn raw(client: APIClient, r: RawApi<K>) -> Self {
         Reflector {
             client,
             resource: r,
@@ -80,7 +78,7 @@ where
 
     /// Initializes with a full list of data from a large initial LIST call
     pub async fn init(self) -> Result<Self> {
-        info!("Starting Reflector for {:?}", self.resource);
+        info!("Starting Reflector for {}", self.resource.kind);
         self.reset().await?;
         Ok(self)
     }
@@ -90,9 +88,9 @@ where
     /// If this returns an error, it tries a full refresh.
     /// This is meant to be run continually in a thread/task. Spawn one.
     pub async fn poll(&self) -> Result<()> {
-        trace!("Watching {:?}", self.resource);
+        trace!("Watching {}", self.resource.kind);
         if let Err(e) = self.single_watch().await {
-            warn!("Poll error on {:?}: {}: {:?}", self.resource, e, e);
+            warn!("Poll error on {}: {}: {:?}", self.resource.kind, e, e);
             // If desynched due to mismatching resourceVersion, retry in a bit
             let dur = Duration::from_secs(10);
             Delay::new(dur).await;
@@ -140,7 +138,7 @@ where
     ///
     /// Same as what is done in `State::new`.
     pub async fn reset(&self) -> Result<()> {
-        trace!("Refreshing {:?}", self.resource);
+        trace!("Refreshing {}", self.resource.kind);
         let (data, version) = self.get_full_resource_entries().await?;
         *self.state.lock().await = State { data, version };
         Ok(())
@@ -156,12 +154,12 @@ where
         trace!(
             "Got {} {} at resourceVersion={:?}",
             res.items.len(),
-            self.resource.resource,
+            self.resource.kind,
             version
         );
         for i in res.items {
             // The non-generic parts we care about are spec + status
-            data.insert(i.meta().into(), i);
+            data.insert(i.metadata().unwrap().into(), i);
         }
         let keys = data
             .keys()
@@ -186,28 +184,28 @@ where
             let mut state = self.state.lock().await;
             match ev {
                 WatchEvent::Added(o) => {
-                    debug!("Adding {} to {}", o.meta().name, rg.resource);
-                    state.data.entry(o.meta().into()).or_insert_with(|| o.clone());
-                    if let Some(v) = &o.meta().resourceVersion {
+                    debug!("Adding {} to {}", o.metadata().unwrap().name, rg.kind);
+                    state.data.entry(o.metadata().unwrap().into()).or_insert_with(|| o.clone());
+                    if let Some(v) = &o.metadata().unwrap().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Modified(o) => {
-                    debug!("Modifying {} in {}", o.meta().name, rg.resource);
-                    state.data.entry(o.meta().into()).and_modify(|e| *e = o.clone());
-                    if let Some(v) = &o.meta().resourceVersion {
+                    debug!("Modifying {} in {}", o.metadata().unwrap().name, rg.kind);
+                    state.data.entry(o.metadata().into()).and_modify(|e| *e = o.clone());
+                    if let Some(v) = &o.metadata().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Deleted(o) => {
-                    debug!("Removing {} from {}", o.meta().name, rg.resource);
-                    state.data.remove(&o.meta().into());
-                    if let Some(v) = &o.meta().resourceVersion {
+                    debug!("Removing {} from {}", o.metadata().name, rg.kind);
+                    state.data.remove(&o.metadata().into());
+                    if let Some(v) = &o.metadata().resourceVersion {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Error(e) => {
-                    warn!("Failed to watch {}: {:?}", rg.resource, e);
+                    warn!("Failed to watch {}: {:?}", rg.kind, e);
                     return Err(Error::Api(e));
                 }
             }

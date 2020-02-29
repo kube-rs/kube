@@ -547,17 +547,19 @@ impl<K> RawApi<K> {
 mod test {
     use crate::api::{PostParams, RawApi};
 
-    use k8s_openapi::api as k8s;
-    use k8s::{apps::v1 as appsv1, core::v1 as corev1, rbac::v1 as rbacv1};
     use k8s::{
         admissionregistration::v1beta1 as adregv1beta1,
+        apps::v1 as appsv1,
         authorization::v1 as authv1,
         autoscaling::v1 as autoscalingv1,
         batch::v1beta1 as batchv1beta1,
+        core::v1 as corev1,
         extensions::v1beta1 as extsv1beta1,
         networking::{v1 as networkingv1, v1beta1 as networkingv1beta1},
+        rbac::v1 as rbacv1,
         storage::v1 as storagev1,
     };
+    use k8s_openapi::api as k8s;
     // use k8s::batch::v1 as batchv1;
 
     // NB: stable requires >= 1.17

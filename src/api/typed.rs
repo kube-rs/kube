@@ -7,21 +7,22 @@ use std::marker::PhantomData;
 
 use crate::{
     api::{
-        resource::{KubeObject, ObjectList, WatchEvent},
+        object::{Metadata, ObjectList, WatchEvent},
         DeleteParams, ListParams, PatchParams, PostParams, RawApi,
     },
     client::{APIClient, Status},
     Result,
 };
 
-/// A typed Api variant that does not expose request internals
+/// An easy Api interaction helper
 ///
 /// The upsides of working with this rather than `RawApi` direct are:
-/// - easiers interface (no figuring out return types)
-/// - openapi types for free
+/// - easiers serialization interface (no figuring out return types)
+/// - client hidden within, less arguments
+///
 ///
 /// But the downsides are:
-/// - k8s-openapi dependency required (behind feature)
+/// - k8s-openapi dependency required (feature'd)
 /// - openapi types are unnecessarily heavy on Option use
 /// - memory intensive structs because they contain the full data
 /// - no control over requests (opinionated)
@@ -54,7 +55,7 @@ where
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + Metadata,
 {
     pub async fn get(&self, name: &str) -> Result<K> {
         let req = self.api.get(name)?;

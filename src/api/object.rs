@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-
 use crate::{
     api::metadata::{ListMeta, ObjectMeta, TypeMeta},
     ErrorResponse,
@@ -7,11 +6,45 @@ use crate::{
 use serde::Deserialize;
 use std::fmt::Debug;
 
+
 /// Accessor trait needed to build higher level abstractions on kubernetes objects
-pub trait KubeObject {
-    /// Every object must have ObjectMeta
-    fn meta(&self) -> &ObjectMeta;
-    // NB: TypeMeta also required, but not used by abstractions yet
+///
+/// Slight mirror of k8s_openapi::Metadata to avoid a hard dependency
+/// Note that their trait does not require Metadata existence, but ours does.
+#[cfg(not(feature = "openapi"))]
+pub trait Metadata {
+    /// The metadata type (typically ObjectMeta, but sometimes ListMeta)
+    type Ty;
+    /// Every object must have metadata
+    ///
+    /// But to match k8s_openapi::Metadata, we pretend it's optional
+    fn metadata(&self) -> Option<&Self::Ty>;
+}
+
+/// Make sure they are have similar use cases
+#[cfg(feature = "openapi")]
+pub use k8s_openapi::Metadata;
+
+pub trait MetaContent : Metadata {
+    fn resource_ver(&self) -> Option<&String>;
+}
+
+#[cfg(not(feature = "openapi"))]
+impl<K> MetaContent for K
+where K: Metadata<Ty=ObjectMeta>
+{
+    fn resource_ver(&self) -> Option<&String> {
+        self.metadata().expect("all types have metadata").resourceVersion.as_ref()
+    }
+}
+
+#[cfg(feature = "openapi")]
+impl<K> MetaContent for K
+where K: k8s_openapi::Metadata<Ty=k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta>
+{
+    fn resource_ver(&self) -> Option<&String> {
+        self.metadata().expect("all useful k8s_openapi types have metadata").resource_version.as_ref()
+    }
 }
 
 /// A raw event returned from a watch query
@@ -21,7 +54,7 @@ pub trait KubeObject {
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<K>
 where
-    K: Clone + KubeObject,
+    K: Clone + Metadata,
 {
     Added(K),
     Modified(K),
@@ -31,7 +64,7 @@ where
 
 impl<K> Debug for WatchEvent<K>
 where
-    K: Clone + KubeObject,
+    K: Clone + Metadata,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
@@ -78,13 +111,16 @@ where
 }
 
 /// Blanked implementation for standard objects that can use Object
-impl<P, U> KubeObject for Object<P, U>
+impl<P, U> Metadata for Object<P, U>
 where
     P: Clone,
     U: Clone,
+    // TODO: only require Resource if in openapi cfg
+    Object<P, U>: k8s_openapi::Resource
 {
-    fn meta(&self) -> &ObjectMeta {
-        &self.metadata
+    type Ty = ObjectMeta;
+    fn metadata(&self) -> Option<&ObjectMeta> {
+        Some(&self.metadata)
     }
 }
 

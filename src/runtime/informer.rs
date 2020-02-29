@@ -1,6 +1,6 @@
 use crate::{
     api::{
-        resource::{KubeObject, WatchEvent},
+        object::{Metadata, MetaContent, WatchEvent},
         Api, ListParams, RawApi,
     },
     client::APIClient,
@@ -21,41 +21,41 @@ use std::{sync::Arc, time::Duration};
 #[derive(Clone)]
 pub struct Informer<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + Metadata,
 {
     version: Arc<Mutex<String>>,
     client: APIClient,
-    resource: RawApi,
+    resource: RawApi<K>,
     params: ListParams,
     needs_resync: Arc<Mutex<bool>>,
     needs_retry: Arc<Mutex<bool>>,
     phantom: std::marker::PhantomData<K>,
 }
 
-impl<K> Informer<K>
-where
-    K: Clone + DeserializeOwned + KubeObject,
-{
-    /// Create a reflector with a kube client on a kube resource
-    pub fn new(r: Api<K>) -> Self {
-        Informer {
-            client: r.client,
-            resource: r.api,
-            params: ListParams::default(),
-            version: Arc::new(Mutex::new(0.to_string())),
-            needs_resync: Arc::new(Mutex::new(false)),
-            needs_retry: Arc::new(Mutex::new(false)),
-            phantom: std::marker::PhantomData,
-        }
-    }
-}
+// impl<K> Informer<K>
+// where
+// K: Clone + DeserializeOwned + Metadata,
+// {
+// Create a reflector with a kube client on a kube resource
+// pub fn new(r: Api<K>) -> Self {
+// Informer {
+// client: r.client,
+// resource: r.api,
+// params: ListParams::default(),
+// version: Arc::new(Mutex::new(0.to_string())),
+// needs_resync: Arc::new(Mutex::new(false)),
+// needs_retry: Arc::new(Mutex::new(false)),
+// phantom: std::marker::PhantomData,
+// }
+// }
+// }
 
 impl<K> Informer<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + MetaContent,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, r: RawApi) -> Self {
+    pub fn raw(client: APIClient, r: RawApi<K>) -> Self {
         Informer {
             client,
             resource: r,
@@ -69,7 +69,7 @@ where
 
     /// Initialize from a prior version
     pub fn init_from(self, v: String) -> Self {
-        info!("Recreating Informer for {:?} at {}", self.resource, v);
+        info!("Recreating Informer for {} at {}", self.resource.kind, v);
 
         // We need to block on this as our mutex needs go be async compatible
         futures::executor::block_on(async {
@@ -92,7 +92,7 @@ where
     ///
     /// If you need to track the `resourceVersion` you can use `Informer::version()`.
     pub async fn poll(&self) -> Result<impl TryStream<Item = Result<WatchEvent<K>>>> {
-        trace!("Watching {:?}", self.resource);
+        trace!("Watching {}", self.resource.kind);
 
         // First check if we need to backoff or reset our resourceVersion from last time
         {
@@ -137,7 +137,7 @@ where
                             | Ok(WatchEvent::Deleted(o)) => {
                                 // Follow docs conventions and store the last resourceVersion
                                 // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                                if let Some(nv) = &o.meta().resourceVersion {
+                                if let Some(nv) = MetaContent::resource_ver(o) {
                                     *version.lock().await = nv.clone();
                                 }
                             }

@@ -3,10 +3,7 @@ use futures::Stream;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    api::{
-        resource::Object,
-        Api, PatchParams, PostParams, RawApi,
-    },
+    api::{object::Object, Api, PatchParams, PostParams, RawApi},
     Error, Result,
 };
 

@@ -1,14 +1,13 @@
 #[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
+use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, Object, WatchEvent},
+    api::{RawApi, WatchEvent},
     client::APIClient,
     config,
     runtime::Informer,
 };
 use std::env;
-type Pod = Object<PodSpec, PodStatus>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -18,8 +17,8 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Api::v1Pod(client.clone()).within(&namespace);
-    let inf = Informer::new(resource.clone());
+    let resource = RawApi::<Pod>::within(&namespace);
+    let inf = Informer::raw(client.clone(), resource.clone());
 
     loop {
         let mut pods = inf.poll().await?.boxed();
@@ -31,22 +30,23 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // This function lets the app handle an event from kube
-fn handle_node(_pods: &Api<Pod>, ev: WatchEvent<Pod>) -> anyhow::Result<()> {
+fn handle_node(_pods: &RawApi<Pod>, ev: WatchEvent<Pod>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
-            let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
-            info!("Added Pod: {} (containers={:?})", o.metadata.name, containers);
+            let containers = o.spec.unwrap().containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
+            info!("Added Pod: {} (containers={:?})", o.metadata.unwrap().name.unwrap(), containers);
         }
         WatchEvent::Modified(o) => {
+            let meta = o.metadata.unwrap();
             let phase = o.status.unwrap().phase.unwrap();
-            let owner = &o.metadata.ownerReferences[0];
+            let owner = &meta.owner_references.unwrap()[0];
             info!(
                 "Modified Pod: {} (phase={}, owner={})",
-                o.metadata.name, phase, owner.name
+                meta.name.unwrap(), phase, owner.name
             );
         }
         WatchEvent::Deleted(o) => {
-            info!("Deleted Pod: {}", o.metadata.name);
+            info!("Deleted Pod: {}", o.metadata.unwrap().name.unwrap());
         }
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);

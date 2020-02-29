@@ -74,7 +74,7 @@ impl CrBuilder {
         self
     }
 
-    // Build a RawApi from Crd properties
+    // Consume the CrBuilder and build a CustomResource
     pub fn build(self) -> CustomResource {
         let version = self.version.expect("Crd must have a version");
         let group = self.group.expect("Crd must have a group");
