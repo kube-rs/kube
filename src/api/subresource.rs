@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     api::{
-        resource::{KubeObject, Object},
+        resource::Object,
         Api, PatchParams, PostParams, RawApi,
     },
     Error, Result,
@@ -104,7 +104,7 @@ pub struct LogParams {
 }
 
 
-impl RawApi {
+impl<K> RawApi<K> {
     /// Get a pod logs
     pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "log?";
@@ -148,9 +148,12 @@ impl RawApi {
     }
 }
 
+#[cfg(feature = "openapi")]
 #[test]
 fn log_path() {
-    let r = RawApi::v1Pod().within("ns");
+    use crate::api::RawApi;
+    use k8s_openapi::api::core::v1 as corev1;
+    let r = RawApi::<corev1::Pod>::within("ns");
     let mut lp = LogParams::default();
     lp.container = Some("blah".into());
     let req = r.logs("foo", &lp).unwrap();
@@ -160,9 +163,12 @@ fn log_path() {
 /// Marker trait for objects that has logs
 pub trait LoggingObject {}
 
+#[cfg(feature = "openapi")]
+impl LoggingObject for k8s_openapi::api::core::v1::Pod {}
+
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + KubeObject + LoggingObject,
+    K: Clone + DeserializeOwned + LoggingObject,
 {
     pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.api.logs(name, lp)?;

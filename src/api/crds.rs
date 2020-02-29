@@ -144,7 +144,7 @@ mod test {
         struct Foo {};
         let config = config::load_kube_config().await.unwrap();
         let client = APIClient::new(config);
-        let r: Api<Foo> = CustomResource::new("Foo")
+        let _r: Api<Foo> = CustomResource::new("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")

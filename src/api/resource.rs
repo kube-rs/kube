@@ -47,14 +47,6 @@ where
 
 /// A standard kubernetes object with .spec and .status
 ///
-/// This is used instead of a full struct for `Deployment`, `Pod`, `Node`, `CRD`, ...
-/// Kubernetes' API generally exposes core structs in this manner, but sometimes the
-/// status, `U`, is missing, and is therefore wrapped in `Option`.
-///
-/// The reasons we use this wrapper rather than the actual structs are:
-/// - metadata field requirement for generic Informers is impossible (no field level traits)
-/// - you cannot implement traits for objects you don't own => no addon traits to k8s-openapi
-///
 /// This struct appears in `ObjectList` and `WatchEvent`, and when using a `Reflector`,
 /// and is exposed as the values in `ObjectMap`.
 #[derive(Deserialize, Serialize, Clone)]
@@ -141,7 +133,7 @@ impl<T: Clone> ObjectList<T> {
     /// `iter_mut` returns an Iterator of mutable references to the elements of this ObjectList
     ///
     /// # Example
-    ///     
+    ///
     /// ```
     /// use kube::api::{ObjectList, ListMeta};
     ///

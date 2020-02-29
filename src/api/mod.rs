@@ -16,11 +16,8 @@ pub use typed::Api;
 mod crds;
 pub use crds::{CrBuilder, CustomResource};
 
-// mod subresource;
-// pub use subresource::{LoggingObject, LogParams, Scale, ScaleSpec, ScaleStatus};
-//#[cfg(feature = "openapi")]
-// impl LoggingObject for k8s_openapi::api::core::v1::Pod {}
-
+mod subresource;
+pub use subresource::{LoggingObject, LogParams, Scale, ScaleSpec, ScaleStatus};
 
 pub(crate) mod resource;
 pub use self::resource::{KubeObject, Object, ObjectList, WatchEvent};
