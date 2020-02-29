@@ -1,4 +1,9 @@
+use std::marker::PhantomData;
 use crate::{Error, Result};
+use inflector::{
+    string::pluralize::to_plural,
+    cases::pascalcase::is_pascal_case,
+};
 
 /// RawApi generation data
 ///
@@ -8,28 +13,136 @@ use crate::{Error, Result};
 /// Can be used directly with a client.
 /// When data is PUT/POST/PATCH'd this struct requires serialized raw bytes.
 #[derive(Clone, Debug)]
-pub struct RawApi {
-    /// API Resource name
-    pub resource: String,
-    /// API Group
+pub struct RawApi<K> {
+    /// The API version of the resource.
+    ///
+    /// This is a composite of Resource::GROUP and Resource::VERSION
+    /// (eg "apiextensions.k8s.io/v1beta1")
+    /// or just the version for resources without a group (eg "v1").
+    /// This is the string used in the apiVersion field of the resource's serialized form.
+    pub api_version: String,
+
+
+    /// The group of the resource
+    ///
+    /// or the empty string if the resource doesn't have a group.
     pub group: String,
-    /// Namespace the resources reside
-    pub namespace: Option<String>,
-    /// API version of the resource
+
+    /// The kind of the resource.
+    ///
+    /// This is the string used in the kind field of the resource's serialized form.
+    pub kind: String,
+
+    /// The version of the resource.
     pub version: String,
-    /// Name of the api prefix (api or apis typically)
-    pub prefix: String,
-    // extra properties for sub resources
+
+    /// The namespace if the resource resides (if namespaced)
+    pub namespace: Option<String>,
+
+    // hidden ref
+    phantom: PhantomData<K>
 }
 
-impl Default for RawApi {
-    fn default() -> Self {
+#[cfg(feature = "openapi")]
+impl<K> From<K> for RawApi<K>
+    where K: k8s_openapi::Resource
+{
+    fn from(_k: K) -> Self {
         Self {
-            resource: "pods".into(), // had to pick something here
+            api_version: K::API_VERSION.to_string(),
+            kind: K::KIND.to_string(),
+            group: K::GROUP.to_string(),
+            version: K::VERSION.to_string(),
             namespace: None,
-            group: "".into(),
-            version: "v1".into(),
-            prefix: "apis".into(), // seems most common
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "openapi")]
+impl<K> RawApi<K>
+    where K: k8s_openapi::Resource
+{
+    pub fn global() -> Self {
+        Self {
+            api_version: K::API_VERSION.to_string(),
+            kind: K::KIND.to_string(),
+            group: K::GROUP.to_string(),
+            version: K::VERSION.to_string(),
+            namespace: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Set as namespaced resource within a specified namespace
+    pub fn within(ns: &str) -> Self {
+        match K::KIND {
+            "Node" | "Namespace" | "ClusterRole" | "CustomResourceDefinition" => {
+                panic!("{} is not a namespace scoped resource", K::KIND)
+            }
+            _ => {}
+        }
+        Self {
+            api_version: K::API_VERSION.to_string(),
+            kind: K::KIND.to_string(),
+            group: K::GROUP.to_string(),
+            version: K::VERSION.to_string(),
+            namespace: Some(ns.to_string()),
+            phantom: PhantomData,
+        }
+    }
+
+}
+
+//impl<K> Default for RawApi<K> {
+//    fn default() -> Self {
+//        Self {
+//            api_version: "v1".into(), // no prefix for core
+//            kind: "Pod".into(), // had to pick something here
+//            group: "".into(), // no prefix for core
+//            version: "v1".into(),
+//            namespace: None,
+//            phantom: PhantomData
+//        }
+//    }
+//}
+
+pub struct CrBuilder<K> {
+    pub(crate) kind: String,
+    pub(crate) version: Option<String>,
+    pub(crate) group: Option<String>,
+    pub(crate) namespace: Option<String>,
+    pub(crate) phantom: PhantomData<K>
+}
+impl<K> CrBuilder<K> {
+    /// Set the api group of a custom resource
+    pub fn group(mut self, group: &str) -> Self {
+        self.group = Some(group.to_string());
+        self
+    }
+
+    /// Set the api version of a custom resource
+    pub fn version(mut self, version: &str) -> Self {
+        self.version = Some(version.to_string());
+        self
+    }
+
+    /// Set the namespace of a custom resource
+    pub fn within(mut self, ns: &str) -> Self {
+        self.namespace = Some(ns.into());
+        self
+    }
+
+    // Build a RawApi from Crd properties
+    pub fn build(self) -> RawApi<K> {
+        let version = self.version.expect("Crd must have a version");
+        let group = self.group.expect("Crd must have a group");
+        RawApi {
+            api_version: format!("{}/{}", group, version),
+            kind: self.kind,
+            version, group,
+            namespace: self.namespace,
+            phantom: PhantomData
         }
     }
 }
@@ -38,81 +151,49 @@ impl Default for RawApi {
 ///
 /// Note: constructors such as RawApi::v1Deployment are implemented via the k8s_obj macro
 /// Find those invocations to see how to add more objects (not fully automated yet)
-impl RawApi {
-    /// Set as namespaced resource within a specified namespace
-    pub fn within(mut self, ns: &str) -> Self {
-        match self.resource.as_ref() {
-            "nodes" | "namespaces" | "clusterroles" | "customresourcedefinitions" => {
-                panic!("{} is not a namespace scoped resource", self.resource)
-            }
-            _ => {}
-        }
-        self.namespace = Some(ns.to_string());
-        self
-    }
-
-    /// Set the api group of a resource manually
-    ///
-    /// Can be used to set legacy versions like "extensions" for old Deployments
-    pub fn group(mut self, group: &str) -> Self {
-        self.group = group.to_string();
-        self
-    }
-
-    /// Set the version of an api group manually
-    ///
-    /// Can be used to set legacy versions like "v1beta1" for old Deployments
-    pub fn version(mut self, version: &str) -> Self {
-        self.version = version.to_string();
-        self
-    }
-
+impl<K> RawApi<K> {
     /// Instance of a CRD
     ///
     /// The version, and group must be set by the user:
     ///
     /// ```
     /// use kube::api::RawApi;
-    /// let foos = RawApi::customResource("foos") // <.spec.name>
+    /// struct Foo {
+    ///     spec: FooSpec,
+    ///     status: FooStatus,
+    /// };
+    /// let foos = RawApi::<Foo>::custom_resource("Foo") // <.spec.kind>
     ///    .group("clux.dev") // <.spec.group>
-    ///    .version("v1");
+    ///    .version("v1")
+    ///    .build();
     /// ```
-    #[allow(non_snake_case)]
-    pub fn customResource(name: &str) -> Self {
-        Self {
-            resource: name.into(),
-            ..Default::default()
+    pub fn custom_resource(name: &str) -> CrBuilder<K> {
+        assert!(to_plural(name) != name); // no plural in kind
+        assert!(is_pascal_case(&name)); // PascalCase kind
+        CrBuilder { kind: name.into(),
+            namespace: None,
+            version: None,
+            group: None,
+            phantom: PhantomData
         }
     }
 }
 
 // -------------------------------------------------------
 
-impl RawApi {
+impl<K> RawApi<K> {
     pub(crate) fn make_url(&self) -> String {
-        let pref = if self.prefix == "" {
-            "".into()
-        } else {
-            format!("{}/", self.prefix)
-        };
-        let g = if self.group == "" {
-            "".into()
-        } else {
-            format!("{}/", self.group)
-        };
         let n = if let Some(ns) = &self.namespace {
             format!("namespaces/{}/", ns)
         } else {
             "".into()
         };
-
         format!(
-            "/{prefix}{group}{version}/{namespaces}{resource}",
-            prefix = pref,
-            group = g,
-            version = self.version,
+            "/{group}/{api_version}/{namespaces}{resource}",
+            group = if self.group.is_empty() { "api" } else { "apis" },
+            api_version = self.api_version,
             namespaces = n,
-            resource = self.resource,
+            resource = to_plural(&self.kind.to_ascii_lowercase()),
         )
     }
 }
@@ -120,7 +201,7 @@ impl RawApi {
 /// Common query parameters used in watch/list/delete calls on collections
 ///
 /// Constructed internally with a builder on Informer and Reflector,
-/// but can be passed to the helper function of RawRawApi.
+/// but can be passed to the helper function of RawApi.
 #[derive(Default, Clone)]
 pub struct ListParams {
     pub field_selector: Option<String>,
@@ -261,7 +342,7 @@ pub enum PropagationPolicy {
 }
 
 /// Convenience methods found from API conventions
-impl RawApi {
+impl<K> RawApi<K> {
     /// List a collection of a resource
     pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "?";
@@ -412,7 +493,7 @@ impl RawApi {
 }
 
 /// Scale subresource
-impl RawApi {
+impl<K> RawApi<K> {
     /// Get an instance of the scale subresource
     pub fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/scale";
@@ -460,7 +541,7 @@ impl RawApi {
 }
 
 /// Status subresource
-impl RawApi {
+impl<K> RawApi<K> {
     /// Get an instance of the status subresource
     pub fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/status";
@@ -507,105 +588,16 @@ impl RawApi {
     }
 }
 
-#[test]
-fn list_path() {
-    let r = RawApi::v1Deployment().within("ns");
-    let gp = ListParams::default();
-    let req = r.list(&gp).unwrap();
-    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
-}
-#[test]
-fn watch_path() {
-    let r = RawApi::v1Pod().within("ns");
-    let gp = ListParams::default();
-    let req = r.watch(&gp, "0").unwrap();
-    assert_eq!(
-        req.uri(),
-        "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290"
-    );
-}
-#[test]
-fn replace_path() {
-    let r = RawApi::v1DaemonSet();
-    let pp = PostParams {
-        dry_run: true,
-        ..Default::default()
-    };
-    let req = r.replace("myds", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
-}
 
-#[test]
-fn delete_path() {
-    let r = RawApi::v1ReplicaSet().within("ns");
-    let dp = DeleteParams::default();
-    let req = r.delete("myrs", &dp).unwrap();
-    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets/myrs");
-    assert_eq!(req.method(), "DELETE")
-}
-
-#[test]
-fn delete_collection_path() {
-    let r = RawApi::v1ReplicaSet().within("ns");
-    let lp = ListParams::default();
-    let req = r.delete_collection(&lp).unwrap();
-    assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets");
-    assert_eq!(req.method(), "DELETE")
-}
-
-#[test]
-fn namespace_path() {
-    // weird object compared to other v1
-    let r = RawApi::v1Namespace();
-    let gp = ListParams::default();
-    let req = r.list(&gp).unwrap();
-    assert_eq!(req.uri(), "/api/v1/namespaces")
-}
-
-#[test]
-fn patch_params_validation() {
-    let pp = PatchParams::default();
-    assert!(pp.validate().is_ok(), "default params should always be valid");
-
-    let patch_strategy_apply_true = PatchParams {
-        patch_strategy: PatchStrategy::Merge,
-        force: true,
-        ..Default::default()
-    };
-    assert!(
-        patch_strategy_apply_true.validate().is_err(),
-        "Merge strategy shouldn't be valid if `force` set to true"
-    );
-}
-
-// subresources with weird version accuracy
-#[test]
-fn patch_status_path() {
-    let r = RawApi::v1Node();
-    let pp = PatchParams::default();
-    let req = r.patch_status("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
-    assert_eq!(
-        req.headers().get("Content-Type").unwrap().to_str().unwrap(),
-        format!("{}", PatchStrategy::Merge)
-    );
-    assert_eq!(req.method(), "PATCH");
-}
-#[test]
-fn replace_status_path() {
-    let r = RawApi::v1Node();
-    let pp = PostParams::default();
-    let req = r.replace_status("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
-    assert_eq!(req.method(), "PUT");
-}
-
+// non-openapi tests
 #[test]
 fn create_custom_resource() {
-    let r = RawApi::customResource("foos")
+    struct Foo {};
+    let r = RawApi::<Foo>::custom_resource("Foo")
         .group("clux.dev")
         .version("v1")
-        .within("myns");
+        .within("myns")
+        .build();
     let pp = PostParams::default();
     let req = r.create(&pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");
@@ -615,57 +607,285 @@ fn create_custom_resource() {
     assert_eq!(req.method(), "PATCH");
 }
 
-#[test]
-fn create_ingress() {
-    let r = RawApi::v1beta1Ingress().within("bleep");
-    let pp = PostParams::default();
-    let req = r.create(&pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/extensions/v1beta1/namespaces/bleep/ingresses?");
-    let patch_params = PatchParams::default();
-    let req = r.patch("baz", &patch_params, vec![]).unwrap();
-    assert_eq!(
-        req.uri(),
-        "/apis/extensions/v1beta1/namespaces/bleep/ingresses/baz?"
-    );
-    assert_eq!(req.method(), "PATCH");
-}
 
-#[test]
-fn replace_status() {
-    let r = RawApi::v1beta1CustomResourceDefinition();
-    let pp = PostParams::default();
-    let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
-    assert_eq!(
-        req.uri(),
-        "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/mycrd.domain.io/status?"
-    );
-}
-#[test]
-fn get_scale_path() {
-    let r = RawApi::v1Node();
-    let req = r.get_scale("mynode").unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale");
-    assert_eq!(req.method(), "GET");
-}
-#[test]
-fn patch_scale_path() {
-    let r = RawApi::v1Node();
-    let pp = PatchParams::default();
-    let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
-    assert_eq!(req.method(), "PATCH");
-}
-#[test]
-fn replace_scale_path() {
-    let r = RawApi::v1Node();
-    let pp = PostParams::default();
-    let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
-    assert_eq!(req.method(), "PUT");
-}
 
-#[test]
-#[should_panic]
-fn global_resources_not_namespaceable() {
-    RawApi::v1Node().within("ns");
+/// Extensive tests for RawApi::<k8s_openapi::Resource impls>
+///
+/// Cheap sanity check to ensure type maps work as expected
+/// Only uses RawApi::create to check the general url format.
+#[cfg(feature = "openapi")]
+#[cfg(test)]
+mod test {
+    use crate::api::{PostParams, RawApi};
+
+    use k8s_openapi::api as k8s;
+    use k8s::core::v1 as corev1;
+    use k8s::apps::v1 as appsv1;
+    use k8s::rbac::v1 as rbacv1;
+    //use k8s::batch::v1 as batchv1;
+    use k8s::batch::v1beta1 as batchv1beta1;
+    use k8s::autoscaling::v1 as autoscalingv1;
+    use k8s::networking::v1 as networkingv1;
+    use k8s::networking::v1beta1 as networkingv1beta1;
+    use k8s::extensions::v1beta1 as extsv1beta1;
+    use k8s::storage::v1 as storagev1;
+    use k8s::authorization::v1 as authv1;
+    use k8s::admissionregistration::v1beta1 as adregv1beta1;
+
+    // NB: stable requires >= 1.17
+    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiextsv1;
+
+    use k8s_openapi::Resource;
+    // TODO: fixturize these tests
+    // these are sanity tests for macros that create the RawApi::v1Ctors
+    #[test]
+    fn api_url_secret() {
+        let r = RawApi::<corev1::Secret>::within("ns");
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        println!("trait is: {:?}", corev1::Secret::GROUP);
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/secrets?");
+    }
+
+    #[test]
+    fn api_url_rs() {
+        let r = RawApi::<appsv1::ReplicaSet>::within("ns");
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets?");
+    }
+    #[test]
+    fn api_url_role() {
+        let r = RawApi::<rbacv1::Role>::within("ns");
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/rbac.authorization.k8s.io/v1/namespaces/ns/roles?"
+        );
+    }
+
+    #[test]
+    fn api_url_cj() {
+        let r = RawApi::<batchv1beta1::CronJob>::within("ns");
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(req.uri(), "/apis/batch/v1beta1/namespaces/ns/cronjobs?");
+    }
+    #[test]
+    fn api_url_hpa() {
+        let r = RawApi::<autoscalingv1::HorizontalPodAutoscaler>::within("ns");
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/autoscaling/v1/namespaces/ns/horizontalpodautoscalers?"
+        );
+    }
+
+    #[test]
+    fn api_url_np() {
+        let r = RawApi::<networkingv1::NetworkPolicy>::within("ns");
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/networking.k8s.io/v1/namespaces/ns/networkpolicies?"
+        );
+    }
+    #[test]
+    fn api_url_ingress() {
+        let r = RawApi::<extsv1beta1::Ingress>::within("ns");
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(req.uri(), "/apis/extensions/v1beta1/namespaces/ns/ingresses?");
+    }
+
+    #[test]
+    fn api_url_vattach() {
+        let r = RawApi::<storagev1::VolumeAttachment>::global();
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(req.uri(), "/apis/storage.k8s.io/v1/volumeattachments?");
+    }
+
+    #[test]
+    fn api_url_admission() {
+        let r = RawApi::<adregv1beta1::ValidatingWebhookConfiguration>::global();
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/admissionregistration.k8s.io/v1beta1/validatingwebhookconfigurations?"
+        );
+    }
+
+    #[test]
+    fn api_auth_selfreview() {
+        let r = RawApi::<authv1::SelfSubjectRulesReview>::global();
+        assert_eq!(r.group, "authorization.k8s.io");
+        assert_eq!(r.kind, "SelfSubjectRulesReview");
+
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/authorization.k8s.io/v1/selfsubjectrulesreviews?"
+        );
+    }
+
+    #[test]
+    fn api_apiextsv1_crd() {
+        let r = RawApi::<apiextsv1::CustomResourceDefinition>::global();
+        let req = r.create(&PostParams::default(), vec![]).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/apiextensions.k8s.io/v1/customresourcedefinitions?"
+        );
+    }
+
+    /// -----------------------------------------------------------------
+    /// Tests that the misc mappings are also sensible
+
+    use crate::api::{ListParams, PatchParams, DeleteParams, PatchStrategy};
+    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiextsv1beta1;
+
+    #[test]
+    fn list_path() {
+        let r = RawApi::<appsv1::Deployment>::within("ns");
+        let gp = ListParams::default();
+        let req = r.list(&gp).unwrap();
+        assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
+    }
+    #[test]
+    fn watch_path() {
+        let r = RawApi::<corev1::Pod>::within("ns");
+        let gp = ListParams::default();
+        let req = r.watch(&gp, "0").unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290"
+        );
+    }
+    #[test]
+    fn replace_path() {
+        let r = RawApi::<appsv1::DaemonSet>::global();
+        let pp = PostParams {
+            dry_run: true,
+            ..Default::default()
+        };
+        let req = r.replace("myds", &pp, vec![]).unwrap();
+        assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
+    }
+
+    #[test]
+    fn delete_path() {
+        let r = RawApi::<appsv1::ReplicaSet>::within("ns");
+        let dp = DeleteParams::default();
+        let req = r.delete("myrs", &dp).unwrap();
+        assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets/myrs");
+        assert_eq!(req.method(), "DELETE")
+    }
+
+    #[test]
+    fn delete_collection_path() {
+        let r = RawApi::<appsv1::ReplicaSet>::within("ns");
+        let lp = ListParams::default();
+        let req = r.delete_collection(&lp).unwrap();
+        assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets");
+        assert_eq!(req.method(), "DELETE")
+    }
+
+    #[test]
+    fn namespace_path() {
+        let r = RawApi::<corev1::Namespace>::global();
+        let gp = ListParams::default();
+        let req = r.list(&gp).unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces")
+    }
+
+    #[test]
+    fn patch_params_validation() {
+        let pp = PatchParams::default();
+        assert!(pp.validate().is_ok(), "default params should always be valid");
+
+        let patch_strategy_apply_true = PatchParams {
+            patch_strategy: PatchStrategy::Merge,
+            force: true,
+            ..Default::default()
+        };
+        assert!(
+            patch_strategy_apply_true.validate().is_err(),
+            "Merge strategy shouldn't be valid if `force` set to true"
+        );
+    }
+
+    // subresources with weird version accuracy
+    #[test]
+    fn patch_status_path() {
+        let r = RawApi::<corev1::Node>::global();
+        let pp = PatchParams::default();
+        let req = r.patch_status("mynode", &pp, vec![]).unwrap();
+        assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
+        assert_eq!(
+            req.headers().get("Content-Type").unwrap().to_str().unwrap(),
+            format!("{}", PatchStrategy::Merge)
+        );
+        assert_eq!(req.method(), "PATCH");
+    }
+    #[test]
+    fn replace_status_path() {
+        let r = RawApi::<corev1::Node>::global();
+        let pp = PostParams::default();
+        let req = r.replace_status("mynode", &pp, vec![]).unwrap();
+        assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
+        assert_eq!(req.method(), "PUT");
+    }
+
+    #[test]
+    fn create_ingress() {
+        // NB: Ingress exists in extensions AND networking
+        let r = RawApi::<networkingv1beta1::Ingress>::within("ns");
+        let pp = PostParams::default();
+        let req = r.create(&pp, vec![]).unwrap();
+
+        assert_eq!(req.uri(), "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses?");
+        let patch_params = PatchParams::default();
+        let req = r.patch("baz", &patch_params, vec![]).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses/baz?"
+        );
+        assert_eq!(req.method(), "PATCH");
+    }
+
+    #[test]
+    fn replace_status() {
+        let r = RawApi::<apiextsv1beta1::CustomResourceDefinition>::global();
+        let pp = PostParams::default();
+        let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/mycrd.domain.io/status?"
+        );
+    }
+    #[test]
+    fn get_scale_path() {
+        let r = RawApi::<corev1::Node>::global();
+        let req = r.get_scale("mynode").unwrap();
+        assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale");
+        assert_eq!(req.method(), "GET");
+    }
+    #[test]
+    fn patch_scale_path() {
+        let r = RawApi::<corev1::Node>::global();
+        let pp = PatchParams::default();
+        let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
+        assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
+        assert_eq!(req.method(), "PATCH");
+    }
+    #[test]
+    fn replace_scale_path() {
+        let r = RawApi::<corev1::Node>::global();
+        let pp = PostParams::default();
+        let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
+        assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
+        assert_eq!(req.method(), "PUT");
+    }
+
+    #[test]
+    #[should_panic]
+    fn global_resources_not_namespaceable() {
+        RawApi::<corev1::Node>::within("ns");
+    }
 }
