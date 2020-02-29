@@ -1,9 +1,6 @@
-use std::marker::PhantomData;
 use crate::{Error, Result};
-use inflector::{
-    string::pluralize::to_plural,
-    cases::pascalcase::is_pascal_case,
-};
+use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
+use std::marker::PhantomData;
 
 /// RawApi generation data
 ///
@@ -22,7 +19,6 @@ pub struct RawApi<K> {
     /// This is the string used in the apiVersion field of the resource's serialized form.
     pub api_version: String,
 
-
     /// The group of the resource
     ///
     /// or the empty string if the resource doesn't have a group.
@@ -40,12 +36,13 @@ pub struct RawApi<K> {
     pub namespace: Option<String>,
 
     // hidden ref
-    phantom: PhantomData<K>
+    phantom: PhantomData<K>,
 }
 
 #[cfg(feature = "openapi")]
 impl<K> From<K> for RawApi<K>
-    where K: k8s_openapi::Resource
+where
+    K: k8s_openapi::Resource,
 {
     fn from(_k: K) -> Self {
         Self {
@@ -61,7 +58,8 @@ impl<K> From<K> for RawApi<K>
 
 #[cfg(feature = "openapi")]
 impl<K> RawApi<K>
-    where K: k8s_openapi::Resource
+where
+    K: k8s_openapi::Resource,
 {
     pub fn global() -> Self {
         Self {
@@ -126,8 +124,7 @@ impl CustomResource {
 }
 
 /// This impl makes CustomResource useable without k8s_openapi
-impl<K> From<CustomResource> for RawApi<K>
-{
+impl<K> From<CustomResource> for RawApi<K> {
     fn from(c: CustomResource) -> Self {
         Self {
             api_version: c.api_version,
@@ -152,8 +149,12 @@ impl CrBuilder {
     fn new(kind: &str) -> Self {
         assert!(to_plural(kind) != kind); // no plural in kind
         assert!(is_pascal_case(&kind)); // PascalCase kind
-        Self { kind: kind.into(), ..Default::default() }
+        Self {
+            kind: kind.into(),
+            ..Default::default()
+        }
     }
+
     /// Set the api group of a custom resource
     pub fn group(mut self, group: &str) -> Self {
         self.group = Some(group.to_string());
@@ -179,7 +180,8 @@ impl CrBuilder {
         CustomResource {
             api_version: format!("{}/{}", group, version),
             kind: self.kind,
-            version, group,
+            version,
+            group,
             namespace: self.namespace,
         }
     }
@@ -599,7 +601,7 @@ impl<K> RawApi<K> {
 #[test]
 fn create_custom_resource() {
     struct Foo {};
-    let r : RawApi<Foo> = CustomResource::new("Foo")
+    let r: RawApi<Foo> = CustomResource::new("Foo")
         .group("clux.dev")
         .version("v1")
         .within("myns")
@@ -615,7 +617,6 @@ fn create_custom_resource() {
 }
 
 
-
 /// Extensive tests for RawApi::<k8s_openapi::Resource impls>
 ///
 /// Cheap sanity check to ensure type maps work as expected
@@ -625,19 +626,18 @@ fn create_custom_resource() {
 mod test {
     use crate::api::{PostParams, RawApi};
 
+    use k8s::{apps::v1 as appsv1, core::v1 as corev1, rbac::v1 as rbacv1};
     use k8s_openapi::api as k8s;
-    use k8s::core::v1 as corev1;
-    use k8s::apps::v1 as appsv1;
-    use k8s::rbac::v1 as rbacv1;
-    //use k8s::batch::v1 as batchv1;
-    use k8s::batch::v1beta1 as batchv1beta1;
-    use k8s::autoscaling::v1 as autoscalingv1;
-    use k8s::networking::v1 as networkingv1;
-    use k8s::networking::v1beta1 as networkingv1beta1;
-    use k8s::extensions::v1beta1 as extsv1beta1;
-    use k8s::storage::v1 as storagev1;
-    use k8s::authorization::v1 as authv1;
-    use k8s::admissionregistration::v1beta1 as adregv1beta1;
+    // use k8s::batch::v1 as batchv1;
+    use k8s::{
+        admissionregistration::v1beta1 as adregv1beta1,
+        authorization::v1 as authv1,
+        autoscaling::v1 as autoscalingv1,
+        batch::v1beta1 as batchv1beta1,
+        extensions::v1beta1 as extsv1beta1,
+        networking::{v1 as networkingv1, v1beta1 as networkingv1beta1},
+        storage::v1 as storagev1,
+    };
 
     // NB: stable requires >= 1.17
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiextsv1;
@@ -743,8 +743,7 @@ mod test {
 
     /// -----------------------------------------------------------------
     /// Tests that the misc mappings are also sensible
-
-    use crate::api::{ListParams, PatchParams, DeleteParams, PatchStrategy};
+    use crate::api::{DeleteParams, ListParams, PatchParams, PatchStrategy};
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiextsv1beta1;
 
     #[test]
@@ -846,7 +845,10 @@ mod test {
         let pp = PostParams::default();
         let req = r.create(&pp, vec![]).unwrap();
 
-        assert_eq!(req.uri(), "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses?");
+        assert_eq!(
+            req.uri(),
+            "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses?"
+        );
         let patch_params = PatchParams::default();
         let req = r.patch("baz", &patch_params, vec![]).unwrap();
         assert_eq!(

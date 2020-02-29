@@ -10,14 +10,13 @@ pub struct NotUsed {}
 pub(crate) mod raw;
 pub use raw::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, RawApi};
 
-//pub(crate) mod typed;
-//pub use typed::Api;
+// pub(crate) mod typed;
+// pub use typed::Api;
 
-//mod subresource;
-//pub use subresource::{LoggingObject, LogParams, Scale, ScaleSpec, ScaleStatus};
+// mod subresource;
+// pub use subresource::{LoggingObject, LogParams, Scale, ScaleSpec, ScaleStatus};
 //#[cfg(feature = "openapi")]
-//impl LoggingObject for k8s_openapi::api::core::v1::Pod {}
-
+// impl LoggingObject for k8s_openapi::api::core::v1::Pod {}
 
 
 pub(crate) mod resource;
