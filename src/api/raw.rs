@@ -130,6 +130,50 @@ impl ListParams {
     }
 }
 
+/// Builder interface to ListParams
+///
+/// Usage:
+/// ```
+/// let lp = ListParams::default()
+///     .timeout(60)
+///     .labels("kubernetes.io/lifecycle=spot");
+/// ```
+impl ListParams {
+    /// Configure the timeout for list/watch calls
+    ///
+    /// This limits the duration of the call, regardless of any activity or inactivity.
+    /// Defaults to 290s
+    pub fn timeout(mut self, timeout_secs: u32) -> Self {
+        self.timeout = Some(timeout_secs);
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their fields.
+    ///
+    /// Defaults to everything.
+    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
+    /// The server only supports a limited number of field queries per type.
+    pub fn fields(mut self, field_selector: &str) -> Self {
+        self.field_selector = Some(field_selector.to_string());
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their labels.
+    ///
+    /// Defaults to everything.
+    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
+    pub fn labels(mut self, label_selector: &str) -> Self {
+        self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// If called, partially initialized resources are included in watch/list responses.
+    pub fn include_uninitialized(mut self) -> Self {
+        self.include_uninitialized = true;
+        self
+    }
+}
+
 /// Common query parameters for put/post calls
 #[derive(Default, Clone)]
 pub struct PostParams {

@@ -67,44 +67,6 @@ where
         }
     }
 
-    // builders for GetParams
-
-    /// Configure the timeout for the list/watch call.
-    ///
-    /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// Defaults to 290s
-    pub fn timeout(mut self, timeout_secs: u32) -> Self {
-        self.params.timeout = Some(timeout_secs);
-        self
-    }
-
-    /// Configure the selector to restrict the list of returned objects by their fields.
-    ///
-    /// Defaults to everything.
-    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
-    /// The server only supports a limited number of field queries per type.
-    pub fn fields(mut self, field_selector: &str) -> Self {
-        self.params.field_selector = Some(field_selector.to_string());
-        self
-    }
-
-    /// Configure the selector to restrict the list of returned objects by their labels.
-    ///
-    /// Defaults to everything.
-    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
-    pub fn labels(mut self, label_selector: &str) -> Self {
-        self.params.label_selector = Some(label_selector.to_string());
-        self
-    }
-
-    /// If called, partially initialized resources are included in watch/list responses.
-    pub fn include_uninitialized(mut self) -> Self {
-        self.params.include_uninitialized = true;
-        self
-    }
-
-    // finalizers:
-
     /// Initialize from a prior version
     pub fn init_from(self, v: String) -> Self {
         info!("Recreating Informer for {:?} at {}", self.resource, v);
