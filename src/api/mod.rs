@@ -10,8 +10,11 @@ pub struct NotUsed {}
 pub(crate) mod raw;
 pub use raw::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, RawApi};
 
-// pub(crate) mod typed;
-// pub use typed::Api;
+pub(crate) mod typed;
+pub use typed::Api;
+
+mod crds;
+pub use crds::{CrBuilder, CustomResource};
 
 // mod subresource;
 // pub use subresource::{LoggingObject, LogParams, Scale, ScaleSpec, ScaleStatus};

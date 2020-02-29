@@ -1,14 +1,8 @@
 use crate::{Error, Result};
-use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
+use inflector::string::pluralize::to_plural;
 use std::marker::PhantomData;
 
-/// RawApi generation data
-///
-/// This data defines the urls used by kubernetes' APIs.
-/// This struct is client agnostic, and can be passed to an Informer or a Reflector.
-///
-/// Can be used directly with a client.
-/// When data is PUT/POST/PATCH'd this struct requires serialized raw bytes.
+/// The Resource information needed to operate a kubernetes client
 #[derive(Clone, Debug)]
 pub struct RawApi<K> {
     /// The API version of the resource.
@@ -36,7 +30,7 @@ pub struct RawApi<K> {
     pub namespace: Option<String>,
 
     // hidden ref
-    phantom: PhantomData<K>,
+    pub(crate) phantom: PhantomData<K>,
 }
 
 #[cfg(feature = "openapi")]
@@ -87,102 +81,6 @@ where
             version: K::VERSION.to_string(),
             namespace: Some(ns.to_string()),
             phantom: PhantomData,
-        }
-    }
-}
-
-/// A Resource trait equivalent for Custom Resource
-///
-/// This is the smallest amount of info we need to run the API against a CR
-/// The version, and group must be set by the user:
-///
-/// ```
-/// use kube::api::{CustomResource, RawApi};
-/// struct Foo {
-///     spec: FooSpec,
-///     status: FooStatus,
-/// };
-/// let foos : RawApi<Foo> = CustomResource::new("Foo") // <.spec.kind>
-///    .group("clux.dev") // <.spec.group>
-///    .version("v1")
-///    .build()
-///    .into();
-/// ```
-pub struct CustomResource {
-    kind: String,
-    group: String,
-    version: String,
-    api_version: String,
-    namespace: Option<String>,
-}
-
-impl CustomResource {
-    /// Construct a CrBuilder
-    pub fn new(kind: &str) -> CrBuilder {
-        CrBuilder::new(kind)
-    }
-}
-
-/// This impl makes CustomResource useable without k8s_openapi
-impl<K> From<CustomResource> for RawApi<K> {
-    fn from(c: CustomResource) -> Self {
-        Self {
-            api_version: c.api_version,
-            kind: c.kind,
-            group: c.group,
-            version: c.version,
-            namespace: c.namespace,
-            phantom: PhantomData,
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct CrBuilder {
-    pub(crate) kind: String,
-    pub(crate) version: Option<String>,
-    pub(crate) group: Option<String>,
-    pub(crate) namespace: Option<String>,
-}
-impl CrBuilder {
-    /// Create a CrBuilder {
-    fn new(kind: &str) -> Self {
-        assert!(to_plural(kind) != kind); // no plural in kind
-        assert!(is_pascal_case(&kind)); // PascalCase kind
-        Self {
-            kind: kind.into(),
-            ..Default::default()
-        }
-    }
-
-    /// Set the api group of a custom resource
-    pub fn group(mut self, group: &str) -> Self {
-        self.group = Some(group.to_string());
-        self
-    }
-
-    /// Set the api version of a custom resource
-    pub fn version(mut self, version: &str) -> Self {
-        self.version = Some(version.to_string());
-        self
-    }
-
-    /// Set the namespace of a custom resource
-    pub fn within(mut self, ns: &str) -> Self {
-        self.namespace = Some(ns.into());
-        self
-    }
-
-    // Build a RawApi from Crd properties
-    pub fn build(self) -> CustomResource {
-        let version = self.version.expect("Crd must have a version");
-        let group = self.group.expect("Crd must have a group");
-        CustomResource {
-            api_version: format!("{}/{}", group, version),
-            kind: self.kind,
-            version,
-            group,
-            namespace: self.namespace,
         }
     }
 }
@@ -595,27 +493,6 @@ impl<K> RawApi<K> {
         req.body(data).map_err(Error::HttpError)
     }
 }
-
-
-// non-openapi tests
-#[test]
-fn create_custom_resource() {
-    struct Foo {};
-    let r: RawApi<Foo> = CustomResource::new("Foo")
-        .group("clux.dev")
-        .version("v1")
-        .within("myns")
-        .build()
-        .into();
-    let pp = PostParams::default();
-    let req = r.create(&pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");
-    let patch_params = PatchParams::default();
-    let req = r.patch("baz", &patch_params, vec![]).unwrap();
-    assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos/baz?");
-    assert_eq!(req.method(), "PATCH");
-}
-
 
 /// Extensive tests for RawApi::<k8s_openapi::Resource impls>
 ///

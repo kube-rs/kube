@@ -38,12 +38,15 @@ pub struct Api<K> {
 /// Expose same interface as Api for controlling scope/group/versions/ns
 #[cfg(feature = "openapi")]
 impl<K> Api<K>
-    where K: k8s_openapi::Resource
+where
+    K: k8s_openapi::Resource,
 {
     pub fn new(client: APIClient) -> Self {
         let api = RawApi::<K>::global();
         Self {
-            api, client, phantom: PhantomData
+            api,
+            client,
+            phantom: PhantomData,
         }
     }
 }
@@ -96,21 +99,3 @@ where
             .map(|stream| stream.filter_map(|e| async move { e.ok() }))
     }
 }
-
-/// Api Constructor for CRDs
-///
-/// Because it relies entirely on user definitions, this ctor does not rely on openapi.
-impl<K> Api<K>
-where
-    K: Clone + DeserializeOwned,
-{
-    pub fn custom_resource(client: APIClient, name: &str) -> Self {
-        Self {
-            api: RawApi::custom_resource(name),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
-
-// all other native impls in openapi.rs
