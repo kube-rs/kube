@@ -25,25 +25,55 @@ pub trait Metadata {
 #[cfg(feature = "openapi")]
 pub use k8s_openapi::Metadata;
 
-pub trait MetaContent : Metadata {
-    fn resource_ver(&self) -> Option<&String>;
+pub trait MetaContent: Metadata {
+    fn resource_ver(&self) -> Option<String>;
+    fn name(&self) -> String;
+    fn namespace(&self) -> Option<String>;
 }
 
 #[cfg(not(feature = "openapi"))]
 impl<K> MetaContent for K
-where K: Metadata<Ty=ObjectMeta>
+where
+    K: Metadata<Ty = ObjectMeta>,
 {
-    fn resource_ver(&self) -> Option<&String> {
-        self.metadata().expect("all types have metadata").resourceVersion.as_ref()
+    fn resource_ver(&self) -> Option<String> {
+        self.metadata().unwrap().resourceVersion.clone()
+    }
+
+    fn name(&self) -> String {
+        self.metadata().unwrap().name.clone()
+    }
+
+    fn namespace(&self) -> Option<String> {
+        self.metadata().unwrap().namespace.clone()
     }
 }
 
 #[cfg(feature = "openapi")]
 impl<K> MetaContent for K
-where K: k8s_openapi::Metadata<Ty=k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta>
+where
+    K: k8s_openapi::Metadata<Ty = k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta>,
 {
-    fn resource_ver(&self) -> Option<&String> {
-        self.metadata().expect("all useful k8s_openapi types have metadata").resource_version.as_ref()
+    fn resource_ver(&self) -> Option<String> {
+        self.metadata()
+            .expect("all useful k8s_openapi types have metadata")
+            .resource_version
+            .clone()
+    }
+
+    fn name(&self) -> String {
+        self.metadata()
+            .expect("all useful k8s_openapi types have metadata")
+            .name
+            .clone()
+            .unwrap()
+    }
+
+    fn namespace(&self) -> Option<String> {
+        self.metadata()
+            .expect("all useful k8s_openapi types have metadata")
+            .namespace
+            .clone()
     }
 }
 
@@ -115,10 +145,11 @@ impl<P, U> Metadata for Object<P, U>
 where
     P: Clone,
     U: Clone,
-    // TODO: only require Resource if in openapi cfg
-    Object<P, U>: k8s_openapi::Resource
+    /* TODO: only require Resource if in openapi cfg
+     * Object<P, U>: k8s_openapi::Resource */
 {
     type Ty = ObjectMeta;
+
     fn metadata(&self) -> Option<&ObjectMeta> {
         Some(&self.metadata)
     }

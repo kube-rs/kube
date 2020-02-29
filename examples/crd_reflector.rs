@@ -4,38 +4,39 @@ use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{NotUsed, Object, RawApi},
+    api::{CustomResource, ListParams, NotUsed, Object, RawApi},
     client::APIClient,
     config,
     runtime::Reflector,
 };
 
-// Own custom resource spec
 #[derive(Deserialize, Serialize, Clone)]
 pub struct FooSpec {
     name: String,
     info: String,
 }
-// The kubernetes generic object with our spec and no status
+
 type Foo = Object<FooSpec, NotUsed>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
-    let resource = RawApi::customResource("foos")
+    let resource: RawApi<Foo> = CustomResource::new("Foo")
         .group("clux.dev")
-        .within(&namespace);
+        .version("v1")
+        .within(&namespace)
+        .build()
+        .into();
 
-    let rf: Reflector<Foo> = Reflector::raw(client, resource)
-        .timeout(20) // low timeout in this example
-        .init()
-        .await?;
+    let lp = ListParams::default().timeout(20); // low timeout in this example
+
+    let rf: Reflector<Foo> = Reflector::raw(client, lp, resource).init().await?;
 
     let cloned = rf.clone();
     tokio::spawn(async move {

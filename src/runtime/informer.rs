@@ -1,6 +1,6 @@
 use crate::{
     api::{
-        object::{Metadata, MetaContent, WatchEvent},
+        object::{MetaContent, Metadata, WatchEvent},
         Api, ListParams, RawApi,
     },
     client::APIClient,

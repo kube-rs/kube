@@ -33,8 +33,18 @@ async fn main() -> anyhow::Result<()> {
 fn handle_node(_pods: &RawApi<Pod>, ev: WatchEvent<Pod>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
-            let containers = o.spec.unwrap().containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
-            info!("Added Pod: {} (containers={:?})", o.metadata.unwrap().name.unwrap(), containers);
+            let containers = o
+                .spec
+                .unwrap()
+                .containers
+                .into_iter()
+                .map(|c| c.name)
+                .collect::<Vec<_>>();
+            info!(
+                "Added Pod: {} (containers={:?})",
+                o.metadata.unwrap().name.unwrap(),
+                containers
+            );
         }
         WatchEvent::Modified(o) => {
             let meta = o.metadata.unwrap();
@@ -42,7 +52,9 @@ fn handle_node(_pods: &RawApi<Pod>, ev: WatchEvent<Pod>) -> anyhow::Result<()> {
             let owner = &meta.owner_references.unwrap()[0];
             info!(
                 "Modified Pod: {} (phase={}, owner={})",
-                meta.name.unwrap(), phase, owner.name
+                meta.name.unwrap(),
+                phase,
+                owner.name
             );
         }
         WatchEvent::Deleted(o) => {

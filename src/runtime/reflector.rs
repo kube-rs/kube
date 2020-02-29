@@ -1,6 +1,6 @@
 use crate::{
     api::{
-        object::{Metadata, ObjectList, WatchEvent},
+        object::{MetaContent, Metadata, ObjectList, WatchEvent},
         Api, ListParams, ObjectMeta, RawApi,
     },
     client::APIClient,
@@ -41,7 +41,7 @@ impl<K> Default for State<K> {
 #[derive(Clone)]
 pub struct Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send + Metadata,
+    K: Clone + DeserializeOwned + Send + MetaContent,
 {
     state: Arc<Mutex<State<K>>>,
     client: APIClient,
@@ -64,14 +64,14 @@ where
 // }
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned + Metadata + Send,
+    K: Clone + DeserializeOwned + MetaContent + Send,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, r: RawApi<K>) -> Self {
+    pub fn raw(client: APIClient, lp: ListParams, r: RawApi<K>) -> Self {
         Reflector {
             client,
             resource: r,
-            params: ListParams::default(),
+            params: lp,
             state: Default::default(),
         }
     }
@@ -159,11 +159,11 @@ where
         );
         for i in res.items {
             // The non-generic parts we care about are spec + status
-            data.insert(i.metadata().unwrap().into(), i);
+            data.insert(ObjectId::key_for(&i), i);
         }
         let keys = data
             .keys()
-            .map(|key: &ObjectId| key.to_string())
+            .map(ObjectId::to_string)
             .collect::<Vec<_>>()
             .join(", ");
         debug!("Initialized with: [{}]", keys);
@@ -184,23 +184,32 @@ where
             let mut state = self.state.lock().await;
             match ev {
                 WatchEvent::Added(o) => {
-                    debug!("Adding {} to {}", o.metadata().unwrap().name, rg.kind);
-                    state.data.entry(o.metadata().unwrap().into()).or_insert_with(|| o.clone());
-                    if let Some(v) = &o.metadata().unwrap().resourceVersion {
+                    let name = MetaContent::name(&o);
+                    debug!("Adding {} to {}", name, rg.kind);
+                    state
+                        .data
+                        .entry(ObjectId::key_for(&o))
+                        .or_insert_with(|| o.clone());
+                    if let Some(v) = MetaContent::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Modified(o) => {
-                    debug!("Modifying {} in {}", o.metadata().unwrap().name, rg.kind);
-                    state.data.entry(o.metadata().into()).and_modify(|e| *e = o.clone());
-                    if let Some(v) = &o.metadata().resourceVersion {
+                    let name = MetaContent::name(&o);
+                    debug!("Modifying {} in {}", name, rg.kind);
+                    state
+                        .data
+                        .entry(ObjectId::key_for(&o))
+                        .and_modify(|e| *e = o.clone());
+                    if let Some(v) = MetaContent::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Deleted(o) => {
-                    debug!("Removing {} from {}", o.metadata().name, rg.kind);
-                    state.data.remove(&o.metadata().into());
-                    if let Some(v) = &o.metadata().resourceVersion {
+                    let name = MetaContent::name(&o);
+                    debug!("Removing {} from {}", name, rg.kind);
+                    state.data.remove(&ObjectId::key_for(&o));
+                    if let Some(v) = MetaContent::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
@@ -230,11 +239,11 @@ impl ToString for ObjectId {
     }
 }
 
-impl From<&ObjectMeta> for ObjectId {
-    fn from(object_meta: &ObjectMeta) -> Self {
+impl ObjectId {
+    fn key_for<K: MetaContent>(o: &K) -> Self {
         ObjectId {
-            name: object_meta.name.clone(),
-            namespace: object_meta.namespace.clone(),
+            name: MetaContent::name(o).clone(),
+            namespace: MetaContent::namespace(o).clone(),
         }
     }
 }
