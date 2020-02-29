@@ -91,30 +91,69 @@ impl<K> RawApi<K>
             phantom: PhantomData,
         }
     }
-
 }
 
-//impl<K> Default for RawApi<K> {
-//    fn default() -> Self {
-//        Self {
-//            api_version: "v1".into(), // no prefix for core
-//            kind: "Pod".into(), // had to pick something here
-//            group: "".into(), // no prefix for core
-//            version: "v1".into(),
-//            namespace: None,
-//            phantom: PhantomData
-//        }
-//    }
-//}
+/// A Resource trait equivalent for Custom Resource
+///
+/// This is the smallest amount of info we need to run the API against a CR
+/// The version, and group must be set by the user:
+///
+/// ```
+/// use kube::api::{CustomResource, RawApi};
+/// struct Foo {
+///     spec: FooSpec,
+///     status: FooStatus,
+/// };
+/// let foos : RawApi<Foo> = CustomResource::new("Foo") // <.spec.kind>
+///    .group("clux.dev") // <.spec.group>
+///    .version("v1")
+///    .build()
+///    .into();
+/// ```
+pub struct CustomResource {
+    kind: String,
+    group: String,
+    version: String,
+    api_version: String,
+    namespace: Option<String>,
+}
 
-pub struct CrBuilder<K> {
+impl CustomResource {
+    /// Construct a CrBuilder
+    pub fn new(kind: &str) -> CrBuilder {
+        CrBuilder::new(kind)
+    }
+}
+
+/// This impl makes CustomResource useable without k8s_openapi
+impl<K> From<CustomResource> for RawApi<K>
+{
+    fn from(c: CustomResource) -> Self {
+        Self {
+            api_version: c.api_version,
+            kind: c.kind,
+            group: c.group,
+            version: c.version,
+            namespace: c.namespace,
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct CrBuilder {
     pub(crate) kind: String,
     pub(crate) version: Option<String>,
     pub(crate) group: Option<String>,
     pub(crate) namespace: Option<String>,
-    pub(crate) phantom: PhantomData<K>
 }
-impl<K> CrBuilder<K> {
+impl CrBuilder {
+    /// Create a CrBuilder {
+    fn new(kind: &str) -> Self {
+        assert!(to_plural(kind) != kind); // no plural in kind
+        assert!(is_pascal_case(&kind)); // PascalCase kind
+        Self { kind: kind.into(), ..Default::default() }
+    }
     /// Set the api group of a custom resource
     pub fn group(mut self, group: &str) -> Self {
         self.group = Some(group.to_string());
@@ -134,47 +173,14 @@ impl<K> CrBuilder<K> {
     }
 
     // Build a RawApi from Crd properties
-    pub fn build(self) -> RawApi<K> {
+    pub fn build(self) -> CustomResource {
         let version = self.version.expect("Crd must have a version");
         let group = self.group.expect("Crd must have a group");
-        RawApi {
+        CustomResource {
             api_version: format!("{}/{}", group, version),
             kind: self.kind,
             version, group,
             namespace: self.namespace,
-            phantom: PhantomData
-        }
-    }
-}
-
-/// RawApi root implementations
-///
-/// Note: constructors such as RawApi::v1Deployment are implemented via the k8s_obj macro
-/// Find those invocations to see how to add more objects (not fully automated yet)
-impl<K> RawApi<K> {
-    /// Instance of a CRD
-    ///
-    /// The version, and group must be set by the user:
-    ///
-    /// ```
-    /// use kube::api::RawApi;
-    /// struct Foo {
-    ///     spec: FooSpec,
-    ///     status: FooStatus,
-    /// };
-    /// let foos = RawApi::<Foo>::custom_resource("Foo") // <.spec.kind>
-    ///    .group("clux.dev") // <.spec.group>
-    ///    .version("v1")
-    ///    .build();
-    /// ```
-    pub fn custom_resource(name: &str) -> CrBuilder<K> {
-        assert!(to_plural(name) != name); // no plural in kind
-        assert!(is_pascal_case(&name)); // PascalCase kind
-        CrBuilder { kind: name.into(),
-            namespace: None,
-            version: None,
-            group: None,
-            phantom: PhantomData
         }
     }
 }
@@ -593,11 +599,12 @@ impl<K> RawApi<K> {
 #[test]
 fn create_custom_resource() {
     struct Foo {};
-    let r = RawApi::<Foo>::custom_resource("Foo")
+    let r : RawApi<Foo> = CustomResource::new("Foo")
         .group("clux.dev")
         .version("v1")
         .within("myns")
-        .build();
+        .build()
+        .into();
     let pp = PostParams::default();
     let req = r.create(&pp, vec![]).unwrap();
     assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");

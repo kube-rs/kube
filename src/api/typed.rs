@@ -28,7 +28,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request creator object
-    pub(crate) api: RawApi,
+    pub(crate) api: RawApi<K>,
     /// The client to use (from this library)
     pub(crate) client: APIClient,
     /// Underlying Object unstored
@@ -36,20 +36,15 @@ pub struct Api<K> {
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K> Api<K> {
-    pub fn within(mut self, ns: &str) -> Self {
-        self.api = self.api.within(ns);
-        self
-    }
-
-    pub fn group(mut self, group: &str) -> Self {
-        self.api = self.api.group(group);
-        self
-    }
-
-    pub fn version(mut self, version: &str) -> Self {
-        self.api = self.api.version(version);
-        self
+#[cfg(feature = "openapi")]
+impl<K> Api<K>
+    where K: k8s_openapi::Resource
+{
+    pub fn new(client: APIClient) -> Self {
+        let api = RawApi::<K>::global();
+        Self {
+            api, client, phantom: PhantomData
+        }
     }
 }
 
@@ -109,9 +104,9 @@ impl<K> Api<K>
 where
     K: Clone + DeserializeOwned,
 {
-    pub fn customResource(client: APIClient, name: &str) -> Self {
+    pub fn custom_resource(client: APIClient, name: &str) -> Self {
         Self {
-            api: RawApi::customResource(name),
+            api: RawApi::custom_resource(name),
             client,
             phantom: PhantomData,
         }
