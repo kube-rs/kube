@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = RawApi::<Pod>::within(&namespace);
+    let resource = RawApi::namespaced::<Pod>(&namespace);
     let inf = Informer::raw(client.clone(), resource.clone());
 
     loop {
@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // This function lets the app handle an event from kube
-fn handle_node(_pods: &RawApi<Pod>, ev: WatchEvent<Pod>) -> anyhow::Result<()> {
+fn handle_node(_pods: &RawApi, ev: WatchEvent<Pod>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
             let containers = o

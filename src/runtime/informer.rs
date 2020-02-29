@@ -25,7 +25,7 @@ where
 {
     version: Arc<Mutex<String>>,
     client: APIClient,
-    resource: RawApi<K>,
+    resource: RawApi,
     params: ListParams,
     needs_resync: Arc<Mutex<bool>>,
     needs_retry: Arc<Mutex<bool>>,
@@ -55,7 +55,7 @@ where
     K: Clone + DeserializeOwned + MetaContent,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, r: RawApi<K>) -> Self {
+    pub fn raw(client: APIClient, r: RawApi) -> Self {
         Informer {
             client,
             resource: r,

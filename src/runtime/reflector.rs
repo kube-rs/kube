@@ -45,7 +45,7 @@ where
 {
     state: Arc<Mutex<State<K>>>,
     client: APIClient,
-    resource: RawApi<K>,
+    resource: RawApi,
     params: ListParams,
 }
 // impl<K> Reflector<K>
@@ -67,7 +67,7 @@ where
     K: Clone + DeserializeOwned + MetaContent + Send,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, lp: ListParams, r: RawApi<K>) -> Self {
+    pub fn raw(client: APIClient, lp: ListParams, r: RawApi) -> Self {
         Reflector {
             client,
             resource: r,

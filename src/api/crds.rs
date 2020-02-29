@@ -1,5 +1,5 @@
 use crate::{
-    api::{raw::RawApi, typed::Api},
+    api::{RawApi, typed::Api},
     client::APIClient,
 };
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
@@ -86,10 +86,26 @@ impl CrBuilder {
             namespace: self.namespace,
         }
     }
+
+    // Consume the CrBuilder and convert to an Api object
+    pub fn into_api<K>(self, client: APIClient) -> Api<K> {
+        let crd = self.build();
+        Api {
+            client,
+            api: crd.into(),
+            phantom: PhantomData,
+        }
+    }
+
+    // Consume the CrBuilder and convert to a RawApi object
+    pub fn into_rawapi(self) -> RawApi {
+        let crd = self.build();
+        crd.into()
+    }
 }
 
 /// Make RawApi useable on CRDs without k8s_openapi
-impl<K> From<CustomResource> for RawApi<K> {
+impl From<CustomResource> for RawApi {
     fn from(c: CustomResource) -> Self {
         Self {
             api_version: c.api_version,
@@ -97,7 +113,6 @@ impl<K> From<CustomResource> for RawApi<K> {
             group: c.group,
             version: c.version,
             namespace: c.namespace,
-            phantom: PhantomData,
         }
     }
 }
@@ -121,12 +136,11 @@ mod test {
     #[test]
     fn raw_custom_resource() {
         struct Foo {};
-        let r: RawApi<Foo> = CustomResource::kind("Foo")
+        let r: RawApi = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
-            .build()
-            .into();
+            .into_rawapi();
         let pp = PostParams::default();
         let req = r.create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");

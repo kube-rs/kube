@@ -27,12 +27,11 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
-    let resource: RawApi<Foo> = CustomResource::kind("Foo")
+    let resource = CustomResource::kind("Foo")
         .group("clux.dev")
         .version("v1")
         .within(&namespace)
-        .build()
-        .into();
+        .into_rawapi();
 
     let lp = ListParams::default().timeout(20); // low timeout in this example
 

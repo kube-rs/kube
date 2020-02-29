@@ -29,7 +29,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request creator object
-    pub(crate) api: RawApi<K>,
+    pub(crate) api: RawApi,
     /// The client to use (from this library)
     pub(crate) client: APIClient,
     /// Underlying Object unstored
@@ -42,8 +42,16 @@ impl<K> Api<K>
 where
     K: k8s_openapi::Resource,
 {
-    pub fn new(client: APIClient) -> Self {
-        let api = RawApi::<K>::global();
+    pub fn global(client: APIClient) -> Self {
+        let api = RawApi::global::<K>();
+        Self {
+            api,
+            client,
+            phantom: PhantomData,
+        }
+    }
+    pub fn namespaced(client: APIClient, ns: &str) -> Self {
+        let api = RawApi::namespaced::<K>(ns);
         Self {
             api,
             client,

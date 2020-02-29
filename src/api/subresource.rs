@@ -101,7 +101,7 @@ pub struct LogParams {
 }
 
 
-impl<K> RawApi<K> {
+impl RawApi {
     /// Get a pod logs
     pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "log?";
@@ -150,7 +150,7 @@ impl<K> RawApi<K> {
 fn log_path() {
     use crate::api::RawApi;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = RawApi::<corev1::Pod>::within("ns");
+    let r = RawApi::namespaced::<corev1::Pod>("ns");
     let mut lp = LogParams::default();
     lp.container = Some("blah".into());
     let req = r.logs("foo", &lp).unwrap();
