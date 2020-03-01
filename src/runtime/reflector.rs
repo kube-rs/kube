@@ -1,9 +1,5 @@
 use crate::{
-    api::{
-        ObjectList, WatchEvent,
-        MetaContent,
-        ListParams, Resource,
-    },
+    api::{ListParams, MetaContent, ObjectList, Resource, WatchEvent},
     client::APIClient,
     Error, Result,
 };

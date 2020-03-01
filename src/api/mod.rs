@@ -8,7 +8,9 @@
 pub struct NotUsed {}
 
 pub(crate) mod resource;
-pub use resource::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, Resource};
+pub use resource::{
+    DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, Resource,
+};
 
 pub(crate) mod typed;
 pub use typed::Api;
@@ -23,4 +25,4 @@ pub(crate) mod object;
 pub use self::object::{Object, ObjectList, WatchEvent};
 
 mod metadata;
-pub use self::metadata::{ListMeta, ObjectMeta, TypeMeta, MetaContent, Metadata};
+pub use self::metadata::{ListMeta, MetaContent, Metadata, ObjectMeta, TypeMeta};

@@ -1,5 +1,5 @@
 use crate::{
-    api::{Resource, typed::Api},
+    api::{typed::Api, Resource},
     client::APIClient,
 };
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
@@ -131,7 +131,7 @@ impl CustomResource {
 
 #[cfg(test)]
 mod test {
-    use crate::api::{CustomResource, PatchParams, PostParams, Resource, Object, NotUsed};
+    use crate::api::{CustomResource, NotUsed, Object, PatchParams, PostParams, Resource};
     // non-openapi tests
     #[test]
     fn raw_custom_resource() {

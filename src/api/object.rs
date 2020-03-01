@@ -1,5 +1,5 @@
 use crate::{
-    api::metadata::{TypeMeta, ObjectMeta, ListMeta, Metadata},
+    api::metadata::{ListMeta, Metadata, ObjectMeta, TypeMeta},
     ErrorResponse,
 };
 use serde::Deserialize;

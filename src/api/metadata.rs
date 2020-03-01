@@ -1,5 +1,7 @@
-pub use k8s_openapi::Metadata;
-pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
+pub use k8s_openapi::{
+    apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta},
+    Metadata,
+};
 
 
 #[derive(Deserialize, Serialize, Clone, Default)]
@@ -51,13 +53,3 @@ where
             .clone()
     }
 }
-
-/*/// Status is a return value for calls that don't return other objects
-#[derive(Deserialize, Serialize, Clone, Default)]
-pub struct Status {
-    pub code: Option<i32>,
-    pub message: Option<String>,
-    pub reason: Option<String>,
-    pub status: Option<String>,
-}
-*/

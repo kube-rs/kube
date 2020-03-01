@@ -4,10 +4,7 @@ use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
 use crate::{
-    api::{
-        MetaContent, ObjectList, WatchEvent,
-        DeleteParams, ListParams, PatchParams, PostParams, Resource,
-    },
+    api::{DeleteParams, ListParams, MetaContent, ObjectList, PatchParams, PostParams, Resource, WatchEvent},
     client::{APIClient, Status},
     Result,
 };
@@ -46,6 +43,7 @@ where
             phantom: PhantomData,
         }
     }
+
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: APIClient, ns: &str) -> Self {
         let api = Resource::namespaced::<K>(ns);
