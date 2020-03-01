@@ -153,6 +153,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore] // circle has no kube config
     async fn convenient_custom_resource() {
         use crate::{api::Api, client::APIClient, config};
         struct Foo {};
