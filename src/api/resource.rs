@@ -108,6 +108,7 @@ impl ListParams {
 ///
 /// Usage:
 /// ```
+/// use kube::api::ListParams;
 /// let lp = ListParams::default()
 ///     .timeout(60)
 ///     .labels("kubernetes.io/lifecycle=spot");

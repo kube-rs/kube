@@ -37,15 +37,16 @@ impl CrBuilder {
     ///
     /// ```
     /// use kube::api::{CustomResource, Resource};
+    /// struct FooSpec {};
+    /// struct FooStatus {};
     /// struct Foo {
     ///     spec: FooSpec,
-    ///     status: FooStatus,
+    ///     status: FooStatus
     /// };
-    /// let foos : Resource<Foo> = CustomResource::kind("Foo") // <.spec.kind>
+    /// let foos : Resource = CustomResource::kind("Foo") // <.spec.kind>
     ///    .group("clux.dev") // <.spec.group>
     ///    .version("v1")
-    ///    .build()
-    ///    .into();
+    ///    .into_resource();
     /// ```
     fn kind(kind: &str) -> Self {
         assert!(to_plural(kind) != kind); // no plural in kind
