@@ -145,7 +145,6 @@ impl Resource {
     }
 }
 
-#[cfg(feature = "openapi")]
 #[test]
 fn log_path() {
     use crate::api::Resource;
@@ -160,7 +159,6 @@ fn log_path() {
 /// Marker trait for objects that has logs
 pub trait LoggingObject {}
 
-#[cfg(feature = "openapi")]
 impl LoggingObject for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>

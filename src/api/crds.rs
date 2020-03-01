@@ -132,7 +132,6 @@ impl CustomResource {
 #[cfg(test)]
 mod test {
     use crate::api::{CustomResource, NotUsed, Object, PatchParams, PostParams, Resource};
-    // non-openapi tests
     #[test]
     fn raw_custom_resource() {
         struct FooSpec {};
@@ -142,6 +141,7 @@ mod test {
             .within("myns")
             .into_resource();
         type Foo = Object<FooSpec, NotUsed>;
+        // TODO: want to somehow impl k8s_openapi::Resource on Foo
 
         let pp = PostParams::default();
         let req = r.create(&pp, vec![]).unwrap();
@@ -152,8 +152,6 @@ mod test {
         assert_eq!(req.method(), "PATCH");
     }
 
-
-    #[cfg(feature = "openapi")]
     #[tokio::test]
     async fn convenient_custom_resource() {
         use crate::{api::Api, client::APIClient, config};
