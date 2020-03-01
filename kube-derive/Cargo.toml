@@ -1,0 +1,18 @@
+[package]
+name = "kube-derive"
+description = "Custom derives for the kube kubernetes client library"
+version = "0.1.0"
+authors = ["clux <sszynrae@gmail.com>"]
+edition = "2018"
+license = "Apache-2.0"
+repository = "https://github.com/clux/kube-rs"
+readme = "README.md"
+
+[dependencies]
+#http = "0.2"
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "1", features = ["extra-traits"] }
+
+[lib]
+proc-macro = true

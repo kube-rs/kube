@@ -154,20 +154,8 @@ mod test {
     #[ignore] // circle has no kube config
     async fn convenient_custom_resource() {
         use crate::{api::Api, client::APIClient, config};
-        #[derive(
-            Clone,
-            Debug,
-            PartialEq,
-            k8s_openapi_derive::CustomResourceDefinition,
-            serde_derive::Deserialize,
-            serde_derive::Serialize,
-        )]
-        #[custom_resource_definition(
-            group = "k8s-openapi-tests-custom-resource-definition.com",
-            version = "v1",
-            plural = "foobars",
-            namespaced
-        )]
+        #[derive(Clone, Debug, PartialEq, kube_derive::CustomResource, Deserialize, Serialize)]
+        #[kube(group = "clux.dev", version = "v1", plural = "foos", namespaced)]
         struct FooSpec {
             foo: String,
         };
@@ -179,5 +167,6 @@ mod test {
             .within("myns")
             .build()
             .into_api(client);
+        // ^ ensures that traits are implemented
     }
 }
