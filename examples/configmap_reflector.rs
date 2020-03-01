@@ -1,24 +1,32 @@
 #[macro_use] extern crate log;
-use kube::{api::Api, client::APIClient, config, runtime::Reflector};
+use k8s_openapi::api::core::v1::ConfigMap;
+use kube::{
+    api::{ListParams, Resource},
+    client::APIClient,
+    config,
+    runtime::Reflector,
+};
 
 /// Example way to read secrets
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Api::v1ConfigMap(client).within(&namespace);
-    let rf = Reflector::new(resource)
-        .timeout(10) // low timeout in this example
-        .init()
-        .await?;
+    let resource = Resource::namespaced::<ConfigMap>(&namespace);
+    let lp = ListParams::default().timeout(10); // short watch timeout in this example
+    let rf: Reflector<ConfigMap> = Reflector::new(client, lp, resource).init().await?;
 
     // Can read initial state now:
     rf.state().await?.into_iter().for_each(|cm| {
-        info!("Found configmap {} with data: {:?}", cm.metadata.name, cm.data);
+        info!(
+            "Found configmap {} with data: {:?}",
+            cm.metadata.unwrap().name.unwrap(),
+            cm.data
+        );
     });
 
     loop {
@@ -30,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
             .state()
             .await?
             .into_iter()
-            .map(|cm| cm.metadata.name)
+            .map(|cm| cm.metadata.unwrap().name.unwrap())
             .collect::<Vec<_>>();
 
         info!("Current configmaps: {:?}", pods);

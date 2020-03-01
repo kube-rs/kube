@@ -1,29 +1,33 @@
 #[macro_use] extern crate log;
-use kube::{api::Api, client::APIClient, config, runtime::Reflector};
+use k8s_openapi::api::apps::v1::Deployment;
+use kube::{
+    api::{ListParams, Resource},
+    client::APIClient,
+    config,
+    runtime::Reflector,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Api::v1Deployment(client).within(&namespace);
-    let rf = Reflector::new(resource)
-        .timeout(10) // low timeout in this example
-        .init()
-        .await?;
+    let resource = Resource::namespaced::<Deployment>(&namespace);
+    let lp = ListParams::default().timeout(10); // short watch timeout in this example
+    let rf: Reflector<Deployment> = Reflector::new(client, lp, resource).init().await?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is Map of name -> Deployment
-    rf.state().await?.into_iter().for_each(|deployment| {
+    rf.state().await?.into_iter().for_each(|d| {
         info!(
             "Found deployment for {} - {} replicas running {:?}",
-            deployment.metadata.name,
-            deployment.status.unwrap().replicas.unwrap(),
-            deployment
-                .spec
+            d.metadata.unwrap().name.unwrap(),
+            d.status.unwrap().replicas.unwrap(),
+            d.spec
+                .unwrap()
                 .template
                 .spec
                 .unwrap()
@@ -43,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
             .state()
             .await?
             .into_iter()
-            .map(|deployment| deployment.metadata.name)
+            .map(|deployment| deployment.metadata.unwrap().name.unwrap())
             .collect::<Vec<_>>();
         info!("Current deploys: {:?}", deploys);
     }

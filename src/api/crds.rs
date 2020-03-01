@@ -154,18 +154,21 @@ mod test {
     async fn convenient_custom_resource() {
         use crate::{api::Api, client::APIClient, config};
         #[derive(
-            Clone, Debug, PartialEq,
+            Clone,
+            Debug,
+            PartialEq,
             k8s_openapi_derive::CustomResourceDefinition,
-            serde_derive::Deserialize, serde_derive::Serialize,
+            serde_derive::Deserialize,
+            serde_derive::Serialize,
         )]
         #[custom_resource_definition(
             group = "k8s-openapi-tests-custom-resource-definition.com",
             version = "v1",
             plural = "foobars",
-            namespaced,
+            namespaced
         )]
         struct FooSpec {
-            foo: String
+            foo: String,
         };
         let config = config::load_kube_config().await.unwrap();
         let client = APIClient::new(config);

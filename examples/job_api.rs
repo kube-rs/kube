@@ -1,5 +1,6 @@
 #[macro_use] extern crate log;
 use futures::StreamExt;
+use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 
 use kube::{
@@ -10,17 +11,19 @@ use kube::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
+    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Create a Job
+    let job_name = "empty-job";
     let my_job = json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
         "metadata": {
-            "name": "empty-job"
+            "name": job_name,
         },
         "spec": {
             "template": {
@@ -38,27 +41,29 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let jobs = Api::v1Job(client).within("default");
+    let jobs: Api<Job> = Api::namespaced(client, &namespace);
     let pp = PostParams::default();
 
     let data = serde_json::to_vec(&my_job).expect("failed to serialize job");
     jobs.create(&pp, data).await.expect("failed to create job");
 
     // See if it ran to completion
-    let lp = ListParams::default();
+    let lp = ListParams::default()
+        .fields(&format!("metadata.name={}", job_name)) // only want events for our job
+        .timeout(20); // should be done by then
     let mut stream = jobs.watch(&lp, "").await?.boxed();
 
     while let Some(status) = stream.next().await {
         match status {
-            WatchEvent::Added(s) => info!("Added {}", s.metadata.name),
+            WatchEvent::Added(s) => info!("Added {}", s.metadata.unwrap().name.unwrap()),
             WatchEvent::Modified(s) => {
                 let current_status = s.status.clone().expect("Status is missing");
                 match current_status.completion_time {
-                    Some(_) => info!("Modified: {} is complete", s.metadata.name),
-                    _ => info!("Modified: {} is running", s.metadata.name),
+                    Some(_) => info!("Modified: {} is complete", s.metadata.unwrap().name.unwrap()),
+                    _ => info!("Modified: {} is running", s.metadata.unwrap().name.unwrap()),
                 }
             }
-            WatchEvent::Deleted(s) => info!("Deleted {}", s.metadata.name),
+            WatchEvent::Deleted(s) => info!("Deleted {}", s.metadata.unwrap().name.unwrap()),
             WatchEvent::Error(s) => error!("{}", s),
         }
     }

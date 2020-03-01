@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Resource, WatchEvent},
+    api::{ListParams, Resource, WatchEvent},
     client::APIClient,
     config,
     runtime::Informer,
@@ -18,19 +18,19 @@ async fn main() -> anyhow::Result<()> {
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<Pod>(&namespace);
-    let inf = Informer::raw(client.clone(), resource.clone());
+    let inf = Informer::new(client, ListParams::default(), resource);
 
     loop {
         let mut pods = inf.poll().await?.boxed();
 
         while let Some(event) = pods.try_next().await? {
-            handle_node(&resource, event)?;
+            handle_pod(event)?;
         }
     }
 }
 
 // This function lets the app handle an event from kube
-fn handle_node(_pods: &Resource, ev: WatchEvent<Pod>) -> anyhow::Result<()> {
+fn handle_pod(ev: WatchEvent<Pod>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
             let containers = o

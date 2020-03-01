@@ -1,44 +1,50 @@
 #[macro_use] extern crate log;
+use k8s_openapi::api::core::v1::Event;
 use kube::{
-    api::{v1Event, Api, WatchEvent},
+    api::{ListParams, Resource, WatchEvent},
     client::APIClient,
     config,
     runtime::Informer,
 };
 
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
 
-    let events = Api::v1Event(client);
-    let ei = Informer::new(events);
+    let events = Resource::all::<Event>();
+    let lp = ListParams::default();
+    let ei = Informer::new(client, lp, events);
 
     loop {
         let mut events = ei.poll().await?.boxed();
 
-        while let Some(event) = events.next().await {
-            let event = event?;
-            handle_events(event)?;
+        while let Some(event) = events.try_next().await? {
+            handle_event(event)?;
         }
     }
 }
 
 // This function lets the app handle an event from kube
-fn handle_events(ev: WatchEvent<v1Event>) -> anyhow::Result<()> {
+fn handle_event(ev: WatchEvent<Event>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
-            info!("New Event: {}, {}", o.type_, o.message);
+            info!(
+                "New Event: {} (via {} {})",
+                o.message.unwrap(),
+                o.involved_object.kind.unwrap(),
+                o.involved_object.name.unwrap()
+            );
         }
         WatchEvent::Modified(o) => {
-            info!("Modified Event: {}", o.reason);
+            info!("Modified Event: {}", o.reason.unwrap());
         }
         WatchEvent::Deleted(o) => {
-            info!("Deleted Event: {}", o.message);
+            info!("Deleted Event: {}", o.message.unwrap());
         }
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);

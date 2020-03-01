@@ -1,22 +1,22 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
+#[macro_use] extern crate k8s_openapi_derive;
 use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{CustomResource, ListParams, NotUsed, Object, Resource},
+    api::{CustomResource, ListParams},
     client::APIClient,
     config,
     runtime::Reflector,
 };
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(CustomResourceDefinition, Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[custom_resource_definition(group = "clux.dev", version = "v1", plural = "foos", namespaced)]
 pub struct FooSpec {
     name: String,
     info: String,
 }
-
-type Foo = Object<FooSpec, NotUsed>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
 
     let lp = ListParams::default().timeout(20); // low timeout in this example
 
-    let rf: Reflector<Foo> = Reflector::raw(client, lp, resource).init().await?;
+    let rf: Reflector<Foo> = Reflector::new(client, lp, resource).init().await?;
 
     let cloned = rf.clone();
     tokio::spawn(async move {
@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
             .state()
             .await?
             .into_iter()
-            .map(|crd| crd.metadata.name)
+            .map(|crd| crd.metadata.unwrap().name.unwrap())
             .collect::<Vec<_>>();
         info!("Current crds: {:?}", crds);
     }

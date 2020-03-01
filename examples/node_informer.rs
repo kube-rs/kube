@@ -1,15 +1,12 @@
 #[macro_use] extern crate log;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
-    api::{Api, ListParams, Object, Resource, WatchEvent},
+    api::{Api, ListParams, Resource, WatchEvent},
     client::APIClient,
     config,
     runtime::Informer,
 };
-
-type Node = Object<NodeSpec, NodeStatus>;
-type Event = v1Event; // snowflake obj
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,16 +16,15 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
 
     let nodes = Resource::all::<Node>();
-    let events = Resource::all::<Event>();
-    let events = Api::v1Event(client.clone());
+    let events: Api<Event> = Api::all(client.clone());
+
     let lp = ListParams::default().labels("beta.kubernetes.io/os=linux");
-    let ni = Informer::new(client.clone(), nodes);
+    let ni = Informer::new(client.clone(), lp, nodes);
 
     loop {
         let mut nodes = ni.poll().await?.boxed();
 
-        while let Some(ne) = nodes.next().await {
-            let ne = ne?;
+        while let Some(ne) = nodes.try_next().await? {
             handle_nodes(&events, ne).await?;
         }
     }
@@ -38,11 +34,12 @@ async fn main() -> anyhow::Result<()> {
 async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Result<()> {
     match ne {
         WatchEvent::Added(o) => {
-            info!("New Node: {}", o.spec.provider_id.unwrap());
+            info!("New Node: {}", o.spec.unwrap().provider_id.unwrap());
         }
         WatchEvent::Modified(o) => {
+            let name = o.metadata.unwrap().name.unwrap();
             // Nodes often modify a lot - only print broken nodes
-            if let Some(true) = o.spec.unschedulable {
+            if let Some(true) = o.spec.unwrap().unschedulable {
                 let failed = o
                     .status
                     .unwrap()
@@ -57,29 +54,28 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
                     })
                     .map(|c| c.message)
                     .collect::<Vec<_>>(); // failed statuses
-                warn!("Unschedulable Node: {}, ({:?})", o.metadata.name, failed);
+                warn!("Unschedulable Node: {}, ({:?})", name, failed);
                 // Find events related to this node
-                let sel = format!("involvedObject.kind=Node,involvedObject.name={}", o.metadata.name);
-                let opts = ListParams {
-                    field_selector: Some(sel),
-                    ..Default::default()
-                };
+                let opts = ListParams::default()
+                    .fields(&format!("involvedObject.kind=Node,involvedObject.name={}", name));
                 let evlist = events.list(&opts).await?;
                 for e in evlist {
                     warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);
                 }
             } else {
                 // Turn up logging above to see
-                debug!("Normal node: {}", o.metadata.name);
+                debug!("Healthy node: {}", name);
             }
         }
         WatchEvent::Deleted(o) => {
+            let meta = o.metadata.unwrap();
+            let name = meta.name.unwrap();
             warn!(
                 "Deleted node: {} ({:?}) running {:?} with labels: {:?}",
-                o.metadata.name,
-                o.spec.provider_id.unwrap(),
+                name,
+                o.spec.unwrap().provider_id.unwrap(),
                 o.status.unwrap().conditions.unwrap(),
-                o.metadata.labels,
+                meta.labels,
             );
         }
         WatchEvent::Error(e) => {

@@ -4,7 +4,7 @@
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-alpha-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 
-Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go). It makes certain assumptions about the kubernetes api to allow writing generic abstractions, and as such contains rust reinterpretations of `Reflector` and `Informer` to allow writing kubernetes controllers/watchers/operators easily.
+Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go). It makes certain assumptions about the kubernetes api to allow writing generic abstractions, and as such contains rust reinterpretations of `Reflector` and `Informer` to allow writing kubernetes controllers/watchers/operators more easily.
 
 NB: This library is currently undergoing a lot of changes with async/await stabilizing. Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
 
@@ -117,12 +117,8 @@ then you should `poll()` the reflector, and `state()` to get the current cached 
 rf.poll().await?; // watches + updates state
 
 // Clone state and do something with it
-rf.state().await.into_iter().for_each(|(name, p)| {
-    println!("Found pod {} ({}) with {:?}",
-        name,
-        p.status.unwrap().phase.unwrap(),
-        p.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>(),
-    );
+rf.state().await.into_iter().for_each(|(node)| {
+    println!("Found Node {:?}", node);
 });
 ```
 
@@ -131,7 +127,7 @@ Note that `poll` holds the future for [290s by default](https://github.com/kuber
 If you need the details of just a single object, you can use the more efficient, `Reflector::get` and `Reflector::get_within`.
 
 ## Examples
-Examples that show a little common flows. These all have logging of this library set up to `debug`.
+Examples that show a little common flows. These all have logging of this library set up to `debug`, and where possible pick up on the `NAMSEPACE` evar.
 
 ```sh
 # watch pod events
@@ -165,8 +161,9 @@ For straight API use examples, try:
 
 ```sh
 cargo run --example crd_api
-cargo run --example crd_openapi
-cargo run --example pod_openapi
+cargo run --example job_api
+cargo run --example log_stream
+cargo run --example pod_api
 NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
@@ -174,7 +171,7 @@ NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 Kube has basic support for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
 
 ```sh
-cargo run --example pod_informer --no-default-features --features=openapi,rustls-tls
+cargo run --example pod_informer --no-default-features --features=rustls-tls
 ```
 
 or in `Cargo.toml`:
