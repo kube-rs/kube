@@ -35,7 +35,7 @@ The direct `Api` type takes a client, and is constructed with either the `::glob
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
-let pods = Api::namespaced::<Pod>(client, "default");
+let pods: Api<Pod> = Api::namespaced(client, "default");
 
 let p = pods.get("blog").await?;
 println!("Got blog pod with containers: {:?}", p.spec.containers);
@@ -80,15 +80,15 @@ How you handle them is up to you, you could build your own state, you can use th
 async fn handle(event: WatchEvent<Pod>) -> anyhow::Result<()> {
     match event {
         WatchEvent::Added(o) => {
-            let containers = o.spec.containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
-            println!("Added Pod: {} (containers={:?})", o.metadata.name, containers);
+            let containers = o.spec.unwrap().containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
+            println!("Added Pod: {} (containers={:?})", o.metadata.unwrap().name.unwrap(), containers);
         },
         WatchEvent::Modified(o) => {
-            let phase = o.status.phase.unwrap();
-            println!("Modified Pod: {} (phase={})", o.metadata.name, phase);
+            let phase = o.status.unwrap().phase.unwrap();
+            println!("Modified Pod: {} (phase={})", o.metadata.unwrap().name.unwrap(), phase);
         },
         WatchEvent::Deleted(o) => {
-            println!("Deleted Pod: {}", o.metadata.name);
+            println!("Deleted Pod: {}", o.metadata.unwrap().name.unwrap());
         },
         WatchEvent::Error(e) => {
             println!("Error event: {:?}", e);
