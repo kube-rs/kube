@@ -13,4 +13,4 @@ jobs:
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --features=openapi,rustls-tls --no-default-features
+          args: --features=rustls-tls --no-default-features

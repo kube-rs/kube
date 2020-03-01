@@ -1,8 +1,5 @@
 use crate::{
-    api::{
-        resource::{KubeObject, ObjectList, WatchEvent},
-        Api, ListParams, ObjectMeta, RawApi,
-    },
+    api::{ListParams, Meta, ObjectList, Resource, WatchEvent},
     client::APIClient,
     Error, Result,
 };
@@ -41,85 +38,31 @@ impl<K> Default for State<K> {
 #[derive(Clone)]
 pub struct Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send,
+    K: Clone + DeserializeOwned + Send + Meta,
 {
     state: Arc<Mutex<State<K>>>,
     client: APIClient,
-    resource: RawApi,
+    resource: Resource,
     params: ListParams,
 }
 
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send,
+    K: Clone + DeserializeOwned + Meta + Send,
 {
-    /// Create a reflector with a kube client on a kube resource
-    pub fn new(r: Api<K>) -> Self {
-        Reflector {
-            client: r.client,
-            resource: r.api,
-            params: ListParams::default(),
-            state: Default::default(),
-        }
-    }
-}
-
-impl<K> Reflector<K>
-where
-    K: Clone + DeserializeOwned + KubeObject + Send,
-{
-    /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, r: RawApi) -> Self {
+    /// Create a reflector with a kube client on a resource
+    pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
         Reflector {
             client,
             resource: r,
-            params: ListParams::default(),
+            params: lp,
             state: Default::default(),
         }
     }
 
-    // builders for ListParams - TODO: defer to internal informer in future?
-    // for now, copy paste of informer's methods.
-
-    /// Configure the timeout for the list/watch call.
-    ///
-    /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// Defaults to 290s
-    pub fn timeout(mut self, timeout_secs: u32) -> Self {
-        self.params.timeout = Some(timeout_secs);
-        self
-    }
-
-    /// Configure the selector to restrict the list of returned objects by their fields.
-    ///
-    /// Defaults to everything.
-    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
-    /// The server only supports a limited number of field queries per type.
-    pub fn fields(mut self, field_selector: &str) -> Self {
-        self.params.field_selector = Some(field_selector.to_string());
-        self
-    }
-
-    /// Configure the selector to restrict the list of returned objects by their labels.
-    ///
-    /// Defaults to everything.
-    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
-    pub fn labels(mut self, label_selector: &str) -> Self {
-        self.params.label_selector = Some(label_selector.to_string());
-        self
-    }
-
-    /// If called, partially initialized resources are included in watch/list responses.
-    pub fn include_uninitialized(mut self) -> Self {
-        self.params.include_uninitialized = true;
-        self
-    }
-
-    // finalizers:
-
     /// Initializes with a full list of data from a large initial LIST call
     pub async fn init(self) -> Result<Self> {
-        info!("Starting Reflector for {:?}", self.resource);
+        info!("Starting Reflector for {}", self.resource.kind);
         self.reset().await?;
         Ok(self)
     }
@@ -129,9 +72,9 @@ where
     /// If this returns an error, it tries a full refresh.
     /// This is meant to be run continually in a thread/task. Spawn one.
     pub async fn poll(&self) -> Result<()> {
-        trace!("Watching {:?}", self.resource);
+        trace!("Watching {}", self.resource.kind);
         if let Err(e) = self.single_watch().await {
-            warn!("Poll error on {:?}: {}: {:?}", self.resource, e, e);
+            warn!("Poll error on {}: {}: {:?}", self.resource.kind, e, e);
             // If desynched due to mismatching resourceVersion, retry in a bit
             let dur = Duration::from_secs(10);
             Delay::new(dur).await;
@@ -179,7 +122,7 @@ where
     ///
     /// Same as what is done in `State::new`.
     pub async fn reset(&self) -> Result<()> {
-        trace!("Refreshing {:?}", self.resource);
+        trace!("Refreshing {}", self.resource.kind);
         let (data, version) = self.get_full_resource_entries().await?;
         *self.state.lock().await = State { data, version };
         Ok(())
@@ -190,21 +133,21 @@ where
         // NB: Object isn't general enough here
         let res = self.client.request::<ObjectList<K>>(req).await?;
         let mut data = BTreeMap::new();
-        let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
+        let version = res.metadata.resource_version.unwrap_or_else(|| "".into());
 
         trace!(
             "Got {} {} at resourceVersion={:?}",
             res.items.len(),
-            self.resource.resource,
+            self.resource.kind,
             version
         );
         for i in res.items {
             // The non-generic parts we care about are spec + status
-            data.insert(i.meta().into(), i);
+            data.insert(ObjectId::key_for(&i), i);
         }
         let keys = data
             .keys()
-            .map(|key: &ObjectId| key.to_string())
+            .map(ObjectId::to_string)
             .collect::<Vec<_>>()
             .join(", ");
         debug!("Initialized with: [{}]", keys);
@@ -225,28 +168,37 @@ where
             let mut state = self.state.lock().await;
             match ev {
                 WatchEvent::Added(o) => {
-                    debug!("Adding {} to {}", o.meta().name, rg.resource);
-                    state.data.entry(o.meta().into()).or_insert_with(|| o.clone());
-                    if let Some(v) = &o.meta().resourceVersion {
+                    let name = Meta::name(&o);
+                    debug!("Adding {} to {}", name, rg.kind);
+                    state
+                        .data
+                        .entry(ObjectId::key_for(&o))
+                        .or_insert_with(|| o.clone());
+                    if let Some(v) = Meta::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Modified(o) => {
-                    debug!("Modifying {} in {}", o.meta().name, rg.resource);
-                    state.data.entry(o.meta().into()).and_modify(|e| *e = o.clone());
-                    if let Some(v) = &o.meta().resourceVersion {
+                    let name = Meta::name(&o);
+                    debug!("Modifying {} in {}", name, rg.kind);
+                    state
+                        .data
+                        .entry(ObjectId::key_for(&o))
+                        .and_modify(|e| *e = o.clone());
+                    if let Some(v) = Meta::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Deleted(o) => {
-                    debug!("Removing {} from {}", o.meta().name, rg.resource);
-                    state.data.remove(&o.meta().into());
-                    if let Some(v) = &o.meta().resourceVersion {
+                    let name = Meta::name(&o);
+                    debug!("Removing {} from {}", name, rg.kind);
+                    state.data.remove(&ObjectId::key_for(&o));
+                    if let Some(v) = Meta::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Error(e) => {
-                    warn!("Failed to watch {}: {:?}", rg.resource, e);
+                    warn!("Failed to watch {}: {:?}", rg.kind, e);
                     return Err(Error::Api(e));
                 }
             }
@@ -271,11 +223,11 @@ impl ToString for ObjectId {
     }
 }
 
-impl From<&ObjectMeta> for ObjectId {
-    fn from(object_meta: &ObjectMeta) -> Self {
+impl ObjectId {
+    fn key_for<K: Meta>(o: &K) -> Self {
         ObjectId {
-            name: object_meta.name.clone(),
-            namespace: object_meta.namespace.clone(),
+            name: Meta::name(o),
+            namespace: Meta::namespace(o),
         }
     }
 }

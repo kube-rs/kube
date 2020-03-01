@@ -1,8 +1,5 @@
 use crate::{
-    api::{
-        resource::{KubeObject, WatchEvent},
-        Api, ListParams, RawApi,
-    },
+    api::{ListParams, Meta, Resource, WatchEvent},
     client::APIClient,
     Result,
 };
@@ -21,11 +18,11 @@ use std::{sync::Arc, time::Duration};
 #[derive(Clone)]
 pub struct Informer<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + Meta,
 {
     version: Arc<Mutex<String>>,
     client: APIClient,
-    resource: RawApi,
+    resource: Resource,
     params: ListParams,
     needs_resync: Arc<Mutex<bool>>,
     needs_retry: Arc<Mutex<bool>>,
@@ -34,32 +31,14 @@ where
 
 impl<K> Informer<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + Meta,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(r: Api<K>) -> Self {
-        Informer {
-            client: r.client,
-            resource: r.api,
-            params: ListParams::default(),
-            version: Arc::new(Mutex::new(0.to_string())),
-            needs_resync: Arc::new(Mutex::new(false)),
-            needs_retry: Arc::new(Mutex::new(false)),
-            phantom: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<K> Informer<K>
-where
-    K: Clone + DeserializeOwned + KubeObject,
-{
-    /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, r: RawApi) -> Self {
+    pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
         Informer {
             client,
             resource: r,
-            params: ListParams::default(),
+            params: lp,
             version: Arc::new(Mutex::new(0.to_string())),
             needs_resync: Arc::new(Mutex::new(false)),
             needs_retry: Arc::new(Mutex::new(false)),
@@ -67,47 +46,9 @@ where
         }
     }
 
-    // builders for GetParams
-
-    /// Configure the timeout for the list/watch call.
-    ///
-    /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// Defaults to 290s
-    pub fn timeout(mut self, timeout_secs: u32) -> Self {
-        self.params.timeout = Some(timeout_secs);
-        self
-    }
-
-    /// Configure the selector to restrict the list of returned objects by their fields.
-    ///
-    /// Defaults to everything.
-    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
-    /// The server only supports a limited number of field queries per type.
-    pub fn fields(mut self, field_selector: &str) -> Self {
-        self.params.field_selector = Some(field_selector.to_string());
-        self
-    }
-
-    /// Configure the selector to restrict the list of returned objects by their labels.
-    ///
-    /// Defaults to everything.
-    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
-    pub fn labels(mut self, label_selector: &str) -> Self {
-        self.params.label_selector = Some(label_selector.to_string());
-        self
-    }
-
-    /// If called, partially initialized resources are included in watch/list responses.
-    pub fn include_uninitialized(mut self) -> Self {
-        self.params.include_uninitialized = true;
-        self
-    }
-
-    // finalizers:
-
     /// Initialize from a prior version
     pub fn init_from(self, v: String) -> Self {
-        info!("Recreating Informer for {:?} at {}", self.resource, v);
+        info!("Recreating Informer for {} at {}", self.resource.kind, v);
 
         // We need to block on this as our mutex needs go be async compatible
         futures::executor::block_on(async {
@@ -130,7 +71,7 @@ where
     ///
     /// If you need to track the `resourceVersion` you can use `Informer::version()`.
     pub async fn poll(&self) -> Result<impl TryStream<Item = Result<WatchEvent<K>>>> {
-        trace!("Watching {:?}", self.resource);
+        trace!("Watching {}", self.resource.kind);
 
         // First check if we need to backoff or reset our resourceVersion from last time
         {
@@ -175,7 +116,7 @@ where
                             | Ok(WatchEvent::Deleted(o)) => {
                                 // Follow docs conventions and store the last resourceVersion
                                 // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                                if let Some(nv) = &o.meta().resourceVersion {
+                                if let Some(nv) = Meta::resource_ver(o) {
                                     *version.lock().await = nv.clone();
                                 }
                             }

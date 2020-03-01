@@ -1,32 +1,35 @@
 #[macro_use] extern crate log;
-use futures_timer::Delay;
-use kube::{api::Api, client::APIClient, config, runtime::Reflector};
-
-use std::time::Duration;
+use k8s_openapi::api::core::v1::Node;
+use kube::{
+    api::{ListParams, Meta, Resource},
+    client::APIClient,
+    config,
+    runtime::Reflector,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
 
-    let resource = Api::v1Node(client);
-    let rf = Reflector::new(resource)
-        //.labels("kubernetes.io/lifecycle=spot")
-        .timeout(10) // low timeout in this example
-        .init()
-        .await?;
+    let resource = Resource::all::<Node>();
+    let lp = ListParams::default()
+        .labels("beta.kubernetes.io/instance-type=m4.2xlarge") // filter instances by label
+        .timeout(10); // short watch timeout in this example
+    let rf: Reflector<Node> = Reflector::new(client, lp, resource).init().await?;
 
     // rf is initialized with full state, which can be extracted on demand.
-    // Output is Map of name -> Node
-    rf.state().await?.into_iter().for_each(|object| {
+    // Output is an owned Vec<Node>
+    rf.state().await?.into_iter().for_each(|o| {
+        let labels = Meta::meta(&o).labels.clone().unwrap();
         info!(
             "Found node {} ({:?}) running {:?} with labels: {:?}",
-            object.metadata.name,
-            object.spec.provider_id.unwrap(),
-            object.status.unwrap().conditions.unwrap(),
-            object.metadata.labels,
+            Meta::name(&o),
+            o.spec.unwrap().provider_id.unwrap(),
+            o.status.unwrap().conditions.unwrap(),
+            labels
         );
     });
 
@@ -40,13 +43,11 @@ async fn main() -> anyhow::Result<()> {
     });
 
     loop {
-        Delay::new(Duration::from_secs(5)).await;
-        let deploys = rf
-            .state()
-            .await?
-            .into_iter()
-            .map(|o| o.metadata.name)
-            .collect::<Vec<_>>();
-        info!("Current nodes: {:?}", deploys);
+        // Update internal state by calling watch (waits the full timeout)
+        rf.poll().await?;
+
+        // Read the updated internal state (instant):
+        let deploys: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
+        info!("Current {} nodes: {:?}", deploys.len(), deploys);
     }
 }

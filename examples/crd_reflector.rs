@@ -1,41 +1,41 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
+#[macro_use] extern crate k8s_openapi_derive;
 use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{NotUsed, Object, RawApi},
+    api::{CustomResource, ListParams, Meta},
     client::APIClient,
     config,
     runtime::Reflector,
 };
 
-// Own custom resource spec
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(CustomResourceDefinition, Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[custom_resource_definition(group = "clux.dev", version = "v1", plural = "foos", namespaced)]
 pub struct FooSpec {
     name: String,
     info: String,
 }
-// The kubernetes generic object with our spec and no status
-type Foo = Object<FooSpec, NotUsed>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
-    let resource = RawApi::customResource("foos")
+    let resource = CustomResource::kind("Foo")
         .group("clux.dev")
-        .within(&namespace);
+        .version("v1")
+        .within(&namespace)
+        .into_resource();
 
-    let rf: Reflector<Foo> = Reflector::raw(client, resource)
-        .timeout(20) // low timeout in this example
-        .init()
-        .await?;
+    let lp = ListParams::default().timeout(20); // low timeout in this example
+
+    let rf: Reflector<Foo> = Reflector::new(client, lp, resource).init().await?;
 
     let cloned = rf.clone();
     tokio::spawn(async move {
@@ -49,12 +49,7 @@ async fn main() -> anyhow::Result<()> {
     loop {
         Delay::new(Duration::from_secs(5)).await;
         // Read updated internal state (instant):
-        let crds = rf
-            .state()
-            .await?
-            .into_iter()
-            .map(|crd| crd.metadata.name)
-            .collect::<Vec<_>>();
+        let crds = rf.state().await?.iter().map(Meta::name).collect::<Vec<_>>();
         info!("Current crds: {:?}", crds);
     }
 }

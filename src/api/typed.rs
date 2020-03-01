@@ -1,34 +1,28 @@
-#![allow(non_snake_case)]
-
 use either::Either;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
 use crate::{
-    api::{
-        resource::{KubeObject, ObjectList, WatchEvent},
-        DeleteParams, ListParams, PatchParams, PostParams, RawApi,
-    },
+    api::{DeleteParams, ListParams, Meta, ObjectList, PatchParams, PostParams, Resource, WatchEvent},
     client::{APIClient, Status},
     Result,
 };
 
-/// A typed Api variant that does not expose request internals
+/// An easy Api interaction helper
 ///
-/// The upsides of working with this rather than `RawApi` direct are:
-/// - easiers interface (no figuring out return types)
-/// - openapi types for free
+/// The upsides of working with this rather than a `Resource` directly are:
+/// - easiers serialization interface (no figuring out return types)
+/// - client hidden within, less arguments
 ///
 /// But the downsides are:
-/// - k8s-openapi dependency required (behind feature)
-/// - openapi types are unnecessarily heavy on Option use
-/// - memory intensive structs because they contain the full data
+/// - openapi types can take up a large amount of memory
+/// - openapi types can be annoying to wrangle with their heavy Option use
 /// - no control over requests (opinionated)
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request creator object
-    pub(crate) api: RawApi,
+    pub(crate) api: Resource,
     /// The client to use (from this library)
     pub(crate) client: APIClient,
     /// Underlying Object unstored
@@ -36,27 +30,35 @@ pub struct Api<K> {
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K> Api<K> {
-    pub fn within(mut self, ns: &str) -> Self {
-        self.api = self.api.within(ns);
-        self
+impl<K> Api<K>
+where
+    K: k8s_openapi::Resource,
+{
+    /// Cluster level resources, or resources viewed across all namespaces
+    pub fn all(client: APIClient) -> Self {
+        let api = Resource::all::<K>();
+        Self {
+            api,
+            client,
+            phantom: PhantomData,
+        }
     }
 
-    pub fn group(mut self, group: &str) -> Self {
-        self.api = self.api.group(group);
-        self
-    }
-
-    pub fn version(mut self, version: &str) -> Self {
-        self.api = self.api.version(version);
-        self
+    /// Namespaced resource within a given namespace
+    pub fn namespaced(client: APIClient, ns: &str) -> Self {
+        let api = Resource::namespaced::<K>(ns);
+        Self {
+            api,
+            client,
+            phantom: PhantomData,
+        }
     }
 }
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + KubeObject,
+    K: Clone + DeserializeOwned + Meta,
 {
     pub async fn get(&self, name: &str) -> Result<K> {
         let req = self.api.get(name)?;
@@ -101,21 +103,3 @@ where
             .map(|stream| stream.filter_map(|e| async move { e.ok() }))
     }
 }
-
-/// Api Constructor for CRDs
-///
-/// Because it relies entirely on user definitions, this ctor does not rely on openapi.
-impl<K> Api<K>
-where
-    K: Clone + DeserializeOwned,
-{
-    pub fn customResource(client: APIClient, name: &str) -> Self {
-        Self {
-            api: RawApi::customResource(name),
-            client,
-            phantom: PhantomData,
-        }
-    }
-}
-
-// all other native impls in openapi.rs

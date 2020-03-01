@@ -7,25 +7,22 @@
 #[derive(Clone, Deserialize, Serialize, Default)]
 pub struct NotUsed {}
 
-/// Use [`NotUsed`](notused.struct.html) instead. Renamed to avoid confusion with [`void::Void`](https://docs.rs/void/1.0.2/void/enum.Void.html).
-#[deprecated]
-pub type Void = NotUsed;
-
-pub(crate) mod raw;
-pub use raw::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, RawApi};
+pub(crate) mod resource;
+pub use resource::{
+    DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, Resource,
+};
 
 pub(crate) mod typed;
 pub use typed::Api;
 
+mod crds;
+pub use crds::{CrBuilder, CustomResource};
+
 mod subresource;
-pub use subresource::{LogParams, Scale, ScaleSpec, ScaleStatus};
+pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};
 
-pub(crate) mod resource;
-pub use self::resource::{KubeObject, Object, ObjectList, WatchEvent};
-
-mod openapi;
-#[cfg(feature = "openapi")] mod snowflake;
-#[cfg(feature = "openapi")] pub use snowflake::{v1ConfigMap, v1Event, v1Secret};
+pub(crate) mod object;
+pub use self::object::{ObjectList, WatchEvent};
 
 mod metadata;
-pub use self::metadata::{Initializers, ListMeta, ObjectMeta, OwnerReference, TypeMeta};
+pub use self::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta};

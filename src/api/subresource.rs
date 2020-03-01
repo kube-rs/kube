@@ -3,28 +3,14 @@ use futures::Stream;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    api::{
-        resource::{KubeObject, Object},
-        Api, PatchParams, PostParams, RawApi,
-    },
+    api::{Api, PatchParams, PostParams, Resource},
     Error, Result,
 };
 
 
 // ----------------------------------------------------------------------------
 
-/// Scale spec from api::autoscaling::v1
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct ScaleSpec {
-    pub replicas: Option<i32>,
-}
-/// Scale status from api::autoscaling::v1
-#[derive(Deserialize, Serialize, Clone, Default, Debug)]
-pub struct ScaleStatus {
-    pub replicas: i32,
-    pub selector: Option<String>,
-}
-pub type Scale = Object<ScaleSpec, ScaleStatus>;
+pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
 /// Scale subresource
 ///
@@ -104,7 +90,7 @@ pub struct LogParams {
 }
 
 
-impl RawApi {
+impl Resource {
     /// Get a pod logs
     pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "log?";
@@ -150,7 +136,9 @@ impl RawApi {
 
 #[test]
 fn log_path() {
-    let r = RawApi::v1Pod().within("ns");
+    use crate::api::Resource;
+    use k8s_openapi::api::core::v1 as corev1;
+    let r = Resource::namespaced::<corev1::Pod>("ns");
     let mut lp = LogParams::default();
     lp.container = Some("blah".into());
     let req = r.logs("foo", &lp).unwrap();
@@ -160,9 +148,11 @@ fn log_path() {
 /// Marker trait for objects that has logs
 pub trait LoggingObject {}
 
+impl LoggingObject for k8s_openapi::api::core::v1::Pod {}
+
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + KubeObject + LoggingObject,
+    K: Clone + DeserializeOwned + LoggingObject,
 {
     pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.api.logs(name, lp)?;
