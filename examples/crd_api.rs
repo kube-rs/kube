@@ -21,6 +21,7 @@ pub struct FooSpec {
     replicas: i32,
 }
 
+// TODO: cannot use status objects with this custom derive impl
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct FooStatus {
     is_bad: bool,
@@ -87,7 +88,11 @@ async fn main() -> anyhow::Result<()> {
     let patch_params = PatchParams::default();
     match crds.create(&pp, serde_json::to_vec(&foocrd)?).await {
         Ok(o) => {
-            info!("Created {} ({:?})", o.metadata.unwrap().name.unwrap(), o.status.unwrap());
+            info!(
+                "Created {} ({:?})",
+                o.metadata.unwrap().name.unwrap(),
+                o.status.unwrap()
+            );
             debug!("Created CRD: {:?}", o.spec);
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
@@ -96,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
 
 
     // Manage the Foo CR
-    let foos : Api<Foo> = CustomResource::kind("Foo")
+    let foos: Api<Foo> = CustomResource::kind("Foo")
         .group("clux.dev")
         .version("v1")
         .within(&namespace)
@@ -111,8 +116,9 @@ async fn main() -> anyhow::Result<()> {
         "spec": { "name": "baz", "info": "old baz", "replicas": 1 },
     });
     let o = foos.create(&pp, serde_json::to_vec(&f1)?).await?;
-    assert_eq!(f1["metadata"]["name"], o.metadata.unwrap().name.unwrap());
-    info!("Created {}", o.metadata.unwrap().name.unwrap());
+    let f1name = o.metadata.unwrap().name.unwrap();
+    assert_eq!(f1["metadata"]["name"], f1name);
+    info!("Created {}", f1name);
 
     // Verify we can get it
     info!("Get Foo baz");
@@ -134,8 +140,9 @@ async fn main() -> anyhow::Result<()> {
     let f1_replaced = foos
         .replace("baz", &pp, serde_json::to_vec(&foo_replace)?)
         .await?;
-    assert_eq!(f1_replaced.spec.unwrap().name, "baz");
-    assert_eq!(f1_replaced.spec.unwrap().info, "new baz");
+    let f1_replacedsspec = f1_replaced.spec.unwrap();
+    assert_eq!(f1_replacedsspec.name, "baz");
+    assert_eq!(f1_replacedsspec.info, "new baz");
     //assert!(f1_replaced.status.is_none()); TODO: STATUS
 
     // Delete it
@@ -157,7 +164,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Created {}", o.metadata.unwrap().name.unwrap());
 
     // Update status on qux
-    info!("Replace Status on Foo instance qux");
+    /*info!("Replace Status on Foo instance qux");
     let fs = json!({
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
@@ -202,7 +209,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     info!("Patched scale {:?} for {}", o.spec, o.metadata.name);
     assert_eq!(o.status.unwrap().replicas, 1);
-    assert_eq!(o.spec.replicas.unwrap(), 2); // we only asked for more
+    assert_eq!(o.spec.replicas.unwrap(), 2); // we only asked for more*/
 
     // Modify a Foo qux with a Patch
     info!("Patch Foo instance qux");
@@ -212,9 +219,14 @@ async fn main() -> anyhow::Result<()> {
     let o = foos
         .patch("qux", &patch_params, serde_json::to_vec(&patch)?)
         .await?;
-    info!("Patched {} with new name: {}", o.metadata.name, o.spec.name);
-    assert_eq!(o.spec.info, "patched qux");
-    assert_eq!(o.spec.name, "qux"); // didn't blat existing params
+    let ospec = o.spec.unwrap();
+    info!(
+        "Patched {} with new name: {}",
+        o.metadata.unwrap().name.unwrap(),
+        ospec.name
+    );
+    assert_eq!(ospec.info, "patched qux");
+    assert_eq!(ospec.name, "qux"); // didn't blat existing params
 
     // Check we have 1 remaining instance
     let lp = ListParams::default();
@@ -227,7 +239,10 @@ async fn main() -> anyhow::Result<()> {
     // Cleanup the full collection - expect a wait
     match foos.delete_collection(&lp).await? {
         Left(list) => {
-            let deleted = list.into_iter().map(|i| i.metadata.name).collect::<Vec<_>>();
+            let deleted = list
+                .into_iter()
+                .map(|i| i.metadata.unwrap().name.unwrap())
+                .collect::<Vec<_>>();
             info!("Deleted collection of foos: {:?}", deleted);
         }
         Right(status) => {
