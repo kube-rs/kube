@@ -4,7 +4,7 @@ use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, WatchEvent},
+    api::{Api, DeleteParams, ListParams, Meta, PostParams, WatchEvent},
     client::APIClient,
     config,
 };
@@ -55,15 +55,15 @@ async fn main() -> anyhow::Result<()> {
 
     while let Some(status) = stream.next().await {
         match status {
-            WatchEvent::Added(s) => info!("Added {}", s.metadata.unwrap().name.unwrap()),
+            WatchEvent::Added(s) => info!("Added {}", Meta::name(&s)),
             WatchEvent::Modified(s) => {
                 let current_status = s.status.clone().expect("Status is missing");
                 match current_status.completion_time {
-                    Some(_) => info!("Modified: {} is complete", s.metadata.unwrap().name.unwrap()),
-                    _ => info!("Modified: {} is running", s.metadata.unwrap().name.unwrap()),
+                    Some(_) => info!("Modified: {} is complete", Meta::name(&s)),
+                    _ => info!("Modified: {} is running", Meta::name(&s)),
                 }
             }
-            WatchEvent::Deleted(s) => info!("Deleted {}", s.metadata.unwrap().name.unwrap()),
+            WatchEvent::Deleted(s) => info!("Deleted {}", Meta::name(&s)),
             WatchEvent::Error(s) => error!("{}", s),
         }
     }

@@ -1,7 +1,5 @@
-pub use k8s_openapi::{
-    apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta},
-    Metadata,
-};
+pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
+use k8s_openapi::Metadata;
 
 
 #[derive(Deserialize, Serialize, Clone, Default)]
@@ -20,36 +18,42 @@ pub struct TypeMeta {
     pub kind: Option<String>,
 }
 
-pub trait MetaContent: Metadata {
-    fn resource_ver(&self) -> Option<String>;
+/// An accessor trait for Metadata
+///
+/// This for a subset of kubernetes type that do not end in List
+/// These types, using ObjectMeta, SHOULD all have required properties:
+/// - .metadata
+/// - .metadata.name
+/// And these optional properties:
+/// - .metadata.namespace
+/// - .metadata.resource_version
+///
+/// This avoids a bunch of the unnecessary unwrap mechanics for apps
+pub trait Meta: Metadata {
+    fn meta(&self) -> &ObjectMeta;
     fn name(&self) -> String;
     fn namespace(&self) -> Option<String>;
+    fn resource_ver(&self) -> Option<String>;
 }
 
-/// Any main Kind that is not a listable should use ObjectMeta
-impl<K> MetaContent for K
+/// Implement accessor trait for any ObjectMeta-using kubernetes Resource
+impl<K> Meta for K
 where
     K: Metadata<Ty = ObjectMeta>,
 {
-    fn resource_ver(&self) -> Option<String> {
-        self.metadata()
-            .expect("all useful k8s_openapi types have metadata")
-            .resource_version
-            .clone()
+    fn meta(&self) -> &ObjectMeta {
+        self.metadata().expect("kind has metadata")
     }
 
     fn name(&self) -> String {
-        self.metadata()
-            .expect("all useful k8s_openapi types have metadata")
-            .name
-            .clone()
-            .unwrap()
+        self.meta().name.clone().expect("kind has metadata.name")
+    }
+
+    fn resource_ver(&self) -> Option<String> {
+        self.meta().resource_version.clone()
     }
 
     fn namespace(&self) -> Option<String> {
-        self.metadata()
-            .expect("all useful k8s_openapi types have metadata")
-            .namespace
-            .clone()
+        self.meta().namespace.clone()
     }
 }

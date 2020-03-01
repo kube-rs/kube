@@ -1,5 +1,5 @@
 use crate::{
-    api::metadata::{ListMeta, Metadata},
+    api::metadata::{ListMeta, Meta},
     ErrorResponse,
 };
 use serde::Deserialize;
@@ -12,7 +12,7 @@ use std::fmt::Debug;
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<K>
 where
-    K: Clone + Metadata,
+    K: Clone + Meta,
 {
     Added(K),
     Modified(K),
@@ -22,7 +22,7 @@ where
 
 impl<K> Debug for WatchEvent<K>
 where
-    K: Clone + Metadata,
+    K: Clone + Meta,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
@@ -44,8 +44,8 @@ where
 /// Note that this is only used internally within reflectors and informers,
 /// and is generally produced from list/watch/delete collection queries on an `Resource`.
 ///
-/// This is now equivalent to k8s_openapi::List<T>, but with extra convenience impls
-#[derive(Deserialize)]
+/// This almost equivalent to k8s_openapi::List<T>, but iterable
+#[derive(Deserialize, Debug)]
 pub struct ObjectList<T>
 where
     T: Clone,

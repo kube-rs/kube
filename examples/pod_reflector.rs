@@ -2,7 +2,7 @@
 use futures_timer::Delay;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{ListParams, Resource},
+    api::{ListParams, Meta, Resource},
     client::APIClient,
     config,
     runtime::Reflector,
@@ -23,17 +23,16 @@ async fn main() -> anyhow::Result<()> {
 
     // Can read initial state now:
     rf.state().await?.into_iter().for_each(|pod| {
-        info!(
-            "Found initial pod {} ({}) with {:?}",
-            pod.metadata.unwrap().name.unwrap(),
-            pod.status.unwrap().phase.unwrap(),
-            pod.spec
-                .unwrap()
-                .containers
-                .into_iter()
-                .map(|c| c.name)
-                .collect::<Vec<_>>(),
-        );
+        let name = Meta::name(&pod);
+        let phase = pod.status.unwrap().phase.unwrap();
+        let containers = pod
+            .spec
+            .unwrap()
+            .containers
+            .into_iter()
+            .map(|c| c.name)
+            .collect::<Vec<_>>();
+        info!("Found initial pod {} ({}) with {:?}", name, phase, containers);
     });
 
     let cloned = rf.clone();
@@ -47,12 +46,7 @@ async fn main() -> anyhow::Result<()> {
 
     loop {
         Delay::new(Duration::from_secs(5)).await;
-        let pods = rf
-            .state()
-            .await?
-            .into_iter()
-            .map(|pod| pod.metadata.unwrap().name.unwrap())
-            .collect::<Vec<_>>();
+        let pods: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
         info!("Current pods: {:?}", pods);
     }
 }

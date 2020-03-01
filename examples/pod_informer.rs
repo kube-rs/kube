@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{ListParams, Resource, WatchEvent},
+    api::{ListParams, Meta, Resource, WatchEvent},
     client::APIClient,
     config,
     runtime::Informer,
@@ -33,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
 fn handle_pod(ev: WatchEvent<Pod>) -> anyhow::Result<()> {
     match ev {
         WatchEvent::Added(o) => {
+            let name = Meta::name(&o);
             let containers = o
                 .spec
                 .unwrap()
@@ -40,25 +41,16 @@ fn handle_pod(ev: WatchEvent<Pod>) -> anyhow::Result<()> {
                 .into_iter()
                 .map(|c| c.name)
                 .collect::<Vec<_>>();
-            info!(
-                "Added Pod: {} (containers={:?})",
-                o.metadata.unwrap().name.unwrap(),
-                containers
-            );
+            info!("Added Pod: {} (containers={:?})", name, containers);
         }
         WatchEvent::Modified(o) => {
-            let meta = o.metadata.unwrap();
+            let name = Meta::name(&o);
+            let owner = &Meta::meta(&o).owner_references.clone().unwrap()[0];
             let phase = o.status.unwrap().phase.unwrap();
-            let owner = &meta.owner_references.unwrap()[0];
-            info!(
-                "Modified Pod: {} (phase={}, owner={})",
-                meta.name.unwrap(),
-                phase,
-                owner.name
-            );
+            info!("Modified Pod: {} (phase={}, owner={})", name, phase, owner.name);
         }
         WatchEvent::Deleted(o) => {
-            info!("Deleted Pod: {}", o.metadata.unwrap().name.unwrap());
+            info!("Deleted Pod: {}", Meta::name(&o));
         }
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);

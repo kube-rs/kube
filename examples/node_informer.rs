@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
-    api::{Api, ListParams, Resource, WatchEvent},
+    api::{Api, ListParams, Meta, Resource, WatchEvent},
     client::APIClient,
     config,
     runtime::Informer,
@@ -37,7 +37,7 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
             info!("New Node: {}", o.spec.unwrap().provider_id.unwrap());
         }
         WatchEvent::Modified(o) => {
-            let name = o.metadata.unwrap().name.unwrap();
+            let name = Meta::name(&o);
             // Nodes often modify a lot - only print broken nodes
             if let Some(true) = o.spec.unwrap().unschedulable {
                 let failed = o
@@ -68,14 +68,13 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
             }
         }
         WatchEvent::Deleted(o) => {
-            let meta = o.metadata.unwrap();
-            let name = meta.name.unwrap();
+            let labels = Meta::meta(&o).labels.clone().unwrap();
             warn!(
                 "Deleted node: {} ({:?}) running {:?} with labels: {:?}",
-                name,
+                Meta::name(&o),
                 o.spec.unwrap().provider_id.unwrap(),
                 o.status.unwrap().conditions.unwrap(),
-                meta.labels,
+                labels,
             );
         }
         WatchEvent::Error(e) => {

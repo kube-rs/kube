@@ -5,7 +5,7 @@ use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{CustomResource, ListParams},
+    api::{CustomResource, ListParams, Meta},
     client::APIClient,
     config,
     runtime::Reflector,
@@ -49,12 +49,7 @@ async fn main() -> anyhow::Result<()> {
     loop {
         Delay::new(Duration::from_secs(5)).await;
         // Read updated internal state (instant):
-        let crds = rf
-            .state()
-            .await?
-            .into_iter()
-            .map(|crd| crd.metadata.unwrap().name.unwrap())
-            .collect::<Vec<_>>();
+        let crds = rf.state().await?.iter().map(Meta::name).collect::<Vec<_>>();
         info!("Current crds: {:?}", crds);
     }
 }

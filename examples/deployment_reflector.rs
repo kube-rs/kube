@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
-    api::{ListParams, Resource},
+    api::{ListParams, Meta, Resource},
     client::APIClient,
     config,
     runtime::Reflector,
@@ -20,11 +20,11 @@ async fn main() -> anyhow::Result<()> {
     let rf: Reflector<Deployment> = Reflector::new(client, lp, resource).init().await?;
 
     // rf is initialized with full state, which can be extracted on demand.
-    // Output is Map of name -> Deployment
+    // Output is an owned Vec<Deployment>
     rf.state().await?.into_iter().for_each(|d| {
         info!(
             "Found deployment for {} - {} replicas running {:?}",
-            d.metadata.unwrap().name.unwrap(),
+            Meta::name(&d),
             d.status.unwrap().replicas.unwrap(),
             d.spec
                 .unwrap()
@@ -43,12 +43,7 @@ async fn main() -> anyhow::Result<()> {
         rf.poll().await?;
 
         // Read the updated internal state (instant):
-        let deploys = rf
-            .state()
-            .await?
-            .into_iter()
-            .map(|deployment| deployment.metadata.unwrap().name.unwrap())
-            .collect::<Vec<_>>();
+        let deploys: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
         info!("Current deploys: {:?}", deploys);
     }
 }

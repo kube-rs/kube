@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
 use crate::{
-    api::{DeleteParams, ListParams, MetaContent, ObjectList, PatchParams, PostParams, Resource, WatchEvent},
+    api::{DeleteParams, ListParams, Meta, ObjectList, PatchParams, PostParams, Resource, WatchEvent},
     client::{APIClient, Status},
     Result,
 };
@@ -58,7 +58,7 @@ where
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + MetaContent,
+    K: Clone + DeserializeOwned + Meta,
 {
     pub async fn get(&self, name: &str) -> Result<K> {
         let req = self.api.get(name)?;

@@ -1,5 +1,5 @@
 use crate::{
-    api::{ListParams, MetaContent, Resource, WatchEvent},
+    api::{ListParams, Meta, Resource, WatchEvent},
     client::APIClient,
     Result,
 };
@@ -18,7 +18,7 @@ use std::{sync::Arc, time::Duration};
 #[derive(Clone)]
 pub struct Informer<K>
 where
-    K: Clone + DeserializeOwned + MetaContent,
+    K: Clone + DeserializeOwned + Meta,
 {
     version: Arc<Mutex<String>>,
     client: APIClient,
@@ -31,7 +31,7 @@ where
 
 impl<K> Informer<K>
 where
-    K: Clone + DeserializeOwned + MetaContent,
+    K: Clone + DeserializeOwned + Meta,
 {
     /// Create a reflector with a kube client on a kube resource
     pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
@@ -116,7 +116,7 @@ where
                             | Ok(WatchEvent::Deleted(o)) => {
                                 // Follow docs conventions and store the last resourceVersion
                                 // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                                if let Some(nv) = MetaContent::resource_ver(o) {
+                                if let Some(nv) = Meta::resource_ver(o) {
                                     *version.lock().await = nv.clone();
                                 }
                             }

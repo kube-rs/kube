@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-    api::{ListParams, Resource},
+    api::{ListParams, Meta, Resource},
     client::APIClient,
     config,
     runtime::Reflector,
@@ -22,11 +22,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Can read initial state now:
     rf.state().await?.into_iter().for_each(|cm| {
-        info!(
-            "Found configmap {} with data: {:?}",
-            cm.metadata.unwrap().name.unwrap(),
-            cm.data
-        );
+        info!("Found configmap {} with data: {:?}", Meta::name(&cm), cm.data);
     });
 
     loop {
@@ -34,13 +30,7 @@ async fn main() -> anyhow::Result<()> {
         rf.poll().await?; // ideally call this from a thread/task
 
         // up to date state:
-        let pods = rf
-            .state()
-            .await?
-            .into_iter()
-            .map(|cm| cm.metadata.unwrap().name.unwrap())
-            .collect::<Vec<_>>();
-
+        let pods: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
         info!("Current configmaps: {:?}", pods);
     }
 }

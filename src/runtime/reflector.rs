@@ -1,5 +1,5 @@
 use crate::{
-    api::{ListParams, MetaContent, ObjectList, Resource, WatchEvent},
+    api::{ListParams, Meta, ObjectList, Resource, WatchEvent},
     client::APIClient,
     Error, Result,
 };
@@ -38,7 +38,7 @@ impl<K> Default for State<K> {
 #[derive(Clone)]
 pub struct Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send + MetaContent,
+    K: Clone + DeserializeOwned + Send + Meta,
 {
     state: Arc<Mutex<State<K>>>,
     client: APIClient,
@@ -48,7 +48,7 @@ where
 
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned + MetaContent + Send,
+    K: Clone + DeserializeOwned + Meta + Send,
 {
     /// Create a reflector with a kube client on a resource
     pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
@@ -168,32 +168,32 @@ where
             let mut state = self.state.lock().await;
             match ev {
                 WatchEvent::Added(o) => {
-                    let name = MetaContent::name(&o);
+                    let name = Meta::name(&o);
                     debug!("Adding {} to {}", name, rg.kind);
                     state
                         .data
                         .entry(ObjectId::key_for(&o))
                         .or_insert_with(|| o.clone());
-                    if let Some(v) = MetaContent::resource_ver(&o) {
+                    if let Some(v) = Meta::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Modified(o) => {
-                    let name = MetaContent::name(&o);
+                    let name = Meta::name(&o);
                     debug!("Modifying {} in {}", name, rg.kind);
                     state
                         .data
                         .entry(ObjectId::key_for(&o))
                         .and_modify(|e| *e = o.clone());
-                    if let Some(v) = MetaContent::resource_ver(&o) {
+                    if let Some(v) = Meta::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
                 WatchEvent::Deleted(o) => {
-                    let name = MetaContent::name(&o);
+                    let name = Meta::name(&o);
                     debug!("Removing {} from {}", name, rg.kind);
                     state.data.remove(&ObjectId::key_for(&o));
-                    if let Some(v) = MetaContent::resource_ver(&o) {
+                    if let Some(v) = Meta::resource_ver(&o) {
                         state.version = v.to_string();
                     }
                 }
@@ -224,10 +224,10 @@ impl ToString for ObjectId {
 }
 
 impl ObjectId {
-    fn key_for<K: MetaContent>(o: &K) -> Self {
+    fn key_for<K: Meta>(o: &K) -> Self {
         ObjectId {
-            name: MetaContent::name(o),
-            namespace: MetaContent::namespace(o),
+            name: Meta::name(o),
+            namespace: Meta::namespace(o),
         }
     }
 }

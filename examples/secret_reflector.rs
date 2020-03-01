@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    api::{ListParams, Resource},
+    api::{ListParams, Meta, Resource},
     client::APIClient,
     config,
     runtime::Reflector,
@@ -46,11 +46,7 @@ async fn main() -> anyhow::Result<()> {
     // Can read initial state now:
     rf.state().await?.into_iter().for_each(|secret| {
         let res = decode(&secret);
-        info!(
-            "Found secret {} with data: {:?}",
-            secret.metadata.unwrap().name.unwrap(),
-            res
-        );
+        info!("Found secret {} with data: {:?}", Meta::name(&secret), res);
     });
 
     loop {
@@ -58,12 +54,7 @@ async fn main() -> anyhow::Result<()> {
         rf.poll().await?; // ideally call this from a thread/task
 
         // Read updated internal state (instant):
-        let secrets = rf
-            .state()
-            .await?
-            .into_iter()
-            .map(|secret| secret.metadata.unwrap().name.unwrap())
-            .collect::<Vec<_>>();
+        let secrets: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
         info!("Current secrets: {:?}", secrets);
     }
 }

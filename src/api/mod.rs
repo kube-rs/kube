@@ -25,4 +25,4 @@ pub(crate) mod object;
 pub use self::object::{ObjectList, WatchEvent};
 
 mod metadata;
-pub use self::metadata::{ListMeta, MetaContent, Metadata, ObjectMeta, TypeMeta};
+pub use self::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta};

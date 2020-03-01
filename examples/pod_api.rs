@@ -3,7 +3,7 @@ use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, PatchParams, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
     client::APIClient,
     config,
 };
@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     let pp = PostParams::default();
     match pods.create(&pp, serde_json::to_vec(&p)?).await {
         Ok(o) => {
-            let name = o.metadata.unwrap().name.unwrap();
+            let name = Meta::name(&o);
             assert_eq!(p["metadata"]["name"], name);
             info!("Created {}", name);
             // wait for it..
@@ -49,15 +49,16 @@ async fn main() -> anyhow::Result<()> {
     // Verify we can get it
     info!("Get Pod blog");
     let p1cpy = pods.get("blog").await?;
-    let p1cpyspec = p1cpy.spec.unwrap();
-    info!("Got blog pod with containers: {:?}", p1cpyspec.containers);
-    assert_eq!(p1cpyspec.containers[0].name, "blog");
+    if let Some(spec) = &p1cpy.spec {
+        info!("Got blog pod with containers: {:?}", spec.containers);
+        assert_eq!(spec.containers[0].name, "blog");
+    }
 
     // Replace its spec
     info!("Patch Pod blog");
     let patch = json!({
         "metadata": {
-            "resourceVersion": p1cpy.metadata.unwrap().resource_version,
+            "resourceVersion": Meta::resource_ver(&p1cpy),
         },
         "spec": {
             "activeDeadlineSeconds": 5
@@ -71,13 +72,13 @@ async fn main() -> anyhow::Result<()> {
 
     let lp = ListParams::default().fields(&format!("metadata.name={}", "blog")); // only want results for our pod
     for p in pods.list(&lp).await? {
-        info!("Found Pod: {}", p.metadata.unwrap().name.unwrap());
+        info!("Found Pod: {}", Meta::name(&p));
     }
 
     // Delete it
     let dp = DeleteParams::default();
     pods.delete("blog", &dp).await?.map_left(|pdel| {
-        assert_eq!(pdel.metadata.unwrap().name.unwrap(), "blog");
+        assert_eq!(Meta::name(&pdel), "blog");
         info!("Deleting blog pod started");
     });
 

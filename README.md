@@ -38,7 +38,7 @@ use k8s_openapi::api::core::v1::Pod;
 let pods: Api<Pod> = Api::namespaced(client, "default");
 
 let p = pods.get("blog").await?;
-println!("Got blog pod with containers: {:?}", p.spec.containers);
+println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
 
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
@@ -49,7 +49,7 @@ assert_eq!(patched.spec.active_deadline_seconds, Some(5));
 pods.delete("blog", &DeleteParams::default()).await?;
 ```
 
-See the `pod_openapi` or `crd_openapi` examples for more uses.
+See the examples ending in `_api` examples for more detail.
 
 ## Runtime
 The optional `kube::runtime` module contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the watch book-keeping yourself.
@@ -81,14 +81,14 @@ async fn handle(event: WatchEvent<Pod>) -> anyhow::Result<()> {
     match event {
         WatchEvent::Added(o) => {
             let containers = o.spec.unwrap().containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
-            println!("Added Pod: {} (containers={:?})", o.metadata.unwrap().name.unwrap(), containers);
+            println!("Added Pod: {} (containers={:?})", Meta::name(&o), containers);
         },
         WatchEvent::Modified(o) => {
             let phase = o.status.unwrap().phase.unwrap();
-            println!("Modified Pod: {} (phase={})", o.metadata.unwrap().name.unwrap(), phase);
+            println!("Modified Pod: {} (phase={})", Meta::name(&o), phase);
         },
         WatchEvent::Deleted(o) => {
-            println!("Deleted Pod: {}", o.metadata.unwrap().name.unwrap());
+            println!("Deleted Pod: {}", Meta::name(&o));
         },
         WatchEvent::Error(e) => {
             println!("Error event: {:?}", e);

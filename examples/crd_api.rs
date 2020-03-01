@@ -7,7 +7,7 @@ use serde_json::json;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::CustomResourceDefinition;
 
 use kube::{
-    api::{Api, CustomResource, DeleteParams, ListParams, PatchParams, PostParams},
+    api::{Api, CustomResource, DeleteParams, ListParams, Meta, PatchParams, PostParams},
     client::APIClient,
     config,
 };
@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
         res.map_left(|o| {
             info!(
                 "Deleted {}: ({:?})",
-                o.metadata.unwrap().name.unwrap(),
+                Meta::name(&o),
                 o.status.unwrap().conditions.unwrap().last()
             );
             // NB: PropagationPolicy::Foreground doesn't cause us to block here
@@ -88,11 +88,7 @@ async fn main() -> anyhow::Result<()> {
     let patch_params = PatchParams::default();
     match crds.create(&pp, serde_json::to_vec(&foocrd)?).await {
         Ok(o) => {
-            info!(
-                "Created {} ({:?})",
-                o.metadata.unwrap().name.unwrap(),
-                o.status.unwrap()
-            );
+            info!("Created {} ({:?})", Meta::name(&o), o.status.unwrap());
             debug!("Created CRD: {:?}", o.spec);
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
@@ -116,14 +112,13 @@ async fn main() -> anyhow::Result<()> {
         "spec": { "name": "baz", "info": "old baz", "replicas": 1 },
     });
     let o = foos.create(&pp, serde_json::to_vec(&f1)?).await?;
-    let f1name = o.metadata.unwrap().name.unwrap();
-    assert_eq!(f1["metadata"]["name"], f1name);
-    info!("Created {}", f1name);
+    assert_eq!(f1["metadata"]["name"], Meta::name(&o));
+    info!("Created {}", Meta::name(&o));
 
     // Verify we can get it
     info!("Get Foo baz");
     let f1cpy = foos.get("baz").await?;
-    assert_eq!(f1cpy.spec.unwrap().info, "old baz");
+    assert_eq!(f1cpy.spec.as_ref().unwrap().info, "old baz");
 
     // Replace its spec
     info!("Replace Foo baz");
@@ -133,7 +128,7 @@ async fn main() -> anyhow::Result<()> {
         "metadata": {
             "name": "baz",
             // Updates need to provide our last observed version:
-            "resourceVersion": f1cpy.metadata.unwrap().resource_version,
+            "resourceVersion": Meta::resource_ver(&f1cpy),
         },
         "spec": { "name": "baz", "info": "new baz", "replicas": 1 },
     });
@@ -161,7 +156,7 @@ async fn main() -> anyhow::Result<()> {
         "status": FooStatus::default(),
     });
     let o = foos.create(&pp, serde_json::to_vec(&f2)?).await?;
-    info!("Created {}", o.metadata.unwrap().name.unwrap());
+    info!("Created {}", Meta::name(&o));
 
     // Update status on qux
     /*info!("Replace Status on Foo instance qux");
@@ -171,12 +166,12 @@ async fn main() -> anyhow::Result<()> {
         "metadata": {
             "name": "qux",
             // Updates need to provide our last observed version:
-            "resourceVersion": o.metadata.unwrap().resource_version.unwrap(),
+            "resourceVersion": Meta::resource_ver(&o),
         },
         "status": FooStatus { is_bad: true, replicas: 0 }
     });
     let o = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?).await?;
-    info!("Replaced status {:?} for {}", o.status, o.metadata.unwrap().name.unwrap());
+    info!("Replaced status {:?} for {}", o.status, Meta::name(&o));
     assert!(o.status.unwrap().is_bad);
 
     info!("Patch Status on Foo instance qux");
@@ -191,7 +186,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Get Status on Foo instance qux");
     let o = foos.get_status("qux").await?;
-    info!("Got status {:?} for {}", o.status, o.metadata.name);
+    info!("Got status {:?} for {}", o.status, Meta::name(&o);
     assert!(!o.status.unwrap().is_bad);
 
     // Check scale subresource:
@@ -207,7 +202,7 @@ async fn main() -> anyhow::Result<()> {
     let o = foos
         .patch_scale("qux", &patch_params, serde_json::to_vec(&fs)?)
         .await?;
-    info!("Patched scale {:?} for {}", o.spec, o.metadata.name);
+    info!("Patched scale {:?} for {}", o.spec, Meta::name(&o));
     assert_eq!(o.status.unwrap().replicas, 1);
     assert_eq!(o.spec.replicas.unwrap(), 2); // we only asked for more*/
 
@@ -219,12 +214,8 @@ async fn main() -> anyhow::Result<()> {
     let o = foos
         .patch("qux", &patch_params, serde_json::to_vec(&patch)?)
         .await?;
-    let ospec = o.spec.unwrap();
-    info!(
-        "Patched {} with new name: {}",
-        o.metadata.unwrap().name.unwrap(),
-        ospec.name
-    );
+    let ospec = o.spec.as_ref().unwrap();
+    info!("Patched {} with new name: {}", Meta::name(&o), ospec.name);
     assert_eq!(ospec.info, "patched qux");
     assert_eq!(ospec.name, "qux"); // didn't blat existing params
 
@@ -239,10 +230,7 @@ async fn main() -> anyhow::Result<()> {
     // Cleanup the full collection - expect a wait
     match foos.delete_collection(&lp).await? {
         Left(list) => {
-            let deleted = list
-                .into_iter()
-                .map(|i| i.metadata.unwrap().name.unwrap())
-                .collect::<Vec<_>>();
+            let deleted: Vec<_> = list.iter().map(Meta::name).collect();
             info!("Deleted collection of foos: {:?}", deleted);
         }
         Right(status) => {

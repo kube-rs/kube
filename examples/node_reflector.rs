@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
-    api::{ListParams, Resource},
+    api::{ListParams, Meta, Resource},
     client::APIClient,
     config,
     runtime::Reflector,
@@ -21,15 +21,15 @@ async fn main() -> anyhow::Result<()> {
     let rf: Reflector<Node> = Reflector::new(client, lp, resource).init().await?;
 
     // rf is initialized with full state, which can be extracted on demand.
-    // Output is Map of name -> Node
-    rf.state().await?.into_iter().for_each(|object| {
-        let meta = object.metadata.unwrap();
+    // Output is an owned Vec<Node>
+    rf.state().await?.into_iter().for_each(|o| {
+        let labels = Meta::meta(&o).labels.clone().unwrap();
         info!(
             "Found node {} ({:?}) running {:?} with labels: {:?}",
-            meta.name.unwrap(),
-            object.spec.unwrap().provider_id.unwrap(),
-            object.status.unwrap().conditions.unwrap(),
-            meta.labels.unwrap(),
+            Meta::name(&o),
+            o.spec.unwrap().provider_id.unwrap(),
+            o.status.unwrap().conditions.unwrap(),
+            labels
         );
     });
 
@@ -47,12 +47,7 @@ async fn main() -> anyhow::Result<()> {
         rf.poll().await?;
 
         // Read the updated internal state (instant):
-        let deploys = rf
-            .state()
-            .await?
-            .into_iter()
-            .map(|o| o.metadata.unwrap().name.unwrap())
-            .collect::<Vec<_>>();
+        let deploys: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
         info!("Current {} nodes: {:?}", deploys.len(), deploys);
     }
 }
