@@ -20,7 +20,7 @@ k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"
 Note that turning off `default-features` for `k8s-openapi` is recommended to speed up your compilation (and we provide an api anyway).
 
 ## Usage
-See the [examples directory](./examples) for how to watch over resources in a simplistic way.
+See the [examples directory](./kube/examples) for how to watch over resources in a simplistic way.
 
 **[API Docs](https://docs.rs/kube/)**
 
@@ -98,7 +98,7 @@ async fn handle(event: WatchEvent<Pod>) -> anyhow::Result<()> {
 }
 ```
 
-The [node_informer example](./examples/node_informer.rs) has an example of using api calls from within event handlers.
+The [node_informer example](./kube/examples/node_informer.rs) has an example of using api calls from within event handlers.
 
 ## Reflector
 A cache for `K` that keeps itself up to date. It does not expose events, but you can inspect the state map at any time.
