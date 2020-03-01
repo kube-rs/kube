@@ -131,17 +131,14 @@ impl CustomResource {
 
 #[cfg(test)]
 mod test {
-    use crate::api::{CustomResource, NotUsed, Object, PatchParams, PostParams, Resource};
+    use crate::api::{CustomResource, PatchParams, PostParams, Resource};
     #[test]
     fn raw_custom_resource() {
-        struct FooSpec {};
         let r: Resource = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
             .into_resource();
-        type Foo = Object<FooSpec, NotUsed>;
-        // TODO: want to somehow impl k8s_openapi::Resource on Foo
 
         let pp = PostParams::default();
         let req = r.create(&pp, vec![]).unwrap();
@@ -156,7 +153,20 @@ mod test {
     #[ignore] // circle has no kube config
     async fn convenient_custom_resource() {
         use crate::{api::Api, client::APIClient, config};
-        struct Foo {};
+        #[derive(
+            Clone, Debug, PartialEq,
+            k8s_openapi_derive::CustomResourceDefinition,
+            serde_derive::Deserialize, serde_derive::Serialize,
+        )]
+        #[custom_resource_definition(
+            group = "k8s-openapi-tests-custom-resource-definition.com",
+            version = "v1",
+            plural = "foobars",
+            namespaced,
+        )]
+        struct FooSpec {
+            foo: String
+        };
         let config = config::load_kube_config().await.unwrap();
         let client = APIClient::new(config);
         let _r: Api<Foo> = CustomResource::kind("Foo")

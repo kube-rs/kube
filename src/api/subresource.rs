@@ -3,25 +3,14 @@ use futures::Stream;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    api::{object::Object, Api, PatchParams, PostParams, Resource},
+    api::{Api, PatchParams, PostParams, Resource},
     Error, Result,
 };
 
 
 // ----------------------------------------------------------------------------
 
-/// Scale spec from api::autoscaling::v1
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct ScaleSpec {
-    pub replicas: Option<i32>,
-}
-/// Scale status from api::autoscaling::v1
-#[derive(Deserialize, Serialize, Clone, Default, Debug)]
-pub struct ScaleStatus {
-    pub replicas: i32,
-    pub selector: Option<String>,
-}
-pub type Scale = Object<ScaleSpec, ScaleStatus>;
+pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
 /// Scale subresource
 ///

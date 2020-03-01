@@ -1,5 +1,5 @@
 use crate::{
-    api::metadata::{ListMeta, Metadata, ObjectMeta, TypeMeta},
+    api::metadata::{ListMeta, Metadata},
     ErrorResponse,
 };
 use serde::Deserialize;
@@ -35,59 +35,6 @@ where
 }
 
 // -------------------------------------------------------
-
-/// A standard kubernetes object with .spec and .status
-///
-/// This struct appears in `ObjectList` and `WatchEvent`, and when using a `Reflector`,
-/// and is exposed as the values in `ObjectMap`.
-///
-/// This is what kubernetes maintainers tell you the world looks like.
-/// It's.. generally true.
-#[derive(Deserialize, Serialize, Clone)]
-pub struct Object<P, U>
-where
-    P: Clone,
-    U: Clone,
-{
-    #[serde(flatten)]
-    pub types: TypeMeta,
-
-    /// Resource metadata
-    ///
-    /// Contains information common to most resources about the Resource,
-    /// including the object name, annotations, labels and more.
-    pub metadata: ObjectMeta,
-
-    /// The Spec struct of a resource. I.e. `PodSpec`, `DeploymentSpec`, etc.
-    ///
-    /// This defines the desired state of the Resource as specified by the user.
-    pub spec: P,
-
-    /// The Status of a resource. I.e. `PotStatus`, `DeploymentStatus`, etc.
-    ///
-    /// This publishes the state of the Resource as observed by the controller.
-    /// Internally passed as `Option<()>` when a status does not exist.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<U>,
-}
-
-/// Blanked implementation for standard objects that can use Object
-///
-/// This is primarily useful for types created through `CustomResource`
-/// if https://github.com/Arnavion/k8s-openapi/issues/61 gets resolved.
-/// If not, then Object is kind of useless with the openapi dependency.
-impl<P, U> Metadata for Object<P, U>
-where
-    P: Clone,
-    U: Clone,
-    Object<P, U>: k8s_openapi::Resource,
-{
-    type Ty = ObjectMeta;
-
-    fn metadata(&self) -> Option<&ObjectMeta> {
-        Some(&self.metadata)
-    }
-}
 
 /// A generic kubernetes object list
 ///

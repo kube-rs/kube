@@ -34,11 +34,11 @@ where
     K: Clone + DeserializeOwned + MetaContent,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: APIClient, r: Resource) -> Self {
+    pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
         Informer {
             client,
             resource: r,
-            params: ListParams::default(),
+            params: lp,
             version: Arc::new(Mutex::new(0.to_string())),
             needs_resync: Arc::new(Mutex::new(false)),
             needs_retry: Arc::new(Mutex::new(false)),

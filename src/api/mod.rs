@@ -19,10 +19,10 @@ mod crds;
 pub use crds::{CrBuilder, CustomResource};
 
 mod subresource;
-pub use subresource::{LogParams, LoggingObject, Scale, ScaleSpec, ScaleStatus};
+pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};
 
 pub(crate) mod object;
-pub use self::object::{Object, ObjectList, WatchEvent};
+pub use self::object::{ObjectList, WatchEvent};
 
 mod metadata;
 pub use self::metadata::{ListMeta, MetaContent, Metadata, ObjectMeta, TypeMeta};
