@@ -2,9 +2,9 @@ VERSION=$(shell grep version Cargo.toml | awk -F"\"" '{print $$2}' | head -n 1)
 
 clippy:
 	#rustup component add clippy --toolchain nightly
-	touch src/lib.rs
-	cargo +nightly clippy --no-default-features --features=rustls-tls
-	cargo +nightly clippy --no-default-features --features=rustls-tls --examples -- --allow clippy::or_fun_call
+	touch kube/src/lib.rs
+	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls
+	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls --examples -- --allow clippy::or_fun_call
 
 fmt:
 	#rustup component add rustfmt --toolchain nightly
@@ -18,7 +18,7 @@ test:
 	cargo test --lib
 	cargo test --example crd_api crd_reflector
 	cargo test -j4
-	cargo test --lib --features=rustls-tls
+	cd kube && cargo test --lib --features=rustls-tls --no-default-features
 
 readme:
 	rustdoc README.md --test --edition=2018
