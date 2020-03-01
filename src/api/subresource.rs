@@ -3,7 +3,7 @@ use futures::Stream;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    api::{object::Object, Api, PatchParams, PostParams, RawApi},
+    api::{object::Object, Api, PatchParams, PostParams, Resource},
     Error, Result,
 };
 
@@ -101,7 +101,7 @@ pub struct LogParams {
 }
 
 
-impl RawApi {
+impl Resource {
     /// Get a pod logs
     pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "log?";
@@ -148,9 +148,9 @@ impl RawApi {
 #[cfg(feature = "openapi")]
 #[test]
 fn log_path() {
-    use crate::api::RawApi;
+    use crate::api::Resource;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = RawApi::namespaced::<corev1::Pod>("ns");
+    let r = Resource::namespaced::<corev1::Pod>("ns");
     let mut lp = LogParams::default();
     lp.container = Some("blah".into());
     let req = r.logs("foo", &lp).unwrap();

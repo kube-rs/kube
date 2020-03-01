@@ -1,7 +1,8 @@
 use crate::{
     api::{
-        object::{MetaContent, ObjectList, WatchEvent},
-        ListParams, RawApi,
+        ObjectList, WatchEvent,
+        MetaContent,
+        ListParams, Resource,
     },
     client::APIClient,
     Error, Result,
@@ -45,29 +46,16 @@ where
 {
     state: Arc<Mutex<State<K>>>,
     client: APIClient,
-    resource: RawApi,
+    resource: Resource,
     params: ListParams,
 }
-// impl<K> Reflector<K>
-// where
-// K: Clone + DeserializeOwned + Send,
-// {
-// Create a reflector with a kube client on a kube resource
-// pub fn new(r: Api<K>) -> Self {
-// Reflector {
-// client: r.client,
-// resource: r.api,
-// params: ListParams::default(),
-// state: Default::default(),
-// }
-// }
-// }
+
 impl<K> Reflector<K>
 where
     K: Clone + DeserializeOwned + MetaContent + Send,
 {
-    /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, lp: ListParams, r: RawApi) -> Self {
+    /// Create a reflector with a kube client on a resource
+    pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
         Reflector {
             client,
             resource: r,
@@ -149,7 +137,7 @@ where
         // NB: Object isn't general enough here
         let res = self.client.request::<ObjectList<K>>(req).await?;
         let mut data = BTreeMap::new();
-        let version = res.metadata.resourceVersion.unwrap_or_else(|| "".into());
+        let version = res.metadata.resource_version.unwrap_or_else(|| "".into());
 
         trace!(
             "Got {} {} at resourceVersion={:?}",

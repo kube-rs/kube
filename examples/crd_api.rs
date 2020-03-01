@@ -4,7 +4,7 @@ use either::Either::{Left, Right};
 use serde_json::json;
 
 use kube::{
-    api::{DeleteParams, ListParams, NotUsed, Object, ObjectList, PatchParams, PostParams, RawApi},
+    api::{DeleteParams, ListParams, NotUsed, Object, ObjectList, PatchParams, PostParams, Resource},
     client::APIClient,
     config,
 };
@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Manage the CRD
-    let crds = RawApi::v1beta1CustomResourceDefinition();
+    let crds = Resource::v1beta1CustomResourceDefinition();
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
@@ -92,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Manage the Foo CR
-    let foos = RawApi::customResource("foos")
+    let foos = Resource::customResource("foos")
         .version("v1")
         .group("clux.dev")
         .within(&namespace);

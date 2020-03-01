@@ -4,7 +4,7 @@ use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{CustomResource, ListParams, NotUsed, Object, RawApi},
+    api::{CustomResource, ListParams, NotUsed, Object, Resource},
     client::APIClient,
     config,
     runtime::Reflector,
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
         .group("clux.dev")
         .version("v1")
         .within(&namespace)
-        .into_rawapi();
+        .into_resource();
 
     let lp = ListParams::default().timeout(20); // low timeout in this example
 

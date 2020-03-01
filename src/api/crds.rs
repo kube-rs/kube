@@ -1,5 +1,5 @@
 use crate::{
-    api::{RawApi, typed::Api},
+    api::{Resource, typed::Api},
     client::APIClient,
 };
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
@@ -36,12 +36,12 @@ impl CrBuilder {
     /// Create a CrBuilder
     ///
     /// ```
-    /// use kube::api::{CustomResource, RawApi};
+    /// use kube::api::{CustomResource, Resource};
     /// struct Foo {
     ///     spec: FooSpec,
     ///     status: FooStatus,
     /// };
-    /// let foos : RawApi<Foo> = CustomResource::kind("Foo") // <.spec.kind>
+    /// let foos : Resource<Foo> = CustomResource::kind("Foo") // <.spec.kind>
     ///    .group("clux.dev") // <.spec.group>
     ///    .version("v1")
     ///    .build()
@@ -97,15 +97,15 @@ impl CrBuilder {
         }
     }
 
-    // Consume the CrBuilder and convert to a RawApi object
-    pub fn into_rawapi(self) -> RawApi {
+    // Consume the CrBuilder and convert to a Resource object
+    pub fn into_resource(self) -> Resource {
         let crd = self.build();
         crd.into()
     }
 }
 
-/// Make RawApi useable on CRDs without k8s_openapi
-impl From<CustomResource> for RawApi {
+/// Make Resource useable on CRDs without k8s_openapi
+impl From<CustomResource> for Resource {
     fn from(c: CustomResource) -> Self {
         Self {
             api_version: c.api_version,
@@ -131,16 +131,18 @@ impl CustomResource {
 
 #[cfg(test)]
 mod test {
-    use crate::api::{CustomResource, PatchParams, PostParams, RawApi};
+    use crate::api::{CustomResource, PatchParams, PostParams, Resource, Object, NotUsed};
     // non-openapi tests
     #[test]
     fn raw_custom_resource() {
-        struct Foo {};
-        let r: RawApi = CustomResource::kind("Foo")
+        struct FooSpec {};
+        let r: Resource = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
-            .into_rawapi();
+            .into_resource();
+        type Foo = Object<FooSpec, NotUsed>;
+
         let pp = PostParams::default();
         let req = r.create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");

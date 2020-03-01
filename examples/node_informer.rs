@@ -1,8 +1,8 @@
 #[macro_use] extern crate log;
 use futures::StreamExt;
-use k8s_openapi::api::core::v1::{NodeSpec, NodeStatus};
+use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
-    api::{v1Event, Api, ListParams, Object, RawApi, WatchEvent},
+    api::{Api, ListParams, Object, Resource, WatchEvent},
     client::APIClient,
     config,
     runtime::Informer,
@@ -13,15 +13,16 @@ type Event = v1Event; // snowflake obj
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,node_informer=debug,kube=trace");
+    std::env::set_var("RUST_LOG", "info,node_informer=debug,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);
 
-    let nodes = RawApi::v1Node();
+    let nodes = Resource::all::<Node>();
+    let events = Resource::all::<Event>();
     let events = Api::v1Event(client.clone());
-    let ni = Informer::raw(client.clone(), nodes);
-    //.labels("beta.kubernetes.io/os=linux")
+    let lp = ListParams::default().labels("beta.kubernetes.io/os=linux");
+    let ni = Informer::new(client.clone(), nodes);
 
     loop {
         let mut nodes = ni.poll().await?.boxed();

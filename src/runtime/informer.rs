@@ -1,7 +1,7 @@
 use crate::{
     api::{
-        object::{MetaContent, Metadata, WatchEvent},
-        ListParams, RawApi,
+        MetaContent, WatchEvent,
+        ListParams, Resource,
     },
     client::APIClient,
     Result,
@@ -21,41 +21,23 @@ use std::{sync::Arc, time::Duration};
 #[derive(Clone)]
 pub struct Informer<K>
 where
-    K: Clone + DeserializeOwned + Metadata,
+    K: Clone + DeserializeOwned + MetaContent,
 {
     version: Arc<Mutex<String>>,
     client: APIClient,
-    resource: RawApi,
+    resource: Resource,
     params: ListParams,
     needs_resync: Arc<Mutex<bool>>,
     needs_retry: Arc<Mutex<bool>>,
     phantom: std::marker::PhantomData<K>,
 }
 
-// impl<K> Informer<K>
-// where
-// K: Clone + DeserializeOwned + Metadata,
-// {
-// Create a reflector with a kube client on a kube resource
-// pub fn new(r: Api<K>) -> Self {
-// Informer {
-// client: r.client,
-// resource: r.api,
-// params: ListParams::default(),
-// version: Arc::new(Mutex::new(0.to_string())),
-// needs_resync: Arc::new(Mutex::new(false)),
-// needs_retry: Arc::new(Mutex::new(false)),
-// phantom: std::marker::PhantomData,
-// }
-// }
-// }
-
 impl<K> Informer<K>
 where
     K: Clone + DeserializeOwned + MetaContent,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn raw(client: APIClient, r: RawApi) -> Self {
+    pub fn new(client: APIClient, r: Resource) -> Self {
         Informer {
             client,
             resource: r,

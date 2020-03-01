@@ -1,81 +1,9 @@
-#![allow(non_snake_case)]
 use crate::{
-    api::metadata::{ListMeta, ObjectMeta, TypeMeta},
+    api::metadata::{TypeMeta, ObjectMeta, ListMeta, Metadata},
     ErrorResponse,
 };
 use serde::Deserialize;
 use std::fmt::Debug;
-
-
-/// Accessor trait needed to build higher level abstractions on kubernetes objects
-///
-/// Slight mirror of k8s_openapi::Metadata to avoid a hard dependency
-/// Note that their trait does not require Metadata existence, but ours does.
-#[cfg(not(feature = "openapi"))]
-pub trait Metadata {
-    /// The metadata type (typically ObjectMeta, but sometimes ListMeta)
-    type Ty;
-    /// Every object must have metadata
-    ///
-    /// But to match k8s_openapi::Metadata, we pretend it's optional
-    fn metadata(&self) -> Option<&Self::Ty>;
-}
-
-/// Make sure they are have similar use cases
-#[cfg(feature = "openapi")]
-pub use k8s_openapi::Metadata;
-
-pub trait MetaContent: Metadata {
-    fn resource_ver(&self) -> Option<String>;
-    fn name(&self) -> String;
-    fn namespace(&self) -> Option<String>;
-}
-
-#[cfg(not(feature = "openapi"))]
-impl<K> MetaContent for K
-where
-    K: Metadata<Ty = ObjectMeta>,
-{
-    fn resource_ver(&self) -> Option<String> {
-        self.metadata().unwrap().resourceVersion.clone()
-    }
-
-    fn name(&self) -> String {
-        self.metadata().unwrap().name.clone()
-    }
-
-    fn namespace(&self) -> Option<String> {
-        self.metadata().unwrap().namespace.clone()
-    }
-}
-
-#[cfg(feature = "openapi")]
-impl<K> MetaContent for K
-where
-    K: k8s_openapi::Metadata<Ty = k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta>,
-{
-    fn resource_ver(&self) -> Option<String> {
-        self.metadata()
-            .expect("all useful k8s_openapi types have metadata")
-            .resource_version
-            .clone()
-    }
-
-    fn name(&self) -> String {
-        self.metadata()
-            .expect("all useful k8s_openapi types have metadata")
-            .name
-            .clone()
-            .unwrap()
-    }
-
-    fn namespace(&self) -> Option<String> {
-        self.metadata()
-            .expect("all useful k8s_openapi types have metadata")
-            .namespace
-            .clone()
-    }
-}
 
 /// A raw event returned from a watch query
 ///
@@ -112,6 +40,9 @@ where
 ///
 /// This struct appears in `ObjectList` and `WatchEvent`, and when using a `Reflector`,
 /// and is exposed as the values in `ObjectMap`.
+///
+/// This is what kubernetes maintainers tell you the world looks like.
+/// It's.. generally true.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Object<P, U>
 where
@@ -141,25 +72,15 @@ where
 }
 
 /// Blanked implementation for standard objects that can use Object
-#[cfg(feature = "openapi")]
+///
+/// This is primarily useful for types created through `CustomResource`
+/// if https://github.com/Arnavion/k8s-openapi/issues/61 gets resolved.
+/// If not, then Object is kind of useless with the openapi dependency.
 impl<P, U> Metadata for Object<P, U>
 where
     P: Clone,
     U: Clone,
     Object<P, U>: k8s_openapi::Resource,
-{
-    type Ty = ObjectMeta;
-
-    fn metadata(&self) -> Option<&ObjectMeta> {
-        Some(&self.metadata)
-    }
-}
-
-#[cfg(not(feature = "openapi"))]
-impl<P, U> Metadata for Object<P, U>
-where
-    P: Clone,
-    U: Clone,
 {
     type Ty = ObjectMeta;
 
@@ -174,7 +95,9 @@ where
 /// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
 ///
 /// Note that this is only used internally within reflectors and informers,
-/// and is generally produced from list/watch/delete collection queries on an `RawApi`.
+/// and is generally produced from list/watch/delete collection queries on an `Resource`.
+///
+/// This is now equivalent to k8s_openapi::List<T>, but with extra convenience impls
 #[derive(Deserialize)]
 pub struct ObjectList<T>
 where
@@ -183,7 +106,7 @@ where
     // NB: kind and apiVersion can be set here, but no need for it atm
     /// ListMeta - only really used for its resourceVersion
     ///
-    /// See [ListMeta](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ListMeta.html)
+    /// See [ListMeta](https://arnavion.github.io/k8s-openapi/v0.7.x/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ListMeta.html)
     pub metadata: ListMeta,
 
     /// The items we are actually interested in. In practice; T:= Resource<T,U>.
