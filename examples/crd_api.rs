@@ -30,7 +30,7 @@ pub struct FooStatus {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let config = config::load_kube_config().await?;
     let client = APIClient::new(config);

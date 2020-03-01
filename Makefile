@@ -4,6 +4,7 @@ clippy:
 	#rustup component add clippy --toolchain nightly
 	touch src/lib.rs
 	cargo +nightly clippy --no-default-features --features=rustls-tls
+	cargo +nightly clippy --no-default-features --features=rustls-tls --examples -- --allow clippy::or_fun_call
 
 fmt:
 	#rustup component add rustfmt --toolchain nightly
