@@ -35,6 +35,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 /// Generally maps and vecs are moved out of their Options to avoid unnecessary boxing
 /// because `xs.is_none()` is often functionally equivalent to `xs.is_empty()`.
 #[derive(Deserialize, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ObjectMeta {
     /// The unique name (within namespace) for a resource
     ///
