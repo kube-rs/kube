@@ -9,6 +9,8 @@ use std::marker::PhantomData;
 ///
 /// This is the smallest amount of info we need to run the API against a CR
 /// The version, and group must be set by the user.
+///
+/// Prefer using #[derive(CustomResource)] from `kube-derive` over this.
 pub struct CustomResource {
     kind: String,
     group: String,
@@ -129,7 +131,6 @@ impl CustomResource {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::api::{CustomResource, PatchParams, PostParams, Resource};
@@ -154,19 +155,22 @@ mod test {
     #[ignore] // circle has no kube config
     async fn convenient_custom_resource() {
         use crate::{api::Api, client::APIClient, config};
-        #[derive(Clone, Debug, PartialEq, kube_derive::CustomResource, Deserialize, Serialize)]
-        #[kube(group = "clux.dev", version = "v1", plural = "foos", namespaced)]
+        #[derive(Clone, Debug, kube_derive::CustomResource, Deserialize, Serialize)]
+        #[kube(group = "clux.dev", version = "v1", namespaced)]
         struct FooSpec {
             foo: String,
         };
         let config = config::load_kube_config().await.unwrap();
         let client = APIClient::new(config);
-        let _r: Api<Foo> = CustomResource::kind("Foo")
+        let r1: Api<Foo> = Api::namespaced(client.clone(), "myns");
+
+        let r2 : Api<Foo> = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
             .build()
             .into_api(client);
+        assert_eq!(r1.api.api_version, r2.api.api_version);
         // ^ ensures that traits are implemented
     }
 }

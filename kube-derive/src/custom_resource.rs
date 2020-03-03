@@ -2,8 +2,6 @@ use crate::{CustomDerive, ResultExt};
 use proc_macro2::{Ident, Span};
 use syn::{Data, DeriveInput, Result};
 
-// TODO: deal with different crd versions pre/post 1.17
-// https://book.kubebuilder.io/reference/generating-crd.html
 #[derive(Debug)]
 pub struct CustomResource {
     tokens: proc_macro2::TokenStream,
@@ -13,7 +11,9 @@ pub struct CustomResource {
     version: String,
     namespaced: bool,
     status: bool,
+    unstable: bool,
     printcolums: Vec<String>,
+    scale: Option<String>,
 }
 
 impl CustomDerive for CustomResource {
@@ -41,13 +41,14 @@ impl CustomDerive for CustomResource {
         let mut version = None;
         let mut namespaced = false;
         let mut status = false;
+        let mut unstable = false;
+        let mut scale = None;
         let mut printcolums = vec![];
         // TODO:
-        // #[kube(subresource = scale)] ?
-        // #[kube(status = FooStatus)] match subresource? (currently just assumes FooStatus)
-        // better printcolumn
+        // #[kube(subresource:status = FooStatus)] ?
+        // better printcolumn + scale parsing?
 
-        // TODO: identify the FooSpec name from input somehow
+        // Arg parsing
         for attr in &input.attrs {
             if attr.style != syn::AttrStyle::Outer {
                 continue;
@@ -80,6 +81,14 @@ impl CustomDerive for CustomResource {
                                 return Err(r#"#[kube(version = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
+                        } else if meta.path.is_ident("subresource_scale") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                scale = Some(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(subresource_scale = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
                         } else if meta.path.is_ident("printcolumn") {
                             if let syn::Lit::Str(lit) = &meta.lit {
                                 printcolums.push(lit.value());
@@ -97,8 +106,11 @@ impl CustomDerive for CustomResource {
                         if path.is_ident("namespaced") {
                             namespaced = true;
                             continue;
-                        } else if path.is_ident("status") {
+                        } else if path.is_ident("subresource_status") {
                             status = true;
+                            continue;
+                        } else if path.is_ident("unstable") {
+                            unstable = true;
                             continue;
                         } else {
                             &meta
@@ -132,9 +144,12 @@ impl CustomDerive for CustomResource {
             namespaced,
             printcolums,
             status,
+            unstable,
+            scale
         })
     }
 
+    // Using parsed info, create code
     fn emit(self) -> Result<proc_macro2::TokenStream> {
         let CustomResource {
             tokens,
@@ -144,7 +159,9 @@ impl CustomDerive for CustomResource {
             version,
             namespaced,
             status,
-            printcolums
+            printcolums,
+            unstable,
+            scale
         } = self;
 
 
@@ -165,7 +182,7 @@ impl CustomDerive for CustomResource {
         };
 
         let root_obj = quote! {
-            #[derive(Debug)]
+            #[derive(Serialize, Deserialize, Debug, Clone)]
             pub struct #rootident {
                 metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
                 spec: #ident,
@@ -203,45 +220,62 @@ impl CustomDerive for CustomResource {
         // TODO: verify serialize at compile time vs current runtime check..
         // HOWEVER.. That requires k8s_openapi dep in here..
         // and we need to define the version feature :/
-        // tbh, still need to have a check for at runtime though..
+        // ... this will clash with user selected feature :(
         // Sketch:
-/*        use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-        let crd : CustomResourceDefinition = serde_json::from_value(serde_json::json!({
-            "metadata": {
-                "name": name,
-            },
-            "spec": {
-                "group": group,
-                "scope": scope,
-                "names": {
-                    "plural": plural,
-                    "singular": name,
-                    "kind": kind,
-                },
-                "versions": [{
-                  "name": version,
-                  "served": true,
-                  "storage": true,
-                }],
-                "subresources": {
-                    "status": {}
-                }
-            }
-        })).map_err(|e| format!(r#"#[derive(CustomResource)] was unable to deserialize CustomResourceDefinition: {}"#, e))
-        .spanning(&tokens)?;
-        let crd_json = serde_json::to_string(&crd).unwrap();
-*/
-        let cols = format!("[ {} ]", printcolums.join(",")); // hacksss
-        //println!("got {}", cols);
+        //use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+        //let crd : CustomResourceDefinition = serde_json::from_value(
+        //    serde_json::json!({})
+        //    ).map_err(|e| format!(r#"#[derive(CustomResource)] was unable to deserialize CustomResourceDefinition: {}"#, e))
+        //.spanning(&tokens)?;
+        //let crd_json = serde_json::to_string(&crd).unwrap();
 
+        // Compute a bunch of crd props
+        let printers = format!("[ {} ]", printcolums.join(",")); // hacksss
+        let scale_code = if let Some(s) = scale {
+            s
+        } else {
+            "".to_string()
+        };
+
+        // Ensure it generates for the correct CRD version
+        let use_correct_crd = if unstable {
+            quote! {
+                use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiext;
+            }
+        } else {
+            quote! {
+                use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiext;
+            }
+        };
+
+
+        let crd_meta_name = format!("{}.{}", plural, group);
+        let crd_meta = quote! { { "name": #crd_meta_name } };
         let impl_crd = quote! {
+            #use_correct_crd
             impl #rootident {
-                fn crd(&self) -> k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition {
-                    let columns : Vec<k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceColumnDefinition> = serde_json::from_str(#cols).expect("valid printer column json");
+                fn crd() -> apiext::CustomResourceDefinition {
+                    let columns : Vec<apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
+                    let scale: Option<apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
+                        None
+                    } else {
+                        serde_json::from_str(#scale_code).expect("valid scale subresource json")
+                    };
+                    let subres = if #status {
+                        if let Some(s) = &scale {
+                            serde_json::json!({
+                                "status": {},
+                                "scale": scale
+                            })
+                        } else {
+                            serde_json::json!({"status": {} })
+                        }
+                    } else {
+                        serde_json::json!({})
+                    };
+
                     serde_json::from_value(serde_json::json!({
-                        "metadata": {
-                            "name": #name,
-                        },
+                        "metadata": #crd_meta,
                         "spec": {
                             "group": #group,
                             "scope": #scope,
@@ -256,9 +290,7 @@ impl CustomDerive for CustomResource {
                               "storage": true,
                               "additionalPrinterColumns": columns,
                             }],
-                            "subresources": {
-                                "status": {}
-                            },
+                            "subresources": subres,
                         }
                     })).expect("valid custom resource from #[kube(attrs..)]")
                 }

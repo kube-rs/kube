@@ -1,18 +1,18 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
-#[macro_use] extern crate k8s_openapi_derive;
+#[macro_use] extern crate kube_derive;
 use futures_timer::Delay;
 use std::time::Duration;
 
 use kube::{
-    api::{CustomResource, ListParams, Meta},
+    api::{ListParams, Resource, Meta},
     client::APIClient,
     config,
     runtime::Reflector,
 };
 
-#[derive(CustomResourceDefinition, Deserialize, Serialize, Clone, Debug, PartialEq)]
-#[custom_resource_definition(group = "clux.dev", version = "v1", plural = "foos", namespaced)]
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
+#[kube(group = "clux.dev", version = "v1", namespaced)]
 pub struct FooSpec {
     name: String,
     info: String,
@@ -27,14 +27,8 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
-    let resource = CustomResource::kind("Foo")
-        .group("clux.dev")
-        .version("v1")
-        .within(&namespace)
-        .into_resource();
-
+    let resource = Resource::namespaced::<Foo>(&namespace);
     let lp = ListParams::default().timeout(20); // low timeout in this example
-
     let rf: Reflector<Foo> = Reflector::new(client, lp, resource).init().await?;
 
     let cloned = rf.clone();
