@@ -5,6 +5,7 @@ use kube::api::ObjectMeta;
 #[derive(CustomResource, Default, Debug)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 #[kube(status)]
+#[kube(printcolumn = "{\"name\":\"Spec\",\"type\": \"string\", \"description\":\"name of foo\",\"jsonPath\": \".spec.name\"}")]
 pub struct FooSpec {
     name: String,
     info: String,

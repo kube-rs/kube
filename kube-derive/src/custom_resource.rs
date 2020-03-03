@@ -45,7 +45,7 @@ impl CustomDerive for CustomResource {
         // TODO:
         // #[kube(subresource = scale)] ?
         // #[kube(status = FooStatus)] match subresource? (currently just assumes FooStatus)
-        // #[kube(printcolumn = "{name:`Alias`,type:string,description:`woot woot`,JSONPath=`blah`")]
+        // better printcolumn
 
         // TODO: identify the FooSpec name from input somehow
         for attr in &input.attrs {
@@ -175,7 +175,6 @@ impl CustomDerive for CustomResource {
 
         // 2. Implement Resource trait for k8s_openapi
         let api_ver = format!("{}/{}", group, version);
-        println!("impl Resource for {}", kind);
         let impl_resource = quote! {
             impl k8s_openapi::Resource for #rootident {
                 const API_VERSION: &'static str = #api_ver;
@@ -204,7 +203,7 @@ impl CustomDerive for CustomResource {
         // TODO: verify serialize at compile time vs current runtime check..
         // HOWEVER.. That requires k8s_openapi dep in here..
         // and we need to define the version feature :/
-        // tbh, still need to have a check for it here though..
+        // tbh, still need to have a check for at runtime though..
         // Sketch:
 /*        use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
         let crd : CustomResourceDefinition = serde_json::from_value(serde_json::json!({
@@ -232,9 +231,13 @@ impl CustomDerive for CustomResource {
         .spanning(&tokens)?;
         let crd_json = serde_json::to_string(&crd).unwrap();
 */
+        let cols = format!("[ {} ]", printcolums.join(",")); // hacksss
+        //println!("got {}", cols);
+
         let impl_crd = quote! {
             impl #rootident {
                 fn crd(&self) -> k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition {
+                    let columns : Vec<k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceColumnDefinition> = serde_json::from_str(#cols).expect("valid printer column json");
                     serde_json::from_value(serde_json::json!({
                         "metadata": {
                             "name": #name,
@@ -251,10 +254,11 @@ impl CustomDerive for CustomResource {
                               "name": #version,
                               "served": true,
                               "storage": true,
+                              "additionalPrinterColumns": columns,
                             }],
                             "subresources": {
                                 "status": {}
-                            }
+                            },
                         }
                     })).expect("valid custom resource from #[kube(attrs..)]")
                 }
