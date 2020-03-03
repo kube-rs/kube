@@ -18,7 +18,9 @@ use kube::{
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 #[kube(unstable)] // v1beta1::CustomResourceDefinition
 #[kube(subresource_status)]
-#[kube(subresource_scale = "{\"specReplicasPath\":\".spec.replicas\", \"statusReplicasPath\":\".status.replicas\"}")]
+#[kube(
+    subresource_scale = "{\"specReplicasPath\":\".spec.replicas\", \"statusReplicasPath\":\".status.replicas\"}"
+)]
 pub struct FooSpec {
     name: String,
     info: String,
@@ -64,7 +66,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Create the CRD so we can create Foos in kube
     let foocrd = Foo::crd();
-    info!("Creating CRD foos.clux.dev: {}", serde_json::to_string_pretty(&foocrd)?);
+    info!(
+        "Creating CRD foos.clux.dev: {}",
+        serde_json::to_string_pretty(&foocrd)?
+    );
     let pp = PostParams::default();
     let patch_params = PatchParams::default();
     match crds.create(&pp, serde_json::to_vec(&foocrd)?).await {

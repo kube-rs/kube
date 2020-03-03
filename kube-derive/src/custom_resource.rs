@@ -86,8 +86,10 @@ impl CustomDerive for CustomResource {
                                 scale = Some(lit.value());
                                 continue;
                             } else {
-                                return Err(r#"#[kube(subresource_scale = "...")] expects a string literal value"#)
-                                    .spanning(meta);
+                                return Err(
+                                    r#"#[kube(subresource_scale = "...")] expects a string literal value"#,
+                                )
+                                .spanning(meta);
                             }
                         } else if meta.path.is_ident("printcolumn") {
                             if let syn::Lit::Str(lit) = &meta.lit {
@@ -145,7 +147,7 @@ impl CustomDerive for CustomResource {
             printcolums,
             status,
             unstable,
-            scale
+            scale,
         })
     }
 
@@ -161,7 +163,7 @@ impl CustomDerive for CustomResource {
             status,
             printcolums,
             unstable,
-            scale
+            scale,
         } = self;
 
 
@@ -175,10 +177,10 @@ impl CustomDerive for CustomResource {
 
         // if status set, also add that
         let statusq = if status {
-            let ident  = format_ident!("{}{}", kind, "Status");
+            let ident = format_ident!("{}{}", kind, "Status");
             quote! { status: Option<#ident>, }
         } else {
-            quote! { }
+            quote! {}
         };
 
         let root_obj = quote! {
@@ -231,11 +233,7 @@ impl CustomDerive for CustomResource {
 
         // Compute a bunch of crd props
         let printers = format!("[ {} ]", printcolums.join(",")); // hacksss
-        let scale_code = if let Some(s) = scale {
-            s
-        } else {
-            "".to_string()
-        };
+        let scale_code = if let Some(s) = scale { s } else { "".to_string() };
 
         // Ensure it generates for the correct CRD version
         let use_correct_crd = if unstable {

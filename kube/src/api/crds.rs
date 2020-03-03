@@ -164,7 +164,7 @@ mod test {
         let client = APIClient::new(config);
         let r1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
-        let r2 : Api<Foo> = CustomResource::kind("Foo")
+        let r2: Api<Foo> = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
