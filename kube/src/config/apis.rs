@@ -143,11 +143,14 @@ impl Config {
 }
 
 impl Cluster {
-    pub(crate) fn load_certificate_authority(&self) -> Result<Vec<u8>> {
+    pub(crate) fn load_certificate_authority(&self) -> Result<Option<Vec<u8>>> {
+        if self.certificate_authority.is_none() && self.certificate_authority_data.is_none() {
+            return Ok(None);
+        }
         let res =
             utils::data_or_file_with_base64(&self.certificate_authority_data, &self.certificate_authority)
                 .map_err(|e| Error::KubeConfig(format!("{}", e)))?;
-        Ok(res)
+        Ok(Some(res))
     }
 }
 

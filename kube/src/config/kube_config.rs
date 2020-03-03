@@ -97,11 +97,17 @@ impl KubeConfigLoader {
     }
 
     #[cfg(feature = "native-tls")]
-    pub fn ca_bundle(&self) -> Result<Vec<Der>> {
+    pub fn ca_bundle(&self) -> Result<Option<Vec<Der>>> {
         let bundle = self
             .cluster
             .load_certificate_authority()
             .map_err(|e| Error::SslError(format!("{}", e)))?;
+
+        if bundle.is_none() {
+            return Ok(None)
+        }
+        let bundle = bundle.unwrap();
+
         let bundle = X509::stack_from_pem(&bundle).map_err(|e| Error::SslError(format!("{}", e)))?;
 
         let mut stack = vec![];
@@ -109,14 +115,20 @@ impl KubeConfigLoader {
             let der = ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
             stack.push(Der(der))
         }
-        Ok(stack)
+        Ok(Some(stack))
     }
 
     #[cfg(feature = "rustls-tls")]
-    pub fn ca_bundle(&self) -> Result<Vec<Der>> {
+    pub fn ca_bundle(&self) -> Result<Option<Vec<Der>>> {
         use rustls::internal::pemfile;
         use std::io::Cursor;
         let bundle = self.cluster.load_certificate_authority()?;
+
+        if bundle.is_none() {
+            return Ok(None)
+        }
+        let bundle = bundle.unwrap();
+
         let mut pem = Cursor::new(bundle);
         pem.set_position(0);
 
@@ -124,6 +136,6 @@ impl KubeConfigLoader {
         for ca in pemfile::certs(&mut pem).map_err(|e| Error::SslError(format!("{:?}", e)))? {
             stack.push(Der(ca.0))
         }
-        Ok(stack)
+        Ok(Some(stack))
     }
 }
