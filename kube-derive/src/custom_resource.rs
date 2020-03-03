@@ -1,0 +1,277 @@
+use crate::{CustomDerive, ResultExt};
+use proc_macro2::{Ident, Span};
+use syn::{Data, DeriveInput, Result};
+
+// TODO: deal with different crd versions pre/post 1.17
+// https://book.kubebuilder.io/reference/generating-crd.html
+#[derive(Debug)]
+pub struct CustomResource {
+    tokens: proc_macro2::TokenStream,
+    ident: proc_macro2::Ident,
+    kind: String,
+    group: String,
+    version: String,
+    namespaced: bool,
+    status: bool,
+    printcolums: Vec<String>,
+}
+
+impl CustomDerive for CustomResource {
+    fn parse(input: DeriveInput, tokens: proc_macro2::TokenStream) -> Result<Self> {
+        let ident = input.ident;
+
+        // Limit derive to structs
+        let _s = match input.data {
+            Data::Struct(ref s) => s,
+            _ => return Err(r#"Enums or Unions can not #[derive(CustomResource)"#).spanning(ident),
+        };
+
+        // Parse struct name. Must end in Spec and be PascalCase
+        let kind = {
+            let struct_name = ident.to_string();
+            if !struct_name.ends_with("Spec") {
+                return Err("#[derive(CustomResource)] requires the name of the struct to end with `Spec`")
+                    .spanning(ident);
+            }
+            struct_name[..(struct_name.len() - 4)].to_owned()
+        };
+
+        // Outputs
+        let mut group = None;
+        let mut version = None;
+        let mut namespaced = false;
+        let mut status = false;
+        let mut printcolums = vec![];
+        // TODO:
+        // #[kube(subresource = scale)] ?
+        // #[kube(status = FooStatus)] match subresource? (currently just assumes FooStatus)
+        // #[kube(printcolumn = "{name:`Alias`,type:string,description:`woot woot`,JSONPath=`blah`")]
+
+        // TODO: identify the FooSpec name from input somehow
+        for attr in &input.attrs {
+            if attr.style != syn::AttrStyle::Outer {
+                continue;
+            }
+            if !attr.path.is_ident("kube") {
+                continue;
+            }
+            let metas = match attr.parse_meta()? {
+                syn::Meta::List(meta) => meta.nested,
+                meta => return Err(r#"#[kube] expects a list of metas, like `#[kube(...)]`"#).spanning(meta),
+            };
+
+            for meta in metas {
+                let meta: &dyn quote::ToTokens = match &meta {
+                    // key-value arguments
+                    syn::NestedMeta::Meta(syn::Meta::NameValue(meta)) => {
+                        if meta.path.is_ident("group") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                group = Some(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(group = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
+                        } else if meta.path.is_ident("version") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                version = Some(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(version = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
+                        } else if meta.path.is_ident("printcolumn") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                printcolums.push(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(printcolumn = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
+                        } else {
+                            meta
+                        }
+                    }
+                    // indicator arguments
+                    syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
+                        if path.is_ident("namespaced") {
+                            namespaced = true;
+                            continue;
+                        } else if path.is_ident("status") {
+                            status = true;
+                            continue;
+                        } else {
+                            &meta
+                        }
+                    }
+
+                    // unknown arg
+                    meta => meta,
+                };
+                // throw on unknown arg
+                return
+                    Err(r#"#[derive(CustomResource)] found unexpected meta. Expected `group = "..."`, `namespaced`, or `version = "..."`"#)
+                    .spanning(meta);
+            }
+        }
+        let mkerror = |arg| {
+            format!(
+                r#"#[derive(CustomResource)] did not find a #[kube({} = "...")] attribute on the struct"#,
+                arg
+            )
+        };
+        let group = group.ok_or(mkerror("group")).spanning(&tokens)?;
+        let version = version.ok_or(mkerror("version")).spanning(&tokens)?;
+
+        Ok(CustomResource {
+            tokens,
+            ident,
+            kind,
+            group,
+            version,
+            namespaced,
+            printcolums,
+            status,
+        })
+    }
+
+    fn emit(self) -> Result<proc_macro2::TokenStream> {
+        let CustomResource {
+            tokens,
+            ident,
+            group,
+            kind,
+            version,
+            namespaced,
+            status,
+            printcolums
+        } = self;
+
+
+        // 1. Create root object Foo and truncate name from FooSpec
+
+        // Default visibility is `pub(crate)`
+        // Default generics is no generics (makes little sense to re-use CRD kind?)
+        // We enforce metadata + spec's existence (always there)
+        // => No default impl
+        let rootident = Ident::new(&kind, Span::call_site());
+
+        // if status set, also add that
+        let statusq = if status {
+            let ident  = format_ident!("{}{}", kind, "Status");
+            quote! { status: Option<#ident>, }
+        } else {
+            quote! { }
+        };
+
+        let root_obj = quote! {
+            #[derive(Debug)]
+            pub struct #rootident {
+                metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
+                spec: #ident,
+                #statusq
+            }
+        };
+
+        // 2. Implement Resource trait for k8s_openapi
+        let api_ver = format!("{}/{}", group, version);
+        println!("impl Resource for {}", kind);
+        let impl_resource = quote! {
+            impl k8s_openapi::Resource for #rootident {
+                const API_VERSION: &'static str = #api_ver;
+                const GROUP: &'static str = #group;
+                const KIND: &'static str = #kind;
+                const VERSION: &'static str = #version;
+            }
+        };
+
+        // 3. Implement Metadata trait for k8s_openapi
+        let impl_metadata = quote! {
+            impl k8s_openapi::Metadata for #rootident {
+                type Ty = k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+                fn metadata(&self) -> Option<&Self::Ty> {
+                    Some(&self.metadata)
+                }
+            }
+        };
+
+        // 4. Implement CustomResource
+        use inflector::string::pluralize::to_plural;
+        let name = kind.to_ascii_lowercase();
+        let plural = to_plural(&name);
+        let scope = if namespaced { "Namespaced" } else { "Cluster" };
+
+        // TODO: verify serialize at compile time vs current runtime check..
+        // HOWEVER.. That requires k8s_openapi dep in here..
+        // and we need to define the version feature :/
+        // tbh, still need to have a check for it here though..
+        // Sketch:
+/*        use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+        let crd : CustomResourceDefinition = serde_json::from_value(serde_json::json!({
+            "metadata": {
+                "name": name,
+            },
+            "spec": {
+                "group": group,
+                "scope": scope,
+                "names": {
+                    "plural": plural,
+                    "singular": name,
+                    "kind": kind,
+                },
+                "versions": [{
+                  "name": version,
+                  "served": true,
+                  "storage": true,
+                }],
+                "subresources": {
+                    "status": {}
+                }
+            }
+        })).map_err(|e| format!(r#"#[derive(CustomResource)] was unable to deserialize CustomResourceDefinition: {}"#, e))
+        .spanning(&tokens)?;
+        let crd_json = serde_json::to_string(&crd).unwrap();
+*/
+        let impl_crd = quote! {
+            impl #rootident {
+                fn crd(&self) -> k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition {
+                    serde_json::from_value(serde_json::json!({
+                        "metadata": {
+                            "name": #name,
+                        },
+                        "spec": {
+                            "group": #group,
+                            "scope": #scope,
+                            "names": {
+                                "plural": #plural,
+                                "singular": #name,
+                                "kind": #kind,
+                            },
+                            "versions": [{
+                              "name": #version,
+                              "served": true,
+                              "storage": true,
+                            }],
+                            "subresources": {
+                                "status": {}
+                            }
+                        }
+                    })).expect("valid custom resource from #[kube(attrs..)]")
+                }
+            }
+        };
+
+        // Concat output
+        let output = quote! {
+            #root_obj
+            #impl_resource
+            #impl_metadata
+            #impl_crd
+        };
+        // Try to convert to a TokenStream
+        let res = syn::parse(output.into())
+            .map_err(|err| format!("#[derive(CustomResource)] failed: {:?}", err))
+            .spanning(&tokens)?;
+        Ok(res)
+    }
+}

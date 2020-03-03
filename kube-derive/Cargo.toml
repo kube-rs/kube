@@ -9,10 +9,20 @@ repository = "https://github.com/clux/kube-rs"
 readme = "README.md"
 
 [dependencies]
-#http = "0.2"
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "1", features = ["extra-traits"] }
+Inflector = "0.11.4"
+serde_json = "1.0.48"
+
+[dev-dependencies.k8s-openapi]
+version = "0.7.1"
+default-features = false
+features = ["v1_17"]
 
 [lib]
 proc-macro = true
+
+[features]
+default = []
+unstable-crd = []
