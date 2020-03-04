@@ -3,15 +3,13 @@
 use k8s_openapi::Resource;
 use kube::api::ObjectMeta;
 
+
+
 #[derive(CustomResource, Serialize, Deserialize, Default, Debug, Clone)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 #[kube(subresource_status)]
-#[kube(
-    subresource_scale = "{\"specReplicasPath\":\".spec.replicas\", \"statusReplicasPath\":\".status.replicas\"}"
-)]
-#[kube(
-    printcolumn = "{\"name\":\"Spec\", \"type\":\"string\", \"description\":\"name of foo\", \"jsonPath\":\".spec.name\"}"
-)]
+#[kube(subresource_scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+#[kube(printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#)]
 pub struct FooSpec {
     name: String,
     info: String,

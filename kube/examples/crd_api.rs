@@ -18,9 +18,7 @@ use kube::{
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 #[kube(unstable)] // v1beta1::CustomResourceDefinition
 #[kube(subresource_status)]
-#[kube(
-    subresource_scale = "{\"specReplicasPath\":\".spec.replicas\", \"statusReplicasPath\":\".status.replicas\"}"
-)]
+#[kube(subresource_scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
     info: String,
