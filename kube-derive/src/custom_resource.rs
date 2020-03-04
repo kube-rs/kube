@@ -11,7 +11,7 @@ pub struct CustomResource {
     version: String,
     namespaced: bool,
     status: bool,
-    unstable: bool,
+    crd_version: String,
     printcolums: Vec<String>,
     scale: Option<String>,
 }
@@ -41,12 +41,11 @@ impl CustomDerive for CustomResource {
         let mut version = None;
         let mut namespaced = false;
         let mut status = false;
-        let mut unstable = false;
+        let mut crd_version = "v1".to_string();
         let mut scale = None;
         let mut printcolums = vec![];
         // TODO:
         // #[kube(subresource:status = FooStatus)] ?
-        // better printcolumn + scale parsing?
 
         // Arg parsing
         for attr in &input.attrs {
@@ -91,6 +90,16 @@ impl CustomDerive for CustomResource {
                                 )
                                 .spanning(meta);
                             }
+                        } else if meta.path.is_ident("crd_version") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                crd_version = lit.value();
+                                continue;
+                            } else {
+                                return Err(
+                                    r#"#[kube(crd_version = "...")] expects a string literal value"#,
+                                )
+                                .spanning(meta);
+                            }
                         } else if meta.path.is_ident("printcolumn") {
                             if let syn::Lit::Str(lit) = &meta.lit {
                                 printcolums.push(lit.value());
@@ -110,9 +119,6 @@ impl CustomDerive for CustomResource {
                             continue;
                         } else if path.is_ident("subresource_status") {
                             status = true;
-                            continue;
-                        } else if path.is_ident("unstable") {
-                            unstable = true;
                             continue;
                         } else {
                             &meta
@@ -146,7 +152,7 @@ impl CustomDerive for CustomResource {
             namespaced,
             printcolums,
             status,
-            unstable,
+            crd_version,
             scale,
         })
     }
@@ -162,7 +168,7 @@ impl CustomDerive for CustomResource {
             namespaced,
             status,
             printcolums,
-            unstable,
+            crd_version,
             scale,
         } = self;
 
@@ -232,20 +238,18 @@ impl CustomDerive for CustomResource {
         //let crd_json = serde_json::to_string(&crd).unwrap();
 
         // Compute a bunch of crd props
-        let printers = format!("[ {} ]", printcolums.join(",")); // hacksss
+        let mut printers = format!("[ {} ]", printcolums.join(",")); // hacksss
+        if crd_version == "v1beta1" {
+            // only major api inconsistency..
+            printers = printers.replace("jsonPath", "JSONPath");
+        }
         let scale_code = if let Some(s) = scale { s } else { "".to_string() };
 
         // Ensure it generates for the correct CRD version
-        let use_correct_crd = if unstable {
-            quote! {
-                use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiext;
-            }
-        } else {
-            quote! {
-                use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiext;
-            }
+        let v1ident = format_ident!("{}", crd_version);
+        let use_correct_crd = quote !{
+            use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident as apiext;
         };
-
 
         let crd_meta_name = format!("{}.{}", plural, group);
         let crd_meta = quote! { { "name": #crd_meta_name } };
@@ -253,6 +257,7 @@ impl CustomDerive for CustomResource {
             #use_correct_crd
             impl #rootident {
                 fn crd() -> apiext::CustomResourceDefinition {
+                    trace!("Printers: {}, Scale: {}", #printers, #scale_code);
                     let columns : Vec<apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
                     let scale: Option<apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                         None

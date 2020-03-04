@@ -4,8 +4,8 @@
 use either::Either::{Left, Right};
 use serde_json::json;
 
-// Note: import corresponds to #[kube(unstable)]
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::CustomResourceDefinition;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
+use apiexts::CustomResourceDefinition;
 
 use kube::{
     api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
@@ -16,7 +16,7 @@ use kube::{
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
-#[kube(unstable)] // v1beta1::CustomResourceDefinition
+#[kube(crd_version = "v1beta1")]
 #[kube(subresource_status)]
 #[kube(subresource_scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
