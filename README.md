@@ -51,6 +51,38 @@ pods.delete("blog", &DeleteParams::default()).await?;
 
 See the examples ending in `_api` examples for more detail.
 
+## Custom Resource Definitions
+Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](./kube-derive). You only need to `#[derive(CustomResource)]` on a struct:
+
+```rust
+#[derive(CustomResource, Serialize, Deserialize, Default, Debug, Clone)]
+#[kube(group = "clux.dev", version = "v1", namespaced)]
+pub struct FooSpec {
+    name: String,
+    info: String,
+}
+```
+
+Then you can use a lot of generated code as:
+
+```rust
+fn main() {
+    let config = config::load_kube_config().await?;
+    let client = APIClient::new(config);
+
+    println!("kind = {}", Foo::KIND); // from k8s_openapi::Resource
+    let foos: Api<Foo> = Api::namespaced(client, "default");
+    let f = Foo {
+        metadata: ObjectMeta::default(),
+        spec: FooSpec::default()
+    };
+    // Print CRD
+    println!("{}", serde_json::to_string_pretty(&foo.crd());
+}
+```
+
+There are a ton of kubebuilder like instructions that you can annotate with here. See the `crd_` prefixed [examples](./kube/examples) for more.
+
 ## Runtime
 The optional `kube::runtime` module contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the watch book-keeping yourself.
 

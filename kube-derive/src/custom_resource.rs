@@ -1,6 +1,7 @@
 use crate::{CustomDerive, ResultExt};
 use proc_macro2::{Ident, Span};
 use syn::{Data, DeriveInput, Result};
+use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 
 #[derive(Debug)]
 pub struct CustomResource {
@@ -26,16 +27,6 @@ impl CustomDerive for CustomResource {
             _ => return Err(r#"Enums or Unions can not #[derive(CustomResource)"#).spanning(ident),
         };
 
-        // Parse struct name. Must end in Spec and be PascalCase
-        let kind = {
-            let struct_name = ident.to_string();
-            if !struct_name.ends_with("Spec") {
-                return Err("#[derive(CustomResource)] requires the name of the struct to end with `Spec`")
-                    .spanning(ident);
-            }
-            struct_name[..(struct_name.len() - 4)].to_owned()
-        };
-
         // Outputs
         let mut group = None;
         let mut version = None;
@@ -44,8 +35,10 @@ impl CustomDerive for CustomResource {
         let mut crd_version = "v1".to_string();
         let mut scale = None;
         let mut printcolums = vec![];
+        let mut kind = None;
         // TODO:
         // #[kube(subresource:status = FooStatus)] ?
+        // TODO: allow arbitrary spec name if kind argument given
 
         // Arg parsing
         for attr in &input.attrs {
@@ -83,6 +76,14 @@ impl CustomDerive for CustomResource {
                         } else if meta.path.is_ident("scale") {
                             if let syn::Lit::Str(lit) = &meta.lit {
                                 scale = Some(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(scale = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
+                        } else if meta.path.is_ident("kind") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                kind = Some(lit.value());
                                 continue;
                             } else {
                                 return Err(r#"#[kube(scale = "...")] expects a string literal value"#)
@@ -130,6 +131,29 @@ impl CustomDerive for CustomResource {
                     .spanning(meta);
             }
         }
+
+        // Find our Kind
+        let struct_name = ident.to_string();
+        let kind = if let Some(k) = kind {
+            if k == struct_name {
+                return Err(r#"#[derive(CustomResource)] `kind = "..."` must not equal the struct name (this is generated)"#)
+                    .spanning(ident);
+            }
+            k
+        } else {
+            // Fallback, infer from struct name
+
+            if !struct_name.ends_with("Spec") {
+                return Err(r#"#[derive(CustomResource)] requires either a `kind = "..."` or the struct to end with `Spec`"#)
+                    .spanning(ident);
+            }
+            struct_name[..(struct_name.len() - 4)].to_owned()
+        };
+        if !is_pascal_case(&kind) {
+            return Err(r#"#[derive(CustomResource)] requires a PascalCase `kind = "..."` or PascalCase struct name"#)
+                    .spanning(ident);
+        }
+
         let mkerror = |arg| {
             format!(
                 r#"#[derive(CustomResource)] did not find a #[kube({} = "...")] attribute on the struct"#,
@@ -216,7 +240,6 @@ impl CustomDerive for CustomResource {
         };
 
         // 4. Implement CustomResource
-        use inflector::string::pluralize::to_plural;
         let name = kind.to_ascii_lowercase();
         let plural = to_plural(&name);
         let scope = if namespaced { "Namespaced" } else { "Cluster" };
@@ -253,7 +276,6 @@ impl CustomDerive for CustomResource {
             #use_correct_crd
             impl #rootident {
                 fn crd() -> apiext::CustomResourceDefinition {
-                    trace!("Printers: {}, Scale: {}", #printers, #scale_code);
                     let columns : Vec<apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
                     let scale: Option<apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                         None

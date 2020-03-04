@@ -5,13 +5,13 @@ use kube::api::ObjectMeta;
 
 
 #[derive(CustomResource, Serialize, Deserialize, Default, Debug, Clone)]
-#[kube(group = "clux.dev", version = "v1", namespaced)]
+#[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status)]
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 #[kube(
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 )]
-pub struct FooSpec {
+pub struct MyFoo { // arbitrary name due to #[kube(kind = "Foo")]
     name: String,
     info: String,
 }
@@ -25,7 +25,7 @@ fn main() {
     println!("Kind {}", Foo::KIND);
     let foo = Foo {
         metadata: ObjectMeta::default(),
-        spec: FooSpec::default(),
+        spec: MyFoo::default(),
         status: Some(FooStatus { is_bad: true }),
     };
     println!("Foo: {:?}", foo);
