@@ -104,7 +104,7 @@ impl KubeConfigLoader {
             .map_err(|e| Error::SslError(format!("{}", e)))?;
 
         if bundle.is_none() {
-            return Ok(None)
+            return Ok(None);
         }
         let bundle = bundle.unwrap();
 
@@ -125,7 +125,7 @@ impl KubeConfigLoader {
         let bundle = self.cluster.load_certificate_authority()?;
 
         if bundle.is_none() {
-            return Ok(None)
+            return Ok(None);
         }
         let bundle = bundle.unwrap();
 

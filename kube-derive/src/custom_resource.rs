@@ -1,7 +1,7 @@
 use crate::{CustomDerive, ResultExt};
+use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 use proc_macro2::{Ident, Span};
 use syn::{Data, DeriveInput, Result};
-use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 
 #[derive(Debug)]
 pub struct CustomResource {
@@ -150,8 +150,10 @@ impl CustomDerive for CustomResource {
             struct_name[..(struct_name.len() - 4)].to_owned()
         };
         if !is_pascal_case(&kind) {
-            return Err(r#"#[derive(CustomResource)] requires a PascalCase `kind = "..."` or PascalCase struct name"#)
-                    .spanning(ident);
+            return Err(
+                r#"#[derive(CustomResource)] requires a PascalCase `kind = "..."` or PascalCase struct name"#,
+            )
+            .spanning(ident);
         }
 
         let mkerror = |arg| {

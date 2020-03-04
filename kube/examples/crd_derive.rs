@@ -11,7 +11,7 @@ use kube::api::ObjectMeta;
 #[kube(
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 )]
-pub struct MyFoo { // arbitrary name due to #[kube(kind = "Foo")]
+pub struct MyFoo {
     name: String,
     info: String,
 }
