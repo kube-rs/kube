@@ -46,8 +46,8 @@ use custom_resource::CustomResource;
 /// This will generate a root object that implements the `k8s_openapi::Metadata` and
 /// `k8s_openapi::Resource` traits for this type so it can be used with `kube::Api`
 ///
-/// Additionally, it will implement the `kube::CustomResourceDefinition` trait,
-/// which allows posting, or printing the CustomResourceDefinition.
+/// Additionally, it will implement a `Foo::crd` function which will generate the,
+/// CustomResourceDefinition at the specified api version (or v1 if unspecified).
 ///
 /// # Example
 ///
@@ -64,6 +64,11 @@ use custom_resource::CustomResource;
 ///
 /// This example creates a `struct Foo` containing metadata, the spec,
 /// and optionally status.
+///
+/// The struct should be named MyKindSpec for it to infer the Kind is MyKind normally.
+/// But you can also use an arbitrary name if you supply `#[kube(kind = "MyFoo")]`
+///
+/// Setting printercolumns + subresources are also supported.
 ///
 ///
 /// Try `cargo-expand` to see your own macro expansion.
