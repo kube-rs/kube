@@ -4,8 +4,8 @@
 use either::Either::{Left, Right};
 use serde_json::json;
 
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 use apiexts::CustomResourceDefinition;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 
 use kube::{
     api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
@@ -17,8 +17,8 @@ use kube::{
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 #[kube(crd_version = "v1beta1")]
-#[kube(subresource_status)]
-#[kube(subresource_scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+#[kube(status)]
+#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
     info: String,
@@ -64,10 +64,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create the CRD so we can create Foos in kube
     let foocrd = Foo::crd();
-    info!(
-        "Creating CRD foos.clux.dev: {}",
-        serde_json::to_string_pretty(&foocrd)?
-    );
+    info!("Creating Foo CRD: {}", serde_json::to_string_pretty(&foocrd)?);
     let pp = PostParams::default();
     let patch_params = PatchParams::default();
     match crds.create(&pp, serde_json::to_vec(&foocrd)?).await {

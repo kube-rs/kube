@@ -80,25 +80,21 @@ impl CustomDerive for CustomResource {
                                 return Err(r#"#[kube(version = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
-                        } else if meta.path.is_ident("subresource_scale") {
+                        } else if meta.path.is_ident("scale") {
                             if let syn::Lit::Str(lit) = &meta.lit {
                                 scale = Some(lit.value());
                                 continue;
                             } else {
-                                return Err(
-                                    r#"#[kube(subresource_scale = "...")] expects a string literal value"#,
-                                )
-                                .spanning(meta);
+                                return Err(r#"#[kube(scale = "...")] expects a string literal value"#)
+                                    .spanning(meta);
                             }
                         } else if meta.path.is_ident("crd_version") {
                             if let syn::Lit::Str(lit) = &meta.lit {
                                 crd_version = lit.value();
                                 continue;
                             } else {
-                                return Err(
-                                    r#"#[kube(crd_version = "...")] expects a string literal value"#,
-                                )
-                                .spanning(meta);
+                                return Err(r#"#[kube(crd_version = "...")] expects a string literal value"#)
+                                    .spanning(meta);
                             }
                         } else if meta.path.is_ident("printcolumn") {
                             if let syn::Lit::Str(lit) = &meta.lit {
@@ -117,7 +113,7 @@ impl CustomDerive for CustomResource {
                         if path.is_ident("namespaced") {
                             namespaced = true;
                             continue;
-                        } else if path.is_ident("subresource_status") {
+                        } else if path.is_ident("status") {
                             status = true;
                             continue;
                         } else {
@@ -247,7 +243,7 @@ impl CustomDerive for CustomResource {
 
         // Ensure it generates for the correct CRD version
         let v1ident = format_ident!("{}", crd_version);
-        let use_correct_crd = quote !{
+        let use_correct_crd = quote! {
             use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident as apiext;
         };
 
