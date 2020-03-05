@@ -55,7 +55,7 @@ See the examples ending in `_api` examples for more detail.
 Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](./kube-derive). You only need to `#[derive(CustomResource)]` on a struct:
 
 ```rust
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, Clone)]
+#[derive(CustomResource, Serialize, Deserialize, Default, Clone)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 pub struct FooSpec {
     name: String,

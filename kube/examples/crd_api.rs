@@ -16,8 +16,8 @@ use kube::{
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
-#[kube(crd_version = "v1beta1")]
-#[kube(status)]
+#[kube(apiextensions = "v1beta1")]
+#[kube(status = "FooStatus")]
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,

@@ -11,8 +11,9 @@ pub struct CustomResource {
     group: String,
     version: String,
     namespaced: bool,
-    status: bool,
-    crd_version: String,
+    status: Option<String>,
+    shortnames: Vec<String>,
+    apiextensions: String,
     printcolums: Vec<String>,
     scale: Option<String>,
 }
@@ -31,14 +32,12 @@ impl CustomDerive for CustomResource {
         let mut group = None;
         let mut version = None;
         let mut namespaced = false;
-        let mut status = false;
-        let mut crd_version = "v1".to_string();
+        let mut status = None;
+        let mut apiextensions = "v1".to_string();
         let mut scale = None;
         let mut printcolums = vec![];
+        let mut shortnames = vec![];
         let mut kind = None;
-        // TODO:
-        // #[kube(subresource:status = FooStatus)] ?
-        // TODO: allow arbitrary spec name if kind argument given
 
         // Arg parsing
         for attr in &input.attrs {
@@ -81,6 +80,14 @@ impl CustomDerive for CustomResource {
                                 return Err(r#"#[kube(scale = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
+                        } else if meta.path.is_ident("shortname") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                shortnames.push(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(shortname = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
                         } else if meta.path.is_ident("kind") {
                             if let syn::Lit::Str(lit) = &meta.lit {
                                 kind = Some(lit.value());
@@ -89,13 +96,23 @@ impl CustomDerive for CustomResource {
                                 return Err(r#"#[kube(scale = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
-                        } else if meta.path.is_ident("crd_version") {
+                        } else if meta.path.is_ident("status") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                crd_version = lit.value();
+                                status = Some(lit.value());
                                 continue;
                             } else {
-                                return Err(r#"#[kube(crd_version = "...")] expects a string literal value"#)
+                                return Err(r#"#[kube(status = "...")] expects a string literal value"#)
                                     .spanning(meta);
+                            }
+                        } else if meta.path.is_ident("apiextensions") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                apiextensions = lit.value();
+                                continue;
+                            } else {
+                                return Err(
+                                    r#"#[kube(apiextensions = "...")] expects a string literal value"#,
+                                )
+                                .spanning(meta);
                             }
                         } else if meta.path.is_ident("printcolumn") {
                             if let syn::Lit::Str(lit) = &meta.lit {
@@ -106,6 +123,7 @@ impl CustomDerive for CustomResource {
                                     .spanning(meta);
                             }
                         } else {
+                            //println!("Unknown arg {:?}", meta.path.get_ident());
                             meta
                         }
                     }
@@ -113,9 +131,6 @@ impl CustomDerive for CustomResource {
                     syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
                         if path.is_ident("namespaced") {
                             namespaced = true;
-                            continue;
-                        } else if path.is_ident("status") {
-                            status = true;
                             continue;
                         } else {
                             &meta
@@ -126,9 +141,7 @@ impl CustomDerive for CustomResource {
                     meta => meta,
                 };
                 // throw on unknown arg
-                return
-                    Err(r#"#[derive(CustomResource)] found unexpected meta. Expected `group = "..."`, `namespaced`, or `version = "..."`"#)
-                    .spanning(meta);
+                return Err(r#"#[derive(CustomResource)] found unexpected meta"#).spanning(meta);
             }
         }
 
@@ -149,9 +162,9 @@ impl CustomDerive for CustomResource {
             }
             struct_name[..(struct_name.len() - 4)].to_owned()
         };
-        if !is_pascal_case(&kind) {
+        if !is_pascal_case(&kind) || to_plural(&kind) == kind {
             return Err(
-                r#"#[derive(CustomResource)] requires a PascalCase `kind = "..."` or PascalCase struct name"#,
+                r#"#[derive(CustomResource)] requires a non-plural PascalCase `kind = "..."` or non-plural PascalCase struct name"#,
             )
             .spanning(ident);
         }
@@ -174,7 +187,8 @@ impl CustomDerive for CustomResource {
             namespaced,
             printcolums,
             status,
-            crd_version,
+            shortnames,
+            apiextensions,
             scale,
         })
     }
@@ -189,8 +203,9 @@ impl CustomDerive for CustomResource {
             version,
             namespaced,
             status,
+            shortnames,
             printcolums,
-            crd_version,
+            apiextensions,
             scale,
         } = self;
 
@@ -204,15 +219,16 @@ impl CustomDerive for CustomResource {
         let rootident = Ident::new(&kind, Span::call_site());
 
         // if status set, also add that
-        let statusq = if status {
-            let ident = format_ident!("{}{}", kind, "Status");
+        let statusq = if let Some(status_name) = &status {
+            let ident = format_ident!("{}", status_name);
             quote! { status: Option<#ident>, }
         } else {
             quote! {}
         };
+        let has_status = status.is_some();
 
         let root_obj = quote! {
-            #[derive(Serialize, Deserialize, Debug, Clone)]
+            #[derive(Serialize, Deserialize, Clone)]
             pub struct #rootident {
                 metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
                 spec: #ident,
@@ -260,31 +276,40 @@ impl CustomDerive for CustomResource {
 
         // Compute a bunch of crd props
         let mut printers = format!("[ {} ]", printcolums.join(",")); // hacksss
-        if crd_version == "v1beta1" {
+        if apiextensions == "v1beta1" {
             // only major api inconsistency..
             printers = printers.replace("jsonPath", "JSONPath");
         }
         let scale_code = if let Some(s) = scale { s } else { "".to_string() };
 
         // Ensure it generates for the correct CRD version
-        let v1ident = format_ident!("{}", crd_version);
+        let v1ident = format_ident!("{}", apiextensions);
         let use_correct_crd = quote! {
             use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident as apiext;
         };
 
+        let short_json = format!(
+            "[{}]",
+            shortnames
+                .into_iter()
+                .map(|sn| format!("\"{}\"", sn))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
         let crd_meta_name = format!("{}.{}", plural, group);
         let crd_meta = quote! { { "name": #crd_meta_name } };
         let impl_crd = quote! {
             #use_correct_crd
             impl #rootident {
-                fn crd() -> apiext::CustomResourceDefinition {
+                pub fn crd() -> apiext::CustomResourceDefinition {
                     let columns : Vec<apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
                     let scale: Option<apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                         None
                     } else {
                         serde_json::from_str(#scale_code).expect("valid scale subresource json")
                     };
-                    let subres = if #status {
+                    let shorts : Vec<String> = serde_json::from_str(#short_json).expect("valid shortnames");
+                    let subres = if #has_status {
                         if let Some(s) = &scale {
                             serde_json::json!({
                                 "status": {},
@@ -306,6 +331,7 @@ impl CustomDerive for CustomResource {
                                 "plural": #plural,
                                 "singular": #name,
                                 "kind": #kind,
+                                "shortNames": shorts
                             },
                             "versions": [{
                               "name": #version,
