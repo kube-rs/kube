@@ -1,4 +1,4 @@
-0.28.0 / 2020-03-XX
+0.28.0 / 2020-03-05
 ===================
   * `RawApi` removed -> `Resource` added
   * `Resource` implements `k8s_openapi::Resource`
@@ -7,7 +7,8 @@
   * `openapi` feature removed (light dependency mandatory now)
   * **LIBRARY WORKS WITH ALL `k8s_openapi` KUBERNETES OBJECTS**
   * `KubeObject` trait removed in favour of `Meta` trait
-  * `Object<FooSpec, FooStatus>` removed -> types implementing `k8s_openapi::Resource` required instead (codegen incoming)
+  * `Object<FooSpec, FooStatus>` removed -> types implementing `k8s_openapi::Resource` required instead
+  * `kube-derive` crate added to derive this trait + other kubebuilder like codegen
 
 0.27.0 / 2020-02-26
 ===================
