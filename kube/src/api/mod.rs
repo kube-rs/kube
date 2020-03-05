@@ -4,7 +4,7 @@
 ///
 /// Not using [`()`](https://doc.rust-lang.org/stable/std/primitive.unit.html), because serde's
 /// [`Deserialize`](https://docs.rs/serde/1.0.104/serde/trait.Deserialize.html) `impl` is too strict.
-#[derive(Clone, Deserialize, Serialize, Default)]
+#[derive(Clone, Deserialize, Serialize, Default, Debug)]
 pub struct NotUsed {}
 
 pub(crate) mod resource;

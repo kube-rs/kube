@@ -1,27 +1,30 @@
 #[macro_use] extern crate log;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate k8s_openapi_derive;
 use either::Either::{Left, Right};
+use kube_derive::CustomResource;
+use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1::CustomResourceDefinition;
+use apiexts::CustomResourceDefinition;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 
 use kube::{
-    api::{Api, CustomResource, DeleteParams, ListParams, Meta, PatchParams, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
     client::APIClient,
     config,
 };
 
 // Own custom resource
-#[derive(CustomResourceDefinition, Deserialize, Serialize, Clone, Debug, PartialEq)]
-#[custom_resource_definition(group = "clux.dev", version = "v1", plural = "foos", namespaced)]
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
+#[kube(group = "clux.dev", version = "v1", namespaced)]
+#[kube(apiextensions = "v1beta1")]
+#[kube(status = "FooStatus")]
+#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
     info: String,
     replicas: i32,
 }
 
-// TODO: cannot use status objects with this custom derive impl
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct FooStatus {
     is_bad: bool,
@@ -60,30 +63,8 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Create the CRD so we can create Foos in kube
-    let foocrd = json!({
-        "metadata": {
-            "name": "foos.clux.dev"
-        },
-        "spec": {
-            "group": "clux.dev",
-            "version": "v1",
-            "scope": "Namespaced",
-            "names": {
-                "plural": "foos",
-                "singular": "foo",
-                "kind": "Foo",
-            },
-            "subresources": {
-                "status": {},
-                "scale": {
-                    "specReplicasPath": ".spec.replicas",
-                    "statusReplicasPath": ".status.replicas",
-                }
-            }
-        },
-    });
-
-    info!("Creating CRD foos.clux.dev");
+    let foocrd = Foo::crd();
+    info!("Creating Foo CRD: {}", serde_json::to_string_pretty(&foocrd)?);
     let pp = PostParams::default();
     let patch_params = PatchParams::default();
     match crds.create(&pp, serde_json::to_vec(&foocrd)?).await {
@@ -97,11 +78,7 @@ async fn main() -> anyhow::Result<()> {
 
 
     // Manage the Foo CR
-    let foos: Api<Foo> = CustomResource::kind("Foo")
-        .group("clux.dev")
-        .version("v1")
-        .within(&namespace)
-        .into_api(client.clone());
+    let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
     // Create Foo baz
     info!("Creating Foo instance baz");
@@ -118,7 +95,7 @@ async fn main() -> anyhow::Result<()> {
     // Verify we can get it
     info!("Get Foo baz");
     let f1cpy = foos.get("baz").await?;
-    assert_eq!(f1cpy.spec.as_ref().unwrap().info, "old baz");
+    assert_eq!(f1cpy.spec.info, "old baz");
 
     // Replace its spec
     info!("Replace Foo baz");
@@ -135,14 +112,13 @@ async fn main() -> anyhow::Result<()> {
     let f1_replaced = foos
         .replace("baz", &pp, serde_json::to_vec(&foo_replace)?)
         .await?;
-    let f1_replacedsspec = f1_replaced.spec.unwrap();
-    assert_eq!(f1_replacedsspec.name, "baz");
-    assert_eq!(f1_replacedsspec.info, "new baz");
-    //assert!(f1_replaced.status.is_none()); TODO: STATUS
+    assert_eq!(f1_replaced.spec.name, "baz");
+    assert_eq!(f1_replaced.spec.info, "new baz");
+    assert!(f1_replaced.status.is_none());
 
     // Delete it
     foos.delete("baz", &dp).await?.map_left(|f1del| {
-        assert_eq!(f1del.spec.unwrap().info, "old baz");
+        assert_eq!(f1del.spec.info, "old baz");
     });
 
 
@@ -159,7 +135,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Created {}", Meta::name(&o));
 
     // Update status on qux
-    /*info!("Replace Status on Foo instance qux");
+    info!("Replace Status on Foo instance qux");
     let fs = json!({
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
@@ -181,12 +157,12 @@ async fn main() -> anyhow::Result<()> {
     let o = foos
         .patch_status("qux", &patch_params, serde_json::to_vec(&fs)?)
         .await?;
-    info!("Patched status {:?} for {}", o.status, o.metadata.name);
+    info!("Patched status {:?} for {}", o.status, Meta::name(&o));
     assert!(!o.status.unwrap().is_bad);
 
     info!("Get Status on Foo instance qux");
     let o = foos.get_status("qux").await?;
-    info!("Got status {:?} for {}", o.status, Meta::name(&o);
+    info!("Got status {:?} for {}", o.status, Meta::name(&o));
     assert!(!o.status.unwrap().is_bad);
 
     // Check scale subresource:
@@ -204,7 +180,8 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     info!("Patched scale {:?} for {}", o.spec, Meta::name(&o));
     assert_eq!(o.status.unwrap().replicas, 1);
-    assert_eq!(o.spec.replicas.unwrap(), 2); // we only asked for more*/
+    assert_eq!(o.spec.unwrap().replicas.unwrap(), 2); // we only asked for more
+
 
     // Modify a Foo qux with a Patch
     info!("Patch Foo instance qux");
@@ -214,10 +191,9 @@ async fn main() -> anyhow::Result<()> {
     let o = foos
         .patch("qux", &patch_params, serde_json::to_vec(&patch)?)
         .await?;
-    let ospec = o.spec.as_ref().unwrap();
-    info!("Patched {} with new name: {}", Meta::name(&o), ospec.name);
-    assert_eq!(ospec.info, "patched qux");
-    assert_eq!(ospec.name, "qux"); // didn't blat existing params
+    info!("Patched {} with new name: {}", Meta::name(&o), o.spec.name);
+    assert_eq!(o.spec.info, "patched qux");
+    assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
     // Check we have 1 remaining instance
     let lp = ListParams::default();

@@ -59,6 +59,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub mod api;
+pub use api::{Api, Resource};
 pub mod client;
 pub mod config;
 mod oauth2;
