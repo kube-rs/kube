@@ -1,9 +1,11 @@
-#[macro_use] extern crate kube_derive;
-#[macro_use] extern crate serde_derive;
 use k8s_openapi::Resource;
 use kube::api::ObjectMeta;
+use kube_derive::CustomResource;
+use serde_derive::{Deserialize, Serialize};
 
-
+/// Our spec for Foo
+///
+/// A struct with our chosen Kind will be created for us, using the following kube attrs
 #[derive(CustomResource, Serialize, Deserialize, Debug, Clone)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
@@ -35,14 +37,8 @@ fn main() {
     println!("Foo CRD: {:?}", Foo::crd());
 }
 
-#[test]
-fn verify_resource() {
-    assert_eq!(Foo::KIND, "Foo");
-    assert_eq!(Foo::GROUP, "clux.dev");
-    assert_eq!(Foo::VERSION, "v1");
-    assert_eq!(Foo::API_VERSION, "clux.dev/v1");
-}
 
+// some tests
 // Verify Foo::crd
 #[test]
 fn verify_crd() {
@@ -82,4 +78,12 @@ fn verify_crd() {
     });
     let outputcrd = serde_json::from_value(output).expect("expected output is valid");
     assert_eq!(crd, outputcrd);
+}
+
+#[test]
+fn verify_resource() {
+    assert_eq!(Foo::KIND, "Foo");
+    assert_eq!(Foo::GROUP, "clux.dev");
+    assert_eq!(Foo::VERSION, "v1");
+    assert_eq!(Foo::API_VERSION, "clux.dev/v1");
 }

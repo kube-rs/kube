@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate kube_derive;
 use either::Either::{Left, Right};
+use kube_derive::CustomResource;
+use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 
 use apiexts::CustomResourceDefinition;
