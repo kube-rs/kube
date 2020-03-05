@@ -262,18 +262,6 @@ impl CustomDerive for CustomResource {
         let plural = to_plural(&name);
         let scope = if namespaced { "Namespaced" } else { "Cluster" };
 
-        // TODO: verify serialize at compile time vs current runtime check..
-        // HOWEVER.. That requires k8s_openapi dep in here..
-        // and we need to define the version feature :/
-        // ... this will clash with user selected feature :(
-        // Sketch:
-        //use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-        //let crd : CustomResourceDefinition = serde_json::from_value(
-        //    serde_json::json!({})
-        //    ).map_err(|e| format!(r#"#[derive(CustomResource)] was unable to deserialize CustomResourceDefinition: {}"#, e))
-        //.spanning(&tokens)?;
-        //let crd_json = serde_json::to_string(&crd).unwrap();
-
         // Compute a bunch of crd props
         let mut printers = format!("[ {} ]", printcolums.join(",")); // hacksss
         if apiextensions == "v1beta1" {
@@ -298,6 +286,7 @@ impl CustomDerive for CustomResource {
         );
         let crd_meta_name = format!("{}.{}", plural, group);
         let crd_meta = quote! { { "name": #crd_meta_name } };
+        // TODO: should ::crd be from a trait?
         let impl_crd = quote! {
             #use_correct_crd
             impl #rootident {

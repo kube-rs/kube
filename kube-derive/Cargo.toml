@@ -14,10 +14,6 @@ quote = "1"
 syn = { version = "1", features = ["extra-traits"] }
 Inflector = "0.11.4"
 
-[dev-dependencies.k8s-openapi]
-version = "0.7.1"
-default-features = false
-
 [lib]
 proc-macro = true
 
