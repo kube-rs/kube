@@ -6,7 +6,7 @@ authors = ["clux <sszynrae@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"
 repository = "https://github.com/clux/kube-rs"
-readme = "README.md"
+readme = "../README.md"
 
 [dependencies]
 proc-macro2 = "1"
