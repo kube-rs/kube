@@ -221,7 +221,7 @@ impl CustomDerive for CustomResource {
         // if status set, also add that
         let statusq = if let Some(status_name) = &status {
             let ident = format_ident!("{}", status_name);
-            quote! { status: Option<#ident>, }
+            quote! { pub status: Option<#ident>, }
         } else {
             quote! {}
         };
@@ -230,8 +230,8 @@ impl CustomDerive for CustomResource {
         let root_obj = quote! {
             #[derive(Serialize, Deserialize, Clone)]
             pub struct #rootident {
-                metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
-                spec: #ident,
+                pub metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
+                pub spec: #ident,
                 #statusq
             }
         };
