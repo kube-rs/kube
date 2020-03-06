@@ -233,10 +233,27 @@ impl CustomDerive for CustomResource {
 
         let root_obj = quote! {
             #[derive(Serialize, Deserialize, Clone)]
+            #[serde(rename_all = "camelCase")]
             pub struct #rootident {
+                #visibility api_version: String,
+                #visibility kind: String,
                 #visibility metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
                 #visibility spec: #ident,
                 #statusq
+            }
+            impl #rootident {
+                pub fn new(name: &str, spec: #ident) -> Self {
+                    Self {
+                        api_version: #rootident::API_VERSION.to_string(),
+                        kind: #rootident::KIND.to_string(),
+                        metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                            name: Some(name.to_string()),
+                            ..Default::default()
+                        },
+                        spec: spec,
+                        status: None,
+                    }
+                }
             }
         };
 
