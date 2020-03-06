@@ -1,5 +1,4 @@
 use k8s_openapi::Resource;
-use kube::api::ObjectMeta;
 use kube_derive::CustomResource;
 use serde_derive::{Deserialize, Serialize};
 
@@ -25,14 +24,11 @@ pub struct FooStatus {
 
 fn main() {
     println!("Kind {}", Foo::KIND);
-    let foo = Foo {
-        metadata: ObjectMeta::default(),
-        spec: MyFoo {
-            name: "hi".into(),
-            info: None,
-        },
-        status: Some(FooStatus { is_bad: true }),
-    };
+    let mut foo = Foo::new("hi", MyFoo {
+        name: "hi".into(),
+        info: None,
+    });
+    foo.status = Some(FooStatus { is_bad: true });
     println!("Spec: {:?}", foo.spec);
     println!("Foo CRD: {:?}", Foo::crd());
 }

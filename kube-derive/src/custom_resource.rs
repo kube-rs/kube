@@ -223,20 +223,41 @@ impl CustomDerive for CustomResource {
         let rootident = Ident::new(&kind, Span::call_site());
 
         // if status set, also add that
-        let statusq = if let Some(status_name) = &status {
+        let (statusq, statusdef) = if let Some(status_name) = &status {
             let ident = format_ident!("{}", status_name);
-            quote! { #visibility status: Option<#ident>, }
+            let fst = quote! { #visibility status: Option<#ident>, };
+            let snd = quote! { status: None, };
+            (fst, snd)
         } else {
-            quote! {}
+            let fst = quote! {};
+            let snd = quote! {};
+            (fst, snd)
         };
         let has_status = status.is_some();
 
         let root_obj = quote! {
             #[derive(Serialize, Deserialize, Clone)]
-            pub struct #rootident {
+            #[serde(rename_all = "camelCase")]
+            #visibility struct #rootident {
+                #visibility api_version: String,
+                #visibility kind: String,
                 #visibility metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
                 #visibility spec: #ident,
                 #statusq
+            }
+            impl #rootident {
+                pub fn new(name: &str, spec: #ident) -> Self {
+                    Self {
+                        api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
+                        kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
+                        metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                            name: Some(name.to_string()),
+                            ..Default::default()
+                        },
+                        spec: spec,
+                        #statusdef
+                    }
+                }
             }
         };
 
