@@ -1,6 +1,6 @@
 //! API helpers
 
-/// Empty struct for when no Spec is required
+/// Empty struct for when data should be discarded
 ///
 /// Not using [`()`](https://doc.rust-lang.org/stable/std/primitive.unit.html), because serde's
 /// [`Deserialize`](https://docs.rs/serde/1.0.104/serde/trait.Deserialize.html) `impl` is too strict.
@@ -25,4 +25,4 @@ pub(crate) mod object;
 pub use self::object::{ObjectList, WatchEvent};
 
 mod metadata;
-pub use self::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta};
+pub use self::metadata::{ListMeta, Meta, ObjectMeta};

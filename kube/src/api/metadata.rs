@@ -1,23 +1,6 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use k8s_openapi::Metadata;
 
-
-#[derive(Deserialize, Serialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct TypeMeta {
-    /// The version of the API
-    ///
-    /// Marked optional because it's not always present for items in a `ResourceList`
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub api_version: Option<String>,
-
-    /// The name of the API
-    ///
-    /// Marked optional because it's not always present for items in a `ResourceList`
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub kind: Option<String>,
-}
-
 /// An accessor trait for Metadata
 ///
 /// This for a subset of kubernetes type that do not end in List
