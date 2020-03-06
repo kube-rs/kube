@@ -1,12 +1,13 @@
 use crate::{CustomDerive, ResultExt};
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 use proc_macro2::{Ident, Span};
-use syn::{Data, DeriveInput, Result};
+use syn::{Data, DeriveInput, Result, Visibility};
 
 #[derive(Debug)]
 pub struct CustomResource {
     tokens: proc_macro2::TokenStream,
     ident: proc_macro2::Ident,
+    visibility: Visibility,
     kind: String,
     group: String,
     version: String,
@@ -21,6 +22,7 @@ pub struct CustomResource {
 impl CustomDerive for CustomResource {
     fn parse(input: DeriveInput, tokens: proc_macro2::TokenStream) -> Result<Self> {
         let ident = input.ident;
+        let visibility = input.vis;
 
         // Limit derive to structs
         let _s = match input.data {
@@ -181,6 +183,7 @@ impl CustomDerive for CustomResource {
         Ok(CustomResource {
             tokens,
             ident,
+            visibility,
             kind,
             group,
             version,
@@ -198,6 +201,7 @@ impl CustomDerive for CustomResource {
         let CustomResource {
             tokens,
             ident,
+            visibility,
             group,
             kind,
             version,
@@ -221,7 +225,7 @@ impl CustomDerive for CustomResource {
         // if status set, also add that
         let statusq = if let Some(status_name) = &status {
             let ident = format_ident!("{}", status_name);
-            quote! { status: Option<#ident>, }
+            quote! { #visibility status: Option<#ident>, }
         } else {
             quote! {}
         };
@@ -230,8 +234,8 @@ impl CustomDerive for CustomResource {
         let root_obj = quote! {
             #[derive(Serialize, Deserialize, Clone)]
             pub struct #rootident {
-                metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
-                spec: #ident,
+                #visibility metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
+                #visibility spec: #ident,
                 #statusq
             }
         };
