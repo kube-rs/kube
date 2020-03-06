@@ -5,17 +5,24 @@ use crate::{
     },
     client::APIClient,
     runtime::informer::Informer,
+    Result,
 };
+use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
 
+#[derive(Clone)]
 pub struct Controller<K>
 where
     K: Clone + DeserializeOwned + Meta,
 {
     client: APIClient,
     resource: Resource,
-    reconciler: Box<dyn Fn()>,
     watches: Vec<Informer<K>>,
+}
+
+pub struct ReconcileEvent {
+    pub name: String,
+    pub namespace: Option<String>,
 }
 
 impl<K> Controller<K>
@@ -27,7 +34,6 @@ where
         Controller {
             client: client,
             resource: r,
-            reconciler: Box::new(|| ()),
             watches: vec![],
         }
     }
@@ -40,12 +46,12 @@ where
         self
     }
 
-    // TODO: callback fn to reconcile
-    // needs to just call it with "name" + namespace
-    // TODO: let users pass in their own state?
-    pub fn reconciler<CB: 'static + Fn()>(mut self, cb: CB) -> Self {
-        self.reconciler = Box::new(cb);
-        self
+    /// Poll reconcile events through all internal informers
+    pub async fn poll(&self) -> Result<impl Stream<Item = Result<ReconcileEvent>>> {
+        // TODO: poll informers in parallel, have them push to a joint queue
+        // TODO: debounce and read from joint queue
+        // TODO: pass on debounced events to stream
+        Ok(stream::empty())
     }
 
     /// Initialize
