@@ -1,7 +1,7 @@
 use crate::{CustomDerive, ResultExt};
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 use proc_macro2::{Ident, Span};
-use syn::{Data, DeriveInput, Visibility, Result};
+use syn::{Data, DeriveInput, Result, Visibility};
 
 #[derive(Debug)]
 pub struct CustomResource {
