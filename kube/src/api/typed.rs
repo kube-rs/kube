@@ -1,12 +1,11 @@
-use either::Either;
-use futures::{Stream, StreamExt};
-use serde::de::DeserializeOwned;
-
 use crate::{
     api::{DeleteParams, ListParams, Meta, ObjectList, PatchParams, PostParams, Resource, WatchEvent},
     client::{APIClient, Status},
     Result,
 };
+use either::Either;
+use futures::{Stream, StreamExt};
+use serde::{de::DeserializeOwned, Serialize};
 
 /// An easy Api interaction helper
 ///
@@ -57,11 +56,12 @@ impl Api {
         self.client.request::<K>(req).await
     }
 
-    pub async fn create<K>(&self, pp: &PostParams, data: Vec<u8>) -> Result<K>
+    pub async fn create<K>(&self, pp: &PostParams, data: &K) -> Result<K>
     where
-        K: Clone + DeserializeOwned + Meta,
+        K: Clone + DeserializeOwned + Meta + Serialize,
     {
-        let req = self.api.create(&pp, data)?;
+        let bytes = serde_json::to_vec(data)?;
+        let req = self.api.create(&pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
@@ -97,11 +97,12 @@ impl Api {
         self.client.request::<K>(req).await
     }
 
-    pub async fn replace<K>(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K>
+    pub async fn replace<K>(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
     where
-        K: Clone + DeserializeOwned + Meta,
+        K: Clone + DeserializeOwned + Meta + Serialize,
     {
-        let req = self.api.replace(name, &pp, data)?;
+        let bytes = serde_json::to_vec(data)?;
+        let req = self.api.replace(name, &pp, bytes)?;
         self.client.request::<K>(req).await
     }
 

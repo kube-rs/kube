@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Pod blog
     info!("Creating Pod instance blog");
-    let p = json!({
+    let p: Pod = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": { "name": "blog" },
@@ -31,13 +31,13 @@ async fn main() -> anyhow::Result<()> {
               "image": "clux/blog:0.1.0"
             }],
         }
-    });
+    }))?;
 
     let pp = PostParams::default();
-    match pods.create::<Pod>(&pp, serde_json::to_vec(&p)?).await {
+    match pods.create::<Pod>(&pp, &p).await {
         Ok(o) => {
             let name = Meta::name(&o);
-            assert_eq!(p["metadata"]["name"], name);
+            assert_eq!(Meta::name(&p), name);
             info!("Created {}", name);
             // wait for it..
             std::thread::sleep(std::time::Duration::from_millis(5_000));

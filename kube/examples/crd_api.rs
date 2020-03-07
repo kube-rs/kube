@@ -70,10 +70,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Creating Foo CRD: {}", serde_json::to_string_pretty(&foocrd)?);
     let pp = PostParams::default();
     let patch_params = PatchParams::default();
-    match crds
-        .create::<CustomResourceDefinition>(&pp, serde_json::to_vec(&foocrd)?)
-        .await
-    {
+    match crds.create::<CustomResourceDefinition>(&pp, &foocrd).await {
         Ok(o) => {
             info!("Created {} ({:?})", Meta::name(&o), o.status.unwrap());
             debug!("Created CRD: {:?}", o.spec);
@@ -88,14 +85,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Foo baz
     info!("Creating Foo instance baz");
-    let f1 = json!({
-        "apiVersion": "clux.dev/v1",
-        "kind": "Foo",
-        "metadata": { "name": "baz" },
-        "spec": { "name": "baz", "info": "old baz", "replicas": 1 },
+    let f1 = Foo::new("baz", FooSpec {
+        name: "baz".into(),
+        info: "old baz".into(),
+        replicas: 1,
     });
-    let o = foos.create::<Foo>(&pp, serde_json::to_vec(&f1)?).await?;
-    assert_eq!(f1["metadata"]["name"], Meta::name(&o));
+    let o = foos.create::<Foo>(&pp, &f1).await?;
+    assert_eq!(Meta::name(&f1), Meta::name(&o));
     info!("Created {}", Meta::name(&o));
 
     // Verify we can get it
@@ -105,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Replace its spec
     info!("Replace Foo baz");
-    let foo_replace = json!({
+    let foo_replace = serde_json::from_value(json!({
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "metadata": {
@@ -114,10 +110,9 @@ async fn main() -> anyhow::Result<()> {
             "resourceVersion": Meta::resource_ver(&f1cpy),
         },
         "spec": { "name": "baz", "info": "new baz", "replicas": 1 },
-    });
-    let f1_replaced = foos
-        .replace::<Foo>("baz", &pp, serde_json::to_vec(&foo_replace)?)
-        .await?;
+    }))?;
+
+    let f1_replaced = foos.replace::<Foo>("baz", &pp, &foo_replace).await?;
     assert_eq!(f1_replaced.spec.name, "baz");
     assert_eq!(f1_replaced.spec.info, "new baz");
     assert!(f1_replaced.status.is_none());
@@ -130,14 +125,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Foo qux with status
     info!("Create Foo instance qux");
-    let f2 = json!({
-        "apiVersion": "clux.dev/v1",
-        "kind": "Foo",
-        "metadata": { "name": "qux" },
-        "spec": FooSpec { name: "qux".into(), replicas: 0, info: "unpatched qux".into() },
-        "status": FooStatus::default(),
+    let mut f2 = Foo::new("qux", FooSpec {
+        name: "qux".into(),
+        replicas: 0,
+        info: "unpatched qux".into(),
     });
-    let o = foos.create::<Foo>(&pp, serde_json::to_vec(&f2)?).await?;
+    f2.status = Some(FooStatus::default());
+    let o = foos.create::<Foo>(&pp, &f2).await?;
     info!("Created {}", Meta::name(&o));
 
     // Update status on qux
