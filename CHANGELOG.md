@@ -1,3 +1,8 @@
+0.28.1 / 2020-03-07
+===================
+  * `#[derive(CustomResource)]` now implements `::new` on the generated `Kind`
+  * derived `Kind` now properly contains `TypeMeta` - #170
+
 0.28.0 / 2020-03-05
 ===================
   * `RawApi` removed -> `Resource` added

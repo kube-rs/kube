@@ -14,7 +14,7 @@ Select a version of `kube` along with the [generated k8s api types](https://gith
 
 ```toml
 [dependencies]
-kube = "0.28.0"
+kube = "0.28.1"
 k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
 ```
 
@@ -53,7 +53,8 @@ pods.delete("blog", &DeleteParams::default()).await?;
 See the examples ending in `_api` examples for more detail.
 
 ## Custom Resource Definitions
-Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](./kube-derive). You only need to `#[derive(CustomResource)]` on a struct:
+Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](./kube-derive).
+You only need to `#[derive(CustomResource)]` on a struct:
 
 ```rust
 #[derive(CustomResource, Serialize, Deserialize, Default, Clone)]
@@ -73,12 +74,9 @@ fn main() {
 
     println!("kind = {}", Foo::KIND); // from k8s_openapi::Resource
     let foos: Api<Foo> = Api::namespaced(client, "default");
-    let f = Foo {
-        metadata: ObjectMeta::default(),
-        spec: FooSpec::default()
-    };
-    // Print CRD
-    println!("{}", serde_json::to_string_pretty(&foo.crd());
+    let f = Foo::new("my-crd");
+    println!("foo: {:?}", f)
+    println!("crd: {}", serde_json::to_string_pretty(Foo::crd());
 }
 ```
 
@@ -211,7 +209,7 @@ or in `Cargo.toml`:
 
 ```toml
 [dependencies]
-kube = { version = "0.28.0", default-features = false, features = ["rustls-tls"] }
+kube = { version = "0.28.1", default-features = false, features = ["rustls-tls"] }
 k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
 ```
 
