@@ -22,11 +22,11 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow!("Usage: log_follow <pod>"))?;
     info!("Fetching logs for {:?} in {}", mypod, namespace);
 
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods = Api::namespaced::<Pod>(client, &namespace);
     let mut lp = LogParams::default();
     lp.follow = true;
     lp.tail_lines = Some(1);
-    let mut logs = pods.log_stream(&mypod, &lp).await?.boxed();
+    let mut logs = pods.log_stream::<Pod>(&mypod, &lp).await?.boxed();
 
     while let Some(line) = logs.try_next().await? {
         println!("{:?}", String::from_utf8_lossy(&line));

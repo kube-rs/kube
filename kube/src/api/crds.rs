@@ -3,7 +3,6 @@ use crate::{
     client::APIClient,
 };
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
-use std::marker::PhantomData;
 
 /// A data equivalent of the Resource trait for for Custom Resources
 ///
@@ -91,12 +90,11 @@ impl CrBuilder {
     }
 
     // Consume the CrBuilder and convert to an Api object
-    pub fn into_api<K>(self, client: APIClient) -> Api<K> {
+    pub fn into_api(self, client: APIClient) -> Api {
         let crd = self.build();
         Api {
             client,
             api: crd.into(),
-            phantom: PhantomData,
         }
     }
 
@@ -122,11 +120,10 @@ impl From<CustomResource> for Resource {
 
 /// Make Api useable on CRDs without k8s_openapi
 impl CustomResource {
-    pub fn into_api<K>(self, client: APIClient) -> Api<K> {
+    pub fn into_api(self, client: APIClient) -> Api {
         Api {
             client,
             api: self.into(),
-            phantom: PhantomData,
         }
     }
 }
@@ -162,9 +159,9 @@ mod test {
         };
         let config = config::load_kube_config().await.unwrap();
         let client = APIClient::new(config);
-        let r1: Api<Foo> = Api::namespaced(client.clone(), "myns");
+        let r1 = Api::namespaced::<Foo>(client.clone(), "myns");
 
-        let r2: Api<Foo> = CustomResource::kind("Foo")
+        let r2 = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")

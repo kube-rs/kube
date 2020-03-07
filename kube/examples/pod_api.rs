@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Manage pods
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods = Api::namespaced::<Pod>(client, &namespace);
 
     // Create Pod blog
     info!("Creating Pod instance blog");
@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let pp = PostParams::default();
-    match pods.create(&pp, serde_json::to_vec(&p)?).await {
+    match pods.create::<Pod>(&pp, serde_json::to_vec(&p)?).await {
         Ok(o) => {
             let name = Meta::name(&o);
             assert_eq!(p["metadata"]["name"], name);
@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Verify we can get it
     info!("Get Pod blog");
-    let p1cpy = pods.get("blog").await?;
+    let p1cpy = pods.get::<Pod>("blog").await?;
     if let Some(spec) = &p1cpy.spec {
         info!("Got blog pod with containers: {:?}", spec.containers);
         assert_eq!(spec.containers[0].name, "blog");
@@ -66,18 +66,18 @@ async fn main() -> anyhow::Result<()> {
     });
     let patch_params = PatchParams::default();
     let p_patched = pods
-        .patch("blog", &patch_params, serde_json::to_vec(&patch)?)
+        .patch::<Pod>("blog", &patch_params, serde_json::to_vec(&patch)?)
         .await?;
     assert_eq!(p_patched.spec.unwrap().active_deadline_seconds, Some(5));
 
     let lp = ListParams::default().fields(&format!("metadata.name={}", "blog")); // only want results for our pod
-    for p in pods.list(&lp).await? {
+    for p in pods.list::<Pod>(&lp).await? {
         info!("Found Pod: {}", Meta::name(&p));
     }
 
     // Delete it
     let dp = DeleteParams::default();
-    pods.delete("blog", &dp).await?.map_left(|pdel| {
+    pods.delete::<Pod>("blog", &dp).await?.map_left(|pdel| {
         assert_eq!(Meta::name(&pdel), "blog");
         info!("Deleting blog pod started");
     });

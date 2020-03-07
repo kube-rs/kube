@@ -15,21 +15,27 @@ pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 /// Scale subresource
 ///
 /// https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource
-impl<K> Api<K>
-where
-    K: Clone + DeserializeOwned,
-{
-    pub async fn get_scale(&self, name: &str) -> Result<Scale> {
+impl Api {
+    pub async fn get_scale<K>(&self, name: &str) -> Result<Scale>
+    where
+        K: Clone + DeserializeOwned,
+    {
         let req = self.api.get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
 
-    pub async fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
+    pub async fn patch_scale<K>(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale>
+    where
+        K: Clone + DeserializeOwned,
+    {
         let req = self.api.patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
 
-    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
+    pub async fn replace_scale<K>(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale>
+    where
+        K: Clone + DeserializeOwned,
+    {
         let req = self.api.replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await
     }
@@ -41,21 +47,27 @@ where
 /// Status subresource
 ///
 /// https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource
-impl<K> Api<K>
-where
-    K: Clone + DeserializeOwned,
-{
-    pub async fn get_status(&self, name: &str) -> Result<K> {
+impl Api {
+    pub async fn get_status<K>(&self, name: &str) -> Result<K>
+    where
+        K: Clone + DeserializeOwned,
+    {
         let req = self.api.get_status(name)?;
         self.client.request::<K>(req).await
     }
 
-    pub async fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
+    pub async fn patch_status<K>(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K>
+    where
+        K: Clone + DeserializeOwned,
+    {
         let req = self.api.patch_status(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
 
-    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
+    pub async fn replace_status<K>(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K>
+    where
+        K: Clone + DeserializeOwned,
+    {
         let req = self.api.replace_status(name, &pp, data)?;
         self.client.request::<K>(req).await
     }
@@ -150,16 +162,19 @@ pub trait LoggingObject {}
 
 impl LoggingObject for k8s_openapi::api::core::v1::Pod {}
 
-impl<K> Api<K>
-where
-    K: Clone + DeserializeOwned + LoggingObject,
-{
-    pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
+impl Api {
+    pub async fn log<K>(&self, name: &str, lp: &LogParams) -> Result<String>
+    where
+        K: Clone + DeserializeOwned + LoggingObject,
+    {
         let req = self.api.logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
 
-    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
+    pub async fn log_stream<K>(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>>
+    where
+        K: Clone + DeserializeOwned + LoggingObject,
+    {
         let req = self.api.logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
     }

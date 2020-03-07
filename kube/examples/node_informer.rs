@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let client = APIClient::new(config);
 
     let nodes = Resource::all::<Node>();
-    let events: Api<Event> = Api::all(client.clone());
+    let events = Api::all::<Event>(client.clone());
 
     let lp = ListParams::default().labels("beta.kubernetes.io/os=linux");
     let ni = Informer::new(client.clone(), lp, nodes);
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // This function lets the app handle an event from kube
-async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Result<()> {
+async fn handle_nodes(events: &Api, ne: WatchEvent<Node>) -> anyhow::Result<()> {
     match ne {
         WatchEvent::Added(o) => {
             info!("New Node: {}", o.spec.unwrap().provider_id.unwrap());
@@ -58,7 +58,7 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
                 // Find events related to this node
                 let opts = ListParams::default()
                     .fields(&format!("involvedObject.kind=Node,involvedObject.name={}", name));
-                let evlist = events.list(&opts).await?;
+                let evlist = events.list::<Event>(&opts).await?;
                 for e in evlist {
                     warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);
                 }

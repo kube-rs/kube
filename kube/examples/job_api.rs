@@ -41,17 +41,17 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let jobs: Api<Job> = Api::namespaced(client, &namespace);
+    let jobs = Api::namespaced::<Job>(client, &namespace);
     let pp = PostParams::default();
 
-    let data = serde_json::to_vec(&my_job).expect("failed to serialize job");
-    jobs.create(&pp, data).await.expect("failed to create job");
+    let data = serde_json::to_vec(&my_job)?;
+    jobs.create::<Job>(&pp, data).await?;
 
     // See if it ran to completion
     let lp = ListParams::default()
         .fields(&format!("metadata.name={}", job_name)) // only want events for our job
         .timeout(20); // should be done by then
-    let mut stream = jobs.watch(&lp, "").await?.boxed();
+    let mut stream = jobs.watch::<Job>(&lp, "").await?.boxed();
 
     while let Some(status) = stream.next().await {
         match status {
@@ -71,6 +71,6 @@ async fn main() -> anyhow::Result<()> {
     // Clean up the old job record..
     info!("Deleting the job record.");
     let dp = DeleteParams::default();
-    jobs.delete("empty-job", &dp).await.expect("failed to delete job");
+    jobs.delete::<Job>("empty-job", &dp).await?;
     Ok(())
 }
