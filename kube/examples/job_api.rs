@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create a Job
     let job_name = "empty-job";
-    let my_job = json!({
+    let my_job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
         "metadata": {
@@ -39,13 +39,12 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-    });
+    }))?;
 
     let jobs: Api<Job> = Api::namespaced(client, &namespace);
     let pp = PostParams::default();
 
-    let data = serde_json::to_vec(&my_job).expect("failed to serialize job");
-    jobs.create(&pp, data).await.expect("failed to create job");
+    jobs.create(&pp, &my_job).await?;
 
     // See if it ran to completion
     let lp = ListParams::default()

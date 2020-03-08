@@ -1,6 +1,6 @@
 use either::Either;
 use futures::{Stream, StreamExt};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 
 use crate::{
@@ -65,8 +65,12 @@ where
         self.client.request::<K>(req).await
     }
 
-    pub async fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = self.api.create(&pp, data)?;
+    pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K>
+    where
+        K: Serialize,
+    {
+        let bytes = serde_json::to_vec(&data)?;
+        let req = self.api.create(&pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
@@ -90,8 +94,12 @@ where
         self.client.request::<K>(req).await
     }
 
-    pub async fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = self.api.replace(name, &pp, data)?;
+    pub async fn replace(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
+    where
+        K: Serialize,
+    {
+        let bytes = serde_json::to_vec(&data)?;
+        let req = self.api.replace(name, &pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
