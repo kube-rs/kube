@@ -15,8 +15,8 @@ use kube::{
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
-#[kube(apiextensions = "v1beta1")]
 #[kube(status = "FooStatus")]
+#[kube(apiextensions = "v1beta1")]
 //#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
@@ -50,10 +50,14 @@ async fn main() -> anyhow::Result<()> {
 
     // 0. Install the CRD
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-    match crds.patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?).await { // TODO: infer name
+    info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
+    match crds.patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?).await {
         Ok(o) => info!("Applied {}: ({:?})", Meta::name(&o), o.spec),
-        Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-        Err(e) => return Err(e.into()),                        // any other case is probably bad
+        Err(kube::Error::Api(ae)) => {
+            warn!("apply error: {:?}", ae);
+            assert_eq!(ae.code, 409); // if you skipped delete, for instance
+        },
+        Err(e) => return Err(e.into()),
     }
 
     // 1. Create a Foo
