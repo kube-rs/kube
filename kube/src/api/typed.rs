@@ -58,14 +58,17 @@ where
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Serialize + Meta,
+    K: Clone + DeserializeOwned + Meta,
 {
     pub async fn get(&self, name: &str) -> Result<K> {
         let req = self.api.get(name)?;
         self.client.request::<K>(req).await
     }
 
-    pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K> {
+    pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K>
+    where
+        K: Serialize,
+    {
         let bytes = serde_json::to_vec(&data)?;
         let req = self.api.create(&pp, bytes)?;
         self.client.request::<K>(req).await
@@ -91,7 +94,10 @@ where
         self.client.request::<K>(req).await
     }
 
-    pub async fn replace(&self, name: &str, pp: &PostParams, data: &K) -> Result<K> {
+    pub async fn replace(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
+    where
+        K: Serialize,
+    {
         let bytes = serde_json::to_vec(&data)?;
         let req = self.api.replace(name, &pp, bytes)?;
         self.client.request::<K>(req).await
