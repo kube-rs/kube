@@ -200,6 +200,20 @@ where
         self.client.request::<K>(req).await
     }
 
+/*    // TODO: K impls Into<serde_yaml::Value> ?
+    // TODO: force bool?
+    pub async fn apply(&self, name: &str, patch: Vec<u8>) -> Result<K> {
+        // TODO: patch params Apply + default field manager (executable name)
+        let req = self.api.patch(name, &pp, patch)?;
+        self.client.request::<K>(req).await
+    }
+    pub async fn diff(&self, name: &str, patch: Vec<u8>) -> Result<K> {
+        // TODO: as above but with dry_run: true
+        let req = self.api.patch(name, &pp, patch)?;
+        self.client.request::<K>(req).await
+    }*/
+
+
     /// Replace a resource entirely with a new one
     ///
     /// This is used just like `Api::create`, but with one additional instruction:
