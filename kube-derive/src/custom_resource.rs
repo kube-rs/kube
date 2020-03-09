@@ -236,7 +236,7 @@ impl CustomDerive for CustomResource {
         let has_status = status.is_some();
 
         let root_obj = quote! {
-            #[derive(Serialize, Deserialize, Clone)]
+            #[derive(Serialize, Deserialize, Clone, Debug)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
                 #visibility api_version: String,
