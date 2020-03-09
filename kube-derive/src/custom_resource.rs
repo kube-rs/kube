@@ -297,8 +297,8 @@ impl CustomDerive for CustomResource {
 
         // Ensure it generates for the correct CRD version
         let v1ident = format_ident!("{}", apiextensions);
-        let use_correct_crd = quote! {
-            use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident as apiext;
+        let apiext = quote! {
+            k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident
         };
 
         let short_json = format!(
@@ -313,11 +313,10 @@ impl CustomDerive for CustomResource {
         let crd_meta = quote! { { "name": #crd_meta_name } };
         // TODO: should ::crd be from a trait?
         let impl_crd = quote! {
-            #use_correct_crd
             impl #rootident {
-                pub fn crd() -> apiext::CustomResourceDefinition {
-                    let columns : Vec<apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
-                    let scale: Option<apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
+                pub fn crd() -> #apiext::CustomResourceDefinition {
+                    let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
+                    let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                         None
                     } else {
                         serde_json::from_str(#scale_code).expect("valid scale subresource json")
