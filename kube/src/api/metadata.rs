@@ -40,3 +40,16 @@ where
         self.meta().namespace.clone()
     }
 }
+
+/// A convenience struct for ad-hoc serialization
+///
+/// Mostly useful for `Object`
+#[derive(Deserialize, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TypeMeta {
+    /// The version of the API
+    pub api_version: String,
+
+    /// The name of the API
+    pub kind: String,
+}

@@ -1,5 +1,5 @@
 use crate::{
-    api::metadata::{ListMeta, Meta},
+    api::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta},
     ErrorResponse,
 };
 use serde::Deserialize;
@@ -35,6 +35,64 @@ where
 }
 
 // -------------------------------------------------------
+
+/// A standard kubernetes object with .spec and .status
+///
+/// This is a convenience struct provided for serialization/deserialization
+/// It is not useful within the library anymore, because it can not easily implement
+/// the k8s_openapi traits.
+///
+/// This is what kubernetes maintainers tell you the world looks like.
+/// It's.. generally true.
+#[derive(Deserialize, Serialize, Clone)]
+pub struct Object<P, U>
+where
+    P: Clone,
+    U: Clone,
+{
+    #[serde(flatten)]
+    pub types: TypeMeta,
+
+    /// Resource metadata
+    ///
+    /// Contains information common to most resources about the Resource,
+    /// including the object name, annotations, labels and more.
+    pub metadata: ObjectMeta,
+
+    /// The Spec struct of a resource. I.e. `PodSpec`, `DeploymentSpec`, etc.
+    ///
+    /// This defines the desired state of the Resource as specified by the user.
+    pub spec: P,
+
+    /// The Status of a resource. I.e. `PotStatus`, `DeploymentStatus`, etc.
+    ///
+    /// This publishes the state of the Resource as observed by the controller.
+    /// Use `U = NotUsed` when a status does not exist.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<U>,
+}
+
+impl<P, U> Object<P, U>
+where
+    P: Clone,
+    U: Clone,
+{
+    /// A constructor like the one from kube-derive
+    pub fn new<K: k8s_openapi::Resource>(name: &str, spec: P) -> Self {
+        Self {
+            types: TypeMeta {
+                api_version: <K as k8s_openapi::Resource>::API_VERSION.to_string(),
+                kind: <K as k8s_openapi::Resource>::KIND.to_string(),
+            },
+            metadata: ObjectMeta {
+                name: Some(name.to_string()),
+                ..Default::default()
+            },
+            spec: spec,
+            status: None,
+        }
+    }
+}
 
 /// A generic kubernetes object list
 ///
