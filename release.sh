@@ -20,6 +20,9 @@ bump-toml() {
 }
 
 cargo-publish() {
-  cd kube-derive && cargo publish
-  cd kube && cargo publish
+  cd kube-derive && cargo publish && cd -
+  cd kube && cargo publish && cd -
 }
+
+git-tag
+cargo-publish
