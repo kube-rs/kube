@@ -8,8 +8,8 @@ use http::{self, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 
-#[allow(non_snake_case)]
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct StatusDetails {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
@@ -22,7 +22,7 @@ pub struct StatusDetails {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub causes: Vec<StatusCause>,
     #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
-    pub retryAfterSeconds: u32,
+    pub retry_after_seconds: u32,
 }
 
 #[derive(Deserialize, Debug)]
