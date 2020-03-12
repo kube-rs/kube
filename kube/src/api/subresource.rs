@@ -154,7 +154,7 @@ impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + LoggingObject,
 {
-    pub async fn log(&self, name: &str, lp: &LogParams) -> Result<String> {
+    pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.api.logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
