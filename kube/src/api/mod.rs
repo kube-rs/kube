@@ -22,7 +22,7 @@ mod subresource;
 pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};
 
 pub(crate) mod object;
-pub use self::object::{ObjectList, WatchEvent};
+pub use self::object::{Object, ObjectList, WatchEvent};
 
 mod metadata;
-pub use self::metadata::{ListMeta, Meta, ObjectMeta};
+pub use self::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta};
