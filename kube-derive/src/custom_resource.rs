@@ -225,7 +225,10 @@ impl CustomDerive for CustomResource {
         // if status set, also add that
         let (statusq, statusdef) = if let Some(status_name) = &status {
             let ident = format_ident!("{}", status_name);
-            let fst = quote! { #visibility status: Option<#ident>, };
+            let fst = quote! {
+                #[serde(skip_serializing_if = "Option::is_none")]
+                #visibility status: Option<#ident>,
+            };
             let snd = quote! { status: None, };
             (fst, snd)
         } else {
