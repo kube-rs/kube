@@ -1,3 +1,13 @@
+0.29.0 / 2020-03-12
+===================
+  * `Api::log` -> `Api::logs` (now matches `Resource::logs`)
+  * `Object<FooSpec, FooStatus>` back for ad-hoc ser/de
+  * kube-derive now derives `Debug` (requires `Debug` on spec struct)
+  * kube-derive now allows multiple derives per file
+  * `Api::create` now takes data `K` rather than bytes
+  * `Api::replace` now takes data `K` rather than bytes
+    - (note that `Resource::create` and `Resource::replace` still takes bytes)
+
 0.28.1 / 2020-03-07
 ===================
   * `#[derive(CustomResource)]` now implements `::new` on the generated `Kind`
