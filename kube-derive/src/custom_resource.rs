@@ -177,8 +177,8 @@ impl CustomDerive for CustomResource {
                 arg
             )
         };
-        let group = group.ok_or(mkerror("group")).spanning(&tokens)?;
-        let version = version.ok_or(mkerror("version")).spanning(&tokens)?;
+        let group = group.ok_or_else(|| mkerror("group")).spanning(&tokens)?;
+        let version = version.ok_or_else(|| mkerror("version")).spanning(&tokens)?;
 
         Ok(CustomResource {
             tokens,
