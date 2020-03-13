@@ -14,7 +14,8 @@ Select a version of `kube` along with the [generated k8s api types](https://gith
 
 ```toml
 [dependencies]
-kube = "0.28.1"
+kube = "0.29.0"
+kube-derive = "0.29.0"
 k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
 ```
 
@@ -55,7 +56,7 @@ See the examples ending in `_api` examples for more detail.
 ## Custom Resource Definitions
 Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](./kube-derive).
 
-You only need to `#[derive(CustomResource)]` on a struct:
+You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec struct:
 
 ```rust
 #[derive(CustomResource, Serialize, Deserialize, Default, Clone)]
@@ -69,16 +70,14 @@ pub struct FooSpec {
 Then you can use a lot of generated code as:
 
 ```rust
-fn main() {
-    let config = config::load_kube_config().await?;
-    let client = APIClient::new(config);
+let config = config::load_kube_config().await?;
+let client = APIClient::new(config);
 
-    println!("kind = {}", Foo::KIND); // from k8s_openapi::Resource
-    let foos: Api<Foo> = Api::namespaced(client, "default");
-    let f = Foo::new("my-crd");
-    println!("foo: {:?}", f)
-    println!("crd: {}", serde_json::to_string_pretty(Foo::crd());
-}
+println!("kind = {}", Foo::KIND); // impl k8s_openapi::Resource
+let foos: Api<Foo> = Api::namespaced(client, "default");
+let f = Foo::new("my-foo");
+println!("foo: {:?}", f)
+println!("crd: {}", serde_yaml::to_string(Foo::crd());
 ```
 
 There are a ton of kubebuilder like instructions that you can annotate with here. See the `crd_` prefixed [examples](./kube/examples) for more.
@@ -210,7 +209,7 @@ or in `Cargo.toml`:
 
 ```toml
 [dependencies]
-kube = { version = "0.28.1", default-features = false, features = ["rustls-tls"] }
+kube = { version = "0.29.0", default-features = false, features = ["rustls-tls"] }
 k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
 ```
 
