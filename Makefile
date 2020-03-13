@@ -15,6 +15,7 @@ doc:
 
 test:
 	cargo test --lib
+	cargo test --lib -- --ignored # also run tests that fail on circleci
 	cargo test --example crd_api crd_reflector
 	cargo test -j4
 	cd kube && cargo test --lib --features=rustls-tls --no-default-features
