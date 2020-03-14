@@ -7,9 +7,10 @@ use crate::{
     runtime::informer::Informer,
     Error, Result,
 };
-use futures::{channel::mpsc, lock::Mutex, stream, Stream, StreamExt};
+use futures::{lock::Mutex, stream, Stream, StreamExt};
 use serde::de::DeserializeOwned;
-use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
+use std::convert::TryFrom;
+use tokio::sync::mpsc;
 
 /// An object to be reconciled
 ///
@@ -57,14 +58,13 @@ where
     client: APIClient,
     resource: Resource,
     informers: Vec<Informer<K>>,
-    queue: Arc<Mutex<VecDeque<ReconcileEvent>>>,
     channel: (
         mpsc::UnboundedSender<Result<ReconcileEvent>>,
         mpsc::UnboundedReceiver<Result<ReconcileEvent>>,
     ),
 }
 
-
+// TODO: is 'static limiting here?
 impl<K: 'static> Controller<K>
 where
     K: Clone + DeserializeOwned + Meta + Send + Sync,
@@ -75,8 +75,7 @@ where
             client: client,
             resource: r,
             informers: vec![],
-            queue: Default::default(),
-            channel: mpsc::unbounded(),
+            channel: mpsc::unbounded_channel(),
         }
     }
 
@@ -89,13 +88,20 @@ where
     }
 
     /// Poll reconcile events through all internal informers
-    /*    pub async fn poll(&self) -> Result<impl Stream<Item = Result<ReconcileEvent>>> {
-            // TODO: debounce rx events
-            //let stream = stream::from(self.channel.1);
-                //futures::stream::try_unfold(self.channel.1, |rx| async move { async { return rx.try_next() } });
-            Ok(self.channel.1)
-        }
-    */
+    pub async fn poll(&self) -> Result<impl Stream<Item = ReconcileEvent>> {
+        // TODO: debounce rx events
+        let rx = &self.channel.1;
+        let stream = futures::stream::unfold(rx, |mut rx| async move {
+            //async {
+            match rx.recv().await {
+                Some(w) => return Some((w, rx)),
+                None => return None,
+            }
+            //}
+        });
+        Ok(stream.map(futures::stream::iter).flatten())
+    }
+
     /// Initialize
     pub fn init(self) -> Self {
         info!("Starting Controller for {:?}", self.resource);
@@ -112,7 +118,7 @@ where
                         Ok(wi) => {
                             let ri = ReconcileEvent::try_from(wi);
                             //(*queue.lock().await).push_back(ri);
-                            tx.unbounded_send(ri).expect("channel can receive");
+                            tx.send(ri).expect("channel can receive");
                         }
                         _ => unimplemented!(),
                         //Err(e) => tx.unbounded_send(Err(e)),
