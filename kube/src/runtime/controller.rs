@@ -9,7 +9,7 @@ use crate::{
 };
 use futures::{lock::Mutex, stream, Stream, StreamExt};
 use serde::de::DeserializeOwned;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, time::Duration};
 use tokio::sync::mpsc;
 
 /// An object to be reconciled
@@ -50,32 +50,44 @@ where
     }
 }
 
+/// An Ok return value from a reconcile fn
+///
+/// Designed so the Controller can decide  whether to requeue the event
+/// Error cases are not encapsulated in this struct (they are handled by Result)
+#[derive(Debug)]
+pub enum ReconcileStatus {
+    /// Successful reconcile
+    Complete,
+    ///  Partial success, reque after some time
+    RequeAfter(Duration),
+}
+
 /// A controller for a kubernetes object K
-pub struct Controller<K>
+#[derive(Clone)]
+pub struct Controller<K, F>
 where
     K: Clone + DeserializeOwned + Meta,
+    F: Fn(ReconcileEvent) -> Result<ReconcileStatus>,
 {
     client: APIClient,
     resource: Resource,
     informers: Vec<Informer<K>>,
-    channel: (
-        mpsc::UnboundedSender<Result<ReconcileEvent>>,
-        mpsc::UnboundedReceiver<Result<ReconcileEvent>>,
-    ),
+    reconciler: Box<F>,
 }
 
 // TODO: is 'static limiting here?
-impl<K: 'static> Controller<K>
+impl<K, F> Controller<K, F>
 where
     K: Clone + DeserializeOwned + Meta + Send + Sync,
+    F: Fn(ReconcileEvent) -> Result<ReconcileStatus> + Send,
 {
     /// Create a controller with a kube client on a kube resource
-    pub fn new(client: APIClient, r: Resource) -> Self {
+    pub fn new(client: APIClient, r: Resource, recfn: F) -> Self {
         Controller {
             client: client,
             resource: r,
             informers: vec![],
-            channel: mpsc::unbounded_channel(),
+            reconciler: Box::new(recfn),
         }
     }
 
@@ -87,38 +99,24 @@ where
         self
     }
 
-    /// Poll reconcile events through all internal informers
-    pub async fn poll(&self) -> Result<impl Stream<Item = ReconcileEvent>> {
-        // TODO: debounce rx events
-        let rx = &self.channel.1;
-        let stream = futures::stream::unfold(rx, |mut rx| async move {
-            //async {
-            match rx.recv().await {
-                Some(w) => return Some((w, rx)),
-                None => return None,
-            }
-            //}
-        });
-        Ok(stream.map(futures::stream::iter).flatten())
-    }
-
     /// Initialize
-    pub fn init(self) -> Self {
+    pub fn init(self) {
         info!("Starting Controller for {:?}", self.resource);
+        let (tx, mut rx) = mpsc::unbounded_channel();
 
         // 1. poll informers in parallel and push results to queue
         for inf in self.informers.clone() {
             // TODO: ownership move?
             //let queue = self.queue.clone();
-            let tx = self.channel.0.clone();
-            tokio::spawn(async move {
+            let txi = tx.clone();
+            tokio::spawn(async {
                 let mut poll_i = inf.poll().await.unwrap().boxed();
                 while let Some(ev) = poll_i.next().await {
                     match ev {
                         Ok(wi) => {
                             let ri = ReconcileEvent::try_from(wi);
                             //(*queue.lock().await).push_back(ri);
-                            tx.send(ri).expect("channel can receive");
+                            txi.send(ri).expect("channel can receive");
                         }
                         _ => unimplemented!(),
                         //Err(e) => tx.unbounded_send(Err(e)),
@@ -129,7 +127,30 @@ where
         // TODO: init main informer
         // TODO: queue up events
         // TODO: debounce events
-        // TODO: trigger events
-        self
+
+        // Event loop that triggers the reconcile fn
+        tokio::spawn(async move {
+            loop {
+                match rx.recv().await {
+                    None => return, // tx dropped
+                    Some(wi) => {
+                        if let Ok(wo) = wi {
+                            // TODO: deal with WatchError event
+                            // TODO: retry on error?
+                            match (self.reconciler)(wo) {
+                                Ok(status) => {
+                                    // Reconcile cb completed with app decicion
+                                    info!("Reconciled {:?}", status)
+                                }
+                                Err(e) => {
+                                    // Ceconcile cb failed (any unspecified error)
+                                    // TODO: reque with exponential decay
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 }
