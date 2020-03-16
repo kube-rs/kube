@@ -8,6 +8,7 @@ use crate::{
     Error, Result,
 };
 use futures::{lock::Mutex, stream, Stream, StreamExt};
+use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{convert::TryFrom, time::Duration};
 use tokio::sync::mpsc;
@@ -76,10 +77,10 @@ where
 }
 
 // TODO: is 'static limiting here?
-impl<K, F> Controller<K, F>
+impl<K: 'static, F: 'static> Controller<K, F>
 where
     K: Clone + DeserializeOwned + Meta + Send + Sync,
-    F: Fn(ReconcileEvent) -> Result<ReconcileStatus> + Send,
+    F: Fn(ReconcileEvent) -> Result<ReconcileStatus> + Send + Sync,
 {
     /// Create a controller with a kube client on a kube resource
     pub fn new(client: APIClient, r: Resource, recfn: F) -> Self {
@@ -109,8 +110,8 @@ where
             // TODO: ownership move?
             //let queue = self.queue.clone();
             let txi = tx.clone();
-            tokio::spawn(async {
-                let mut poll_i = inf.poll().await.unwrap().boxed();
+            tokio::spawn(async move {
+                let mut poll_i = inf.poll().await.expect("could talk to api server").boxed();
                 while let Some(ev) = poll_i.next().await {
                     match ev {
                         Ok(wi) => {
@@ -128,23 +129,44 @@ where
         // TODO: queue up events
         // TODO: debounce events
 
+
+        // Prepare a sender so we can stack things back on the channel
+        let txa = tx.clone();
         // Event loop that triggers the reconcile fn
         tokio::spawn(async move {
             loop {
                 match rx.recv().await {
                     None => return, // tx dropped
                     Some(wi) => {
-                        if let Ok(wo) = wi {
-                            // TODO: deal with WatchError event
-                            // TODO: retry on error?
-                            match (self.reconciler)(wo) {
-                                Ok(status) => {
-                                    // Reconcile cb completed with app decicion
-                                    info!("Reconciled {:?}", status)
-                                }
-                                Err(e) => {
-                                    // Ceconcile cb failed (any unspecified error)
-                                    // TODO: reque with exponential decay
+                        match wi {
+                            Err(e) => {
+                                // Got WatchEvent::Error
+                                // TODO: handle here? handle above?
+                            }
+                            Ok(wo) => {
+                                let ri = wo.clone();
+                                let name = wo.name.clone();
+                                match (self.reconciler)(wo) {
+                                    Ok(status) => {
+                                        // Reconcile cb completed with app decicion
+                                        match status {
+                                            ReconcileStatus::Complete => {
+                                                info!("Reconciled {}", name);
+                                            }
+                                            ReconcileStatus::RequeAfter(dur) => {
+                                                info!("Requeing {} in {:?}", name, dur);
+                                                Delay::new(dur).await;
+                                                txa.send(Ok(ri)).expect("channel can receive");
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        // Reconcile cb failed (any unspecified error)
+                                        let dur = Duration::from_secs(10); // TODO: expo decay
+                                        warn!("Failed to reconcile {} - requining in {:?}", e, dur);
+                                        Delay::new(dur).await;
+                                        txa.send(Ok(ri)).expect("channel can receive");
+                                    }
                                 }
                             }
                         }
