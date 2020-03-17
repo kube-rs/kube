@@ -338,26 +338,52 @@ impl CustomDerive for CustomResource {
                         serde_json::json!({})
                     };
 
-                    serde_json::from_value(serde_json::json!({
-                        "metadata": #crd_meta,
-                        "spec": {
-                            "group": #group,
-                            "scope": #scope,
-                            "names": {
-                                "plural": #plural,
-                                "singular": #name,
-                                "kind": #kind,
-                                "shortNames": shorts
-                            },
-                            "versions": [{
-                              "name": #version,
-                              "served": true,
-                              "storage": true,
-                              "additionalPrinterColumns": columns,
-                            }],
-                            "subresources": subres,
-                        }
-                    })).expect("valid custom resource from #[kube(attrs..)]")
+                    let jsondata = if #apiextensions == "v1beta1" {
+                        serde_json::json!({
+                            "metadata": #crd_meta,
+                            "spec": {
+                                "group": #group,
+                                "scope": #scope,
+                                "names": {
+                                    "plural": #plural,
+                                    "singular": #name,
+                                    "kind": #kind,
+                                    "shortNames": shorts
+                                },
+                                // printer columns can't be on versions reliably in v1beta..
+                                "additionalPrinterColumns": columns,
+                                "versions": [{
+                                  "name": #version,
+                                  "served": true,
+                                  "storage": true,
+                                }],
+                                "subresources": subres,
+                            }
+                        })
+                    } else {
+                        serde_json::json!({
+                            "metadata": #crd_meta,
+                            "spec": {
+                                "group": #group,
+                                "scope": #scope,
+                                "names": {
+                                    "plural": #plural,
+                                    "singular": #name,
+                                    "kind": #kind,
+                                    "shortNames": shorts
+                                },
+                                "versions": [{
+                                  "name": #version,
+                                  "served": true,
+                                  "storage": true,
+                                }],
+                                "additionalPrinterColumns": columns,
+                                "subresources": subres,
+                            }
+                        })
+                    };
+                    serde_json::from_value(jsondata)
+                        .expect("valid custom resource from #[kube(attrs..)]")
                 }
             }
         };

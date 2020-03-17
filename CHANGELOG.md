@@ -1,3 +1,7 @@
+0.29.1 / 2020-03-XX
+===================
+  * Fix `#[kube(printcolumn)]` when `#[kube(apiextensions = "v1beta1")]`
+
 0.29.0 / 2020-03-12
 ===================
   * `Api::log` -> `Api::logs` (now matches `Resource::logs`)

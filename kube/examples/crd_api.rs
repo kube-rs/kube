@@ -19,6 +19,7 @@ use kube::{
 #[kube(apiextensions = "v1beta1")]
 #[kube(status = "FooStatus")]
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+#[kube(printcolumn = r#"{"name":"Team", "jsonPath": ".spec.metadata.team", "type": "string"}"#)]
 pub struct FooSpec {
     name: String,
     info: String,
