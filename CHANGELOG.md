@@ -1,6 +1,7 @@
-0.29.1 / 2020-03-XX
+0.30.0 / 2020-03-17
 ===================
   * Fix `#[kube(printcolumn)]` when `#[kube(apiextensions = "v1beta1")]`
+  * Fix `#[kube(status)]` causing serializes of empty optional statuses
 
 0.29.0 / 2020-03-12
 ===================
