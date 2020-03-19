@@ -195,10 +195,19 @@ impl APIClient {
                                             // added in the current partial line to our buffer for
                                             // use in the next loop
                                             if !e.is_eof() {
-                                                warn!("Failed to parse: {}", String::from_utf8_lossy(line));
+                                                // Check if it's a general API error response
+                                                let e = match serde_json::from_slice(&new_buff) {
+                                                    Ok(e) => Error::Api(e),
+                                                    _ => {
+                                                        let line = String::from_utf8_lossy(line);
+                                                        warn!("Failed to parse: {}", line);
+                                                        Error::SerdeError(e)
+                                                    }
+                                                };
+
                                                 // Clear the buffer as this was a valid object
                                                 new_buff.clear();
-                                                items.push(Err(Error::SerdeError(e)));
+                                                items.push(Err(e));
                                             }
                                         }
                                     }
