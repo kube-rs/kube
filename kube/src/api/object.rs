@@ -64,7 +64,7 @@ where
     /// This defines the desired state of the Resource as specified by the user.
     pub spec: P,
 
-    /// The Status of a resource. I.e. `PotStatus`, `DeploymentStatus`, etc.
+    /// The Status of a resource. I.e. `PodStatus`, `DeploymentStatus`, etc.
     ///
     /// This publishes the state of the Resource as observed by the controller.
     /// Use `U = NotUsed` when a status does not exist.
