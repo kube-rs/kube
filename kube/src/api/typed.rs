@@ -200,6 +200,7 @@ where
         self.client.request::<K>(req).await
     }
 
+    /*
     /// Server side apply a yaml patch over a named resource
     ///
     /// TODO: simplified ApplyParams with default field manager to exe name
@@ -214,11 +215,12 @@ where
             field_manager: Some(env!("CARGO_PKG_NAME").into()),
             ..Default::default()
         };
-        let bytes = serde_yaml::to_vec(patch)?;
+        // TODO: fill in a blank object using K::KIND + K::API_VERSION and meta.name == name ?
+        let bytes = serde_yaml::to_vec(&patch)?;
         let req = self.api.patch(name, &ssapply, bytes)?;
         self.client.request::<K>(req).await
     }
-    /*pub async fn diff(&self, name: &str, patch: Vec<u8>) -> Result<K> {
+    pub async fn diff(&self, name: &str, patch: Vec<u8>) -> Result<K> {
         // TODO: as above but with dry_run: true
         let req = self.api.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await

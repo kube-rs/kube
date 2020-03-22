@@ -25,7 +25,7 @@ use kube::{
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
-    info: String,
+    info: Option<String>,
     replicas: i32,
 }
 
@@ -66,37 +66,46 @@ async fn main() -> anyhow::Result<()> {
     // Wait for the apply to take place
     Delay::new(Duration::from_secs(2)).await;
 
-    // 1. Create a Foo
+    // Start applying foos
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
+    // 1. Apply from a full struct (e.g. equivalent to replace w/o resource_version)
     let foo = Foo::new("baz", FooSpec {
         name: "baz".into(),
-        info: "old baz".into(),
+        info: Some("old baz".into()),
         replicas: 3,
     });
-    info!("Applying: \n{}", serde_yaml::to_string(&foo)?);
+    info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
     let o = foos.patch("baz", &ssapply, serde_yaml::to_vec(&foo)?).await?;
-    info!("Applied {}: {:?}", Meta::name(&o), o.spec);
+    info!("Applied 1 {}: {:?}", Meta::name(&o), o.spec);
 
-    // Apply from rawstring yaml:
-    let yamlpatch = r#"
-        spec:
-            info: "new baz"
-            name: "foo"
-    "#;
-    info!("Apply: {:?}", yamlpatch);
-    let o2 = foos.patch("baz", &ssapply, serde_yaml::to_vec(yamlpatch)?).await?;
-    info!("Applied {}: {:?}", Meta::name(&o2), o2.spec);
+    // 2. Apply from partial json!
+    // NB: requires TypeMeta + everything non-optional in the spec
+    // NB: unfortunately optionals are nulled out by the apiserver...
+    // (Because this does not go through K::Serialize it's not related to serde annots)
+    // (it's actually defaulted by the server => crd schema needs to provide this info..)
+    let patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "name": "foo",
+            "replicas": 2
+        }
+    });
 
-    // Simplified using shortcut method:
-/*    let yamlpatch2 = r#"
+    info!("Applying 2: \n{}", serde_yaml::to_string(&patch)?);
+    let o2 = foos.patch("baz", &ssapply, serde_yaml::to_vec(&patch)?).await?;
+    info!("Applied 2 {}: {:?}", Meta::name(&o2), o2.spec);
+
+/*    // 3. apply from partial yaml (EXPERIMENT, IGNORE, VERY BAD)
+    let yamlpatch2 = r#"
         spec:
             info: "newer baz"
             name: "foo"
     "#;
-    info!("Apply: {:?}", yamlpatch2);
     let o3 = foos.apply("baz", yamlpatch2).await?;
     assert_eq!(o3.spec.info, "newer baz");
+    info!("Applied 3 {}: {:?}", Meta::name(&o3), o3.spec);
 */
     Ok(())
 }
