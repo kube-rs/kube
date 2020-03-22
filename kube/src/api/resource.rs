@@ -149,6 +149,8 @@ impl ListParams {
     }
 }
 
+// TODO: WatchParams (same as ListParams but with extra resource_version + allow_watch_bookmarks)
+
 /// Common query parameters for put/post calls
 #[derive(Default, Clone)]
 pub struct PostParams {

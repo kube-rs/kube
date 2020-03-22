@@ -61,8 +61,8 @@ async fn main() -> anyhow::Result<()> {
             info!("Deleted foos.clux.dev: ({:?})", s);
         })
     });
-    // Wait for the delete to take place (map-left case)
-    Delay::new(Duration::from_secs(1)).await;
+    // Wait for the delete to take place (map-left case or delete from previous run)
+    Delay::new(Duration::from_secs(2)).await;
 
     // Create the CRD so we can create Foos in kube
     let foocrd = Foo::crd();
