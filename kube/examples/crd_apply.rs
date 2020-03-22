@@ -1,4 +1,5 @@
 #[macro_use] extern crate log;
+use futures::StreamExt;
 use futures_timer::Delay;
 use kube_derive::CustomResource;
 use serde_derive::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 
 use kube::{
-    api::{Api, Meta, PatchParams, PatchStrategy},
+    api::{Api, ListParams, Meta, PatchParams, PatchStrategy, WatchEvent},
     client::APIClient,
     config,
 };
@@ -52,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    // 0. Install the CRD
+    // 0. Apply the CRD
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
     match crds
@@ -66,7 +67,33 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => return Err(e.into()),
     }
-    // Wait for the apply to take place
+    // Wait for the apply to take place (takes a sec or two during first install)
+    let lp = ListParams::default()
+        .fields(&format!("metadata.name={}", "foos.clux.dev")) // our crd only
+        .timeout(10); // should not take long
+    let mut stream = crds.watch(&lp, "0").await?.boxed();
+
+    while let Some(status) = stream.next().await {
+        match status {
+            WatchEvent::Added(s) => info!("Added {}", Meta::name(&s)),
+            WatchEvent::Modified(s) => {
+                info!("Modify event for {}", Meta::name(&s));
+                if let Some(s) = s.status {
+                    if let Some(conds) = s.conditions {
+                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "NamesAccepted") {
+                            if pcond.status == "True" {
+                                info!("crd was accepted: {:?}", pcond);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            WatchEvent::Deleted(s) => info!("Deleted {}", Meta::name(&s)),
+            WatchEvent::Error(s) => error!("{}", s),
+        }
+    }
+
     Delay::new(Duration::from_secs(2)).await;
 
     // Start applying foos

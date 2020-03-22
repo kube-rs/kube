@@ -58,7 +58,10 @@ async fn main() -> anyhow::Result<()> {
             WatchEvent::Modified(s) => {
                 let current_status = s.status.clone().expect("Status is missing");
                 match current_status.completion_time {
-                    Some(_) => info!("Modified: {} is complete", Meta::name(&s)),
+                    Some(_) => {
+                        info!("Modified: {} is complete", Meta::name(&s));
+                        break;
+                    }
                     _ => info!("Modified: {} is running", Meta::name(&s)),
                 }
             }
