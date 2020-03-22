@@ -1,8 +1,8 @@
 #[macro_use] extern crate log;
+use futures_timer::Delay;
 use kube_derive::CustomResource;
 use serde_derive::{Deserialize, Serialize};
 use serde_yaml;
-use futures_timer::Delay;
 use std::time::Duration;
 
 use apiexts::CustomResourceDefinition;
@@ -55,12 +55,15 @@ async fn main() -> anyhow::Result<()> {
     // 0. Install the CRD
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
-    match crds.patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?).await {
+    match crds
+        .patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?)
+        .await
+    {
         Ok(o) => info!("Applied {}: ({:?})", Meta::name(&o), o.spec),
         Err(kube::Error::Api(ae)) => {
             warn!("apply error: {:?}", ae);
             assert_eq!(ae.code, 409); // if it's still there..
-        },
+        }
         Err(e) => return Err(e.into()),
     }
     // Wait for the apply to take place
@@ -97,15 +100,15 @@ async fn main() -> anyhow::Result<()> {
     let o2 = foos.patch("baz", &ssapply, serde_yaml::to_vec(&patch)?).await?;
     info!("Applied 2 {}: {:?}", Meta::name(&o2), o2.spec);
 
-/*    // 3. apply from partial yaml (EXPERIMENT, IGNORE, VERY BAD)
-    let yamlpatch2 = r#"
-        spec:
-            info: "newer baz"
-            name: "foo"
-    "#;
-    let o3 = foos.apply("baz", yamlpatch2).await?;
-    assert_eq!(o3.spec.info, "newer baz");
-    info!("Applied 3 {}: {:?}", Meta::name(&o3), o3.spec);
-*/
+    /*    // 3. apply from partial yaml (EXPERIMENT, IGNORE, VERY BAD)
+        let yamlpatch2 = r#"
+            spec:
+                info: "newer baz"
+                name: "foo"
+        "#;
+        let o3 = foos.apply("baz", yamlpatch2).await?;
+        assert_eq!(o3.spec.info, "newer baz");
+        info!("Applied 3 {}: {:?}", Meta::name(&o3), o3.spec);
+    */
     Ok(())
 }
