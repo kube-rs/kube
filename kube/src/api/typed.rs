@@ -200,33 +200,6 @@ where
         self.client.request::<K>(req).await
     }
 
-    /*
-    /// Server side apply a yaml patch over a named resource
-    ///
-    /// TODO: simplified ApplyParams with default field manager to exe name
-    pub async fn apply(&self, name: &str, patch: &str) -> Result<K> {
-        // for now hard-code
-        use crate::api::PatchStrategy;
-        let ssapply = PatchParams {
-            patch_strategy: PatchStrategy::Apply,
-            // always override on conflicts
-            force: true,
-            // owner of the fields: (us)
-            field_manager: Some(env!("CARGO_PKG_NAME").into()),
-            ..Default::default()
-        };
-        // TODO: fill in a blank object using K::KIND + K::API_VERSION and meta.name == name ?
-        let bytes = serde_yaml::to_vec(&patch)?;
-        let req = self.api.patch(name, &ssapply, bytes)?;
-        self.client.request::<K>(req).await
-    }
-    pub async fn diff(&self, name: &str, patch: Vec<u8>) -> Result<K> {
-        // TODO: as above but with dry_run: true
-        let req = self.api.patch(name, &pp, patch)?;
-        self.client.request::<K>(req).await
-    }*/
-
-
     /// Replace a resource entirely with a new one
     ///
     /// This is used just like `Api::create`, but with one additional instruction:

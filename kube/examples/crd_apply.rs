@@ -100,15 +100,5 @@ async fn main() -> anyhow::Result<()> {
     let o2 = foos.patch("baz", &ssapply, serde_yaml::to_vec(&patch)?).await?;
     info!("Applied 2 {}: {:?}", Meta::name(&o2), o2.spec);
 
-    /*    // 3. apply from partial yaml (EXPERIMENT, IGNORE, VERY BAD)
-        let yamlpatch2 = r#"
-            spec:
-                info: "newer baz"
-                name: "foo"
-        "#;
-        let o3 = foos.apply("baz", yamlpatch2).await?;
-        assert_eq!(o3.spec.info, "newer baz");
-        info!("Applied 3 {}: {:?}", Meta::name(&o3), o3.spec);
-    */
     Ok(())
 }
