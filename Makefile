@@ -32,4 +32,11 @@ bump-patch:
 publish:
 	./release.sh publish
 
-.PHONY: doc build fmt clippy test readme
+minikube-create:
+	sudo -E minikube start --driver=none --kubernetes-version v1.16.8 --extra-config kubeadm.ignore-preflight-errors=SystemVerification
+
+minikube:
+	kubectl config set-context --cluster=minikube --user=minikube --namespace=apps minikube
+	kubectl create namespace apps
+
+.PHONY: doc build fmt clippy test readme minikube
