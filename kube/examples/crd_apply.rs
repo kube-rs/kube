@@ -2,6 +2,8 @@
 use kube_derive::CustomResource;
 use serde_derive::{Deserialize, Serialize};
 use serde_yaml;
+use futures_timer::Delay;
+use std::time::Duration;
 
 use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
@@ -17,7 +19,7 @@ use kube::{
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 #[kube(status = "FooStatus")]
 #[kube(apiextensions = "v1beta1")]
-//#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
     info: String,
@@ -46,7 +48,6 @@ async fn main() -> anyhow::Result<()> {
         field_manager: Some("crd_apply_example".to_string()),
         ..Default::default()
     };
-    //let jsonmerge = PatchParams::default();
 
     // 0. Install the CRD
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
@@ -55,38 +56,34 @@ async fn main() -> anyhow::Result<()> {
         Ok(o) => info!("Applied {}: ({:?})", Meta::name(&o), o.spec),
         Err(kube::Error::Api(ae)) => {
             warn!("apply error: {:?}", ae);
-            assert_eq!(ae.code, 409); // if you skipped delete, for instance
+            assert_eq!(ae.code, 409); // if it's still there..
         },
         Err(e) => return Err(e.into()),
     }
+    // Wait for the apply to take place
+    Delay::new(Duration::from_secs(2)).await;
 
     // 1. Create a Foo
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
-    let f1 = Foo::new("baz", FooSpec {
+    let foo = Foo::new("baz", FooSpec {
         name: "baz".into(),
         info: "old baz".into(),
         replicas: 3,
     });
-    info!("Apply: \n{}", serde_yaml::to_string(&f1)?);
+    info!("Applying: \n{}", serde_yaml::to_string(&foo)?);
+    let o = foos.patch("baz", &ssapply, serde_yaml::to_vec(&foo)?).await?;
+    info!("Applied {}: {:?}", Meta::name(&o), o.spec);
 
-    // 1a). Invalid yaml apply (due to ints being made into floats)
-    let o = foos.patch("baz", &ssapply, serde_yaml::to_vec(&f1)?).await?;
-
-    // 1b). Valid json Merge strategy (somehow validates)
-    //let o = foos.patch("baz", &jsonmerge, serde_json::to_vec(&f1)?).await?;
-
-    info!("Created {}: {:?}", Meta::name(&o), o.spec);
-
-    /*// Apply a subset of baz
-    let patch = r#"
+    // Apply from rawstring yaml:
+    let yamlpatch = r#"
         spec:
             info: "new baz"
             name: "foo"
     "#;
-    info!("Apply: {:?}", serde_yaml::from_str(&patch)?);
-    let o = foos.patch("baz", &pp, serde_yaml::to_vec(patch)?).await?;
-    info!("Applied {}: {:?}", Meta::name(&o), o.spec);*/
+    info!("Apply: {:?}", yamlpatch);
+    let o2 = foos.patch("baz", &ssapply, serde_yaml::to_vec(yamlpatch)?).await?;
+    info!("Applied {}: {:?}", Meta::name(&o2), o2.spec);
 
     Ok(())
 }
