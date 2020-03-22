@@ -14,11 +14,14 @@ use kube::{
     config,
 };
 
+// NB: This example uses server side apply and beta1 customresources
+// Please test against kubernetes 1.16.X!
+
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 #[kube(status = "FooStatus")]
-#[kube(apiextensions = "v1beta1")]
+#[kube(apiextensions = "v1beta1")] // remove this if using kubernetes >= 1.17
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
@@ -85,5 +88,15 @@ async fn main() -> anyhow::Result<()> {
     let o2 = foos.patch("baz", &ssapply, serde_yaml::to_vec(yamlpatch)?).await?;
     info!("Applied {}: {:?}", Meta::name(&o2), o2.spec);
 
+    // Simplified using shortcut method:
+/*    let yamlpatch2 = r#"
+        spec:
+            info: "newer baz"
+            name: "foo"
+    "#;
+    info!("Apply: {:?}", yamlpatch2);
+    let o3 = foos.apply("baz", yamlpatch2).await?;
+    assert_eq!(o3.spec.info, "newer baz");
+*/
     Ok(())
 }

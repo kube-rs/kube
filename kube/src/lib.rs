@@ -37,6 +37,10 @@ pub enum Error {
     #[error("Error deserializing response")]
     SerdeError(#[from] serde_json::Error),
 
+    /// Common error when trying to serialize arbitrary app yaml
+    #[error("Error serializing request")]
+    SerdeYamlError(#[from] serde_yaml::Error),
+
     #[error("Error building request")]
     RequestBuild,
     #[error("Error executing request")]
