@@ -79,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
     let dp = DeleteParams::default();
     pods.delete("blog", &dp).await?.map_left(|pdel| {
         assert_eq!(Meta::name(&pdel), "blog");
-        info!("Deleting blog pod started");
+        info!("Deleting blog pod started: {:?}", pdel);
     });
 
     Ok(())

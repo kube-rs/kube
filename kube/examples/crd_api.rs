@@ -1,8 +1,10 @@
 #[macro_use] extern crate log;
 use either::Either::{Left, Right};
+use futures_timer::Delay;
 use kube_derive::CustomResource;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
+use std::time::Duration;
 
 use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
@@ -49,19 +51,18 @@ async fn main() -> anyhow::Result<()> {
     let _ = crds.delete("foos.clux.dev", &dp).await.map(|res| {
         res.map_left(|o| {
             info!(
-                "Deleted {}: ({:?})",
+                "Deleting {}: ({:?})",
                 Meta::name(&o),
                 o.status.unwrap().conditions.unwrap().last()
             );
-            // NB: PropagationPolicy::Foreground doesn't cause us to block here
-            // we have to watch for it explicitly.. but this is a demo:
-            std::thread::sleep(std::time::Duration::from_millis(1000));
         })
         .map_right(|s| {
             // it's gone.
             info!("Deleted foos.clux.dev: ({:?})", s);
         })
     });
+    // Wait for the delete to take place (map-left case)
+    Delay::new(Duration::from_secs(1)).await;
 
     // Create the CRD so we can create Foos in kube
     let foocrd = Foo::crd();
@@ -76,6 +77,8 @@ async fn main() -> anyhow::Result<()> {
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
         Err(e) => return Err(e.into()),                        // any other case is probably bad
     }
+    // Wait for the api to catch up
+    Delay::new(Duration::from_secs(1)).await;
 
 
     // Manage the Foo CR
@@ -205,7 +208,7 @@ async fn main() -> anyhow::Result<()> {
     match foos.delete_collection(&lp).await? {
         Left(list) => {
             let deleted: Vec<_> = list.iter().map(Meta::name).collect();
-            info!("Deleted collection of foos: {:?}", deleted);
+            info!("Deleting collection of foos: {:?}", deleted);
         }
         Right(status) => {
             info!("Deleted collection of crds: status={:?}", status);
