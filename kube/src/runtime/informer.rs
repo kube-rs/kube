@@ -1,6 +1,6 @@
 use crate::{
     api::{ListParams, Meta, Resource, WatchEvent},
-    Client,Result,
+    Client, Result,
 };
 
 use futures::{lock::Mutex, Stream, StreamExt};

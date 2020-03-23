@@ -76,9 +76,10 @@ impl Client {
         // TODO: lift this match into config module
         let configuration = match config::incluster_config() {
             Err(e) => {
-                debug!("No in-cluster configuration found ({})- falling back to local kube config", e);
+                debug!("No in-cluster config found: {}", e);
+                debug!("Falling back to local kube config");
                 config::load_kube_config().await?
-            },
+            }
             Ok(o) => o,
         };
         Ok(Self { configuration })
