@@ -1,7 +1,6 @@
 use crate::{
     api::{ListParams, Meta, Resource, WatchEvent},
-    client::APIClient,
-    Result,
+    Client,Result,
 };
 
 use futures::{lock::Mutex, Stream, StreamExt};
@@ -21,7 +20,7 @@ where
     K: Clone + DeserializeOwned + Meta,
 {
     version: Arc<Mutex<String>>,
-    client: APIClient,
+    client: Client,
     resource: Resource,
     params: ListParams,
     needs_resync: Arc<Mutex<bool>>,
@@ -34,7 +33,7 @@ where
     K: Clone + DeserializeOwned + Meta,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
+    pub fn new(client: Client, lp: ListParams, r: Resource) -> Self {
         Informer {
             client,
             resource: r,

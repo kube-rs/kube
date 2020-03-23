@@ -60,11 +60,11 @@ where
     /// NB: Requires that the resource has a status subresource.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PatchParams}, config, client::APIClient};
+    /// use kube::{api::{Api, PatchParams}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = APIClient::new(config::load_kube_config().await?);
+    ///     let client = Client::new().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut j = jobs.get("baz").await?;
     ///     let pp = PatchParams::default(); // json merge patch
@@ -89,11 +89,11 @@ where
     /// You can leave out the .spec entirely from the serialized output.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PostParams}, config, client::APIClient};
+    /// use kube::{api::{Api, PostParams}, Client};
     /// use k8s_openapi::api::batch::v1::{Job, JobStatus};
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = APIClient::new(config::load_kube_config().await?);
+    ///     let client = Client::new().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut o = jobs.get_status("baz").await?; // retrieve partial object
     ///     o.status = Some(JobStatus::default()); // update the job part

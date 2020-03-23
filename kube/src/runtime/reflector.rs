@@ -1,7 +1,6 @@
 use crate::{
     api::{ListParams, Meta, ObjectList, Resource, WatchEvent},
-    client::APIClient,
-    Error, Result,
+    Client, Error, Result,
 };
 use futures::{lock::Mutex, StreamExt, TryStreamExt};
 use futures_timer::Delay;
@@ -41,7 +40,7 @@ where
     K: Clone + DeserializeOwned + Send + Meta,
 {
     state: Arc<Mutex<State<K>>>,
-    client: APIClient,
+    client: Client,
     resource: Resource,
     params: ListParams,
 }
@@ -51,7 +50,7 @@ where
     K: Clone + DeserializeOwned + Meta + Send,
 {
     /// Create a reflector with a kube client on a resource
-    pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
+    pub fn new(client: Client, lp: ListParams, r: Resource) -> Self {
         Reflector {
             client,
             resource: r,

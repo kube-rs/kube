@@ -70,9 +70,6 @@ pub struct FooSpec {
 Then you can use a lot of generated code as:
 
 ```rust
-let config = config::load_kube_config().await?;
-let client = APIClient::new(config);
-
 println!("kind = {}", Foo::KIND); // impl k8s_openapi::Resource
 let foos: Api<Foo> = Api::namespaced(client, "default");
 let f = Foo::new("my-foo");
