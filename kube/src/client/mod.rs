@@ -280,3 +280,21 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use super::Status;
+
+    // ensure our status schema is sensible
+    #[test]
+    fn delete_deserialize_test() {
+        let statusresp = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"name":"some-app","group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
+        let s: Status = serde_json::from_str::<Status>(statusresp).unwrap();
+        assert_eq!(s.details.unwrap().name, "some-app");
+
+        let statusnoname = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
+        let s2: Status = serde_json::from_str::<Status>(statusnoname).unwrap();
+        assert_eq!(s2.details.unwrap().name, ""); // optional probably better..
+    }
+}
