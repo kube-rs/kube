@@ -8,6 +8,7 @@
   * `Client` now implements `From<Configuration>`
   * Added comprehensive documentation on `Api`
   * Rename `config::KubeConfigLoader` -> `config::ConfigLoader`
+  * removed `futures-timer` dependency for `tokio` (feature=timer)
 
 0.30.0 / 2020-03-17
 ===================

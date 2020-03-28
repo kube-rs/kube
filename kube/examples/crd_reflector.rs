@@ -1,8 +1,8 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate kube_derive;
-use futures_timer::Delay;
 use std::time::Duration;
+use tokio::time::delay_for;
 
 use kube::{
     api::{ListParams, Meta, Resource},
@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     loop {
-        Delay::new(Duration::from_secs(5)).await;
+        delay_for(Duration::from_secs(5)).await;
         // Read updated internal state (instant):
         let crds = rf.state().await?.iter().map(Meta::name).collect::<Vec<_>>();
         info!("Current crds: {:?}", crds);

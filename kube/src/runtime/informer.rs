@@ -4,9 +4,9 @@ use crate::{
 };
 
 use futures::{lock::Mutex, Stream, StreamExt};
-use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
+use tokio::time::delay_for;
 
 /// An event informer for a `Resource`
 ///
@@ -79,7 +79,7 @@ where
             if *needs_resync || *needs_retry {
                 // Try again in a bit
                 let dur = Duration::from_secs(10);
-                Delay::new(dur).await;
+                delay_for(dur).await;
                 // If we are outside history, start over from latest
                 if *needs_resync {
                     self.reset().await;

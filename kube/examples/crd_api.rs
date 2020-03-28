@@ -1,10 +1,10 @@
 #[macro_use] extern crate log;
 use either::Either::{Left, Right};
-use futures_timer::Delay;
 use kube_derive::CustomResource;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
+use tokio::time::delay_for;
 
 use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
@@ -60,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
         })
     });
     // Wait for the delete to take place (map-left case or delete from previous run)
-    Delay::new(Duration::from_secs(2)).await;
+    delay_for(Duration::from_secs(2)).await;
 
     // Create the CRD so we can create Foos in kube
     let foocrd = Foo::crd();
@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
         Err(e) => return Err(e.into()),                        // any other case is probably bad
     }
     // Wait for the api to catch up
-    Delay::new(Duration::from_secs(1)).await;
+    delay_for(Duration::from_secs(1)).await;
 
 
     // Manage the Foo CR

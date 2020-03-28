@@ -3,8 +3,8 @@ use crate::{
     Client, Error, Result,
 };
 use futures::{lock::Mutex, StreamExt, TryStreamExt};
-use futures_timer::Delay;
 use serde::de::DeserializeOwned;
+use tokio::time::delay_for;
 
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -76,7 +76,7 @@ where
             warn!("Poll error on {}: {}: {:?}", self.resource.kind, e, e);
             // If desynched due to mismatching resourceVersion, retry in a bit
             let dur = Duration::from_secs(10);
-            Delay::new(dur).await;
+            delay_for(dur).await;
             self.reset().await?; // propagate error if this failed..
         }
 
