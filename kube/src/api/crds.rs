@@ -115,7 +115,8 @@ impl From<CustomResource> for Resource {
             kind: c.kind,
             group: c.group,
             version: c.version,
-            namespace: c.namespace,
+            namespace: c.namespace, // yeah, needs to be merged into scope
+            scope: crate::api::resource::ResourceScope::Namespace, // otherwise can clash with ::All
         }
     }
 }

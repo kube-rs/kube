@@ -27,6 +27,15 @@ pub struct Resource {
 
     /// The namespace if the resource resides (if namespaced)
     pub namespace: Option<String>,
+
+    pub scope: ResourceScope,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResourceScope {
+    Cluster,
+    Namespace, // could maybe put the resource.namespace string in here
+    All,
 }
 
 
@@ -80,10 +89,14 @@ impl Resource {
             group: K::GROUP.to_string(),
             version: K::VERSION.to_string(),
             namespace: None,
+            scope: ResourceScope::Cluster,
         }
     }
 
     /// Namespaced resources viewed across all namespaces
+    ///
+    /// This does not let you read / get individual objects
+    /// because the resources still need to know the underlying namespace.
     pub fn all<K: NamespaceScopedResource>() -> Self {
         Self {
             api_version: K::API_VERSION.to_string(),
@@ -91,6 +104,7 @@ impl Resource {
             group: K::GROUP.to_string(),
             version: K::VERSION.to_string(),
             namespace: None,
+            scope: ResourceScope::All
         }
     }
 
@@ -102,6 +116,7 @@ impl Resource {
             group: K::GROUP.to_string(),
             version: K::VERSION.to_string(),
             namespace: Some(ns.to_string()),
+            scope: ResourceScope::Namespace,
         }
     }
 }

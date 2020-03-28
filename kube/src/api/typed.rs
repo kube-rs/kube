@@ -92,6 +92,7 @@ where
     /// }
     /// ```
     pub async fn get(&self, name: &str) -> Result<K> {
+        assert!(self.api.scope != crate::api::resource::ResourceScope::All);
         let req = self.api.get(name)?;
         self.client.request::<K>(req).await
     }
@@ -139,7 +140,7 @@ where
     where
         K: Serialize,
     {
-        // TODO: assert self.resource is not a Resource::all
+        assert!(self.api.scope != crate::api::resource::ResourceScope::All);
         let bytes = serde_json::to_vec(&data)?;
         let req = self.api.create(&pp, bytes)?;
         self.client.request::<K>(req).await
