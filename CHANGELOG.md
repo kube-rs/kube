@@ -7,6 +7,7 @@
   * Add `Client::inferred` as a recommended constructor
   * `Client` now implements `From<Configuration>`
   * Added comprehensive documentation on `Api`
+  * Rename `config::KubeConfigLoader` -> `config::ConfigLoader`
 
 0.30.0 / 2020-03-17
 ===================

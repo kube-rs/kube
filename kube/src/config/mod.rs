@@ -15,7 +15,7 @@ use crate::{config::kube_config::Der, Error, Result};
 use reqwest::{header, Client, ClientBuilder};
 use std::convert::TryInto;
 
-use self::kube_config::KubeConfigLoader;
+use self::kube_config::ConfigLoader;
 
 /// Configuration stores kubernetes path and client for requests.
 #[derive(Clone)]
@@ -105,11 +105,11 @@ fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, _: &Der) -> Clie
 /// Returns a client builder and config loader, based on the cluster information from the kubeconfig file.
 ///
 /// This allows to create your custom reqwest client for using with the cluster API.
-pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder, KubeConfigLoader)> {
+pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder, ConfigLoader)> {
     let kubeconfig =
         utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
 
-    let loader = KubeConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
+    let loader = ConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
 
     let token = match &loader.user.token {
         Some(token) => Some(token.clone()),
