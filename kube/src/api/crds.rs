@@ -162,6 +162,7 @@ mod test {
         };
         let client = Client::from(Configuration::infer().await.unwrap());
         let r1: Api<Foo> = Api::namespaced(client.clone(), "myns");
+        impl crate::api::resource::NamespaceScopedResource for Foo {} // TODO: This in kube-derive
 
         let r2: Api<Foo> = CustomResource::kind("Foo")
             .group("clux.dev")

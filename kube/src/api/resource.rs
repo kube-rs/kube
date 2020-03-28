@@ -29,9 +29,62 @@ pub struct Resource {
     pub namespace: Option<String>,
 }
 
+
+// Try Arnavion's first suggestion
+pub trait ClusterScopedResource: k8s_openapi::Resource { }
+pub trait NamespaceScopedResource: k8s_openapi::Resource { }
+use k8s::{
+    admissionregistration::v1beta1 as adregv1beta1,
+    apps::v1 as appsv1,
+    authorization::v1 as authv1,
+    autoscaling::v1 as autoscalingv1,
+    batch::v1beta1 as batchv1beta1,
+    core::v1 as corev1,
+    extensions::v1beta1 as extsv1beta1,
+    networking::{v1 as networkingv1, v1beta1 as networkingv1beta1},
+    rbac::v1 as rbacv1,
+    storage::v1 as storagev1,
+};
+use k8s_openapi::api as k8s;
+impl NamespaceScopedResource for corev1::Secret {}
+impl NamespaceScopedResource for rbacv1::Role {}
+impl NamespaceScopedResource for batchv1beta1::CronJob {}
+impl NamespaceScopedResource for autoscalingv1::HorizontalPodAutoscaler {}
+impl NamespaceScopedResource for networkingv1::NetworkPolicy {}
+impl NamespaceScopedResource for extsv1beta1::Ingress {}
+impl NamespaceScopedResource for appsv1::Deployment {}
+impl NamespaceScopedResource for corev1::Pod {}
+impl NamespaceScopedResource for appsv1::ReplicaSet {}
+impl NamespaceScopedResource for networkingv1beta1::Ingress {}
+impl NamespaceScopedResource for appsv1::DaemonSet {}
+
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiextsv1;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiextsv1beta1;
+
+impl ClusterScopedResource for storagev1::VolumeAttachment {}
+impl ClusterScopedResource for adregv1beta1::ValidatingWebhookConfiguration {}
+impl ClusterScopedResource for authv1::SelfSubjectRulesReview {}
+impl ClusterScopedResource for apiextsv1::CustomResourceDefinition {}
+impl ClusterScopedResource for corev1::Namespace {}
+impl ClusterScopedResource for apiextsv1beta1::CustomResourceDefinition {}
+impl ClusterScopedResource for corev1::Node {}
+
+
+
 impl Resource {
-    /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all<K: k8s_openapi::Resource>() -> Self {
+    /// Cluster level resources,
+    pub fn cluster<K: ClusterScopedResource>() -> Self {
+        Self {
+            api_version: K::API_VERSION.to_string(),
+            kind: K::KIND.to_string(),
+            group: K::GROUP.to_string(),
+            version: K::VERSION.to_string(),
+            namespace: None,
+        }
+    }
+
+    /// Namespaced resources viewed across all namespaces
+    pub fn all<K: NamespaceScopedResource>() -> Self {
         Self {
             api_version: K::API_VERSION.to_string(),
             kind: K::KIND.to_string(),
@@ -42,13 +95,7 @@ impl Resource {
     }
 
     /// Namespaced resource within a given namespace
-    pub fn namespaced<K: k8s_openapi::Resource>(ns: &str) -> Self {
-        match K::KIND {
-            "Node" | "Namespace" | "ClusterRole" | "CustomResourceDefinition" => {
-                panic!("{} is not a namespace scoped resource", K::KIND)
-            }
-            _ => {}
-        }
+    pub fn namespaced<K: NamespaceScopedResource>(ns: &str) -> Self {
         Self {
             api_version: K::API_VERSION.to_string(),
             kind: K::KIND.to_string(),
@@ -588,14 +635,14 @@ mod test {
 
     #[test]
     fn api_url_vattach() {
-        let r = Resource::all::<storagev1::VolumeAttachment>();
+        let r = Resource::cluster::<storagev1::VolumeAttachment>();
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/storage.k8s.io/v1/volumeattachments?");
     }
 
     #[test]
     fn api_url_admission() {
-        let r = Resource::all::<adregv1beta1::ValidatingWebhookConfiguration>();
+        let r = Resource::cluster::<adregv1beta1::ValidatingWebhookConfiguration>();
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(
             req.uri(),
@@ -605,7 +652,7 @@ mod test {
 
     #[test]
     fn api_auth_selfreview() {
-        let r = Resource::all::<authv1::SelfSubjectRulesReview>();
+        let r = Resource::cluster::<authv1::SelfSubjectRulesReview>();
         assert_eq!(r.group, "authorization.k8s.io");
         assert_eq!(r.kind, "SelfSubjectRulesReview");
 
@@ -618,7 +665,7 @@ mod test {
 
     #[test]
     fn api_apiextsv1_crd() {
-        let r = Resource::all::<apiextsv1::CustomResourceDefinition>();
+        let r = Resource::cluster::<apiextsv1::CustomResourceDefinition>();
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(
             req.uri(),
@@ -679,7 +726,7 @@ mod test {
 
     #[test]
     fn namespace_path() {
-        let r = Resource::all::<corev1::Namespace>();
+        let r = Resource::cluster::<corev1::Namespace>();
         let gp = ListParams::default();
         let req = r.list(&gp).unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces")
@@ -704,7 +751,7 @@ mod test {
     // subresources with weird version accuracy
     #[test]
     fn patch_status_path() {
-        let r = Resource::all::<corev1::Node>();
+        let r = Resource::cluster::<corev1::Node>();
         let pp = PatchParams::default();
         let req = r.patch_status("mynode", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
@@ -716,7 +763,7 @@ mod test {
     }
     #[test]
     fn replace_status_path() {
-        let r = Resource::all::<corev1::Node>();
+        let r = Resource::cluster::<corev1::Node>();
         let pp = PostParams::default();
         let req = r.replace_status("mynode", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
@@ -745,7 +792,7 @@ mod test {
 
     #[test]
     fn replace_status() {
-        let r = Resource::all::<apiextsv1beta1::CustomResourceDefinition>();
+        let r = Resource::cluster::<apiextsv1beta1::CustomResourceDefinition>();
         let pp = PostParams::default();
         let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
         assert_eq!(
@@ -755,14 +802,14 @@ mod test {
     }
     #[test]
     fn get_scale_path() {
-        let r = Resource::all::<corev1::Node>();
+        let r = Resource::cluster::<corev1::Node>();
         let req = r.get_scale("mynode").unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale");
         assert_eq!(req.method(), "GET");
     }
     #[test]
     fn patch_scale_path() {
-        let r = Resource::all::<corev1::Node>();
+        let r = Resource::cluster::<corev1::Node>();
         let pp = PatchParams::default();
         let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
@@ -770,16 +817,16 @@ mod test {
     }
     #[test]
     fn replace_scale_path() {
-        let r = Resource::all::<corev1::Node>();
+        let r = Resource::cluster::<corev1::Node>();
         let pp = PostParams::default();
         let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
         assert_eq!(req.method(), "PUT");
     }
 
-    #[test]
-    #[should_panic]
+/*    #[test]
+    #[should_panic] - compile fails now!
     fn all_resources_not_namespaceable() {
         Resource::namespaced::<corev1::Node>("ns");
-    }
+    }*/
 }
