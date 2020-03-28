@@ -114,17 +114,19 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
 
     let loader = ConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
 
-    let token = match &loader.user.token {
-        Some(token) => Some(token.clone()),
-        None => {
+
+    let (token, client_certificate_data, client_key_data) = match (&loader.user.token, &loader.user.client_certificate_data, &loader.user.client_certificate_data) {
+        (Some(token), _, _) => (Some(token.clone()), None, None),
+        (_, Some(client_certificate_data), Some(client_key_data)) => (None, Some(client_certificate_data.clone()), Some(client_key_data.clone())),
+        (_, _, _) => {
             if let Some(exec) = &loader.user.exec {
                 let creds = exec::auth_exec(exec)?;
                 let status = creds.status.ok_or_else(|| {
                     Error::KubeConfig("exec-plugin response did not contain a status".into())
                 })?;
-                status.token
+                (status.token, status.client_certificate_data, status.client_key_data)
             } else {
-                None
+                (None, None, None)
             }
         }
     };
