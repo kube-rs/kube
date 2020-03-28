@@ -4,9 +4,8 @@ use std::collections::BTreeMap;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{ListParams, Meta, Resource},
-    client::APIClient,
-    config,
     runtime::Reflector,
+    Client, Configuration,
 };
 
 /// Example way to read secrets
@@ -35,8 +34,7 @@ fn decode(secret: &Secret) -> BTreeMap<String, Decoded> {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let config = config::load_kube_config().await?;
-    let client = APIClient::new(config);
+    let client = Client::from(Configuration::inferred().await?);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<Secret>(&namespace);

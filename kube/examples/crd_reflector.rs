@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use kube::{
     api::{ListParams, Meta, Resource},
-    Client,
     runtime::Reflector,
+    Client,
 };
 
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
@@ -21,7 +21,7 @@ pub struct FooSpec {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::new().await?;
+    let client = Client::inferred().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
