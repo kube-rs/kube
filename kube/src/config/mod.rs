@@ -112,7 +112,7 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
     let kubeconfig =
         utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
 
-    let loader = ConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
+    let mut loader = ConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
 
 
     let (token, client_certificate_data, client_key_data) = match (&loader.user.token, &loader.user.client_certificate_data, &loader.user.client_certificate_data) {
@@ -130,10 +130,14 @@ pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuil
             }
         }
     };
+    loader.user.token = token;
+    loader.user.client_key_data = client_key_data;
+    loader.user.client_certificate_data = client_certificate_data;
 
     let mut client_builder = Client::builder()
         // hard disallow more than 5 minute polls due to kubernetes limitations
         .timeout(std::time::Duration::new(295, 0));
+
 
     if let Some(ca_bundle) = loader.ca_bundle()? {
         for ca in ca_bundle {
