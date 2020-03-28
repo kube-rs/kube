@@ -3,15 +3,13 @@ use crate::{
         resource::{ListParams, Resource},
         Meta, WatchEvent,
     },
-    client::APIClient,
     runtime::informer::Informer,
-    Error, Result,
+    Client, Error, Result,
 };
 use futures::{lock::Mutex, stream, Stream, StreamExt};
-use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{convert::TryFrom, time::Duration};
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time::delay_for};
 
 /// An object to be reconciled
 ///
@@ -70,7 +68,7 @@ where
     K: Clone + DeserializeOwned + Meta,
     F: Fn(ReconcileEvent) -> Result<ReconcileStatus>,
 {
-    client: APIClient,
+    client: Client,
     resource: Resource,
     informers: Vec<Informer<K>>,
     reconciler: Box<F>,
@@ -83,7 +81,7 @@ where
     F: Fn(ReconcileEvent) -> Result<ReconcileStatus> + Send + Sync,
 {
     /// Create a controller with a kube client on a kube resource
-    pub fn new(client: APIClient, r: Resource, recfn: F) -> Self {
+    pub fn new(client: Client, r: Resource, recfn: F) -> Self {
         Controller {
             client: client,
             resource: r,
@@ -155,7 +153,7 @@ where
                                             }
                                             ReconcileStatus::RequeAfter(dur) => {
                                                 info!("Requeing {} in {:?}", name, dur);
-                                                Delay::new(dur).await;
+                                                delay_for(dur).await;
                                                 txa.send(Ok(ri)).expect("channel can receive");
                                             }
                                         }
@@ -164,7 +162,7 @@ where
                                         // Reconcile cb failed (any unspecified error)
                                         let dur = Duration::from_secs(10); // TODO: expo decay
                                         warn!("Failed to reconcile {} - requining in {:?}", e, dur);
-                                        Delay::new(dur).await;
+                                        delay_for(dur).await;
                                         txa.send(Ok(ri)).expect("channel can receive");
                                     }
                                 }
