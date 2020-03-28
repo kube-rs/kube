@@ -37,8 +37,8 @@ pub enum ResourceScope {
 
 
 // Try Arnavion's first suggestion
-pub trait ClusterScopedResource: k8s_openapi::Resource { }
-pub trait NamespaceScopedResource: k8s_openapi::Resource { }
+pub trait ClusterScopedResource: k8s_openapi::Resource {}
+pub trait NamespaceScopedResource: k8s_openapi::Resource {}
 use k8s::{
     admissionregistration::v1beta1 as adregv1beta1,
     apps::v1 as appsv1,
@@ -64,8 +64,9 @@ impl NamespaceScopedResource for appsv1::ReplicaSet {}
 impl NamespaceScopedResource for networkingv1beta1::Ingress {}
 impl NamespaceScopedResource for appsv1::DaemonSet {}
 
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiextsv1;
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiextsv1beta1;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::{
+    v1 as apiextsv1, v1beta1 as apiextsv1beta1,
+};
 
 impl ClusterScopedResource for storagev1::VolumeAttachment {}
 impl ClusterScopedResource for adregv1beta1::ValidatingWebhookConfiguration {}
@@ -74,7 +75,6 @@ impl ClusterScopedResource for apiextsv1::CustomResourceDefinition {}
 impl ClusterScopedResource for corev1::Namespace {}
 impl ClusterScopedResource for apiextsv1beta1::CustomResourceDefinition {}
 impl ClusterScopedResource for corev1::Node {}
-
 
 
 impl Resource {
@@ -99,7 +99,7 @@ impl Resource {
             kind: K::KIND.to_string(),
             group: K::GROUP.to_string(),
             version: K::VERSION.to_string(),
-            scope: ResourceScope::All
+            scope: ResourceScope::All,
         }
     }
 
@@ -833,7 +833,7 @@ mod test {
         assert_eq!(req.method(), "PUT");
     }
 
-/*    #[test]
+    /*    #[test]
     #[should_panic] - compile fails now!
     fn all_resources_not_namespaceable() {
         Resource::namespaced::<corev1::Node>("ns");

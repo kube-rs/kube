@@ -29,7 +29,7 @@ pub struct Api<K> {
     pub(crate) phantom: PhantomData<K>,
 }
 
-use crate::api::resource::{NamespaceScopedResource, ClusterScopedResource};
+use crate::api::resource::{ClusterScopedResource, NamespaceScopedResource};
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K> Api<K>
@@ -38,7 +38,8 @@ where
 {
     /// Cluster level resources
     pub fn cluster(client: Client) -> Self
-    where K: ClusterScopedResource
+    where
+        K: ClusterScopedResource,
     {
         let api = Resource::cluster::<K>();
         Self {
@@ -50,7 +51,8 @@ where
 
     /// Namespaced resources viewed across all namespaces
     pub fn all(client: Client) -> Self
-    where K: NamespaceScopedResource
+    where
+        K: NamespaceScopedResource,
     {
         let api = Resource::all::<K>();
         Self {
@@ -62,7 +64,8 @@ where
 
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self
-    where K: NamespaceScopedResource
+    where
+        K: NamespaceScopedResource,
     {
         let api = Resource::namespaced::<K>(ns);
         Self {
