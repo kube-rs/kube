@@ -8,6 +8,8 @@ use http::{self, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 
+// TODO: replace with Status in k8s openapi?
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusDetails {
@@ -51,15 +53,29 @@ pub struct Status {
     pub code: u16,
 }
 
-/// APIClient requires `config::Configuration` includes client to connect with kubernetes cluster.
+/// Client requires `config::Configuration` includes client to connect with kubernetes cluster.
 #[derive(Clone)]
-pub struct APIClient {
+pub struct Client {
     configuration: Configuration,
 }
 
-impl APIClient {
-    pub fn new(configuration: Configuration) -> Self {
-        APIClient { configuration }
+impl From<Configuration> for Client {
+    /// Convert Configuration into a Client
+    fn from(configuration: Configuration) -> Self {
+        Self { configuration }
+    }
+}
+
+impl Client {
+    /// Create and initialize a Client with the appropriate kube config
+    ///
+    /// Will use `Configuration::infer` to try in-cluster evars first,
+    /// then fallback to the local kube config.
+    ///
+    /// Will fail if neither configuration could be loaded.
+    pub async fn infer() -> Result<Self> {
+        let configuration = crate::config::Configuration::infer().await?;
+        Ok(Self { configuration })
     }
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {

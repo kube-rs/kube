@@ -2,9 +2,8 @@
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{ListParams, Meta, Resource},
-    client::APIClient,
-    config,
     runtime::Reflector,
+    Client, Configuration,
 };
 
 /// Example way to read secrets
@@ -12,8 +11,7 @@ use kube::{
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let config = config::load_kube_config().await?;
-    let client = APIClient::new(config);
+    let client = Client::from(Configuration::infer().await?);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<ConfigMap>(&namespace);

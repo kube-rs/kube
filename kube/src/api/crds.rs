@@ -1,6 +1,6 @@
 use crate::{
     api::{typed::Api, Resource},
-    client::APIClient,
+    Client,
 };
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 use std::marker::PhantomData;
@@ -91,7 +91,7 @@ impl CrBuilder {
     }
 
     // Consume the CrBuilder and convert to an Api object
-    pub fn into_api<K>(self, client: APIClient) -> Api<K> {
+    pub fn into_api<K>(self, client: Client) -> Api<K> {
         let crd = self.build();
         Api {
             client,
@@ -122,7 +122,7 @@ impl From<CustomResource> for Resource {
 
 /// Make Api useable on CRDs without k8s_openapi
 impl CustomResource {
-    pub fn into_api<K>(self, client: APIClient) -> Api<K> {
+    pub fn into_api<K>(self, client: Client) -> Api<K> {
         Api {
             client,
             api: self.into(),
@@ -154,14 +154,13 @@ mod test {
     #[tokio::test]
     #[ignore] // circle has no kube config
     async fn convenient_custom_resource() {
-        use crate::{api::Api, client::APIClient, config};
+        use crate::{Api, Client, Configuration};
         #[derive(Clone, Debug, kube_derive::CustomResource, Deserialize, Serialize)]
         #[kube(group = "clux.dev", version = "v1", namespaced)]
         struct FooSpec {
             foo: String,
         };
-        let config = config::load_kube_config().await.unwrap();
-        let client = APIClient::new(config);
+        let client = Client::from(Configuration::infer().await.unwrap());
         let r1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
         let r2: Api<Foo> = CustomResource::kind("Foo")

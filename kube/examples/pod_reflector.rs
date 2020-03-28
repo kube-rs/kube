@@ -1,20 +1,18 @@
 #[macro_use] extern crate log;
-use futures_timer::Delay;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{ListParams, Meta, Resource},
-    client::APIClient,
-    config,
     runtime::Reflector,
+    Client, Configuration,
 };
 use std::time::Duration;
+use tokio::time::delay_for;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let config = config::load_kube_config().await?;
-    let client = APIClient::new(config);
+    let client = Client::from(Configuration::infer().await?);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<Pod>(&namespace);
@@ -45,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     loop {
-        Delay::new(Duration::from_secs(5)).await;
+        delay_for(Duration::from_secs(5)).await;
         let pods: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
         info!("Current pods: {:?}", pods);
     }

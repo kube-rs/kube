@@ -1,14 +1,13 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate kube_derive;
-use futures_timer::Delay;
 use std::time::Duration;
+use tokio::time::delay_for;
 
 use kube::{
     api::{ListParams, Meta, Resource},
-    client::APIClient,
-    config,
     runtime::Reflector,
+    Client,
 };
 
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
@@ -22,8 +21,7 @@ pub struct FooSpec {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let config = config::load_kube_config().await?;
-    let client = APIClient::new(config);
+    let client = Client::infer().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
@@ -41,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     loop {
-        Delay::new(Duration::from_secs(5)).await;
+        delay_for(Duration::from_secs(5)).await;
         // Read updated internal state (instant):
         let crds = rf.state().await?.iter().map(Meta::name).collect::<Vec<_>>();
         info!("Current crds: {:?}", crds);

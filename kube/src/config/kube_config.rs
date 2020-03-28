@@ -22,21 +22,21 @@ impl TryFrom<Der> for Certificate {
     }
 }
 
-/// KubeConfigLoader loads current context, cluster, and authentication information.
+/// ConfigLoader loads current context, cluster, and authentication information.
 #[derive(Clone, Debug)]
-pub struct KubeConfigLoader {
+pub struct ConfigLoader {
     pub current_context: Context,
     pub cluster: Cluster,
     pub user: AuthInfo,
 }
 
-impl KubeConfigLoader {
+impl ConfigLoader {
     pub async fn load<P: AsRef<Path>>(
         path: P,
         context: Option<String>,
         cluster: Option<String>,
         user: Option<String>,
-    ) -> Result<KubeConfigLoader> {
+    ) -> Result<ConfigLoader> {
         let config = Config::read_from(path)?;
         let context_name = context.as_ref().unwrap_or(&config.current_context);
         let current_context = config
@@ -63,7 +63,7 @@ impl KubeConfigLoader {
             }
         }
         let user = user_opt.ok_or_else(|| Error::KubeConfig("Unable to find named user".into()))?;
-        Ok(KubeConfigLoader {
+        Ok(ConfigLoader {
             current_context: current_context.clone(),
             cluster: cluster.clone(),
             user,

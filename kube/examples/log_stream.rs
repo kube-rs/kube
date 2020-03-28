@@ -4,8 +4,7 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, LogParams},
-    client::APIClient,
-    config,
+    Client, Configuration,
 };
 use std::env;
 
@@ -13,8 +12,7 @@ use std::env;
 async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let config = config::load_kube_config().await?;
-    let client = APIClient::new(config);
+    let client = Client::from(Configuration::infer().await?);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let mypod = env::args()

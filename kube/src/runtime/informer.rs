@@ -1,13 +1,12 @@
 use crate::{
     api::{ListParams, Meta, Resource, WatchEvent},
-    client::APIClient,
-    Result,
+    Client, Result,
 };
 
 use futures::{lock::Mutex, Stream, StreamExt};
-use futures_timer::Delay;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
+use tokio::time::delay_for;
 
 /// An event informer for a `Resource`
 ///
@@ -21,7 +20,7 @@ where
     K: Clone + DeserializeOwned + Meta,
 {
     version: Arc<Mutex<String>>,
-    client: APIClient,
+    client: Client,
     resource: Resource,
     params: ListParams,
     needs_resync: Arc<Mutex<bool>>,
@@ -34,7 +33,7 @@ where
     K: Clone + DeserializeOwned + Meta,
 {
     /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: APIClient, lp: ListParams, r: Resource) -> Self {
+    pub fn new(client: Client, lp: ListParams, r: Resource) -> Self {
         Informer {
             client,
             resource: r,
@@ -80,7 +79,7 @@ where
             if *needs_resync || *needs_retry {
                 // Try again in a bit
                 let dur = Duration::from_secs(10);
-                Delay::new(dur).await;
+                delay_for(dur).await;
                 // If we are outside history, start over from latest
                 if *needs_resync {
                     self.reset().await;
