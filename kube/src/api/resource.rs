@@ -30,6 +30,14 @@ pub struct Resource {
 }
 
 
+trait ResourceScope { }
+struct ClusterScopedResource {}
+impl ResourceScope for ClusterScopedResource { }
+struct NamespaceScopedResource {}
+impl ResourceScope for NamespaceScopedResource { }
+struct NotScopedResource {}
+impl ResourceScope for NotScopedResource { }
+
 // Try Arnavion's first suggestion
 pub trait ClusterScopedResource: k8s_openapi::Resource { }
 pub trait NamespaceScopedResource: k8s_openapi::Resource { }
