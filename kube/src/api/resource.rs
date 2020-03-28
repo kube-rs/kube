@@ -25,16 +25,13 @@ pub struct Resource {
     /// The version of the resource.
     pub version: String,
 
-    /// The namespace if the resource resides (if namespaced)
-    pub namespace: Option<String>,
-
     pub scope: ResourceScope,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResourceScope {
     Cluster,
-    Namespace, // could maybe put the resource.namespace string in here
+    Namespace(String),
     All,
 }
 
@@ -88,7 +85,6 @@ impl Resource {
             kind: K::KIND.to_string(),
             group: K::GROUP.to_string(),
             version: K::VERSION.to_string(),
-            namespace: None,
             scope: ResourceScope::Cluster,
         }
     }
@@ -103,7 +99,6 @@ impl Resource {
             kind: K::KIND.to_string(),
             group: K::GROUP.to_string(),
             version: K::VERSION.to_string(),
-            namespace: None,
             scope: ResourceScope::All
         }
     }
@@ -115,8 +110,7 @@ impl Resource {
             kind: K::KIND.to_string(),
             group: K::GROUP.to_string(),
             version: K::VERSION.to_string(),
-            namespace: Some(ns.to_string()),
-            scope: ResourceScope::Namespace,
+            scope: ResourceScope::Namespace(ns.to_string()),
         }
     }
 }
@@ -125,7 +119,7 @@ impl Resource {
 
 impl Resource {
     pub(crate) fn make_url(&self) -> String {
-        let n = if let Some(ns) = &self.namespace {
+        let n = if let ResourceScope::Namespace(ns) = &self.scope {
             format!("namespaces/{}/", ns)
         } else {
             "".into()

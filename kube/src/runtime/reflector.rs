@@ -97,9 +97,15 @@ where
     /// If you are using a non-namespaced resources with name clashes,
     /// Try `Reflector::get_within` instead.
     pub fn get(&self, name: &str) -> Result<Option<K>> {
+        use crate::api::resource::ResourceScope;
+        let namespace = match &self.resource.scope {
+            ResourceScope::Namespace(ns) => Some(ns.to_owned()),
+            _ => None,
+        };
         let id = ObjectId {
             name: name.into(),
-            namespace: self.resource.namespace.clone(),
+            // TODO: impl From<Resource> for ObjectId
+            namespace,
         };
 
         futures::executor::block_on(async { Ok(self.state.lock().await.data.get(&id).map(Clone::clone)) })
