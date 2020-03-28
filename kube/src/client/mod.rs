@@ -69,19 +69,12 @@ impl From<Configuration> for Client {
 impl Client {
     /// Create and initialize a Client with the appropriate kube config
     ///
-    /// By default this tries the in-cluster config first,
-    /// and falls back to the local kube config otherwise.
-    pub async fn new() -> Result<Self> {
-        use crate::config;
-        // TODO: lift this match into config module
-        let configuration = match config::incluster_config() {
-            Err(e) => {
-                debug!("No in-cluster config found: {}", e);
-                debug!("Falling back to local kube config");
-                config::load_kube_config().await?
-            }
-            Ok(o) => o,
-        };
+    /// Will use `Configuration::inferred` to try in-cluster evars first,
+    /// then fallback to the local kube config.
+    ///
+    /// Will fail if neither configuration could be loaded.
+    pub async fn inferred() -> Result<Self> {
+        let configuration = crate::config::Configuration::inferred().await?;
         Ok(Self { configuration })
     }
 

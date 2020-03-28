@@ -40,6 +40,19 @@ impl Configuration {
             default_ns,
         }
     }
+
+    /// Construct configuration by attempting to load in-cluster first, then local
+    pub async fn inferred() -> Result<Self> {
+        let cfg = match incluster_config() {
+            Err(e) => {
+                trace!("No in-cluster config found: {}", e);
+                trace!("Falling back to local kube config");
+                load_kube_config().await?
+            }
+            Ok(o) => o,
+        };
+        Ok(cfg)
+    }
 }
 
 /// Returns a config includes authentication and cluster infomation from kubeconfig file.

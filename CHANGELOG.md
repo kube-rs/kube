@@ -1,3 +1,13 @@
+0.31.0 / 2020-03-XX
+===================
+  * Expose `config::Configuration` at root level
+  * Add `Configuration::inferred` as a recommended constructor
+  * Rename `client::APIClient` to `client::Client`
+  * Expose `client::Client` at root level
+  * Add `Client::inferred` as a recommended constructor
+  * `Client` now implements `From<Configuration>`
+  * Added comprehensive documentation on `Api`
+
 0.30.0 / 2020-03-17
 ===================
   * Fix `#[kube(printcolumn)]` when `#[kube(apiextensions = "v1beta1")]`

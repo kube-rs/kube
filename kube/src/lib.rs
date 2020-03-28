@@ -63,5 +63,6 @@ pub use api::{Api, Resource};
 pub mod client;
 pub use client::Client;
 pub mod config;
+pub use config::Configuration;
 mod oauth2;
 pub mod runtime;
