@@ -64,7 +64,7 @@ where
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = Client::inferred().await?;
+    ///     let client = Client::infer().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut j = jobs.get("baz").await?;
     ///     let pp = PatchParams::default(); // json merge patch
@@ -93,7 +93,7 @@ where
     /// use k8s_openapi::api::batch::v1::{Job, JobStatus};
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = Client::inferred().await?;
+    ///     let client = Client::infer().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut o = jobs.get_status("baz").await?; // retrieve partial object
     ///     o.status = Some(JobStatus::default()); // update the job part

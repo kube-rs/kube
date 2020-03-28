@@ -69,12 +69,12 @@ impl From<Configuration> for Client {
 impl Client {
     /// Create and initialize a Client with the appropriate kube config
     ///
-    /// Will use `Configuration::inferred` to try in-cluster evars first,
+    /// Will use `Configuration::infer` to try in-cluster evars first,
     /// then fallback to the local kube config.
     ///
     /// Will fail if neither configuration could be loaded.
-    pub async fn inferred() -> Result<Self> {
-        let configuration = crate::config::Configuration::inferred().await?;
+    pub async fn infer() -> Result<Self> {
+        let configuration = crate::config::Configuration::infer().await?;
         Ok(Self { configuration })
     }
 

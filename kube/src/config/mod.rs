@@ -41,8 +41,11 @@ impl Configuration {
         }
     }
 
-    /// Construct configuration by attempting to load in-cluster first, then local
-    pub async fn inferred() -> Result<Self> {
+    /// Infer the config type and return it
+    ///
+    /// Done by attempting to load in-cluster evars first,
+    /// then if that fails, try the full local kube config.
+    pub async fn infer() -> Result<Self> {
         let cfg = match incluster_config() {
             Err(e) => {
                 trace!("No in-cluster config found: {}", e);

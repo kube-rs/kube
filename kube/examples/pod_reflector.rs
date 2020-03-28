@@ -12,7 +12,7 @@ use tokio::time::delay_for;
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::from(Configuration::inferred().await?);
+    let client = Client::from(Configuration::infer().await?);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<Pod>(&namespace);
