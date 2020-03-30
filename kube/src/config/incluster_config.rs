@@ -13,8 +13,9 @@ const SERVICE_DEFAULT_NS: &str = "/var/run/secrets/kubernetes.io/serviceaccount/
 
 /// Returns kubernetes address from specified environment variables.
 pub fn kube_server() -> Option<String> {
-    let f = |(h, p)| format!("https://{}:{}", h, p);
-    kube_host().and_then(|h| kube_port().map(|p| f((h, p))))
+    let host = kube_host()?;
+    let port = kube_port()?;
+    Some(format!("https://{}:{}", host, port))
 }
 
 fn kube_host() -> Option<String> {

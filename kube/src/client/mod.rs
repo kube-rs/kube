@@ -1,9 +1,6 @@
 //! A basic API client with standard kube error handling
 
-mod client_builder;
-mod exec;
-
-use crate::config::{ConfigOptions, Configuration};
+use crate::config::ClientConfig;
 use crate::{Error, ErrorResponse, Result};
 use bytes::Bytes;
 use either::{Either, Left, Right};
@@ -11,10 +8,6 @@ use futures::{self, Stream, TryStream, TryStreamExt};
 use http::{self, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
-use tokio::sync::Mutex;
-
-use std::future::Future;
-use std::pin::Pin;
 
 // TODO: replace with Status in k8s openapi?
 
@@ -61,33 +54,20 @@ pub struct Status {
     pub code: u16,
 }
 
-lazy_static::lazy_static! {
-    static ref CLIENT_BUILDER: Mutex<Pin<Box<dyn Future<Output = Result<reqwest::ClientBuilder>> + Send>>> = {
-        Mutex::new(Box::pin(client_builder::create(ConfigOptions::default())))
-    };
-}
-
 /// Client requires `config::Configuration` includes client to connect with kubernetes cluster.
 #[derive(Clone)]
 pub struct Client {
-    configuration: Configuration,
+    base_path: String,
     inner: reqwest::Client,
 }
 
 impl Client {
-    pub async fn new(configuration: crate::config::Configuration) -> Result<Self> {
-        let mut builder = CLIENT_BUILDER.lock().await;
+    pub async fn new(mut client_config: ClientConfig) -> Result<Self> {
+        let base_path = std::mem::replace(&mut client_config.base_path, String::new());
+        let builder: reqwest::ClientBuilder = client_config.into();
         Ok(Self {
-            configuration,
-            inner: builder.as_mut().await?.build()?,
-        })
-    }
-
-    pub async fn new_from_options(config_opts: ConfigOptions) -> Result<Self> {
-        let client_builder = client_builder::create(config_opts.clone()).await?;
-        Ok(Self {
-            configuration: Configuration::new_from_options(&config_opts).await?,
-            inner: client_builder.build()?,
+            base_path,
+            inner: builder.build()?,
         })
     }
 
@@ -98,22 +78,22 @@ impl Client {
     ///
     /// Will fail if neither configuration could be loaded.
     pub async fn infer() -> Result<Self> {
-        let configuration = crate::config::Configuration::infer().await?;
-
-        let client_builder = match crate::config::incluster_client() {
+        let mut client_config = match ClientConfig::infer().await {
             Ok(c) => c,
-            Err(_) => client_builder::create(ConfigOptions::default()).await?,
+            Err(_) => ClientConfig::new_from_config_file(Default::default()).await?,
         };
+        let base_path = std::mem::replace(&mut client_config.base_path, String::new());
+        let client_builder: reqwest::ClientBuilder = client_config.into();
 
         Ok(Self {
-            configuration,
+            base_path,
             inner: client_builder.build()?,
         })
     }
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
         let (parts, body) = request.into_parts();
-        let uri_str = format!("{}{}", self.configuration.base_path, parts.uri);
+        let uri_str = format!("{}{}", self.base_path, parts.uri);
         trace!("Sending request => method = {} uri = {}", parts.method, uri_str);
 
         let request = match parts.method {
@@ -322,6 +302,27 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
         }
     } else {
         Ok(())
+    }
+}
+
+impl std::convert::From<crate::config::ClientConfig> for reqwest::ClientBuilder {
+    fn from(config: crate::config::ClientConfig) -> Self {
+        let mut builder = Self::new();
+
+        if let Some(c) = config.root_cert {
+            builder = builder.add_root_certificate(c);
+        }
+        builder = builder.default_headers(config.headers);
+        if let Some(to) = config.timeout {
+            builder = builder.timeout(to);
+        }
+
+        builder = builder.danger_accept_invalid_certs(config.accept_invalid_certs);
+
+        if let Some(i) = config.identity {
+            builder = builder.identity(i)
+        }
+        builder
     }
 }
 
