@@ -57,16 +57,16 @@ pub struct Status {
 /// Client requires `config::Configuration` includes client to connect with kubernetes cluster.
 #[derive(Clone)]
 pub struct Client {
-    base_path: String,
+    cluster_url: reqwest::Url,
     inner: reqwest::Client,
 }
 
 impl Client {
     pub async fn new(mut client_config: ClientConfig) -> Result<Self> {
-        let base_path = std::mem::replace(&mut client_config.base_path, String::new());
+        let cluster_url = client_config.cluster_url.clone();
         let builder: reqwest::ClientBuilder = client_config.into();
         Ok(Self {
-            base_path,
+            cluster_url,
             inner: builder.build()?,
         })
     }
@@ -78,22 +78,19 @@ impl Client {
     ///
     /// Will fail if neither configuration could be loaded.
     pub async fn infer() -> Result<Self> {
-        let mut client_config = match ClientConfig::infer().await {
-            Ok(c) => c,
-            Err(_) => ClientConfig::new_from_config_file(Default::default()).await?,
-        };
-        let base_path = std::mem::replace(&mut client_config.base_path, String::new());
+        let mut client_config = ClientConfig::infer().await?;
+        let cluster_url = client_config.cluster_url.clone();
         let client_builder: reqwest::ClientBuilder = client_config.into();
 
         Ok(Self {
-            base_path,
+            cluster_url,
             inner: client_builder.build()?,
         })
     }
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
         let (parts, body) = request.into_parts();
-        let uri_str = format!("{}{}", self.base_path, parts.uri);
+        let uri_str = format!("{}{}", self.cluster_url, parts.uri);
         trace!("Sending request => method = {} uri = {}", parts.method, uri_str);
 
         let request = match parts.method {

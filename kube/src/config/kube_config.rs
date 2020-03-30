@@ -33,11 +33,11 @@ pub struct ConfigLoader {
 
 impl ConfigLoader {
     /// Returns a config loader based on the cluster information from the kubeconfig file.
-    pub async fn new_from_options(options: &ConfigOptions) -> Result<ConfigLoader> {
+    pub async fn new_from_options(options: &ConfigOptions) -> Result<Self> {
         let kubeconfig =
             utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
 
-        let loader = ConfigLoader::load(
+        let loader = Self::load(
             kubeconfig,
             options.context.as_ref(),
             options.cluster.as_ref(),
@@ -53,7 +53,7 @@ impl ConfigLoader {
         context: Option<&String>,
         cluster: Option<&String>,
         user: Option<&String>,
-    ) -> Result<ConfigLoader> {
+    ) -> Result<Self> {
         let config = Config::read_from(path)?;
         let context_name = context.unwrap_or(&config.current_context);
         let current_context = config

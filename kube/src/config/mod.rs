@@ -19,36 +19,57 @@ pub use self::kube_config::ConfigLoader;
 /// Configuration stores kubernetes path and client for requests.
 #[derive(Clone, Debug)]
 pub struct Configuration {
-    pub base_path: String,
+    pub cluster_url: reqwest::Url,
     /// The current default namespace. This will be "default" while running outside of a cluster,
     /// and will be the namespace of the pod while running inside a cluster.
     pub default_ns: String,
 }
 
 impl Configuration {
-    pub fn new(base_path: String, default_ns: String) -> Self {
+    /// Returns a new configuration based on the provided cluster url
+    /// and sets the default namespace to "default"
+    pub fn new(cluster_url: reqwest::Url) -> Self {
+        Self::new_with_default_namespace(cluster_url, String::from("default"))
+    }
+
+    /// Create a new `Configuration` based on a cluster url and default namespace
+    pub fn new_with_default_namespace(cluster_url: reqwest::Url, default_ns: String) -> Self {
         Self {
-            base_path,
+            cluster_url,
             default_ns,
         }
     }
 
-    /// Returns a new configuration based on the provided
-    pub fn new_with_default_ns(base_path: String) -> Self {
-        Self::new(base_path, String::from("default"))
+    /// Infer the config type and return it
+    ///
+    /// Done by attempting to load in-cluster evars first,
+    /// then if that fails, try the full local kube config.
+    pub async fn infer() -> Result<Self> {
+        match Self::new_from_cluster_env() {
+            Err(e) => {
+                trace!("No in-cluster config found: {}", e);
+                trace!("Falling back to local kube config");
+                Ok(Self::new_from_kube_config(&ConfigOptions::default()).await?)
+            }
+            Ok(o) => Ok(o),
+        }
     }
 
-    /// Returns a config which includes authentication and cluster information from kubeconfig file.
-    pub async fn new_from_options(options: &ConfigOptions) -> Result<Self> {
+    /// Returns a config from kube config file.
+    ///
+    /// This file is typically found in `~/.kube/config`
+    pub async fn new_from_kube_config(options: &ConfigOptions) -> Result<Self> {
         let loader = ConfigLoader::new_from_options(options).await?;
-        Ok(Self::new_with_default_ns(loader.cluster.server))
+        let url = reqwest::Url::parse(&loader.cluster.server)
+            .map_err(|e| Error::KubeConfig(format!("malformed url: {}", e)))?;
+        Ok(Self::new(url))
     }
 
     /// Returns a config which is used by clients within pods on kubernetes
     /// by reading configuration from the environment.
     ///
     /// It will return an error if called from out of kubernetes cluster.
-    pub fn new_in_cluster() -> Result<Self> {
+    pub fn new_from_cluster_env() -> Result<Self> {
         let server = incluster_config::kube_server().ok_or_else(|| {
             Error::KubeConfig(format!(
                 "Unable to load incluster config, {} and {} must be defined",
@@ -57,31 +78,14 @@ impl Configuration {
             ))
         })?;
 
+        let url =
+            reqwest::Url::parse(&server).map_err(|e| Error::KubeConfig(format!("malformed url: {}", e)))?;
+
         let default_ns = incluster_config::load_default_ns()
             .map_err(|e| Error::KubeConfig(format!("Unable to load incluster default namespace: {}", e)))?;
 
-        Ok(Self::new(server, default_ns))
+        Ok(Self::new_with_default_namespace(url, default_ns))
     }
-
-    /// Infer the config type and return it
-    ///
-    /// Done by attempting to load in-cluster evars first,
-    /// then if that fails, try the full local kube config.
-    pub async fn infer() -> Result<Self> {
-        match Self::new_in_cluster() {
-            Err(e) => {
-                trace!("No in-cluster config found: {}", e);
-                trace!("Falling back to local kube config");
-                Ok(load_kube_config().await?)
-            }
-            Ok(o) => Ok(o),
-        }
-    }
-}
-
-/// Returns a config includes authentication and cluster infomation from kubeconfig file.
-pub async fn load_kube_config() -> Result<Configuration> {
-    Configuration::new_from_options(&ConfigOptions::default()).await
 }
 
 /// ConfigOptions stores options used when loading kubeconfig file.
@@ -94,7 +98,7 @@ pub struct ConfigOptions {
 
 #[derive(Debug)]
 pub struct ClientConfig {
-    pub(crate) base_path: String,
+    pub(crate) cluster_url: reqwest::Url,
     pub(crate) root_cert: Option<reqwest::Certificate>,
     pub(crate) headers: reqwest::header::HeaderMap,
     pub(crate) timeout: Option<std::time::Duration>,
@@ -105,10 +109,17 @@ pub struct ClientConfig {
 impl ClientConfig {
     pub async fn infer() -> Result<Self> {
         let config = Configuration::infer().await?;
-        Self::new_in_cluster(config)
+        match Self::new_from_cluster_env(config) {
+            Err(e) => {
+                trace!("No in-cluster config found: {}", e);
+                trace!("Falling back to local kube config");
+                Ok(Self::new_from_kube_config(&ConfigOptions::default()).await?)
+            }
+            Ok(o) => Ok(o),
+        }
     }
 
-    pub fn new_in_cluster(config: Configuration) -> Result<Self> {
+    pub fn new_from_cluster_env(config: Configuration) -> Result<Self> {
         let root_cert = incluster_config::load_cert()?;
 
         let token = incluster_config::load_token()
@@ -122,7 +133,7 @@ impl ClientConfig {
         );
 
         Ok(Self {
-            base_path: config.base_path,
+            cluster_url: config.cluster_url,
             root_cert: Some(root_cert),
             headers,
             timeout: None,
@@ -134,8 +145,8 @@ impl ClientConfig {
     /// Returns a client builder based on the cluster information from the kubeconfig file.
     ///
     /// This allows to create your custom reqwest client for using with the cluster API.
-    pub async fn new_from_config_file(options: ConfigOptions) -> Result<Self> {
-        let configuration = Configuration::new_from_options(&options).await?;
+    pub async fn new_from_kube_config(options: &ConfigOptions) -> Result<Self> {
+        let configuration = Configuration::new_from_kube_config(&options).await?;
         let loader = ConfigLoader::new_from_options(&options).await?;
 
         let token = match &loader.user.token {
@@ -202,7 +213,7 @@ impl ClientConfig {
         }
 
         Ok(Self {
-            base_path: configuration.base_path,
+            cluster_url: configuration.cluster_url,
             root_cert,
             headers,
             timeout: Some(timeout),
