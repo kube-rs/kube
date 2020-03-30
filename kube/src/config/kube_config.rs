@@ -5,6 +5,7 @@ use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
 
 use reqwest::{Certificate, Identity};
 
+use super::{utils, ConfigOptions};
 use crate::{
     config::apis::{AuthInfo, Cluster, Config, Context},
     Error, Result,
@@ -31,28 +32,44 @@ pub struct ConfigLoader {
 }
 
 impl ConfigLoader {
+    /// Returns a config loader based on the cluster information from the kubeconfig file.
+    pub async fn new_from_options(options: &ConfigOptions) -> Result<ConfigLoader> {
+        let kubeconfig =
+            utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
+
+        let loader = ConfigLoader::load(
+            kubeconfig,
+            options.context.as_ref(),
+            options.cluster.as_ref(),
+            options.user.as_ref(),
+        )
+        .await?;
+
+        Ok(loader)
+    }
+
     pub async fn load<P: AsRef<Path>>(
         path: P,
-        context: Option<String>,
-        cluster: Option<String>,
-        user: Option<String>,
+        context: Option<&String>,
+        cluster: Option<&String>,
+        user: Option<&String>,
     ) -> Result<ConfigLoader> {
         let config = Config::read_from(path)?;
-        let context_name = context.as_ref().unwrap_or(&config.current_context);
+        let context_name = context.unwrap_or(&config.current_context);
         let current_context = config
             .contexts
             .iter()
             .find(|named_context| &named_context.name == context_name)
             .map(|named_context| &named_context.context)
             .ok_or_else(|| Error::KubeConfig("Unable to load current context".into()))?;
-        let cluster_name = cluster.as_ref().unwrap_or(&current_context.cluster);
+        let cluster_name = cluster.unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
             .ok_or_else(|| Error::KubeConfig("Unable to load cluster of context".into()))?;
-        let user_name = user.as_ref().unwrap_or(&current_context.user);
+        let user_name = user.unwrap_or(&current_context.user);
 
         let mut user_opt = None;
         for named_user in config.auth_infos {

@@ -1,9 +1,10 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{ListParams, Meta, Resource},
     runtime::Reflector,
-    Client, Configuration,
+    Client,
 };
 use std::time::Duration;
 use tokio::time::delay_for;
@@ -12,7 +13,7 @@ use tokio::time::delay_for;
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::from(Configuration::infer().await?);
+    let client = Client::infer().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<Pod>(&namespace);

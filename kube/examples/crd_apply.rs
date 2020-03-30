@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use futures::StreamExt;
 use kube_derive::CustomResource;
 use serde_derive::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as a
 
 use kube::{
     api::{Api, ListParams, Meta, PatchParams, PatchStrategy, WatchEvent},
-    Client, Configuration,
+    Client,
 };
 
 // NB: This example uses server side apply and beta1 customresources
@@ -37,7 +38,7 @@ pub struct FooStatus {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=info");
     env_logger::init();
-    let client = Client::from(Configuration::infer().await?);
+    let client = Client::infer().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let ssapply = PatchParams {
@@ -69,11 +70,14 @@ async fn main() -> anyhow::Result<()> {
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
     // 1. Apply from a full struct (e.g. equivalent to replace w/o resource_version)
-    let foo = Foo::new("baz", FooSpec {
-        name: "baz".into(),
-        info: Some("old baz".into()),
-        replicas: 3,
-    });
+    let foo = Foo::new(
+        "baz",
+        FooSpec {
+            name: "baz".into(),
+            info: Some("old baz".into()),
+            replicas: 3,
+        },
+    );
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
     let o = foos.patch("baz", &ssapply, serde_yaml::to_vec(&foo)?).await?;
     info!("Applied 1 {}: {:?}", Meta::name(&o), o.spec);

@@ -1,9 +1,10 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use k8s_openapi::api::core::v1::Event;
 use kube::{
     api::{ListParams, Resource, WatchEvent},
     runtime::Informer,
-    Client, Configuration,
+    Client,
 };
 
 use futures::{StreamExt, TryStreamExt};
@@ -12,7 +13,7 @@ use futures::{StreamExt, TryStreamExt};
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::from(Configuration::infer().await?);
+    let client = Client::infer().await?;
 
     let events = Resource::all::<Event>();
     let lp = ListParams::default();

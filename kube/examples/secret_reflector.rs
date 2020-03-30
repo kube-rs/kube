@@ -1,11 +1,12 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{ListParams, Meta, Resource},
     runtime::Reflector,
-    Client, Configuration,
+    Client,
 };
 
 /// Example way to read secrets
@@ -33,7 +34,7 @@ fn decode(secret: &Secret) -> BTreeMap<String, Decoded> {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::from(Configuration::infer().await?);
+    let client = Client::infer().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<Secret>(&namespace);

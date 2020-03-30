@@ -135,7 +135,7 @@ impl CredentialsClient {
             ])
             .finish();
 
-        let token_response: TokenResponse = self
+        let token_response = self
             .client
             .post(&self.credentials.token_uri)
             .body(body)

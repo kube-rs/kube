@@ -160,7 +160,7 @@ mod test {
         struct FooSpec {
             foo: String,
         };
-        let client = Client::from(Configuration::infer().await.unwrap());
+        let client = Client::new(Configuration::infer().await.unwrap()).await.unwrap();
         let r1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
         let r2: Api<Foo> = CustomResource::kind("Foo")

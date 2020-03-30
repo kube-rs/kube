@@ -1,12 +1,20 @@
 //! A basic API client with standard kube error handling
 
-use crate::{config::Configuration, Error, ErrorResponse, Result};
+mod client_builder;
+mod exec;
+
+use crate::config::{ConfigOptions, Configuration};
+use crate::{Error, ErrorResponse, Result};
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, TryStream, TryStreamExt};
 use http::{self, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
+use tokio::sync::Mutex;
+
+use std::future::Future;
+use std::pin::Pin;
 
 // TODO: replace with Status in k8s openapi?
 
@@ -53,20 +61,36 @@ pub struct Status {
     pub code: u16,
 }
 
+lazy_static::lazy_static! {
+    static ref CLIENT_BUILDER: Mutex<Pin<Box<dyn Future<Output = Result<reqwest::ClientBuilder>> + Send>>> = {
+        Mutex::new(Box::pin(client_builder::create(ConfigOptions::default())))
+    };
+}
+
 /// Client requires `config::Configuration` includes client to connect with kubernetes cluster.
 #[derive(Clone)]
 pub struct Client {
     configuration: Configuration,
-}
-
-impl From<Configuration> for Client {
-    /// Convert Configuration into a Client
-    fn from(configuration: Configuration) -> Self {
-        Self { configuration }
-    }
+    inner: reqwest::Client,
 }
 
 impl Client {
+    pub async fn new(configuration: crate::config::Configuration) -> Result<Self> {
+        let mut builder = CLIENT_BUILDER.lock().await;
+        Ok(Self {
+            configuration,
+            inner: builder.as_mut().await?.build()?,
+        })
+    }
+
+    pub async fn new_from_options(config_opts: ConfigOptions) -> Result<Self> {
+        let client_builder = client_builder::create(config_opts.clone()).await?;
+        Ok(Self {
+            configuration: Configuration::new_from_options(&config_opts).await?,
+            inner: client_builder.build()?,
+        })
+    }
+
     /// Create and initialize a Client with the appropriate kube config
     ///
     /// Will use `Configuration::infer` to try in-cluster evars first,
@@ -75,27 +99,34 @@ impl Client {
     /// Will fail if neither configuration could be loaded.
     pub async fn infer() -> Result<Self> {
         let configuration = crate::config::Configuration::infer().await?;
-        Ok(Self { configuration })
+
+        let client_builder = match crate::config::incluster_client() {
+            Ok(c) => c,
+            Err(_) => client_builder::create(ConfigOptions::default()).await?,
+        };
+
+        Ok(Self {
+            configuration,
+            inner: client_builder.build()?,
+        })
     }
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
         let (parts, body) = request.into_parts();
         let uri_str = format!("{}{}", self.configuration.base_path, parts.uri);
-        trace!("{} {}", parts.method, uri_str);
-        // trace!("Request body: {:?}", String::from_utf8_lossy(&body));
-        let req = match parts.method {
-            http::Method::GET => self.configuration.client.get(&uri_str),
-            http::Method::POST => self.configuration.client.post(&uri_str),
-            http::Method::DELETE => self.configuration.client.delete(&uri_str),
-            http::Method::PUT => self.configuration.client.put(&uri_str),
-            http::Method::PATCH => self.configuration.client.patch(&uri_str),
+        trace!("Sending request => method = {} uri = {}", parts.method, uri_str);
+
+        let request = match parts.method {
+            http::Method::GET
+            | http::Method::POST
+            | http::Method::DELETE
+            | http::Method::PUT
+            | http::Method::PATCH => self.inner.request(parts.method, &uri_str),
             other => return Err(Error::InvalidMethod(other.to_string())),
-        }
-        .headers(parts.headers)
-        .body(body)
-        .build()?;
-        // trace!("Request Headers: {:?}", req.headers());
-        let res = self.configuration.client.execute(req).await?;
+        };
+
+        let req = request.headers(parts.headers).body(body).build()?;
+        let res = self.inner.execute(req).await?;
         Ok(res)
     }
 
@@ -104,8 +135,7 @@ impl Client {
         T: DeserializeOwned,
     {
         let res: reqwest::Response = self.send(request).await?;
-        trace!("{} {}", res.status().as_str(), res.url());
-        // trace!("Response Headers: {:?}", res.headers());
+        trace!("Status = {:?} for {}", res.status(), res.url());
         let s = res.status();
         let text = res.text().await?;
         handle_api_errors(&text, s)?;
@@ -118,8 +148,7 @@ impl Client {
 
     pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String> {
         let res: reqwest::Response = self.send(request).await?;
-        trace!("{} {}", res.status().as_str(), res.url());
-        // trace!("Response Headers: {:?}", res.headers());
+        trace!("Status = {:?} for {}", res.status(), res.url());
         let s = res.status();
         let text = res.text().await?;
         handle_api_errors(&text, s)?;
@@ -132,7 +161,7 @@ impl Client {
         request: http::Request<Vec<u8>>,
     ) -> Result<impl Stream<Item = Result<Bytes>>> {
         let res: reqwest::Response = self.send(request).await?;
-        trace!("{} {}", res.status().as_str(), res.url());
+        trace!("Status = {:?} for {}", res.status(), res.url());
 
         Ok(res.bytes_stream().map_err(Error::ReqwestError))
     }
@@ -142,8 +171,7 @@ impl Client {
         T: DeserializeOwned,
     {
         let res: reqwest::Response = self.send(request).await?;
-        trace!("{} {}", res.status().as_str(), res.url());
-        // trace!("Response Headers: {:?}", res.headers());
+        trace!("Status = {:?} for {}", res.status(), res.url());
         let s = res.status();
         let text = res.text().await?;
         handle_api_errors(&text, s)?;

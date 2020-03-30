@@ -6,37 +6,37 @@
 //! The full `Config` and child-objects are exposed here for convenience only.
 
 mod apis;
-mod exec;
-mod incluster_config;
-mod kube_config;
-mod utils;
+pub mod incluster_config;
+pub(crate) mod kube_config;
+pub(crate) mod utils;
 
-use crate::{config::kube_config::Der, Error, Result};
-use reqwest::{header, Client, ClientBuilder};
-use std::convert::TryInto;
+use crate::{Error, Result};
 
-use self::kube_config::ConfigLoader;
+pub use self::kube_config::ConfigLoader;
 
 /// Configuration stores kubernetes path and client for requests.
 #[derive(Clone, Debug)]
 pub struct Configuration {
     pub base_path: String,
-    pub client: Client,
-
     /// The current default namespace. This will be "default" while running outside of a cluster,
     /// and will be the namespace of the pod while running inside a cluster.
     pub default_ns: String,
 }
 
 impl Configuration {
-    pub fn new(base_path: String, client: Client) -> Self {
-        Self::with_default_ns(base_path, client, "default".to_string())
+    pub fn new(base_path: String) -> Self {
+        Self::with_default_ns(base_path, "default".to_string())
     }
 
-    pub fn with_default_ns(base_path: String, client: Client, default_ns: String) -> Self {
-        Configuration {
+    /// Returns a config which includes authentication and cluster information from kubeconfig file.
+    pub async fn new_from_options(options: &ConfigOptions) -> Result<Self> {
+        let loader = ConfigLoader::new_from_options(options).await?;
+        Ok(Self::new(loader.cluster.server))
+    }
+
+    pub fn with_default_ns(base_path: String, default_ns: String) -> Self {
+        Self {
             base_path,
-            client,
             default_ns,
         }
     }
@@ -60,124 +60,15 @@ impl Configuration {
 
 /// Returns a config includes authentication and cluster infomation from kubeconfig file.
 pub async fn load_kube_config() -> Result<Configuration> {
-    load_kube_config_with(Default::default()).await
+    Configuration::new_from_options(&ConfigOptions::default()).await
 }
 
 /// ConfigOptions stores options used when loading kubeconfig file.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ConfigOptions {
     pub context: Option<String>,
     pub cluster: Option<String>,
     pub user: Option<String>,
-}
-
-/// Returns a config which includes authentication and cluster information from kubeconfig file.
-pub async fn load_kube_config_with(options: ConfigOptions) -> Result<Configuration> {
-    let result = create_client_builder(options).await?;
-    Ok(Configuration::new(
-        result.1.cluster.server,
-        result
-            .0
-            .build()
-            .map_err(|e| Error::KubeConfig(format!("Unable to build client: {}", e)))?,
-    ))
-}
-
-// temporary catalina hack for openssl only
-#[cfg(all(target_os = "macos", feature = "native-tls"))]
-fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, ca_: &Der) -> ClientBuilder {
-    use openssl::x509::X509;
-    let ca = X509::from_der(&ca_.0).expect("valid der is a der");
-    if ca
-        .not_before()
-        .diff(ca.not_after())
-        .map(|d| d.days.abs() > 824)
-        .unwrap_or(false)
-    {
-        client_builder.danger_accept_invalid_certs(true)
-    } else {
-        client_builder
-    }
-}
-
-#[cfg(any(not(target_os = "macos"), not(feature = "native-tls")))]
-fn hacky_cert_lifetime_for_macos(client_builder: ClientBuilder, _: &Der) -> ClientBuilder {
-    client_builder
-}
-
-/// Returns a client builder and config loader, based on the cluster information from the kubeconfig file.
-///
-/// This allows to create your custom reqwest client for using with the cluster API.
-pub async fn create_client_builder(options: ConfigOptions) -> Result<(ClientBuilder, ConfigLoader)> {
-    let kubeconfig =
-        utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
-
-    let loader = ConfigLoader::load(kubeconfig, options.context, options.cluster, options.user).await?;
-
-    let token = match &loader.user.token {
-        Some(token) => Some(token.clone()),
-        None => {
-            if let Some(exec) = &loader.user.exec {
-                let creds = exec::auth_exec(exec)?;
-                let status = creds.status.ok_or_else(|| {
-                    Error::KubeConfig("exec-plugin response did not contain a status".into())
-                })?;
-                status.token
-            } else {
-                None
-            }
-        }
-    };
-
-    let mut client_builder = Client::builder()
-        // hard disallow more than 5 minute polls due to kubernetes limitations
-        .timeout(std::time::Duration::new(295, 0));
-
-    if let Some(ca_bundle) = loader.ca_bundle()? {
-        for ca in ca_bundle {
-            client_builder = hacky_cert_lifetime_for_macos(client_builder, &ca);
-            client_builder = client_builder.add_root_certificate(ca.try_into()?);
-        }
-    }
-
-    match loader.identity(" ") {
-        Ok(id) => {
-            client_builder = client_builder.identity(id);
-        }
-        Err(e) => {
-            debug!("failed to load client identity from kube config: {}", e);
-            // last resort only if configs ask for it, and no client certs
-            if let Some(true) = loader.cluster.insecure_skip_tls_verify {
-                client_builder = client_builder.danger_accept_invalid_certs(true);
-            }
-        }
-    }
-
-    let mut headers = header::HeaderMap::new();
-
-    match (
-        utils::data_or_file(&token, &loader.user.token_file),
-        (&loader.user.username, &loader.user.password),
-    ) {
-        (Ok(token), _) => {
-            headers.insert(
-                header::AUTHORIZATION,
-                header::HeaderValue::from_str(&format!("Bearer {}", token))
-                    .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
-            );
-        }
-        (_, (Some(u), Some(p))) => {
-            let encoded = base64::encode(&format!("{}:{}", u, p));
-            headers.insert(
-                header::AUTHORIZATION,
-                header::HeaderValue::from_str(&format!("Basic {}", encoded))
-                    .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
-            );
-        }
-        _ => {}
-    }
-
-    Ok((client_builder.default_headers(headers), loader))
 }
 
 /// Returns a config which is used by clients within pods on kubernetes.
@@ -192,32 +83,28 @@ pub fn incluster_config() -> Result<Configuration> {
         ))
     })?;
 
+    let default_ns = incluster_config::load_default_ns()
+        .map_err(|e| Error::KubeConfig(format!("Unable to load incluster default namespace: {}", e)))?;
+
+    Ok(Configuration::with_default_ns(server, default_ns))
+}
+
+pub(crate) fn incluster_client() -> Result<reqwest::ClientBuilder> {
     let cert = incluster_config::load_cert()?;
 
     let token = incluster_config::load_token()
         .map_err(|e| Error::KubeConfig(format!("Unable to load in cluster token: {}", e)))?;
 
-    let default_ns = incluster_config::load_default_ns()
-        .map_err(|e| Error::KubeConfig(format!("Unable to load incluster default namespace: {}", e)))?;
-
-    let mut headers = header::HeaderMap::new();
+    let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
-        header::AUTHORIZATION,
-        header::HeaderValue::from_str(&format!("Bearer {}", token))
+        reqwest::header::AUTHORIZATION,
+        reqwest::header::HeaderValue::from_str(&format!("Bearer {}", token))
             .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
     );
 
-    let client_builder = Client::builder()
+    Ok(reqwest::Client::builder()
         .add_root_certificate(cert)
-        .default_headers(headers);
-
-    Ok(Configuration::with_default_ns(
-        server,
-        client_builder
-            .build()
-            .map_err(|e| Error::KubeConfig(format!("Unable to build client: {}", e)))?,
-        default_ns,
-    ))
+        .default_headers(headers))
 }
 
 // Expose raw config structs

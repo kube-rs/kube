@@ -1,10 +1,11 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{ListParams, Meta, Resource, WatchEvent},
     runtime::Informer,
-    Client, Configuration,
+    Client,
 };
 use std::env;
 
@@ -12,7 +13,7 @@ use std::env;
 async fn main() -> anyhow::Result<()> {
     env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::from(Configuration::infer().await?);
+    let client = Client::infer().await?;
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<Pod>(&namespace);
