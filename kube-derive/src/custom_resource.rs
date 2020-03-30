@@ -213,7 +213,6 @@ impl CustomDerive for CustomResource {
             scale,
         } = self;
 
-
         // 1. Create root object Foo and truncate name from FooSpec
 
         // Default visibility is `pub(crate)`

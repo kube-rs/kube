@@ -78,7 +78,6 @@ async fn main() -> anyhow::Result<()> {
     // Wait for the api to catch up
     delay_for(Duration::from_secs(1)).await;
 
-
     // Manage the Foo CR
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
@@ -119,7 +118,6 @@ async fn main() -> anyhow::Result<()> {
     foos.delete("baz", &dp).await?.map_left(|f1del| {
         assert_eq!(f1del.spec.info, "old baz");
     });
-
 
     // Create Foo qux with status
     info!("Create Foo instance qux");
@@ -180,7 +178,6 @@ async fn main() -> anyhow::Result<()> {
     info!("Patched scale {:?} for {}", o.spec, Meta::name(&o));
     assert_eq!(o.status.unwrap().replicas, 1);
     assert_eq!(o.spec.unwrap().replicas.unwrap(), 2); // we only asked for more
-
 
     // Modify a Foo qux with a Patch
     info!("Patch Foo instance qux");

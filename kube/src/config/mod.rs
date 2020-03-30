@@ -18,7 +18,7 @@ use std::convert::TryInto;
 use self::kube_config::ConfigLoader;
 
 /// Configuration stores kubernetes path and client for requests.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Configuration {
     pub base_path: String,
     pub client: Client,
@@ -219,7 +219,6 @@ pub fn incluster_config() -> Result<Configuration> {
         default_ns,
     ))
 }
-
 
 // Expose raw config structs
 pub use apis::{
