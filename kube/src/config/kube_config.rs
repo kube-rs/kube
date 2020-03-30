@@ -2,14 +2,21 @@ use std::path::Path;
 
 #[cfg(feature = "native-tls")]
 use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
-
 use reqwest::{Certificate, Identity};
 
-use super::{utils, ConfigOptions};
-use crate::{
-    config::apis::{AuthInfo, Cluster, Config, Context},
-    Error, Result,
+use super::{
+    apis::{AuthInfo, Cluster, Context, KubeConfig},
+    utils,
 };
+use crate::{Error, Result};
+
+/// ConfigOptions stores options used when loading kubeconfig file.
+#[derive(Default, Clone)]
+pub struct KubeConfigOptions {
+    pub context: Option<String>,
+    pub cluster: Option<String>,
+    pub user: Option<String>,
+}
 
 /// Regardless of tls type, a Certificate Der is always a byte array
 pub struct Der(pub Vec<u8>);
@@ -33,7 +40,7 @@ pub struct ConfigLoader {
 
 impl ConfigLoader {
     /// Returns a config loader based on the cluster information from the kubeconfig file.
-    pub async fn new_from_options(options: &ConfigOptions) -> Result<Self> {
+    pub async fn new_from_options(options: &KubeConfigOptions) -> Result<Self> {
         let kubeconfig =
             utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
 
@@ -54,7 +61,7 @@ impl ConfigLoader {
         cluster: Option<&String>,
         user: Option<&String>,
     ) -> Result<Self> {
-        let config = Config::read_from(path)?;
+        let config = KubeConfig::read_from(path)?;
         let context_name = context.unwrap_or(&config.current_context);
         let current_context = config
             .contexts

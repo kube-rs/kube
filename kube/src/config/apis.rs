@@ -2,12 +2,14 @@ use std::{collections::HashMap, fs::File, path::Path};
 
 use crate::{config::utils, oauth2, Error, Result};
 
-/// Config stores information to connect remote kubernetes cluster.
+/// [`KubeConfig`] represents information on how to connect to a remote kubernetes cluster
+/// that is normally stored in `~/.kube/config`
 ///
 /// This type (and its children) are exposed for convenience only.
-/// Please load a `Configuration` object for use with a `kube::Client`.
+/// Please load a [`Config`] object for use with a `kube::Client`
+/// which will read and parse the kube config file
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Config {
+pub struct KubeConfig {
     pub kind: Option<String>,
     #[serde(rename = "apiVersion")]
     pub api_version: Option<String>,
@@ -127,16 +129,16 @@ pub struct Context {
 }
 
 /// Some helpers on the raw Config object are exposed for people needing to parse it
-impl Config {
+impl KubeConfig {
     /// Read a Config from an arbitrary location
-    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Config> {
+    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<KubeConfig> {
         let f = File::open(path).map_err(|e| Error::KubeConfig(format!("{}", e)))?;
         let config = serde_yaml::from_reader(f).map_err(|e| Error::KubeConfig(format!("{}", e)))?;
         Ok(config)
     }
 
     /// Read a Config from the default location
-    pub fn read() -> Result<Config> {
+    pub fn read() -> Result<KubeConfig> {
         let path = utils::find_kubeconfig()?;
         Self::read_from(path)
     }
