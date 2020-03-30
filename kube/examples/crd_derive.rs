@@ -37,7 +37,6 @@ fn main() {
     println!("Foo CRD: {:?}", Foo::crd());
 }
 
-
 // some tests
 // Verify Foo::crd
 #[test]

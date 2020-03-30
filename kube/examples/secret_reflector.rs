@@ -17,7 +17,6 @@ enum Decoded {
     Bytes(Vec<u8>),
 }
 
-
 fn decode(secret: &Secret) -> BTreeMap<String, Decoded> {
     let mut res = BTreeMap::new();
     for (k, v) in secret.data.clone().unwrap() {

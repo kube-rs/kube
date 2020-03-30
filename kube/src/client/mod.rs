@@ -297,7 +297,6 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::Status;

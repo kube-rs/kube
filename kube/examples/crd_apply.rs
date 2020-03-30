@@ -65,7 +65,6 @@ async fn main() -> anyhow::Result<()> {
     }
     wait_for_crd_ready(&crds).await?; // wait for k8s to deal with it
 
-
     // Start applying foos
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 

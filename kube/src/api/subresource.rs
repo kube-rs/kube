@@ -7,7 +7,6 @@ use crate::{
     Error, Result,
 };
 
-
 // ----------------------------------------------------------------------------
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
@@ -36,7 +35,6 @@ where
 }
 
 // ----------------------------------------------------------------------------
-
 
 /// Status subresource
 ///
@@ -135,7 +133,6 @@ pub struct LogParams {
     /// If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.
     pub timestamps: bool,
 }
-
 
 impl Resource {
     /// Get a pod logs
