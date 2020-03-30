@@ -54,7 +54,7 @@ pub struct Status {
     pub code: u16,
 }
 
-/// Client requires `config::Configuration` includes client to connect with kubernetes cluster.
+/// Client for connecting with a kubernetes cluster.
 #[derive(Clone)]
 pub struct Client {
     cluster_url: reqwest::Url,
@@ -62,7 +62,8 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn new(mut client_config: ClientConfig) -> Result<Self> {
+    /// Create a client based on a [`ClientConfig`]
+    pub async fn new(client_config: ClientConfig) -> Result<Self> {
         let cluster_url = client_config.cluster_url.clone();
         let builder: reqwest::ClientBuilder = client_config.into();
         Ok(Self {
@@ -73,19 +74,13 @@ impl Client {
 
     /// Create and initialize a Client with the appropriate kube config
     ///
-    /// Will use `Configuration::infer` to try in-cluster evars first,
+    /// Will use [`ClientConfig::infer`] to try in-cluster evars first,
     /// then fallback to the local kube config.
     ///
     /// Will fail if neither configuration could be loaded.
     pub async fn infer() -> Result<Self> {
-        let mut client_config = ClientConfig::infer().await?;
-        let cluster_url = client_config.cluster_url.clone();
-        let client_builder: reqwest::ClientBuilder = client_config.into();
-
-        Ok(Self {
-            cluster_url,
-            inner: client_builder.build()?,
-        })
+        let client_config = ClientConfig::infer().await?;
+        Self::new(client_config).await
     }
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
