@@ -2,12 +2,15 @@
 
 use crate::config::Config;
 use crate::{Error, ErrorResponse, Result};
+
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, TryStream, TryStreamExt};
 use http::{self, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
+
+use std::convert::TryFrom;
 
 // TODO: replace with Status in k8s openapi?
 
@@ -55,6 +58,12 @@ pub struct Status {
 }
 
 /// Client for connecting with a kubernetes cluster.
+///
+/// The best way to instantiate the client is either by
+/// inferring the configuration from the environment using
+/// [`Client::try_default`] or with an existing [`Config`]
+/// using `Client::try_from` (note that this requires
+/// [`std::convert::TryFrom`] to be in scope.)
 #[derive(Clone)]
 pub struct Client {
     cluster_url: reqwest::Url,
@@ -62,16 +71,6 @@ pub struct Client {
 }
 
 impl Client {
-    /// Create a client based on a [`Config`]
-    pub async fn new(config: Config) -> Result<Self> {
-        let cluster_url = config.cluster_url.clone();
-        let builder: reqwest::ClientBuilder = config.into();
-        Ok(Self {
-            cluster_url,
-            inner: builder.build()?,
-        })
-    }
-
     /// Create and initialize a [`Client`] using the inferred
     /// configuration.
     ///
@@ -79,9 +78,12 @@ impl Client {
     /// variables first, then fallback to the local kube config.
     ///
     /// Will fail if neither configuration could be loaded.
-    pub async fn default() -> Result<Self> {
+    ///
+    /// If you already have a [`Config`] then use [`Client::try_from`]
+    /// instead
+    pub async fn try_default() -> Result<Self> {
         let client_config = Config::infer().await?;
-        Self::new(client_config).await
+        Self::try_from(client_config)
     }
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
@@ -298,8 +300,22 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
     }
 }
 
-impl std::convert::From<crate::config::Config> for reqwest::ClientBuilder {
-    fn from(config: crate::config::Config) -> Self {
+impl TryFrom<Config> for Client {
+    type Error = Error;
+
+    /// Convert [`Config`] into a [`Client`]
+    fn try_from(config: Config) -> Result<Self> {
+        let cluster_url = config.cluster_url.clone();
+        let builder: reqwest::ClientBuilder = config.into();
+        Ok(Self {
+            cluster_url,
+            inner: builder.build()?,
+        })
+    }
+}
+
+impl std::convert::From<Config> for reqwest::ClientBuilder {
+    fn from(config: Config) -> Self {
         let mut builder = Self::new();
 
         if let Some(c) = config.root_cert {

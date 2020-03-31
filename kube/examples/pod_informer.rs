@@ -13,7 +13,7 @@ use std::env;
 async fn main() -> anyhow::Result<()> {
     env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::default().await?;
+    let client = Client::try_default().await?;
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let resource = Resource::namespaced::<Pod>(&namespace);

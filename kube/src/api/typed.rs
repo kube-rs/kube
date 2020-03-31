@@ -67,7 +67,7 @@ where
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = Client::default().await?;
+    ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let p: Pod = pods.get("blog").await?;
     ///     Ok(())
@@ -87,7 +87,7 @@ where
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = Client::default().await?;
+    ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
     ///     for p in pods.list(&lp).await? {
@@ -140,7 +140,7 @@ where
     /// use apiexts::CustomResourceDefinition;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = Client::default().await?;
+    ///     let client = Client::try_default().await?;
     ///     let crds: Api<CustomResourceDefinition> = Api::all(client);
     ///     crds.delete("foos.clux.dev", &DeleteParams::default()).await?
     ///         .map_left(|o| println!("Deleting CRD: {:?}", o.status))
@@ -166,7 +166,7 @@ where
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = Client::default().await?;
+    ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     match pods.delete_collection(&ListParams::default()).await? {
     ///         either::Left(list) => {
@@ -213,7 +213,7 @@ where
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = Client::default().await?;
+    ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut j = jobs.get("baz").await?;
     ///     let j_new: Job = serde_json::from_value(serde_json::json!({
@@ -264,7 +264,7 @@ where
     /// use futures::StreamExt;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
-    ///     let client = Client::default().await?;
+    ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default()
     ///         .fields("metadata.name=my_job")

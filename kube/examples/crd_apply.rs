@@ -38,7 +38,7 @@ pub struct FooStatus {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=info");
     env_logger::init();
-    let client = Client::default().await?;
+    let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let ssapply = PatchParams {

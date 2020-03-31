@@ -11,7 +11,7 @@ use kube::{
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::default().await?;
+    let client = Client::try_default().await?;
 
     let resource = Resource::all::<Node>();
     let lp = ListParams::default()
