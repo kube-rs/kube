@@ -12,7 +12,7 @@ use kube::{
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,node_informer=debug,kube=debug");
     env_logger::init();
-    let client = Client::infer().await?;
+    let client = Client::default().await?;
     let nodes = Resource::all::<Node>();
     let events: Api<Event> = Api::all(client.clone());
 

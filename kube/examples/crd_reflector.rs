@@ -1,6 +1,9 @@
-#[macro_use] extern crate log;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate kube_derive;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate kube_derive;
 use std::time::Duration;
 use tokio::time::delay_for;
 
@@ -21,7 +24,7 @@ pub struct FooSpec {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::infer().await?;
+    let client = Client::default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first

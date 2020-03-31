@@ -72,13 +72,14 @@ impl Client {
         })
     }
 
-    /// Create and initialize a Client with the appropriate kube config
+    /// Create and initialize a [`Client`] using the inferred
+    /// configuration.
     ///
-    /// Will use [`ClientConfig::infer`] to try in-cluster evars first,
-    /// then fallback to the local kube config.
+    /// Will use [`ClientConfig::infer`] to try in-cluster enironment
+    /// variables first, then fallback to the local kube config.
     ///
     /// Will fail if neither configuration could be loaded.
-    pub async fn infer() -> Result<Self> {
+    pub async fn default() -> Result<Self> {
         let client_config = ClientConfig::infer().await?;
         Self::new(client_config).await
     }
