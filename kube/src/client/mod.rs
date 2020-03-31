@@ -62,8 +62,7 @@ pub struct Status {
 /// The best way to instantiate the client is either by
 /// inferring the configuration from the environment using
 /// [`Client::try_default`] or with an existing [`Config`]
-/// using `Client::try_from` (note that this requires
-/// [`std::convert::TryFrom`] to be in scope.)
+/// using [`Client::new`]
 #[derive(Clone)]
 pub struct Client {
     cluster_url: reqwest::Url,
@@ -71,6 +70,19 @@ pub struct Client {
 }
 
 impl Client {
+    /// Create and initialize a [`Client`] using the given
+    /// configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the configuration supplied leads to an invalid HTTP client.
+    /// Refer to the [`reqwest::ClientBuilder::build`] docs for information
+    /// on situations where this might fail. If you want to handle this error case
+    /// use [`Config::try_from`] (note that this requires [`std::convert::TryFrom`]
+    /// to be in scope.)
+    pub fn new(config: Config) -> Self {
+        Self::try_from(config).expect("Could not create a client from the supplied config")
+    }
     /// Create and initialize a [`Client`] using the inferred
     /// configuration.
     ///
