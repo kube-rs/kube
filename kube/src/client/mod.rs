@@ -100,15 +100,16 @@ impl Client {
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
         let (parts, body) = request.into_parts();
-        let uri_str = format!("{}{}", self.cluster_url, parts.uri);
-        trace!("Sending request => method = {} uri = {}", parts.method, uri_str);
+        let pandq = parts.uri.path_and_query().unwrap(); // TODO: catch
+        let uri_str = self.cluster_url.join(pandq.as_str()).unwrap();
+        //trace!("Sending request => method = {} uri = {}", parts.method, uri_str);
 
         let request = match parts.method {
             http::Method::GET
             | http::Method::POST
             | http::Method::DELETE
             | http::Method::PUT
-            | http::Method::PATCH => self.inner.request(parts.method, &uri_str),
+            | http::Method::PATCH => self.inner.request(parts.method, uri_str),
             other => return Err(Error::InvalidMethod(other.to_string())),
         };
 
@@ -202,6 +203,7 @@ impl Client {
                     match resp.chunk().await {
                         Ok(Some(chunk)) => {
                             trace!("Some chunk of len {}", chunk.len());
+                            //trace!("Chunk contents: {}", String::from_utf8_lossy(&chunk));
                             buff.extend_from_slice(&chunk);
 
                             // If we've encountered a newline, see if we have any items to yield

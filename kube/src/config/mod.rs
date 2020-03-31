@@ -1,9 +1,7 @@
-//! In cluster or out of cluster kubeconfig to be used by an api client
+//! Kubernetes configuration objects from ~/.kube/config or in cluster environment
 //!
-//! You primarily want to interact with `Configuration`,
-//! and its associated load functions.
-//!
-//! The full `Config` and child-objects are exposed here for convenience only.
+//! Used to populate `Config` that is ultimately used to construct a `Client`
+//! Unless you have issues, prefe using `Config::infer` and pass it to a `Client`.
 
 mod exec;
 mod file_config;
