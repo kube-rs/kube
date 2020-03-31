@@ -7,7 +7,7 @@ use std::{
 
 use crate::{Error, Result};
 
-use reqwest::{header::CONTENT_TYPE, Client};
+use reqwest::header::CONTENT_TYPE;
 use url::form_urlencoded::Serializer;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
@@ -79,7 +79,7 @@ impl Credentials {
 
 pub struct CredentialsClient {
     pub credentials: Credentials,
-    pub client: Client,
+    pub client: reqwest::Client,
 }
 
 // https://github.com/golang/oauth2/blob/c85d3e98c914e3a33234ad863dcbff5dbc425bb8/internal/token.go#L61-L66
@@ -114,7 +114,7 @@ impl CredentialsClient {
     pub fn new() -> Result<CredentialsClient> {
         Ok(CredentialsClient {
             credentials: Credentials::load()?,
-            client: Client::new(),
+            client: reqwest::Client::new(),
         })
     }
 
@@ -135,7 +135,7 @@ impl CredentialsClient {
             ])
             .finish();
 
-        let token_response: TokenResponse = self
+        let token_response = self
             .client
             .post(&self.credentials.token_uri)
             .body(body)

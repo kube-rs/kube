@@ -154,13 +154,13 @@ mod test {
     #[tokio::test]
     #[ignore] // circle has no kube config
     async fn convenient_custom_resource() {
-        use crate::{Api, Client, Configuration};
+        use crate::{Api, Client};
         #[derive(Clone, Debug, kube_derive::CustomResource, Deserialize, Serialize)]
         #[kube(group = "clux.dev", version = "v1", namespaced)]
         struct FooSpec {
             foo: String,
         };
-        let client = Client::from(Configuration::infer().await.unwrap());
+        let client = Client::try_default().await.unwrap();
         let r1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
         let r2: Api<Foo> = CustomResource::kind("Foo")

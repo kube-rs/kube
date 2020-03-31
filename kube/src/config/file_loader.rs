@@ -2,13 +2,21 @@ use std::path::Path;
 
 #[cfg(feature = "native-tls")]
 use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
-
 use reqwest::{Certificate, Identity};
 
-use crate::{
-    config::apis::{AuthInfo, Cluster, Config, Context},
-    Error, Result,
+use super::{
+    file_config::{AuthInfo, Cluster, Context, KubeConfig},
+    utils,
 };
+use crate::{Error, Result};
+
+/// ConfigOptions stores options used when loading kubeconfig file.
+#[derive(Default, Clone)]
+pub struct KubeConfigOptions {
+    pub context: Option<String>,
+    pub cluster: Option<String>,
+    pub user: Option<String>,
+}
 
 /// Regardless of tls type, a Certificate Der is always a byte array
 pub struct Der(pub Vec<u8>);
@@ -22,7 +30,8 @@ impl TryFrom<Der> for Certificate {
     }
 }
 
-/// ConfigLoader loads current context, cluster, and authentication information.
+/// ConfigLoader loads current context, cluster, and authentication information
+/// from a kube config file.
 #[derive(Clone, Debug)]
 pub struct ConfigLoader {
     pub current_context: Context,
@@ -31,28 +40,44 @@ pub struct ConfigLoader {
 }
 
 impl ConfigLoader {
+    /// Returns a config loader based on the cluster information from the kubeconfig file.
+    pub async fn new_from_options(options: &KubeConfigOptions) -> Result<Self> {
+        let kubeconfig_path =
+            utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
+
+        let loader = Self::load(
+            kubeconfig_path,
+            options.context.as_ref(),
+            options.cluster.as_ref(),
+            options.user.as_ref(),
+        )
+        .await?;
+
+        Ok(loader)
+    }
+
     pub async fn load<P: AsRef<Path>>(
         path: P,
-        context: Option<String>,
-        cluster: Option<String>,
-        user: Option<String>,
-    ) -> Result<ConfigLoader> {
-        let config = Config::read_from(path)?;
-        let context_name = context.as_ref().unwrap_or(&config.current_context);
+        context: Option<&String>,
+        cluster: Option<&String>,
+        user: Option<&String>,
+    ) -> Result<Self> {
+        let config = KubeConfig::read_from(path)?;
+        let context_name = context.unwrap_or(&config.current_context);
         let current_context = config
             .contexts
             .iter()
             .find(|named_context| &named_context.name == context_name)
             .map(|named_context| &named_context.context)
             .ok_or_else(|| Error::KubeConfig("Unable to load current context".into()))?;
-        let cluster_name = cluster.as_ref().unwrap_or(&current_context.cluster);
+        let cluster_name = cluster.unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
             .ok_or_else(|| Error::KubeConfig("Unable to load cluster of context".into()))?;
-        let user_name = user.as_ref().unwrap_or(&current_context.user);
+        let user_name = user.unwrap_or(&current_context.user);
 
         let mut user_opt = None;
         for named_user in config.auth_infos {

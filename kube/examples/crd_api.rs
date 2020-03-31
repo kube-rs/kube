@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use either::Either::{Left, Right};
 use kube_derive::CustomResource;
 use serde_derive::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as a
 
 use kube::{
     api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
-    Client, Configuration,
+    Client,
 };
 
 // Own custom resource
@@ -37,7 +38,7 @@ pub struct FooStatus {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::from(Configuration::infer().await?);
+    let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Manage CRDs first
@@ -83,11 +84,14 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Foo baz
     info!("Creating Foo instance baz");
-    let f1 = Foo::new("baz", FooSpec {
-        name: "baz".into(),
-        info: "old baz".into(),
-        replicas: 1,
-    });
+    let f1 = Foo::new(
+        "baz",
+        FooSpec {
+            name: "baz".into(),
+            info: "old baz".into(),
+            replicas: 1,
+        },
+    );
     let o = foos.create(&pp, &f1).await?;
     assert_eq!(Meta::name(&f1), Meta::name(&o));
     info!("Created {}", Meta::name(&o));
@@ -121,11 +125,14 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Foo qux with status
     info!("Create Foo instance qux");
-    let mut f2 = Foo::new("qux", FooSpec {
-        name: "qux".into(),
-        replicas: 0,
-        info: "unpatched qux".into(),
-    });
+    let mut f2 = Foo::new(
+        "qux",
+        FooSpec {
+            name: "qux".into(),
+            replicas: 0,
+            info: "unpatched qux".into(),
+        },
+    );
     f2.status = Some(FooStatus::default());
 
     let o = foos.create(&pp, &f2).await?;

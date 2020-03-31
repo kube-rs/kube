@@ -1,7 +1,9 @@
 use thiserror::Error;
 
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate log;
 
 #[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[error("{message}: {reason}")]
@@ -61,8 +63,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub mod api;
 pub use api::{Api, Resource};
 pub mod client;
+#[doc(inline)]
 pub use client::Client;
 pub mod config;
-pub use config::Configuration;
+#[doc(inline)]
+pub use config::Config;
 mod oauth2;
 pub mod runtime;
