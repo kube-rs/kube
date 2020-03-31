@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 

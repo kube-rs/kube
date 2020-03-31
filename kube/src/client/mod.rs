@@ -1,7 +1,6 @@
 //! A basic API client with standard kube error handling
 
-use crate::config::Config;
-use crate::{Error, ErrorResponse, Result};
+use crate::{config::Config, Error, ErrorResponse, Result};
 
 use bytes::Bytes;
 use either::{Either, Left, Right};
@@ -83,6 +82,7 @@ impl Client {
     pub fn new(config: Config) -> Self {
         Self::try_from(config).expect("Could not create a client from the supplied config")
     }
+
     /// Create and initialize a [`Client`] using the inferred
     /// configuration.
     ///

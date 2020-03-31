@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
     api::{ListParams, Meta, Resource},
