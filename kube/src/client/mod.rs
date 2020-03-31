@@ -1,6 +1,6 @@
 //! A basic API client with standard kube error handling
 
-use crate::config::ClientConfig;
+use crate::config::Config;
 use crate::{Error, ErrorResponse, Result};
 use bytes::Bytes;
 use either::{Either, Left, Right};
@@ -62,10 +62,10 @@ pub struct Client {
 }
 
 impl Client {
-    /// Create a client based on a [`ClientConfig`]
-    pub async fn new(client_config: ClientConfig) -> Result<Self> {
-        let cluster_url = client_config.cluster_url.clone();
-        let builder: reqwest::ClientBuilder = client_config.into();
+    /// Create a client based on a [`Config`]
+    pub async fn new(config: Config) -> Result<Self> {
+        let cluster_url = config.cluster_url.clone();
+        let builder: reqwest::ClientBuilder = config.into();
         Ok(Self {
             cluster_url,
             inner: builder.build()?,
@@ -75,12 +75,12 @@ impl Client {
     /// Create and initialize a [`Client`] using the inferred
     /// configuration.
     ///
-    /// Will use [`ClientConfig::infer`] to try in-cluster enironment
+    /// Will use [`Config::infer`] to try in-cluster enironment
     /// variables first, then fallback to the local kube config.
     ///
     /// Will fail if neither configuration could be loaded.
     pub async fn default() -> Result<Self> {
-        let client_config = ClientConfig::infer().await?;
+        let client_config = Config::infer().await?;
         Self::new(client_config).await
     }
 
@@ -298,8 +298,8 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
     }
 }
 
-impl std::convert::From<crate::config::ClientConfig> for reqwest::ClientBuilder {
-    fn from(config: crate::config::ClientConfig) -> Self {
+impl std::convert::From<crate::config::Config> for reqwest::ClientBuilder {
+    fn from(config: crate::config::Config) -> Self {
         let mut builder = Self::new();
 
         if let Some(c) = config.root_cert {

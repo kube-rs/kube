@@ -5,117 +5,73 @@
 //!
 //! The full `Config` and child-objects are exposed here for convenience only.
 
-mod apis;
 mod exec;
-pub mod incluster_config;
-pub(crate) mod kube_config;
-pub(crate) mod utils;
+mod file_config;
+mod file_loader;
+mod incluster_config;
+mod utils;
 
-use crate::config::{
-    self,
-    kube_config::{Der, KubeConfigOptions},
-};
 use crate::{Error, Result};
+use file_loader::{ConfigLoader, Der, KubeConfigOptions};
 
-pub use self::kube_config::ConfigLoader;
-
-/// Stores kubernetes cluster url and default namespace.
-#[derive(Clone, Debug)]
+/// Configuration object detailing things like cluster_url, default namespace, root certificates, and timeouts
+#[derive(Debug)]
 pub struct Config {
-    /// The url which points to the cluster's server
+    /// The configured cluster url
     pub cluster_url: reqwest::Url,
-    /// The current default namespace. This will be "default" while running outside of a cluster,
-    /// and will be the namespace of the pod while running inside a cluster.
+    /// The configured default namespace
     pub default_ns: String,
+    /// The configured root certificate
+    pub root_cert: Option<reqwest::Certificate>,
+    /// Default headers to be used to communicate with the kubernetes API
+    pub headers: reqwest::header::HeaderMap,
+    /// Timeout for calls to the kubernetes API.
+    ///
+    /// A value of `None` means no timeout
+    pub(crate) timeout: Option<std::time::Duration>,
+    /// Whether to accept invalid ceritifacts
+    pub(crate) accept_invalid_certs: bool,
+    /// The identity to use for communicating with the kubernetes API
+    pub(crate) identity: Option<reqwest::Identity>,
 }
 
 impl Config {
-    /// Returns a new configuration based on the provided cluster url
-    /// and sets the default namespace to "default"
-    pub fn new(cluster_url: reqwest::Url) -> Self {
-        Self::new_with_default_namespace(cluster_url, String::from("default"))
-    }
-
-    /// Create a new [`Config`] based on a cluster url and default namespace
-    pub fn new_with_default_namespace(cluster_url: reqwest::Url, default_ns: String) -> Self {
-        Self {
-            cluster_url,
-            default_ns,
-        }
-    }
-
-    /// Infer the config type and return it
+    /// Infer the config from the environment
     ///
-    /// Done by attempting to load in-cluster evars first,
-    /// then if that fails, try the full local kube config.
+    /// Done by attempting to load in-cluster environment variables first, and
+    /// then if that fails, trying the local kube config.
+    ///
+    /// Fails if inference from both sources fails
     pub async fn infer() -> Result<Self> {
         match Self::new_from_cluster_env() {
-            Err(e) => {
-                trace!("No in-cluster config found: {}", e);
+            Err(e1) => {
+                trace!("No in-cluster config found: {}", e1);
                 trace!("Falling back to local kube config");
-                Ok(Self::new_from_kube_config(&KubeConfigOptions::default()).await?)
+                let config = Self::new_from_kube_config(&KubeConfigOptions::default())
+                    .await
+                    .map_err(|e2| Error::KubeConfig(format!("Failed to infer config: {}, {}", e1, e2)))?;
+
+                Ok(config)
             }
-            Ok(o) => Ok(o),
+            success => success,
         }
     }
 
-    /// Returns a config from kube config file.
-    ///
-    /// This file is typically found in `~/.kube/config`
-    pub async fn new_from_kube_config(options: &KubeConfigOptions) -> Result<Self> {
-        let loader = ConfigLoader::new_from_options(options).await?;
-        let url = reqwest::Url::parse(&loader.cluster.server)
-            .map_err(|e| Error::KubeConfig(format!("malformed url: {}", e)))?;
-        Ok(Self::new(url))
-    }
-
-    /// Returns a config which is used by clients within pods on kubernetes
-    /// by reading a config from the environment.
-    ///
-    /// It will return an error if called from out of kubernetes cluster.
+    /// Read the config from the cluster's environment variables
     pub fn new_from_cluster_env() -> Result<Self> {
-        let server = incluster_config::kube_server().ok_or_else(|| {
+        let cluster_url = incluster_config::kube_server().ok_or_else(|| {
             Error::KubeConfig(format!(
-                "Unable to load incluster config, {} and {} must be defined",
+                "Unable to load in cluster config, {} and {} must be defined",
                 incluster_config::SERVICE_HOSTENV,
                 incluster_config::SERVICE_PORTENV
             ))
         })?;
-
-        let url =
-            reqwest::Url::parse(&server).map_err(|e| Error::KubeConfig(format!("malformed url: {}", e)))?;
+        let cluster_url = reqwest::Url::parse(&cluster_url)
+            .map_err(|e| Error::KubeConfig(format!("Malformed url: {}", e)))?;
 
         let default_ns = incluster_config::load_default_ns()
             .map_err(|e| Error::KubeConfig(format!("Unable to load incluster default namespace: {}", e)))?;
 
-        Ok(Self::new_with_default_namespace(url, default_ns))
-    }
-}
-
-#[derive(Debug)]
-pub struct ClientConfig {
-    pub(crate) cluster_url: reqwest::Url,
-    pub(crate) root_cert: Option<reqwest::Certificate>,
-    pub(crate) headers: reqwest::header::HeaderMap,
-    pub(crate) timeout: Option<std::time::Duration>,
-    pub(crate) accept_invalid_certs: bool,
-    pub(crate) identity: Option<reqwest::Identity>,
-}
-
-impl ClientConfig {
-    pub async fn infer() -> Result<Self> {
-        let config = Config::infer().await?;
-        match Self::new_from_cluster_env(config) {
-            Err(e) => {
-                trace!("No in-cluster config found: {}", e);
-                trace!("Falling back to local kube config");
-                Ok(Self::new_from_kube_config(&KubeConfigOptions::default()).await?)
-            }
-            Ok(o) => Ok(o),
-        }
-    }
-
-    pub fn new_from_cluster_env(config: Config) -> Result<Self> {
         let root_cert = incluster_config::load_cert()?;
 
         let token = incluster_config::load_token()
@@ -129,7 +85,8 @@ impl ClientConfig {
         );
 
         Ok(Self {
-            cluster_url: config.cluster_url,
+            cluster_url,
+            default_ns,
             root_cert: Some(root_cert),
             headers,
             timeout: None,
@@ -142,8 +99,15 @@ impl ClientConfig {
     ///
     /// This allows to create your custom reqwest client for using with the cluster API.
     pub async fn new_from_kube_config(options: &KubeConfigOptions) -> Result<Self> {
-        let configuration = Config::new_from_kube_config(&options).await?;
-        let loader = ConfigLoader::new_from_options(&options).await?;
+        let loader = ConfigLoader::new_from_options(options).await?;
+        let cluster_url = reqwest::Url::parse(&loader.cluster.server)
+            .map_err(|e| Error::KubeConfig(format!("Malformed url: {}", e)))?;
+
+        let default_ns = loader
+            .current_context
+            .namespace
+            .clone()
+            .unwrap_or_else(|| String::from("default"));
 
         let token = match &loader.user.token {
             Some(token) => Some(token.clone()),
@@ -187,7 +151,7 @@ impl ClientConfig {
         let mut headers = reqwest::header::HeaderMap::new();
 
         match (
-            config::utils::data_or_file(&token, &loader.user.token_file),
+            utils::data_or_file(&token, &loader.user.token_file),
             (&loader.user.username, &loader.user.password),
         ) {
             (Ok(token), _) => {
@@ -209,7 +173,8 @@ impl ClientConfig {
         }
 
         Ok(Self {
-            cluster_url: configuration.cluster_url,
+            cluster_url,
+            default_ns,
             root_cert,
             headers,
             timeout: Some(timeout),
@@ -236,7 +201,7 @@ fn hacky_cert_lifetime_for_macos(_: &Der) -> bool {
 }
 
 // Expose raw config structs
-pub use apis::{
+pub use file_config::{
     AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, KubeConfig, NamedCluster, NamedContext,
     NamedExtension, Preferences,
 };

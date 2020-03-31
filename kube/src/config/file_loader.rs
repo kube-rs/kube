@@ -5,7 +5,7 @@ use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
 use reqwest::{Certificate, Identity};
 
 use super::{
-    apis::{AuthInfo, Cluster, Context, KubeConfig},
+    file_config::{AuthInfo, Cluster, Context, KubeConfig},
     utils,
 };
 use crate::{Error, Result};
@@ -30,7 +30,8 @@ impl TryFrom<Der> for Certificate {
     }
 }
 
-/// ConfigLoader loads current context, cluster, and authentication information.
+/// ConfigLoader loads current context, cluster, and authentication information
+/// from a kube config file.
 #[derive(Clone, Debug)]
 pub struct ConfigLoader {
     pub current_context: Context,
@@ -41,11 +42,11 @@ pub struct ConfigLoader {
 impl ConfigLoader {
     /// Returns a config loader based on the cluster information from the kubeconfig file.
     pub async fn new_from_options(options: &KubeConfigOptions) -> Result<Self> {
-        let kubeconfig =
+        let kubeconfig_path =
             utils::find_kubeconfig().map_err(|e| Error::KubeConfig(format!("Unable to load file: {}", e)))?;
 
         let loader = Self::load(
-            kubeconfig,
+            kubeconfig_path,
             options.context.as_ref(),
             options.cluster.as_ref(),
             options.user.as_ref(),

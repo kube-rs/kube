@@ -63,8 +63,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub mod api;
 pub use api::{Api, Resource};
 pub mod client;
+#[doc(inline)]
 pub use client::Client;
 pub mod config;
+#[doc(inline)]
 pub use config::Config;
 mod oauth2;
 pub mod runtime;
