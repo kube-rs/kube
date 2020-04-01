@@ -44,7 +44,7 @@ pub enum Error {
     #[error("Invalid API method {0}")]
     InvalidMethod(String),
 
-    /// A request validation failed  
+    /// A request validation failed
     #[error("Request validation failed with {0}")]
     RequestValidation(String),
 
@@ -55,6 +55,11 @@ pub enum Error {
     /// An error with configuring SSL occured
     #[error("SslError: {0}")]
     SslError(String),
+
+    /// An error from openssl when handling configuration
+    #[cfg(feature = "native-tls")]
+    #[error("TlsError: {0}")]
+    SslError2(#[from] openssl::error::ErrorStack)
 }
 
 /// An Error response from the API
