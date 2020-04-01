@@ -34,7 +34,7 @@ pub fn load_token() -> Result<String> {
 /// Returns certification from specified path in cluster.
 pub fn load_cert() -> Result<Certificate> {
     let ca = utils::data_or_file_with_base64(&None, &Some(SERVICE_CERTFILE))?;
-    Certificate::from_pem(&ca).map_err(|e| Error::KubeConfig(format!("{}", e)))
+    Certificate::from_pem(&ca).map_err(|e| Error::Kubeconfig(format!("{}", e)))
 }
 
 /// Returns the default namespace from specified path in cluster.

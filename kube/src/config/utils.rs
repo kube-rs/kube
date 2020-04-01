@@ -15,7 +15,7 @@ const KUBECONFIG: &str = "KUBECONFIG";
 pub fn find_kubeconfig() -> Result<PathBuf> {
     kubeconfig_path()
         .or_else(default_kube_path)
-        .ok_or_else(|| Error::KubeConfig("Failed to find path of kubeconfig".into()))
+        .ok_or_else(|| Error::Kubeconfig("Failed to find path of kubeconfig".into()))
 }
 
 /// Returns kubeconfig path from specified environment variable.
@@ -31,7 +31,7 @@ pub fn default_kube_path() -> Option<PathBuf> {
 pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Option<P>) -> Result<Vec<u8>> {
     match (data, file) {
         (Some(d), _) => {
-            base64::decode(&d).map_err(|e| Error::KubeConfig(format!("Failed to decode base64: {}", e)))
+            base64::decode(&d).map_err(|e| Error::Kubeconfig(format!("Failed to decode base64: {}", e)))
         }
         (_, Some(f)) => {
             let f = (*f).as_ref();
@@ -40,18 +40,18 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Op
             } else {
                 find_kubeconfig().and_then(|cfg| {
                     cfg.parent().map(|kubedir| kubedir.join(f)).ok_or_else(|| {
-                        Error::KubeConfig(format!("Failed to compute the absolute path of '{:?}'", f))
+                        Error::Kubeconfig(format!("Failed to compute the absolute path of '{:?}'", f))
                     })
                 })?
             };
             // dbg!(&abs_file);
-            let mut ff = File::open(&abs_file).map_err(|e| Error::KubeConfig(format!("{}", e)))?;
+            let mut ff = File::open(&abs_file).map_err(|e| Error::Kubeconfig(format!("{}", e)))?;
             let mut b = vec![];
             ff.read_to_end(&mut b)
-                .map_err(|e| Error::KubeConfig(format!("Failed to read file: {}", e)))?;
+                .map_err(|e| Error::Kubeconfig(format!("Failed to read file: {}", e)))?;
             Ok(b)
         }
-        _ => Err(Error::KubeConfig(
+        _ => Err(Error::Kubeconfig(
             "Failed to get data/file with base64 format".into(),
         )),
     }
@@ -63,12 +63,12 @@ pub fn data_or_file<P: AsRef<Path>>(data: &Option<String>, file: &Option<P>) -> 
         (_, Some(f)) => {
             let mut s = String::new();
             let mut ff =
-                File::open(f).map_err(|e| Error::KubeConfig(format!("Failed to open file: {}", e)))?;
+                File::open(f).map_err(|e| Error::Kubeconfig(format!("Failed to open file: {}", e)))?;
             ff.read_to_string(&mut s)
-                .map_err(|e| Error::KubeConfig(format!("Failed to read file: {}", e)))?;
+                .map_err(|e| Error::Kubeconfig(format!("Failed to read file: {}", e)))?;
             Ok(s)
         }
-        _ => Err(Error::KubeConfig("Failed to get data/file".into())),
+        _ => Err(Error::Kubeconfig("Failed to get data/file".into())),
     }
 }
 

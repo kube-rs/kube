@@ -1,7 +1,9 @@
 use thiserror::Error;
 
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate log;
 
 #[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[error("{message}: {reason}")]
@@ -49,8 +51,8 @@ pub enum Error {
     RequestValidation(String),
 
     /// Configuration error
-    #[error("Error loading kube config: {0}")]
-    KubeConfig(String),
+    #[error("Error loading kubeconfig: {0}")]
+    Kubeconfig(String),
 
     #[error("SslError: {0}")]
     SslError(String),
@@ -61,8 +63,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub mod api;
 pub use api::{Api, Resource};
 pub mod client;
-#[doc(inline)] pub use client::Client;
+#[doc(inline)]
+pub use client::Client;
 pub mod config;
-#[doc(inline)] pub use config::Config;
+#[doc(inline)]
+pub use config::Config;
 mod oauth2;
 pub mod runtime;

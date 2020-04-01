@@ -152,7 +152,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // circle has no kube config
+    #[ignore] // circle has no kubeconfig
     async fn convenient_custom_resource() {
         use crate::{Api, Client};
         #[derive(Clone, Debug, kube_derive::CustomResource, Deserialize, Serialize)]
