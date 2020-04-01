@@ -13,7 +13,7 @@ use crate::{Error, Result};
 use file_loader::{ConfigLoader, Der, KubeConfigOptions};
 
 /// Configuration object detailing things like cluster_url, default namespace, root certificates, and timeouts
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     /// The configured cluster url
     pub cluster_url: reqwest::Url,
@@ -30,7 +30,9 @@ pub struct Config {
     /// Whether to accept invalid ceritifacts
     pub(crate) accept_invalid_certs: bool,
     /// The identity to use for communicating with the kubernetes API
-    pub(crate) identity: Option<reqwest::Identity>,
+    pub(crate) identity: Option<Vec<u8>>,
+    /// Password for decrypting identity
+    pub(crate) identity_password: String,
 }
 
 impl Config {
@@ -90,6 +92,7 @@ impl Config {
             timeout: None,
             accept_invalid_certs: false,
             identity: None,
+            identity_password: String::new(),
         })
     }
 
@@ -135,7 +138,7 @@ impl Config {
             }
         }
 
-        match loader.identity(" ") {
+        match loader.identity(IDENTITY_PASSWORD) {
             Ok(id) => identity = Some(id),
             Err(e) => {
                 debug!("failed to load client identity from kubeconfig: {}", e);
@@ -178,9 +181,28 @@ impl Config {
             timeout: Some(timeout),
             accept_invalid_certs,
             identity,
+            identity_password: String::from(IDENTITY_PASSWORD),
         })
     }
+
+    #[cfg(feature = "rustls-tls")]
+    pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
+        Some(
+            reqwest::Identity::from_pem(self.identity.as_ref()?)
+                .expect("Identity buffer was not valid identity"),
+        )
+    }
+
+    #[cfg(feature = "native-tls")]
+    pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
+        Some(
+            reqwest::Identity::from_pkcs12_der(self.identity.as_ref()?, &self.identity_password)
+                .expect("Identity buffer was not valid identity"),
+        )
+    }
 }
+
+const IDENTITY_PASSWORD: &'static str = " ";
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]

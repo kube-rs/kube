@@ -96,7 +96,7 @@ impl ConfigLoader {
     }
 
     #[cfg(feature = "native-tls")]
-    pub fn identity(&self, password: &str) -> Result<Identity> {
+    pub fn identity(&self, password: &str) -> Result<Vec<u8>> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
@@ -108,17 +108,19 @@ impl ConfigLoader {
             .map_err(|e| Error::SslError(format!("{}", e)))?;
 
         let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
-        Ok(Identity::from_pkcs12_der(&der, password)?)
+        let _ = Identity::from_pkcs12_der(&der, password)?;
+        Ok(der)
     }
 
     #[cfg(feature = "rustls-tls")]
-    pub fn identity(&self, _password: &str) -> Result<Identity> {
+    pub fn identity(&self, _password: &str) -> Result<Vec<u8>> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
         let mut buffer = client_key.clone();
         buffer.extend_from_slice(client_cert);
-        Identity::from_pem(&buffer.as_slice()).map_err(|e| Error::SslError(format!("{}", e)))
+        let _ = Identity::from_pem(&buffer.as_slice()).map_err(|e| Error::SslError(format!("{}", e)));
+        Ok(buffer)
     }
 
     #[cfg(feature = "native-tls")]
