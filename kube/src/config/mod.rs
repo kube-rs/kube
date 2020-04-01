@@ -12,6 +12,8 @@ mod utils;
 use crate::{Error, Result};
 use file_loader::{ConfigLoader, Der, KubeConfigOptions};
 
+use reqwest::header::{self, HeaderMap};
+
 /// Configuration object detailing things like cluster_url, default namespace, root certificates, and timeouts
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -22,13 +24,13 @@ pub struct Config {
     /// The configured root certificate
     pub root_cert: Option<reqwest::Certificate>,
     /// Default headers to be used to communicate with the kubernetes API
-    pub headers: reqwest::header::HeaderMap,
+    pub headers: HeaderMap,
     /// Timeout for calls to the kubernetes API.
     ///
     /// A value of `None` means no timeout
-    pub(crate) timeout: Option<std::time::Duration>,
+    pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid ceritifacts
-    pub(crate) accept_invalid_certs: bool,
+    pub accept_invalid_certs: bool,
     /// The identity to use for communicating with the kubernetes API
     /// along wit the password to decrypt it.
     ///
@@ -38,6 +40,23 @@ pub struct Config {
 }
 
 impl Config {
+    /// Construct a new config where only the `cluster_url` is set by the user.
+    /// and everything else receives a default value.
+    ///
+    /// Most likely you want to use [`Config::infer`] to infer the config from
+    /// the environment.
+    pub fn new(cluster_url: reqwest::Url) -> Self {
+        Self {
+            cluster_url,
+            default_ns: String::from("default"),
+            root_cert: None,
+            headers: HeaderMap::new(),
+            timeout: None,
+            accept_invalid_certs: false,
+            identity: None,
+        }
+    }
+
     /// Infer the config from the environment
     ///
     /// Done by attempting to load in-cluster environment variables first, and
@@ -79,10 +98,10 @@ impl Config {
         let token = incluster_config::load_token()
             .map_err(|e| Error::Kubeconfig(format!("Unable to load in cluster token: {}", e)))?;
 
-        let mut headers = reqwest::header::HeaderMap::new();
+        let mut headers = HeaderMap::new();
         headers.insert(
-            reqwest::header::AUTHORIZATION,
-            reqwest::header::HeaderValue::from_str(&format!("Bearer {}", token))
+            header::AUTHORIZATION,
+            header::HeaderValue::from_str(&format!("Bearer {}", token))
                 .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
         );
 
@@ -150,7 +169,7 @@ impl Config {
             }
         }
 
-        let mut headers = reqwest::header::HeaderMap::new();
+        let mut headers = HeaderMap::new();
 
         match (
             utils::data_or_file(&token, &loader.user.token_file),
@@ -158,16 +177,16 @@ impl Config {
         ) {
             (Ok(token), _) => {
                 headers.insert(
-                    reqwest::header::AUTHORIZATION,
-                    reqwest::header::HeaderValue::from_str(&format!("Bearer {}", token))
+                    header::AUTHORIZATION,
+                    header::HeaderValue::from_str(&format!("Bearer {}", token))
                         .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
                 );
             }
             (_, (Some(u), Some(p))) => {
                 let encoded = base64::encode(&format!("{}:{}", u, p));
                 headers.insert(
-                    reqwest::header::AUTHORIZATION,
-                    reqwest::header::HeaderValue::from_str(&format!("Basic {}", encoded))
+                    header::AUTHORIZATION,
+                    header::HeaderValue::from_str(&format!("Basic {}", encoded))
                         .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
                 );
             }
