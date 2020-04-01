@@ -30,9 +30,11 @@ pub struct Config {
     /// Whether to accept invalid ceritifacts
     pub(crate) accept_invalid_certs: bool,
     /// The identity to use for communicating with the kubernetes API
-    pub(crate) identity: Option<Vec<u8>>,
-    /// Password for decrypting identity
-    pub(crate) identity_password: String,
+    /// along wit the password to decrypt it.
+    ///
+    /// This is stored in a raw buffer form so that Config can implement `Clone`
+    /// (since [`reqwest::Identity`] does not currently implement `Clone`)
+    pub(crate) identity: Option<(Vec<u8>, String)>,
 }
 
 impl Config {
@@ -92,7 +94,6 @@ impl Config {
             timeout: None,
             accept_invalid_certs: false,
             identity: None,
-            identity_password: String::new(),
         })
     }
 
@@ -180,23 +181,31 @@ impl Config {
             headers,
             timeout: Some(timeout),
             accept_invalid_certs,
-            identity,
-            identity_password: String::from(IDENTITY_PASSWORD),
+            identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
         })
     }
 
+    // The identity functions are used to parse the stored identity buffer
+    // into an `reqwest::Identity` type. We do this because `reqwest::Identity`
+    // is not `Clone`. This allows us to store and clone the buffer and supply
+    // the `Identity` in a just-in-time fashion.
+    //
+    // Note: this should be removed if/when reqwest implements [`Clone` for
+    // `Identity`](https://github.com/seanmonstar/reqwest/issues/871)
+
+    // feature = "rustls-tls" assumes the buffer is pem
     #[cfg(feature = "rustls-tls")]
     pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
-        Some(
-            reqwest::Identity::from_pem(self.identity.as_ref()?)
-                .expect("Identity buffer was not valid identity"),
-        )
+        let (identity, _identity_password) = self.identity.as_ref()?;
+        Some(reqwest::Identity::from_pem().expect("Identity buffer was not valid identity"))
     }
 
+    // feature = "native-tls" assumes the buffer is pkcs12 der
     #[cfg(feature = "native-tls")]
     pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
+        let (identity, identity_password) = self.identity.as_ref()?;
         Some(
-            reqwest::Identity::from_pkcs12_der(self.identity.as_ref()?, &self.identity_password)
+            reqwest::Identity::from_pkcs12_der(identity, identity_password)
                 .expect("Identity buffer was not valid identity"),
         )
     }
