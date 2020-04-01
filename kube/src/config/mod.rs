@@ -37,17 +37,17 @@ impl Config {
     /// Infer the config from the environment
     ///
     /// Done by attempting to load in-cluster environment variables first, and
-    /// then if that fails, trying the local kube config.
+    /// then if that fails, trying the local kubeconfig.
     ///
     /// Fails if inference from both sources fails
     pub async fn infer() -> Result<Self> {
         match Self::new_from_cluster_env() {
             Err(e1) => {
                 trace!("No in-cluster config found: {}", e1);
-                trace!("Falling back to local kube config");
-                let config = Self::new_from_kube_config(&KubeConfigOptions::default())
+                trace!("Falling back to local kubeconfig");
+                let config = Self::new_from_kubeconfig(&KubeConfigOptions::default())
                     .await
-                    .map_err(|e2| Error::KubeConfig(format!("Failed to infer config: {}, {}", e1, e2)))?;
+                    .map_err(|e2| Error::Kubeconfig(format!("Failed to infer config: {}, {}", e1, e2)))?;
 
                 Ok(config)
             }
@@ -58,28 +58,28 @@ impl Config {
     /// Read the config from the cluster's environment variables
     pub fn new_from_cluster_env() -> Result<Self> {
         let cluster_url = incluster_config::kube_server().ok_or_else(|| {
-            Error::KubeConfig(format!(
+            Error::Kubeconfig(format!(
                 "Unable to load in cluster config, {} and {} must be defined",
                 incluster_config::SERVICE_HOSTENV,
                 incluster_config::SERVICE_PORTENV
             ))
         })?;
         let cluster_url = reqwest::Url::parse(&cluster_url)
-            .map_err(|e| Error::KubeConfig(format!("Malformed url: {}", e)))?;
+            .map_err(|e| Error::Kubeconfig(format!("Malformed url: {}", e)))?;
 
         let default_ns = incluster_config::load_default_ns()
-            .map_err(|e| Error::KubeConfig(format!("Unable to load incluster default namespace: {}", e)))?;
+            .map_err(|e| Error::Kubeconfig(format!("Unable to load incluster default namespace: {}", e)))?;
 
         let root_cert = incluster_config::load_cert()?;
 
         let token = incluster_config::load_token()
-            .map_err(|e| Error::KubeConfig(format!("Unable to load in cluster token: {}", e)))?;
+            .map_err(|e| Error::Kubeconfig(format!("Unable to load in cluster token: {}", e)))?;
 
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::AUTHORIZATION,
             reqwest::header::HeaderValue::from_str(&format!("Bearer {}", token))
-                .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
+                .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
         );
 
         Ok(Self {
@@ -96,10 +96,10 @@ impl Config {
     /// Returns a client builder based on the cluster information from the kubeconfig file.
     ///
     /// This allows to create your custom reqwest client for using with the cluster API.
-    pub async fn new_from_kube_config(options: &KubeConfigOptions) -> Result<Self> {
+    pub async fn new_from_kubeconfig(options: &KubeConfigOptions) -> Result<Self> {
         let loader = ConfigLoader::new_from_options(options).await?;
         let cluster_url = reqwest::Url::parse(&loader.cluster.server)
-            .map_err(|e| Error::KubeConfig(format!("Malformed url: {}", e)))?;
+            .map_err(|e| Error::Kubeconfig(format!("Malformed url: {}", e)))?;
 
         let default_ns = loader
             .current_context
@@ -113,7 +113,7 @@ impl Config {
                 if let Some(exec) = &loader.user.exec {
                     let creds = exec::auth_exec(exec)?;
                     let status = creds.status.ok_or_else(|| {
-                        Error::KubeConfig("exec-plugin response did not contain a status".into())
+                        Error::Kubeconfig("exec-plugin response did not contain a status".into())
                     })?;
                     status.token
                 } else {
@@ -138,7 +138,7 @@ impl Config {
         match loader.identity(" ") {
             Ok(id) => identity = Some(id),
             Err(e) => {
-                debug!("failed to load client identity from kube config: {}", e);
+                debug!("failed to load client identity from kubeconfig: {}", e);
                 // last resort only if configs ask for it, and no client certs
                 if let Some(true) = loader.cluster.insecure_skip_tls_verify {
                     accept_invalid_certs = true;
@@ -156,7 +156,7 @@ impl Config {
                 headers.insert(
                     reqwest::header::AUTHORIZATION,
                     reqwest::header::HeaderValue::from_str(&format!("Bearer {}", token))
-                        .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
+                        .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
                 );
             }
             (_, (Some(u), Some(p))) => {
@@ -164,7 +164,7 @@ impl Config {
                 headers.insert(
                     reqwest::header::AUTHORIZATION,
                     reqwest::header::HeaderValue::from_str(&format!("Basic {}", encoded))
-                        .map_err(|e| Error::KubeConfig(format!("Invalid bearer token: {}", e)))?,
+                        .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
                 );
             }
             _ => {}
@@ -200,6 +200,6 @@ fn hacky_cert_lifetime_for_macos(_: &Der) -> bool {
 
 // Expose raw config structs
 pub use file_config::{
-    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, KubeConfig, NamedCluster, NamedContext,
+    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedCluster, NamedContext,
     NamedExtension, Preferences,
 };

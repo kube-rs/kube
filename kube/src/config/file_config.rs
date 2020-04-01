@@ -2,14 +2,14 @@ use std::{collections::HashMap, fs::File, path::Path};
 
 use crate::{config::utils, oauth2, Error, Result};
 
-/// [`KubeConfig`] represents information on how to connect to a remote kubernetes cluster
+/// [`Kubeconfig`] represents information on how to connect to a remote kubernetes cluster
 /// that is normally stored in `~/.kube/config`
 ///
 /// This type (and its children) are exposed for convenience only.
 /// Please load a [`Config`] object for use with a `kube::Client`
-/// which will read and parse the kube config file
+/// which will read and parse the kubeconfig file
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct KubeConfig {
+pub struct Kubeconfig {
     pub kind: Option<String>,
     #[serde(rename = "apiVersion")]
     pub api_version: Option<String>,
@@ -129,16 +129,16 @@ pub struct Context {
 }
 
 /// Some helpers on the raw Config object are exposed for people needing to parse it
-impl KubeConfig {
+impl Kubeconfig {
     /// Read a Config from an arbitrary location
-    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<KubeConfig> {
-        let f = File::open(path).map_err(|e| Error::KubeConfig(format!("{}", e)))?;
-        let config = serde_yaml::from_reader(f).map_err(|e| Error::KubeConfig(format!("{}", e)))?;
+    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig> {
+        let f = File::open(path).map_err(|e| Error::Kubeconfig(format!("{}", e)))?;
+        let config = serde_yaml::from_reader(f).map_err(|e| Error::Kubeconfig(format!("{}", e)))?;
         Ok(config)
     }
 
     /// Read a Config from the default location
-    pub fn read() -> Result<KubeConfig> {
+    pub fn read() -> Result<Kubeconfig> {
         let path = utils::find_kubeconfig()?;
         Self::read_from(path)
     }
@@ -151,7 +151,7 @@ impl Cluster {
         }
         let res =
             utils::data_or_file_with_base64(&self.certificate_authority_data, &self.certificate_authority)
-                .map_err(|e| Error::KubeConfig(format!("{}", e)))?;
+                .map_err(|e| Error::Kubeconfig(format!("{}", e)))?;
         Ok(Some(res))
     }
 }
@@ -181,11 +181,11 @@ impl AuthInfo {
 
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
-            .map_err(|e| Error::KubeConfig(format!("{}", e)))
+            .map_err(|e| Error::Kubeconfig(format!("{}", e)))
     }
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
-            .map_err(|e| Error::KubeConfig(format!("{}", e)))
+            .map_err(|e| Error::Kubeconfig(format!("{}", e)))
     }
 }

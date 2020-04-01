@@ -46,13 +46,13 @@ pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential> {
     }
     let out = cmd
         .output()
-        .map_err(|e| Error::KubeConfig(format!("Unable to run auth exec: {}", e)))?;
+        .map_err(|e| Error::Kubeconfig(format!("Unable to run auth exec: {}", e)))?;
     if !out.status.success() {
         let err = format!("command `{:?}` failed: {:?}", cmd, out);
-        return Err(Error::KubeConfig(err));
+        return Err(Error::Kubeconfig(err));
     }
     let creds = serde_json::from_slice(&out.stdout)
-        .map_err(|e| Error::KubeConfig(format!("Unable to parse auth exec result: {}", e)))?;
+        .map_err(|e| Error::Kubeconfig(format!("Unable to parse auth exec result: {}", e)))?;
 
     Ok(creds)
 }

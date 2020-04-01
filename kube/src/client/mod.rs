@@ -88,7 +88,7 @@ impl Client {
     /// configuration.
     ///
     /// Will use [`Config::infer`] to try in-cluster enironment
-    /// variables first, then fallback to the local kube config.
+    /// variables first, then fallback to the local kubeconfig.
     ///
     /// Will fail if neither configuration could be loaded.
     ///

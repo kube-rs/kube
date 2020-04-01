@@ -68,11 +68,11 @@ impl Credentials {
     pub fn load() -> Result<Credentials> {
         let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
             .map(PathBuf::from)
-            .ok_or_else(|| Error::KubeConfig("Missing GOOGLE_APPLICATION_CREDENTIALS env".into()))?;
+            .ok_or_else(|| Error::Kubeconfig("Missing GOOGLE_APPLICATION_CREDENTIALS env".into()))?;
         let f = File::open(path)
-            .map_err(|e| Error::KubeConfig(format!("Unable to load credentials file: {}", e)))?;
+            .map_err(|e| Error::Kubeconfig(format!("Unable to load credentials file: {}", e)))?;
         let config = serde_json::from_reader(f)
-            .map_err(|e| Error::KubeConfig(format!("Unable to parse credentials file: {}", e)))?;
+            .map_err(|e| Error::Kubeconfig(format!("Unable to parse credentials file: {}", e)))?;
         Ok(config)
     }
 }
@@ -142,10 +142,10 @@ impl CredentialsClient {
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
             .send()
             .await
-            .map_err(|e| Error::KubeConfig(format!("Unable to request token: {}", e)))
+            .map_err(|e| Error::Kubeconfig(format!("Unable to request token: {}", e)))
             .and_then(|response| {
                 if response.status() != reqwest::StatusCode::OK {
-                    Err(Error::KubeConfig(format!(
+                    Err(Error::Kubeconfig(format!(
                         "Fail to retrieve new credential {:#?}",
                         response
                     )))
@@ -155,7 +155,7 @@ impl CredentialsClient {
             })?
             .json::<TokenResponse>()
             .await
-            .map_err(|e| Error::KubeConfig(format!("Unable to parse request token: {}", e)))?;
+            .map_err(|e| Error::Kubeconfig(format!("Unable to parse request token: {}", e)))?;
         Ok(token_response.into_token())
     }
 }
