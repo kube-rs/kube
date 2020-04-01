@@ -11,8 +11,8 @@ mod incluster_config;
 mod utils;
 
 use crate::{Error, Result};
-use file_loader::{ConfigLoader, Der};
 pub use file_loader::KubeConfigOptions;
+use file_loader::{ConfigLoader, Der};
 
 use reqwest::header::{self, HeaderMap};
 
