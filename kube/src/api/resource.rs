@@ -35,47 +35,19 @@ pub enum ResourceScope {
     All,
 }
 
+// Traits we hope can be exported upstream
+// See https://github.com/clux/kube-rs/issues/194
+// TODO: stop exporting these temporary traits
 
-// Try Arnavion's first suggestion
+/// Temporarily exported trait - do not import
 pub trait ClusterScopedResource: k8s_openapi::Resource {}
+/// Temporarily exported trait - do not import
 pub trait NamespaceScopedResource: k8s_openapi::Resource {}
-use k8s::{
-    admissionregistration::v1beta1 as adregv1beta1,
-    apps::v1 as appsv1,
-    authorization::v1 as authv1,
-    autoscaling::v1 as autoscalingv1,
-    batch::v1beta1 as batchv1beta1,
-    core::v1 as corev1,
-    extensions::v1beta1 as extsv1beta1,
-    networking::{v1 as networkingv1, v1beta1 as networkingv1beta1},
-    rbac::v1 as rbacv1,
-    storage::v1 as storagev1,
-};
-use k8s_openapi::api as k8s;
-impl NamespaceScopedResource for corev1::Secret {}
-impl NamespaceScopedResource for rbacv1::Role {}
-impl NamespaceScopedResource for batchv1beta1::CronJob {}
-impl NamespaceScopedResource for autoscalingv1::HorizontalPodAutoscaler {}
-impl NamespaceScopedResource for networkingv1::NetworkPolicy {}
-impl NamespaceScopedResource for extsv1beta1::Ingress {}
-impl NamespaceScopedResource for appsv1::Deployment {}
-impl NamespaceScopedResource for corev1::Pod {}
-impl NamespaceScopedResource for appsv1::ReplicaSet {}
-impl NamespaceScopedResource for networkingv1beta1::Ingress {}
-impl NamespaceScopedResource for appsv1::DaemonSet {}
 
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::{
-    v1 as apiextsv1, v1beta1 as apiextsv1beta1,
-};
-
-impl ClusterScopedResource for storagev1::VolumeAttachment {}
-impl ClusterScopedResource for adregv1beta1::ValidatingWebhookConfiguration {}
-impl ClusterScopedResource for authv1::SelfSubjectRulesReview {}
-impl ClusterScopedResource for apiextsv1::CustomResourceDefinition {}
-impl ClusterScopedResource for corev1::Namespace {}
-impl ClusterScopedResource for apiextsv1beta1::CustomResourceDefinition {}
-impl ClusterScopedResource for corev1::Node {}
-
+// For now - we can'd distinguish between the two types
+impl<T: k8s_openapi::Resource> ClusterScopedResource for T {}
+impl<T: k8s_openapi::Resource> NamespaceScopedResource for T {}
+// TODO: impl NamespaceScopedResource in kube_derive in the future
 
 impl Resource {
     /// Cluster level resources,

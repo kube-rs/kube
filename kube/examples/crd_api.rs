@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Manage CRDs first
-    let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
