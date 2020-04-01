@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// This avoids a bunch of the unnecessary unwrap mechanics for apps
 pub trait Meta: Metadata {
-    /// Metadata that all persisted resources must have, which includes all objects users must create.
+    /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
     /// The name of the resource
     fn name(&self) -> String;

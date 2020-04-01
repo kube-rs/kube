@@ -1,7 +1,7 @@
 use crate::{Error, Result};
 use inflector::string::pluralize::to_plural;
 
-/// A Kubernetes resource that can be access through the API
+/// A Kubernetes resource that can be accessed through the API
 #[derive(Clone, Debug)]
 pub struct Resource {
     /// The API version of the resource.
@@ -215,11 +215,11 @@ impl PatchParams {
 pub enum PatchStrategy {
     /// Apply patches
     Apply,
-    /// A JSON merge. See See https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment
+    /// A [JSON merge](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
     JSON,
     /// A regular merge
     Merge,
-    /// A stategic merge. See https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-strategic-merge-patch-to-update-a-deployment
+    /// A [stategic merge](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-strategic-merge-patch-to-update-a-deployment)
     Strategic,
 }
 
