@@ -106,8 +106,7 @@ impl ConfigLoader {
         let x509 = X509::from_pem(&client_cert)?;
         let pkey = PKey::private_key_from_pem(&client_key)?;
 
-        let p12 = Pkcs12::builder()
-            .build(password, "kubeconfig", &pkey, &x509)?;
+        let p12 = Pkcs12::builder().build(password, "kubeconfig", &pkey, &x509)?;
 
         let der = p12.to_der()?;
         // Make sure the buffer can be parsed properly but throw away the result
@@ -129,9 +128,7 @@ impl ConfigLoader {
 
     #[cfg(feature = "native-tls")]
     pub fn ca_bundle(&self) -> Result<Option<Vec<Der>>> {
-        let bundle = self
-            .cluster
-            .load_certificate_authority()?;
+        let bundle = self.cluster.load_certificate_authority()?;
 
         if let Some(bundle) = bundle {
             let bundle = X509::stack_from_pem(&bundle)?;

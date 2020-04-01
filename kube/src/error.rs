@@ -59,7 +59,7 @@ pub enum Error {
     /// An error from openssl when handling configuration
     #[cfg(feature = "native-tls")]
     #[error("TlsError: {0}")]
-    SslError2(#[from] openssl::error::ErrorStack)
+    SslError2(#[from] openssl::error::ErrorStack),
 }
 
 /// An Error response from the API
