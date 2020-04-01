@@ -338,13 +338,13 @@ impl From<Config> for reqwest::ClientBuilder {
         if let Some(i) = config.identity() {
             builder = builder.identity(i)
         }
+
         if let Some(c) = config.root_cert {
             builder = builder.add_root_certificate(c);
         }
+
         builder = builder.default_headers(config.headers);
-        if let Some(to) = config.timeout {
-            builder = builder.timeout(to);
-        }
+        builder = builder.timeout(config.timeout);
         builder = builder.danger_accept_invalid_certs(config.accept_invalid_certs);
 
         builder

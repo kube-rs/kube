@@ -14,6 +14,8 @@ use file_loader::{ConfigLoader, Der, KubeConfigOptions};
 
 use reqwest::header::{self, HeaderMap};
 
+use std::time::Duration;
+
 /// Configuration object detailing things like cluster_url, default namespace, root certificates, and timeouts
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -28,7 +30,7 @@ pub struct Config {
     /// Timeout for calls to the kubernetes API.
     ///
     /// A value of `None` means no timeout
-    pub timeout: Option<std::time::Duration>,
+    pub timeout: std::time::Duration,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
     /// The identity to use for communicating with the kubernetes API
@@ -51,7 +53,7 @@ impl Config {
             default_ns: String::from("default"),
             root_cert: None,
             headers: HeaderMap::new(),
-            timeout: None,
+            timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs: false,
             identity: None,
         }
@@ -110,7 +112,7 @@ impl Config {
             default_ns,
             root_cert: Some(root_cert),
             headers,
-            timeout: None,
+            timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs: false,
             identity: None,
         })
@@ -145,7 +147,6 @@ impl Config {
             }
         };
 
-        let timeout = std::time::Duration::new(295, 0);
         let mut accept_invalid_certs = false;
         let mut root_cert = None;
         let mut identity = None;
@@ -198,7 +199,7 @@ impl Config {
             default_ns,
             root_cert,
             headers,
-            timeout: Some(timeout),
+            timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs,
             identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
         })
@@ -230,6 +231,7 @@ impl Config {
     }
 }
 
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const IDENTITY_PASSWORD: &'static str = " ";
 
 // temporary catalina hack for openssl only
