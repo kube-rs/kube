@@ -1,10 +1,19 @@
-0.31.0 / 2020-03-XX
+0.32.0 / 2020-04-XX
+===================
+  * Major `config` + `client` module refactor
+  * `Config` is the new `Configuration` struct
+  * `Client` is now just a configured `reqwest::Client` plus a `reqwest::Url`
+  * implement `From<Config> for reqwest::ClientBuilder`
+  * implement `TryFrom<Config> for Client`
+  * `Client::try_default` or `Client::new` now recommended constructors
+  * People parsing `~/.kube/config` must use the `KubeConfig` struct instead
+
+0.31.0 / 2020-03-27
 ===================
   * Expose `config::Configuration` at root level
   * Add `Configuration::infer` as a recommended constructor
   * Rename `client::APIClient` to `client::Client`
   * Expose `client::Client` at root level
-  * Add `Client::infer` as a recommended constructor
   * `Client` now implements `From<Configuration>`
   * Added comprehensive documentation on `Api`
   * Rename `config::KubeConfigLoader` -> `config::ConfigLoader`

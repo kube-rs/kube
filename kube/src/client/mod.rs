@@ -65,6 +65,7 @@ pub struct Status {
 #[derive(Clone)]
 pub struct Client {
     cluster_url: reqwest::Url,
+    default_ns: String,
     inner: reqwest::Client,
 }
 
@@ -320,15 +321,17 @@ impl TryFrom<Config> for Client {
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
+        let default_ns = config.default_ns.clone();
         let builder: reqwest::ClientBuilder = config.into();
         Ok(Self {
             cluster_url,
+            default_ns,
             inner: builder.build()?,
         })
     }
 }
 
-impl std::convert::From<Config> for reqwest::ClientBuilder {
+impl From<Config> for reqwest::ClientBuilder {
     fn from(config: Config) -> Self {
         let mut builder = Self::new();
 
