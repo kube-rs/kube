@@ -13,7 +13,7 @@ use crate::{Error, Result};
 use file_loader::{ConfigLoader, Der, KubeConfigOptions};
 
 /// Configuration object detailing things like cluster_url, default namespace, root certificates, and timeouts
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     /// The configured cluster url
     pub cluster_url: reqwest::Url,
@@ -30,7 +30,11 @@ pub struct Config {
     /// Whether to accept invalid ceritifacts
     pub(crate) accept_invalid_certs: bool,
     /// The identity to use for communicating with the kubernetes API
-    pub(crate) identity: Option<reqwest::Identity>,
+    /// along wit the password to decrypt it.
+    ///
+    /// This is stored in a raw buffer form so that Config can implement `Clone`
+    /// (since [`reqwest::Identity`] does not currently implement `Clone`)
+    pub(crate) identity: Option<(Vec<u8>, String)>,
 }
 
 impl Config {
@@ -135,7 +139,7 @@ impl Config {
             }
         }
 
-        match loader.identity(" ") {
+        match loader.identity(IDENTITY_PASSWORD) {
             Ok(id) => identity = Some(id),
             Err(e) => {
                 debug!("failed to load client identity from kubeconfig: {}", e);
@@ -177,10 +181,37 @@ impl Config {
             headers,
             timeout: Some(timeout),
             accept_invalid_certs,
-            identity,
+            identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
         })
     }
+
+    // The identity functions are used to parse the stored identity buffer
+    // into an `reqwest::Identity` type. We do this because `reqwest::Identity`
+    // is not `Clone`. This allows us to store and clone the buffer and supply
+    // the `Identity` in a just-in-time fashion.
+    //
+    // Note: this should be removed if/when reqwest implements [`Clone` for
+    // `Identity`](https://github.com/seanmonstar/reqwest/issues/871)
+
+    // feature = "rustls-tls" assumes the buffer is pem
+    #[cfg(feature = "rustls-tls")]
+    pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
+        let (identity, _identity_password) = self.identity.as_ref()?;
+        Some(reqwest::Identity::from_pem(identity).expect("Identity buffer was not valid identity"))
+    }
+
+    // feature = "native-tls" assumes the buffer is pkcs12 der
+    #[cfg(feature = "native-tls")]
+    pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
+        let (identity, identity_password) = self.identity.as_ref()?;
+        Some(
+            reqwest::Identity::from_pkcs12_der(identity, identity_password)
+                .expect("Identity buffer was not valid identity"),
+        )
+    }
 }
+
+const IDENTITY_PASSWORD: &'static str = " ";
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]

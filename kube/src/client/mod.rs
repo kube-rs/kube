@@ -335,6 +335,9 @@ impl From<Config> for reqwest::ClientBuilder {
     fn from(config: Config) -> Self {
         let mut builder = Self::new();
 
+        if let Some(i) = config.identity() {
+            builder = builder.identity(i)
+        }
         if let Some(c) = config.root_cert {
             builder = builder.add_root_certificate(c);
         }
@@ -342,12 +345,8 @@ impl From<Config> for reqwest::ClientBuilder {
         if let Some(to) = config.timeout {
             builder = builder.timeout(to);
         }
-
         builder = builder.danger_accept_invalid_certs(config.accept_invalid_certs);
 
-        if let Some(i) = config.identity {
-            builder = builder.identity(i)
-        }
         builder
     }
 }
