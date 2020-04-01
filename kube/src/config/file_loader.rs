@@ -10,11 +10,14 @@ use super::{
 };
 use crate::{Error, Result};
 
-/// ConfigOptions stores options used when loading kubeconfig file.
+/// KubeConfigOptions stores options used when loading kubeconfig file.
 #[derive(Default, Clone)]
 pub struct KubeConfigOptions {
+    /// The named context to load
     pub context: Option<String>,
+    /// The cluster to load
     pub cluster: Option<String>,
+    /// The user to load
     pub user: Option<String>,
 }
 

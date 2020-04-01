@@ -2,7 +2,6 @@
 use futures::StreamExt;
 use kube_derive::CustomResource;
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 
 use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;

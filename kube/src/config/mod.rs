@@ -235,7 +235,7 @@ impl Config {
 
 // https://github.com/clux/kube-rs/issues/146#issuecomment-590924397
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
-const IDENTITY_PASSWORD: &'static str = " ";
+const IDENTITY_PASSWORD: &str = " ";
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]
