@@ -53,6 +53,11 @@ where
             phantom: PhantomData,
         }
     }
+
+    /// Consume self and return the [`Client`]
+    pub fn into_client(self) -> Client {
+        self.into()
+    }
 }
 
 /// PUSH/PUT/POST/GET abstractions
@@ -287,5 +292,11 @@ where
             .request_events::<WatchEvent<K>>(req)
             .await
             .map(|stream| stream.filter_map(|e| async move { e.ok() }))
+    }
+}
+
+impl<K> From<Api<K>> for Client {
+    fn from(api: Api<K>) -> Self {
+        api.client
     }
 }
