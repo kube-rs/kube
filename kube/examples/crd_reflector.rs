@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate kube_derive;
 use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
 use tokio::time::delay_for;
 
 use kube::{
@@ -10,7 +10,7 @@ use kube::{
     Client,
 };
 
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
+#[derive(kube_derive::CustomResource, Deserialize, Serialize, Clone, Debug)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 pub struct FooSpec {
     name: String,

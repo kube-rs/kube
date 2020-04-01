@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use futures::StreamExt;
 use kube_derive::CustomResource;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_yaml;
 
 use apiexts::CustomResourceDefinition;
@@ -13,13 +13,13 @@ use kube::{
 };
 
 // NB: This example uses server side apply and beta1 customresources
-// Please test against kubernetes 1.16.X!
+// Please test against Kubernetes 1.16.X!
 
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
 #[kube(group = "clux.dev", version = "v1", namespaced)]
 #[kube(status = "FooStatus")]
-#[kube(apiextensions = "v1beta1")] // remove this if using kubernetes >= 1.17
+#[kube(apiextensions = "v1beta1")] // remove this if using Kubernetes >= 1.17
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,

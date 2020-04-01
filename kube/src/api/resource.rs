@@ -1,7 +1,7 @@
 use crate::{Error, Result};
 use inflector::string::pluralize::to_plural;
 
-/// The Resource information needed to operate a kubernetes client
+/// A Kubernetes resource that can be access through the API
 #[derive(Clone, Debug)]
 pub struct Resource {
     /// The API version of the resource.
@@ -83,6 +83,7 @@ impl Resource {
 /// Constructed internally with a builder on Informer and Reflector,
 /// but can be passed to the helper function of Resource.
 #[derive(Default, Clone)]
+#[allow(missing_docs)]
 pub struct ListParams {
     pub field_selector: Option<String>,
     pub include_uninitialized: bool,
@@ -154,12 +155,14 @@ impl ListParams {
 /// Common query parameters for put/post calls
 #[derive(Default, Clone)]
 pub struct PostParams {
+    /// Whether to run this as a dry run
     pub dry_run: bool,
 }
 
 /// Common query parameters for patch calls
 #[derive(Default, Clone)]
 pub struct PatchParams {
+    /// Whether to run this as a dry run
     pub dry_run: bool,
     /// Strategy which will be used. Defaults to `PatchStrategy::Strategic`
     pub patch_strategy: PatchStrategy,
@@ -205,13 +208,18 @@ impl PatchParams {
     }
 }
 
-/// For patch different patch types are supported. See https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment
+/// Four different patch types are supported.
+///
 /// Apply strategy is kinda special
 #[derive(Clone, PartialEq)]
 pub enum PatchStrategy {
+    /// Apply patches
     Apply,
+    /// A JSON merge. See See https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment
     JSON,
+    /// A regular merge
     Merge,
+    /// A stategic merge. See https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-strategic-merge-patch-to-update-a-deployment
     Strategic,
 }
 

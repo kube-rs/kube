@@ -1,62 +1,28 @@
-//! A basic API client with standard kube error handling
+//! A basic API client for interacting with the Kubernetes API
+//!
+//! The [`Client`] uses standard kube error handling.
+//!
+//! This client can be used on its own or in conjuction with
+//! the [`Api`][crate::api::Api] type for more structured
+//! interaction with the kuberneres API
 
-use crate::{config::Config, Error, ErrorResponse, Result};
+use crate::{
+    api::{Meta, WatchEvent},
+    config::Config,
+    error::ErrorResponse,
+    Error, Result,
+};
 
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, TryStream, TryStreamExt};
 use http::{self, StatusCode};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{self, Value};
 
 use std::convert::TryFrom;
 
-// TODO: replace with Status in k8s openapi?
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusDetails {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub name: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub group: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub kind: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub uid: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub causes: Vec<StatusCause>,
-    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
-    pub retry_after_seconds: u32,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct StatusCause {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub reason: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub message: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub field: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Status {
-    // TODO: typemeta
-    // TODO: metadata that can be completely empty (listmeta...)
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub status: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub message: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub reason: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub details: Option<StatusDetails>,
-    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
-    pub code: u16,
-}
-
-/// Client for connecting with a kubernetes cluster.
+/// Client for connecting with a Kubernetes cluster.
 ///
 /// The best way to instantiate the client is either by
 /// inferring the configuration from the environment using
@@ -78,7 +44,7 @@ impl Client {
     /// Panics if the configuration supplied leads to an invalid HTTP client.
     /// Refer to the [`reqwest::ClientBuilder::build`] docs for information
     /// on situations where this might fail. If you want to handle this error case
-    /// use [`Config::try_from`] (note that this requires [`std::convert::TryFrom`]
+    /// use `Config::try_from` (note that this requires [`std::convert::TryFrom`]
     /// to be in scope.)
     pub fn new(config: Config) -> Self {
         Self::try_from(config).expect("Could not create a client from the supplied config")
@@ -92,7 +58,7 @@ impl Client {
     ///
     /// Will fail if neither configuration could be loaded.
     ///
-    /// If you already have a [`Config`] then use [`Client::try_from`]
+    /// If you already have a [`Config`] then use `Client::try_from`
     /// instead
     pub async fn try_default() -> Result<Self> {
         let client_config = Config::infer().await?;
@@ -119,15 +85,13 @@ impl Client {
         Ok(res)
     }
 
+    /// Perform a raw HTTP request against the API and deserialize the response
+    /// as JSON to some known type.
     pub async fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Status = {:?} for {}", res.status(), res.url());
-        let s = res.status();
-        let text = res.text().await?;
-        handle_api_errors(&text, s)?;
+        let text = self.request_text(request).await?;
 
         serde_json::from_str(&text).map_err(|e| {
             warn!("{}, {:?}", text, e);
@@ -135,6 +99,8 @@ impl Client {
         })
     }
 
+    /// Perform a raw HTTP request against the API and get back the response
+    /// as a string
     pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String> {
         let res: reqwest::Response = self.send(request).await?;
         trace!("Status = {:?} for {}", res.status(), res.url());
@@ -145,6 +111,8 @@ impl Client {
         Ok(text)
     }
 
+    /// Perform a raw HTTP request against the API and get back the response
+    /// as a stream of bytes
     pub async fn request_text_stream(
         &self,
         request: http::Request<Vec<u8>>,
@@ -155,6 +123,8 @@ impl Client {
         Ok(res.bytes_stream().map_err(Error::ReqwestError))
     }
 
+    /// Perform a raw HTTP request against the API and get back either an object
+    /// deserialized as JSON or a [`Status`] Object.
     pub async fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
@@ -181,10 +151,11 @@ impl Client {
         }
     }
 
-    pub async fn request_events<T>(
+    /// Perform a raw request and get back a stream of [`WatchEvent`] objects
+    pub async fn request_events<T: Clone + Meta>(
         &self,
         request: http::Request<Vec<u8>>,
-    ) -> Result<impl TryStream<Item = Result<T>>>
+    ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>>>
     where
         T: DeserializeOwned,
     {
@@ -349,6 +320,57 @@ impl From<Config> for reqwest::ClientBuilder {
 
         builder
     }
+}
+
+// TODO: replace with Status in k8s openapi?
+
+/// A Kubernetes status object
+#[allow(missing_docs)]
+#[derive(Deserialize, Debug)]
+pub struct Status {
+    // TODO: typemeta
+    // TODO: metadata that can be completely empty (listmeta...)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub status: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub message: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<StatusDetails>,
+    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
+    pub code: u16,
+}
+
+/// Status details object on the [`Status`] object
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+#[allow(missing_docs)]
+pub struct StatusDetails {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub group: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub uid: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub causes: Vec<StatusCause>,
+    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
+    pub retry_after_seconds: u32,
+}
+
+/// Status cause object on the [`StatusDetails`] object
+#[derive(Deserialize, Debug)]
+#[allow(missing_docs)]
+pub struct StatusCause {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub message: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub field: String,
 }
 
 #[cfg(test)]

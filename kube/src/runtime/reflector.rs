@@ -8,25 +8,7 @@ use tokio::time::delay_for;
 
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-/// Internal representation for Reflector
-type Cache<K> = BTreeMap<ObjectId, K>;
-
-/// Internal shared state of Reflector
-struct State<K> {
-    data: Cache<K>,
-    version: String,
-}
-
-impl<K> Default for State<K> {
-    fn default() -> Self {
-        State {
-            data: Default::default(),
-            version: 0.to_string(),
-        }
-    }
-}
-
-/// A reflection of `Resource` state in kubernetes
+/// A reflection of [`Resource`] state in Kubernetes
 ///
 /// This watches and caches a `Resource<K>` by:
 /// - seeding the cache from a large initial list call
@@ -95,7 +77,7 @@ where
     ///
     /// Will read in the configured namsepace, or globally on non-namespaced reflectors.
     /// If you are using a non-namespaced resources with name clashes,
-    /// Try `Reflector::get_within` instead.
+    /// Try [`Reflector::get_within`] instead.
     pub fn get(&self, name: &str) -> Result<Option<K>> {
         let id = ObjectId {
             name: name.into(),
@@ -107,7 +89,7 @@ where
 
     /// Read a single entry by name within a specific namespace
     ///
-    /// This is a more specific version of `Reflector::get`.
+    /// This is a more specific version of [`Reflector::get`].
     /// This is only useful if your reflector is configured to poll across namsepaces.
     pub fn get_within(&self, name: &str, ns: &str) -> Result<Option<K>> {
         let id = ObjectId {
@@ -118,8 +100,6 @@ where
     }
 
     /// Reset the state with a full LIST call
-    ///
-    /// Same as what is done in `State::new`.
     pub async fn reset(&self) -> Result<()> {
         trace!("Refreshing {}", self.resource.kind);
         let (data, version) = self.get_full_resource_entries().await?;
@@ -158,7 +138,7 @@ where
         let rg = &self.resource;
         let oldver = self.state.lock().await.version.clone();
         let req = rg.watch(&self.params, &oldver)?;
-        let mut events = self.client.request_events::<WatchEvent<K>>(req).await?.boxed();
+        let mut events = self.client.request_events::<K>(req).await?.boxed();
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
@@ -227,6 +207,25 @@ impl ObjectId {
         ObjectId {
             name: Meta::name(o),
             namespace: Meta::namespace(o),
+        }
+    }
+}
+
+
+/// Internal representation for Reflector
+type Cache<K> = BTreeMap<ObjectId, K>;
+
+/// Internal shared state of Reflector
+struct State<K> {
+    data: Cache<K>,
+    version: String,
+}
+
+impl<K> Default for State<K> {
+    fn default() -> Self {
+        State {
+            data: Default::default(),
+            version: 0.to_string(),
         }
     }
 }

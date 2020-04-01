@@ -2,7 +2,9 @@ use crate::{
     api::{typed::Api, Resource},
     Client,
 };
+
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
+
 use std::marker::PhantomData;
 
 /// A data equivalent of the Resource trait for for Custom Resources
@@ -27,6 +29,20 @@ impl CustomResource {
 }
 
 /// A builder for CustomResource
+///
+/// ```
+/// use kube::api::{CustomResource, Resource};
+/// struct FooSpec {};
+/// struct FooStatus {};
+/// struct Foo {
+///     spec: FooSpec,
+///     status: FooStatus
+/// };
+/// let foos : Resource = CustomResource::kind("Foo") // <.spec.kind>
+///    .group("clux.dev") // <.spec.group>
+///    .version("v1")
+///    .into_resource();
+/// ```
 #[derive(Default)]
 pub struct CrBuilder {
     pub(crate) kind: String,
@@ -34,22 +50,11 @@ pub struct CrBuilder {
     pub(crate) group: Option<String>,
     pub(crate) namespace: Option<String>,
 }
+
 impl CrBuilder {
-    /// Create a CrBuilder
+    /// Create a CrBuilder specifying the CustomResource's kind
     ///
-    /// ```
-    /// use kube::api::{CustomResource, Resource};
-    /// struct FooSpec {};
-    /// struct FooStatus {};
-    /// struct Foo {
-    ///     spec: FooSpec,
-    ///     status: FooStatus
-    /// };
-    /// let foos : Resource = CustomResource::kind("Foo") // <.spec.kind>
-    ///    .group("clux.dev") // <.spec.group>
-    ///    .version("v1")
-    ///    .into_resource();
-    /// ```
+    /// The kind must not be plural and it must be in PascalCase
     fn kind(kind: &str) -> Self {
         assert!(to_plural(kind) != kind); // no plural in kind
         assert!(is_pascal_case(&kind)); // PascalCase kind
@@ -77,7 +82,7 @@ impl CrBuilder {
         self
     }
 
-    // Consume the CrBuilder and build a CustomResource
+    /// Consume the CrBuilder and build a CustomResource
     pub fn build(self) -> CustomResource {
         let version = self.version.expect("Crd must have a version");
         let group = self.group.expect("Crd must have a group");
@@ -90,7 +95,7 @@ impl CrBuilder {
         }
     }
 
-    // Consume the CrBuilder and convert to an Api object
+    /// Consume the CrBuilder and convert to an Api object
     pub fn into_api<K>(self, client: Client) -> Api<K> {
         let crd = self.build();
         Api {
@@ -100,7 +105,7 @@ impl CrBuilder {
         }
     }
 
-    // Consume the CrBuilder and convert to a Resource object
+    /// Consume the CrBuilder and convert to a Resource object
     pub fn into_resource(self) -> Resource {
         let crd = self.build();
         crd.into()
@@ -122,6 +127,7 @@ impl From<CustomResource> for Resource {
 
 /// Make Api useable on CRDs without k8s_openapi
 impl CustomResource {
+    /// Turn a custom resource into an [`Api`] type
     pub fn into_api<K>(self, client: Client) -> Api<K> {
         Api {
             client,
@@ -155,6 +161,7 @@ mod test {
     #[ignore] // circle has no kubeconfig
     async fn convenient_custom_resource() {
         use crate::{Api, Client};
+        use serde::{Deserialize, Serialize};
         #[derive(Clone, Debug, kube_derive::CustomResource, Deserialize, Serialize)]
         #[kube(group = "clux.dev", version = "v1", namespaced)]
         struct FooSpec {

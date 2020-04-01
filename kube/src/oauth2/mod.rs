@@ -8,6 +8,7 @@ use std::{
 use crate::{Error, Result};
 
 use reqwest::header::CONTENT_TYPE;
+use serde::{Deserialize, Serialize};
 use url::form_urlencoded::Serializer;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";

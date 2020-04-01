@@ -1,7 +1,8 @@
 //! Kubernetes configuration objects from ~/.kube/config or in cluster environment
 //!
-//! Used to populate `Config` that is ultimately used to construct a `Client`
-//! Unless you have issues, prefe using `Config::infer` and pass it to a `Client`.
+//! Used to populate [`Config`] that is ultimately used to construct a [`Client`][crate::Client].
+//!
+//! Unless you have issues, prefer using `Config::infer` and pass it to a [`Client`][crate::Client].
 
 mod exec;
 mod file_config;
@@ -25,15 +26,15 @@ pub struct Config {
     pub default_ns: String,
     /// The configured root certificate
     pub root_cert: Option<reqwest::Certificate>,
-    /// Default headers to be used to communicate with the kubernetes API
+    /// Default headers to be used to communicate with the Kubernetes API
     pub headers: HeaderMap,
-    /// Timeout for calls to the kubernetes API.
+    /// Timeout for calls to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
     pub timeout: std::time::Duration,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
-    /// The identity to use for communicating with the kubernetes API
+    /// The identity to use for communicating with the Kubernetes API
     /// along wit the password to decrypt it.
     ///
     /// This is stored in a raw buffer form so that Config can implement `Clone`

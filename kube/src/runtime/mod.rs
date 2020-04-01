@@ -1,5 +1,7 @@
-mod reflector;
-pub use self::reflector::Reflector;
+//! Runtime helpers for keeping track of Kubernetes resources
 
 mod informer;
-pub use self::informer::Informer;
+mod reflector;
+
+pub use informer::Informer;
+pub use reflector::Reflector;
