@@ -108,7 +108,7 @@ impl ConfigLoader {
             .map_err(|e| Error::SslError(format!("{}", e)))?;
 
         let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
-        // Make sure the buffer can be parsed properly but through away the result
+        // Make sure the buffer can be parsed properly but throw away the result
         let _identity = Identity::from_pkcs12_der(&der, password)?;
         Ok(der)
     }
@@ -120,7 +120,7 @@ impl ConfigLoader {
 
         let mut buffer = client_key.clone();
         buffer.extend_from_slice(client_cert);
-        // Make sure the buffer can be parsed properly but through away the result
+        // Make sure the buffer can be parsed properly but throw away the result
         let _identity = Identity::from_pem(&buffer.as_slice()).map_err(|e| Error::SslError(format!("{}", e)));
         Ok(buffer)
     }
