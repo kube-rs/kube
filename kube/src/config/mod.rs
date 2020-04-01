@@ -197,7 +197,7 @@ impl Config {
     #[cfg(feature = "rustls-tls")]
     pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
         let (identity, _identity_password) = self.identity.as_ref()?;
-        Some(reqwest::Identity::from_pem().expect("Identity buffer was not valid identity"))
+        Some(reqwest::Identity::from_pem(identity).expect("Identity buffer was not valid identity"))
     }
 
     // feature = "native-tls" assumes the buffer is pkcs12 der
