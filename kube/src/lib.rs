@@ -1,68 +1,94 @@
-use thiserror::Error;
+//! Crate for interacting with the Kubernetes API
+//!
+//! This crate includes the tools for manipulating Kubernetes resources as
+//! well as keeping track of those resources as they change over time
+//!
+//! # Example
+//!
+//! The following example will crate a [`Pod`][k8s_openapi::api::core::v1::Pod]
+//! and then watch for it to become available
+//!
+//! ```rust,no_run
+//! use k8s_openapi::api::core::v1::Pod;
+//! use tokio::stream::StreamExt as _;
+//! use futures_util::stream::StreamExt as _;
+//!
+//! async {
+//!     // Read the environment to find config for kube client.
+//!     // Note that this tries an in-cluster configuration first,
+//!     // then falls back on a kubeconfig file.
+//!     let kube_client = kube::Client::try_default()
+//!        .await
+//!        .expect("kubeconfig failed to load");
+//!     
+//!     // Get a strongly typed handle to the Kubernetes API for interacting
+//!     // with pods in the "default" namespace.
+//!     let pods: kube::Api<Pod> = kube::Api::namespaced(kube_client.clone(), "default");
+//!     
+//!     // Create a pod from JSON
+//!     let pod = serde_json::from_value(serde_json::json!({
+//!         "apiVersion": "v1",
+//!         "kind": "Pod",
+//!         "metadata": {
+//!             "name": "my-pod"
+//!         },
+//!         "spec": {
+//!             "containers": [
+//!                 {
+//!                     "name": "my-container",
+//!                     "image": "myregistry.azurecr.io/hello-world:v1",
+//!                 },
+//!             ],
+//!         }
+//!     })).unwrap();
+//!
+//!     // Create the pod
+//!     let pod = pods.create(&kube::api::PostParams::default(), &pod).await.unwrap();
+//!
+//!     // Create an informer for watching events about
+//!     let informer: kube::runtime::Informer<Pod> = kube::runtime::Informer::new(
+//!         kube_client,
+//!         kube::api::ListParams::default()
+//!             .fields("metadata.name=my-container")
+//!             .timeout(10),
+//!         kube::Resource::namespaced::<Pod>("default"),
+//!     );
+//!
+//!     // Get an event stream from the informer
+//!     let mut events_stream = informer.poll().await.unwrap().boxed();
+//!     
+//!     // Keep getting events from the events stream
+//!     while let Some(event) = events_stream.try_next().await.unwrap() {
+//!         use kube::api::WatchEvent;
+//!         match event {
+//!             WatchEvent::Modified(e) if e.status.as_ref().unwrap().phase.as_ref().unwrap() == "Running" => {
+//!                 println!("It's running!");
+//!             }
+//!             WatchEvent::Error(e) => {
+//!                 panic!("WatchEvent error: {:?}", e);
+//!             }
+//!             _ => {}
+//!         }
+//!     }
+//! };
+//! ```
 
-#[macro_use] extern crate serde_derive;
+#![deny(missing_docs)]
+
 #[macro_use] extern crate log;
 
-#[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
-#[error("{message}: {reason}")]
-pub struct ErrorResponse {
-    pub status: String,
-    #[serde(default)]
-    pub message: String,
-    #[serde(default)]
-    pub reason: String,
-    pub code: u16,
-}
-
-#[derive(Error, Debug)]
-pub enum Error {
-    /// ApiError for when things fail
-    ///
-    /// This can be parsed into as an error handling fallback.
-    /// Replacement data for reqwest::Response::error_for_status,
-    /// which is often lacking in good permission errors.
-    /// It's also used in `WatchEvent` from watch calls.
-    ///
-    /// It's quite common to get a `410 Gone` when the resourceVersion is too old.
-    #[error("ApiError: {0} ({0:?})")]
-    Api(ErrorResponse),
-
-    // Request errors
-    #[error("ReqwestError: {0}")]
-    ReqwestError(#[from] reqwest::Error),
-    #[error("HttpError: {0}")]
-    HttpError(#[from] http::Error),
-
-    /// Common error case when requesting parsing into own structs
-    #[error("Error deserializing response")]
-    SerdeError(#[from] serde_json::Error),
-
-    #[error("Error building request")]
-    RequestBuild,
-    #[error("Error executing request")]
-    RequestSend,
-    #[error("Error parsing response")]
-    RequestParse,
-    #[error("Invalid API method {0}")]
-    InvalidMethod(String),
-    #[error("Request validation failed with {0}")]
-    RequestValidation(String),
-
-    /// Configuration error
-    #[error("Error loading kubeconfig: {0}")]
-    Kubeconfig(String),
-
-    #[error("SslError: {0}")]
-    SslError(String),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
 pub mod api;
-pub use api::{Api, Resource};
 pub mod client;
-#[doc(inline)] pub use client::Client;
 pub mod config;
-#[doc(inline)] pub use config::Config;
-mod oauth2;
 pub mod runtime;
+
+pub mod error;
+mod oauth2;
+
+pub use api::{Api, Resource};
+#[doc(inline)] pub use client::Client;
+#[doc(inline)] pub use config::Config;
+#[doc(inline)] pub use error::Error;
+
+/// Convient alias for `Result<T, Error>`
+pub type Result<T> = std::result::Result<T, Error>;

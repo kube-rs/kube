@@ -289,7 +289,7 @@ where
     pub async fn watch(&self, lp: &ListParams, version: &str) -> Result<impl Stream<Item = WatchEvent<K>>> {
         let req = self.api.watch(&lp, &version)?;
         self.client
-            .request_events::<WatchEvent<K>>(req)
+            .request_events::<K>(req)
             .await
             .map(|stream| stream.filter_map(|e| async move { e.ok() }))
     }

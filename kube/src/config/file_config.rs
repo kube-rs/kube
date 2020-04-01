@@ -1,12 +1,16 @@
+#![allow(missing_docs)]
+
 use std::{collections::HashMap, fs::File, path::Path};
 
 use crate::{config::utils, oauth2, Error, Result};
 
-/// [`Kubeconfig`] represents information on how to connect to a remote kubernetes cluster
+use serde::{Deserialize, Serialize};
+
+/// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
 /// that is normally stored in `~/.kube/config`
 ///
 /// This type (and its children) are exposed for convenience only.
-/// Please load a [`Config`] object for use with a `kube::Client`
+/// Please load a [`Config`][crate::Config] object for use with a [`Client`][crate::Client]
 /// which will read and parse the kubeconfig file
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Kubeconfig {
@@ -44,7 +48,7 @@ pub struct NamedCluster {
     pub cluster: Cluster,
 }
 
-/// Cluster stores information to connect kubernetes cluster.
+/// Cluster stores information to connect Kubernetes cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Cluster {
     pub server: String,

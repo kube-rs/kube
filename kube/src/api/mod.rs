@@ -1,4 +1,6 @@
-//! API helpers
+//! API helpers for structured interaction with the Kubernetes API
+
+use serde::{Deserialize, Serialize};
 
 /// Empty struct for when data should be discarded
 ///

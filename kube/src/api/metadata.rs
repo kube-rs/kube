@@ -1,9 +1,10 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use k8s_openapi::Metadata;
+use serde::{Deserialize, Serialize};
 
 /// An accessor trait for Metadata
 ///
-/// This for a subset of kubernetes type that do not end in List
+/// This for a subset of Kubernetes type that do not end in List
 /// These types, using ObjectMeta, SHOULD all have required properties:
 /// - .metadata
 /// - .metadata.name
@@ -13,13 +14,17 @@ use k8s_openapi::Metadata;
 ///
 /// This avoids a bunch of the unnecessary unwrap mechanics for apps
 pub trait Meta: Metadata {
+    /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
+    /// The name of the resource
     fn name(&self) -> String;
+    /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
+    /// Tthe resource version
     fn resource_ver(&self) -> Option<String>;
 }
 
-/// Implement accessor trait for any ObjectMeta-using kubernetes Resource
+/// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
 impl<K> Meta for K
 where
     K: Metadata<Ty = ObjectMeta>,

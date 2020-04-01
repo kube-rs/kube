@@ -1,8 +1,8 @@
 use crate::{
     api::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta},
-    ErrorResponse,
+    error::ErrorResponse,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 /// A raw event returned from a watch query
@@ -14,9 +14,13 @@ pub enum WatchEvent<K>
 where
     K: Clone + Meta,
 {
+    /// Resource was added
     Added(K),
+    /// Resource was modified
     Modified(K),
+    /// Resource was deleted
     Deleted(K),
+    /// There was some kind of error
     Error(ErrorResponse),
 }
 
@@ -36,13 +40,13 @@ where
 
 // -------------------------------------------------------
 
-/// A standard kubernetes object with .spec and .status
+/// A standard Kubernetes object with .spec and .status
 ///
 /// This is a convenience struct provided for serialization/deserialization
 /// It is not useful within the library anymore, because it can not easily implement
 /// the k8s_openapi traits.
 ///
-/// This is what kubernetes maintainers tell you the world looks like.
+/// This is what Kubernetes maintainers tell you the world looks like.
 /// It's.. generally true.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Object<P, U>
@@ -50,6 +54,7 @@ where
     P: Clone,
     U: Clone,
 {
+    /// The types field of an `Object`
     #[serde(flatten)]
     pub types: TypeMeta,
 
@@ -94,7 +99,7 @@ where
     }
 }
 
-/// A generic kubernetes object list
+/// A generic Kubernetes object list
 ///
 /// This is used instead of a full struct for `DeploymentList`, `PodList`, etc.
 /// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).

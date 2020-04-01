@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use either::Either::{Left, Right};
 use kube_derive::CustomResource;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
 use tokio::time::delay_for;

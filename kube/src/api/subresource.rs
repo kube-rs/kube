@@ -7,8 +7,6 @@ use crate::{
     Error, Result,
 };
 
-// ----------------------------------------------------------------------------
-
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
 /// Scale subresource
@@ -18,16 +16,19 @@ impl<K> Api<K>
 where
     K: Clone + DeserializeOwned,
 {
+    /// Fetch the scale subresource
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
         let req = self.api.get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
 
+    /// Update the scale subresource
     pub async fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
         let req = self.api.patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
 
+    /// Replace the scale subresource
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
         let req = self.api.replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await
@@ -110,6 +111,7 @@ where
 // Log subresource
 // ----------------------------------------------------------------------------
 
+/// Params for logging
 #[derive(Default, Clone, Debug)]
 pub struct LogParams {
     /// The container for which to stream logs. Defaults to only container if there is one container in the pod.
@@ -198,11 +200,13 @@ impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + LoggingObject,
 {
+    /// Fetch logs as a string
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.api.logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
 
+    /// Fetch logs as a stream of bytes
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
         let req = self.api.logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)

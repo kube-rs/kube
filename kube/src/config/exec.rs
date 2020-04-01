@@ -2,6 +2,8 @@ use std::process::Command;
 
 use crate::{config::ExecConfig, Error, Result};
 
+use serde::{Deserialize, Serialize};
+
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
 /// HTTP transports.
 #[derive(Clone, Debug, Serialize, Deserialize)]

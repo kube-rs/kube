@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
 use tokio::time::delay_for;
 
-/// An event informer for a `Resource`
+/// An event informer for a [`Resource`]
 ///
 /// This watches a `Resource<K>`, by:
 /// - seeding the intial resourceVersion with a list call (optional)
@@ -98,7 +98,7 @@ where
         let needs_resync = self.needs_resync.clone();
 
         // Attempt to fetch our stream
-        let stream = self.client.request_events::<WatchEvent<K>>(req).await;
+        let stream = self.client.request_events::<K>(req).await;
 
         match stream {
             Ok(events) => {

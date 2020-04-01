@@ -11,7 +11,7 @@ const SERVICE_TOKENFILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/t
 const SERVICE_CERTFILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const SERVICE_DEFAULT_NS: &str = "/var/run/secrets/kubernetes.io/serviceaccount/namespace";
 
-/// Returns kubernetes address from specified environment variables.
+/// Returns Kubernetes address from specified environment variables.
 pub fn kube_server() -> Option<String> {
     let host = kube_host()?;
     let port = kube_port()?;
