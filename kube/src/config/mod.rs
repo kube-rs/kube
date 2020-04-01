@@ -11,7 +11,8 @@ mod incluster_config;
 mod utils;
 
 use crate::{Error, Result};
-use file_loader::{ConfigLoader, Der, KubeConfigOptions};
+use file_loader::{ConfigLoader, Der};
+pub use file_loader::KubeConfigOptions;
 
 use reqwest::header::{self, HeaderMap};
 
@@ -232,6 +233,7 @@ impl Config {
     }
 }
 
+// https://github.com/clux/kube-rs/issues/146#issuecomment-590924397
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const IDENTITY_PASSWORD: &'static str = " ";
 
