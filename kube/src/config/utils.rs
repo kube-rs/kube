@@ -1,7 +1,5 @@
 use std::{
-    env,
-    fs::File,
-    io::Read,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -45,11 +43,8 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Op
                 })?
             };
             // dbg!(&abs_file);
-            let mut ff = File::open(&abs_file).map_err(|e| Error::Kubeconfig(format!("{}", e)))?;
-            let mut b = vec![];
-            ff.read_to_end(&mut b)
-                .map_err(|e| Error::Kubeconfig(format!("Failed to read file: {}", e)))?;
-            Ok(b)
+            fs::read(&abs_file)
+                .map_err(|e| Error::Kubeconfig(format!("Failed to read {:?}: {}", abs_file, e)))
         }
         _ => Err(Error::Kubeconfig(
             "Failed to get data/file with base64 format".into(),
@@ -61,12 +56,7 @@ pub fn data_or_file<P: AsRef<Path>>(data: &Option<String>, file: &Option<P>) -> 
     match (data, file) {
         (Some(d), _) => Ok(d.to_string()),
         (_, Some(f)) => {
-            let mut s = String::new();
-            let mut ff =
-                File::open(f).map_err(|e| Error::Kubeconfig(format!("Failed to open file: {}", e)))?;
-            ff.read_to_string(&mut s)
-                .map_err(|e| Error::Kubeconfig(format!("Failed to read file: {}", e)))?;
-            Ok(s)
+            fs::read_to_string(f).map_err(|e| Error::Kubeconfig(format!("Failed to read file: {}", e)))
         }
         _ => Err(Error::Kubeconfig("Failed to get data/file".into())),
     }
