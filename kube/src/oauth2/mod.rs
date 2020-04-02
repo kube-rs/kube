@@ -173,19 +173,11 @@ fn jws_encode(claim: &Claim, header: &Header, private_key: &str) -> Result<Strin
 #[cfg(feature = "native-tls")]
 fn sign(signature_base: &str, private_key: &str) -> Result<Vec<u8>> {
     use openssl::{hash::MessageDigest, pkey::PKey, rsa::Padding, sign::Signer};
-    let key =
-        PKey::private_key_from_pem(private_key.as_bytes()).map_err(|e| Error::SslError(format!("{}", e)))?;
-    let mut signer =
-        Signer::new(MessageDigest::sha256(), &key).map_err(|e| Error::SslError(format!("{}", e)))?;
-    signer
-        .set_rsa_padding(Padding::PKCS1)
-        .map_err(|e| Error::SslError(format!("{}", e)))?;
-    signer
-        .update(signature_base.as_bytes())
-        .map_err(|e| Error::SslError(format!("{}", e)))?;
-    signer
-        .sign_to_vec()
-        .map_err(|e| Error::SslError(format!("{}", e)))
+    let key = PKey::private_key_from_pem(private_key.as_bytes())?;
+    let mut signer = Signer::new(MessageDigest::sha256(), &key)?;
+    signer.set_rsa_padding(Padding::PKCS1)?;
+    signer.update(signature_base.as_bytes())?;
+    Ok(signer.sign_to_vec()?)
 }
 
 #[cfg(feature = "rustls-tls")]

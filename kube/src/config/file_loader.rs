@@ -103,14 +103,12 @@ impl ConfigLoader {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
 
-        let x509 = X509::from_pem(&client_cert).map_err(|e| Error::SslError(format!("{}", e)))?;
-        let pkey = PKey::private_key_from_pem(&client_key).map_err(|e| Error::SslError(format!("{}", e)))?;
+        let x509 = X509::from_pem(&client_cert)?;
+        let pkey = PKey::private_key_from_pem(&client_key)?;
 
-        let p12 = Pkcs12::builder()
-            .build(password, "kubeconfig", &pkey, &x509)
-            .map_err(|e| Error::SslError(format!("{}", e)))?;
+        let p12 = Pkcs12::builder().build(password, "kubeconfig", &pkey, &x509)?;
 
-        let der = p12.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
+        let der = p12.to_der()?;
         // Make sure the buffer can be parsed properly but throw away the result
         let _identity = Identity::from_pkcs12_der(&der, password)?;
         Ok(der)
@@ -124,23 +122,20 @@ impl ConfigLoader {
         let mut buffer = client_key.clone();
         buffer.extend_from_slice(client_cert);
         // Make sure the buffer can be parsed properly but throw away the result
-        let _identity = Identity::from_pem(&buffer.as_slice()).map_err(|e| Error::SslError(format!("{}", e)));
+        let _identity = Identity::from_pem(&buffer.as_slice())?;
         Ok(buffer)
     }
 
     #[cfg(feature = "native-tls")]
     pub fn ca_bundle(&self) -> Result<Option<Vec<Der>>> {
-        let bundle = self
-            .cluster
-            .load_certificate_authority()
-            .map_err(|e| Error::SslError(format!("{}", e)))?;
+        let bundle = self.cluster.load_certificate_authority()?;
 
         if let Some(bundle) = bundle {
-            let bundle = X509::stack_from_pem(&bundle).map_err(|e| Error::SslError(format!("{}", e)))?;
+            let bundle = X509::stack_from_pem(&bundle)?;
 
             let mut stack = vec![];
             for ca in bundle {
-                let der = ca.to_der().map_err(|e| Error::SslError(format!("{}", e)))?;
+                let der = ca.to_der()?;
                 stack.push(Der(der))
             }
             return Ok(Some(stack));
