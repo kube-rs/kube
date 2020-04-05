@@ -98,7 +98,6 @@ where
         let resource_version = self.version.lock().await.clone();
         let stream = self.api.watch(&self.params, &resource_version).await?;
 
-        info!("got here");
         // Intercept stream elements to update internal resourceVersion
         let newstream = stream.then(move |event| {
             // Clone our Arcs for each event
