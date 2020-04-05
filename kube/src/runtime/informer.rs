@@ -1,53 +1,59 @@
 use crate::{
-    api::{ListParams, Meta, Resource, WatchEvent},
-    Client, Result,
+    api::{Api, ListParams, Meta, WatchEvent},
+    Result,
 };
 
 use futures::{lock::Mutex, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
-use tokio::time::delay_for;
 
 /// An event informer for a [`Resource`]
 ///
-/// This watches a `Resource<K>`, by:
-/// - seeding the intial resourceVersion with a list call (optional)
-/// - keeping track of resourceVersions during every poll
-/// - recovering when resourceVersions get desynced
+/// This observes events on an `Api<K>` and tracks last seen versions.
+/// As per the kubernetes documentation, this is an abstraction that can
+/// [efficiently detect changes](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
+///
+/// In the case where kubernetes returns 410 Gone (desynced / watched for too long)
+/// this object will reset the informer ensuring that it always keeps running.
+///
+/// This means that you might occasionally get some duplicate added events,
+/// but we have configured timeouts such that this should not happen frequently.
+///
+/// On boot, the initial watch causes added events for every currently live object.
 #[derive(Clone)]
 pub struct Informer<K>
 where
     K: Clone + DeserializeOwned + Meta,
 {
     version: Arc<Mutex<String>>,
-    client: Client,
-    resource: Resource,
+    api: Api<K>,
     params: ListParams,
     needs_resync: Arc<Mutex<bool>>,
-    needs_retry: Arc<Mutex<bool>>,
-    phantom: std::marker::PhantomData<K>,
 }
 
 impl<K> Informer<K>
 where
     K: Clone + DeserializeOwned + Meta,
 {
-    /// Create a reflector with a kube client on a kube resource
-    pub fn new(client: Client, lp: ListParams, r: Resource) -> Self {
+    /// Create an informer on an api resource with a set of parameters
+    pub fn new(api: Api<K>, lp: ListParams) -> Self {
         Informer {
-            client,
-            resource: r,
+            api,
             params: lp,
             version: Arc::new(Mutex::new(0.to_string())),
             needs_resync: Arc::new(Mutex::new(false)),
-            needs_retry: Arc::new(Mutex::new(false)),
-            phantom: std::marker::PhantomData,
         }
     }
 
     /// Initialize from a prior version
+    ///
+    /// Prefer not using this. Even if you track previous resource versions,
+    /// you will miss deleted events if you have any downtime.
+    ///
+    /// Controllers/finalizers/ownerReferences are the preferred ways
+    /// to garbage collect related resources.
     pub fn init_from(self, v: String) -> Self {
-        info!("Recreating Informer for {} at {}", self.resource.kind, v);
+        info!("Recreating Informer for {} at {}", self.api.resource.kind, v);
 
         // We need to block on this as our mutex needs go be async compatible
         futures::executor::block_on(async {
@@ -58,94 +64,79 @@ where
 
     /// Start a single watch stream
     ///
-    /// Opens a long polling GET and returns the complete WatchEvents as a Stream.
+    /// Opens a long polling GET and returns a stream of WatchEvents.
     /// You should always poll. When this call ends, call it again.
     /// Do not call it from more than one context.
     ///
-    /// This function will handle error handling up to a point:
-    /// - if we go out of history (410 Gone), we reset to latest
-    /// - if we failed an initial poll, we will retry
     /// All real errors are bubbled up, as are WachEvent::Error instances.
-    /// In the retry/reset cases we wait 10s between each attempt.
+    /// If we are desynced we force a 10s wait 10s before starting the poll.
     ///
     /// If you need to track the `resourceVersion` you can use `Informer::version()`.
     pub async fn poll(&self) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        trace!("Watching {}", self.resource.kind);
+        trace!("Watching {}", self.api.resource.kind);
 
         // First check if we need to backoff or reset our resourceVersion from last time
         {
-            let mut needs_retry = self.needs_retry.lock().await;
             let mut needs_resync = self.needs_resync.lock().await;
-            if *needs_resync || *needs_retry {
+            if *needs_resync {
                 // Try again in a bit
                 let dur = Duration::from_secs(10);
-                delay_for(dur).await;
+                tokio::time::delay_for(dur).await;
                 // If we are outside history, start over from latest
                 if *needs_resync {
                     self.reset().await;
                 }
                 *needs_resync = false;
-                *needs_retry = false;
             }
         }
-
-        // Create our watch request
-        let resource_version = self.version.lock().await.clone();
-        let req = self.resource.watch(&self.params, &resource_version)?;
 
         // Clone Arcs for stream handling
         let version = self.version.clone();
         let needs_resync = self.needs_resync.clone();
 
-        // Attempt to fetch our stream
-        let stream = self.client.request_events::<K>(req).await;
+        // Start watching from our previous watch point
+        let resource_version = self.version.lock().await.clone();
+        let stream = self.api.watch(&self.params, &resource_version).await?;
 
-        match stream {
-            Ok(events) => {
-                // Intercept stream elements to update internal resourceVersion
-                Ok(events.then(move |event| {
-                    // Need to clone our Arcs as they are consumed each loop
-                    let needs_resync = needs_resync.clone();
-                    let version = version.clone();
-                    async move {
-                        // Check if we need to update our version based on the incoming events
-                        match &event {
-                            Ok(WatchEvent::Added(o))
-                            | Ok(WatchEvent::Modified(o))
-                            | Ok(WatchEvent::Deleted(o)) => {
-                                // Follow docs conventions and store the last resourceVersion
-                                // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                                if let Some(nv) = Meta::resource_ver(o) {
-                                    *version.lock().await = nv.clone();
-                                }
-                            }
-                            Ok(WatchEvent::Error(e)) => {
-                                // 410 Gone => we need to restart from latest next call
-                                if e.code == 410 {
-                                    warn!("Stream desynced: {:?}", e);
-                                    *needs_resync.lock().await = true;
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Unexpected watch error: {:?}", e);
-                            }
-                        };
-                        event
+        info!("got here");
+        // Intercept stream elements to update internal resourceVersion
+        let newstream = stream.then(move |event| {
+            // Clone our Arcs for each event
+            let needs_resync = needs_resync.clone();
+            let version = version.clone();
+            async move {
+                // Check if we need to update our version based on the incoming events
+                match &event {
+                    Ok(WatchEvent::Added(o)) | Ok(WatchEvent::Modified(o)) | Ok(WatchEvent::Deleted(o)) => {
+                        // always store the last seen resourceVersion
+                        if let Some(nv) = Meta::resource_ver(o) {
+                            *version.lock().await = nv.clone();
+                        }
                     }
-                }))
+                    Ok(WatchEvent::Error(e)) => {
+                        // 410 Gone => we need to restart from latest next call
+                        if e.code == 410 {
+                            warn!("Stream desynced: {:?}", e);
+                            *needs_resync.lock().await = true;
+                        }
+                    }
+                    Err(e) => {
+                        // All we seem to get here are:
+                        // - EOFs (mostly solved with timeout enforcement + resyncs)
+                        // - serde errors (bad struct use, on app side)
+                        // Not much we can do about these here.
+                        warn!("Unexpected watch error: {:?}", e);
+                    }
+                };
+                event
             }
-            Err(e) => {
-                warn!("Poll error: {:?}", e);
-                // If we failed to do the main watch - try again later with same version
-                *self.needs_retry.lock().await = false;
-                Err(e)
-            }
-        }
+        });
+        Ok(newstream)
     }
 
     /// Reset the resourceVersion to 0
     ///
-    /// Note: This will cause duplicate Added events for all existing resources
+    /// This will trigger Added events for all existing resources
     pub async fn reset(&self) {
         *self.version.lock().await = 0.to_string();
     }

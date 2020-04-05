@@ -1,5 +1,5 @@
 use either::Either;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 
@@ -22,7 +22,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request creator object
-    pub(crate) api: Resource,
+    pub(crate) resource: Resource,
     /// The client to use (from this library)
     pub(crate) client: Client,
     /// Underlying Object unstored
@@ -36,9 +36,9 @@ where
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
-        let api = Resource::all::<K>();
+        let resource = Resource::all::<K>();
         Self {
-            api,
+            resource,
             client,
             phantom: PhantomData,
         }
@@ -46,9 +46,9 @@ where
 
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self {
-        let api = Resource::namespaced::<K>(ns);
+        let resource = Resource::namespaced::<K>(ns);
         Self {
-            api,
+            resource,
             client,
             phantom: PhantomData,
         }
@@ -79,7 +79,7 @@ where
     /// }
     /// ```
     pub async fn get(&self, name: &str) -> Result<K> {
-        let req = self.api.get(name)?;
+        let req = self.resource.get(name)?;
         self.client.request::<K>(req).await
     }
 
@@ -102,7 +102,7 @@ where
     /// }
     /// ```
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let req = self.api.list(&lp)?;
+        let req = self.resource.list(&lp)?;
         self.client.request::<ObjectList<K>>(req).await
     }
 
@@ -127,7 +127,7 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = self.api.create(&pp, bytes)?;
+        let req = self.resource.create(&pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
@@ -154,7 +154,7 @@ where
     /// }
     /// ```
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let req = self.api.delete(name, &dp)?;
+        let req = self.resource.delete(name, &dp)?;
         self.client.request_status::<K>(req).await
     }
 
@@ -186,7 +186,7 @@ where
     /// }
     /// ```
     pub async fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<K>, Status>> {
-        let req = self.api.delete_collection(&lp)?;
+        let req = self.resource.delete_collection(&lp)?;
         self.client.request_status::<ObjectList<K>>(req).await
     }
 
@@ -201,7 +201,7 @@ where
     /// however, you **must** serialize your data using `serde_yaml`.
     /// NB: This is currently broken due to https://github.com/clux/kube-rs/issues/176
     pub async fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
-        let req = self.api.patch(name, &pp, patch)?;
+        let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
 
@@ -254,7 +254,7 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = self.api.replace(name, &pp, bytes)?;
+        let req = self.resource.replace(name, &pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
@@ -286,12 +286,13 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn watch(&self, lp: &ListParams, version: &str) -> Result<impl Stream<Item = WatchEvent<K>>> {
-        let req = self.api.watch(&lp, &version)?;
-        self.client
-            .request_events::<K>(req)
-            .await
-            .map(|stream| stream.filter_map(|e| async move { e.ok() }))
+    pub async fn watch(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
+        let req = self.resource.watch(&lp, &version)?;
+        self.client.request_events::<K>(req).await
     }
 }
 

@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{ListParams, Meta, Resource, WatchEvent},
+    api::{Api, ListParams, Meta, WatchEvent},
     runtime::Informer,
     Client,
 };
@@ -15,8 +15,8 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Resource::namespaced::<Pod>(&namespace);
-    let inf = Informer::new(client, ListParams::default(), resource);
+    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let inf = Informer::new(pods, ListParams::default());
 
     loop {
         let mut pods = inf.poll().await?.boxed();

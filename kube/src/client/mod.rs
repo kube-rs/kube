@@ -167,6 +167,7 @@ impl Client {
         // We first construct a Stream of Vec<Result<T>> as we potentially might need to
         // yield multiple objects per loop, then we flatten it to the Stream<Result<T>> as expected.
         // Any reqwest errors will terminate this stream early.
+
         let stream = futures::stream::try_unfold((res, Vec::new()), |(mut resp, _buff)| {
             async {
                 let mut buff = _buff; // can be avoided, see #145
@@ -177,6 +178,10 @@ impl Client {
                             trace!("Some chunk of len {}", chunk.len());
                             //trace!("Chunk contents: {}", String::from_utf8_lossy(&chunk));
                             buff.extend_from_slice(&chunk);
+
+                            //if buff.len() > 32000 { // TEST CASE
+                            //    return Err(Error::InvalidMethod(format!("{}", buff.len())));
+                            //}
 
                             // If we've encountered a newline, see if we have any items to yield
                             if chunk.contains(&b'\n') {

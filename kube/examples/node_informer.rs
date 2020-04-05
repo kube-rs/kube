@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
-    api::{Api, ListParams, Meta, Resource, WatchEvent},
+    api::{Api, ListParams, Meta, WatchEvent},
     runtime::Informer,
     Client,
 };
@@ -12,16 +12,16 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,node_informer=debug,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
-    let nodes = Resource::all::<Node>();
     let events: Api<Event> = Api::all(client.clone());
+    let nodes: Api<Node> = Api::all(client.clone());
 
     let lp = ListParams::default().labels("beta.kubernetes.io/os=linux");
-    let ni = Informer::new(client.clone(), lp, nodes);
+    let ni = Informer::new(nodes, lp);
 
     loop {
         let mut nodes = ni.poll().await?.boxed();
 
-        while let Some(ne) = nodes.try_next().await? {
+        while let Some(ne) = nodes.next().await {
             handle_nodes(&events, ne).await?;
         }
     }
