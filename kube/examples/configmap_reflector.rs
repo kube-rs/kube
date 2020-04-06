@@ -16,19 +16,17 @@ async fn main() -> anyhow::Result<()> {
 
     let cms: Api<ConfigMap> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf = Reflector::new(cms, lp).init().await?;
+    let rf = Reflector::new(cms).params(lp);
+    let runner = rf.clone().run();
 
-    // Can read initial state now:
-    rf.state().await?.into_iter().for_each(|cm| {
-        info!("Found configmap {} with data: {:?}", Meta::name(&cm), cm.data);
+    tokio::spawn(async move {
+        loop {
+            // Periodically read our state
+            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+            let pods: Vec<_> = rf.state().await.unwrap().iter().map(Meta::name).collect();
+            info!("Current configmaps: {:?}", pods);
+        }
     });
-
-    loop {
-        // Update internal state by calling watch (waits the full timeout)
-        rf.poll().await?; // ideally call this from a thread/task
-
-        // up to date state:
-        let pods: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
-        info!("Current configmaps: {:?}", pods);
-    }
+    runner.await?;
+    Ok(())
 }

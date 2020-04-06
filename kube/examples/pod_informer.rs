@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = env::var("NAMESPACE").unwrap_or("default".into());
 
     let pods: Api<Pod> = Api::namespaced(client, &namespace);
-    let inf = Informer::new(pods, ListParams::default());
+    let inf = Informer::new(pods).params(ListParams::default().timeout(10));
 
     loop {
         let mut pods = inf.poll().await?.boxed();

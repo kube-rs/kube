@@ -44,6 +44,10 @@ pub enum Error {
     #[error("Invalid API method {0}")]
     InvalidMethod(String),
 
+    /// Runtime reached an irrecoverable state
+    #[error("Runtime Error {0}")]
+    RuntimeError(String),
+
     /// A request validation failed
     #[error("Request validation failed with {0}")]
     RequestValidation(String),

@@ -35,31 +35,51 @@ impl<K> Informer<K>
 where
     K: Clone + DeserializeOwned + Meta,
 {
-    /// Create an informer on an api resource with a set of parameters
-    pub fn new(api: Api<K>, lp: ListParams) -> Self {
+    /// Create an informer on an api resource
+    pub fn new(api: Api<K>) -> Self {
         Informer {
             api,
-            params: lp,
+            params: ListParams::default(),
             version: Arc::new(Mutex::new(0.to_string())),
             needs_resync: Arc::new(Mutex::new(false)),
         }
     }
 
-    /// Initialize from a prior version
+    /// Modify the default watch parameters for the underlying watch
+    pub fn params(mut self, lp: ListParams) -> Self {
+        self.params = lp;
+        self
+    }
+
+    /// Override the version to an externally tracked version
     ///
     /// Prefer not using this. Even if you track previous resource versions,
     /// you will miss deleted events if you have any downtime.
     ///
     /// Controllers/finalizers/ownerReferences are the preferred ways
     /// to garbage collect related resources.
-    pub fn init_from(self, v: String) -> Self {
-        info!("Recreating Informer for {} at {}", self.api.resource.kind, v);
+    pub fn set_version(self, v: String) -> Self {
+        debug!("Setting Informer version for {} to {}", self.api.resource.kind, v);
 
         // We need to block on this as our mutex needs go be async compatible
         futures::executor::block_on(async {
             *self.version.lock().await = v;
         });
         self
+    }
+
+    /// Reset the resourceVersion to 0
+    ///
+    /// This will trigger new Added events for all existing resources
+    pub async fn reset(&self) {
+        *self.version.lock().await = 0.to_string();
+    }
+
+    /// Return the current version
+    pub fn version(&self) -> String {
+        // We need to block on a future here quickly
+        // to get a lock on our version
+        futures::executor::block_on(async { self.version.lock().await.clone() })
     }
 
     /// Start a single watch stream
@@ -92,6 +112,8 @@ where
 
         // Clone Arcs for stream handling
         let version = self.version.clone();
+        let origin = self.version.lock().await.clone();
+        info!("poll start at {}", origin);
         let needs_resync = self.needs_resync.clone();
 
         // Start watching from our previous watch point
@@ -104,12 +126,23 @@ where
             let needs_resync = needs_resync.clone();
             let version = version.clone();
             async move {
+                let current = version.lock().await.clone();
                 // Check if we need to update our version based on the incoming events
                 match &event {
                     Ok(WatchEvent::Added(o)) | Ok(WatchEvent::Modified(o)) | Ok(WatchEvent::Deleted(o)) => {
                         // always store the last seen resourceVersion
                         if let Some(nv) = Meta::resource_ver(o) {
-                            *version.lock().await = nv.clone();
+                            use std::str::FromStr;
+                            let u = if let (Ok(nvu), Ok(cu)) = (u32::from_str(&nv), u32::from_str(&current)) {
+                                // actually parse int because k8s does not keep its contract
+                                // https://github.com/kubernetes-client/python/issues/819
+                                std::cmp::max(nvu, cu).to_string()
+                            } else {
+                                // recommended solution - treat resourceVersion as opaque string
+                                nv.clone()
+                            };
+                            info!("updating informer version to: {} (got {})", u, nv);
+                            *version.lock().await = u;
                         }
                     }
                     Ok(WatchEvent::Error(e)) => {
@@ -131,19 +164,5 @@ where
             }
         });
         Ok(newstream)
-    }
-
-    /// Reset the resourceVersion to 0
-    ///
-    /// This will trigger Added events for all existing resources
-    pub async fn reset(&self) {
-        *self.version.lock().await = 0.to_string();
-    }
-
-    /// Return the current version
-    pub fn version(&self) -> String {
-        // We need to block on a future here quickly
-        // to get a lock on our version
-        futures::executor::block_on(async { self.version.lock().await.clone() })
     }
 }
