@@ -7,7 +7,7 @@ use futures::{lock::Mutex, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
 
-/// An event informer for a [`Resource`]
+/// An event informer for a Kubernetes ['Api'] resource
 ///
 /// This observes events on an `Api<K>` and tracks last seen versions.
 /// As per the kubernetes documentation, this is an abstraction that can

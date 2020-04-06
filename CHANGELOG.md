@@ -7,6 +7,10 @@
   * implement `TryFrom<Config> for Client`
   * `Client::try_default` or `Client::new` now recommended constructors
   * People parsing `~/.kube/config` must use the `KubeConfig` struct instead
+  * `Reflector<K>` now takes an `Api<K>` + `ListParams` to construct
+  * `Informer<K>` now takes an `Api<K>` + `ListParams` to construct
+  * `Api::watch` no longer filters out error events (`next` -> `try_next`)
+  * `Api::watch` returns `Result<WatchEvent>` rather than `WatchEvent`
 
 0.31.0 / 2020-03-27
 ===================

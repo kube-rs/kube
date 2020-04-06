@@ -266,7 +266,7 @@ where
     /// ```no_run
     /// use kube::{api::{Api, ListParams, Meta, WatchEvent}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
-    /// use futures::StreamExt;
+    /// use futures::{StreamExt, TryStreamExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
@@ -275,7 +275,7 @@ where
     ///         .fields("metadata.name=my_job")
     ///         .timeout(20); // upper bound of how long we watch for
     ///     let mut stream = jobs.watch(&lp, "0").await?.boxed();
-    ///     while let Some(status) = stream.next().await {
+    ///     while let Some(status) = stream.try_next().await? {
     ///         match status {
     ///             WatchEvent::Added(s) => println!("Added {}", Meta::name(&s)),
     ///             WatchEvent::Modified(s) => println!("Modified: {}", Meta::name(&s)),

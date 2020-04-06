@@ -1,6 +1,6 @@
 use crate::{
-    api::{ListParams, Meta, ObjectList, Resource, WatchEvent},
-    Client, Error, Result,
+    api::{Api, ListParams, Meta, WatchEvent},
+    Error, Result,
 };
 use futures::{lock::Mutex, StreamExt, TryStreamExt};
 use serde::de::DeserializeOwned;
@@ -8,7 +8,7 @@ use tokio::time::delay_for;
 
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-/// A reflection of [`Resource`] state in Kubernetes
+/// A reflection of state for a Kubernetes ['Api'] resource
 ///
 /// This watches and caches a `Resource<K>` by:
 /// - seeding the cache from a large initial list call
@@ -22,8 +22,7 @@ where
     K: Clone + DeserializeOwned + Send + Meta,
 {
     state: Arc<Mutex<State<K>>>,
-    client: Client,
-    resource: Resource,
+    api: Api<K>,
     params: ListParams,
 }
 
@@ -31,11 +30,10 @@ impl<K> Reflector<K>
 where
     K: Clone + DeserializeOwned + Meta + Send,
 {
-    /// Create a reflector with a kube client on a resource
-    pub fn new(client: Client, lp: ListParams, r: Resource) -> Self {
+    /// Create a reflector on an api resource with a set of parameters
+    pub fn new(api: Api<K>, lp: ListParams) -> Self {
         Reflector {
-            client,
-            resource: r,
+            api,
             params: lp,
             state: Default::default(),
         }
@@ -43,7 +41,7 @@ where
 
     /// Initializes with a full list of data from a large initial LIST call
     pub async fn init(self) -> Result<Self> {
-        info!("Starting Reflector for {}", self.resource.kind);
+        info!("Starting Reflector for {}", self.api.resource.kind);
         self.reset().await?;
         Ok(self)
     }
@@ -53,9 +51,9 @@ where
     /// If this returns an error, it tries a full refresh.
     /// This is meant to be run continually in a thread/task. Spawn one.
     pub async fn poll(&self) -> Result<()> {
-        trace!("Watching {}", self.resource.kind);
+        trace!("Watching {}", self.api.resource.kind);
         if let Err(e) = self.single_watch().await {
-            warn!("Poll error on {}: {}: {:?}", self.resource.kind, e, e);
+            warn!("Poll error on {}: {}: {:?}", self.api.resource.kind, e, e);
             // If desynched due to mismatching resourceVersion, retry in a bit
             let dur = Duration::from_secs(10);
             delay_for(dur).await;
@@ -81,7 +79,7 @@ where
     pub fn get(&self, name: &str) -> Result<Option<K>> {
         let id = ObjectId {
             name: name.into(),
-            namespace: self.resource.namespace.clone(),
+            namespace: self.api.resource.namespace.clone(),
         };
 
         futures::executor::block_on(async { Ok(self.state.lock().await.data.get(&id).map(Clone::clone)) })
@@ -101,25 +99,22 @@ where
 
     /// Reset the state with a full LIST call
     pub async fn reset(&self) -> Result<()> {
-        trace!("Refreshing {}", self.resource.kind);
+        trace!("Refreshing {}", self.api.resource.kind);
         let (data, version) = self.get_full_resource_entries().await?;
         *self.state.lock().await = State { data, version };
         Ok(())
     }
 
     async fn get_full_resource_entries(&self) -> Result<(Cache<K>, String)> {
-        let req = self.resource.list(&self.params)?;
-        // NB: Object isn't general enough here
-        let res = self.client.request::<ObjectList<K>>(req).await?;
-        let mut data = BTreeMap::new();
-        let version = res.metadata.resource_version.unwrap_or_else(|| "".into());
-
+        let res = self.api.list(&self.params).await?;
+        let version = res.metadata.resource_version.unwrap_or_default();
         trace!(
             "Got {} {} at resourceVersion={:?}",
             res.items.len(),
-            self.resource.kind,
+            self.api.resource.kind,
             version
         );
+        let mut data = BTreeMap::new();
         for i in res.items {
             // The non-generic parts we care about are spec + status
             data.insert(ObjectId::key_for(&i), i);
@@ -135,10 +130,9 @@ where
 
     // Watch helper
     async fn single_watch(&self) -> Result<()> {
-        let rg = &self.resource;
+        let rg = &self.api.resource;
         let oldver = self.state.lock().await.version.clone();
-        let req = rg.watch(&self.params, &oldver)?;
-        let mut events = self.client.request_events::<K>(req).await?.boxed();
+        let mut events = self.api.watch(&self.params, &oldver).await?.boxed();
 
         // Follow docs conventions and store the last resourceVersion
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
@@ -147,8 +141,7 @@ where
             let mut state = self.state.lock().await;
             match ev {
                 WatchEvent::Added(o) => {
-                    let name = Meta::name(&o);
-                    debug!("Adding {} to {}", name, rg.kind);
+                    debug!("Adding {} to {}", Meta::name(&o), rg.kind);
                     state
                         .data
                         .entry(ObjectId::key_for(&o))
@@ -158,8 +151,7 @@ where
                     }
                 }
                 WatchEvent::Modified(o) => {
-                    let name = Meta::name(&o);
-                    debug!("Modifying {} in {}", name, rg.kind);
+                    debug!("Modifying {} in {}", Meta::name(&o), rg.kind);
                     state
                         .data
                         .entry(ObjectId::key_for(&o))
@@ -169,8 +161,7 @@ where
                     }
                 }
                 WatchEvent::Deleted(o) => {
-                    let name = Meta::name(&o);
-                    debug!("Removing {} from {}", name, rg.kind);
+                    debug!("Removing {} from {}", Meta::name(&o), rg.kind);
                     state.data.remove(&ObjectId::key_for(&o));
                     if let Some(v) = Meta::resource_ver(&o) {
                         state.version = v.to_string();

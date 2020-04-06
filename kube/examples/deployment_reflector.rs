@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
-    api::{ListParams, Meta, Resource},
+    api::{Api, ListParams, Meta},
     runtime::Reflector,
     Client,
 };
@@ -14,9 +14,9 @@ async fn main() -> anyhow::Result<()> {
 
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Resource::namespaced::<Deployment>(&namespace);
+    let deploys: Api<Deployment> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf: Reflector<Deployment> = Reflector::new(client, lp, resource).init().await?;
+    let rf = Reflector::new(deploys, lp).init().await?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is an owned Vec<Deployment>

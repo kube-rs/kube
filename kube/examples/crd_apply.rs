@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use kube_derive::CustomResource;
 use serde::{Deserialize, Serialize};
 
@@ -108,7 +108,7 @@ async fn wait_for_crd_ready(crds: &Api<CustomResourceDefinition>) -> anyhow::Res
         .timeout(5); // should not take long
     let mut stream = crds.watch(&lp, "0").await?.boxed();
 
-    while let Some(status) = stream.next().await {
+    while let Some(status) = stream.try_next().await? {
         if let WatchEvent::Modified(s) = status {
             info!("Modify event for {}", Meta::name(&s));
             if let Some(s) = s.status {

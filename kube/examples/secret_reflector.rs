@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    api::{ListParams, Meta, Resource},
+    api::{Api, ListParams, Meta},
     runtime::Reflector,
     Client,
 };
@@ -36,9 +36,9 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Resource::namespaced::<Secret>(&namespace);
+    let secrets: Api<Secret> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf: Reflector<Secret> = Reflector::new(client, lp, resource).init().await?;
+    let rf = Reflector::new(secrets, lp).init().await?;
 
     // Can read initial state now:
     rf.state().await?.into_iter().for_each(|secret| {
