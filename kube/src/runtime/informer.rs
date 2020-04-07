@@ -112,8 +112,6 @@ where
 
         // Clone Arcs for stream handling
         let version = self.version.clone();
-        let origin = self.version.lock().await.clone();
-        info!("poll start at {}", origin);
         let needs_resync = self.needs_resync.clone();
 
         // Start watching from our previous watch point
@@ -126,23 +124,12 @@ where
             let needs_resync = needs_resync.clone();
             let version = version.clone();
             async move {
-                let current = version.lock().await.clone();
                 // Check if we need to update our version based on the incoming events
                 match &event {
                     Ok(WatchEvent::Added(o)) | Ok(WatchEvent::Modified(o)) | Ok(WatchEvent::Deleted(o)) => {
                         // always store the last seen resourceVersion
                         if let Some(nv) = Meta::resource_ver(o) {
-                            use std::str::FromStr;
-                            let u = if let (Ok(nvu), Ok(cu)) = (u32::from_str(&nv), u32::from_str(&current)) {
-                                // actually parse int because k8s does not keep its contract
-                                // https://github.com/kubernetes-client/python/issues/819
-                                std::cmp::max(nvu, cu).to_string()
-                            } else {
-                                // recommended solution - treat resourceVersion as opaque string
-                                nv.clone()
-                            };
-                            info!("updating informer version to: {} (got {})", u, nv);
-                            *version.lock().await = u;
+                            *version.lock().await = nv.clone();
                         }
                     }
                     Ok(WatchEvent::Error(e)) => {
