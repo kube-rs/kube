@@ -13,6 +13,8 @@
   * `Reflector` now has basic signal handling #152
   * `Api::watch` no longer filters out error events (`next` -> `try_next`)
   * `Api::watch` returns `Result<WatchEvent>` rather than `WatchEvent`
+  * `WatchEvent::Bookmark` added to enum
+  * `ListParams::allow_bookmarks` added
 
 0.31.0 / 2020-03-27
 ===================
