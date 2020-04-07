@@ -20,6 +20,9 @@ use std::{sync::Arc, time::Duration};
 /// but we have configured timeouts such that this should not happen frequently.
 ///
 /// On boot, the initial watch causes added events for every currently live object.
+///
+/// Because of https://github.com/clux/kube-rs/issues/219 we recommend you use this
+/// with kubernetes >= 1.16 and watch bookmarks enabled.
 #[derive(Clone)]
 pub struct Informer<K>
 where
