@@ -280,6 +280,7 @@ where
     ///             WatchEvent::Added(s) => println!("Added {}", Meta::name(&s)),
     ///             WatchEvent::Modified(s) => println!("Modified: {}", Meta::name(&s)),
     ///             WatchEvent::Deleted(s) => println!("Deleted {}", Meta::name(&s)),
+    ///             WatchEvent::Bookmark(s) => {},
     ///             WatchEvent::Error(s) => println!("{}", s),
     ///         }
     ///     }
