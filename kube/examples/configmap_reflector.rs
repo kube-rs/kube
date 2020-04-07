@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-    api::{ListParams, Meta, Resource},
+    api::{Api, ListParams, Meta},
     runtime::Reflector,
     Client,
 };
@@ -14,9 +14,9 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let resource = Resource::namespaced::<ConfigMap>(&namespace);
+    let cms: Api<ConfigMap> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf: Reflector<ConfigMap> = Reflector::new(client, lp, resource).init().await?;
+    let rf = Reflector::new(cms, lp).init().await?;
 
     // Can read initial state now:
     rf.state().await?.into_iter().for_each(|cm| {

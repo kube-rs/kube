@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tokio::time::delay_for;
 
 use kube::{
-    api::{ListParams, Meta, Resource},
+    api::{Api, ListParams, Meta},
     runtime::Reflector,
     Client,
 };
@@ -26,9 +26,9 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first
-    let resource = Resource::namespaced::<Foo>(&namespace);
+    let foos: Api<Foo> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(20); // low timeout in this example
-    let rf: Reflector<Foo> = Reflector::new(client, lp, resource).init().await?;
+    let rf = Reflector::new(foos, lp).init().await?;
 
     let cloned = rf.clone();
     tokio::spawn(async move {

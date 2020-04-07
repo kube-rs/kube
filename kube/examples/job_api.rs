@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 
@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
         .timeout(20); // should be done by then
     let mut stream = jobs.watch(&lp, "").await?.boxed();
 
-    while let Some(status) = stream.next().await {
+    while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(s) => info!("Added {}", Meta::name(&s)),
             WatchEvent::Modified(s) => {

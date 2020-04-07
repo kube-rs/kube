@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
-    api::{ListParams, Meta, Resource},
+    api::{Api, ListParams, Meta},
     runtime::Reflector,
     Client,
 };
@@ -12,11 +12,11 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let client = Client::try_default().await?;
 
-    let resource = Resource::all::<Node>();
+    let nodes: Api<Node> = Api::all(client.clone());
     let lp = ListParams::default()
         .labels("beta.kubernetes.io/instance-type=m4.2xlarge") // filter instances by label
         .timeout(10); // short watch timeout in this example
-    let rf: Reflector<Node> = Reflector::new(client, lp, resource).init().await?;
+    let rf = Reflector::new(nodes, lp).init().await?;
 
     // rf is initialized with full state, which can be extracted on demand.
     // Output is an owned Vec<Node>

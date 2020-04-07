@@ -88,14 +88,14 @@ A basic event watcher that presents a stream of api events on a resource with a 
 An Informer updates the last received `resourceVersion` internally on every event, before shipping the event to the app. If your controller restarts, you will receive one event for every active object at startup, before entering a normal watch.
 
 ```rust
-let r = Resource::all::<Pod>();
-let inf = Informer::new(client, r);
+let pods: Api<Pod> = Api::namespaced(client, "default");
+let inform = Informer::new(pods, pods);
 ```
 
 The main feature of `Informer<K>` is being able to subscribe to events while having a streaming `.poll()` open:
 
 ```rust
-let pods = inf.poll().await?.boxed(); // starts a watch and returns a stream
+let pods = inform.poll().await?.boxed(); // starts a watch and returns a stream
 
 while let Some(event) = pods.try_next().await? { // await next event
     handle(event).await?; // pass the WatchEvent to a handler
@@ -133,10 +133,10 @@ A cache for `K` that keeps itself up to date. It does not expose events, but you
 
 
 ```rust
-let r = Resource::namespaced::<Node>(&namespace);
+let nodes: Api<Node> = Api::namespaced(client, &namespace);
 let lp = ListParams::default()
     .labels("beta.kubernetes.io/instance-type=m4.2xlarge");
-let rf = Reflector::new(client, lp, r);
+let rf = Reflector::new(nodes, lp);
 ```
 
 then you should `poll()` the reflector, and `state()` to get the current cached state:

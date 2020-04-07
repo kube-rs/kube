@@ -18,19 +18,19 @@ where
 {
     /// Fetch the scale subresource
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
-        let req = self.api.get_scale(name)?;
+        let req = self.resource.get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
 
     /// Update the scale subresource
     pub async fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
-        let req = self.api.patch_scale(name, &pp, patch)?;
+        let req = self.resource.patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
 
     /// Replace the scale subresource
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
-        let req = self.api.replace_scale(name, &pp, data)?;
+        let req = self.resource.replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await
     }
 }
@@ -50,7 +50,7 @@ where
     ///
     /// This actually returns the whole K, with metadata, and spec.
     pub async fn get_status(&self, name: &str) -> Result<K> {
-        let req = self.api.get_status(name)?;
+        let req = self.resource.get_status(name)?;
         self.client.request::<K>(req).await
     }
 
@@ -78,7 +78,7 @@ where
     /// }
     /// ```
     pub async fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
-        let req = self.api.patch_status(name, &pp, patch)?;
+        let req = self.resource.patch_status(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
 
@@ -102,7 +102,7 @@ where
     /// }
     /// ```
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = self.api.replace_status(name, &pp, data)?;
+        let req = self.resource.replace_status(name, &pp, data)?;
         self.client.request::<K>(req).await
     }
 }
@@ -202,13 +202,13 @@ where
 {
     /// Fetch logs as a string
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
-        let req = self.api.logs(name, lp)?;
+        let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
 
     /// Fetch logs as a stream of bytes
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let req = self.api.logs(name, lp)?;
+        let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
     }
 }

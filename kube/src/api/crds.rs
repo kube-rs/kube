@@ -100,7 +100,7 @@ impl CrBuilder {
         let crd = self.build();
         Api {
             client,
-            api: crd.into(),
+            resource: crd.into(),
             phantom: PhantomData,
         }
     }
@@ -131,7 +131,7 @@ impl CustomResource {
     pub fn into_api<K>(self, client: Client) -> Api<K> {
         Api {
             client,
-            api: self.into(),
+            resource: self.into(),
             phantom: PhantomData,
         }
     }
@@ -168,15 +168,15 @@ mod test {
             foo: String,
         };
         let client = Client::try_default().await.unwrap();
-        let r1: Api<Foo> = Api::namespaced(client.clone(), "myns");
+        let a1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
-        let r2: Api<Foo> = CustomResource::kind("Foo")
+        let a2: Api<Foo> = CustomResource::kind("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
             .build()
             .into_api(client);
-        assert_eq!(r1.api.api_version, r2.api.api_version);
+        assert_eq!(a1.resource.api_version, a2.resource.api_version);
         // ^ ensures that traits are implemented
     }
 }
