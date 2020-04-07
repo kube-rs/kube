@@ -126,7 +126,10 @@ where
             async move {
                 // Check if we need to update our version based on the incoming events
                 match &event {
-                    Ok(WatchEvent::Added(o)) | Ok(WatchEvent::Modified(o)) | Ok(WatchEvent::Deleted(o)) => {
+                    Ok(WatchEvent::Added(o))
+                    | Ok(WatchEvent::Modified(o))
+                    | Ok(WatchEvent::Deleted(o))
+                    | Ok(WatchEvent::Bookmark(o)) => {
                         // always store the last seen resourceVersion
                         if let Some(nv) = Meta::resource_ver(o) {
                             *version.lock().await = nv.clone();

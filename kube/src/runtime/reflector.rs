@@ -96,6 +96,9 @@ where
                     debug!("Removing {} from {}", Meta::name(&o), kind);
                     state.remove(&ObjectId::key_for(&o));
                 }
+                WatchEvent::Bookmark(o) => {
+                    debug!("Bookmarking {} from {}", Meta::name(&o), kind);
+                }
                 WatchEvent::Error(e) => {
                     warn!("Failed to watch {}: {:?}", kind, e);
                     return Err(Error::Api(e));
