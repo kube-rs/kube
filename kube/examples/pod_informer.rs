@@ -50,6 +50,7 @@ fn handle_pod(ev: WatchEvent<Pod>) -> anyhow::Result<()> {
         WatchEvent::Deleted(o) => {
             info!("Deleted Pod: {}", Meta::name(&o));
         }
+        WatchEvent::Bookmark(_) => {}
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);
         }

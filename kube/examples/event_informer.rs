@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
 
     let events: Api<Event> = Api::all(client);
     let lp = ListParams::default();
-    let ei = Informer::new(events, lp);
+    let ei = Informer::new(events).params(lp);
 
     loop {
         let mut events = ei.poll().await?.boxed();
@@ -47,6 +47,7 @@ fn handle_event(ev: WatchEvent<Event>) -> anyhow::Result<()> {
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);
         }
+        _ => {}
     }
     Ok(())
 }

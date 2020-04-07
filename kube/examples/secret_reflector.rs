@@ -19,11 +19,14 @@ enum Decoded {
 
 fn decode(secret: &Secret) -> BTreeMap<String, Decoded> {
     let mut res = BTreeMap::new();
-    for (k, v) in secret.data.clone().unwrap() {
-        if let Ok(b) = std::str::from_utf8(&v.0) {
-            res.insert(k, Decoded::Utf8(b.to_string()));
-        } else {
-            res.insert(k, Decoded::Bytes(v.0));
+    // Ignoring binary data for now
+    if let Some(data) = secret.data.clone() {
+        for (k, v) in data {
+            if let Ok(b) = std::str::from_utf8(&v.0) {
+                res.insert(k, Decoded::Utf8(b.to_string()));
+            } else {
+                res.insert(k, Decoded::Bytes(v.0));
+            }
         }
     }
     res
@@ -38,20 +41,23 @@ async fn main() -> anyhow::Result<()> {
 
     let secrets: Api<Secret> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf = Reflector::new(secrets, lp).init().await?;
+    let rf = Reflector::new(secrets).params(lp);
+    let runner = rf.clone().run();
 
-    // Can read initial state now:
-    rf.state().await?.into_iter().for_each(|secret| {
-        let res = decode(&secret);
-        info!("Found secret {} with data: {:?}", Meta::name(&secret), res);
+    tokio::spawn(async move {
+        loop {
+            // Periodically read our state
+            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+            let secrets: Vec<_> = rf
+                .state()
+                .await
+                .unwrap()
+                .iter()
+                .map(|s| format!("{}: {:?}", Meta::name(s), decode(s).keys()))
+                .collect();
+            info!("Current secrets: {:?}", secrets);
+        }
     });
-
-    loop {
-        // Update internal state by calling watch (waits the full timeout)
-        rf.poll().await?; // ideally call this from a thread/task
-
-        // Read updated internal state (instant):
-        let secrets: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
-        info!("Current secrets: {:?}", secrets);
-    }
+    runner.await?;
+    Ok(())
 }

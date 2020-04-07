@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let nodes: Api<Node> = Api::all(client.clone());
 
     let lp = ListParams::default().labels("beta.kubernetes.io/os=linux");
-    let ni = Informer::new(nodes, lp);
+    let ni = Informer::new(nodes).params(lp);
 
     loop {
         let mut nodes = ni.poll().await?.boxed();
@@ -77,6 +77,7 @@ async fn handle_nodes(events: &Api<Event>, ne: WatchEvent<Node>) -> anyhow::Resu
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);
         }
+        _ => {}
     }
     Ok(())
 }
