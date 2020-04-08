@@ -1,7 +1,7 @@
 [package]
 name = "kube"
 version = "0.31.0"
-description = "Kubernetes client in the style of client-go"
+description = "Kubernetes client in futures controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
   "ynqa <un.pensiero.vano@gmail.com>",
@@ -9,7 +9,7 @@ authors = [
 license = "Apache-2.0"
 repository = "https://github.com/clux/kube-rs"
 readme = "../README.md"
-keywords = ["kubernetes", "reflector", "informer", "client-go", "client-rust"]
+keywords = ["kubernetes", "client", "runtime", "reflector", "informer"]
 categories = ["web-programming::http-client"]
 edition = "2018"
 

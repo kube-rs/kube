@@ -194,7 +194,7 @@ where
 
     /// Read a single entry by name
     ///
-    /// Will read in the configured namsepace, or globally on non-namespaced reflectors.
+    /// Will read in the configured namespace, or globally on non-namespaced reflectors.
     /// If you are using a non-namespaced resources with name clashes,
     /// Try [`Reflector::get_within`] instead.
     pub async fn get(&self, name: &str) -> Result<Option<K>> {
@@ -209,7 +209,8 @@ where
     /// Read a single entry by name within a specific namespace
     ///
     /// This is a more specific version of [`Reflector::get`].
-    /// This is only useful if your reflector is configured to poll across namsepaces.
+    /// This is only useful if your reflector is configured to poll across namespaces.
+    /// TODO: remove once #194 is resolved
     pub async fn get_within(&self, name: &str, ns: &str) -> Result<Option<K>> {
         let id = ObjectId {
             name: name.into(),
