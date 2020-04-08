@@ -16,6 +16,8 @@
   * `Api::watch` returns `Result<WatchEvent>` rather than `WatchEvent`
   * `WatchEvent::Bookmark` added to enum
   * `ListParams::allow_bookmarks` added
+  * `PatchParams::default_apply` ctor added
+  * `PatchParams` builder mutators: `::force` and `::dry_run` added
 
 0.31.0 / 2020-03-27
 ===================
