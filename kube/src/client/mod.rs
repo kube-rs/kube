@@ -67,8 +67,9 @@ impl Client {
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
         let (parts, body) = request.into_parts();
-        let pandq = parts.uri.path_and_query().unwrap(); // TODO: catch
-        let uri_str = self.cluster_url.join(pandq.as_str()).unwrap();
+        // By construction in resource.rs we always have a path and query
+        let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
+        let uri_str = self.cluster_url.join(pandq.as_str())?;
         //trace!("Sending request => method = {} uri = {}", parts.method, uri_str);
 
         let request = match parts.method {

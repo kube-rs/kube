@@ -24,6 +24,10 @@ pub enum Error {
     #[error("HttpError: {0}")]
     HttpError(#[from] http::Error),
 
+    /// Url conversion error
+    #[error("InternalUrlError: {0}")]
+    InternalUrlError(#[from] url::ParseError),
+
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
     SerdeError(#[from] serde_json::Error),
@@ -43,10 +47,6 @@ pub enum Error {
     /// An invalid method was used
     #[error("Invalid API method {0}")]
     InvalidMethod(String),
-
-    /// Runtime reached an irrecoverable state
-    #[error("Runtime Error {0}")]
-    RuntimeError(String),
 
     /// A request validation failed
     #[error("Request validation failed with {0}")]
