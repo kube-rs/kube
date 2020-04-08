@@ -7,10 +7,15 @@
   * implement `TryFrom<Config> for Client`
   * `Client::try_default` or `Client::new` now recommended constructors
   * People parsing `~/.kube/config` must use the `KubeConfig` struct instead
-  * `Reflector<K>` now takes an `Api<K>` + `ListParams` to construct
-  * `Informer<K>` now takes an `Api<K>` + `ListParams` to construct
+  * `Reflector<K>` now only takes an `Api<K>` to construct (.params method)
+  * `Informer<K>` now only takes an `Api<K>` to construct (.params method)
+  * `Informer::init_from` -> `Informer::set_version`
+  * `Reflector` now self-polls #151 + handles signals #152
+  * `Reflector::poll` made private in favour of `Reflector::run`
   * `Api::watch` no longer filters out error events (`next` -> `try_next`)
   * `Api::watch` returns `Result<WatchEvent>` rather than `WatchEvent`
+  * `WatchEvent::Bookmark` added to enum
+  * `ListParams::allow_bookmarks` added
 
 0.31.0 / 2020-03-27
 ===================

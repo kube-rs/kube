@@ -89,7 +89,7 @@ An Informer updates the last received `resourceVersion` internally on every even
 
 ```rust
 let pods: Api<Pod> = Api::namespaced(client, "default");
-let inform = Informer::new(pods, pods);
+let inform = Informer::new(pods);
 ```
 
 The main feature of `Informer<K>` is being able to subscribe to events while having a streaming `.poll()` open:
@@ -120,7 +120,8 @@ async fn handle(event: WatchEvent<Pod>) -> anyhow::Result<()> {
         },
         WatchEvent::Error(e) => {
             println!("Error event: {:?}", e);
-        }
+        },
+        _ => {},
     }
     Ok(())
 }
@@ -136,7 +137,7 @@ A cache for `K` that keeps itself up to date. It does not expose events, but you
 let nodes: Api<Node> = Api::namespaced(client, &namespace);
 let lp = ListParams::default()
     .labels("beta.kubernetes.io/instance-type=m4.2xlarge");
-let rf = Reflector::new(nodes, lp);
+let rf = Reflector::new(nodes).params(lp);
 ```
 
 then you should `poll()` the reflector, and `state()` to get the current cached state:

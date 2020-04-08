@@ -20,6 +20,9 @@ use std::{sync::Arc, time::Duration};
 /// but we have configured timeouts such that this should not happen frequently.
 ///
 /// On boot, the initial watch causes added events for every currently live object.
+///
+/// Because of https://github.com/clux/kube-rs/issues/219 we recommend you use this
+/// with kubernetes >= 1.16 and watch bookmarks enabled.
 #[derive(Clone)]
 pub struct Informer<K>
 where
@@ -35,31 +38,51 @@ impl<K> Informer<K>
 where
     K: Clone + DeserializeOwned + Meta,
 {
-    /// Create an informer on an api resource with a set of parameters
-    pub fn new(api: Api<K>, lp: ListParams) -> Self {
+    /// Create an informer on an api resource
+    pub fn new(api: Api<K>) -> Self {
         Informer {
             api,
-            params: lp,
+            params: ListParams::default(),
             version: Arc::new(Mutex::new(0.to_string())),
             needs_resync: Arc::new(Mutex::new(false)),
         }
     }
 
-    /// Initialize from a prior version
+    /// Modify the default watch parameters for the underlying watch
+    pub fn params(mut self, lp: ListParams) -> Self {
+        self.params = lp;
+        self
+    }
+
+    /// Override the version to an externally tracked version
     ///
     /// Prefer not using this. Even if you track previous resource versions,
     /// you will miss deleted events if you have any downtime.
     ///
     /// Controllers/finalizers/ownerReferences are the preferred ways
     /// to garbage collect related resources.
-    pub fn init_from(self, v: String) -> Self {
-        info!("Recreating Informer for {} at {}", self.api.resource.kind, v);
+    pub fn set_version(self, v: String) -> Self {
+        debug!("Setting Informer version for {} to {}", self.api.resource.kind, v);
 
         // We need to block on this as our mutex needs go be async compatible
         futures::executor::block_on(async {
             *self.version.lock().await = v;
         });
         self
+    }
+
+    /// Reset the resourceVersion to 0
+    ///
+    /// This will trigger new Added events for all existing resources
+    pub async fn reset(&self) {
+        *self.version.lock().await = 0.to_string();
+    }
+
+    /// Return the current version
+    pub fn version(&self) -> String {
+        // We need to block on a future here quickly
+        // to get a lock on our version
+        futures::executor::block_on(async { self.version.lock().await.clone() })
     }
 
     /// Start a single watch stream
@@ -106,7 +129,10 @@ where
             async move {
                 // Check if we need to update our version based on the incoming events
                 match &event {
-                    Ok(WatchEvent::Added(o)) | Ok(WatchEvent::Modified(o)) | Ok(WatchEvent::Deleted(o)) => {
+                    Ok(WatchEvent::Added(o))
+                    | Ok(WatchEvent::Modified(o))
+                    | Ok(WatchEvent::Deleted(o))
+                    | Ok(WatchEvent::Bookmark(o)) => {
                         // always store the last seen resourceVersion
                         if let Some(nv) = Meta::resource_ver(o) {
                             *version.lock().await = nv.clone();
@@ -131,19 +157,5 @@ where
             }
         });
         Ok(newstream)
-    }
-
-    /// Reset the resourceVersion to 0
-    ///
-    /// This will trigger Added events for all existing resources
-    pub async fn reset(&self) {
-        *self.version.lock().await = 0.to_string();
-    }
-
-    /// Return the current version
-    pub fn version(&self) -> String {
-        // We need to block on a future here quickly
-        // to get a lock on our version
-        futures::executor::block_on(async { self.version.lock().await.clone() })
     }
 }

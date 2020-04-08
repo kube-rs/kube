@@ -89,6 +89,7 @@ pub struct ListParams {
     pub include_uninitialized: bool,
     pub label_selector: Option<String>,
     pub timeout: Option<u32>,
+    pub allow_bookmarks: bool,
 }
 
 impl ListParams {
@@ -146,6 +147,12 @@ impl ListParams {
     /// If called, partially initialized resources are included in watch/list responses.
     pub fn include_uninitialized(mut self) -> Self {
         self.include_uninitialized = true;
+        self
+    }
+
+    /// Enables watch bookmarks from the api server if supported
+    pub fn allow_bookmarks(mut self) -> Self {
+        self.allow_bookmarks = true;
         self
     }
 }
@@ -317,6 +324,9 @@ impl Resource {
         }
         if let Some(labels) = &lp.label_selector {
             qp.append_pair("labelSelector", &labels);
+        }
+        if lp.allow_bookmarks {
+            qp.append_pair("allowWatchBookmarks", "true");
         }
 
         let urlstr = qp.finish();

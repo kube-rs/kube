@@ -16,33 +16,17 @@ async fn main() -> anyhow::Result<()> {
 
     let deploys: Api<Deployment> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf = Reflector::new(deploys, lp).init().await?;
+    let rf = Reflector::new(deploys).params(lp);
 
-    // rf is initialized with full state, which can be extracted on demand.
-    // Output is an owned Vec<Deployment>
-    rf.state().await?.into_iter().for_each(|d| {
-        info!(
-            "Found deployment for {} - {} replicas running {:?}",
-            Meta::name(&d),
-            d.status.unwrap().replicas.unwrap(),
-            d.spec
-                .unwrap()
-                .template
-                .spec
-                .unwrap()
-                .containers
-                .into_iter()
-                .map(|c| c.image.unwrap())
-                .collect::<Vec<_>>()
-        );
+    let rf2 = rf.clone(); // read from a clone in a task
+    tokio::spawn(async move {
+        loop {
+            // Periodically read our state
+            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+            let deploys: Vec<_> = rf2.state().await.unwrap().iter().map(Meta::name).collect();
+            info!("Current deploys: {:?}", deploys);
+        }
     });
-
-    loop {
-        // Update internal state by calling watch (waits the full timeout)
-        rf.poll().await?;
-
-        // Read the updated internal state (instant):
-        let deploys: Vec<_> = rf.state().await?.iter().map(Meta::name).collect();
-        info!("Current deploys: {:?}", deploys);
-    }
+    rf.run().await?; // run reflector and listen for signals
+    Ok(())
 }

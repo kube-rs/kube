@@ -47,7 +47,7 @@
 //!     let pod = pods.create(&PostParams::default(), &pod).await?;
 //!
 //!     // Create an informer for watching events about
-//!     let informer = Informer::new(pods,
+//!     let informer = Informer::new(pods).params(
 //!         ListParams::default()
 //!             .fields("metadata.name=my-container")
 //!             .timeout(10),
