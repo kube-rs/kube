@@ -179,7 +179,6 @@ pub struct PatchParams {
     /// optional for everything else
     pub field_manager: Option<String>,
 }
-
 impl PatchParams {
     fn validate(&self) -> Result<()> {
         if let Some(field_manager) = &self.field_manager {
@@ -212,6 +211,27 @@ impl PatchParams {
         if let Some(ref field_manager) = self.field_manager {
             qp.append_pair("fieldManager", &field_manager);
         }
+    }
+
+    /// Construct PatchParams for server-side apply
+    pub fn default_apply() -> Self {
+        Self {
+            patch_strategy: PatchStrategy::Apply,
+            field_manager: Some(env!("CARGO_PKG_NAME").into()),
+            ..Self::default()
+        }
+    }
+
+    /// Force the result through on conflicts
+    pub fn force(mut self) -> Self {
+        self.force = true;
+        self
+    }
+
+    /// Perform a dryRun only
+    pub fn dry_run(mut self) -> Self {
+        self.dry_run = true;
+        self
     }
 }
 

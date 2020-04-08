@@ -199,7 +199,29 @@ where
     ///
     /// When using `PatchStrategy::Apply`, this restriction is not necessary,
     /// however, you **must** serialize your data using `serde_yaml`.
-    /// NB: This is currently broken due to https://github.com/clux/kube-rs/issues/176
+    ///
+    /// ```no_run
+    /// use kube::{api::{Api, PatchParams, Meta}, Client};
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), anyhow::Error> {
+    ///     let client = Client::try_default().await?;
+    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+    ///     let ss_apply = PatchParams::default_apply().force();
+    ///     let patch = serde_yaml::to_vec(&serde_json::json!({
+    ///         "apiVersion": "v1",
+    ///         "kind": "Pod",
+    ///         "metadata": {
+    ///             "name": "blog"
+    ///         },
+    ///         "spec": {
+    ///             "activeDeadlineSeconds": 5
+    ///         }
+    ///     }))?;
+    ///     let o_patched = pods.patch("blog", &ss_apply, patch).await?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
@@ -220,7 +242,7 @@ where
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
-    ///     let mut j = jobs.get("baz").await?;
+    ///     let j = jobs.get("baz").await?;
     ///     let j_new: Job = serde_json::from_value(serde_json::json!({
     ///         "apiVersion": "batch/v1",
     ///         "kind": "Job",
