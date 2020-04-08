@@ -6,6 +6,17 @@ use kube::{
     Client,
 };
 
+fn spawn_periodic_reader(rf: Reflector<ConfigMap>) {
+    tokio::spawn(async move {
+        loop {
+            // Periodically read our state
+            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+            let cms: Vec<_> = rf.state().await.unwrap().iter().map(Meta::name).collect();
+            info!("Current configmaps: {:?}", cms);
+        }
+    });
+}
+
 /// Example way to read secrets
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -18,15 +29,7 @@ async fn main() -> anyhow::Result<()> {
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
     let rf = Reflector::new(cms).params(lp);
 
-    let rf2 = rf.clone(); // read from a clone in a task
-    tokio::spawn(async move {
-        loop {
-            // Periodically read our state
-            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-            let pods: Vec<_> = rf2.state().await.unwrap().iter().map(Meta::name).collect();
-            info!("Current configmaps: {:?}", pods);
-        }
-    });
+    spawn_periodic_reader(rf.clone()); // read from a clone in a task
 
     rf.run().await?; // run reflector and listen for signals
     Ok(())

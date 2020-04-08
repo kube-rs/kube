@@ -4,7 +4,10 @@ use crate::{
 };
 use futures::{future::FutureExt, lock::Mutex, pin_mut, select, TryStreamExt};
 use serde::de::DeserializeOwned;
-use tokio::{signal, time::delay_for};
+use tokio::{
+    signal::{self, ctrl_c},
+    time::delay_for,
+};
 
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -53,24 +56,37 @@ where
     pub async fn run(self) -> Result<()> {
         self.reset().await?;
         loop {
-            let signal_fut = signal::ctrl_c().fuse(); // TODO: SIGTERM
-            let stream_fut = self.poll().fuse();
-            pin_mut!(signal_fut, stream_fut);
+            // local development needs listening for ctrl_c
+            let ctrlc_fut = ctrl_c().fuse();
+            // kubernetes apps need to listen for SIGTERM (30s warning)
+            use signal::unix::{signal, SignalKind}; // TODO: conditional compile
+            let mut sigterm = signal(SignalKind::terminate()).unwrap();
+            let sigterm_fut = sigterm.recv().fuse();
+
+            // and reflector needs to poll continuously
+            let poll_fut = self.poll().fuse();
+
+            // Then pin then futures to the stack, and wait for any of them
+            pin_mut!(ctrlc_fut, sigterm_fut, poll_fut);
             select! {
-                sig = signal_fut => {
+                ctrlc = ctrlc_fut => {
                     warn!("Intercepted ctrl_c signal");
                     return Ok(());
                 },
-                stream = stream_fut => {
-                    if let Err(e) = stream {
+                sigterm = sigterm_fut => {
+                    warn!("Intercepted SIGTERM");
+                    return Ok(());
+                }
+                poll = poll_fut => {
+                    // Error handle if not ok, otherwise, we do another iteration
+                    if let Err(e) = poll {
                         warn!("Poll error on {}: {}: {:?}", self.api.resource.kind, e, e);
                         // If desynched due to mismatching resourceVersion, retry in a bit
                         let dur = Duration::from_secs(10);
                         delay_for(dur).await;
                         self.reset().await?; // propagate error if this failed..
                     }
-                },
-                complete => continue, // another poll
+                }
             }
         }
     }
@@ -86,6 +102,7 @@ where
         // For every event, modify our state
         while let Some(ev) = stream.try_next().await? {
             let mut state = self.state.lock().await;
+            // Informer-like version tracking:
             match &ev {
                 WatchEvent::Added(o)
                 | WatchEvent::Modified(o)
@@ -101,6 +118,7 @@ where
             }
 
             let data = &mut state.data;
+            // Core Reflector logic
             match ev {
                 WatchEvent::Added(o) => {
                     debug!("Adding {} to {}", Meta::name(&o), kind);
