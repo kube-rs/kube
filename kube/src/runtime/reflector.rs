@@ -23,7 +23,7 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 #[derive(Clone)]
 pub struct Reflector<K>
 where
-    K: Clone + DeserializeOwned + Send + Meta,
+    K: Clone + DeserializeOwned + Meta,
 {
     state: Arc<Mutex<State<K>>>,
     params: ListParams,
@@ -32,7 +32,7 @@ where
 
 impl<K> Reflector<K>
 where
-    K: Clone + DeserializeOwned + Meta + Send,
+    K: Clone + DeserializeOwned + Meta,
 {
     /// Create a reflector on an api resource
     pub fn new(api: Api<K>) -> Self {
@@ -82,8 +82,8 @@ where
         let resource_version = self.state.lock().await.version.clone();
         trace!("Polling {} from resourceVersion={}", kind, resource_version);
         let stream = self.api.watch(&self.params, &resource_version).await?;
-
         pin_mut!(stream);
+
         // For every event, modify our state
         while let Some(ev) = stream.try_next().await? {
             let mut state = self.state.lock().await;
