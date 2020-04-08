@@ -26,13 +26,13 @@ async fn main() -> anyhow::Result<()> {
     let foos: Api<Foo> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(20); // low timeout in this example
     let rf = Reflector::new(foos).params(lp);
-    let runner = rf.clone().run();
 
+    let rf2 = rf.clone(); // read from a clone in a task
     tokio::spawn(async move {
         loop {
             // Periodically read our state
             tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-            let crds = rf
+            let crds = rf2
                 .state()
                 .await
                 .unwrap()
@@ -42,6 +42,6 @@ async fn main() -> anyhow::Result<()> {
             info!("Current crds: {:?}", crds);
         }
     });
-    runner.await?;
+    rf.run().await?; // run reflector and listen for signals
     Ok(())
 }

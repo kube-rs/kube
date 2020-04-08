@@ -17,16 +17,17 @@ async fn main() -> anyhow::Result<()> {
     let cms: Api<ConfigMap> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
     let rf = Reflector::new(cms).params(lp);
-    let runner = rf.clone().run();
 
+    let rf2 = rf.clone(); // read from a clone in a task
     tokio::spawn(async move {
         loop {
             // Periodically read our state
             tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-            let pods: Vec<_> = rf.state().await.unwrap().iter().map(Meta::name).collect();
+            let pods: Vec<_> = rf2.state().await.unwrap().iter().map(Meta::name).collect();
             info!("Current configmaps: {:?}", pods);
         }
     });
-    runner.await?;
+
+    rf.run().await?; // run reflector and listen for signals
     Ok(())
 }

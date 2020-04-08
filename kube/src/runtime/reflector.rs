@@ -71,7 +71,6 @@ where
                     }
                 },
                 complete => continue, // another poll
-                //default => panic!(), // never runs - futures runs first, then complete
             }
         }
     }

@@ -17,16 +17,16 @@ async fn main() -> anyhow::Result<()> {
     let deploys: Api<Deployment> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
     let rf = Reflector::new(deploys).params(lp);
-    let runner = rf.clone().run();
 
+    let rf2 = rf.clone(); // read from a clone in a task
     tokio::spawn(async move {
         loop {
             // Periodically read our state
             tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-            let deploys: Vec<_> = rf.state().await.unwrap().iter().map(Meta::name).collect();
+            let deploys: Vec<_> = rf2.state().await.unwrap().iter().map(Meta::name).collect();
             info!("Current deploys: {:?}", deploys);
         }
     });
-    runner.await?;
+    rf.run().await?; // run reflector and listen for signals
     Ok(())
 }
