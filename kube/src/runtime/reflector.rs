@@ -70,11 +70,11 @@ where
             pin_mut!(ctrlc_fut, sigterm_fut, poll_fut);
             select! {
                 ctrlc = ctrlc_fut => {
-                    warn!("Intercepted ctrl_c signal");
+                    info!("Received ctrl_c, exiting");
                     return Ok(());
                 },
                 sigterm = sigterm_fut => {
-                    warn!("Intercepted SIGTERM");
+                    info!("Received SIGTERM, exiting");
                     return Ok(());
                 }
                 poll = poll_fut => {
