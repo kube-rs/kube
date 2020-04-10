@@ -15,6 +15,7 @@ doc:
 
 test:
 	cargo test --lib
+	cargo test --doc
 	cargo test --lib -- --ignored # also run tests that fail on circleci
 	cargo test --example crd_api crd_reflector
 	cargo test -j4

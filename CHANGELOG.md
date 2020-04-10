@@ -1,3 +1,7 @@
+0.33.0 / 2020-04-XX
+===================
+  * upgrade all dependencies, including minor bumps to rustls and base64
+
 0.32.0 / 2020-04-10
 ===================
   * Major `config` + `client` module refactor
