@@ -26,11 +26,11 @@ See the [examples directory](./kube/examples) for how to watch over resources in
 
 **[API Docs](https://docs.rs/kube/)**
 
-See [version-rs](https://github.com/clux/version-rs) for a super light (~100 lines), actix*, prometheus, deployment api setup.
+Some real world examples:
 
-See [controller-rs](https://github.com/clux/controller-rs) for a full actix* example, with circleci, and kube yaml.
+- [version-rs](https://github.com/clux/version-rs): super lightweight reflector deployment with actix 2 and prometheus metrics
 
-NB: actix examples with futures are due for a rewrite with the current version.
+- [krustlet](https://github.com/deislabs/krustlet): a complete `WASM` running `kubelet`
 
 ## Api
 The direct `Api` type takes a client, and is constructed with either the `::global` or `::namespaced` functions:
