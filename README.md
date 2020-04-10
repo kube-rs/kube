@@ -130,7 +130,7 @@ async fn handle(event: WatchEvent<Pod>) -> anyhow::Result<()> {
 The [node_informer example](./kube/examples/node_informer.rs) has an example of using api calls from within event handlers.
 
 ## Reflector
-A cache for `K` that keeps itself up to date. It does not expose events, but you can inspect the state map at any time.
+A cache for `K` that keeps itself up to date, and runs the polling machinery itself. It does not expose events, but you can inspect the state map at any time.
 
 
 ```rust
@@ -140,20 +140,9 @@ let lp = ListParams::default()
 let rf = Reflector::new(nodes).params(lp);
 ```
 
-then you should `poll()` the reflector, and `state()` to get the current cached state:
+then you should await `rf.run()` at the end of `main` so that it can continuously poll.  If you have more than one runtime (like say more than one reflector, or perhaps a webserver like actix-rt), then [await all of them within inside a `futures::select`](https://github.com/clux/version-rs/blob/30f295774098053377dd495438babba68a448d89/version.rs#L91).
 
-```rust
-rf.poll().await?; // watches + updates state
-
-// Clone state and do something with it
-rf.state().await.into_iter().for_each(|(node)| {
-    println!("Found Node {:?}", node);
-});
-```
-
-Note that `poll` holds the future for [290s by default](https://github.com/kubernetes/kubernetes/issues/6513), but you can (and should) get `.state()` from another async context (see reflector examples for how to spawn an async task to do this). See also the [self-driving issue](https://github.com/clux/kube-rs/issues/151).
-
-If you need the details of just a single object, you can use the more efficient, `Reflector::get` and `Reflector::get_within`.
+At any point you can use a clone of the reflector instance with `Reflector::get` and `Reflector::get_within`.
 
 ## Examples
 Examples that show a little common flows. These all have logging of this library set up to `debug`, and where possible pick up on the `NAMSEPACE` evar.
