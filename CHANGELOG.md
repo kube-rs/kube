@@ -1,4 +1,4 @@
-0.32.0 / 2020-04-XX
+0.32.0 / 2020-04-10
 ===================
   * Major `config` + `client` module refactor
   * `Config` is the new `Configuration` struct
