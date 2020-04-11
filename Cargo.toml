@@ -2,5 +2,6 @@
 default-members = ["kube"]
 members = [
   "kube",
+  "kube-config",
   "kube-derive",
 ]

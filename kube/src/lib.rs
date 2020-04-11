@@ -78,15 +78,11 @@
 
 pub mod api;
 pub mod client;
-pub mod config;
 pub mod runtime;
-
 pub mod error;
-mod oauth2;
 
 pub use api::{Api, Resource};
 #[doc(inline)] pub use client::Client;
-#[doc(inline)] pub use config::Config;
 #[doc(inline)] pub use error::Error;
 
 /// Convient alias for `Result<T, Error>`

@@ -5,14 +5,14 @@
 //! This client can be used on its own or in conjuction with
 //! the [`Api`][crate::api::Api] type for more structured
 //! interaction with the kuberneres API
-
 use crate::{
     api::{Meta, WatchEvent},
-    config::Config,
     error::ErrorResponse,
     Error, Result,
 };
 
+// TODO: feature?
+use kube_config::Config;
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, TryStream, TryStreamExt};

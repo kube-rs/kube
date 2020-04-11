@@ -1,7 +1,7 @@
 [package]
-name = "kube"
+name = "kube-config"
 version = "0.32.0"
-description = "Kubernetes client in futures controller runtime"
+description = "Kubernetes config parser"
 authors = [
   "clux <sszynrae@gmail.com>",
   "ynqa <un.pensiero.vano@gmail.com>",
@@ -9,11 +9,14 @@ authors = [
 license = "Apache-2.0"
 repository = "https://github.com/clux/kube-rs"
 readme = "../README.md"
-keywords = ["kubernetes", "client", "runtime", "reflector", "informer"]
+keywords = ["kubernetes", "config", "oauth"]
 categories = ["web-programming::http-client"]
 edition = "2018"
 
 [dependencies]
+base64 = "0.12.0"
+chrono = "0.4.11"
+dirs = "2.0.2"
 serde = { version = "1.0.106", features = ["derive"] }
 serde_json = "1.0.51"
 serde_yaml = "0.8.11"
@@ -21,40 +24,20 @@ http = "0.2.1"
 url = "2.1.1"
 log = "0.4.8"
 time = "0.2.9"
-either = "1.5.3"
 thiserror = "1.0.14"
-futures-util = "0.3.4"
-futures = "0.3.4"
 openssl = { version = "0.10.29", optional = true }
 rustls = { version = "0.17.0", optional = true }
-bytes = "0.5.4"
-Inflector = "0.11.4"
-tokio = { version = "0.2.17", features = ["time"] }
 
 [dependencies.reqwest]
 version = "0.10.4"
-default-features = false
+optional = true
 features = ["json", "gzip", "stream"]
 
-[dependencies.k8s-openapi]
-version = "0.7.1"
-default-features = false
-features = []
-
 [features]
-default = ["native-tls"]
+default = ["native-tls", "oauth"]
+oauth = []
 native-tls = ["openssl", "reqwest/native-tls"]
 rustls-tls = ["rustls", "reqwest/rustls-tls"]
 
 [dev-dependencies]
-kube-derive = { path = "../kube-derive" }
-kube-config = { path = "../kube-config" }
 tempfile = "3.1.0"
-env_logger = "0.7.1"
-tokio = { version = "0.2.17", features = ["full"] }
-anyhow = "1.0.28"
-
-[dev-dependencies.k8s-openapi]
-version = "0.7.1"
-default-features = false
-features = ["v1_17"]
