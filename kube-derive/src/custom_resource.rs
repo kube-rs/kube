@@ -168,7 +168,7 @@ impl CustomDerive for CustomResource {
             return Err(
                 r#"#[derive(CustomResource)] requires a non-plural PascalCase `kind = "..."` or non-plural PascalCase struct name"#,
             )
-            .spanning(ident);
+                .spanning(ident);
         }
 
         let mkerror = |arg| {
@@ -238,7 +238,7 @@ impl CustomDerive for CustomResource {
         let has_status = status.is_some();
 
         let root_obj = quote! {
-            #[derive(Serialize, Deserialize, Clone, Debug)]
+            #[derive(kube::serde::Serialize, kube::serde::Deserialize, Clone, Debug)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
                 #visibility api_version: String,
@@ -317,6 +317,9 @@ impl CustomDerive for CustomResource {
         let impl_crd = quote! {
             impl #rootident {
                 pub fn crd() -> #apiext::CustomResourceDefinition {
+
+                    use kube::serde_json;
+
                     let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
                     let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                         None

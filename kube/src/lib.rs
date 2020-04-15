@@ -89,5 +89,15 @@ pub use api::{Api, Resource};
 #[doc(inline)] pub use config::Config;
 #[doc(inline)] pub use error::Error;
 
+#[cfg(feature = "derive")] pub use kube_derive as derive;
+
+#[cfg(feature = "derive")]
+#[doc(hidden)]
+pub use serde_json;
+
+#[cfg(feature = "derive")]
+#[doc(hidden)]
+pub use serde;
+
 /// Convient alias for `Result<T, Error>`
 pub type Result<T> = std::result::Result<T, Error>;
