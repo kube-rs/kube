@@ -1,4 +1,4 @@
-0.33.1 / 2020-04-15
+0.32.1 / 2020-04-15
 ===================
   * add missing tokio `signal` feature as a dependency
   * upgrade all dependencies, including minor bumps to rustls and base64
