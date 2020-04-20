@@ -209,5 +209,20 @@ async fn main() -> anyhow::Result<()> {
             info!("Deleted collection of crds: status={:?}", status);
         }
     }
+
+    // Cleanup the CRD definition
+    match crds.delete("foos.clux.dev", &dp).await? {
+        Left(o) => {
+            info!(
+                "Deleting {} CRD definition: {:?}",
+                Meta::name(&o),
+                o.status.unwrap().conditions.unwrap().last()
+            );
+        }
+        Right(status) => {
+            info!("Deleted foos CRD definition: status={:?}", status);
+        }
+    }
+
     Ok(())
 }
