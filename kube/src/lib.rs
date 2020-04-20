@@ -49,7 +49,7 @@
 //!     // Create an informer for watching events about
 //!     let informer = Informer::new(pods).params(
 //!         ListParams::default()
-//!             .fields("metadata.name=my-container")
+//!             .fields("metadata.name=my-pod")
 //!             .timeout(10),
 //!     );
 //!
