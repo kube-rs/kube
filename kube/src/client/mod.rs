@@ -33,6 +33,7 @@ pub struct Client {
     cluster_url: reqwest::Url,
     default_ns: String,
     inner: reqwest::Client,
+    config: Config,
 }
 
 impl Client {
@@ -72,6 +73,12 @@ impl Client {
         let uri_str = self.cluster_url.join(pandq.as_str())?;
         //trace!("Sending request => method = {} uri = {}", parts.method, uri_str);
 
+        let mut headers = parts.headers;
+        // If we have auth headers set, make sure they are updated and attached to the request
+        if let Some(auth_header) = self.config.get_auth_header().await? {
+            headers.insert(reqwest::header::AUTHORIZATION, auth_header);
+        }
+
         let request = match parts.method {
             http::Method::GET
             | http::Method::POST
@@ -81,7 +88,7 @@ impl Client {
             other => return Err(Error::InvalidMethod(other.to_string())),
         };
 
-        let req = request.headers(parts.headers).body(body).build()?;
+        let req = request.headers(headers).body(body).build()?;
         let res = self.inner.execute(req).await?;
         Ok(res)
     }
@@ -299,11 +306,13 @@ impl TryFrom<Config> for Client {
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
         let default_ns = config.default_ns.clone();
+        let config_clone = config.clone();
         let builder: reqwest::ClientBuilder = config.into();
         Ok(Self {
             cluster_url,
             default_ns,
             inner: builder.build()?,
+            config: config_clone,
         })
     }
 }
