@@ -240,7 +240,9 @@ impl PatchParams {
 /// Apply strategy is kinda special
 #[derive(Clone, PartialEq)]
 pub enum PatchStrategy {
-    /// Apply patches
+    /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
+    ///
+    /// Requires kubernetes >=1.16
     Apply,
     /// A [JSON merge](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
     JSON,

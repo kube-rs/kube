@@ -1,3 +1,7 @@
+0.XX.X / 2020-04-XX
+===================
+  * documentation fixes for `Api::patch`
+
 0.32.1 / 2020-04-15
 ===================
   * add missing tokio `signal` feature as a dependency

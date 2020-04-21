@@ -10,7 +10,7 @@ fmt:
 	cargo +nightly fmt
 
 doc:
-	cargo doc --lib
+	cargo +nightly doc --lib
 	xdg-open target/doc/kube/index.html
 
 test:

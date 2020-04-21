@@ -192,13 +192,18 @@ where
 
     /// Patch a resource a subset of its properties
     ///
-    /// In all patch methods except PatchStrategy::Apply, you must set:
-    /// `metadata.resourceVersion` to get k8s to accept the update.
+    /// Note that some of the [`PatchStrategy`](crate::api::PatchStrategy) variants require different serialization.
     ///
-    /// Thus to use these older patch methods you must first do a `get` then a `patch`.
+    /// The original strategies such as `PatchStrategy::Merge`, `PatchStrategy::JSON`
+    /// and `PatchStrategy::Merge` should be serialized using `serde_json::to_vec`.
     ///
-    /// When using `PatchStrategy::Apply`, this restriction is not necessary,
-    /// however, you **must** serialize your data using `serde_yaml`.
+    /// See [kubernetes json patch types](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    /// for more information about their distinction.
+    ///
+    ///
+    /// When using `PatchStrategy::Apply`, you **must** serialize your
+    /// data using `serde_yaml`:
+    ///
     ///
     /// ```no_run
     /// use kube::{api::{Api, PatchParams, Meta}, Client};
@@ -222,6 +227,8 @@ where
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// Note that you can still create the data any way you like (like with `serde_json`).
     pub async fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
