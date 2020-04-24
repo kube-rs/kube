@@ -22,15 +22,49 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
-pub(crate) struct AuthHeader {
-    value: String,
-    expiration: Option<DateTime<Utc>>,
+pub(crate) enum Authentication {
+    None,
+    Basic(String),
+    Token(String),
+    RefreshableToken(Arc<Mutex<(String, DateTime<Utc>)>>, ConfigLoader),
 }
 
-impl AuthHeader {
-    fn to_header(&self) -> Result<header::HeaderValue> {
-        header::HeaderValue::from_str(&self.value)
-            .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))
+impl Authentication {
+    async fn to_header(&self) -> Result<Option<header::HeaderValue>> {
+        match self {
+            Self::None => Ok(None),
+            Self::Basic(value) => {
+                Ok(Some(header::HeaderValue::from_str(value).map_err(|e| {
+                    Error::Kubeconfig(format!("Invalid basic auth: {}", e))
+                })?))
+            }
+            Self::Token(value) => {
+                Ok(Some(header::HeaderValue::from_str(value).map_err(|e| {
+                    Error::Kubeconfig(format!("Invalid bearer token: {}", e))
+                })?))
+            }
+            Self::RefreshableToken(data, loader) => {
+                let mut locked_data = data.lock().await;
+                // Add some wiggle room onto the current timestamp so we don't get any race
+                // conditions where the token expires while we are refreshing
+                if chrono::Utc::now() + chrono::Duration::seconds(60) >= locked_data.1 {
+                    if let Authentication::RefreshableToken(d, _) = load_auth_header(loader)? {
+                        let (new_token, new_expire) = Arc::try_unwrap(d)
+                            .expect("Unable to unwrap Arc, this is likely a programming error")
+                            .into_inner();
+                        locked_data.0 = new_token;
+                        locked_data.1 = new_expire;
+                    } else {
+                        return Err(Error::Kubeconfig(
+                            "Tried to refresh a token and got a non-refreshable token response".to_owned(),
+                        ));
+                    }
+                }
+                Ok(Some(header::HeaderValue::from_str(&locked_data.0).map_err(
+                    |e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)),
+                )?))
+            }
+        }
     }
 }
 
@@ -57,9 +91,7 @@ pub struct Config {
     /// This is stored in a raw buffer form so that Config can implement `Clone`
     /// (since [`reqwest::Identity`] does not currently implement `Clone`)
     pub(crate) identity: Option<(Vec<u8>, String)>,
-    pub(crate) auth_header: Option<Arc<Mutex<AuthHeader>>>,
-
-    loader: Option<ConfigLoader>,
+    pub(crate) auth_header: Authentication,
 }
 
 impl Config {
@@ -77,8 +109,7 @@ impl Config {
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs: false,
             identity: None,
-            auth_header: None,
-            loader: None,
+            auth_header: Authentication::None,
         }
     }
 
@@ -122,10 +153,6 @@ impl Config {
 
         let token = incluster_config::load_token()
             .map_err(|e| Error::Kubeconfig(format!("Unable to load in cluster token: {}", e)))?;
-        let token = AuthHeader {
-            value: format!("Bearer {}", token),
-            expiration: None,
-        };
 
         Ok(Self {
             cluster_url,
@@ -135,8 +162,7 @@ impl Config {
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs: false,
             identity: None,
-            auth_header: Some(Arc::new(Mutex::new(token))),
-            loader: None,
+            auth_header: Authentication::Token(format!("Bearer {}", token)),
         })
     }
 
@@ -153,8 +179,6 @@ impl Config {
             .namespace
             .clone()
             .unwrap_or_else(|| String::from("default"));
-
-        let auth_header = load_auth_header(&loader)?;
 
         let mut accept_invalid_certs = false;
         let mut root_cert = None;
@@ -187,42 +211,12 @@ impl Config {
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs,
             identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
-            auth_header: auth_header.map(|h| Arc::new(Mutex::new(h))),
-            loader: Some(loader),
+            auth_header: load_auth_header(&loader)?,
         })
     }
 
-    async fn needs_refresh(&self) -> bool {
-        if let Some(header) = self.auth_header.as_ref() {
-            header
-                .lock()
-                .await
-                .expiration
-                // Add some wiggle room onto the current timestamp so we don't get any race
-                // conditions where the token expires while we are refreshing
-                .map_or(false, |ex| {
-                    chrono::Utc::now() + chrono::Duration::seconds(60) >= ex
-                })
-        } else {
-            false
-        }
-    }
-
     pub(crate) async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>> {
-        if self.needs_refresh().await {
-            if let Some(loader) = self.loader.as_ref() {
-                if let (Some(current_header), Some(new_header)) =
-                    (self.auth_header.as_ref(), load_auth_header(loader)?)
-                {
-                    *current_header.lock().await = new_header;
-                }
-            }
-        }
-        let header = match self.auth_header.as_ref() {
-            Some(h) => Some(h.lock().await.to_header()?),
-            None => None,
-        };
-        Ok(header)
+        self.auth_header.to_header().await
     }
 
     // The identity functions are used to parse the stored identity buffer
@@ -251,7 +245,7 @@ impl Config {
     }
 }
 
-fn load_auth_header(loader: &ConfigLoader) -> Result<Option<AuthHeader>> {
+fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
     let (raw_token, expiration) = match &loader.user.token {
         Some(token) => (Some(token.clone()), None),
         None => {
@@ -275,19 +269,18 @@ fn load_auth_header(loader: &ConfigLoader) -> Result<Option<AuthHeader>> {
     match (
         utils::data_or_file(&raw_token, &loader.user.token_file),
         (&loader.user.username, &loader.user.password),
+        expiration,
     ) {
-        (Ok(token), _) => Ok(Some(AuthHeader {
-            value: format!("Bearer {}", token),
-            expiration,
-        })),
-        (_, (Some(u), Some(p))) => {
+        (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
+        (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(
+            Arc::new(Mutex::new((format!("Bearer {}", token), expire))),
+            loader.clone(),
+        )),
+        (_, (Some(u), Some(p)), _) => {
             let encoded = base64::encode(&format!("{}:{}", u, p));
-            Ok(Some(AuthHeader {
-                value: format!("Basic {}", encoded),
-                expiration: None,
-            }))
+            Ok(Authentication::Basic(format!("Basic {}", encoded)))
         }
-        _ => Ok(None),
+        _ => Ok(Authentication::None),
     }
 }
 
