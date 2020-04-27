@@ -1,6 +1,7 @@
-0.XX.X / 2020-04-XX
+0.33.0 / 2020-04-27
 ===================
   * documentation fixes for `Api::patch`
+  * Config: add automatic token refresh - #72 / #224 / #234
 
 0.32.1 / 2020-04-15
 ===================
