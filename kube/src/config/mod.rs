@@ -91,6 +91,9 @@ pub struct Config {
     /// This is stored in a raw buffer form so that Config can implement `Clone`
     /// (since [`reqwest::Identity`] does not currently implement `Clone`)
     pub(crate) identity: Option<(Vec<u8>, String)>,
+    /// The authentication header from the credentials available in the kubeconfig. This supports
+    /// exec plugins as well as specified in
+    /// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
     pub(crate) auth_header: Authentication,
 }
 
@@ -245,6 +248,9 @@ impl Config {
     }
 }
 
+/// Loads the authentication header from the credentials available in the kubeconfig. This supports
+/// exec plugins as well as specified in
+/// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
 fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
     let (raw_token, expiration) = match &loader.user.token {
         Some(token) => (Some(token.clone()), None),
