@@ -18,8 +18,7 @@ use chrono::{DateTime, Utc};
 use reqwest::header::{self, HeaderMap};
 use tokio::sync::Mutex;
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Authentication {
