@@ -14,9 +14,59 @@ use crate::{Error, Result};
 pub use file_loader::KubeConfigOptions;
 use file_loader::{ConfigLoader, Der};
 
+use chrono::{DateTime, Utc};
 use reqwest::header::{self, HeaderMap};
+use tokio::sync::Mutex;
 
+use std::sync::Arc;
 use std::time::Duration;
+
+#[derive(Debug, Clone)]
+pub(crate) enum Authentication {
+    None,
+    Basic(String),
+    Token(String),
+    RefreshableToken(Arc<Mutex<(String, DateTime<Utc>)>>, ConfigLoader),
+}
+
+impl Authentication {
+    async fn to_header(&self) -> Result<Option<header::HeaderValue>> {
+        match self {
+            Self::None => Ok(None),
+            Self::Basic(value) => {
+                Ok(Some(header::HeaderValue::from_str(value).map_err(|e| {
+                    Error::Kubeconfig(format!("Invalid basic auth: {}", e))
+                })?))
+            }
+            Self::Token(value) => {
+                Ok(Some(header::HeaderValue::from_str(value).map_err(|e| {
+                    Error::Kubeconfig(format!("Invalid bearer token: {}", e))
+                })?))
+            }
+            Self::RefreshableToken(data, loader) => {
+                let mut locked_data = data.lock().await;
+                // Add some wiggle room onto the current timestamp so we don't get any race
+                // conditions where the token expires while we are refreshing
+                if chrono::Utc::now() + chrono::Duration::seconds(60) >= locked_data.1 {
+                    if let Authentication::RefreshableToken(d, _) = load_auth_header(loader)? {
+                        let (new_token, new_expire) = Arc::try_unwrap(d)
+                            .expect("Unable to unwrap Arc, this is likely a programming error")
+                            .into_inner();
+                        locked_data.0 = new_token;
+                        locked_data.1 = new_expire;
+                    } else {
+                        return Err(Error::Kubeconfig(
+                            "Tried to refresh a token and got a non-refreshable token response".to_owned(),
+                        ));
+                    }
+                }
+                Ok(Some(header::HeaderValue::from_str(&locked_data.0).map_err(
+                    |e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)),
+                )?))
+            }
+        }
+    }
+}
 
 /// Configuration object detailing things like cluster_url, default namespace, root certificates, and timeouts
 #[derive(Debug, Clone)]
@@ -41,6 +91,10 @@ pub struct Config {
     /// This is stored in a raw buffer form so that Config can implement `Clone`
     /// (since [`reqwest::Identity`] does not currently implement `Clone`)
     pub(crate) identity: Option<(Vec<u8>, String)>,
+    /// The authentication header from the credentials available in the kubeconfig. This supports
+    /// exec plugins as well as specified in
+    /// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
+    pub(crate) auth_header: Authentication,
 }
 
 impl Config {
@@ -58,6 +112,7 @@ impl Config {
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs: false,
             identity: None,
+            auth_header: Authentication::None,
         }
     }
 
@@ -102,21 +157,15 @@ impl Config {
         let token = incluster_config::load_token()
             .map_err(|e| Error::Kubeconfig(format!("Unable to load in cluster token: {}", e)))?;
 
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            header::AUTHORIZATION,
-            header::HeaderValue::from_str(&format!("Bearer {}", token))
-                .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
-        );
-
         Ok(Self {
             cluster_url,
             default_ns,
             root_cert: Some(root_cert),
-            headers,
+            headers: HeaderMap::new(),
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs: false,
             identity: None,
+            auth_header: Authentication::Token(format!("Bearer {}", token)),
         })
     }
 
@@ -133,21 +182,6 @@ impl Config {
             .namespace
             .clone()
             .unwrap_or_else(|| String::from("default"));
-
-        let token = match &loader.user.token {
-            Some(token) => Some(token.clone()),
-            None => {
-                if let Some(exec) = &loader.user.exec {
-                    let creds = exec::auth_exec(exec)?;
-                    let status = creds.status.ok_or_else(|| {
-                        Error::Kubeconfig("exec-plugin response did not contain a status".into())
-                    })?;
-                    status.token
-                } else {
-                    None
-                }
-            }
-        };
 
         let mut accept_invalid_certs = false;
         let mut root_cert = None;
@@ -172,39 +206,20 @@ impl Config {
             }
         }
 
-        let mut headers = HeaderMap::new();
-
-        match (
-            utils::data_or_file(&token, &loader.user.token_file),
-            (&loader.user.username, &loader.user.password),
-        ) {
-            (Ok(token), _) => {
-                headers.insert(
-                    header::AUTHORIZATION,
-                    header::HeaderValue::from_str(&format!("Bearer {}", token))
-                        .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
-                );
-            }
-            (_, (Some(u), Some(p))) => {
-                let encoded = base64::encode(&format!("{}:{}", u, p));
-                headers.insert(
-                    header::AUTHORIZATION,
-                    header::HeaderValue::from_str(&format!("Basic {}", encoded))
-                        .map_err(|e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)))?,
-                );
-            }
-            _ => {}
-        }
-
         Ok(Self {
             cluster_url,
             default_ns,
             root_cert,
-            headers,
+            headers: HeaderMap::new(),
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs,
             identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
+            auth_header: load_auth_header(&loader)?,
         })
+    }
+
+    pub(crate) async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>> {
+        self.auth_header.to_header().await
     }
 
     // The identity functions are used to parse the stored identity buffer
@@ -230,6 +245,48 @@ impl Config {
             reqwest::Identity::from_pkcs12_der(identity, identity_password)
                 .expect("Identity buffer was not valid identity"),
         )
+    }
+}
+
+/// Loads the authentication header from the credentials available in the kubeconfig. This supports
+/// exec plugins as well as specified in
+/// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
+fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
+    let (raw_token, expiration) = match &loader.user.token {
+        Some(token) => (Some(token.clone()), None),
+        None => {
+            if let Some(exec) = &loader.user.exec {
+                let creds = exec::auth_exec(exec)?;
+                let status = creds.status.ok_or_else(|| {
+                    Error::Kubeconfig("exec-plugin response did not contain a status".into())
+                })?;
+                let expiration = match status.expiration_timestamp {
+                    Some(ts) => Some(ts.parse::<DateTime<Utc>>().map_err(|e| {
+                        Error::Kubeconfig(format!("Malformed expriation date on token: {}", e))
+                    })?),
+                    None => None,
+                };
+                (status.token, expiration)
+            } else {
+                (None, None)
+            }
+        }
+    };
+    match (
+        utils::data_or_file(&raw_token, &loader.user.token_file),
+        (&loader.user.username, &loader.user.password),
+        expiration,
+    ) {
+        (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
+        (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(
+            Arc::new(Mutex::new((format!("Bearer {}", token), expire))),
+            loader.clone(),
+        )),
+        (_, (Some(u), Some(p)), _) => {
+            let encoded = base64::encode(&format!("{}:{}", u, p));
+            Ok(Authentication::Basic(format!("Basic {}", encoded)))
+        }
+        _ => Ok(Authentication::None),
     }
 }
 
