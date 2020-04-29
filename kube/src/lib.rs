@@ -79,6 +79,7 @@
 pub mod api;
 pub mod client;
 pub mod config;
+#[cfg(feature = "runtime")]
 pub mod runtime;
 
 pub mod error;

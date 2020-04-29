@@ -26,13 +26,12 @@ log = "0.4.8"
 time = "0.2.9"
 either = "1.5.3"
 thiserror = "1.0.14"
-futures-util = "0.3.4"
 futures = "0.3.4"
 openssl = { version = "0.10.29", optional = true }
 rustls = { version = "0.17.0", optional = true }
 bytes = "0.5.4"
 Inflector = "0.11.4"
-tokio = { version = "0.2.17", features = ["time", "signal", "sync"] }
+tokio = { version = "0.2.17", features = ["time", "sync"] }
 
 [dependencies.reqwest]
 version = "0.10.4"
@@ -45,9 +44,10 @@ default-features = false
 features = []
 
 [features]
-default = ["native-tls"]
+default = ["native-tls", "runtime"]
 native-tls = ["openssl", "reqwest/native-tls"]
 rustls-tls = ["rustls", "reqwest/rustls-tls"]
+runtime = ["tokio/signal"]
 
 [dev-dependencies]
 kube-derive = { path = "../kube-derive" }
