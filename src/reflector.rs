@@ -1,10 +1,9 @@
 use crate::watcher::{self, WatcherEvent};
 use dashmap::DashMap;
 use derivative::Derivative;
-use futures::Stream;
+use futures::{Stream, TryStreamExt};
 use kube::api::Meta;
-use pin_project::pin_project;
-use std::{marker::PhantomData, pin::Pin, task::Poll};
+use std::marker::PhantomData;
 
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -42,47 +41,27 @@ impl<K: Meta> ObjectRef<K> {
 
 pub type Cache<K> = DashMap<ObjectRef<K>, K>;
 
+/// Applies a single event to the cache
+fn apply_to_cache<K: Meta + Clone>(cache: &Cache<K>, event: &WatcherEvent<K>) {
+    match event {
+        WatcherEvent::Added(obj) => {
+            cache.insert(ObjectRef::from_obj(&obj), obj.clone());
+        }
+        WatcherEvent::Deleted(obj) => {
+            cache.remove(&ObjectRef::from_obj(&obj));
+        }
+        WatcherEvent::Restarted => {
+            cache.clear();
+        }
+    }
+}
+
 /// Caches objects locally
 ///
 /// Similar to kube-rs's `Reflector`, and the caching half of client-go's `Reflector`
-#[pin_project]
-pub struct Reflector<K, W> {
-    #[pin]
-    watcher: W,
+pub fn reflector<K: Meta + Clone, W: Stream<Item = watcher::Result<WatcherEvent<K>>>>(
     cache: Cache<K>,
-}
-
-impl<K, W> Reflector<K, W> {
-    pub fn new(cache: Cache<K>, watcher: W) -> Self {
-        Self { cache, watcher }
-    }
-}
-
-impl<K: Meta + Clone, W: Stream<Item = watcher::Result<WatcherEvent<K>>>> Stream
-    for Reflector<K, W>
-{
-    type Item = watcher::Result<WatcherEvent<K>>;
-    fn poll_next(
-        self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-        let poll = this.watcher.poll_next(cx);
-        match &poll {
-            // Nested match to get exhaustiveness checking for the branches that we care about
-            Poll::Ready(Some(Ok(event))) => match event {
-                WatcherEvent::Added(obj) => {
-                    this.cache.insert(ObjectRef::from_obj(&obj), obj.clone());
-                }
-                WatcherEvent::Deleted(obj) => {
-                    this.cache.remove(&ObjectRef::from_obj(&obj));
-                }
-                WatcherEvent::Restarted => {
-                    this.cache.clear();
-                }
-            },
-            _ => {}
-        }
-        poll
-    }
+    stream: W,
+) -> impl Stream<Item = W::Item> {
+    stream.inspect_ok(move |event| apply_to_cache(&cache, event))
 }
