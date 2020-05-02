@@ -16,18 +16,22 @@ use std::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display("failed to perform initial object list: {}", source))]
     InitialListFailed {
         source: kube::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("failed to start watching object: {}", source))]
     WatchStartFailed {
         source: kube::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("error returned by apiserver during watch: {}", source))]
     WatchError {
         source: kube::error::ErrorResponse,
         backtrace: Backtrace,
     },
+    #[snafu(display("watch stream failed: {}", source))]
     WatchFailed {
         source: kube::Error,
         backtrace: Backtrace,

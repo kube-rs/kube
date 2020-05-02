@@ -10,6 +10,6 @@ async fn main() -> Result<()> {
     let client = Client::new(config);
     let api = Api::<Pod>::all(client);
     let watcher = Watcher::new(api, ListParams::default());
-    watcher.for_each(|event| async move { println!("{:?}", event) }).await;
+    watcher.try_for_each(|event| async move { Ok(println!("{:?}", event)) }).await?;
     Ok(())
 }
