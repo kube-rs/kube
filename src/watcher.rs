@@ -49,6 +49,10 @@ pub enum WatcherEvent<K> {
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use Finalizers instead.
     Deleted(K),
+    /// The watch stream was restarted, so `Deleted` events may have been missed
+    ///
+    /// Should be used as a signal to clear caches.
+    Restarted,
 }
 
 #[derive(Derivative)]
@@ -152,7 +156,7 @@ impl<K: Sync + Send + Meta + Clone + DeserializeOwned + 'static> Stream for Watc
                         this.list_params.clone(),
                     )),
                 };
-                self.poll_next(cx)
+                Poll::Ready(Some(Ok(WatcherEvent::Restarted)))
             }
             State::InitListing { list_fut } => match list_fut.as_mut().poll(cx) {
                 Poll::Pending => Poll::Pending,
