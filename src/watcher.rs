@@ -40,29 +40,54 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug)]
+/// Watch events returned from the `Watcher`
 pub enum WatcherEvent<K> {
+    /// A resource was added or modified
     Added(K),
+    /// A resource was deleted
+    ///
+    /// NOTE: This should not be used for managing persistent state elsewhere, since
+    /// events may be lost if the watcher is unavailable. Use Finalizers instead.
     Deleted(K),
 }
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-enum State<K: Meta + Clone> {
+/// The internal FSM driving the [`Watcher`](struct.Watcher.html)
+///
+/// NOTE: This isn't intended to be used externally or part of the external API,
+/// but it's published to document the internal workings.
+pub enum State<K: Meta + Clone> {
+    /// The Watcher is empty, and the next poll() will start the initial LIST to get all existing objects
     Empty,
+    /// The Watcher is performing the initial LIST to get all existing objects
+    ///
+    /// If this fails then we propagate the error and fall back to `Empty`, to retry on the next poll.
     InitListing {
         #[derivative(Debug = "ignore")]
         list_fut: BoxFuture<'static, kube::Result<ObjectList<K>>>,
     },
+    /// The initial LIST was successful, so we return the existing objects as `Added` events one by one
+    ///
+    /// If the queue is empty then move on to starting the actual watch.
     InitListed {
         resource_version: String,
         queue: std::vec::IntoIter<K>,
     },
+    /// We're initializing the watch stream, hold tight!
+    ///
+    /// If this fails then we move back to an empty `InitListed`, and retry on the next poll.
     InitWatching {
         resource_version: String,
         #[derivative(Debug = "ignore")]
         stream_fut:
             BoxFuture<'static, kube::Result<LocalBoxStream<'static, kube::Result<WatchEvent<K>>>>>,
     },
+    /// The watch is in progress, from this point we just return events from the server.
+    ///
+    /// If the connection is disrupted then we propagate the error but try to restart the watch stream.
+    /// If we fall out of the K8s watch window then we propagate the error and fall back doing a re-list
+    /// with `Empty`.
     Watching {
         resource_version: String,
         #[derivative(Debug = "ignore")]
@@ -73,6 +98,10 @@ enum State<K: Meta + Clone> {
 #[pin_project]
 #[derive(Derivative)]
 #[derivative(Debug)]
+/// Watches a Kubernetes Resource for changes
+///
+/// Errors are propagated to the client, but can continue to be polled, in which case it tries to recover
+/// from the error.
 pub struct Watcher<K: Meta + Clone> {
     #[derivative(Debug = "ignore")]
     api: Api<K>,
