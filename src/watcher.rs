@@ -1,5 +1,5 @@
 use derivative::Derivative;
-use futures::{Future, Stream};
+use futures::{future::BoxFuture, stream::LocalBoxStream, Stream};
 use kube::{
     api::{ListParams, Meta, ObjectList, WatchEvent},
     Api,
@@ -9,6 +9,7 @@ use serde::de::DeserializeOwned;
 use snafu::{Backtrace, ResultExt, Snafu};
 use std::{
     clone::Clone,
+    marker::{Send, Sync},
     pin::Pin,
     task::{Context, Poll},
 };
@@ -45,7 +46,7 @@ enum State<K: Meta + Clone> {
     Empty,
     InitListing {
         #[derivative(Debug = "ignore")]
-        list_fut: Pin<Box<dyn Future<Output = kube::Result<ObjectList<K>>>>>,
+        list_fut: BoxFuture<'static, kube::Result<ObjectList<K>>>,
     },
     InitListed {
         resource_version: String,
@@ -54,18 +55,13 @@ enum State<K: Meta + Clone> {
     InitWatching {
         resource_version: String,
         #[derivative(Debug = "ignore")]
-        stream_fut: Pin<
-            Box<
-                dyn Future<
-                    Output = kube::Result<Pin<Box<dyn Stream<Item = kube::Result<WatchEvent<K>>>>>>,
-                >,
-            >,
-        >,
+        stream_fut:
+            BoxFuture<'static, kube::Result<LocalBoxStream<'static, kube::Result<WatchEvent<K>>>>>,
     },
     Watching {
         resource_version: String,
         #[derivative(Debug = "ignore")]
-        stream: Pin<Box<dyn Stream<Item = kube::Result<WatchEvent<K>>>>>,
+        stream: LocalBoxStream<'static, kube::Result<WatchEvent<K>>>,
     },
 }
 
@@ -107,7 +103,7 @@ async fn watch_owning_wrapper<K: Meta + Clone + DeserializeOwned + 'static>(
         .map(|x| Box::pin(x) as Pin<Box<dyn Stream<Item = _>>>)
 }
 
-impl<K: Meta + Clone + DeserializeOwned + 'static> Stream for Watcher<K> {
+impl<K: Sync + Send + Meta + Clone + DeserializeOwned + 'static> Stream for Watcher<K> {
     type Item = Result<WatcherEvent<K>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
