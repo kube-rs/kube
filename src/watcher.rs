@@ -229,6 +229,10 @@ impl<K: Sync + Send + Meta + Clone + DeserializeOwned + 'static> Stream for Watc
                     self.poll_next(cx)
                 }
                 Poll::Ready(Some(Ok(WatchEvent::Error(err)))) => {
+                    // HTTP GONE, means we have to start over and re-list :(
+                    if err.code == 410 {
+                        *this.state = State::Empty;
+                    }
                     Poll::Ready(Some(Err(err).context(WatchError)))
                 }
                 Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(err).context(WatchFailed))),
