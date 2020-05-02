@@ -14,6 +14,7 @@ k8s-openapi = "0.7.1"
 pin-project = "0.4.9"
 derivative = "2.1.1"
 serde = "1.0.106"
+dashmap = "3.11.1"
 
 [dev-dependencies]
 anyhow = "1.0.28"
