@@ -102,6 +102,8 @@ pub enum State<K: Meta + Clone> {
 ///
 /// Errors are propagated to the client, but can continue to be polled, in which case it tries to recover
 /// from the error.
+///
+/// This is similar to kube-rs 0.33's `Informer`, or client-go's `Reflector`.
 pub struct Watcher<K: Meta + Clone> {
     #[derivative(Debug = "ignore")]
     api: Api<K>,
