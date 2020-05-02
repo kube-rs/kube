@@ -1,0 +1,20 @@
+[package]
+name = "kube-rt"
+version = "0.1.0"
+authors = ["Teo Klestrup Röijezon <teo@nullable.se>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "0.3.4"
+kube = "0.33.0"
+snafu = "0.6.6"
+k8s-openapi = "0.7.1"
+pin-project = "0.4.9"
+derivative = "2.1.1"
+serde = "1.0.106"
+
+[dev-dependencies.k8s-openapi]
+version = "0.7.1"
+features = ["v1_16"]
