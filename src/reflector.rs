@@ -39,16 +39,28 @@ impl<K: Meta> ObjectRef<K> {
     }
 }
 
-pub type Cache<K> = DashMap<ObjectRef<K>, K>;
+#[derive(Debug)]
+pub struct Cache<K> {
+    // DashMap isn't async-aware, but that's fine as long
+    // as we never hold the lock over an async/await boundary
+    store: DashMap<ObjectRef<K>, K>,
+}
+
+impl<K: Clone> Cache<K> {
+    pub fn get(&self, key: &ObjectRef<K>) -> Option<K> {
+        // Clone to let go of the entry lock ASAP
+        self.store.get(key).map(|entry| entry.value().clone())
+    }
+}
 
 /// Applies a single event to the cache
 fn apply_to_cache<K: Meta + Clone>(cache: &Cache<K>, event: &watcher::Event<K>) {
     match event {
         watcher::Event::Added(obj) => {
-            cache.insert(ObjectRef::from_obj(&obj), obj.clone());
+            cache.store.insert(ObjectRef::from_obj(&obj), obj.clone());
         }
         watcher::Event::Deleted(obj) => {
-            cache.remove(&ObjectRef::from_obj(&obj));
+            cache.store.remove(&ObjectRef::from_obj(&obj));
         }
         watcher::Event::Restarted(new_objs) => {
             let new_objs = new_objs
@@ -56,9 +68,11 @@ fn apply_to_cache<K: Meta + Clone>(cache: &Cache<K>, event: &watcher::Event<K>) 
                 .map(|obj| (ObjectRef::from_obj(obj), obj))
                 .collect::<HashMap<_, _>>();
             // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
-            cache.retain(|key, _old_value| new_objs.contains_key(key));
-            for (key, obj) in new_objs.into_iter() {
-                cache.insert(key, obj.clone());
+            cache
+                .store
+                .retain(|key, _old_value| new_objs.contains_key(key));
+            for (key, obj) in new_objs {
+                cache.store.insert(key, obj.clone());
             }
         }
     }
