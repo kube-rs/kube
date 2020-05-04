@@ -3,7 +3,7 @@ use dashmap::DashMap;
 use derivative::Derivative;
 use futures::{Stream, TryStreamExt};
 use kube::api::Meta;
-use std::marker::PhantomData;
+use std::{collections::HashMap, marker::PhantomData};
 
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash)]
@@ -50,8 +50,16 @@ fn apply_to_cache<K: Meta + Clone>(cache: &Cache<K>, event: &WatcherEvent<K>) {
         WatcherEvent::Deleted(obj) => {
             cache.remove(&ObjectRef::from_obj(&obj));
         }
-        WatcherEvent::Restarted => {
-            cache.clear();
+        WatcherEvent::Restarted(new_objs) => {
+            let new_objs = new_objs
+                .into_iter()
+                .map(|obj| (ObjectRef::from_obj(obj), obj))
+                .collect::<HashMap<_, _>>();
+            // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
+            cache.retain(|key, _old_value| new_objs.contains_key(key));
+            for (key, obj) in new_objs.into_iter() {
+                cache.insert(key, obj.clone());
+            }
         }
     }
 }

@@ -5,8 +5,8 @@ use kube::{
     api::{ListParams, Meta, WatchEvent},
     Api,
 };
-
 use serde::de::DeserializeOwned;
+use smallvec::SmallVec;
 use snafu::{Backtrace, ResultExt, Snafu};
 use std::clone::Clone;
 
@@ -35,7 +35,7 @@ pub enum Error {
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Watch events returned from the `Watcher`
 pub enum WatcherEvent<K> {
     /// A resource was added or modified
@@ -47,8 +47,23 @@ pub enum WatcherEvent<K> {
     Deleted(K),
     /// The watch stream was restarted, so `Deleted` events may have been missed
     ///
-    /// Should be used as a signal to clear caches.
-    Restarted,
+    /// Should be used as a signal to replace the cache contents atomically.
+    Restarted(Vec<K>),
+}
+
+impl<K> WatcherEvent<K> {
+    /// Flattens out all objects that were added or modified in the event.
+    ///
+    /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
+    /// emitted individually.
+    pub fn into_iter_added(self) -> impl Iterator<Item = K> {
+        match self {
+            WatcherEvent::Added(obj) => SmallVec::from_buf([obj]),
+            WatcherEvent::Deleted(_) => SmallVec::new(),
+            WatcherEvent::Restarted(objs) => SmallVec::from_vec(objs),
+        }
+        .into_iter()
+    }
 }
 
 #[derive(Derivative)]
@@ -60,16 +75,12 @@ pub enum WatcherEvent<K> {
 pub enum State<K: Meta + Clone> {
     /// The Watcher is empty, and the next poll() will start the initial LIST to get all existing objects
     Empty,
-    /// The initial LIST was successful, so we return the existing objects as `Added` events one by one
-    ///
-    /// If the queue is empty then move on to starting the actual watch.
-    InitListed {
-        resource_version: String,
-        queue: std::vec::IntoIter<K>,
-    },
+    /// The initial LIST was successful, so we should move on to starting the actual watch.
+    InitListed { resource_version: String },
     /// The watch is in progress, from this point we just return events from the server.
     ///
-    /// If the connection is disrupted then we propagate the error but try to restart the watch stream.
+    /// If the connection is disrupted then we propagate the error but try to restart the watch stream by
+    /// returning to the `InitListed` state.
     /// If we fall out of the K8s watch window then we propagate the error and fall back doing a re-list
     /// with `Empty`.
     Watching {
@@ -91,26 +102,15 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
     match state {
         State::Empty => match api.list(&list_params).await {
             Ok(list) => (
-                None,
+                Some(Ok(WatcherEvent::Restarted(list.items))),
                 State::InitListed {
                     resource_version: list.metadata.resource_version.unwrap(),
-                    queue: list.items.into_iter(),
                 },
             ),
             Err(err) => (Some(Err(err).context(InitialListFailed)), State::Empty),
         },
-        State::InitListed {
-            resource_version,
-            mut queue,
-        } => match queue.next() {
-            Some(obj) => (
-                Some(Ok(WatcherEvent::Added(obj))),
-                State::InitListed {
-                    resource_version,
-                    queue,
-                },
-            ),
-            None => match api.watch(&list_params, &resource_version).await {
+        State::InitListed { resource_version } => {
+            match api.watch(&list_params, &resource_version).await {
                 Ok(stream) => (
                     None,
                     State::Watching {
@@ -120,13 +120,10 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
                 ),
                 Err(err) => (
                     Some(Err(err).context(WatchStartFailed)),
-                    State::InitListed {
-                        resource_version,
-                        queue,
-                    },
+                    State::InitListed { resource_version },
                 ),
-            },
-        },
+            }
+        }
         State::Watching {
             resource_version,
             mut stream,
@@ -177,13 +174,7 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
                     stream,
                 },
             ),
-            None => (
-                None,
-                State::InitListed {
-                    resource_version,
-                    queue: Vec::new().into_iter(),
-                },
-            ),
+            None => (None, State::InitListed { resource_version }),
         },
     }
 }
@@ -202,6 +193,13 @@ async fn step<K: Meta + Clone + DeserializeOwned + 'static>(
     }
 }
 
+/// Watches a Kubernetes Resource for changes
+///
+/// Errors are propagated to the client, but can continue to be polled, in which case it tries to recover
+/// from the error.
+///
+/// This is similar to kube-rs 0.33's `Informer`, or the watching half of client-go's `Reflector`.
+/// Renamed to avoid confusion with client-go's `Informer`.
 pub fn watcher<K: Meta + Clone + DeserializeOwned + 'static>(
     api: Api<K>,
     list_params: ListParams,

@@ -11,6 +11,8 @@ async fn main() -> Result<()> {
     let api = Api::<Pod>::all(client);
     let watcher = watcher(api, ListParams::default());
     // Use try_for_each to fail on first error, use for_each to keep retrying
-    watcher.try_for_each(|event| async move { Ok(println!("{:?}", event)) }).await?;
+    watcher
+        .try_for_each(|event| async move { Ok(println!("{:?}", event)) })
+        .await?;
     Ok(())
 }
