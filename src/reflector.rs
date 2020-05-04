@@ -1,4 +1,4 @@
-use crate::watcher::{self, WatcherEvent};
+use crate::watcher;
 use dashmap::DashMap;
 use derivative::Derivative;
 use futures::{Stream, TryStreamExt};
@@ -42,15 +42,15 @@ impl<K: Meta> ObjectRef<K> {
 pub type Cache<K> = DashMap<ObjectRef<K>, K>;
 
 /// Applies a single event to the cache
-fn apply_to_cache<K: Meta + Clone>(cache: &Cache<K>, event: &WatcherEvent<K>) {
+fn apply_to_cache<K: Meta + Clone>(cache: &Cache<K>, event: &watcher::Event<K>) {
     match event {
-        WatcherEvent::Added(obj) => {
+        watcher::Event::Added(obj) => {
             cache.insert(ObjectRef::from_obj(&obj), obj.clone());
         }
-        WatcherEvent::Deleted(obj) => {
+        watcher::Event::Deleted(obj) => {
             cache.remove(&ObjectRef::from_obj(&obj));
         }
-        WatcherEvent::Restarted(new_objs) => {
+        watcher::Event::Restarted(new_objs) => {
             let new_objs = new_objs
                 .into_iter()
                 .map(|obj| (ObjectRef::from_obj(obj), obj))
@@ -67,7 +67,7 @@ fn apply_to_cache<K: Meta + Clone>(cache: &Cache<K>, event: &WatcherEvent<K>) {
 /// Caches objects locally
 ///
 /// Similar to kube-rs's `Reflector`, and the caching half of client-go's `Reflector`
-pub fn reflector<K: Meta + Clone, W: Stream<Item = watcher::Result<WatcherEvent<K>>>>(
+pub fn reflector<K: Meta + Clone, W: Stream<Item = watcher::Result<watcher::Event<K>>>>(
     cache: Cache<K>,
     stream: W,
 ) -> impl Stream<Item = W::Item> {

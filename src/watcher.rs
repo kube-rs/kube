@@ -37,7 +37,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, Clone)]
 /// Watch events returned from the `Watcher`
-pub enum WatcherEvent<K> {
+pub enum Event<K> {
     /// A resource was added or modified
     Added(K),
     /// A resource was deleted
@@ -51,16 +51,16 @@ pub enum WatcherEvent<K> {
     Restarted(Vec<K>),
 }
 
-impl<K> WatcherEvent<K> {
+impl<K> Event<K> {
     /// Flattens out all objects that were added or modified in the event.
     ///
     /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
     /// emitted individually.
     pub fn into_iter_added(self) -> impl Iterator<Item = K> {
         match self {
-            WatcherEvent::Added(obj) => SmallVec::from_buf([obj]),
-            WatcherEvent::Deleted(_) => SmallVec::new(),
-            WatcherEvent::Restarted(objs) => SmallVec::from_vec(objs),
+            Event::Added(obj) => SmallVec::from_buf([obj]),
+            Event::Deleted(_) => SmallVec::new(),
+            Event::Restarted(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -98,11 +98,11 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     state: State<K>,
-) -> (Option<Result<WatcherEvent<K>>>, State<K>) {
+) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
         State::Empty => match api.list(&list_params).await {
             Ok(list) => (
-                Some(Ok(WatcherEvent::Restarted(list.items))),
+                Some(Ok(Event::Restarted(list.items))),
                 State::InitListed {
                     resource_version: list.metadata.resource_version.unwrap(),
                 },
@@ -131,7 +131,7 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
             Some(Ok(WatchEvent::Added(obj))) | Some(Ok(WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_ver().unwrap();
                 (
-                    Some(Ok(WatcherEvent::Added(obj))),
+                    Some(Ok(Event::Added(obj))),
                     State::Watching {
                         resource_version,
                         stream,
@@ -141,7 +141,7 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
             Some(Ok(WatchEvent::Deleted(obj))) => {
                 let resource_version = obj.resource_ver().unwrap();
                 (
-                    Some(Ok(WatcherEvent::Deleted(obj))),
+                    Some(Ok(Event::Deleted(obj))),
                     State::Watching {
                         resource_version,
                         stream,
@@ -184,7 +184,7 @@ async fn step<K: Meta + Clone + DeserializeOwned + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     mut state: State<K>,
-) -> (Result<WatcherEvent<K>>, State<K>) {
+) -> (Result<Event<K>>, State<K>) {
     loop {
         match step_trampolined(&api, &list_params, state).await {
             (Some(result), new_state) => return (result, new_state),
@@ -203,7 +203,7 @@ async fn step<K: Meta + Clone + DeserializeOwned + 'static>(
 pub fn watcher<K: Meta + Clone + DeserializeOwned + 'static>(
     api: Api<K>,
     list_params: ListParams,
-) -> impl Stream<Item = Result<WatcherEvent<K>>> {
+) -> impl Stream<Item = Result<Event<K>>> {
     futures::stream::unfold(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {

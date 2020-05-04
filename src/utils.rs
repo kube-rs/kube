@@ -1,8 +1,8 @@
-use crate::watcher::WatcherEvent;
+use crate::watcher;
 use futures::{stream, Stream, TryStream, TryStreamExt};
 
 /// Flattens each item in the list following the rules of `WatcherEvent::into_iter_added`
-pub fn try_flatten_addeds<K, S: TryStream<Ok = WatcherEvent<K>>>(
+pub fn try_flatten_addeds<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,
 ) -> impl Stream<Item = Result<K, S::Error>> {
     stream
