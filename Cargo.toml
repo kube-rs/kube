@@ -14,10 +14,15 @@ derivative = "2.1.1"
 serde = "1.0.106"
 dashmap = "3.11.1"
 smallvec = "1.4.0"
+pin-project = "0.4.10"
 
 [dependencies.snafu]
 version = "0.6.6"
 features = ["futures"]
+
+[dependencies.tokio]
+version = "0.2.20"
+features = ["time"]
 
 [dev-dependencies]
 anyhow = "1.0.28"
