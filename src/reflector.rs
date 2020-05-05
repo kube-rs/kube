@@ -3,7 +3,7 @@ use dashmap::DashMap;
 use derivative::Derivative;
 use futures::{Stream, TryStreamExt};
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::OwnerReference, Resource};
-use kube::api::{Meta, ObjectMeta};
+use kube::api::Meta;
 use std::{collections::HashMap, sync::Arc};
 use std::{fmt::Debug, hash::Hash};
 

@@ -6,8 +6,7 @@ use futures::{
     channel, future, stream, FutureExt, SinkExt, Stream, TryFuture, TryFutureExt, TryStream,
     TryStreamExt,
 };
-use k8s_openapi::Metadata;
-use kube::api::{Meta, ObjectMeta};
+use kube::api::Meta;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
 use std::time::Duration;
 use tokio::time::Instant;
