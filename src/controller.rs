@@ -36,13 +36,28 @@ pub struct ReconcilerAction {
     pub requeue_after: Option<Duration>,
 }
 
+/// Helper for building custom trigger filters, see `trigger_self` and `trigger_owners` for some examples
+pub fn trigger_with<T, K, I, S>(
+    stream: S,
+    mapper: impl Fn(T) -> I,
+) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
+where
+    S: TryStream<Ok = T>,
+    I: IntoIterator<Item = ObjectRef<K>>,
+    K: Meta,
+{
+    stream
+        .map_ok(move |obj| stream::iter(mapper(obj).into_iter().map(Ok)))
+        .try_flatten()
+}
+
 /// Enqueues the object itself for reconciliation
 pub fn trigger_self<S>(stream: S) -> impl Stream<Item = Result<ObjectRef<S::Ok>, S::Error>>
 where
     S: TryStream,
     S::Ok: Meta,
 {
-    stream.map_ok(|obj| ObjectRef::from_obj(&obj))
+    trigger_with(stream, |obj| Some(ObjectRef::from_obj(&obj)))
 }
 
 /// Enqueues any owners of type `KOwner` for reconciliation
@@ -54,20 +69,15 @@ where
     S::Ok: Meta,
     KOwner: Meta,
 {
-    stream
-        .map_ok(|obj| {
-            let meta = obj.meta().clone();
-            let ns = meta.namespace;
-            stream::iter(
-                meta.owner_references
-                    .into_iter()
-                    .flatten()
-                    .map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
-                    .flatten()
-                    .map(Ok),
-            )
-        })
-        .try_flatten()
+    trigger_with(stream, |obj| {
+        let meta = obj.meta().clone();
+        let ns = meta.namespace;
+        meta.owner_references
+            .into_iter()
+            .flatten()
+            .map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
+            .flatten()
+    })
 }
 
 /// Runs a reconciler whenever an object changes
