@@ -104,7 +104,7 @@ impl<K: Resource> From<ObjectRef<K>> for ObjectRef<ErasedResource> {
 }
 
 #[derive(Debug, Derivative)]
-#[derivative(Default, Clone)]
+#[derivative(Default(bound = ""), Clone)]
 pub struct Cache<K: Resource> {
     // DashMap isn't async-aware, but that's fine as long
     // as we never hold the lock over an async/await boundary

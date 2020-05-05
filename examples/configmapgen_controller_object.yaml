@@ -1,0 +1,6 @@
+apiVersion: nullable.se/v1
+kind: ConfigMapGenerator
+metadata:
+  name: foo
+spec:
+  content: Hey!

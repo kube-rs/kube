@@ -26,6 +26,8 @@ features = ["time"]
 
 [dev-dependencies]
 anyhow = "1.0.28"
+kube-derive = "0.33.0"
+serde_json = "1.0.52"
 
 [dev-dependencies.k8s-openapi]
 version = "0.7.1"
