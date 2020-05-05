@@ -6,7 +6,8 @@ use futures::{
     channel, future, stream, FutureExt, SinkExt, Stream, TryFuture, TryFutureExt, TryStream,
     TryStreamExt,
 };
-use kube::api::Meta;
+use k8s_openapi::Metadata;
+use kube::api::{Meta, ObjectMeta};
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
 use std::time::Duration;
 use tokio::time::Instant;
@@ -43,6 +44,31 @@ where
     S::Ok: Meta,
 {
     stream.map_ok(|obj| ObjectRef::from_obj(&obj))
+}
+
+/// Enqueues any owners of type `KOwner` for reconciliation
+pub fn trigger_owners<KOwner, S>(
+    stream: S,
+) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
+where
+    S: TryStream,
+    S::Ok: Meta,
+    KOwner: Meta,
+{
+    stream
+        .map_ok(|obj| {
+            let meta = obj.meta().clone();
+            let ns = meta.namespace;
+            stream::iter(
+                meta.owner_references
+                    .into_iter()
+                    .flatten()
+                    .map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
+                    .flatten()
+                    .map(Ok),
+            )
+        })
+        .try_flatten()
 }
 
 /// Runs a reconciler whenever an object changes

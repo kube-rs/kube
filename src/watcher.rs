@@ -64,6 +64,16 @@ impl<K> Event<K> {
         }
         .into_iter()
     }
+
+    /// Flattens out all objects that were added, modified, or deleted in the event.
+    pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
+        match self {
+            Event::Added(obj) => SmallVec::from_buf([obj]),
+            Event::Deleted(obj) => SmallVec::from_buf([obj]),
+            Event::Restarted(objs) => SmallVec::from_vec(objs),
+        }
+        .into_iter()
+    }
 }
 
 #[derive(Derivative)]

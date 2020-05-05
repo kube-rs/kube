@@ -2,10 +2,10 @@ use crate::watcher;
 use dashmap::DashMap;
 use derivative::Derivative;
 use futures::{Stream, TryStreamExt};
-use k8s_openapi::Resource;
-use kube::api::Meta;
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::OwnerReference, Resource};
+use kube::api::{Meta, ObjectMeta};
 use std::{collections::HashMap, sync::Arc};
-use std::{hash::Hash, fmt::Debug};
+use std::{fmt::Debug, hash::Hash};
 
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash, Clone)]
@@ -37,6 +37,18 @@ impl<K: Meta> ObjectRef<K> {
             kind: (),
             name: obj.name(),
             namespace: obj.namespace(),
+        }
+    }
+
+    pub fn from_owner_ref(namespace: Option<&str>, owner: &OwnerReference) -> Option<Self> {
+        if owner.api_version == K::API_VERSION && owner.kind == K::KIND {
+            Some(Self {
+                kind: (),
+                name: owner.name.clone(),
+                namespace: namespace.map(String::from),
+            })
+        } else {
+            None
         }
     }
 }

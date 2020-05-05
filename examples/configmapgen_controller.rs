@@ -1,5 +1,5 @@
 use anyhow::Result;
-use futures::StreamExt;
+use futures::{stream, StreamExt};
 use k8s_openapi::{
     api::core::v1::ConfigMap,
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
@@ -11,8 +11,10 @@ use kube::{
 };
 use kube_derive::CustomResource;
 use kube_rt::{
-    controller::{controller, trigger_self, ReconcilerAction},
-    reflector, try_flatten_addeds, watcher,
+    controller::{controller, trigger_owners, trigger_self, ReconcilerAction},
+    reflector,
+    utils::{try_flatten_addeds, try_flatten_toucheds},
+    watcher,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
@@ -59,7 +61,6 @@ fn object_to_owner_reference<K: Meta>(meta: ObjectMeta) -> Result<OwnerReference
 async fn main() -> Result<()> {
     let config = Config::infer().await?;
     let client = Client::new(config);
-    let api = Api::<ConfigMapGenerator>::all(client.clone());
 
     let cache = kube_rt::reflector::Cache::<ConfigMapGenerator>::default();
     controller(
@@ -120,10 +121,19 @@ async fn main() -> Result<()> {
             requeue_after: Some(Duration::from_secs(1)),
         },
         cache.clone(),
-        trigger_self(try_flatten_addeds(reflector(
-            cache,
-            watcher(api, ListParams::default()),
-        ))),
+        stream::select(
+            trigger_self(try_flatten_addeds(reflector(
+                cache,
+                watcher(
+                    Api::<ConfigMapGenerator>::all(client.clone()),
+                    ListParams::default(),
+                ),
+            ))),
+            trigger_owners(try_flatten_toucheds(watcher(
+                Api::<ConfigMap>::all(client.clone()),
+                ListParams::default(),
+            ))),
+        ),
     )
     .for_each(|res| async move { println!("I did a thing! {:?}", res) })
     .await;
