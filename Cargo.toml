@@ -9,12 +9,15 @@ edition = "2018"
 [dependencies]
 futures = "0.3.4"
 kube = "0.33.0"
-snafu = "0.6.6"
 k8s-openapi = "0.7.1"
 derivative = "2.1.1"
 serde = "1.0.106"
 dashmap = "3.11.1"
 smallvec = "1.4.0"
+
+[dependencies.snafu]
+version = "0.6.6"
+features = ["futures"]
 
 [dev-dependencies]
 anyhow = "1.0.28"

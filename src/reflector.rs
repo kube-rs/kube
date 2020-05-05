@@ -2,13 +2,15 @@ use crate::watcher;
 use dashmap::DashMap;
 use derivative::Derivative;
 use futures::{Stream, TryStreamExt};
+use k8s_openapi::Resource;
 use kube::api::Meta;
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, sync::Arc};
+use std::{hash::Hash, fmt::Debug};
 
 #[derive(Derivative)]
-#[derivative(Debug, PartialEq, Eq, Hash)]
-pub struct ObjectRef<K> {
-    _type: PhantomData<K>,
+#[derivative(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct ObjectRef<K: RuntimeResource> {
+    kind: K::State,
     pub name: String,
     pub namespace: Option<String>,
 }
@@ -16,7 +18,7 @@ pub struct ObjectRef<K> {
 impl<K: Meta> ObjectRef<K> {
     pub fn new_namespaced(name: String, namespace: String) -> Self {
         Self {
-            _type: PhantomData,
+            kind: (),
             name,
             namespace: Some(namespace),
         }
@@ -24,7 +26,7 @@ impl<K: Meta> ObjectRef<K> {
 
     pub fn new_clusterscoped(name: String) -> Self {
         Self {
-            _type: PhantomData,
+            kind: (),
             name,
             namespace: None,
         }
@@ -32,21 +34,84 @@ impl<K: Meta> ObjectRef<K> {
 
     pub fn from_obj(obj: &K) -> Self {
         Self {
-            _type: PhantomData,
+            kind: (),
             name: obj.name(),
             namespace: obj.namespace(),
         }
     }
 }
 
-#[derive(Debug)]
-pub struct Cache<K> {
-    // DashMap isn't async-aware, but that's fine as long
-    // as we never hold the lock over an async/await boundary
-    store: DashMap<ObjectRef<K>, K>,
+pub trait RuntimeResource {
+    type State: Debug + PartialEq + Eq + Hash + Clone;
+    fn group(state: &Self::State) -> &str;
+    fn version(state: &Self::State) -> &str;
+    fn kind(state: &Self::State) -> &str;
 }
 
-impl<K: Clone> Cache<K> {
+impl<K: Resource> RuntimeResource for K {
+    // All required state is provided at build time
+    type State = ();
+    fn group(_state: &Self::State) -> &str {
+        K::GROUP
+    }
+    fn version(_state: &Self::State) -> &str {
+        K::VERSION
+    }
+    fn kind(_state: &Self::State) -> &str {
+        K::KIND
+    }
+}
+
+pub enum ErasedResource {}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct ErasedResourceState {
+    group: &'static str,
+    version: &'static str,
+    kind: &'static str,
+}
+impl RuntimeResource for ErasedResource {
+    type State = ErasedResourceState;
+    fn group(state: &Self::State) -> &str {
+        &state.group
+    }
+    fn version(state: &Self::State) -> &str {
+        &state.version
+    }
+    fn kind(state: &Self::State) -> &str {
+        &state.kind
+    }
+}
+
+impl ErasedResource {
+    fn erase<K: Resource>() -> ErasedResourceState {
+        ErasedResourceState {
+            group: K::GROUP,
+            version: K::VERSION,
+            kind: K::KIND,
+        }
+    }
+}
+
+impl<K: Resource> From<ObjectRef<K>> for ObjectRef<ErasedResource> {
+    fn from(old: ObjectRef<K>) -> Self {
+        ObjectRef {
+            kind: ErasedResource::erase::<K>(),
+            name: old.name,
+            namespace: old.namespace,
+        }
+    }
+}
+
+#[derive(Debug, Derivative)]
+#[derivative(Default, Clone)]
+pub struct Cache<K: Resource> {
+    // DashMap isn't async-aware, but that's fine as long
+    // as we never hold the lock over an async/await boundary
+    store: Arc<DashMap<ObjectRef<K>, K>>,
+}
+
+impl<K: Clone + Resource> Cache<K> {
     pub fn get(&self, key: &ObjectRef<K>) -> Option<K> {
         // Clone to let go of the entry lock ASAP
         self.store.get(key).map(|entry| entry.value().clone())
