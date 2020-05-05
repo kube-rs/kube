@@ -3,8 +3,8 @@ use crate::{
     scheduler::{self, scheduler, ScheduleRequest},
 };
 use futures::{
-    channel, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt,
-    TryStream, TryStreamExt,
+    channel, future, stream, FutureExt, SinkExt, Stream, TryFuture, TryFutureExt, TryStream,
+    TryStreamExt,
 };
 use kube::api::Meta;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
