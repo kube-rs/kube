@@ -16,6 +16,7 @@ pub struct ObjectRef<K: RuntimeResource> {
 }
 
 impl<K: Meta> ObjectRef<K> {
+    #[must_use]
     pub fn new_namespaced(name: String, namespace: String) -> Self {
         Self {
             kind: (),
@@ -24,6 +25,7 @@ impl<K: Meta> ObjectRef<K> {
         }
     }
 
+    #[must_use]
     pub fn new_clusterscoped(name: String) -> Self {
         Self {
             kind: (),
@@ -32,6 +34,7 @@ impl<K: Meta> ObjectRef<K> {
         }
     }
 
+    #[must_use]
     pub fn from_obj(obj: &K) -> Self {
         Self {
             kind: (),
@@ -40,6 +43,7 @@ impl<K: Meta> ObjectRef<K> {
         }
     }
 
+    #[must_use]
     pub fn from_owner_ref(namespace: Option<&str>, owner: &OwnerReference) -> Option<Self> {
         if owner.api_version == K::API_VERSION && owner.kind == K::KIND {
             Some(Self {
@@ -74,6 +78,8 @@ impl<K: Resource> RuntimeResource for K {
     }
 }
 
+// ! is still unstable: https://github.com/rust-lang/rust/issues/35121
+#[allow(clippy::empty_enum)]
 pub enum ErasedResource {}
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -124,6 +130,7 @@ pub struct Cache<K: Resource> {
 }
 
 impl<K: Clone + Resource> Cache<K> {
+    #[must_use]
     pub fn get(&self, key: &ObjectRef<K>) -> Option<K> {
         // Clone to let go of the entry lock ASAP
         self.store.get(key).map(|entry| entry.value().clone())
@@ -141,7 +148,7 @@ fn apply_to_cache<K: Meta + Clone>(cache: &Cache<K>, event: &watcher::Event<K>) 
         }
         watcher::Event::Restarted(new_objs) => {
             let new_objs = new_objs
-                .into_iter()
+                .iter()
                 .map(|obj| (ObjectRef::from_obj(obj), obj))
                 .collect::<HashMap<_, _>>();
             // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist

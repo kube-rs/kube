@@ -75,8 +75,7 @@ where
         meta.owner_references
             .into_iter()
             .flatten()
-            .map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
-            .flatten()
+            .flat_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
     })
 }
 
