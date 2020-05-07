@@ -126,7 +126,7 @@ impl Config {
             Err(e1) => {
                 trace!("No in-cluster config found: {}", e1);
                 trace!("Falling back to local kubeconfig");
-                let config = Self::new_from_kubeconfig(&KubeConfigOptions::default())
+                let config = Self::new_from_user_kubeconfig(&KubeConfigOptions::default())
                     .await
                     .map_err(|e2| Error::Kubeconfig(format!("Failed to infer config: {}, {}", e1, e2)))?;
 
@@ -168,11 +168,24 @@ impl Config {
         })
     }
 
+    /// Returns a client builder based on the cluster information from the provided kubeconfig
+    /// struct.
+    ///
+    /// This allows to create your custom reqwest client for using with the cluster API.
+    pub async fn new_from_kubeconfig(kubeconfig: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
+        let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
+        Self::new_from_loader(loader)
+    }
+
     /// Returns a client builder based on the cluster information from the kubeconfig file.
     ///
     /// This allows to create your custom reqwest client for using with the cluster API.
-    pub async fn new_from_kubeconfig(options: &KubeConfigOptions) -> Result<Self> {
+    pub async fn new_from_user_kubeconfig(options: &KubeConfigOptions) -> Result<Self> {
         let loader = ConfigLoader::new_from_options(options).await?;
+        Self::new_from_loader(loader)
+    }
+
+    fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
         let cluster_url = reqwest::Url::parse(&loader.cluster.server)
             .map_err(|e| Error::Kubeconfig(format!("Malformed url: {}", e)))?;
 
