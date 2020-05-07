@@ -48,8 +48,9 @@ impl ConfigLoader {
         let kubeconfig_path =
             utils::find_kubeconfig().map_err(|e| Error::Kubeconfig(format!("Unable to load file: {}", e)))?;
 
+        let config = Kubeconfig::read_from(kubeconfig_path)?;
         let loader = Self::load(
-            kubeconfig_path,
+            config,
             options.context.as_ref(),
             options.cluster.as_ref(),
             options.user.as_ref(),
@@ -59,13 +60,24 @@ impl ConfigLoader {
         Ok(loader)
     }
 
-    pub async fn load<P: AsRef<Path>>(
-        path: P,
+    pub async fn new_from_kubeconfig(config: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
+        let loader = Self::load(
+            config,
+            options.context.as_ref(),
+            options.cluster.as_ref(),
+            options.user.as_ref(),
+        )
+        .await?;
+
+        Ok(loader)
+    }
+
+    pub async fn load(
+        config: Kubeconfig,
         context: Option<&String>,
         cluster: Option<&String>,
         user: Option<&String>,
     ) -> Result<Self> {
-        let config = Kubeconfig::read_from(path)?;
         let context_name = context.unwrap_or(&config.current_context);
         let current_context = config
             .contexts
