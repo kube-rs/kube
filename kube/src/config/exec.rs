@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use crate::{config::ExecConfig, Error, Result};
+use crate::{config::ExecConfig, error::ConfigError, Result};
 
 use serde::{Deserialize, Serialize};
 
@@ -46,15 +46,16 @@ pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential> {
             });
         cmd.envs(envs);
     }
-    let out = cmd
-        .output()
-        .map_err(|e| Error::Kubeconfig(format!("Unable to run auth exec: {}", e)))?;
+    let out = cmd.output().map_err(ConfigError::AuthExecStart)?;
     if !out.status.success() {
-        let err = format!("command `{:?}` failed: {:?}", cmd, out);
-        return Err(Error::Kubeconfig(err));
+        return Err(ConfigError::AuthExecRun {
+            cmd: Box::new(cmd),
+            status: out.status,
+            out,
+        }
+        .into());
     }
-    let creds = serde_json::from_slice(&out.stdout)
-        .map_err(|e| Error::Kubeconfig(format!("Unable to parse auth exec result: {}", e)))?;
+    let creds = serde_json::from_slice(&out.stdout).map_err(ConfigError::AuthExecParse)?;
 
     Ok(creds)
 }
