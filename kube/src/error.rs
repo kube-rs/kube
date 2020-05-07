@@ -163,9 +163,9 @@ pub enum ConfigError {
 
     #[error("Unable to run auth exec: {0}")]
     AuthExecStart(#[source] std::io::Error),
-    #[error("Auth exec command '{cmd:?}' failed with status {status}: {out:?}")]
+    #[error("Auth exec command '{cmd}' failed with status {status}: {out:?}")]
     AuthExecRun {
-        cmd: Box<std::process::Command>,
+        cmd: String,
         status: std::process::ExitStatus,
         out: std::process::Output,
     },

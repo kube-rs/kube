@@ -49,7 +49,7 @@ pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential> {
     let out = cmd.output().map_err(ConfigError::AuthExecStart)?;
     if !out.status.success() {
         return Err(ConfigError::AuthExecRun {
-            cmd: Box::new(cmd),
+            cmd: format!("{:?}", cmd),
             status: out.status,
             out,
         }
