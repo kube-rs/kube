@@ -109,18 +109,18 @@ impl Config {
         }
     }
 
-    /// Infer the config from the environment
+    /// Infer the configuration from the environment
     ///
     /// Done by attempting to load in-cluster environment variables first, and
     /// then if that fails, trying the local kubeconfig.
     ///
     /// Fails if inference from both sources fails
     pub async fn infer() -> Result<Self> {
-        match Self::new_from_cluster_env() {
+        match Self::from_cluster_env() {
             Err(cluster_env_err) => {
                 trace!("No in-cluster config found: {}", cluster_env_err);
                 trace!("Falling back to local kubeconfig");
-                let config = Self::new_from_user_kubeconfig(&KubeConfigOptions::default())
+                let config = Self::from_kubeconfig(&KubeConfigOptions::default())
                     .await
                     .map_err(|kubeconfig_err| ConfigError::ConfigInferenceExhausted {
                         cluster_env: Box::new(cluster_env_err),
@@ -133,8 +133,12 @@ impl Config {
         }
     }
 
-    /// Read the config from the cluster's environment variables
-    pub fn new_from_cluster_env() -> Result<Self> {
+    /// Create configuration from the cluster's environment variables
+    ///
+    /// This follows the standard [API Access from a Pod](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod)
+    /// and relies on you having the service account's token mounted,
+    /// as well as having given the service account rbac access to do what you need.
+    pub fn from_cluster_env() -> Result<Self> {
         let cluster_url =
             incluster_config::kube_server().ok_or_else(|| ConfigError::MissingInClusterVariables {
                 hostenv: incluster_config::SERVICE_HOSTENV,
@@ -164,20 +168,22 @@ impl Config {
         })
     }
 
-    /// Returns a client builder based on the cluster information from the provided kubeconfig
-    /// struct.
+    /// Create configuration from the default local config file
     ///
-    /// This allows to create your custom reqwest client for using with the cluster API.
-    pub async fn new_from_kubeconfig(kubeconfig: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
-        let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
+    /// This will respect the `$KUBECONFIG` evar, but otherwise default to `~/.kube/config`.
+    /// You can also customize what context/cluster/user you want to use here,
+    /// but it will default to the current-context.
+    pub async fn from_kubeconfig(options: &KubeConfigOptions) -> Result<Self> {
+        let loader = ConfigLoader::new_from_options(options).await?;
         Self::new_from_loader(loader)
     }
 
-    /// Returns a client builder based on the cluster information from the kubeconfig file.
+    /// Create configuration from a [`Kubeconfig`] struct
     ///
-    /// This allows to create your custom reqwest client for using with the cluster API.
-    pub async fn new_from_user_kubeconfig(options: &KubeConfigOptions) -> Result<Self> {
-        let loader = ConfigLoader::new_from_options(options).await?;
+    /// This bypasses kube's normal config parsing to obtain custom functionality.
+    /// Like if you need stacked kubeconfigs for instance - see #132
+    pub async fn from_custom_kubeconfig(kubeconfig: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
+        let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
         Self::new_from_loader(loader)
     }
 

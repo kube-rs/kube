@@ -1,3 +1,11 @@
+0.34.0 / 2020-05-XX
+===================
+  * Bump `k8s-openapi` to `0.8.0`
+  * `Config::from_cluster_env` <- renamed from `Config::new_from_cluster_env`
+  * `Config::from_kubeconfig` <- renamed from `Config::new_from_kubeconfig`
+  * `Config::from_custom_kubeconfig` added - #236
+  * Majorly overhauled error handlind in config module - #237
+
 0.33.0 / 2020-04-27
 ===================
   * documentation fixes for `Api::patch`
