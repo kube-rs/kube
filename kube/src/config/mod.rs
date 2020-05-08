@@ -10,7 +10,7 @@ mod file_loader;
 mod incluster_config;
 mod utils;
 
-use crate::{Error, Result};
+use crate::{error::ConfigError, Result};
 pub use file_loader::KubeConfigOptions;
 use file_loader::{ConfigLoader, Der};
 
@@ -32,16 +32,12 @@ impl Authentication {
     async fn to_header(&self) -> Result<Option<header::HeaderValue>> {
         match self {
             Self::None => Ok(None),
-            Self::Basic(value) => {
-                Ok(Some(header::HeaderValue::from_str(value).map_err(|e| {
-                    Error::Kubeconfig(format!("Invalid basic auth: {}", e))
-                })?))
-            }
-            Self::Token(value) => {
-                Ok(Some(header::HeaderValue::from_str(value).map_err(|e| {
-                    Error::Kubeconfig(format!("Invalid bearer token: {}", e))
-                })?))
-            }
+            Self::Basic(value) => Ok(Some(
+                header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBasicAuth)?,
+            )),
+            Self::Token(value) => Ok(Some(
+                header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBearerToken)?,
+            )),
             Self::RefreshableToken(data, loader) => {
                 let mut locked_data = data.lock().await;
                 // Add some wiggle room onto the current timestamp so we don't get any race
@@ -54,14 +50,12 @@ impl Authentication {
                         locked_data.0 = new_token;
                         locked_data.1 = new_expire;
                     } else {
-                        return Err(Error::Kubeconfig(
-                            "Tried to refresh a token and got a non-refreshable token response".to_owned(),
-                        ));
+                        return Err(ConfigError::UnrefreshableTokenResponse.into());
                     }
                 }
-                Ok(Some(header::HeaderValue::from_str(&locked_data.0).map_err(
-                    |e| Error::Kubeconfig(format!("Invalid bearer token: {}", e)),
-                )?))
+                Ok(Some(
+                    header::HeaderValue::from_str(&locked_data.0).map_err(ConfigError::InvalidBearerToken)?,
+                ))
             }
         }
     }
@@ -123,12 +117,15 @@ impl Config {
     /// Fails if inference from both sources fails
     pub async fn infer() -> Result<Self> {
         match Self::new_from_cluster_env() {
-            Err(e1) => {
-                trace!("No in-cluster config found: {}", e1);
+            Err(cluster_env_err) => {
+                trace!("No in-cluster config found: {}", cluster_env_err);
                 trace!("Falling back to local kubeconfig");
                 let config = Self::new_from_user_kubeconfig(&KubeConfigOptions::default())
                     .await
-                    .map_err(|e2| Error::Kubeconfig(format!("Failed to infer config: {}, {}", e1, e2)))?;
+                    .map_err(|kubeconfig_err| ConfigError::ConfigInferenceExhausted {
+                        cluster_env: Box::new(cluster_env_err),
+                        kubeconfig: Box::new(kubeconfig_err),
+                    })?;
 
                 Ok(config)
             }
@@ -138,23 +135,22 @@ impl Config {
 
     /// Read the config from the cluster's environment variables
     pub fn new_from_cluster_env() -> Result<Self> {
-        let cluster_url = incluster_config::kube_server().ok_or_else(|| {
-            Error::Kubeconfig(format!(
-                "Unable to load in cluster config, {} and {} must be defined",
-                incluster_config::SERVICE_HOSTENV,
-                incluster_config::SERVICE_PORTENV
-            ))
-        })?;
-        let cluster_url = reqwest::Url::parse(&cluster_url)
-            .map_err(|e| Error::Kubeconfig(format!("Malformed url: {}", e)))?;
+        let cluster_url =
+            incluster_config::kube_server().ok_or_else(|| ConfigError::MissingInClusterVariables {
+                hostenv: incluster_config::SERVICE_HOSTENV,
+                portenv: incluster_config::SERVICE_PORTENV,
+            })?;
+        let cluster_url = reqwest::Url::parse(&cluster_url)?;
 
         let default_ns = incluster_config::load_default_ns()
-            .map_err(|e| Error::Kubeconfig(format!("Unable to load incluster default namespace: {}", e)))?;
+            .map_err(Box::new)
+            .map_err(ConfigError::InvalidInClusterNamespace)?;
 
         let root_cert = incluster_config::load_cert()?;
 
         let token = incluster_config::load_token()
-            .map_err(|e| Error::Kubeconfig(format!("Unable to load in cluster token: {}", e)))?;
+            .map_err(Box::new)
+            .map_err(ConfigError::InvalidInClusterToken)?;
 
         Ok(Self {
             cluster_url,
@@ -186,8 +182,7 @@ impl Config {
     }
 
     fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
-        let cluster_url = reqwest::Url::parse(&loader.cluster.server)
-            .map_err(|e| Error::Kubeconfig(format!("Malformed url: {}", e)))?;
+        let cluster_url = reqwest::Url::parse(&loader.cluster.server)?;
 
         let default_ns = loader
             .current_context
@@ -269,13 +264,12 @@ fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
         None => {
             if let Some(exec) = &loader.user.exec {
                 let creds = exec::auth_exec(exec)?;
-                let status = creds.status.ok_or_else(|| {
-                    Error::Kubeconfig("exec-plugin response did not contain a status".into())
-                })?;
+                let status = creds.status.ok_or_else(|| ConfigError::ExecPluginFailed)?;
                 let expiration = match status.expiration_timestamp {
-                    Some(ts) => Some(ts.parse::<DateTime<Utc>>().map_err(|e| {
-                        Error::Kubeconfig(format!("Malformed expriation date on token: {}", e))
-                    })?),
+                    Some(ts) => Some(
+                        ts.parse::<DateTime<Utc>>()
+                            .map_err(ConfigError::MalformedTokenExpirationDate)?,
+                    ),
                     None => None,
                 };
                 (status.token, expiration)

@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fs::File, path::Path};
 
-use crate::{config::utils, oauth2, Error, Result};
+use crate::{config::utils, error::ConfigError, oauth2, Result};
 
 use serde::{Deserialize, Serialize};
 
@@ -136,8 +136,11 @@ pub struct Context {
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
     pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig> {
-        let f = File::open(path).map_err(|e| Error::Kubeconfig(format!("{}", e)))?;
-        let config = serde_yaml::from_reader(f).map_err(|e| Error::Kubeconfig(format!("{}", e)))?;
+        let f = File::open(&path).map_err(|source| ConfigError::ReadFile {
+            path: path.as_ref().into(),
+            source,
+        })?;
+        let config = serde_yaml::from_reader(f).map_err(ConfigError::ParseYaml)?;
         Ok(config)
     }
 
@@ -154,8 +157,7 @@ impl Cluster {
             return Ok(None);
         }
         let res =
-            utils::data_or_file_with_base64(&self.certificate_authority_data, &self.certificate_authority)
-                .map_err(|e| Error::Kubeconfig(format!("{}", e)))?;
+            utils::data_or_file_with_base64(&self.certificate_authority_data, &self.certificate_authority)?;
         Ok(Some(res))
     }
 }
@@ -185,11 +187,9 @@ impl AuthInfo {
 
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
-            .map_err(|e| Error::Kubeconfig(format!("{}", e)))
     }
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
-            .map_err(|e| Error::Kubeconfig(format!("{}", e)))
     }
 }

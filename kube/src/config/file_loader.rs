@@ -1,5 +1,3 @@
-use std::path::Path;
-
 #[cfg(feature = "native-tls")]
 use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
 use reqwest::{Certificate, Identity};
@@ -8,7 +6,7 @@ use super::{
     file_config::{AuthInfo, Cluster, Context, Kubeconfig},
     utils,
 };
-use crate::{Error, Result};
+use crate::{error::ConfigError, Error, Result};
 
 /// KubeConfigOptions stores options used when loading kubeconfig file.
 #[derive(Default, Clone)]
@@ -45,8 +43,9 @@ pub struct ConfigLoader {
 impl ConfigLoader {
     /// Returns a config loader based on the cluster information from the kubeconfig file.
     pub async fn new_from_options(options: &KubeConfigOptions) -> Result<Self> {
-        let kubeconfig_path =
-            utils::find_kubeconfig().map_err(|e| Error::Kubeconfig(format!("Unable to load file: {}", e)))?;
+        let kubeconfig_path = utils::find_kubeconfig()
+            .map_err(Box::new)
+            .map_err(ConfigError::LoadConfigFile)?;
 
         let config = Kubeconfig::read_from(kubeconfig_path)?;
         let loader = Self::load(
@@ -84,14 +83,18 @@ impl ConfigLoader {
             .iter()
             .find(|named_context| &named_context.name == context_name)
             .map(|named_context| &named_context.context)
-            .ok_or_else(|| Error::Kubeconfig("Unable to load current context".into()))?;
+            .ok_or_else(|| ConfigError::LoadContext {
+                context_name: context_name.clone(),
+            })?;
         let cluster_name = cluster.unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
-            .ok_or_else(|| Error::Kubeconfig("Unable to load cluster of context".into()))?;
+            .ok_or_else(|| ConfigError::LoadClusterOfContext {
+                cluster_name: cluster_name.clone(),
+            })?;
         let user_name = user.unwrap_or(&current_context.user);
 
         let mut user_opt = None;
@@ -102,7 +105,9 @@ impl ConfigLoader {
                 user_opt = Some(user);
             }
         }
-        let user = user_opt.ok_or_else(|| Error::Kubeconfig("Unable to find named user".into()))?;
+        let user = user_opt.ok_or_else(|| ConfigError::FindUser {
+            user_name: user_name.clone(),
+        })?;
         Ok(ConfigLoader {
             current_context: current_context.clone(),
             cluster: cluster.clone(),

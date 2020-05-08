@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{Error, Result};
+use crate::{error::ConfigError, Error, Result};
 use chrono::{DateTime, Utc};
 use dirs::home_dir;
 
@@ -13,7 +13,7 @@ const KUBECONFIG: &str = "KUBECONFIG";
 pub fn find_kubeconfig() -> Result<PathBuf> {
     kubeconfig_path()
         .or_else(default_kube_path)
-        .ok_or_else(|| Error::Kubeconfig("Failed to find path of kubeconfig".into()))
+        .ok_or_else(|| ConfigError::NoKubeconfigPath.into())
 }
 
 /// Returns kubeconfig path from specified environment variable.
@@ -28,37 +28,44 @@ pub fn default_kube_path() -> Option<PathBuf> {
 
 pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Option<P>) -> Result<Vec<u8>> {
     match (data, file) {
-        (Some(d), _) => {
-            base64::decode(&d).map_err(|e| Error::Kubeconfig(format!("Failed to decode base64: {}", e)))
-        }
+        (Some(d), _) => base64::decode(&d)
+            .map_err(ConfigError::Base64Decode)
+            .map_err(Error::Kubeconfig),
         (_, Some(f)) => {
             let f = (*f).as_ref();
             let abs_file = if f.is_absolute() {
                 f.to_path_buf()
             } else {
                 find_kubeconfig().and_then(|cfg| {
-                    cfg.parent().map(|kubedir| kubedir.join(f)).ok_or_else(|| {
-                        Error::Kubeconfig(format!("Failed to compute the absolute path of '{:?}'", f))
-                    })
+                    cfg.parent()
+                        .map(|kubedir| kubedir.join(f))
+                        .ok_or_else(|| ConfigError::NoAbsolutePath { path: f.into() }.into())
                 })?
             };
             // dbg!(&abs_file);
-            fs::read(&abs_file)
-                .map_err(|e| Error::Kubeconfig(format!("Failed to read {:?}: {}", abs_file, e)))
+            fs::read(&abs_file).map_err(|source| {
+                ConfigError::ReadFile {
+                    path: abs_file,
+                    source,
+                }
+                .into()
+            })
         }
-        _ => Err(Error::Kubeconfig(
-            "Failed to get data/file with base64 format".into(),
-        )),
+        _ => Err(ConfigError::NoBase64FileOrData.into()),
     }
 }
 
 pub fn data_or_file<P: AsRef<Path>>(data: &Option<String>, file: &Option<P>) -> Result<String> {
     match (data, file) {
         (Some(d), _) => Ok(d.to_string()),
-        (_, Some(f)) => {
-            fs::read_to_string(f).map_err(|e| Error::Kubeconfig(format!("Failed to read file: {}", e)))
-        }
-        _ => Err(Error::Kubeconfig("Failed to get data/file".into())),
+        (_, Some(f)) => fs::read_to_string(f).map_err(|source| {
+            ConfigError::ReadFile {
+                path: f.as_ref().into(),
+                source,
+            }
+            .into()
+        }),
+        _ => Err(ConfigError::NoFileOrData.into()),
     }
 }
 
