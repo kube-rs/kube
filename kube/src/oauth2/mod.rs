@@ -5,7 +5,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{error::ConfigError, Result};
+use crate::{
+    error::{ConfigError, Error},
+    Result,
+};
 
 use reqwest::header::CONTENT_TYPE;
 use serde::{Deserialize, Serialize};
