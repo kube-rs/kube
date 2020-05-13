@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// - .metadata.resource_version
 ///
 /// This avoids a bunch of the unnecessary unwrap mechanics for apps
-pub trait Meta: Metadata {
+pub trait Meta {
     /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
     /// The name of the resource

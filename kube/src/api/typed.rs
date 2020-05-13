@@ -29,24 +29,15 @@ pub struct Api<K> {
     pub(crate) phantom: PhantomData<K>,
 }
 
-/// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K> Api<K>
-where
-    K: k8s_openapi::Resource,
-{
-    /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all(client: Client) -> Self {
-        let resource = Resource::all::<K>();
-        Self {
-            resource,
-            client,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Namespaced resource within a given namespace
-    pub fn namespaced(client: Client, ns: &str) -> Self {
-        let resource = Resource::namespaced::<K>(ns);
+impl<K> Api<K> {
+    /// Converts an untyped and dynamic `Resource` into a typed `Api<K>`. j
+    ///
+    /// Note: No verification is performed of whether `K` matches the `Resource`.
+    /// It's fully possible to use this to try to read `ReplicaSet`s as `StatefulSet`s,
+    /// but the results will vary between useless and wildly confusing.
+    /// If you're not trying to reimplement `kubectl` then you'll probably want to use
+    /// `all` or `namespaced` instead.
+    pub fn from_dynamic_resource(client: Client, resource: Resource) -> Self {
         Self {
             resource,
             client,
@@ -57,6 +48,22 @@ where
     /// Consume self and return the [`Client`]
     pub fn into_client(self) -> Client {
         self.into()
+    }
+}
+
+/// Expose same interface as Api for controlling scope/group/versions/ns
+impl<K> Api<K>
+where
+    K: k8s_openapi::Resource,
+{
+    /// Cluster level resources, or resources viewed across all namespaces
+    pub fn all(client: Client) -> Self {
+        Self::from_dynamic_resource(client, Resource::all::<K>())
+    }
+
+    /// Namespaced resource within a given namespace
+    pub fn namespaced(client: Client, ns: &str) -> Self {
+        Self::from_dynamic_resource(client, Resource::namespaced::<K>(ns))
     }
 }
 

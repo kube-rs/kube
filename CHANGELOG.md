@@ -1,4 +1,11 @@
-0.34.0 / 2020-05-XX
+0.35.0 / 2020-XX-XX
+===================
+  * Added `Api::from_dynamic_resource` for constructing `Api`s whose Group-Version-Kind is not known at compile time
+  * `k8s_openapi::Metadata` is no longer a supertrait of `Meta`
+    * If you need this, add an extra type bound for `k8s_openapi::Metadata` or switch from 
+      `k8s_openapi::Metadata::metadata()` to `Meta::meta()`
+
+0.34.0 / 2020-05-08
 ===================
   * Bump `k8s-openapi` to `0.8.0`
   * `Config::from_cluster_env` <- renamed from `Config::new_from_cluster_env`
