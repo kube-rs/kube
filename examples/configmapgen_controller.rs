@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::{Result, Report};
 use futures::{stream, StreamExt};
 use k8s_openapi::{
     api::core::v1::ConfigMap,
@@ -23,6 +23,7 @@ use tokio::time::Duration;
 
 #[derive(Debug, Snafu)]
 enum Error {
+    #[snafu(display("Failed to create ConfigMap: {}", source))]
     ConfigMapCreationFailed {
         source: kube::Error,
         backtrace: Backtrace,
@@ -135,7 +136,7 @@ async fn main() -> Result<()> {
             ))),
         ),
     )
-    .for_each(|res| async move { println!("I did a thing! {:?}", res) })
+    .for_each(|res| async move { println!("I did a thing! {:?}", res.map_err(Report::from)) })
     .await;
 
     Ok(())

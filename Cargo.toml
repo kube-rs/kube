@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 futures = "0.3.4"
 kube = "0.33.0"
+# kube = { path = "../kube-rs/kube" }
 k8s-openapi = "0.7.1"
 derivative = "2.1.1"
 serde = "1.0.106"
@@ -25,9 +26,9 @@ version = "0.2.20"
 features = ["time"]
 
 [dev-dependencies]
-anyhow = "1.0.28"
 kube-derive = "0.33.0"
 serde_json = "1.0.52"
+color-eyre = "0.2.3"
 
 [dev-dependencies.k8s-openapi]
 version = "0.7.1"
