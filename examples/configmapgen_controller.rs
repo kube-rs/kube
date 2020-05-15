@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
     let config = Config::infer().await?;
     let client = Client::new(config);
 
-    let store = kube_rt::reflector::StoreWriter::<ConfigMapGenerator>::default();
+    let store = kube_rt::reflector::store::Writer::<ConfigMapGenerator>::default();
     controller(
         |generator| {
             let client = client.clone();

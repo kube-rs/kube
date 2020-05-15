@@ -16,11 +16,11 @@ use std::sync::Arc;
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct StoreWriter<K: Resource> {
+pub struct Writer<K: Resource> {
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
-impl<K: Meta + Clone> StoreWriter<K> {
+impl<K: Meta + Clone> Writer<K> {
     /// Return a read handle to the store
     ///
     /// Multiple read handles may be obtained, by either calling `as_reader` multiple times,
@@ -61,7 +61,7 @@ impl<K: Meta + Clone> StoreWriter<K> {
 /// Cloning will produce a new reference to the same backing store.
 ///
 /// Cannot be constructed directly since one writer handle is required,
-/// use `StoreWriter::as_reader()` instead.
+/// use `Writer::as_reader()` instead.
 #[derive(Debug, Derivative)]
 #[derivative(Clone)]
 pub struct Store<K: Resource> {
