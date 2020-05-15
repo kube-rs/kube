@@ -1,5 +1,5 @@
 use crate::{
-    reflector::{Cache, ErasedResource, ObjectRef},
+    reflector::{ErasedResource, ObjectRef, Store},
     scheduler::{self, scheduler, ScheduleRequest},
     utils::trystream_try_via,
 };
@@ -90,7 +90,7 @@ where
 pub fn controller<K, QueueStream, ReconcilerFut>(
     mut reconciler: impl FnMut(K) -> ReconcilerFut,
     mut error_policy: impl FnMut(&ReconcilerFut::Error) -> ReconcilerAction,
-    store: Cache<K>,
+    store: Store<K>,
     queue: QueueStream,
 ) -> impl Stream<
     Item = Result<

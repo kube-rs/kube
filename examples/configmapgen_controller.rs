@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
     let config = Config::infer().await?;
     let client = Client::new(config);
 
-    let cache = kube_rt::reflector::Cache::<ConfigMapGenerator>::default();
+    let store = kube_rt::reflector::Store::<ConfigMapGenerator>::default();
     controller(
         |generator| {
             let client = client.clone();
@@ -121,10 +121,10 @@ async fn main() -> Result<()> {
         |_error: &Error| ReconcilerAction {
             requeue_after: Some(Duration::from_secs(1)),
         },
-        cache.clone(),
+        store.clone(),
         stream::select(
             trigger_self(try_flatten_addeds(reflector(
-                cache,
+                store,
                 watcher(
                     Api::<ConfigMapGenerator>::all(client.clone()),
                     ListParams::default(),

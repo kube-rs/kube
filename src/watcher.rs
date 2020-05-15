@@ -47,7 +47,7 @@ pub enum Event<K> {
     Deleted(K),
     /// The watch stream was restarted, so `Deleted` events may have been missed
     ///
-    /// Should be used as a signal to replace the cache contents atomically.
+    /// Should be used as a signal to replace the store contents atomically.
     Restarted(Vec<K>),
 }
 
