@@ -16,6 +16,7 @@ serde = "1.0.106"
 dashmap = "3.11.1"
 smallvec = "1.4.0"
 pin-project = "0.4.10"
+pin-cell = { git = "https://github.com/withoutboats/pin-cell" }
 
 [dependencies.snafu]
 version = "0.6.6"

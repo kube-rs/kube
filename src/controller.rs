@@ -1,10 +1,11 @@
 use crate::{
     reflector::{Cache, ErasedResource, ObjectRef},
     scheduler::{self, scheduler, ScheduleRequest},
+    utils::trystream_try_via,
 };
 use futures::{
-    channel, future, stream, FutureExt, SinkExt, Stream, TryFuture, TryFutureExt, TryStream,
-    TryStreamExt,
+    channel, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt,
+    TryStream, TryStreamExt,
 };
 use kube::api::Meta;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
@@ -105,10 +106,15 @@ where
     QueueStream::Error: std::error::Error + 'static,
 {
     let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ObjectRef<K>>>(100);
-    let scheduler_rx = scheduler(scheduler_rx);
-    stream::select(
-        queue.context(QueueError),
-        scheduler_rx.context(SchedulerDequeueFailed),
+    trystream_try_via(
+        stream::select(
+            queue.context(QueueError).map_ok(|obj_ref| ScheduleRequest {
+                message: obj_ref,
+                run_at: Instant::now() + Duration::from_millis(1),
+            }),
+            scheduler_rx.map(Ok),
+        ),
+        |s| scheduler(s).context(SchedulerDequeueFailed),
     )
     .and_then(move |obj_ref| {
         future::ready(
