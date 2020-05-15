@@ -12,7 +12,10 @@ async fn main() -> Result<()> {
     let watcher = watcher(api, ListParams::default());
     // Use try_for_each to fail on first error, use for_each to keep retrying
     watcher
-        .try_for_each(|event| async move { Ok(println!("{:?}", event)) })
+        .try_for_each(|event| async move {
+            println!("{:?}", event);
+            Ok(())
+        })
         .await?;
     Ok(())
 }

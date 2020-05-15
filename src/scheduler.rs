@@ -85,11 +85,8 @@ impl<T: Hash + Eq + Clone, R> Scheduler<T, R> {
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<delay_queue::Expired<T>, time::Error>>> {
         let message = self.queue.poll_expired(cx);
-        match &message {
-            Poll::Ready(Some(Ok(message))) => {
-                self.scheduled.remove(message.get_ref()).expect("Expired message was popped from the Scheduler queue, but was not in the metadata map");
-            }
-            _ => {}
+        if let Poll::Ready(Some(Ok(message))) = &message {
+            self.scheduled.remove(message.get_ref()).expect("Expired message was popped from the Scheduler queue, but was not in the metadata map");
         }
         message
     }

@@ -48,10 +48,10 @@ fn object_to_owner_reference<K: Meta>(meta: ObjectMeta) -> Result<OwnerReference
     Ok(OwnerReference {
         api_version: K::API_VERSION.to_string(),
         kind: K::KIND.to_string(),
-        name: meta.name.clone().context(MissingObjectKey {
+        name: meta.name.context(MissingObjectKey {
             name: ".metadata.name",
         })?,
-        uid: meta.uid.clone().context(MissingObjectKey {
+        uid: meta.uid.context(MissingObjectKey {
             name: ".metadata.backtrace",
         })?,
         ..OwnerReference::default()

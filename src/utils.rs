@@ -47,6 +47,7 @@ where
         let mut inner = PinCell::borrow_mut(this.inner.as_ref());
         let inner_peek = PinMut::as_mut(&mut inner).peek();
         pin_mut!(inner_peek);
+        #[allow(clippy::match_same_arms)]
         match inner_peek.poll(cx) {
             Poll::Ready(Some(Ok(_))) => match PinMut::as_mut(&mut inner).poll_next(cx) {
                 Poll::Ready(Some(Ok(x))) => Poll::Ready(Some(x)),
@@ -80,6 +81,7 @@ where
         let mut inner = PinCell::borrow_mut(this.inner.as_ref());
         let inner_peek = PinMut::as_mut(&mut inner).peek();
         pin_mut!(inner_peek);
+        #[allow(clippy::match_same_arms)]
         match inner_peek.poll(cx) {
             Poll::Ready(Some(Err(_))) => match PinMut::as_mut(&mut inner).poll_next(cx) {
                 Poll::Ready(Some(Err(x))) => Poll::Ready(Some(x)),

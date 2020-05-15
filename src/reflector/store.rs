@@ -25,6 +25,7 @@ impl<K: Meta + Clone> Writer<K> {
     ///
     /// Multiple read handles may be obtained, by either calling `as_reader` multiple times,
     /// or by calling `Store::clone()` afterwards.
+    #[must_use]
     pub fn as_reader(&self) -> Store<K> {
         Store {
             store: self.store.clone(),
