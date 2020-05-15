@@ -66,6 +66,10 @@ impl<K> Event<K> {
     }
 
     /// Flattens out all objects that were added, modified, or deleted in the event.
+    ///
+    /// Note that `Deleted` events may be missed when restarting the stream. Use finalizers
+    /// or owner references instead if you care about cleaning up external resources after
+    /// deleted objects.
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
             Event::Added(obj) | Event::Deleted(obj) => SmallVec::from_buf([obj]),

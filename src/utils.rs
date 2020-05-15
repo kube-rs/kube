@@ -9,7 +9,7 @@ use pin_project::pin_project;
 use std::{fmt::Debug, pin::Pin, rc::Rc, task::Poll};
 use stream::IntoStream;
 
-/// Flattens each item in the list following the rules of `WatcherEvent::into_iter_added`
+/// Flattens each item in the list following the rules of `watcher::Event::into_iter_added`
 pub fn try_flatten_addeds<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,
 ) -> impl Stream<Item = Result<K, S::Error>> {
@@ -18,7 +18,7 @@ pub fn try_flatten_addeds<K, S: TryStream<Ok = watcher::Event<K>>>(
         .try_flatten()
 }
 
-/// Flattens each item in the list following the rules of `WatcherEvent::into_iter_touched`
+/// Flattens each item in the list following the rules of `watcher::Event::into_iter_touched`
 pub fn try_flatten_toucheds<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,
 ) -> impl Stream<Item = Result<K, S::Error>> {
@@ -26,16 +26,6 @@ pub fn try_flatten_toucheds<K, S: TryStream<Ok = watcher::Event<K>>>(
         .map_ok(|event| stream::iter(event.into_iter_touched().map(Ok)))
         .try_flatten()
 }
-
-// #[pin_project]
-// struct TryViaStream<Src, Via> {
-//     input_stream: Src,
-//     via_stream: Via,
-// }
-
-// impl<Src, Via> Stream for TryViaStream<Src, Via> {
-
-// }
 
 #[pin_project]
 pub struct SplitResultOk<S: TryStream> {

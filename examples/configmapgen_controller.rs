@@ -1,4 +1,4 @@
-use color_eyre::{Result, Report};
+use color_eyre::{Report, Result};
 use futures::{stream, StreamExt};
 use k8s_openapi::{
     api::core::v1::ConfigMap,
@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
     let config = Config::infer().await?;
     let client = Client::new(config);
 
-    let store = kube_rt::reflector::Store::<ConfigMapGenerator>::default();
+    let store = kube_rt::reflector::StoreWriter::<ConfigMapGenerator>::default();
     controller(
         |generator| {
             let client = client.clone();
@@ -121,7 +121,7 @@ async fn main() -> Result<()> {
         |_error: &Error| ReconcilerAction {
             requeue_after: Some(Duration::from_secs(1)),
         },
-        store.clone(),
+        store.as_reader(),
         stream::select(
             trigger_self(try_flatten_addeds(reflector(
                 store,
