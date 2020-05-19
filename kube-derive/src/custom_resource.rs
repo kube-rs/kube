@@ -303,6 +303,12 @@ impl CustomDerive for CustomResource {
                 fn metadata(&self) -> Option<&Self::Ty> {
                     Some(&self.metadata)
                 }
+                fn metadata_mut(&mut self) -> Option<&mut Self::Ty> {
+                    Some(&mut self.metadata)
+                }
+                fn set_metadata(&mut self, metadata: Self::Ty) {
+                    self.metadata = metadata;
+                }
             }
         };
 
