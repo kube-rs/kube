@@ -12,6 +12,7 @@ pub struct CustomResource {
     group: String,
     version: String,
     namespaced: bool,
+    partial_eq: bool,
     status: Option<String>,
     shortnames: Vec<String>,
     apiextensions: String,
@@ -34,6 +35,7 @@ impl CustomDerive for CustomResource {
         let mut group = None;
         let mut version = None;
         let mut namespaced = false;
+        let mut partial_eq = false;
         let mut status = None;
         let mut apiextensions = "v1".to_string();
         let mut scale = None;
@@ -134,6 +136,9 @@ impl CustomDerive for CustomResource {
                         if path.is_ident("namespaced") {
                             namespaced = true;
                             continue;
+                        } else if path.is_ident("partial_eq") {
+                            partial_eq = true;
+                            continue;
                         } else {
                             &meta
                         }
@@ -188,6 +193,7 @@ impl CustomDerive for CustomResource {
             group,
             version,
             namespaced,
+            partial_eq,
             printcolums,
             status,
             shortnames,
@@ -206,6 +212,7 @@ impl CustomDerive for CustomResource {
             kind,
             version,
             namespaced,
+            partial_eq,
             status,
             shortnames,
             printcolums,
@@ -237,8 +244,14 @@ impl CustomDerive for CustomResource {
         };
         let has_status = status.is_some();
 
+        let mut derives = vec!["Serialize", "Deserialize", "Clone", "Debug"];
+        if partial_eq {
+            derives.push("PartialEq");
+        }
+        let derives :Vec<Ident>= derives.iter().map(|s|format_ident!("{}", s)).collect();
+
         let root_obj = quote! {
-            #[derive(Serialize, Deserialize, Clone, Debug)]
+            #[derive(#(#derives),*)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
                 #visibility api_version: String,
