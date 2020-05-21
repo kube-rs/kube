@@ -4,10 +4,13 @@ use crate::{
 };
 use futures::{future::FutureExt, lock::Mutex, pin_mut, select, TryStreamExt};
 use serde::de::DeserializeOwned;
-use tokio::{
-    signal::{self, ctrl_c},
-    time::delay_for,
-};
+use tokio::{signal::ctrl_c, time::delay_for};
+
+#[cfg(not(target_family = "windows"))]
+use tokio::signal;
+
+#[cfg(target_family = "windows")]
+use tokio::sync::mpsc::{channel, Receiver};
 
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -59,9 +62,17 @@ where
             // local development needs listening for ctrl_c
             let ctrlc_fut = ctrl_c().fuse();
             // kubernetes apps need to listen for SIGTERM (30s warning)
-            use signal::unix::{signal, SignalKind}; // TODO: conditional compile
+            #[cfg(not(target_family = "windows"))]
+            use signal::unix::{signal, SignalKind};
+            #[cfg(not(target_family = "windows"))]
             let mut sigterm = signal(SignalKind::terminate()).unwrap();
+            #[cfg(not(target_family = "windows"))]
             let sigterm_fut = sigterm.recv().fuse();
+
+            #[cfg(target_family = "windows")]
+            let (_tx, mut rx): (_, Receiver<()>) = channel(1);
+            #[cfg(target_family = "windows")]
+            let sigterm_fut = rx.recv().fuse();
 
             // and reflector needs to poll continuously
             let poll_fut = self.poll().fuse();
