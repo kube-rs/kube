@@ -1,4 +1,4 @@
-0.34.0 / 2020-05-XX
+0.34.0 / 2020-05-08
 ===================
   * Bump `k8s-openapi` to `0.8.0`
   * `Config::from_cluster_env` <- renamed from `Config::new_from_cluster_env`

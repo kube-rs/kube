@@ -6,11 +6,9 @@ use futures::{future::FutureExt, lock::Mutex, pin_mut, select, TryStreamExt};
 use serde::de::DeserializeOwned;
 use tokio::{signal::ctrl_c, time::delay_for};
 
-#[cfg(not(target_family = "windows"))]
-use tokio::signal;
+#[cfg(not(target_family = "windows"))] use tokio::signal;
 
-#[cfg(target_family = "windows")]
-use tokio::sync::mpsc::{channel, Receiver};
+#[cfg(target_family = "windows")] use tokio::sync::mpsc::{channel, Receiver};
 
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -62,8 +60,7 @@ where
             // local development needs listening for ctrl_c
             let ctrlc_fut = ctrl_c().fuse();
             // kubernetes apps need to listen for SIGTERM (30s warning)
-            #[cfg(not(target_family = "windows"))]
-            use signal::unix::{signal, SignalKind};
+            #[cfg(not(target_family = "windows"))] use signal::unix::{signal, SignalKind};
             #[cfg(not(target_family = "windows"))]
             let mut sigterm = signal(SignalKind::terminate()).unwrap();
             #[cfg(not(target_family = "windows"))]
