@@ -1,10 +1,14 @@
 version: 2.1
 
+orbs:
+  win: circleci/windows@2.4.0
+
 workflows:
   version: 2
   all_jobs:
     jobs:
       - cargo_test
+      - windows_test
 
 jobs:
   cargo_test:
@@ -18,7 +22,7 @@ jobs:
       - run: grep "\[dependencies\]" -A 9000 kube/Cargo.toml > deps_checksum
       - restore_cache:
           keys:
-          - cache-{{ checksum "deps_checksum" }}
+            - cache-{{ checksum "deps_checksum" }}
       - run: cargo build
       - run: cargo test --lib
       - run: cargo test --example crd_api crd_reflector
@@ -27,6 +31,38 @@ jobs:
       - save_cache:
           paths:
             - /usr/local/cargo/registry
+            - target/debug/.fingerprint
+            - target/debug/build
+            - target/debug/deps
+          key: cache-{{ checksum "deps_checksum" }}
+  windows_test:
+    environment:
+      - CARGO_INCREMENTAL: 0
+      - CARGO_BUILD_TARGET: "x86_64-pc-windows-msvc"
+    executor:
+      name: win/default
+      shell: bash.exe
+    steps:
+      - checkout
+      - run:
+          name: "HACK: remove gitconfig to prevent ssh fetches from cargo"
+          command: rm ~/.gitconfig
+      - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable --target $CARGO_BUILD_TARGET
+      - run: echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
+      - run: grep "\[dependencies\]" -A 9000 kube/Cargo.toml > deps_checksum
+      - restore_cache:
+          keys:
+            - cache-{{ checksum "deps_checksum" }}
+      # To avoid openssl dependencies on windows, we need to set the rustls-tls feature, which
+      # requires being at the crate level rather than the workspace level
+      - run: cd kube && cargo test --example crd_api crd_reflector --no-default-features --features=rustls-tls
+      - run: cd kube-derive && cargo test -j4
+      - run: cd kube && cargo test -j4 --no-default-features --features=rustls-tls
+      - run: cd kube-derive && cargo test --lib
+      - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls
+      - save_cache:
+          paths:
+            - "$HOME/.cargo/registry"
             - target/debug/.fingerprint
             - target/debug/build
             - target/debug/deps
