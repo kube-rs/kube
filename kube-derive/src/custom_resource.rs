@@ -248,7 +248,7 @@ impl CustomDerive for CustomResource {
         if partial_eq {
             derives.push("PartialEq");
         }
-        let derives :Vec<Ident>= derives.iter().map(|s|format_ident!("{}", s)).collect();
+        let derives: Vec<Ident> = derives.iter().map(|s| format_ident!("{}", s)).collect();
 
         let root_obj = quote! {
             #[derive(#(#derives),*)]
