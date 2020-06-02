@@ -321,6 +321,10 @@ impl From<Config> for reqwest::ClientBuilder {
     fn from(config: Config) -> Self {
         let mut builder = Self::new();
 
+        if let Some(i) = &config.proxy {
+            builder = builder.proxy(i.clone())
+        }
+
         if let Some(i) = config.identity() {
             builder = builder.identity(i)
         }
