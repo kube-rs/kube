@@ -12,20 +12,15 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
 
-    let proxy_url = std::env::var("HTTP_PROXY").ok();
-    if let Some(p) = &proxy_url {
-        info!("HTTP_PROXY is {}", p);
+    let mut config = Config::from_kubeconfig(&KubeConfigOptions::default()).await?;
+
+    if let Ok(proxy_url) = &std::env::var("PROXY_URL") {
+        info!("PROXY_URL is {}", proxy_url);
+        config = config.proxy(reqwest::Proxy::https(proxy_url)?);
     } else {
-        warn!("Running without HTTP_PROXY environment variable set");
+        warn!("Running without PROXY_URL environment variable set");
     }
 
-    let mut config = Config::from_kubeconfig(&KubeConfigOptions::default()).await?;
-    let proxy = proxy_url
-        .map(|url| reqwest::Proxy::https(&url))
-        .map_or(Ok(None), |p| p.map(Some))?;
-    if let Some(p) = proxy {
-      config = config.proxy(p);
-    }
     let client = Client::new(config);
 
     // Verify we can access kubernetes through proxy
