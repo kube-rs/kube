@@ -93,20 +93,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Return a copy of this config with proxy configured
-    ///
-    /// ```rust
-    /// # fn main() {
-    /// # async fn run() -> Result<(), Box< dyn std::error::Error>> {
-    /// let mut config = kube::Config::from_kubeconfig(&kube::config::KubeConfigOptions::default()).await?;
-    /// let proxy = reqwest::Proxy::http("https://localhost:8080")?;
-    /// let config = config.proxy(proxy);
-    /// # Ok(())
-    /// # }}
-    /// ```
-    pub fn proxy(&mut self, proxy: reqwest::Proxy) -> Self {
-        Config { proxy: Some(proxy), ..(self.clone()) }
-    }
     /// Construct a new config where only the `cluster_url` is set by the user.
     /// and everything else receives a default value.
     ///
@@ -277,6 +263,22 @@ impl Config {
             reqwest::Identity::from_pkcs12_der(identity, identity_password)
                 .expect("Identity buffer was not valid identity"),
         )
+    }
+
+    /// Configure a proxy for this kube config
+    ///
+    /// ```rust
+    /// # fn main() {
+    /// # async fn run() -> Result<(), Box< dyn std::error::Error>> {
+    /// let mut config = kube::Config::from_kubeconfig(&kube::config::KubeConfigOptions::default()).await?;
+    /// let proxy = reqwest::Proxy::http("https://localhost:8080")?;
+    /// let config = config.proxy(proxy);
+    /// # Ok(())
+    /// # }}
+    /// ```
+    pub fn proxy(mut self, proxy: reqwest::Proxy) -> Self {
+        self.proxy = Some(proxy);
+        self
     }
 }
 
