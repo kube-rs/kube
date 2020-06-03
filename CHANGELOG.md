@@ -1,3 +1,9 @@
+0.35.0 / 2020-06-XX
+===================
+  * `Config::proxy` support added - #246
+  * `PartialEq` can be derived with `kube-derive` - #242
+  * Windows builds no longer clashes with runtime - #240
+
 0.34.0 / 2020-05-08
 ===================
   * Bump `k8s-openapi` to `0.8.0`
