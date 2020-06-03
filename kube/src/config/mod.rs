@@ -78,6 +78,8 @@ pub struct Config {
     pub timeout: std::time::Duration,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
+    /// Proxy to send requests to Kubernetes API through
+    pub(crate) proxy: Option<reqwest::Proxy>,
     /// The identity to use for communicating with the Kubernetes API
     /// along wit the password to decrypt it.
     ///
@@ -91,6 +93,20 @@ pub struct Config {
 }
 
 impl Config {
+    /// Return a copy of this config with proxy configured
+    ///
+    /// ```rust
+    /// # fn main() {
+    /// # async fn run() -> Result<(), Box< dyn std::error::Error>> {
+    /// let mut config = kube::Config::from_kubeconfig(&kube::config::KubeConfigOptions::default()).await?;
+    /// let proxy = reqwest::Proxy::http("https://localhost:8080")?;
+    /// let config = config.proxy(proxy);
+    /// # Ok(())
+    /// # }}
+    /// ```
+    pub fn proxy(&mut self, proxy: reqwest::Proxy) -> Self {
+        Config { proxy: Some(proxy), ..(self.clone()) }
+    }
     /// Construct a new config where only the `cluster_url` is set by the user.
     /// and everything else receives a default value.
     ///
@@ -104,6 +120,7 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs: false,
+            proxy: None,
             identity: None,
             auth_header: Authentication::None,
         }
@@ -163,6 +180,7 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs: false,
+            proxy: None,
             identity: None,
             auth_header: Authentication::Token(format!("Bearer {}", token)),
         })
@@ -226,6 +244,7 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: DEFAULT_TIMEOUT,
             accept_invalid_certs,
+            proxy: None,
             identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
             auth_header: load_auth_header(&loader)?,
         })
