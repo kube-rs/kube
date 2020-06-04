@@ -12,7 +12,7 @@ pub struct CustomResource {
     group: String,
     version: String,
     namespaced: bool,
-    partial_eq: bool,
+    derives: Vec<String>,
     status: Option<String>,
     shortnames: Vec<String>,
     apiextensions: String,
@@ -36,7 +36,7 @@ impl CustomDerive for CustomResource {
         let mut group = None;
         let mut version = None;
         let mut namespaced = false;
-        let mut partial_eq = false;
+        let mut derives = vec![];
         let mut status = None;
         let mut apiextensions = "v1".to_string();
         let mut scale = None;
@@ -128,6 +128,14 @@ impl CustomDerive for CustomResource {
                                 return Err(r#"#[kube(printcolumn = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
+                        } else if meta.path.is_ident("derive") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                derives.push(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(printcolumn = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
                         } else if meta.path.is_ident("finalizer") {
                             if let syn::Lit::Str(lit) = &meta.lit {
                                 finalizers.push(lit.value());
@@ -145,9 +153,6 @@ impl CustomDerive for CustomResource {
                     syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
                         if path.is_ident("namespaced") {
                             namespaced = true;
-                            continue;
-                        } else if path.is_ident("partial_eq") {
-                            partial_eq = true;
                             continue;
                         } else {
                             &meta
@@ -203,7 +208,7 @@ impl CustomDerive for CustomResource {
             group,
             version,
             namespaced,
-            partial_eq,
+            derives,
             printcolums,
             finalizers,
             status,
@@ -223,7 +228,7 @@ impl CustomDerive for CustomResource {
             kind,
             version,
             namespaced,
-            partial_eq,
+            derives,
             status,
             shortnames,
             printcolums,
@@ -257,15 +262,18 @@ impl CustomDerive for CustomResource {
         let has_status = status.is_some();
         let flizers = serde_json::to_string(&finalizers).unwrap();
 
-        let mut derives = vec!["Serialize", "Deserialize", "Clone", "Debug"];
-        if partial_eq {
-            derives.push("PartialEq");
+        let mut derive_idents = vec![];
+        for d in vec!["Serialize", "Deserialize", "Clone", "Debug"] {
+            derive_idents.push(format_ident!("{}", d));
         }
-        let derives: Vec<Ident> = derives.iter().map(|s| format_ident!("{}", s)).collect();
+        for d in derives {
+            derive_idents.push(format_ident!("{}", d));
+        }
+
         let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
         let root_obj = quote! {
             #[doc = #docstr]
-            #[derive(#(#derives),*)]
+            #[derive(#(#derive_idents),*)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
                 #visibility api_version: String,
