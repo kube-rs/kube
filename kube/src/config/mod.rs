@@ -268,13 +268,14 @@ impl Config {
     /// Configure a proxy for this kube config
     ///
     /// ```rust
-    /// # fn main() {
-    /// # async fn run() -> Result<(), Box< dyn std::error::Error>> {
-    /// let mut config = kube::Config::from_kubeconfig(&kube::config::KubeConfigOptions::default()).await?;
-    /// let proxy = reqwest::Proxy::http("https://localhost:8080")?;
-    /// let config = config.proxy(proxy);
-    /// # Ok(())
-    /// # }}
+    /// use kube::{Config, config};
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), kube::Error> {
+    ///     let mut config = Config::from_kubeconfig(&config::KubeConfigOptions::default()).await?;
+    ///     let proxy = reqwest::Proxy::http("https://localhost:8080")?;
+    ///     let config = config.proxy(proxy);
+    ///     Ok(())
+    /// }
     /// ```
     pub fn proxy(mut self, proxy: reqwest::Proxy) -> Self {
         self.proxy = Some(proxy);
