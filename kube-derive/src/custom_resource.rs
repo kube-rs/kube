@@ -133,7 +133,7 @@ impl CustomDerive for CustomResource {
                                 derives.push(lit.value());
                                 continue;
                             } else {
-                                return Err(r#"#[kube(printcolumn = "...")] expects a string literal value"#)
+                                return Err(r#"#[kube(derive = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
                         } else if meta.path.is_ident("finalizer") {
