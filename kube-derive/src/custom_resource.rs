@@ -130,7 +130,7 @@ impl CustomDerive for CustomResource {
                             }
                         } else if meta.path.is_ident("finalizer") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                finalizers.push(format!("\"{}\"", lit.value()));
+                                finalizers.push(lit.value());
                                 continue;
                             } else {
                                 return Err(r#"#[kube(finalizer = "...")] expects a string literal value"#)
@@ -255,16 +255,16 @@ impl CustomDerive for CustomResource {
             (fst, snd)
         };
         let has_status = status.is_some();
-        let flizers = format!("[ {} ]", finalizers.join(",")); // more hacks
+        let flizers = serde_json::to_string(&finalizers).unwrap();
 
         let mut derives = vec!["Serialize", "Deserialize", "Clone", "Debug"];
         if partial_eq {
             derives.push("PartialEq");
         }
         let derives: Vec<Ident> = derives.iter().map(|s| format_ident!("{}", s)).collect();
-        let docstring = format!(" Auto-generated type that wraps {} for the derived `CustomResource` trait", ident);
+        let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
         let root_obj = quote! {
-            #[doc = #docstring]
+            #[doc = #docstr]
             #[derive(#(#derives),*)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
@@ -332,14 +332,7 @@ impl CustomDerive for CustomResource {
             k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident
         };
 
-        let short_json = format!(
-            "[{}]",
-            shortnames
-                .into_iter()
-                .map(|sn| format!("\"{}\"", sn))
-                .collect::<Vec<_>>()
-                .join(",")
-        );
+        let short_json = serde_json::to_string(&shortnames).unwrap();
         let crd_meta_name = format!("{}.{}", plural, group);
         let crd_meta = quote! { { "name": #crd_meta_name } };
         // TODO: should ::crd be from a trait?
