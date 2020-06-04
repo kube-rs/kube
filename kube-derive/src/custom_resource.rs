@@ -262,9 +262,9 @@ impl CustomDerive for CustomResource {
             derives.push("PartialEq");
         }
         let derives: Vec<Ident> = derives.iter().map(|s| format_ident!("{}", s)).collect();
-
+        let docstring = format!(" Auto-generated type that wraps {} for the derived `CustomResource` trait", ident);
         let root_obj = quote! {
-            /// Auto-generated type the CustomResource around #ident
+            #[doc = #docstring]
             #[derive(#(#derives),*)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
