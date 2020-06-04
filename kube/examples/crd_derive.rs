@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
     kind = "Foo",
     namespaced,
     status = "FooStatus",
-    finalizer = "mygc.foo.clux.dev",
+    finalizer = "mygc.foos.clux.dev",
     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 )]
@@ -36,7 +36,7 @@ fn main() {
     foo.status = Some(FooStatus { is_bad: true });
     println!("Spec: {:?}", foo.spec);
     println!("finalizers: {:?}", foo.metadata.finalizers);
-    println!("Foo CRD: {:?}", Foo::crd());
+    println!("Foo CRD: \n{}", serde_json::to_string_pretty(&Foo::crd()).unwrap());
 }
 
 // some tests
