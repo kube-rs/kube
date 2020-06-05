@@ -267,7 +267,7 @@ impl Config {
 
     /// Configure a proxy for this kube config
     ///
-    /// ```rust
+    /// ```no_run
     /// use kube::{Config, config};
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
