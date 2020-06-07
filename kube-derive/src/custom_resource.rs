@@ -17,7 +17,6 @@ pub struct CustomResource {
     shortnames: Vec<String>,
     apiextensions: String,
     printcolums: Vec<String>,
-    finalizers: Vec<String>,
     scale: Option<String>,
 }
 
@@ -41,7 +40,6 @@ impl CustomDerive for CustomResource {
         let mut apiextensions = "v1".to_string();
         let mut scale = None;
         let mut printcolums = vec![];
-        let mut finalizers = vec![];
         let mut shortnames = vec![];
         let mut kind = None;
 
@@ -136,14 +134,6 @@ impl CustomDerive for CustomResource {
                                 return Err(r#"#[kube(derive = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
-                        } else if meta.path.is_ident("finalizer") {
-                            if let syn::Lit::Str(lit) = &meta.lit {
-                                finalizers.push(lit.value());
-                                continue;
-                            } else {
-                                return Err(r#"#[kube(finalizer = "...")] expects a string literal value"#)
-                                    .spanning(meta);
-                            }
                         } else {
                             //println!("Unknown arg {:?}", meta.path.get_ident());
                             meta
@@ -210,7 +200,6 @@ impl CustomDerive for CustomResource {
             namespaced,
             derives,
             printcolums,
-            finalizers,
             status,
             shortnames,
             apiextensions,
@@ -232,7 +221,6 @@ impl CustomDerive for CustomResource {
             status,
             shortnames,
             printcolums,
-            finalizers,
             apiextensions,
             scale,
         } = self;
@@ -260,7 +248,6 @@ impl CustomDerive for CustomResource {
             (fst, snd)
         };
         let has_status = status.is_some();
-        let flizers = serde_json::to_string(&finalizers).unwrap();
 
         let mut derive_idents = vec![];
         for d in vec!["Serialize", "Deserialize", "Clone", "Debug"] {
@@ -284,13 +271,11 @@ impl CustomDerive for CustomResource {
             }
             impl #rootident {
                 pub fn new(name: &str, spec: #ident) -> Self {
-                    let finals : Vec<String> = serde_json::from_str(#flizers).expect("valid finalizer json");
                     Self {
                         api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
                         kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                             name: Some(name.to_string()),
-                            finalizers: Some(finals),
                             ..Default::default()
                         },
                         spec: spec,

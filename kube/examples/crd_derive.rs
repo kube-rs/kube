@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
     status = "FooStatus",
     derive = "PartialEq",
     shortname = "f",
-    finalizer = "mygc.foos.clux.dev",
     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 )]
@@ -37,7 +36,6 @@ fn main() {
     });
     foo.status = Some(FooStatus { is_bad: true });
     println!("Spec: {:?}", foo.spec);
-    println!("finalizers: {:?}", foo.metadata.finalizers);
     let crd = serde_json::to_string_pretty(&Foo::crd()).unwrap();
     println!("Foo CRD: \n{}", crd);
 }
