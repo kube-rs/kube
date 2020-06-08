@@ -8,7 +8,8 @@ workflows:
   all_jobs:
     jobs:
       - cargo_test
-      - windows_test
+      # windows executor costs money :/
+      #- windows_test
 
 jobs:
   cargo_test:

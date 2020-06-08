@@ -5,13 +5,15 @@ use serde::{Deserialize, Serialize};
 /// Our spec for Foo
 ///
 /// A struct with our chosen Kind will be created for us, using the following kube attrs
-#[derive(CustomResource, Serialize, Deserialize, Debug, Clone)]
+#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[kube(
     group = "clux.dev",
     version = "v1",
     kind = "Foo",
     namespaced,
     status = "FooStatus",
+    derive = "PartialEq",
+    shortname = "f",
     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 )]
@@ -21,7 +23,7 @@ pub struct MyFoo {
     info: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FooStatus {
     is_bad: bool,
 }
@@ -34,7 +36,8 @@ fn main() {
     });
     foo.status = Some(FooStatus { is_bad: true });
     println!("Spec: {:?}", foo.spec);
-    println!("Foo CRD: {:?}", Foo::crd());
+    let crd = serde_json::to_string_pretty(&Foo::crd()).unwrap();
+    println!("Foo CRD: \n{}", crd);
 }
 
 // some tests
