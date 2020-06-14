@@ -142,11 +142,15 @@ impl Config {
     /// and relies on you having the service account's token mounted,
     /// as well as having given the service account rbac access to do what you need.
     pub fn from_cluster_env() -> Result<Self> {
-        let cluster_url =
+        let mut cluster_url =
             incluster_config::kube_server().ok_or_else(|| ConfigError::MissingInClusterVariables {
                 hostenv: incluster_config::SERVICE_HOSTENV,
                 portenv: incluster_config::SERVICE_PORTENV,
             })?;
+        // Ennsure the cluster url ends with a trailing slash
+        if !cluster_url.ends_with('/') {
+            cluster_url.push('/');
+        }
         let cluster_url = reqwest::Url::parse(&cluster_url)?;
 
         let default_ns = incluster_config::load_default_ns()
