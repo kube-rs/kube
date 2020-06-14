@@ -147,7 +147,11 @@ impl Config {
                 hostenv: incluster_config::SERVICE_HOSTENV,
                 portenv: incluster_config::SERVICE_PORTENV,
             })?;
-        // Ennsure the cluster url ends with a trailing slash
+        // Ensure the cluster url ends with a trailing slash
+        //
+        // This ensures that path logic in the client does not discard uri segments
+        // when using Uri::join on cluster_url. This ensures k8s base urls like
+        // the ones from rancher work out of the box with kube. #244
         if !cluster_url.ends_with('/') {
             cluster_url.push('/');
         }
