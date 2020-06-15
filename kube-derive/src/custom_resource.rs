@@ -250,7 +250,7 @@ impl CustomDerive for CustomResource {
         let has_status = status.is_some();
 
         let mut derive_idents = vec![];
-        for d in vec!["Serialize", "Deserialize", "Clone", "Debug"] {
+        for d in &["Serialize", "Deserialize", "Clone", "Debug"] {
             derive_idents.push(format_ident!("{}", d));
         }
         for d in derives {
