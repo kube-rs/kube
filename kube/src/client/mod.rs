@@ -393,7 +393,7 @@ pub struct StatusCause {
 
 /// An internal url joiner to deal with the two different interfaces
 ///
-/// - api module produces a http::Uri which we can turn into a PathAndQuery (has a leading slash)
+/// - api module produces a http::Uri which we can turn into a PathAndQuery (has a leading slash by construction)
 /// - config module produces a url::Url from user input (sometimes contains path segments)
 ///
 /// This deals with that in a pretty easy way (tested below)
