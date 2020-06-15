@@ -426,7 +426,10 @@ mod test {
         let apipath: http::Uri = "/api/v1/nodes?hi=yes".parse().unwrap();
         let pandq = apipath.path_and_query().expect("could pandq apipath");
         let final_url = super::finalize_url(&cluster_url, &pandq);
-        assert_eq!(final_url.as_str(), "https://192.168.1.65:8443/api/v1/nodes?hi=yes");
+        assert_eq!(
+            final_url.as_str(),
+            "https://192.168.1.65:8443/api/v1/nodes?hi=yes"
+        );
     }
 
     #[test]
