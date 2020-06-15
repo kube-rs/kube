@@ -68,10 +68,9 @@ impl Client {
 
     async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
         let (parts, body) = request.into_parts();
-        // By construction in resource.rs we always have a path and query
         let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
-        let uri_str = self.cluster_url.join(pandq.as_str())?;
-        //trace!("Sending request => method = {} uri = {}", parts.method, uri_str);
+        let uri_str = finalize_url(&self.cluster_url, &pandq);
+        info!("Sending request => method = {} uri = {}", parts.method, &uri_str);
 
         let mut headers = parts.headers;
         // If we have auth headers set, make sure they are updated and attached to the request
@@ -84,7 +83,7 @@ impl Client {
             | http::Method::POST
             | http::Method::DELETE
             | http::Method::PUT
-            | http::Method::PATCH => self.inner.request(parts.method, uri_str),
+            | http::Method::PATCH => self.inner.request(parts.method, &uri_str),
             other => return Err(Error::InvalidMethod(other.to_string())),
         };
 
@@ -392,6 +391,18 @@ pub struct StatusCause {
     pub field: String,
 }
 
+/// An internal url joiner to deal with the two different interfaces
+///
+/// - api module produces a http::Uri which we can turn into a PathAndQuery (has a leading slash)
+/// - config module produces a url::Url from user input (sometimes contains path segments)
+///
+/// This deals with that in a pretty easy way (tested below)
+fn finalize_url(cluster_url: &reqwest::Url, request_pandq: &http::uri::PathAndQuery) -> String {
+    let base = cluster_url.as_str();
+    let shortened_base = base.trim_end_matches('/'); // pandq always starts with a slash
+    format!("{}{}", shortened_base, request_pandq)
+}
+
 #[cfg(test)]
 mod test {
     use super::Status;
@@ -406,5 +417,34 @@ mod test {
         let statusnoname = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
         let s2: Status = serde_json::from_str::<Status>(statusnoname).unwrap();
         assert_eq!(s2.details.unwrap().name, ""); // optional probably better..
+    }
+
+    #[test]
+    fn normal_host() {
+        let minikube_host = "https://192.168.1.65:8443";
+        let cluster_url = reqwest::Url::parse(minikube_host).unwrap();
+        let apipath: http::Uri = "/api/v1/nodes?hi=yes".parse().unwrap();
+        let pandq = apipath.path_and_query().expect("could pandq apipath");
+        let final_url = super::finalize_url(&cluster_url, &pandq);
+        assert_eq!(final_url.as_str(), "https://192.168.1.65:8443/api/v1/nodes?hi=yes");
+    }
+
+    #[test]
+    fn rancher_host() {
+        // in rancher, kubernetes server names are not hostnames, but a host with a path:
+        let rancher_host = "https://hostname/foo/bar";
+        let cluster_url = reqwest::Url::parse(rancher_host).unwrap();
+        assert_eq!(cluster_url.host_str().unwrap(), "hostname");
+        assert_eq!(cluster_url.path(), "/foo/bar");
+        // we must be careful when using Url::join on our http::Uri result
+        // as a straight two Uri::join would trim away rancher's initial path
+        // case in point (discards original path):
+        assert_eq!(cluster_url.join("/api/v1/nodes").unwrap().path(), "/api/v1/nodes");
+
+        let apipath: http::Uri = "/api/v1/nodes?hi=yes".parse().unwrap();
+        let pandq = apipath.path_and_query().expect("could pandq apipath");
+
+        let final_url = super::finalize_url(&cluster_url, &pandq);
+        assert_eq!(final_url.as_str(), "https://hostname/foo/bar/api/v1/nodes?hi=yes");
     }
 }
