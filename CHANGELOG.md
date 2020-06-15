@@ -1,8 +1,13 @@
-0.35.0 / 2020-06-XX
+0.36.0 / 2020-06-XX
+===================
+  * big planned runtime changes
+
+0.35.0 / 2020-06-15
 ===================
   * `Config::proxy` support added - #246
   * `PartialEq` can be derived with `kube-derive` - #242
   * Windows builds no longer clashes with runtime - #240
+  * Rancher hosts (with path specifiers) now works - #244
 
 0.34.0 / 2020-05-08
 ===================
