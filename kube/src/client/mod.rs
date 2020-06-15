@@ -398,9 +398,8 @@ pub struct StatusCause {
 ///
 /// This deals with that in a pretty easy way (tested below)
 fn finalize_url(cluster_url: &reqwest::Url, request_pandq: &http::uri::PathAndQuery) -> String {
-    let base = cluster_url.as_str();
-    let shortened_base = base.trim_end_matches('/'); // pandq always starts with a slash
-    format!("{}{}", shortened_base, request_pandq)
+    let base = cluster_url.as_str().trim_end_matches('/'); // pandq always starts with a slash
+    format!("{}{}", base, request_pandq)
 }
 
 #[cfg(test)]
