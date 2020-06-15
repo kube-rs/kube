@@ -70,7 +70,7 @@ impl Client {
         let (parts, body) = request.into_parts();
         let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
         let uri_str = finalize_url(&self.cluster_url, &pandq);
-        info!("Sending request => method = {} uri = {}", parts.method, &uri_str);
+        //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
 
         let mut headers = parts.headers;
         // If we have auth headers set, make sure they are updated and attached to the request
