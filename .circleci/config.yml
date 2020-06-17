@@ -27,7 +27,6 @@ jobs:
       - k8s/create-or-update-resource:
           namespace: apps
           resource-file-path: tests/deployment.yaml
-          resource-name: deployment.apps/foo-test
           show-kubectl-command: true
       - k8s/get-rollout-status:
           namespace: apps
@@ -35,7 +34,7 @@ jobs:
           show-kubectl-command: true
           watch-rollout-status: true
           watch-timeout: 3m
-      - run: kubectl get all --all-namespaces
+      - run: kubectl get all -n apps
 
   cargo_test:
     docker:
