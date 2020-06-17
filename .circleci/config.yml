@@ -17,8 +17,6 @@ jobs:
   k8s_test:
     machine:
       image: ubuntu-1604:201903-01
-    #docker:
-    #  - image: 'cimg/base:stable'
     steps:
       - checkout
       - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o kind
@@ -33,7 +31,7 @@ jobs:
           show-kubectl-command: true
           watch-rollout-status: true
           watch-timeout: 1m
-      - run: kubectl get pods -n apps
+      - run: kubectl get all --all-namespaces
 
   cargo_test:
     docker:
