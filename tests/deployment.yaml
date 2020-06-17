@@ -1,0 +1,128 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: foos.clux.dev
+spec:
+  group: clux.dev
+  names:
+    kind: Foo
+    listKind: FooList
+    plural: foos
+    singular: foo
+  scope: Namespaced
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+
+---
+# Scoped service account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: foo-test
+  namespace: apps
+automountServiceAccountToken: true
+
+---
+# Access for the service account
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: apps
+  name: foo-test-role
+rules:
+  - apiGroups:
+    - clux.dev
+    resources:
+    - foos
+    verbs:
+    - get
+    - watch
+    - list
+
+---
+# Binding the role to the account in apps
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: foo-test-binding
+  namespace: apps
+subjects:
+- kind: ServiceAccount
+  name: foo-test
+roleRef:
+  kind: Role
+  name: foo-test-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Expose the http port of the service
+apiVersion: v1
+kind: Service
+metadata:
+  name: foo-test
+  namespace: apps
+  labels:
+    app: foo-test
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: foo-test
+
+---
+# Main deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foo-test
+  namespace: apps
+  labels:
+    app: foo-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: foo-test
+  template:
+    metadata:
+      labels:
+        app: foo-test
+    spec:
+      serviceAccountName: foo-test
+      containers:
+      - name: foo-test
+        image: "clux/controller:0.4.0"
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 100Mi
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: NAMESPACE
+          value: "apps"

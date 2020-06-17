@@ -2,16 +2,34 @@ version: 2.1
 
 orbs:
   win: circleci/windows@2.4.0
+  k8s: circleci/kubernetes@0.11.0
 
 workflows:
   version: 2
   all_jobs:
     jobs:
-      - cargo_test
+      #- cargo_test
+      - k8s_test
       # windows executor costs money :/
       #- windows_test
 
 jobs:
+  k8s_test:
+    docker:
+      - image: 'cimg/base:stable'
+    steps:
+      - checkout
+      - k8s/install-kubectl
+      - k8s/install-kubeconfig
+      - k8s/create-or-update-resource:
+          namespace: apps
+          resource-file-path: tests/deployment.yaml
+          resource-name: deployment/foo-test
+          show-kubectl-command: true
+          watch-rollout-status: true
+          watch-timeout: 1m
+      - run: kubectl get pods -n apps
+
   cargo_test:
     docker:
       - image: circleci/rust:latest
