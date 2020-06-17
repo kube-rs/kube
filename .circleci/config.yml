@@ -29,14 +29,12 @@ jobs:
           resource-file-path: tests/deployment.yaml
           resource-name: deployment.apps/foo-test
           show-kubectl-command: true
-          watch-rollout-status: true
-          watch-timeout: 1m
       - k8s/get-rollout-status:
           namespace: apps
           resource-name: deployment/foo-test
           show-kubectl-command: true
           watch-rollout-status: true
-          watch-timeout: 1m
+          watch-timeout: 3m
       - run: kubectl get all --all-namespaces
 
   cargo_test:
