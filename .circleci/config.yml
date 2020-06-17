@@ -22,7 +22,8 @@ jobs:
     steps:
       - checkout
       - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o kind
-      - run: kind create cluster --name kube
+      - run: chmod +x ./kind
+      - run: ./kind create cluster --name kube
       - k8s/install-kubectl
       - k8s/install-kubeconfig
       - k8s/create-or-update-resource:
