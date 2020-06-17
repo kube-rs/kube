@@ -3,7 +3,6 @@ version: 2.1
 orbs:
   win: circleci/windows@2.4.0
   k8s: circleci/kubernetes@0.11.0
-  minikube: ccpgames/minikube@0.0.1
 
 workflows:
   version: 2
@@ -16,11 +15,14 @@ workflows:
 
 jobs:
   k8s_test:
-    docker:
-      - image: 'cimg/base:stable'
+    machine:
+      image: ubuntu-1604:201903-01
+    #docker:
+    #  - image: 'cimg/base:stable'
     steps:
       - checkout
-      - minikube/minikube-start
+      - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o /usr/local/bin/kind
+      - run: kind create cluster --name kube
       - k8s/install-kubectl
       - k8s/install-kubeconfig
       - k8s/create-or-update-resource:

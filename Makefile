@@ -41,4 +41,14 @@ minikube:
 	kubectl config set-context --cluster=minikube --user=minikube --namespace=apps minikube
 	kubectl create namespace apps
 
-.PHONY: doc build fmt clippy test readme minikube
+kind-create:
+	kind create cluster --name kube
+
+kind:
+	kubectl config set-context --cluster=kind-kube --user=kind-kube --namespace=apps kind-kube
+	kubectl config use-context kind-kube
+
+kind-delete:
+	kind delete clusters kind-kube
+
+.PHONY: doc build fmt clippy test readme minikube kind
