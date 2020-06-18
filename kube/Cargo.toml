@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.35.0"
+version = "0.35.1"
 description = "Kubernetes client in futures controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",

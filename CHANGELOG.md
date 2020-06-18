@@ -2,6 +2,10 @@
 ===================
   * big planned runtime changes
 
+0.35.1 / 2020-06-18
+===================
+  * Fix in-cluster Client when using having multiple certs in the chain - #251
+
 0.35.0 / 2020-06-15
 ===================
   * `Config::proxy` support added - #246
