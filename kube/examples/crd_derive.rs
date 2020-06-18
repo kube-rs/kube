@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 )]
-#[kube(apiextensions = "v1beta1")] // kubernetes <= 1.16
+//#[kube(apiextensions = "v1beta1")] // kubernetes <= 1.16
 pub struct MyFoo {
     name: String,
     info: Option<String>,

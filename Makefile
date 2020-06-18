@@ -1,3 +1,5 @@
+VERSION=$(shell git rev-parse HEAD)
+
 clippy:
 	#rustup component add clippy --toolchain nightly
 	touch kube/src/lib.rs
@@ -41,4 +43,38 @@ minikube:
 	kubectl config set-context --cluster=minikube --user=minikube --namespace=apps minikube
 	kubectl create namespace apps
 
-.PHONY: doc build fmt clippy test readme minikube
+kind-create:
+	kind create cluster --name kube
+
+kind:
+	kubectl config set-context --cluster=kind-kube --user=kind-kube --namespace=apps kind-kube
+	kubectl config use-context kind-kube
+
+kind-delete:
+	kind delete clusters kind-kube
+
+# local integration tests:
+dapp:
+	docker run \
+		-v cargo-cache:/root/.cargo/registry \
+		-v "$$PWD:/volume" -w /volume \
+		--rm -it clux/muslrust:stable cargo build --release -p tests
+	cp target/x86_64-unknown-linux-musl/release/dapp tests/dapp
+	chmod +x tests/dapp
+integration-test: dapp
+	docker build -t clux/kube-dapp:latest tests/
+	kubectl apply -f tests/deployment.yaml
+
+# for ci (has dapp built)
+integration-ci:
+	docker build -t clux/kube-dapp:$(VERSION) tests/
+	docker push clux/kube-dapp:$(VERSION)
+	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
+
+# to debug ci...
+integration-pull:
+	docker pull clux/kube-dapp:$(VERSION)
+	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
+	kubectl apply -f tests/deployment.yaml
+
+.PHONY: doc build fmt clippy test readme minikube kind
