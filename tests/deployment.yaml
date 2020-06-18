@@ -28,7 +28,7 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: foo-test
+  name: dapp
   namespace: apps
 automountServiceAccountToken: true
 
@@ -38,7 +38,7 @@ kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   namespace: apps
-  name: foo-test-role
+  name: dapp-role
 rules:
   - apiGroups:
     - clux.dev
@@ -54,14 +54,14 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: foo-test-binding
+  name: dapp-binding
   namespace: apps
 subjects:
 - kind: ServiceAccount
-  name: foo-test
+  name: dapp
 roleRef:
   kind: Role
-  name: foo-test-role
+  name: dapp-role
   apiGroup: rbac.authorization.k8s.io
 
 ---
@@ -69,10 +69,10 @@ roleRef:
 apiVersion: v1
 kind: Service
 metadata:
-  name: foo-test
+  name: dapp
   namespace: apps
   labels:
-    app: foo-test
+    app: dapp
 spec:
   ports:
   - port: 80
@@ -80,30 +80,30 @@ spec:
     protocol: TCP
     name: http
   selector:
-    app: foo-test
+    app: dapp
 
 ---
 # Main deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: foo-test
+  name: dapp
   namespace: apps
   labels:
-    app: foo-test
+    app: dapp
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: foo-test
+      app: dapp
   template:
     metadata:
       labels:
-        app: foo-test
+        app: dapp
     spec:
-      serviceAccountName: foo-test
+      serviceAccountName: dapp
       containers:
-      - name: foo-test
+      - name: dapp
         image: "clux/kube-dapp:latest"
         imagePullPolicy: IfNotPresent
         resources:

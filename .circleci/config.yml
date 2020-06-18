@@ -21,6 +21,13 @@ workflows:
               ignore:
                 - master
 
+docker_login: &docker_login
+  run:
+    name: authentication
+    command: |
+      docker --version
+      docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
+
 jobs:
   kind_compile:
     docker:
@@ -46,14 +53,15 @@ jobs:
           paths:
             - dapp
 
-  k8s_kind:
+  kind_k8s:
     machine:
       image: ubuntu-1604:201903-01
     steps:
       - checkout
       - attach_workspace:
           at: tests/
-      - run: docker build -t clux/kube-dapp:latest tests/
+      - <<: *docker_login
+      - run: make integration-ci
       - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o kind
       - run: chmod +x ./kind
       - run: ./kind create cluster --name kube
@@ -65,13 +73,13 @@ jobs:
           show-kubectl-command: true
       - k8s/get-rollout-status:
           namespace: apps
-          resource-name: deployment/foo-test
+          resource-name: deployment/dapp
           show-kubectl-command: true
           watch-rollout-status: true
           watch-timeout: 3m
       - run: kubectl get all -n apps
       - run: sleep 60
-      - run: kubectl logs deploy/foo-test
+      - run: kubectl logs deploy/dapp
 
   cargo_test:
     docker:
