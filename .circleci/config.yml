@@ -39,7 +39,7 @@ jobs:
       - run: grep "\[dependencies\]" -A 9000 kube/Cargo.toml > deps_checksum
       - restore_cache:
           keys:
-            - cache-{{ checksum "deps_checksum" }}
+            - cache-musl-{{ checksum "deps_checksum" }}
       - run: cargo build -p tests --release
       - save_cache:
           paths:
@@ -47,7 +47,7 @@ jobs:
             - target/debug/.fingerprint
             - target/debug/build
             - target/debug/deps
-          key: cache-{{ checksum "deps_checksum" }}
+          key: cache-musl-{{ checksum "deps_checksum" }}
       - persist_to_workspace:
           root: target/x86_64-unknown-linux-musl/release/
           paths:
