@@ -22,6 +22,7 @@ workflows:
                 - master
 
 docker_login: &docker_login
+  # Optional auth (wont work on pr builds, but we don't need this)
   run:
     name: authentication
     command: |
@@ -58,6 +59,7 @@ jobs:
       - checkout
       - attach_workspace:
           at: tests/
+      - <<: *docker_login
       - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o kind
       - run: chmod +x ./kind
       - run: ./kind create cluster
