@@ -48,6 +48,15 @@ rules:
     - get
     - watch
     - list
+  - apiGroups:
+    - batch
+    resources:
+    - jobs
+    verbs:
+    - get
+    - watch
+    - list
+    - delete
 
 ---
 # Binding the role to the account in apps

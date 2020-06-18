@@ -78,8 +78,7 @@ jobs:
           watch-rollout-status: true
           watch-timeout: 3m
       - run: kubectl get all -n apps
-      - run: sleep 60
-      - run: kubectl logs deploy/dapp
+      - run: timeout 60 kubectl logs -f deployment/dapp
 
   cargo_test:
     docker:

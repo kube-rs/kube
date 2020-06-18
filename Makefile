@@ -71,4 +71,10 @@ integration-ci:
 	docker push clux/kube-dapp:$(VERSION)
 	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
 
+# to debug ci...
+integration-pull:
+	docker pull clux/kube-dapp:$(VERSION)
+	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
+	kubectl apply -f tests/deployment.yaml
+
 .PHONY: doc build fmt clippy test readme minikube kind
