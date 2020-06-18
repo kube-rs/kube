@@ -72,6 +72,7 @@ integration-test: dapp
 
 # for ci (has dapp built)
 integration-ci:
+	ls -lah tests/
 	docker build -t clux/kube-dapp:$(VERSION) tests/
 	docker push clux/kube-dapp:$(VERSION) || true
 	./kind load docker-image clux/kube-dapp:$(VERSION)
