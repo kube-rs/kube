@@ -64,11 +64,17 @@ dapp:
 integration-test: dapp
 	docker build -t clux/kube-dapp:latest tests/
 	kubectl apply -f tests/deployment.yaml
+	kubectl rollout status deploy/dapp -n apps
+	kubectl status deploy/dapp -n apps
+	kubectl logs -f -n apps deploy/dapp
+	kubectl get pods -n apps | grep dapp | grep Completed
+	kubectl get pods -n apps | grep empty-job | grep Completed
 
 # for ci (has dapp built)
 integration-ci:
 	docker build -t clux/kube-dapp:$(VERSION) tests/
-	docker push clux/kube-dapp:$(VERSION)
+	#docker push clux/kube-dapp:$(VERSION)
+	kind load docker-image clux/kube-dapp:$(VERSION)
 	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
 
 # to debug ci...
