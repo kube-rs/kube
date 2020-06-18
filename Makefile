@@ -44,14 +44,14 @@ minikube:
 	kubectl create namespace apps
 
 kind-create:
-	kind create cluster --name kube
+	kind create cluster
 
 kind:
-	kubectl config set-context --cluster=kind-kube --user=kind-kube --namespace=apps kind-kube
-	kubectl config use-context kind-kube
+	kubectl config set-context --cluster=kind-kind --user=kind-kind --namespace=apps kind-kind
+	kubectl config use-context kind-kind
 
 kind-delete:
-	kind delete clusters kind-kube
+	kind delete clusters kind-kind
 
 # local integration tests:
 dapp:
