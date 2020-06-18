@@ -32,11 +32,17 @@ pub fn load_token() -> Result<String> {
 }
 
 /// Returns certification from specified path in cluster.
-pub fn load_cert() -> Result<Certificate> {
+pub fn load_cert() -> Result<Vec<Certificate>> {
     let ca = utils::data_or_file_with_base64(&None, &Some(SERVICE_CERTFILE))?;
-    Certificate::from_pem(&ca)
-        .map_err(ConfigError::LoadCert)
-        .map_err(Error::from)
+    let pems = pem::parse_many(ca);
+
+    pems.into_iter()
+        .map(|pem| {
+            Certificate::from_pem(&pem::encode(&pem).into_bytes())
+                .map_err(ConfigError::LoadCert)
+                .map_err(Error::from)
+        })
+        .collect::<Result<Vec<_>>>()
 }
 
 /// Returns the default namespace from specified path in cluster.

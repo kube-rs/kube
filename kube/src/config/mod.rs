@@ -69,7 +69,7 @@ pub struct Config {
     /// The configured default namespace
     pub default_ns: String,
     /// The configured root certificate
-    pub root_cert: Option<reqwest::Certificate>,
+    pub root_cert: Option<Vec<reqwest::Certificate>>,
     /// Default headers to be used to communicate with the Kubernetes API
     pub headers: HeaderMap,
     /// Timeout for calls to the Kubernetes API.
@@ -206,10 +206,15 @@ impl Config {
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
             use std::convert::TryInto;
-            for ca in ca_bundle {
+            for ca in &ca_bundle {
                 accept_invalid_certs = hacky_cert_lifetime_for_macos(&ca);
-                root_cert = Some(ca.try_into()?);
             }
+            root_cert = Some(
+                ca_bundle
+                    .into_iter()
+                    .map(|ca| ca.try_into())
+                    .collect::<Result<Vec<_>>>()?,
+            );
         }
 
         match loader.identity(IDENTITY_PASSWORD) {

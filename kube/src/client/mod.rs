@@ -329,7 +329,9 @@ impl From<Config> for reqwest::ClientBuilder {
         }
 
         if let Some(c) = config.root_cert {
-            builder = builder.add_root_certificate(c);
+            for cert in c {
+                builder = builder.add_root_certificate(cert);
+            }
         }
 
         builder = builder.default_headers(config.headers);
