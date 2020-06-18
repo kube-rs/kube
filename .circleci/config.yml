@@ -9,16 +9,52 @@ workflows:
   all_jobs:
     jobs:
       #- cargo_test
-      - k8s_test
       # windows executor costs money :/
       #- windows_test
+      # kubernetes flow:
+      - kind_compile
+      - kind_k8s:
+          requires:
+            - kind_compile
+          filters:
+            branches:
+              exclude:
+                - master
 
 jobs:
-  k8s_test:
+  kind_compile:
+    docker:
+      - image: clux/muslrust:stable
+    working_directory: /volume
+    steps:
+      - checkout
+      # Cache is based on whether we changed dependencies:
+      - run: grep "\[dependencies\]" -A 9000 kube/Cargo.toml > deps_checksum
+      - restore_cache:
+          keys:
+            - cache-{{ checksum "deps_checksum" }}
+      - run: cargo build -p tests --release
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target/debug/.fingerprint
+            - target/debug/build
+            - target/debug/deps
+          key: cache-{{ checksum "deps_checksum" }}
+      - persist_to_workspace:
+          root: target/x86_64-unknown-linux-musl/release/
+          paths:
+            - dapp
+
+  k8s_kind:
     machine:
       image: ubuntu-1604:201903-01
     steps:
       - checkout
+      - attach_workspace:
+          at: tests/
+      - run:
+      - run: docker build -t clux/kube-dapp:latest tests/
       - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o kind
       - run: chmod +x ./kind
       - run: ./kind create cluster --name kube
@@ -35,6 +71,8 @@ jobs:
           watch-rollout-status: true
           watch-timeout: 3m
       - run: kubectl get all -n apps
+      - run: sleep 60
+      - run: kubectl logs deploy/foo-test
 
   cargo_test:
     docker:
