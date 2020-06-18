@@ -22,11 +22,12 @@ workflows:
                 - master
 
 docker_login: &docker_login
+  # Optional auth (wont work on pr builds, but we don't need this)
   run:
     name: authentication
     command: |
       docker --version
-      docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
+      docker login -u "$DOCKER_USER" -p "$DOCKER_PASS" || true
 
 jobs:
   kind_compile:
@@ -59,10 +60,10 @@ jobs:
       - attach_workspace:
           at: tests/
       - <<: *docker_login
-      - run: make integration-ci
       - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o kind
       - run: chmod +x ./kind
-      - run: ./kind create cluster --name kube
+      - run: ./kind create cluster
+      - run: make integration-ci
       - k8s/install-kubectl
       - k8s/install-kubeconfig
       - k8s/create-or-update-resource:

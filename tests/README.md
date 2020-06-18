@@ -18,9 +18,9 @@ This resumes with a machine excutor (which can run `docker` commands).
 
 It carries on building the tiny image with the mounted binary from the workspace into a [distroless:static](https://github.com/GoogleContainerTools/distroless) image.
 
-This is then pushed to [dockerhub/clux/kube-dapp](https://hub.docker.com/repository/docker/clux/kube-dapp/tags), kind of pointlessly, but it allows debugging a build locally from an artifact from CI.
+This is then pushed to [dockerhub/clux/kube-dapp](https://hub.docker.com/repository/docker/clux/kube-dapp/tags) (if we have creds, wont work on pr builds), otherwise the image is loaded into [kind](https://kind.sigs.k8s.io/).
 
-At this point, we install [kind](https://kind.sigs.k8s.io/) using the direct binary install from their [github releases](https://github.com/kubernetes-sigs/kind/releases), and use the [circleci kubernetes orb](https://circleci.com/orbs/registry/orb/circleci/kubernetes) to apply our [test yaml](./deployment.yaml).
+We install `kind` using the direct binary install from their [github releases](https://github.com/kubernetes-sigs/kind/releases), and use the [circleci kubernetes orb](https://circleci.com/orbs/registry/orb/circleci/kubernetes) to apply our [test yaml](./deployment.yaml).
 
 It's successful if the app exits successfully, without encountering errors.
 

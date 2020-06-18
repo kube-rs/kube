@@ -44,14 +44,14 @@ minikube:
 	kubectl create namespace apps
 
 kind-create:
-	kind create cluster --name kube
+	kind create cluster
 
 kind:
-	kubectl config set-context --cluster=kind-kube --user=kind-kube --namespace=apps kind-kube
-	kubectl config use-context kind-kube
+	kubectl config set-context --cluster=kind-kind --user=kind-kind --namespace=apps kind-kind
+	kubectl config use-context kind-kind
 
 kind-delete:
-	kind delete clusters kind-kube
+	kind delete clusters kind-kind
 
 # local integration tests:
 dapp:
@@ -64,11 +64,18 @@ dapp:
 integration-test: dapp
 	docker build -t clux/kube-dapp:latest tests/
 	kubectl apply -f tests/deployment.yaml
+	kubectl rollout status deploy/dapp -n apps
+	kubectl status deploy/dapp -n apps
+	kubectl logs -f -n apps deploy/dapp
+	kubectl get pods -n apps | grep dapp | grep Completed
+	kubectl get pods -n apps | grep empty-job | grep Completed
 
 # for ci (has dapp built)
 integration-ci:
+	ls -lah tests/
 	docker build -t clux/kube-dapp:$(VERSION) tests/
-	docker push clux/kube-dapp:$(VERSION)
+	docker push clux/kube-dapp:$(VERSION) || true
+	./kind load docker-image clux/kube-dapp:$(VERSION)
 	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
 
 # to debug ci...
