@@ -53,7 +53,6 @@ jobs:
       - checkout
       - attach_workspace:
           at: tests/
-      - run:
       - run: docker build -t clux/kube-dapp:latest tests/
       - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o kind
       - run: chmod +x ./kind
@@ -98,6 +97,7 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cache-{{ checksum "deps_checksum" }}
+
   windows_test:
     environment:
       - CARGO_INCREMENTAL: 0
