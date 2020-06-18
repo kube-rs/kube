@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   win: circleci/windows@2.4.0
+  k8s: circleci/kubernetes@0.11.0
 
 workflows:
   version: 2
@@ -10,8 +11,77 @@ workflows:
       - cargo_test
       # windows executor costs money :/
       #- windows_test
+      # kubernetes flow:
+      - kind_compile
+      - kind_k8s:
+          requires:
+            - kind_compile
+          filters:
+            branches:
+              ignore:
+                - master
+
+docker_login: &docker_login
+  run:
+    name: authentication
+    command: |
+      docker --version
+      docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
 
 jobs:
+  kind_compile:
+    docker:
+      - image: clux/muslrust:stable
+    working_directory: /volume
+    steps:
+      - checkout
+      # Cache is based on whether we changed dependencies:
+      - run: grep "\[dependencies\]" -A 9000 kube/Cargo.toml > deps_checksum
+      - restore_cache:
+          keys:
+            - cache-musl-{{ checksum "deps_checksum" }}-2
+      - run: cargo build -p tests --release
+      - save_cache:
+          paths:
+            - /root/.cargo/registry
+            - target
+          key: cache-musl-{{ checksum "deps_checksum" }}-2
+      - persist_to_workspace:
+          root: target/x86_64-unknown-linux-musl/release/
+          paths:
+            - dapp
+
+  kind_k8s:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - checkout
+      - attach_workspace:
+          at: tests/
+      - <<: *docker_login
+      - run: make integration-ci
+      - run: curl -sSL https://github.com/kubernetes-sigs/kind/releases/download/v0.8.1/kind-linux-amd64 -o kind
+      - run: chmod +x ./kind
+      - run: ./kind create cluster --name kube
+      - k8s/install-kubectl
+      - k8s/install-kubeconfig
+      - k8s/create-or-update-resource:
+          namespace: apps
+          resource-file-path: tests/deployment.yaml
+          show-kubectl-command: true
+      - k8s/get-rollout-status:
+          namespace: apps
+          resource-name: deployment/dapp
+          show-kubectl-command: true
+          watch-rollout-status: true
+          watch-timeout: 3m
+      - run: kubectl get all -n apps
+      - run: kubectl describe deploy dapp -n apps
+      - run: timeout 60 kubectl logs -f deploy/dapp -n apps || kubectl logs -f deploy/dapp -p -n apps
+      - run: kubectl get all -n apps
+      - run: kubectl get pods -n apps | grep dapp | grep Completed
+      - run: kubectl get pods -n apps | grep empty-job | grep Completed
+
   cargo_test:
     docker:
       - image: circleci/rust:latest
@@ -36,6 +106,7 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cache-{{ checksum "deps_checksum" }}
+
   windows_test:
     environment:
       - CARGO_INCREMENTAL: 0
