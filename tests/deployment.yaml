@@ -94,36 +94,45 @@ spec:
 
 ---
 # Main deployment
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: dapp
   namespace: apps
   labels:
     app: dapp
 spec:
-  serviceAccountName: dapp
-  containers:
-  - name: dapp
-    image: "clux/kube-dapp:2d4b4118f419079b92a7faa242a5c8d5d1838e4f"
-    imagePullPolicy: IfNotPresent
-    resources:
-      limits:
-        cpu: 200m
-        memory: 256Mi
-      requests:
-        cpu: 50m
-        memory: 100Mi
-    #ports:
-    #- name: http
-    #  containerPort: 8080
-    #  protocol: TCP
-    #readinessProbe:
-    #  httpGet:
-    #    path: /health
-    #    port: http
-    #  initialDelaySeconds: 5
-    #  periodSeconds: 5
-    env:
-    - name: NAMESPACE
-      value: "apps"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dapp
+  template:
+    metadata:
+      labels:
+        app: dapp
+    spec:
+      serviceAccountName: dapp
+      containers:
+      - name: dapp
+        image: "clux/kube-dapp:latest"
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 100Mi
+        #ports:
+        #- name: http
+        #  containerPort: 8080
+        #  protocol: TCP
+        #readinessProbe:
+        #  httpGet:
+        #    path: /health
+        #    port: http
+        #  initialDelaySeconds: 5
+        #  periodSeconds: 5
+        env:
+        - name: NAMESPACE
+          value: "apps"

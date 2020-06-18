@@ -39,15 +39,13 @@ jobs:
       - run: grep "\[dependencies\]" -A 9000 kube/Cargo.toml > deps_checksum
       - restore_cache:
           keys:
-            - cache-musl-{{ checksum "deps_checksum" }}
+            - cache-musl-{{ checksum "deps_checksum" }}-2
       - run: cargo build -p tests --release
       - save_cache:
           paths:
-            - /usr/local/cargo/registry
-            - target/debug/.fingerprint
-            - target/debug/build
-            - target/debug/deps
-          key: cache-musl-{{ checksum "deps_checksum" }}
+            - /root/.cargo/registry
+            - target
+          key: cache-musl-{{ checksum "deps_checksum" }}-2
       - persist_to_workspace:
           root: target/x86_64-unknown-linux-musl/release/
           paths:
@@ -73,12 +71,13 @@ jobs:
           show-kubectl-command: true
       - k8s/get-rollout-status:
           namespace: apps
-          resource-name: pod/dapp
+          resource-name: deployment/dapp
           show-kubectl-command: true
           watch-rollout-status: true
           watch-timeout: 3m
       - run: kubectl get all -n apps
-      - run: timeout 60 kubectl logs -f dapp
+      - run: kubectl describe deploy dapp -n apps
+      - run: timeout 60 kubectl logs -f deploy/dapp -n apps || kubectl logs -f deploy/dapp -p -n apps
       - run: kubectl get all -n apps
 
   cargo_test:
