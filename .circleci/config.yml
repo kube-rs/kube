@@ -16,10 +16,6 @@ workflows:
       - kind_k8s:
           requires:
             - kind_compile
-          filters:
-            branches:
-              exclude:
-                - master
 
 jobs:
   kind_compile:
