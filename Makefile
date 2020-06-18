@@ -73,8 +73,8 @@ integration-test: dapp
 # for ci (has dapp built)
 integration-ci:
 	docker build -t clux/kube-dapp:$(VERSION) tests/
-	#docker push clux/kube-dapp:$(VERSION)
-	kind load docker-image clux/kube-dapp:$(VERSION)
+	docker push clux/kube-dapp:$(VERSION) || true
+	./kind load docker-image clux/kube-dapp:$(VERSION)
 	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
 
 # to debug ci...
