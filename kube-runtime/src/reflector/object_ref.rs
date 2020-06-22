@@ -63,12 +63,15 @@ pub trait RuntimeResource {
 impl<K: Resource> RuntimeResource for K {
     // All required state is provided at build time
     type State = ();
+
     fn group(_state: &Self::State) -> &str {
         K::GROUP
     }
+
     fn version(_state: &Self::State) -> &str {
         K::VERSION
     }
+
     fn kind(_state: &Self::State) -> &str {
         K::KIND
     }
@@ -86,12 +89,15 @@ pub struct ErasedResourceState {
 }
 impl RuntimeResource for ErasedResource {
     type State = ErasedResourceState;
+
     fn group(state: &Self::State) -> &str {
         &state.group
     }
+
     fn version(state: &Self::State) -> &str {
         &state.version
     }
+
     fn kind(state: &Self::State) -> &str {
         &state.kind
     }

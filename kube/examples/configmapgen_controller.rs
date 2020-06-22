@@ -5,8 +5,7 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
 };
 use kube::{
-    api::Meta,
-    api::{ListParams, PatchParams, PatchStrategy},
+    api::{ListParams, Meta, PatchParams, PatchStrategy},
     Api, Client, Config,
 };
 use kube_derive::CustomResource;
@@ -75,9 +74,7 @@ async fn main() -> Result<()> {
                         name: generator.metadata.name.clone(),
                         owner_references: Some(vec![OwnerReference {
                             controller: Some(true),
-                            ..object_to_owner_reference::<ConfigMapGenerator>(
-                                generator.metadata.clone(),
-                            )?
+                            ..object_to_owner_reference::<ConfigMapGenerator>(generator.metadata.clone())?
                         }]),
                         ..ObjectMeta::default()
                     }),
@@ -86,26 +83,21 @@ async fn main() -> Result<()> {
                 };
                 let cm_api = Api::<ConfigMap>::namespaced(
                     client.clone(),
-                    generator
-                        .metadata
-                        .namespace
-                        .as_ref()
-                        .context(MissingObjectKey {
-                            name: ".metadata.namespace",
-                        })?,
+                    generator.metadata.namespace.as_ref().context(MissingObjectKey {
+                        name: ".metadata.namespace",
+                    })?,
                 );
                 cm_api
                     .patch(
-                        cm.metadata.as_ref().and_then(|x| x.name.as_ref()).context(
-                            MissingObjectKey {
+                        cm.metadata
+                            .as_ref()
+                            .and_then(|x| x.name.as_ref())
+                            .context(MissingObjectKey {
                                 name: ".metadata.name",
-                            },
-                        )?,
+                            })?,
                         &PatchParams {
                             patch_strategy: PatchStrategy::Apply,
-                            field_manager: Some(
-                                "configmapgenerator.kube-rt.nullable.se".to_string(),
-                            ),
+                            field_manager: Some("configmapgenerator.kube-rt.nullable.se".to_string()),
                             dry_run: false,
                             force: false,
                         },

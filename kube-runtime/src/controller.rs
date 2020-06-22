@@ -4,8 +4,8 @@ use crate::{
     utils::trystream_try_via,
 };
 use futures::{
-    channel, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt,
-    TryStream, TryStreamExt,
+    channel, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream,
+    TryStreamExt,
 };
 use kube::api::Meta;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
@@ -62,9 +62,7 @@ where
 }
 
 /// Enqueues any owners of type `KOwner` for reconciliation
-pub fn trigger_owners<KOwner, S>(
-    stream: S,
-) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
+pub fn trigger_owners<KOwner, S>(stream: S) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
 where
     S: TryStream,
     S::Ok: Meta,
@@ -92,12 +90,7 @@ pub fn controller<K, QueueStream, ReconcilerFut>(
     mut error_policy: impl FnMut(&ReconcilerFut::Error) -> ReconcilerAction,
     store: Store<K>,
     queue: QueueStream,
-) -> impl Stream<
-    Item = Result<
-        (ObjectRef<K>, ReconcilerAction),
-        Error<ReconcilerFut::Error, QueueStream::Error>,
-    >,
->
+) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
     K: Clone + Meta + 'static,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction>,

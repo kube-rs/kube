@@ -6,9 +6,7 @@ use dashmap::DashMap;
 use derivative::Derivative;
 use k8s_openapi::Resource;
 use kube::api::Meta;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 /// A writable Store handle
 ///
@@ -47,8 +45,7 @@ impl<K: Meta + Clone> Writer<K> {
                     .map(|obj| (ObjectRef::from_obj(obj), obj))
                     .collect::<HashMap<_, _>>();
                 // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
-                self.store
-                    .retain(|key, _old_value| new_objs.contains_key(key));
+                self.store.retain(|key, _old_value| new_objs.contains_key(key));
                 for (key, obj) in new_objs {
                     self.store.insert(key, obj.clone());
                 }

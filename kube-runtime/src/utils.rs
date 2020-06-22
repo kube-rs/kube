@@ -1,6 +1,6 @@
 use crate::watcher;
-use futures::pin_mut;
 use futures::{
+    pin_mut,
     stream::{self, Peekable},
     Future, Stream, StreamExt, TryStream, TryStreamExt,
 };
@@ -39,6 +39,7 @@ where
     S::Error: Debug,
 {
     type Item = S::Ok;
+
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -51,7 +52,10 @@ where
         match inner_peek.poll(cx) {
             Poll::Ready(Some(Ok(_))) => match PinMut::as_mut(&mut inner).poll_next(cx) {
                 Poll::Ready(Some(Ok(x))) => Poll::Ready(Some(x)),
-                res => panic!("Peekable::poll_next() returned {:?} when Peekable::peek() returned Ready(Some(Ok(_)))", res)
+                res => panic!(
+                    "Peekable::poll_next() returned {:?} when Peekable::peek() returned Ready(Some(Ok(_)))",
+                    res
+                ),
             },
             // Err case will be handled by `SplitResultErr`
             Poll::Ready(Some(Err(_))) => Poll::Pending,
@@ -73,6 +77,7 @@ where
     S::Error: Debug,
 {
     type Item = S::Error;
+
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
