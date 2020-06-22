@@ -1,0 +1,2 @@
+Rethinking [[https://github.com/clux/kube-rs][kube-rs]]'s runtime components. Very unstable. If you're writing something serious then
+you probably want to use kube-rs instead.
