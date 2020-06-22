@@ -2,7 +2,7 @@ use futures::{
     stream::{Fuse, FusedStream},
     Stream, StreamExt,
 };
-use pin_project::{pin_project, project};
+use pin_project::pin_project;
 use snafu::{Backtrace, ResultExt, Snafu};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -38,7 +38,7 @@ struct ScheduledEntry {
     queue_key: delay_queue::Key,
 }
 
-#[pin_project]
+#[pin_project(project = SchedulerProj)]
 struct Scheduler<T, R> {
     queue: DelayQueue<T>,
     scheduled: HashMap<T, ScheduledEntry>,
@@ -56,8 +56,7 @@ impl<T, R: Stream> Scheduler<T, R> {
     }
 }
 
-#[project]
-impl<T: Hash + Eq + Clone, R> Scheduler<T, R> {
+impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
     fn schedule_message(&mut self, request: ScheduleRequest<T>) {
         match self.scheduled.entry(request.message) {
             Entry::Occupied(mut old_entry) if old_entry.get().run_at >= request.run_at => {
