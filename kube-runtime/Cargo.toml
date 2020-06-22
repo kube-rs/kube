@@ -1,15 +1,12 @@
 [package]
-name = "kube-rt"
+name = "kube-runtime"
 version = "0.1.0"
 authors = ["Teo Klestrup Röijezon <teo@nullable.se>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 futures = "0.3.5"
-kube = "0.34.0"
-# kube = { path = "../kube-rs/kube" }
+kube = { path = "../kube" }
 k8s-openapi = "0.8.0"
 derivative = "2.1.1"
 serde = "1.0.110"
@@ -17,24 +14,5 @@ dashmap = "3.11.1"
 smallvec = "1.4.0"
 pin-project = "0.4.16"
 pin-cell = { git = "https://github.com/withoutboats/pin-cell" }
-
-[dependencies.snafu]
-version = "0.6.8"
-features = ["futures"]
-
-[dependencies.tokio]
-version = "0.2.21"
-features = ["time"]
-
-[dev-dependencies]
-kube-derive = "0.34.0"
-serde_json = "1.0.53"
-color-eyre = "0.3.0"
-
-[dev-dependencies.k8s-openapi]
-version = "0.8.0"
-features = ["v1_16"]
-
-[dev-dependencies.tokio]
-version = "0.2.21"
-features = ["macros"]
+tokio = { version = "0.2.21", features = ["time"] }
+snafu = { version = "0.6.8", features = ["futures"] }

@@ -10,7 +10,7 @@ use kube::{
     Api, Client, Config,
 };
 use kube_derive::CustomResource;
-use kube_rt::{
+use kube_runtime::{
     controller::{controller, trigger_owners, trigger_self, ReconcilerAction},
     reflector,
     utils::{try_flatten_addeds, try_flatten_toucheds},
@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
     let config = Config::infer().await?;
     let client = Client::new(config);
 
-    let store = kube_rt::reflector::store::Writer::<ConfigMapGenerator>::default();
+    let store = reflector::store::Writer::<ConfigMapGenerator>::default();
     controller(
         |generator| {
             let client = client.clone();
@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
                         ..ObjectMeta::default()
                     }),
                     data: Some(contents),
-                    binary_data: Default::default(),
+                    ..Default::default()
                 };
                 let cm_api = Api::<ConfigMap>::namespaced(
                     client.clone(),
