@@ -27,18 +27,34 @@ pub fn try_flatten_toucheds<K, S: TryStream<Ok = watcher::Event<K>>>(
         .try_flatten()
 }
 
+/// Allows splitting a `Stream` into several streams that each emit a disjoint subset of the input stream's items,
+/// like a streaming variant of pattern matching.
+///
+/// NOTE: The cases MUST be reunited into the same final stream (using `futures::stream::select` or similar),
+/// since cases for rejected items will *not* register wakeup correctly, and may otherwise lose items and/or deadlock.
+///
+/// NOTE: The whole set of cases will deadlock if there is ever an item that no live case wants to consume.
 #[pin_project]
-pub struct SplitResultOk<S: TryStream> {
-    inner: Pin<Rc<PinCell<Peekable<IntoStream<S>>>>>,
+pub struct SplitCase<S: Stream, Case> {
+    inner: Pin<Rc<PinCell<Peekable<S>>>>,
+    /// Tests whether an item from the stream should be consumed
+    ///
+    /// NOTE: This MUST be total over all `SplitCase`s, otherwise the input stream
+    /// will get stuck deadlocked because no candidate tries to consume the item.
+    should_consume_item: fn(&S::Item) -> bool,
+    /// Narrows the type of the consumed type, using the same precondition as `should_consume_item`.
+    ///
+    /// NOTE: This MUST return `Some` if `should_consume_item` returns `true`, since we can't put
+    /// an item back into the input stream once consumed.
+    try_extract_item_case: fn(S::Item) -> Option<Case>,
 }
 
-impl<S> Stream for SplitResultOk<S>
+impl<S, Case> Stream for SplitCase<S, Case>
 where
-    S: TryStream,
-    S::Ok: Debug,
-    S::Error: Debug,
+    S: Stream,
+    S::Item: Debug,
 {
-    type Item = S::Ok;
+    type Item = Case;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
@@ -48,52 +64,23 @@ where
         let mut inner = PinCell::borrow_mut(this.inner.as_ref());
         let inner_peek = PinMut::as_mut(&mut inner).peek();
         pin_mut!(inner_peek);
-        #[allow(clippy::match_same_arms)]
         match inner_peek.poll(cx) {
-            Poll::Ready(Some(Ok(_))) => match PinMut::as_mut(&mut inner).poll_next(cx) {
-                Poll::Ready(Some(Ok(x))) => Poll::Ready(Some(x)),
-                res => panic!(
-                    "Peekable::poll_next() returned {:?} when Peekable::peek() returned Ready(Some(Ok(_)))",
+            Poll::Ready(Some(x_ref)) => {
+                if (this.should_consume_item)(x_ref) {
+                    match PinMut::as_mut(&mut inner).poll_next(cx) {
+                        Poll::Ready(Some(x)) => Poll::Ready(Some((this.try_extract_item_case)(x).expect(
+                            "`try_extract_item_case` returned `None` despite `should_consume_item` returning `true`",
+                        ))),
+                        res => panic!(
+                    "Peekable::poll_next() returned {:?} when Peekable::peek() returned Ready(Some(_))",
                     res
                 ),
-            },
-            // Err case will be handled by `SplitResultErr`
-            Poll::Ready(Some(Err(_))) => Poll::Pending,
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
-        }
-    }
-}
-
-#[pin_project]
-struct SplitResultErr<S: TryStream> {
-    inner: Pin<Rc<PinCell<Peekable<IntoStream<S>>>>>,
-}
-
-impl<S> Stream for SplitResultErr<S>
-where
-    S: TryStream,
-    S::Ok: Debug,
-    S::Error: Debug,
-{
-    type Item = S::Error;
-
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        let this = self.project();
-        let mut inner = PinCell::borrow_mut(this.inner.as_ref());
-        let inner_peek = PinMut::as_mut(&mut inner).peek();
-        pin_mut!(inner_peek);
-        #[allow(clippy::match_same_arms)]
-        match inner_peek.poll(cx) {
-            Poll::Ready(Some(Err(_))) => match PinMut::as_mut(&mut inner).poll_next(cx) {
-                Poll::Ready(Some(Err(x))) => Poll::Ready(Some(x)),
-                res => panic!("Peekable::poll_next() returned {:?} when Peekable::peek() returned Ready(Some(Error(_)))", res)
-            },
-            // Ok case will be handled by `SplitResultOk`
-            Poll::Ready(Some(Ok(_))) => Poll::Pending,
+                    }
+                } else {
+                    // Handled by another SplitCase instead
+                    Poll::Pending
+                }
+            }
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
@@ -103,7 +90,12 @@ where
 /// Splits a `TryStream` into separate `Ok` and `Error` streams.
 ///
 /// Note: This will deadlock if one branch outlives the other
-fn trystream_split_result<S>(stream: S) -> (SplitResultOk<S>, SplitResultErr<S>)
+fn trystream_split_result<S>(
+    stream: S,
+) -> (
+    SplitCase<IntoStream<S>, S::Ok>,
+    SplitCase<IntoStream<S>, S::Error>,
+)
 where
     S: TryStream,
     S::Ok: Debug,
@@ -111,17 +103,23 @@ where
 {
     let stream = Rc::pin(PinCell::new(stream.into_stream().peekable()));
     (
-        SplitResultOk {
+        SplitCase {
             inner: stream.clone(),
+            should_consume_item: Result::is_ok,
+            try_extract_item_case: Result::ok,
         },
-        SplitResultErr { inner: stream },
+        SplitCase {
+            inner: stream,
+            should_consume_item: Result::is_err,
+            try_extract_item_case: Result::err,
+        },
     )
 }
 
 /// Forwards Ok elements via a stream built from `make_via_stream`, while passing errors through unmodified
 pub fn trystream_try_via<S1, S2>(
     input_stream: S1,
-    make_via_stream: impl FnOnce(SplitResultOk<S1>) -> S2,
+    make_via_stream: impl FnOnce(SplitCase<IntoStream<S1>, S1::Ok>) -> S2,
 ) -> impl Stream<Item = Result<S2::Ok, S1::Error>>
 where
     S1: TryStream,
