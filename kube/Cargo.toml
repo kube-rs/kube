@@ -54,7 +54,7 @@ rustls-tls = ["rustls", "reqwest/rustls-tls"]
 
 [dev-dependencies]
 kube-derive = { path = "../kube-derive" }
-#kube-runtime = { path = "../kube-runtime" }
+kube-runtime = { path = "../kube-runtime", default-features = false }
 tempfile = "3.1.0"
 env_logger = "0.7.1"
 tokio = { version = "0.2.21", features = ["full"] }
