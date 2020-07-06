@@ -5,7 +5,7 @@ use kube::{
     api::{Api, ListParams, Meta},
     Client,
 };
-use kube_runtime::{reflector, reflector::{ObjectRef}, watcher, utils::try_flatten_applied,};
+use kube_runtime::{reflector, reflector::ObjectRef, utils::try_flatten_applied, watcher};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -21,8 +21,8 @@ async fn main() -> anyhow::Result<()> {
         store,
         watcher(
             Api::<Deployment>::namespaced(client.clone(), &namespace),
-            ListParams::default().timeout(10) // short watch timeout in this example
-        )
+            ListParams::default().timeout(10), // short watch timeout in this example
+        ),
     );
 
     // We can also interact with state in another thread
