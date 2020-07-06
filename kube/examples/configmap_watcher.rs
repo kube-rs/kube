@@ -1,13 +1,12 @@
 #[macro_use] extern crate log;
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ListParams},
-    runtime::Informer,
     Client,
 };
+use kube_runtime::watcher;
 
-/// Example way to read secrets
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=trace");
@@ -17,12 +16,10 @@ async fn main() -> anyhow::Result<()> {
 
     let cms: Api<ConfigMap> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().allow_bookmarks().timeout(10); // short watch timeout in this example
-    let inf = Informer::new(cms).params(lp);
 
-    loop {
-        let mut stream = inf.poll().await?.boxed();
-        while let Some(event) = stream.try_next().await? {
-            info!("Got: {:?}", event);
-        }
+    let mut w = Box::pin(watcher(cms, lp));
+    while let Some(event) = w.try_next().await? {
+        info!("Got: {:?}", event);
     }
+    Ok(())
 }

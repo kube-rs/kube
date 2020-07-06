@@ -9,12 +9,12 @@ use pin_project::pin_project;
 use std::{fmt::Debug, pin::Pin, rc::Rc, task::Poll};
 use stream::IntoStream;
 
-/// Flattens each item in the list following the rules of `watcher::Event::into_iter_added`
-pub fn try_flatten_addeds<K, S: TryStream<Ok = watcher::Event<K>>>(
+/// Flattens each item in the list following the rules of `watcher::Event::into_iter_applied`
+pub fn try_flatten_applied<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,
 ) -> impl Stream<Item = Result<K, S::Error>> {
     stream
-        .map_ok(|event| stream::iter(event.into_iter_added().map(Ok)))
+        .map_ok(|event| stream::iter(event.into_iter_applied().map(Ok)))
         .try_flatten()
 }
 

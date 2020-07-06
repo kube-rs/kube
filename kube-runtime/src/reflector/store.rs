@@ -33,7 +33,7 @@ impl<K: Meta + Clone> Writer<K> {
     /// Applies a single watcher event to the store
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
-            watcher::Event::Added(obj) => {
+            watcher::Event::Applied(obj) => {
                 self.store.insert(ObjectRef::from_obj(&obj), obj.clone());
             }
             watcher::Event::Deleted(obj) => {

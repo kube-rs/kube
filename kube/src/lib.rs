@@ -75,9 +75,13 @@
 #![deny(missing_docs)]
 
 #[macro_use] extern crate static_assertions;
-assert_cfg!(all(not(all(feature = "native-tls", feature = "rustls-tls")),
-                any(    feature = "native-tls", feature = "rustls-tls")),
-            "Must use exactly one of native-tls or rustls-tls features");
+assert_cfg!(
+    all(
+        not(all(feature = "native-tls", feature = "rustls-tls")),
+        any(feature = "native-tls", feature = "rustls-tls")
+    ),
+    "Must use exactly one of native-tls or rustls-tls features"
+);
 
 #[macro_use] extern crate log;
 

@@ -38,7 +38,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 /// Watch events returned from the `Watcher`
 pub enum Event<K> {
     /// A resource was added or modified
-    Added(K),
+    Applied(K),
     /// A resource was deleted
     ///
     /// NOTE: This should not be used for managing persistent state elsewhere, since
@@ -55,9 +55,9 @@ impl<K> Event<K> {
     ///
     /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
     /// emitted individually.
-    pub fn into_iter_added(self) -> impl Iterator<Item = K> {
+    pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Added(obj) => SmallVec::from_buf([obj]),
+            Event::Applied(obj) => SmallVec::from_buf([obj]),
             Event::Deleted(_) => SmallVec::new(),
             Event::Restarted(objs) => SmallVec::from_vec(objs),
         }
@@ -71,7 +71,7 @@ impl<K> Event<K> {
     /// deleted objects.
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Added(obj) | Event::Deleted(obj) => SmallVec::from_buf([obj]),
+            Event::Applied(obj) | Event::Deleted(obj) => SmallVec::from_buf([obj]),
             Event::Restarted(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
@@ -104,8 +104,8 @@ pub enum State<K: Meta + Clone> {
 
 /// Progresses the watcher a single step, returning (event, state)
 ///
-/// This function should be trampolined: if event == `None` then the function should be called
-/// again until it returns a Some
+/// This function should be trampolined: if event == `None`
+/// then the function should be called again until it returns a Some.
 async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
@@ -133,7 +133,7 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
         } => match stream.next().await {
             Some(Ok(WatchEvent::Added(obj))) | Some(Ok(WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_ver().unwrap();
-                (Some(Ok(Event::Added(obj))), State::Watching {
+                (Some(Ok(Event::Applied(obj))), State::Watching {
                     resource_version,
                     stream,
                 })
