@@ -12,7 +12,7 @@ use kube_derive::CustomResource;
 use kube_runtime::{
     controller::{controller, trigger_owners, trigger_self, ReconcilerAction},
     reflector,
-    utils::{try_flatten_addeds, try_flatten_toucheds},
+    utils::{try_flatten_applied, try_flatten_touched},
     watcher,
 };
 use serde::{Deserialize, Serialize};
@@ -115,14 +115,14 @@ async fn main() -> Result<()> {
         },
         store.as_reader(),
         stream::select(
-            trigger_self(try_flatten_addeds(reflector(
+            trigger_self(try_flatten_applied(reflector(
                 store,
                 watcher(
                     Api::<ConfigMapGenerator>::all(client.clone()),
                     ListParams::default(),
                 ),
             ))),
-            trigger_owners(try_flatten_toucheds(watcher(
+            trigger_owners(try_flatten_touched(watcher(
                 Api::<ConfigMap>::all(client.clone()),
                 ListParams::default(),
             ))),

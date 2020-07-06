@@ -19,7 +19,7 @@ pub fn try_flatten_applied<K, S: TryStream<Ok = watcher::Event<K>>>(
 }
 
 /// Flattens each item in the list following the rules of `watcher::Event::into_iter_touched`
-pub fn try_flatten_toucheds<K, S: TryStream<Ok = watcher::Event<K>>>(
+pub fn try_flatten_touched<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,
 ) -> impl Stream<Item = Result<K, S::Error>> {
     stream
