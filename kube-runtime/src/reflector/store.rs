@@ -1,7 +1,7 @@
 use super::ObjectRef;
 use crate::watcher;
-use derivative::Derivative;
 use dashmap::DashMap;
+use derivative::Derivative;
 use k8s_openapi::Resource;
 use kube::api::Meta;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
