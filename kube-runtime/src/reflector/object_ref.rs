@@ -13,21 +13,17 @@ pub struct ObjectRef<K: RuntimeResource> {
 
 impl<K: Meta> ObjectRef<K> {
     #[must_use]
-    pub fn new_namespaced(name: String, namespace: String) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
             kind: (),
-            name,
-            namespace: Some(namespace),
+            name: name.into(),
+            namespace: None,
         }
     }
 
-    #[must_use]
-    pub fn new_clusterscoped(name: String) -> Self {
-        Self {
-            kind: (),
-            name,
-            namespace: None,
-        }
+    pub fn within(mut self, namespace: &str) -> Self {
+        self.namespace = Some(namespace.to_string());
+        self
     }
 
     #[must_use]

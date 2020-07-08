@@ -10,12 +10,12 @@ kube = { path = "../kube" }
 k8s-openapi = "0.8.0"
 derivative = "2.1.1"
 serde = "1.0.110"
-dashmap = "3.11.1"
 smallvec = "1.4.0"
 pin-project = "0.4.16"
 pin-cell = { git = "https://github.com/withoutboats/pin-cell" }
 tokio = { version = "0.2.21", features = ["time"] }
 snafu = { version = "0.6.8", features = ["futures"] }
+dashmap = "4.0.0-rc6"
 
 [dev-dependencies.k8s-openapi]
 version = "0.8.0"

@@ -1,9 +1,7 @@
 use super::ObjectRef;
 use crate::watcher;
-// DashMap isn't async-aware, but that's fine as long
-// as we never hold the lock over an async/await boundary
-use dashmap::DashMap;
 use derivative::Derivative;
+use dashmap::DashMap;
 use k8s_openapi::Resource;
 use kube::api::Meta;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
@@ -14,11 +12,11 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct Writer<K: Resource> {
+pub struct Writer<K: 'static + Resource> {
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
-impl<K: Meta + Clone> Writer<K> {
+impl<K: 'static + Meta + Clone> Writer<K> {
     /// Return a read handle to the store
     ///
     /// Multiple read handles may be obtained, by either calling `as_reader` multiple times,
@@ -62,13 +60,11 @@ impl<K: Meta + Clone> Writer<K> {
 /// use `Writer::as_reader()` instead.
 #[derive(Debug, Derivative)]
 #[derivative(Clone)]
-pub struct Store<K: Resource> {
-    // DashMap isn't async-aware, but that's fine as long
-    // as we never hold the lock over an async/await boundary
+pub struct Store<K: 'static + Resource> {
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
-impl<K: Clone + Resource> Store<K> {
+impl<K: 'static + Clone + Resource> Store<K> {
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
     ///
     /// Note that this is a cache and may be stale. Deleted objects may still exist in the cache
@@ -80,5 +76,19 @@ impl<K: Clone + Resource> Store<K> {
     pub fn get(&self, key: &ObjectRef<K>) -> Option<K> {
         // Clone to let go of the entry lock ASAP
         self.store.get(key).map(|entry| entry.value().clone())
+    }
+
+    /// Return a full snapshot of the current values
+    pub fn state(&self) -> Vec<K> {
+        self.store.iter().map(|eg| eg.value().clone()).collect()
+    }
+
+    /// Return a guarded dashmap iterator of our state
+    ///
+    /// This creates an iterator over all entries in the map.
+    /// This does not take a snapshot of the map and thus changes during the lifetime
+    /// of the iterator may or may not become visible in the iterator.
+    pub fn iter(&self) -> dashmap::Iter<ObjectRef<K>, K> {
+        self.store.iter()
     }
 }
