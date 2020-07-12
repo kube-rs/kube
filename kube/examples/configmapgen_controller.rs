@@ -10,7 +10,7 @@ use kube::{
 };
 use kube_derive::CustomResource;
 use kube_runtime::{
-    controller::{controller, trigger_owners, trigger_self, ReconcilerAction},
+    controller::{controller, trigger_owners, trigger_self, Context, ReconcilerAction},
     reflector,
     utils::{try_flatten_applied, try_flatten_touched},
     watcher,
@@ -57,64 +57,79 @@ fn object_to_owner_reference<K: Meta>(meta: ObjectMeta) -> Result<OwnerReference
     })
 }
 
+async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<ReconcilerAction, Error> {
+    let client = ctx.get_ref().client.clone();
+
+    let mut contents = BTreeMap::new();
+    contents.insert("content".to_string(), generator.spec.content);
+    let cm = ConfigMap {
+        metadata: Some(ObjectMeta {
+            name: generator.metadata.name.clone(),
+            owner_references: Some(vec![OwnerReference {
+                controller: Some(true),
+                ..object_to_owner_reference::<ConfigMapGenerator>(generator.metadata.clone())?
+            }]),
+            ..ObjectMeta::default()
+        }),
+        data: Some(contents),
+        ..Default::default()
+    };
+    let cm_api = Api::<ConfigMap>::namespaced(
+        client.clone(),
+        generator.metadata.namespace.as_ref().context(MissingObjectKey {
+            name: ".metadata.namespace",
+        })?,
+    );
+    cm_api
+        .patch(
+            cm.metadata
+                .as_ref()
+                .and_then(|x| x.name.as_ref())
+                .context(MissingObjectKey {
+                    name: ".metadata.name",
+                })?,
+            &PatchParams {
+                patch_strategy: PatchStrategy::Apply,
+                field_manager: Some("configmapgenerator.kube-rt.nullable.se".to_string()),
+                dry_run: false,
+                force: false,
+            },
+            serde_json::to_vec(&cm).context(SerializationFailed)?,
+        )
+        .await
+        .context(ConfigMapCreationFailed)?;
+    Ok(ReconcilerAction {
+        requeue_after: Some(Duration::from_secs(120)),
+    })
+}
+
+fn error_policy(_error: &Error, _ctx: Context<Data>) -> ReconcilerAction {
+    ReconcilerAction {
+        requeue_after: Some(Duration::from_secs(1)),
+    }
+}
+
+struct Data {
+    client: Client,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = Config::infer().await?;
     let client = Client::new(config);
+    let context = Context::new(Data {
+        client: client.clone(),
+    });
 
     let store = reflector::store::Writer::<ConfigMapGenerator>::default();
     controller(
-        |generator| {
-            let client = client.clone();
-            async move {
-                let mut contents = BTreeMap::new();
-                contents.insert("content".to_string(), generator.spec.content);
-                let cm = ConfigMap {
-                    metadata: Some(ObjectMeta {
-                        name: generator.metadata.name.clone(),
-                        owner_references: Some(vec![OwnerReference {
-                            controller: Some(true),
-                            ..object_to_owner_reference::<ConfigMapGenerator>(generator.metadata.clone())?
-                        }]),
-                        ..ObjectMeta::default()
-                    }),
-                    data: Some(contents),
-                    ..Default::default()
-                };
-                let cm_api = Api::<ConfigMap>::namespaced(
-                    client.clone(),
-                    generator.metadata.namespace.as_ref().context(MissingObjectKey {
-                        name: ".metadata.namespace",
-                    })?,
-                );
-                cm_api
-                    .patch(
-                        cm.metadata
-                            .as_ref()
-                            .and_then(|x| x.name.as_ref())
-                            .context(MissingObjectKey {
-                                name: ".metadata.name",
-                            })?,
-                        &PatchParams {
-                            patch_strategy: PatchStrategy::Apply,
-                            field_manager: Some("configmapgenerator.kube-rt.nullable.se".to_string()),
-                            dry_run: false,
-                            force: false,
-                        },
-                        serde_json::to_vec(&cm).context(SerializationFailed)?,
-                    )
-                    .await
-                    .context(ConfigMapCreationFailed)?;
-                Ok(ReconcilerAction {
-                    requeue_after: Some(Duration::from_secs(120)),
-                })
-            }
-        },
-        |_error: &Error| ReconcilerAction {
-            requeue_after: Some(Duration::from_secs(1)),
-        },
+        reconcile,
+        error_policy,
+        context,
         store.as_reader(),
+        // The input stream - should produce a stream of ConfigMapGenerator events
         stream::select(
+            // NB: don't flatten_touched because ownerrefs take care of delete events
             trigger_self(try_flatten_applied(reflector(
                 store,
                 watcher(
@@ -122,6 +137,7 @@ async fn main() -> Result<()> {
                     ListParams::default(),
                 ),
             ))),
+            // Always trigger CMG whenever the child is applied or deleted!
             trigger_owners(try_flatten_touched(watcher(
                 Api::<ConfigMap>::all(client.clone()),
                 ListParams::default(),

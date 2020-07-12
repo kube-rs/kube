@@ -3,13 +3,14 @@ use crate::{
     scheduler::{self, scheduler, ScheduleRequest},
     utils::trystream_try_via,
 };
+use derivative::Derivative;
 use futures::{
     channel, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream,
     TryStreamExt,
 };
 use kube::api::Meta;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use tokio::time::Instant;
 
 #[derive(Snafu, Debug)]
@@ -78,6 +79,32 @@ where
     })
 }
 
+/// A context data type that's passed through to the controllers callbacks
+///
+/// Context<T> gets passed to both the `reconciler` and the `error_policy` callbacks.
+/// allowing a read-only view of the world without creating a big nested lambda.
+/// More or less the same as actix's Data<T>
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct Context<T>(Arc<T>);
+
+impl<T> Context<T> {
+    /// Create new `Data` instance.
+    pub fn new(state: T) -> Context<T> {
+        Context(Arc::new(state))
+    }
+
+    /// Get reference to inner controller data.
+    pub fn get_ref(&self) -> &T {
+        self.0.as_ref()
+    }
+
+    /// Convert to the internal Arc<T>
+    pub fn into_inner(self) -> Arc<T> {
+        self.0
+    }
+}
+
 /// Runs a reconciler whenever an input stream change
 ///
 /// Takes a `store` parameter for the main object which should be updated by a `reflector`.
@@ -85,9 +112,10 @@ where
 /// The `queue` is a source of external events that trigger the reconciler,
 /// usually taken from a `reflector` and then passed through a trigger function such as
 /// `trigger_self`.
-pub fn controller<K, QueueStream, ReconcilerFut>(
-    mut reconciler: impl FnMut(K) -> ReconcilerFut,
-    mut error_policy: impl FnMut(&ReconcilerFut::Error) -> ReconcilerAction,
+pub fn controller<K, QueueStream, ReconcilerFut, T>(
+    mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
+    mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
+    context: Context<T>,
     store: Store<K>,
     queue: QueueStream,
 ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
@@ -98,23 +126,23 @@ where
     QueueStream: TryStream<Ok = ObjectRef<K>>,
     QueueStream::Error: std::error::Error + 'static,
 {
+    let err_context = context.clone();
     let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ObjectRef<K>>>(100);
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
         Box::pin(stream::select(
-            // user inputs
+            // 1. inputs from users queue stream
             queue.context(QueueError).map_ok(|obj_ref| ScheduleRequest {
                 message: obj_ref,
                 run_at: Instant::now() + Duration::from_millis(1),
             }),
-            // back from scheduler
+            // 2. requests sent to scheduler_tx
             scheduler_rx.map(Ok),
         )),
         // all the Oks from the select gets passed through the scheduler stream
         |s| scheduler(s).context(SchedulerDequeueFailed),
     )
-    // TODO: maybe we could do stream::select -> stream::split / stream::map_ok to bypass `trystream_try_via`
     // now have ObjectRefs that we turn into pairs inside (no extra waiting introduced)
     .and_then(move |obj_ref| {
         future::ready(
@@ -128,7 +156,7 @@ where
     })
     // then reconcile every object
     .and_then(move |(obj_ref, obj)| {
-        reconciler(obj) // TODO: add a context argument to the reconcile
+        reconciler(obj, context.clone()) // TODO: add a context argument to the reconcile
             .into_future() // TryFuture -> impl Future
             .map(|result| (obj_ref, result)) // turn into pair and ok wrap
             .map(Ok) // (this lets us deal with errors from reconciler below)
@@ -136,8 +164,8 @@ where
     // finally, for each completed reconcile call:
     .and_then(move |(obj_ref, reconciler_result)| {
         let ReconcilerAction { requeue_after } = match &reconciler_result {
-            Ok(action) => action.clone(),  // do what user told us
-            Err(err) => error_policy(err), // reconciler fn call failed
+            Ok(action) => action.clone(),                       // do what user told us
+            Err(err) => error_policy(err, err_context.clone()), // reconciler fn call failed
         };
         // we should always requeue at some point in case of network errors ^
         let mut scheduler_tx = scheduler_tx.clone();
