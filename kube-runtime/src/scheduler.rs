@@ -62,6 +62,7 @@ impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
             Entry::Occupied(mut old_entry) if old_entry.get().run_at >= request.run_at => {
                 // Old entry will run after the new request, so replace it..
                 let entry = old_entry.get_mut();
+                // TODO: this should add a little delay here to actually debounce
                 self.queue.reset_at(&entry.queue_key, request.run_at);
                 entry.run_at = request.run_at;
             }

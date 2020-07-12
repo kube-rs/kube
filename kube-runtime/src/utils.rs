@@ -117,7 +117,7 @@ where
 }
 
 /// Forwards Ok elements via a stream built from `make_via_stream`, while passing errors through unmodified
-pub fn trystream_try_via<S1, S2>(
+pub(crate) fn trystream_try_via<S1, S2>(
     input_stream: S1,
     make_via_stream: impl FnOnce(SplitCase<IntoStream<S1>, S1::Ok>) -> S2,
 ) -> impl Stream<Item = Result<S2::Ok, S1::Error>>
@@ -127,7 +127,7 @@ where
     S1::Ok: Debug,
     S1::Error: Debug,
 {
-    let (oks, errs) = trystream_split_result(input_stream);
-    let via = make_via_stream(oks);
-    stream::select(via.into_stream(), errs.map(Err))
+    let (oks, errs) = trystream_split_result(input_stream); // the select -> SplitCase
+    let via = make_via_stream(oks); // the map_ok/err function
+    stream::select(via.into_stream(), errs.map(Err)) // recombine
 }

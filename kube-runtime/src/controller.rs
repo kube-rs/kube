@@ -78,9 +78,9 @@ where
     })
 }
 
-/// Runs a reconciler whenever an object changes
+/// Runs a reconciler whenever an input stream change
 ///
-/// The `store` should be kept updated by a `reflector`.
+/// Takes a `store` parameter for the main object which should be updated by a `reflector`.
 ///
 /// The `queue` is a source of external events that trigger the reconciler,
 /// usually taken from a `reflector` and then passed through a trigger function such as
@@ -99,16 +99,23 @@ where
     QueueStream::Error: std::error::Error + 'static,
 {
     let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ObjectRef<K>>>(100);
+    // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
+        // input: stream combining scheduled tasks and user specified inputs event
         stream::select(
+            // user inputs
             queue.context(QueueError).map_ok(|obj_ref| ScheduleRequest {
                 message: obj_ref,
                 run_at: Instant::now() + Duration::from_millis(1),
             }),
+            // back from scheduler
             scheduler_rx.map(Ok),
         ),
+        // all the Oks from the select gets passed through the scheduler stream
         |s| scheduler(s).context(SchedulerDequeueFailed),
     )
+    // TODO: maybe we could do stream::select -> stream::split / stream::map_ok to bypass `trystream_try_via`
+    // now have ObjectRefs that we turn into pairs inside (no extra waiting introduced)
     .and_then(move |obj_ref| {
         future::ready(
             store
@@ -119,19 +126,23 @@ where
                 .map(|obj| (obj_ref, obj)),
         )
     })
+    // then reconcile every object
     .and_then(move |(obj_ref, obj)| {
-        reconciler(obj)
-            .into_future()
-            .map(|result| (obj_ref, result))
-            .map(Ok)
+        reconciler(obj) // TODO: add a context argument to the reconcile
+            .into_future() // TryFuture -> impl Future
+            .map(|result| (obj_ref, result)) // turn into pair and ok wrap
+            .map(Ok) // (this lets us deal with errors from reconciler below)
     })
+    // finally, for each completed reconcile call:
     .and_then(move |(obj_ref, reconciler_result)| {
         let ReconcilerAction { requeue_after } = match &reconciler_result {
-            Ok(action) => action.clone(),
-            Err(err) => error_policy(err),
+            Ok(action) => action.clone(),  // do what user told us
+            Err(err) => error_policy(err), // reconciler fn call failed
         };
+        // we should always requeue at some point in case of network errors ^
         let mut scheduler_tx = scheduler_tx.clone();
         async move {
+            // Transmit the requeue request to the scheduler (picked up again at top)
             if let Some(delay) = requeue_after {
                 scheduler_tx
                     .send(ScheduleRequest {
@@ -139,8 +150,9 @@ where
                         run_at: Instant::now() + delay,
                     })
                     .await
-                    .unwrap();
+                    .expect("Message could not be sent to scheduler_rx");
             }
+            // NB: no else clause ^ because we don't allow not requeuing atm.
             reconciler_result
                 .map(|action| (obj_ref, action))
                 .context(ReconcilerFailed)
