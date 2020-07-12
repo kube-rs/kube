@@ -95,7 +95,7 @@ where
     K: Clone + Meta + 'static,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
     ReconcilerFut::Error: std::error::Error + 'static,
-    QueueStream: TryStream<Ok = ObjectRef<K>>,
+    QueueStream: TryStream<Ok = ObjectRef<K>> + Unpin,
     QueueStream::Error: std::error::Error + 'static,
 {
     let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ObjectRef<K>>>(100);

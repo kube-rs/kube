@@ -4,9 +4,8 @@ use futures::{
     stream::{self, Peekable},
     Future, Stream, StreamExt, TryStream, TryStreamExt,
 };
-use pin_cell::{PinCell, PinMut};
 use pin_project::pin_project;
-use std::{fmt::Debug, pin::Pin, rc::Rc, task::Poll};
+use std::{cell::RefCell, fmt::Debug, pin::Pin, rc::Rc, task::Poll};
 use stream::IntoStream;
 
 /// Flattens each item in the list following the rules of `watcher::Event::into_iter_applied`
@@ -36,7 +35,7 @@ pub fn try_flatten_touched<K, S: TryStream<Ok = watcher::Event<K>>>(
 /// NOTE: The whole set of cases will deadlock if there is ever an item that no live case wants to consume.
 #[pin_project]
 pub struct SplitCase<S: Stream, Case> {
-    inner: Pin<Rc<PinCell<Peekable<S>>>>,
+    inner: Rc<RefCell<Peekable<S>>>,
     /// Tests whether an item from the stream should be consumed
     ///
     /// NOTE: This MUST be total over all `SplitCase`s, otherwise the input stream
@@ -51,7 +50,7 @@ pub struct SplitCase<S: Stream, Case> {
 
 impl<S, Case> Stream for SplitCase<S, Case>
 where
-    S: Stream,
+    S: Stream + Unpin,
     S::Item: Debug,
 {
     type Item = Case;
@@ -61,13 +60,13 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = self.project();
-        let mut inner = PinCell::borrow_mut(this.inner.as_ref());
-        let inner_peek = PinMut::as_mut(&mut inner).peek();
+        let mut inner = Pin::new(this.inner.borrow_mut());
+        let inner_peek = inner.as_mut().peek();
         pin_mut!(inner_peek);
         match inner_peek.poll(cx) {
             Poll::Ready(Some(x_ref)) => {
                 if (this.should_consume_item)(x_ref) {
-                    match PinMut::as_mut(&mut inner).poll_next(cx) {
+                    match inner.as_mut().poll_next(cx) {
                         Poll::Ready(Some(x)) => Poll::Ready(Some((this.try_extract_item_case)(x).expect(
                             "`try_extract_item_case` returned `None` despite `should_consume_item` returning `true`",
                         ))),
@@ -97,11 +96,11 @@ fn trystream_split_result<S>(
     SplitCase<IntoStream<S>, S::Error>,
 )
 where
-    S: TryStream,
+    S: TryStream + Unpin,
     S::Ok: Debug,
     S::Error: Debug,
 {
-    let stream = Rc::pin(PinCell::new(stream.into_stream().peekable()));
+    let stream = Rc::new(RefCell::new(stream.into_stream().peekable()));
     (
         SplitCase {
             inner: stream.clone(),
@@ -122,7 +121,7 @@ pub(crate) fn trystream_try_via<S1, S2>(
     make_via_stream: impl FnOnce(SplitCase<IntoStream<S1>, S1::Ok>) -> S2,
 ) -> impl Stream<Item = Result<S2::Ok, S1::Error>>
 where
-    S1: TryStream,
+    S1: TryStream + Unpin,
     S2: TryStream<Error = S1::Error>,
     S1::Ok: Debug,
     S1::Error: Debug,
