@@ -95,14 +95,14 @@ where
     K: Clone + Meta + 'static,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
     ReconcilerFut::Error: std::error::Error + 'static,
-    QueueStream: TryStream<Ok = ObjectRef<K>> + Unpin,
+    QueueStream: TryStream<Ok = ObjectRef<K>>,
     QueueStream::Error: std::error::Error + 'static,
 {
     let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ObjectRef<K>>>(100);
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
-        stream::select(
+        Box::pin(stream::select(
             // user inputs
             queue.context(QueueError).map_ok(|obj_ref| ScheduleRequest {
                 message: obj_ref,
@@ -110,7 +110,7 @@ where
             }),
             // back from scheduler
             scheduler_rx.map(Ok),
-        ),
+        )),
         // all the Oks from the select gets passed through the scheduler stream
         |s| scheduler(s).context(SchedulerDequeueFailed),
     )

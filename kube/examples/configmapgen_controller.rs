@@ -126,8 +126,7 @@ async fn main() -> Result<()> {
                 Api::<ConfigMap>::all(client.clone()),
                 ListParams::default(),
             ))),
-        )
-        .boxed_local(),
+        ),
     )
     .for_each(|res| async move { println!("I did a thing! {:?}", res.map_err(Report::from)) })
     .await;
