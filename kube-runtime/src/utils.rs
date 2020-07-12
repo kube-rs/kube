@@ -34,7 +34,7 @@ pub fn try_flatten_touched<K, S: TryStream<Ok = watcher::Event<K>>>(
 ///
 /// NOTE: The whole set of cases will deadlock if there is ever an item that no live case wants to consume.
 #[pin_project]
-pub struct SplitCase<S: Stream, Case> {
+pub(crate) struct SplitCase<S: Stream, Case> {
     inner: Rc<RefCell<Peekable<S>>>,
     /// Tests whether an item from the stream should be consumed
     ///
