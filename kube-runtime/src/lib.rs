@@ -6,7 +6,6 @@
 #![allow(clippy::default_trait_access)]
 
 pub mod controller;
-mod manager;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;
