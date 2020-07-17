@@ -220,9 +220,8 @@ where
         let writer = Writer::<K>::default();
         let reader = writer.as_reader();
         let mut selector = stream::SelectAll::new();
-        let self_watcher: Pin<Box<dyn Stream<Item = Result<ObjectRef<K>, watcher::Error>>>> = Box::pin(
-            trigger_self(try_flatten_applied(reflector(writer, watcher(owned_api, lp)))),
-        );
+        let self_watcher =
+            trigger_self(try_flatten_applied(reflector(writer, watcher(owned_api, lp)))).boxed_local();
         selector.push(self_watcher);
         Self { selector, reader }
     }
