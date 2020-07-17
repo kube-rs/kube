@@ -10,8 +10,9 @@ use crate::{
 };
 use derivative::Derivative;
 use futures::{
-    channel, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream,
-    TryStreamExt,
+    channel, future,
+    stream::{self, SelectAll},
+    FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
@@ -203,7 +204,7 @@ where
 {
     // NB: Need to Unpin for stream::select_all
     // TODO: get an arbitrary std::error::Error in here?
-    selector: Vec<Pin<Box<dyn Stream<Item = Result<ObjectRef<K>, watcher::Error>>>>>,
+    selector: SelectAll<Pin<Box<dyn Stream<Item = Result<ObjectRef<K>, watcher::Error>>>>>,
     reader: Store<K>,
 }
 
@@ -218,7 +219,7 @@ where
     pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
         let writer = Writer::<K>::default();
         let reader = writer.as_reader();
-        let mut selector = vec![];
+        let mut selector = stream::SelectAll::new();
         let self_watcher: Pin<Box<dyn Stream<Item = Result<ObjectRef<K>, watcher::Error>>>> = Box::pin(
             trigger_self(try_flatten_applied(reflector(writer, watcher(owned_api, lp)))),
         );
@@ -280,7 +281,6 @@ where
         ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
         ReconcilerFut::Error: std::error::Error + 'static,
     {
-        let input_stream = stream::select_all(self.selector);
-        controller(reconciler, error_policy, context, self.reader, input_stream)
+        controller(reconciler, error_policy, context, self.reader, self.selector)
     }
 }
