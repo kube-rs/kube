@@ -32,9 +32,8 @@ where
     ///
     /// Configure `ListParams` and `Api` so you only get reconcile events
     /// for the correct Api scope (cluster/all/namespaced), or ListParams subset
-    ///
-    /// A writer is exposed for convenience so you can peak into the main reflector's state.
-    pub fn new(owned_api: Api<K>, lp: ListParams, writer: Writer<K>) -> Self {
+    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
+        let writer = Writer::<K>::default();
         let reader = writer.as_reader();
         let mut selector = vec![];
         let self_watcher: Pin<Box<dyn Stream<Item = Result<ObjectRef<K>, watcher::Error>>>> = Box::pin(
@@ -44,15 +43,20 @@ where
         Self { selector, reader }
     }
 
+    /// Retrieve a copy of the reader before starting the controller
+    pub fn store(&self) -> Store<K> {
+        self.reader.clone()
+    }
+
     /// Indicate child objets K owns and be notified when they change
     ///
-    /// This type `CHILD` must have OwnerReferences set to point back to `K`.
+    /// This type `Child` must have OwnerReferences set to point back to `K`.
     /// You can customize the parameters used by the underlying watcher if
-    /// only a subset of `CHILD` entries are required.
+    /// only a subset of `Child` entries are required.
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
-    pub fn owns<CHILD: Clone + Meta + DeserializeOwned + 'static>(
+    pub fn owns<Child: Clone + Meta + DeserializeOwned + 'static>(
         mut self,
-        api: Api<CHILD>,
+        api: Api<Child>,
         lp: ListParams,
     ) -> Self {
         let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)));
@@ -64,13 +68,13 @@ where
     ///
     /// This mapper should return something like Option<ObjectRef<K>>
     pub fn watches<
-        OTHER: Clone + Meta + DeserializeOwned + 'static,
+        Other: Clone + Meta + DeserializeOwned + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
     >(
         mut self,
-        api: Api<OTHER>,
+        api: Api<Other>,
         lp: ListParams,
-        mapper: impl Fn(OTHER) -> I + 'static,
+        mapper: impl Fn(Other) -> I + 'static,
     ) -> Self {
         let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), mapper);
         self.selector.push(Box::pin(other_watcher));

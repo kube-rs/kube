@@ -9,10 +9,7 @@ use kube::{
     Api, Client, Config,
 };
 use kube_derive::CustomResource;
-use kube_runtime::{
-    controller::{Context, ControllerBuilder, ReconcilerAction},
-    reflector::store,
-};
+use kube_runtime::controller::{Context, ControllerBuilder, ReconcilerAction};
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
 use std::collections::BTreeMap;
@@ -123,11 +120,10 @@ async fn main() -> Result<()> {
         client: client.clone(),
     });
 
-    let store = store::Writer::<ConfigMapGenerator>::default();
     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
     let cms = Api::<ConfigMap>::all(client.clone());
 
-    ControllerBuilder::new(cmgs, ListParams::default(), store)
+    ControllerBuilder::new(cmgs, ListParams::default())
         .owns(cms, ListParams::default())
         .run(reconcile, error_policy, context)
         .for_each(|res| async move { println!("reconcile result: {:?}", res.map_err(Report::from)) })
