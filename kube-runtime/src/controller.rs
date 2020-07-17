@@ -112,6 +112,8 @@ impl<T> Context<T> {
 /// The `queue` is a source of external events that trigger the reconciler,
 /// usually taken from a `reflector` and then passed through a trigger function such as
 /// `trigger_self`.
+///
+/// For a more automated starting point, check out `ControllerBuilder`
 pub fn controller<K, QueueStream, ReconcilerFut, T>(
     mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
     mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
@@ -187,3 +189,5 @@ where
         }
     })
 }
+
+pub use crate::manager::ControllerBuilder;

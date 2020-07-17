@@ -1,5 +1,5 @@
 use color_eyre::{Report, Result};
-use futures::{stream, Stream, StreamExt};
+use futures::StreamExt;
 use k8s_openapi::{
     api::core::v1::ConfigMap,
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
@@ -10,14 +10,12 @@ use kube::{
 };
 use kube_derive::CustomResource;
 use kube_runtime::{
-    controller::{controller, trigger_owners, trigger_self, Context, ReconcilerAction},
-    reflector::{reflector, store, ObjectRef},
-    utils::{try_flatten_applied, try_flatten_touched},
-    watcher,
+    controller::{Context, ControllerBuilder, ReconcilerAction},
+    reflector::store,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
-use std::{collections::BTreeMap, pin::Pin};
+use std::collections::BTreeMap;
 use tokio::time::Duration;
 
 #[derive(Debug, Snafu)]
@@ -39,6 +37,7 @@ enum Error {
 
 #[derive(CustomResource, Debug, Clone, Deserialize, Serialize)]
 #[kube(group = "nullable.se", version = "v1", namespaced)]
+#[kube(shortname = "cmg")]
 struct ConfigMapGeneratorSpec {
     content: String,
 }
@@ -57,6 +56,7 @@ fn object_to_owner_reference<K: Meta>(meta: ObjectMeta) -> Result<OwnerReference
     })
 }
 
+/// Controller triggers this whenever our main object or our children changed
 async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().client.clone();
 
@@ -103,17 +103,17 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     })
 }
 
+/// The controller triggers this on reconcile errors
 fn error_policy(_error: &Error, _ctx: Context<Data>) -> ReconcilerAction {
     ReconcilerAction {
         requeue_after: Some(Duration::from_secs(1)),
     }
 }
 
+// Data we want access to in error/reconcile calls
 struct Data {
     client: Client,
 }
-
-type ResultType = Result<ObjectRef<ConfigMapGenerator>, kube_runtime::watcher::Error>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -124,36 +124,14 @@ async fn main() -> Result<()> {
     });
 
     let store = store::Writer::<ConfigMapGenerator>::default();
-    let reader = store.as_reader();
-    let mut inputs: Vec<Pin<Box<dyn Stream<Item = ResultType>>>> = vec![];
-    inputs.push(
-        // NB: don't flatten_touched because ownerrefs take care of delete events
-        Box::pin(trigger_self(try_flatten_applied(reflector(
-            store,
-            watcher(
-                Api::<ConfigMapGenerator>::all(client.clone()),
-                ListParams::default(),
-            ),
-        )))),
-    );
-    inputs.push(
-        // Always trigger CMG whenever the child is applied or deleted!
-        Box::pin(trigger_owners(try_flatten_touched(watcher(
-            Api::<ConfigMap>::all(client.clone()),
-            ListParams::default(),
-        )))),
-    );
-    let input_stream = stream::select_all(inputs);
-    controller(
-        reconcile,
-        error_policy,
-        context,
-        reader,
-        // The input stream - should produce a stream of ConfigMapGenerator events
-        input_stream,
-    )
-    .for_each(|res| async move { println!("I did a thing! {:?}", res.map_err(Report::from)) })
-    .await;
+    let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
+    let cms = Api::<ConfigMap>::all(client.clone());
+
+    ControllerBuilder::new(cmgs, ListParams::default(), store)
+        .owns(cms, ListParams::default())
+        .run(reconcile, error_policy, context)
+        .for_each(|res| async move { println!("I did a thing! {:?}", res.map_err(Report::from)) })
+        .await;
 
     Ok(())
 }

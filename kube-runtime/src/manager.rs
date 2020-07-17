@@ -8,7 +8,7 @@ use crate::{
     utils::{try_flatten_applied, try_flatten_touched},
     watcher::{self, watcher},
 };
-use futures::{stream, Stream, TryFuture, TryStream};
+use futures::{stream, Stream, TryFuture};
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
 use std::pin::Pin;
@@ -34,7 +34,7 @@ where
     /// for the correct Api scope (cluster/all/namespaced), or ListParams subset
     ///
     /// A writer is exposed for convenience so you can peak into the main reflector's state.
-    pub fn new(owned_api: Api<K>, writer: Writer<K>, lp: ListParams) -> Self {
+    pub fn new(owned_api: Api<K>, lp: ListParams, writer: Writer<K>) -> Self {
         let reader = writer.as_reader();
         let mut selector = vec![];
         let self_watcher: Pin<Box<dyn Stream<Item = Result<ObjectRef<K>, watcher::Error>>>> = Box::pin(
@@ -82,7 +82,7 @@ where
     /// This creates a stream from all builder calls and starts a controller with
     /// a specified `reconciler` and `error_policy` callbacks. Each of these will be called
     /// with your configurable `Context`.
-    pub fn run<ReconcilerFut, T, QueueStream>(
+    pub fn run<ReconcilerFut, T>(
         self,
         reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
         error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
@@ -92,8 +92,6 @@ where
         K: Clone + Meta + 'static,
         ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
         ReconcilerFut::Error: std::error::Error + 'static,
-        QueueStream: TryStream<Ok = ObjectRef<K>>,
-        QueueStream::Error: std::error::Error + 'static,
     {
         let input_stream = stream::select_all(self.selector);
         controller(reconciler, error_policy, context, self.reader, input_stream)
