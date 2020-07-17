@@ -1,5 +1,5 @@
 use color_eyre::{Report, Result};
-use futures::{stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
 use k8s_openapi::{
     api::core::v1::ConfigMap,
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
@@ -11,13 +11,13 @@ use kube::{
 use kube_derive::CustomResource;
 use kube_runtime::{
     controller::{controller, trigger_owners, trigger_self, Context, ReconcilerAction},
-    reflector,
+    reflector::{reflector, store, ObjectRef},
     utils::{try_flatten_applied, try_flatten_touched},
     watcher,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, pin::Pin};
 use tokio::time::Duration;
 
 #[derive(Debug, Snafu)]
@@ -113,9 +113,7 @@ struct Data {
     client: Client,
 }
 
-use kube_runtime::reflector::{Store, ObjectRef};
-use futures::stream::TryStream;
-
+type ResultType = Result<ObjectRef<ConfigMapGenerator>, kube_runtime::watcher::Error>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -125,9 +123,9 @@ async fn main() -> Result<()> {
         client: client.clone(),
     });
 
-    let store = reflector::store::Writer::<ConfigMapGenerator>::default();
+    let store = store::Writer::<ConfigMapGenerator>::default();
     let reader = store.as_reader();
-    let input_stream = stream::select_all(vec![
+    let inputs: Vec<Pin<Box<dyn Stream<Item = ResultType>>>> = vec![
         // NB: don't flatten_touched because ownerrefs take care of delete events
         Box::pin(trigger_self(try_flatten_applied(reflector(
             store,
@@ -141,15 +139,15 @@ async fn main() -> Result<()> {
             Api::<ConfigMap>::all(client.clone()),
             ListParams::default(),
         )))),
-    ]);
-
+    ];
+    let input_stream = stream::select_all(inputs);
     controller(
         reconcile,
         error_policy,
         context,
         reader,
         // The input stream - should produce a stream of ConfigMapGenerator events
-        input_stream
+        input_stream,
     )
     .for_each(|res| async move { println!("I did a thing! {:?}", res.map_err(Report::from)) })
     .await;
