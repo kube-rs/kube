@@ -112,16 +112,14 @@ impl<T> Context<T> {
     }
 }
 
-/// Runs a reconciler whenever an input stream change
+/// Apply a reconciler to an input stream
 ///
 /// Takes a `store` parameter for the main object which should be updated by a `reflector`.
 ///
 /// The `queue` is a source of external events that trigger the reconciler,
 /// usually taken from a `reflector` and then passed through a trigger function such as
 /// `trigger_self`.
-///
-/// For an easier starting point, check out `ControllerBuilder`
-pub fn controller<K, QueueStream, ReconcilerFut, T>(
+pub fn applier<K, QueueStream, ReconcilerFut, T>(
     mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
     mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
     context: Context<T>,
@@ -198,7 +196,7 @@ where
 }
 
 /// A builder for controller
-pub struct ControllerBuilder<K>
+pub struct Controller<K>
 where
     K: Clone + Meta + 'static,
 {
@@ -208,11 +206,11 @@ where
     reader: Store<K>,
 }
 
-impl<K> ControllerBuilder<K>
+impl<K> Controller<K>
 where
     K: Clone + Meta + DeserializeOwned + 'static,
 {
-    /// Create a ControllerBuilder on a type `K`
+    /// Create a Controller on a type `K`
     ///
     /// Configure `ListParams` and `Api` so you only get reconcile events
     /// for the correct Api scope (cluster/all/namespaced), or ListParams subset
@@ -264,11 +262,11 @@ where
         self
     }
 
-    /// Consume the ControllerBuilder and start the controller stream
+    /// Consume all the parameters of the Controller and start the applier stream
     ///
-    /// This creates a stream from all builder calls and starts a controller with
+    /// This creates a stream from all builder calls and starts an applier with
     /// a specified `reconciler` and `error_policy` callbacks. Each of these will be called
-    /// with your configurable `Context`.
+    /// with a configurable `Context`.
     pub fn run<ReconcilerFut, T>(
         self,
         reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
@@ -280,6 +278,6 @@ where
         ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
         ReconcilerFut::Error: std::error::Error + 'static,
     {
-        controller(reconciler, error_policy, context, self.reader, self.selector)
+        applier(reconciler, error_policy, context, self.reader, self.selector)
     }
 }

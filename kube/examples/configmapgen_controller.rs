@@ -1,3 +1,4 @@
+#[macro_use] extern crate log;
 use color_eyre::{Report, Result};
 use futures::StreamExt;
 use k8s_openapi::{
@@ -9,7 +10,7 @@ use kube::{
     Api, Client, Config,
 };
 use kube_derive::CustomResource;
-use kube_runtime::controller::{Context, ControllerBuilder, ReconcilerAction};
+use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
 use std::collections::BTreeMap;
@@ -96,7 +97,7 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
         .await
         .context(ConfigMapCreationFailed)?;
     Ok(ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(120)),
+        requeue_after: Some(Duration::from_secs(300)),
     })
 }
 
@@ -114,6 +115,7 @@ struct Data {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    std::env::set_var("RUST_LOG", "info,kube=debug");
     let config = Config::infer().await?;
     let client = Client::new(config);
     let context = Context::new(Data {
@@ -123,10 +125,15 @@ async fn main() -> Result<()> {
     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
     let cms = Api::<ConfigMap>::all(client.clone());
 
-    ControllerBuilder::new(cmgs, ListParams::default())
+    Controller::new(cmgs, ListParams::default())
         .owns(cms, ListParams::default())
         .run(reconcile, error_policy, context)
-        .for_each(|res| async move { println!("reconcile result: {:?}", res.map_err(Report::from)) })
+        .for_each(|res| async move {
+            match res {
+                Ok(o) => info!("reconciled {:?}", o),
+                Err(e) => warn!("reconcile failed: {}", Report::from(e)),
+            }
+        })
         .await;
 
     Ok(())
