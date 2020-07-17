@@ -113,6 +113,10 @@ struct Data {
     client: Client,
 }
 
+use kube_runtime::reflector::{Store, ObjectRef};
+use futures::stream::TryStream;
+
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = Config::infer().await?;
@@ -122,27 +126,30 @@ async fn main() -> Result<()> {
     });
 
     let store = reflector::store::Writer::<ConfigMapGenerator>::default();
+    let reader = store.as_reader();
+    let input_stream = stream::select_all(vec![
+        // NB: don't flatten_touched because ownerrefs take care of delete events
+        Box::pin(trigger_self(try_flatten_applied(reflector(
+            store,
+            watcher(
+                Api::<ConfigMapGenerator>::all(client.clone()),
+                ListParams::default(),
+            ),
+        )))),
+        // Always trigger CMG whenever the child is applied or deleted!
+        Box::pin(trigger_owners(try_flatten_touched(watcher(
+            Api::<ConfigMap>::all(client.clone()),
+            ListParams::default(),
+        )))),
+    ]);
+
     controller(
         reconcile,
         error_policy,
         context,
-        store.as_reader(),
+        reader,
         // The input stream - should produce a stream of ConfigMapGenerator events
-        stream::select(
-            // NB: don't flatten_touched because ownerrefs take care of delete events
-            trigger_self(try_flatten_applied(reflector(
-                store,
-                watcher(
-                    Api::<ConfigMapGenerator>::all(client.clone()),
-                    ListParams::default(),
-                ),
-            ))),
-            // Always trigger CMG whenever the child is applied or deleted!
-            trigger_owners(try_flatten_touched(watcher(
-                Api::<ConfigMap>::all(client.clone()),
-                ListParams::default(),
-            ))),
-        ),
+        input_stream
     )
     .for_each(|res| async move { println!("I did a thing! {:?}", res.map_err(Report::from)) })
     .await;
