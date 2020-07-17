@@ -125,7 +125,8 @@ async fn main() -> Result<()> {
 
     let store = store::Writer::<ConfigMapGenerator>::default();
     let reader = store.as_reader();
-    let inputs: Vec<Pin<Box<dyn Stream<Item = ResultType>>>> = vec![
+    let mut inputs: Vec<Pin<Box<dyn Stream<Item = ResultType>>>> = vec![];
+    inputs.push(
         // NB: don't flatten_touched because ownerrefs take care of delete events
         Box::pin(trigger_self(try_flatten_applied(reflector(
             store,
@@ -134,12 +135,14 @@ async fn main() -> Result<()> {
                 ListParams::default(),
             ),
         )))),
+    );
+    inputs.push(
         // Always trigger CMG whenever the child is applied or deleted!
         Box::pin(trigger_owners(try_flatten_touched(watcher(
             Api::<ConfigMap>::all(client.clone()),
             ListParams::default(),
         )))),
-    ];
+    );
     let input_stream = stream::select_all(inputs);
     controller(
         reconcile,

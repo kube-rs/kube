@@ -6,14 +6,14 @@
 #![allow(clippy::default_trait_access)]
 
 pub mod controller;
+mod manager;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;
 pub mod watcher;
-//mod manager;
 
 pub use controller::controller;
+pub use manager::ControllerBuilder;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use watcher::watcher;
-//pub use manager::ControllerBuilder;
