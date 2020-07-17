@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
     ControllerBuilder::new(cmgs, ListParams::default(), store)
         .owns(cms, ListParams::default())
         .run(reconcile, error_policy, context)
-        .for_each(|res| async move { println!("I did a thing! {:?}", res.map_err(Report::from)) })
+        .for_each(|res| async move { println!("reconcile result: {:?}", res.map_err(Report::from)) })
         .await;
 
     Ok(())
