@@ -1,7 +1,10 @@
 [package]
 name = "kube-runtime"
 version = "0.1.0"
-authors = ["Teo Klestrup Röijezon <teo@nullable.se>"]
+authors = [
+  "Teo Klestrup Röijezon <teo@nullable.se>",
+  "clux <sszynrae@gmail.com>",
+]
 edition = "2018"
 
 [dependencies]

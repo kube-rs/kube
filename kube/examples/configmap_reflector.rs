@@ -1,23 +1,23 @@
 #[macro_use] extern crate log;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ListParams, Meta},
-    runtime::Reflector,
     Client,
 };
+use kube_runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher};
 
-fn spawn_periodic_reader(rf: Reflector<ConfigMap>) {
+fn spawn_periodic_reader(reader: Store<ConfigMap>) {
     tokio::spawn(async move {
         loop {
             // Periodically read our state
             tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-            let cms: Vec<_> = rf.state().await.unwrap().iter().map(Meta::name).collect();
+            let cms: Vec<_> = reader.iter().map(|eg| Meta::name(eg.value()).clone()).collect();
             info!("Current configmaps: {:?}", cms);
         }
     });
 }
 
-/// Example way to read secrets
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
@@ -27,10 +27,16 @@ async fn main() -> anyhow::Result<()> {
 
     let cms: Api<ConfigMap> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf = Reflector::new(cms).params(lp);
 
-    spawn_periodic_reader(rf.clone()); // read from a clone in a task
+    let store = reflector::store::Writer::<ConfigMap>::default();
+    let reader = store.as_reader();
+    let rf = reflector(store, watcher(cms, lp));
 
-    rf.run().await?; // run reflector and listen for signals
+    spawn_periodic_reader(reader); // read from a clone in a task
+
+    let mut applied_events = try_flatten_applied(rf).boxed_local();
+    while let Some(event) = applied_events.try_next().await? {
+        info!("Applied {}", Meta::name(&event))
+    }
     Ok(())
 }
