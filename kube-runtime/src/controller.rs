@@ -1,0 +1,283 @@
+use crate::{
+    reflector::{
+        reflector,
+        store::{Store, Writer},
+        ErasedResource, ObjectRef,
+    },
+    scheduler::{self, scheduler, ScheduleRequest},
+    utils::{try_flatten_applied, try_flatten_touched, trystream_try_via},
+    watcher::{self, watcher},
+};
+use derivative::Derivative;
+use futures::{
+    channel, future,
+    stream::{self, SelectAll},
+    FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
+};
+use kube::api::{Api, ListParams, Meta};
+use serde::de::DeserializeOwned;
+use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
+use std::{pin::Pin, sync::Arc, time::Duration};
+use tokio::time::Instant;
+
+#[derive(Snafu, Debug)]
+pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
+    ObjectNotFound {
+        obj_ref: ObjectRef<ErasedResource>,
+        backtrace: Backtrace,
+    },
+    ReconcilerFailed {
+        source: ReconcilerErr,
+        backtrace: Backtrace,
+    },
+    SchedulerDequeueFailed {
+        #[snafu(backtrace)]
+        source: scheduler::Error,
+    },
+    QueueError {
+        source: QueueErr,
+        backtrace: Backtrace,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct ReconcilerAction {
+    pub requeue_after: Option<Duration>,
+}
+
+/// Helper for building custom trigger filters, see `trigger_self` and `trigger_owners` for some examples
+pub fn trigger_with<T, K, I, S>(
+    stream: S,
+    mapper: impl Fn(T) -> I,
+) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
+where
+    S: TryStream<Ok = T>,
+    I: IntoIterator<Item = ObjectRef<K>>,
+    K: Meta,
+{
+    stream
+        .map_ok(move |obj| stream::iter(mapper(obj).into_iter().map(Ok)))
+        .try_flatten()
+}
+
+/// Enqueues the object itself for reconciliation
+pub fn trigger_self<S>(stream: S) -> impl Stream<Item = Result<ObjectRef<S::Ok>, S::Error>>
+where
+    S: TryStream,
+    S::Ok: Meta,
+{
+    trigger_with(stream, |obj| Some(ObjectRef::from_obj(&obj)))
+}
+
+/// Enqueues any owners of type `KOwner` for reconciliation
+pub fn trigger_owners<KOwner, S>(stream: S) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
+where
+    S: TryStream,
+    S::Ok: Meta,
+    KOwner: Meta,
+{
+    trigger_with(stream, |obj| {
+        let meta = obj.meta().clone();
+        let ns = meta.namespace;
+        meta.owner_references
+            .into_iter()
+            .flatten()
+            .flat_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
+    })
+}
+
+/// A context data type that's passed through to the controllers callbacks
+///
+/// Context<T> gets passed to both the `reconciler` and the `error_policy` callbacks.
+/// allowing a read-only view of the world without creating a big nested lambda.
+/// More or less the same as actix's Data<T>
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct Context<T>(Arc<T>);
+
+impl<T> Context<T> {
+    /// Create new `Data` instance.
+    pub fn new(state: T) -> Context<T> {
+        Context(Arc::new(state))
+    }
+
+    /// Get reference to inner controller data.
+    pub fn get_ref(&self) -> &T {
+        self.0.as_ref()
+    }
+
+    /// Convert to the internal Arc<T>
+    pub fn into_inner(self) -> Arc<T> {
+        self.0
+    }
+}
+
+/// Apply a reconciler to an input stream
+///
+/// Takes a `store` parameter for the main object which should be updated by a `reflector`.
+///
+/// The `queue` is a source of external events that trigger the reconciler,
+/// usually taken from a `reflector` and then passed through a trigger function such as
+/// `trigger_self`.
+pub fn applier<K, QueueStream, ReconcilerFut, T>(
+    mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
+    mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
+    context: Context<T>,
+    store: Store<K>,
+    queue: QueueStream,
+) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
+where
+    K: Clone + Meta + 'static,
+    ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
+    ReconcilerFut::Error: std::error::Error + 'static,
+    QueueStream: TryStream<Ok = ObjectRef<K>>,
+    QueueStream::Error: std::error::Error + 'static,
+{
+    let err_context = context.clone();
+    let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ObjectRef<K>>>(100);
+    // Create a stream of ObjectRefs that need to be reconciled
+    trystream_try_via(
+        // input: stream combining scheduled tasks and user specified inputs event
+        Box::pin(stream::select(
+            // 1. inputs from users queue stream
+            queue.context(QueueError).map_ok(|obj_ref| ScheduleRequest {
+                message: obj_ref,
+                run_at: Instant::now() + Duration::from_millis(1),
+            }),
+            // 2. requests sent to scheduler_tx
+            scheduler_rx.map(Ok),
+        )),
+        // all the Oks from the select gets passed through the scheduler stream
+        |s| scheduler(s).context(SchedulerDequeueFailed),
+    )
+    // now have ObjectRefs that we turn into pairs inside (no extra waiting introduced)
+    .and_then(move |obj_ref| {
+        future::ready(
+            store
+                .get(&obj_ref)
+                .context(ObjectNotFound {
+                    obj_ref: obj_ref.clone(),
+                })
+                .map(|obj| (obj_ref, obj)),
+        )
+    })
+    // then reconcile every object
+    .and_then(move |(obj_ref, obj)| {
+        reconciler(obj, context.clone()) // TODO: add a context argument to the reconcile
+            .into_future() // TryFuture -> impl Future
+            .map(|result| (obj_ref, result)) // turn into pair and ok wrap
+            .map(Ok) // (this lets us deal with errors from reconciler below)
+    })
+    // finally, for each completed reconcile call:
+    .and_then(move |(obj_ref, reconciler_result)| {
+        let ReconcilerAction { requeue_after } = match &reconciler_result {
+            Ok(action) => action.clone(),                       // do what user told us
+            Err(err) => error_policy(err, err_context.clone()), // reconciler fn call failed
+        };
+        // we should always requeue at some point in case of network errors ^
+        let mut scheduler_tx = scheduler_tx.clone();
+        async move {
+            // Transmit the requeue request to the scheduler (picked up again at top)
+            if let Some(delay) = requeue_after {
+                scheduler_tx
+                    .send(ScheduleRequest {
+                        message: obj_ref.clone(),
+                        run_at: Instant::now() + delay,
+                    })
+                    .await
+                    .expect("Message could not be sent to scheduler_rx");
+            }
+            // NB: no else clause ^ because we don't allow not requeuing atm.
+            reconciler_result
+                .map(|action| (obj_ref, action))
+                .context(ReconcilerFailed)
+        }
+    })
+}
+
+/// A builder for controller
+pub struct Controller<K>
+where
+    K: Clone + Meta + 'static,
+{
+    // NB: Need to Unpin for stream::select_all
+    // TODO: get an arbitrary std::error::Error in here?
+    selector: SelectAll<Pin<Box<dyn Stream<Item = Result<ObjectRef<K>, watcher::Error>>>>>,
+    reader: Store<K>,
+}
+
+impl<K> Controller<K>
+where
+    K: Clone + Meta + DeserializeOwned + 'static,
+{
+    /// Create a Controller on a type `K`
+    ///
+    /// Configure `ListParams` and `Api` so you only get reconcile events
+    /// for the correct Api scope (cluster/all/namespaced), or ListParams subset
+    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
+        let writer = Writer::<K>::default();
+        let reader = writer.as_reader();
+        let mut selector = stream::SelectAll::new();
+        let self_watcher =
+            trigger_self(try_flatten_applied(reflector(writer, watcher(owned_api, lp)))).boxed_local();
+        selector.push(self_watcher);
+        Self { selector, reader }
+    }
+
+    /// Retrieve a copy of the reader before starting the controller
+    pub fn store(&self) -> Store<K> {
+        self.reader.clone()
+    }
+
+    /// Indicate child objets K owns and be notified when they change
+    ///
+    /// This type `Child` must have OwnerReferences set to point back to `K`.
+    /// You can customize the parameters used by the underlying watcher if
+    /// only a subset of `Child` entries are required.
+    /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
+    pub fn owns<Child: Clone + Meta + DeserializeOwned + 'static>(
+        mut self,
+        api: Api<Child>,
+        lp: ListParams,
+    ) -> Self {
+        let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)));
+        self.selector.push(Box::pin(child_watcher));
+        self
+    }
+
+    /// Indicate an object to watch with a custom mapper
+    ///
+    /// This mapper should return something like Option<ObjectRef<K>>
+    pub fn watches<
+        Other: Clone + Meta + DeserializeOwned + 'static,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
+    >(
+        mut self,
+        api: Api<Other>,
+        lp: ListParams,
+        mapper: impl Fn(Other) -> I + 'static,
+    ) -> Self {
+        let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), mapper);
+        self.selector.push(Box::pin(other_watcher));
+        self
+    }
+
+    /// Consume all the parameters of the Controller and start the applier stream
+    ///
+    /// This creates a stream from all builder calls and starts an applier with
+    /// a specified `reconciler` and `error_policy` callbacks. Each of these will be called
+    /// with a configurable `Context`.
+    pub fn run<ReconcilerFut, T>(
+        self,
+        reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
+        error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
+        context: Context<T>,
+    ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, watcher::Error>>>
+    where
+        K: Clone + Meta + 'static,
+        ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
+        ReconcilerFut::Error: std::error::Error + 'static,
+    {
+        applier(reconciler, error_policy, context, self.reader, self.selector)
+    }
+}

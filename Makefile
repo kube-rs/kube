@@ -37,7 +37,7 @@ publish:
 
 minikube-create:
 	sudo rm -rf /tmp/juju-mk* /tmp/minikube*
-	sudo -E minikube start --driver=none --kubernetes-version v1.17.4 --extra-config kubeadm.ignore-preflight-errors=SystemVerification
+	sudo -E minikube start --driver=none --kubernetes-version v1.18.6 --extra-config kubeadm.ignore-preflight-errors=SystemVerification
 
 minikube:
 	kubectl config set-context --cluster=minikube --user=minikube --namespace=apps minikube

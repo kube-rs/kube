@@ -5,7 +5,9 @@
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 
-Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go). It makes certain assumptions about the kubernetes api to allow writing generic abstractions, and as such contains rust reinterpretations of `Reflector` and `Informer` to allow writing kubernetes controllers/watchers/operators more easily.
+Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go) plus a runtime abstraction inspired by [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime).
+
+These crate makes certain assumptions about the kubernetes api to allow writing generic abstractions, and as such contains rust reinterpretations of reflectors, informers, and controller so that you can writing kubernetes controllers/watchers/operators more easily.
 
 NB: This library is currently undergoing a lot of changes with async/await stabilizing. Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
 
@@ -80,69 +82,41 @@ println!("crd: {}", serde_yaml::to_string(Foo::crd());
 There are a ton of kubebuilder like instructions that you can annotate with here. See the `crd_` prefixed [examples](./kube/examples) for more.
 
 ## Runtime
-The optional `kube::runtime` module contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the watch book-keeping yourself.
+The `kube_runtime` create contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
 
-### Informer
-A basic event watcher that presents a stream of api events on a resource with a given set of `ListParams`. Events are received as a raw `WatchEvent` type.
+### watcher
+A low level streaming interface (similar to informers) that presents `Applied`, `Deleted` or `Restarted` events.
 
-An Informer updates the last received `resourceVersion` internally on every event, before shipping the event to the app. If your controller restarts, you will receive one event for every active object at startup, before entering a normal watch.
 
 ```rust
-let pods: Api<Pod> = Api::namespaced(client, "default");
-let inform = Informer::new(pods);
+let api = Api::<Pod>::namespaced(client, "default");
+let watcher = watcher(api, ListParams::default());
 ```
 
-The main feature of `Informer<K>` is being able to subscribe to events while having a streaming `.poll()` open:
+This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
 
 ```rust
-let pods = inform.poll().await?.boxed(); // starts a watch and returns a stream
-
-while let Some(event) = pods.try_next().await? { // await next event
-    handle(event).await?; // pass the WatchEvent to a handler
+let apply_events = try_flatten_applied(watcher).boxed_local()
+while let Some(event) = watcher.try_next().await? {
+    println!("Applied: {}", Meta::name(&event));
 }
 ```
 
-How you handle them is up to you, you could build your own state, you can use the `Api`, or just print events. In this example you get complete [Pod objects](https://arnavion.github.io/k8s-openapi/v0.7.x/k8s_openapi/api/core/v1/struct.Pod.html):
-
-```rust
-async fn handle(event: WatchEvent<Pod>) -> anyhow::Result<()> {
-    match event {
-        WatchEvent::Added(o) => {
-            let containers = o.spec.unwrap().containers.into_iter().map(|c| c.name).collect::<Vec<_>>();
-            println!("Added Pod: {} (containers={:?})", Meta::name(&o), containers);
-        },
-        WatchEvent::Modified(o) => {
-            let phase = o.status.unwrap().phase.unwrap();
-            println!("Modified Pod: {} (phase={})", Meta::name(&o), phase);
-        },
-        WatchEvent::Deleted(o) => {
-            println!("Deleted Pod: {}", Meta::name(&o));
-        },
-        WatchEvent::Error(e) => {
-            println!("Error event: {:?}", e);
-        },
-        _ => {},
-    }
-    Ok(())
-}
-```
-
-The [node_informer example](./kube/examples/node_informer.rs) has an example of using api calls from within event handlers.
+NB: the plain stream items a `watcher` returns are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities like `try_flatten_applied` or `try_flatten_touched`.
 
 ## Reflector
-A cache for `K` that keeps itself up to date, and runs the polling machinery itself. It does not expose events, but you can inspect the state map at any time.
+A `reflector` is a `watcher` with `Store` on `K`. It uses all the `Event<K>` exposed by `watcher` to ensure that the state therein is as accurate as possible.
 
 
 ```rust
 let nodes: Api<Node> = Api::namespaced(client, &namespace);
 let lp = ListParams::default()
     .labels("beta.kubernetes.io/instance-type=m4.2xlarge");
-let rf = Reflector::new(nodes).params(lp);
+let store = reflector::store::Writer::<Node>::default();
+let rf = reflector(store, watcher(nodes, lp));
 ```
 
-then you should await `rf.run()` at the end of `main` so that it can continuously poll.  If you have more than one runtime (like say more than one reflector, or perhaps a webserver like actix-rt), then [await all of them within inside a `futures::select`](https://github.com/clux/version-rs/blob/30f295774098053377dd495438babba68a448d89/version.rs#L91).
-
-At any point you can use a clone of the reflector instance with `Reflector::get` and `Reflector::get_within`.
+At this point you can listen to the `reflector` as if it was a `watcher`, but you can also query the store at any point.
 
 ## Examples
 Examples that show a little common flows. These all have logging of this library set up to `debug`, and where possible pick up on the `NAMSEPACE` evar.
