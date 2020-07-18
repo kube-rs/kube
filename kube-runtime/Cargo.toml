@@ -1,6 +1,6 @@
 [package]
 name = "kube-runtime"
-version = "0.1.0"
+version = "0.36.0"
 authors = [
   "Teo Klestrup Röijezon <teo@nullable.se>",
   "clux <sszynrae@gmail.com>",

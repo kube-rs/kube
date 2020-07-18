@@ -104,7 +104,7 @@ while let Some(event) = watcher.try_next().await? {
 
 NB: the plain stream items a `watcher` returns are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities like `try_flatten_applied` or `try_flatten_touched`.
 
-## Reflector
+## reflector
 A `reflector` is a `watcher` with `Store` on `K`. It uses all the `Event<K>` exposed by `watcher` to ensure that the state therein is as accurate as possible.
 
 
@@ -117,6 +117,24 @@ let rf = reflector(store, watcher(nodes, lp));
 ```
 
 At this point you can listen to the `reflector` as if it was a `watcher`, but you can also query the store at any point.
+
+### controller
+A `reflector` with an arbitrary number of watchers that schedule events internally to send events through a reconciler:
+
+```rust
+Controller::new(root_kind_api, ListParams::default())
+    .owns(child_kind_api, ListParams::default())
+    .run(reconcile, error_policy, context)
+    .for_each(|res| async move {
+        match res {
+            Ok(o) => info!("reconciled {:?}", o),
+            Err(e) => warn!("reconcile failed: {}", Report::from(e)),
+        }
+    })
+    .await;
+```
+
+Here `reconcile` and `error_policy` refer to functions you define. The first will be called when the root or child elements change, and the second when the `reconciler` returns an `Err`.
 
 ## Examples
 Examples that show a little common flows. These all have logging of this library set up to `debug`, and where possible pick up on the `NAMSEPACE` evar.

@@ -1,6 +1,7 @@
 0.36.0 / 2020-06-XX
 ===================
-  * big planned runtime changes
+  * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate #258
+  * support level bumped to beta
 
 0.35.1 / 2020-06-18
 ===================
