@@ -105,14 +105,6 @@ impl TryFrom<DynamicResource> for Resource {
     type Error = crate::Error;
 
     fn try_from(rb: DynamicResource) -> Result<Self> {
-        if rb.version.is_none() {
-            return Err(Error::DynamicResource("Resource must have a version".into()));
-        }
-        if rb.group.is_none() {
-            return Err(Error::DynamicResource(
-                "Resource must have a group (can be empty string)".into(),
-            ));
-        }
         if to_plural(&rb.kind) == rb.kind {
             return Err(Error::DynamicResource(format!(
                 "DynamicResource kind '{}' must not be pluralized",
@@ -122,6 +114,18 @@ impl TryFrom<DynamicResource> for Resource {
         if !is_pascal_case(&rb.kind) {
             return Err(Error::DynamicResource(format!(
                 "DynamicResource kind '{}' must be PascalCase",
+                rb.kind
+            )));
+        }
+        if rb.version.is_none() {
+            return Err(Error::DynamicResource(format!(
+                "DynamicResource '{}' must have a version",
+                rb.kind
+            )));
+        }
+        if rb.group.is_none() {
+            return Err(Error::DynamicResource(format!(
+                "DynamicResource '{}' must have a group (can be empty string)",
                 rb.kind
             )));
         }
