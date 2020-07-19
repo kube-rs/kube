@@ -218,7 +218,10 @@ impl Client {
                                                     _ => {
                                                         let line = String::from_utf8_lossy(line);
                                                         warn!("Failed to parse: {}", line);
-                                                        Error::SerdeError(e)
+                                                        match resp.error_for_status_ref() {
+                                                            Ok(_) => Error::SerdeError(e),
+                                                            Err(e) => Error::ReqwestError(e),
+                                                        }
                                                     }
                                                 };
 
