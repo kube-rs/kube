@@ -1,5 +1,4 @@
-use crate::{Error, Result};
-use crate::api::DynamicResource;
+use crate::{api::DynamicResource, Error, Result};
 use inflector::string::pluralize::to_plural;
 
 /// A Kubernetes resource that can be accessed through the API

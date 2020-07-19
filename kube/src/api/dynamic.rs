@@ -1,9 +1,8 @@
-use std::convert::TryFrom;
 use crate::{
     api::{typed::Api, Resource},
-    Client,
-    Result, Error
+    Client, Error, Result,
 };
+use std::convert::TryFrom;
 
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 
@@ -78,7 +77,8 @@ impl DynamicResource {
     pub fn into_api<K>(self, client: Client) -> Api<K> {
         let resource = Resource::try_from(self).unwrap();
         Api {
-            client, resource,
+            client,
+            resource,
             phantom: PhantomData,
         }
     }
@@ -94,7 +94,8 @@ impl DynamicResource {
     pub fn try_into_api<K>(self, client: Client) -> Result<Api<K>> {
         let resource = Resource::try_from(self)?;
         Ok(Api {
-            client, resource,
+            client,
+            resource,
             phantom: PhantomData,
         })
     }
@@ -102,18 +103,27 @@ impl DynamicResource {
 
 impl TryFrom<DynamicResource> for Resource {
     type Error = crate::Error;
+
     fn try_from(rb: DynamicResource) -> Result<Self> {
         if rb.version.is_none() {
             return Err(Error::DynamicResource("Resource must have a version".into()));
         }
         if rb.group.is_none() {
-            return Err(Error::DynamicResource("Resource must have a group (can be empty string)".into()));
+            return Err(Error::DynamicResource(
+                "Resource must have a group (can be empty string)".into(),
+            ));
         }
         if to_plural(&rb.kind) == rb.kind {
-            return Err(Error::DynamicResource(format!("DynamicResource kind '{}' must not be pluralized", rb.kind)));
+            return Err(Error::DynamicResource(format!(
+                "DynamicResource kind '{}' must not be pluralized",
+                rb.kind
+            )));
         }
         if !is_pascal_case(&rb.kind) {
-            return Err(Error::DynamicResource(format!("DynamicResource kind '{}' must be PascalCase", rb.kind)));
+            return Err(Error::DynamicResource(format!(
+                "DynamicResource kind '{}' must be PascalCase",
+                rb.kind
+            )));
         }
         let version = rb.version.unwrap();
         let group = rb.group.unwrap();
@@ -132,11 +142,12 @@ impl TryFrom<DynamicResource> for Resource {
 }
 
 
-
 #[cfg(test)]
 mod test {
-    use crate::api::{PatchParams, PostParams, Resource};
-    use crate::Result;
+    use crate::{
+        api::{PatchParams, PostParams, Resource},
+        Result,
+    };
     #[test]
     fn raw_custom_resource() {
         let r = Resource::dynamic("Foo")

@@ -18,7 +18,7 @@ pub(crate) mod typed;
 pub use typed::Api;
 
 mod dynamic;
-pub use dynamic::{DynamicResource};
+pub use dynamic::DynamicResource;
 
 mod subresource;
 pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};
