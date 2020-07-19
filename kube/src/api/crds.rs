@@ -23,8 +23,13 @@ pub struct CustomResource {
 
 impl CustomResource {
     /// Construct a CrBuilder
+    pub fn try_kind(kind: &str) -> Result<CrBuilder, &'static str> {
+        CrBuilder::try_kind(kind)
+    }
+
+    /// Construct a CrBuilder
     pub fn kind(kind: &str) -> CrBuilder {
-        CrBuilder::kind(kind)
+        Self::try_kind(kind).unwrap()
     }
 }
 
@@ -55,12 +60,16 @@ impl CrBuilder {
     /// Create a CrBuilder specifying the CustomResource's kind
     ///
     /// The kind must not be plural and it must be in PascalCase
-    fn kind(kind: &str) -> Self {
-        assert!(to_plural(kind) != kind); // no plural in kind
-        assert!(is_pascal_case(&kind)); // PascalCase kind
-        Self {
-            kind: kind.into(),
-            ..Default::default()
+    fn try_kind(kind: &str) -> Result<Self, &'static str> {
+        if to_plural(kind) == kind {
+            Err("kind must not be plural")
+        } else if !is_pascal_case(&kind) {
+            Err("kind must be in PascalCase")
+        } else {
+            Ok(Self {
+                kind: kind.into(),
+                ..Default::default()
+            })
         }
     }
 
