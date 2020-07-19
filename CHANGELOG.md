@@ -1,4 +1,4 @@
-0.36.0 / 2020-06-XX
+0.36.0 / 2020-06-19
 ===================
   * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate #258
   * `Controller<K>` added (#148 via #258)
