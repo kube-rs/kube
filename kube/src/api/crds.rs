@@ -87,7 +87,11 @@ impl CrBuilder {
         let version = self.version.expect("Crd must have a version");
         let group = self.group.expect("Crd must have a group");
         CustomResource {
-            api_version: format!("{}/{}", group, version),
+            api_version: if group == "" {
+                version.clone()
+            } else {
+                format!("{}/{}", group, version)
+            },
             kind: self.kind,
             version,
             group,
@@ -155,6 +159,18 @@ mod test {
         let req = r.patch("baz", &patch_params, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos/baz?");
         assert_eq!(req.method(), "PATCH");
+    }
+
+    #[test]
+    fn raw_resource_in_default_group() {
+        let r: Resource = CustomResource::kind("Service")
+            .group("")
+            .version("v1")
+            .into_resource();
+
+        let pp = PostParams::default();
+        let req = r.create(&pp, vec![]).unwrap();
+        assert_eq!(req.uri(), "/api/v1/services?");
     }
 
     #[tokio::test]
