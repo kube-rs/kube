@@ -25,6 +25,7 @@ publish() {
   git-tag
   publish-changed-crate kube
   publish-changed-crate kube-derive
+  # TODO: change kube-derive to pin a version of kube
   #publish-changed-crate kube-runtime
 }
 

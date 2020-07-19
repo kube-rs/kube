@@ -1,16 +1,20 @@
 [package]
 name = "kube-runtime"
 version = "0.36.0"
+description = "Kubernetes futures controller runtime"
 authors = [
   "Teo Klestrup Röijezon <teo@nullable.se>",
   "clux <sszynrae@gmail.com>",
 ]
+license = "Apache-2.0"
+keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
+categories = ["web-programming::http-client"]
 edition = "2018"
 
 [dependencies]
 futures = "0.3.5"
-#kube = { path = "../kube", default-features = false }
-kube = { version = "0.36.0", default-features = false }
+kube = { path = "../kube", default-features = false }
+#kube = { version = "0.36.0", default-features = false }
 k8s-openapi = "0.8.0"
 derivative = "2.1.1"
 serde = "1.0.110"
