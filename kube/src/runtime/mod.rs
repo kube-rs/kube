@@ -1,5 +1,4 @@
 //! Runtime helpers for keeping track of Kubernetes resources
-
 mod informer;
 mod reflector;
 

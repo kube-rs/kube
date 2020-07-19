@@ -2,6 +2,8 @@
 ===================
   * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate #258
   * support level bumped to beta
+  * `kube::api::CustomResource` removed in favour of `kube::api::Resource::dynamic`
+  * `CrBuilder` removed in favour of `DynamicResource` (with new error handling)
 
 0.35.1 / 2020-06-18
 ===================
