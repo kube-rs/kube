@@ -54,6 +54,10 @@ pub enum Error {
     #[error("Request validation failed with {0}")]
     RequestValidation(String),
 
+    /// A dynamic resource conversion failure
+    #[error("Dynamic resource conversion failed {0}")]
+    DynamicResource(String),
+
     /// Configuration error
     #[error("Error loading kubeconfig: {0}")]
     Kubeconfig(#[from] ConfigError),

@@ -25,12 +25,14 @@ publish() {
   git-tag
   publish-changed-crate kube
   publish-changed-crate kube-derive
+  #publish-changed-crate kube-runtime
 }
 
 bump-files() {
   sed -i "s/${VERSION}/${NEWVER}/g" README.md
   sed -i "0,/version/s/version = \".*\"/version = \"${NEWVER}\"/" kube/Cargo.toml
   sed -i "0,/version/s/version = \".*\"/version = \"${NEWVER}\"/" kube-derive/Cargo.toml
+ # sed -i "0,/version/s/version = \".*\"/version = \"${NEWVER}\"/" kube-runtime/Cargo.toml
 }
 
 main() {

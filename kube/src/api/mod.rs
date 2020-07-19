@@ -17,8 +17,8 @@ pub use resource::{
 pub(crate) mod typed;
 pub use typed::Api;
 
-mod crds;
-pub use crds::{CrBuilder, CustomResource};
+mod dynamic;
+pub use dynamic::{DynamicResource};
 
 mod subresource;
 pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};

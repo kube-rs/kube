@@ -1,4 +1,5 @@
 use crate::{Error, Result};
+use crate::api::DynamicResource;
 use inflector::string::pluralize::to_plural;
 
 /// A Kubernetes resource that can be accessed through the API
@@ -56,6 +57,15 @@ impl Resource {
             version: K::VERSION.to_string(),
             namespace: Some(ns.to_string()),
         }
+    }
+
+    /// Manually configured resource or custom resource
+    ///
+    /// This is the only entrypoint to `Resource` that bypasses `k8s-openapi` entirely.
+    /// If you need a `CustomResource` consider using `kube-derive` for its
+    /// #[derive(CustomResource)] proc-macro.
+    pub fn dynamic(kind: &str) -> DynamicResource {
+        DynamicResource::new(kind)
     }
 }
 
