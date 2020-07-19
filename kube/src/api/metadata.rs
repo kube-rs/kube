@@ -30,7 +30,7 @@ where
     K: Metadata<Ty = ObjectMeta>,
 {
     fn meta(&self) -> &ObjectMeta {
-        self.metadata().expect("kind has metadata")
+        self.metadata()
     }
 
     fn name(&self) -> String {

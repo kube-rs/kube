@@ -19,7 +19,7 @@ Select a version of `kube` along with the [generated k8s api types](https://gith
 kube = "0.36.0"
 kube-derive = "0.36.0"
 kube-runtime = "0.36.0"
-k8s-openapi = { version = "0.8.0", default-features = false, features = ["v1_17"] }
+k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
 
 Note that turning off `default-features` for `k8s-openapi` is recommended to speed up your compilation (and we provide an api anyway).
@@ -191,7 +191,7 @@ or in `Cargo.toml`:
 [dependencies]
 kube = { version = "0.36.0", default-features = false, features = ["rustls-tls"] }
 kube-runtime = { version = "0.36.0", default-features = false, features = ["rustls-tls"] }
-k8s-openapi = { version = "0.8.0", default-features = false, features = ["v1_17"] }
+k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
 
 This will pull in the variant of `reqwest` that also uses its `rustls-tls` feature.

@@ -300,8 +300,11 @@ impl CustomDerive for CustomResource {
         let impl_metadata = quote! {
             impl k8s_openapi::Metadata for #rootident {
                 type Ty = k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-                fn metadata(&self) -> Option<&Self::Ty> {
-                    Some(&self.metadata)
+                fn metadata(&self) -> &Self::Ty {
+                    &self.metadata
+                }
+                fn metadata_mut(&mut self) -> &mut Self::Ty {
+                    &mut self.metadata
                 }
             }
         };

@@ -61,14 +61,14 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     let mut contents = BTreeMap::new();
     contents.insert("content".to_string(), generator.spec.content);
     let cm = ConfigMap {
-        metadata: Some(ObjectMeta {
+        metadata: ObjectMeta {
             name: generator.metadata.name.clone(),
             owner_references: Some(vec![OwnerReference {
                 controller: Some(true),
                 ..object_to_owner_reference::<ConfigMapGenerator>(generator.metadata.clone())?
             }]),
             ..ObjectMeta::default()
-        }),
+        },
         data: Some(contents),
         ..Default::default()
     };
@@ -81,8 +81,8 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     cm_api
         .patch(
             cm.metadata
+                .name
                 .as_ref()
-                .and_then(|x| x.name.as_ref())
                 .context(MissingObjectKey {
                     name: ".metadata.name",
                 })?,
