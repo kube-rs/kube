@@ -1,9 +1,12 @@
 0.36.0 / 2020-06-XX
 ===================
   * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate #258
-  * support level bumped to beta
+  * `Controller<K>` added (#148 via #258)
+  * `Reflector` api redesigned (#102 via #258)
+  * Migration release for `Informer` -> `watcher` + `Reflector` -> `reflector`
   * `kube::api::CustomResource` removed in favour of `kube::api::Resource::dynamic`
   * `CrBuilder` removed in favour of `DynamicResource` (with new error handling)
+  * support level bumped to beta
 
 0.35.1 / 2020-06-18
 ===================

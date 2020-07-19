@@ -190,6 +190,7 @@ or in `Cargo.toml`:
 ```toml
 [dependencies]
 kube = { version = "0.36.0", default-features = false, features = ["rustls-tls"] }
+kube-runtime = { version = "0.36.0", default-features = false, features = ["rustls-tls"] }
 k8s-openapi = { version = "0.8.0", default-features = false, features = ["v1_17"] }
 ```
 
