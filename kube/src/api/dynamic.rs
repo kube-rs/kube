@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 
-use std::marker::PhantomData;
+use std::iter;
 
 /// A dynamic builder for Resource
 ///
@@ -79,7 +79,7 @@ impl DynamicResource {
         Api {
             client,
             resource,
-            phantom: PhantomData,
+            phantom: iter::empty(),
         }
     }
 
@@ -96,7 +96,7 @@ impl DynamicResource {
         Ok(Api {
             client,
             resource,
-            phantom: PhantomData,
+            phantom: iter::empty(),
         })
     }
 }
@@ -144,7 +144,6 @@ impl TryFrom<DynamicResource> for Resource {
         })
     }
 }
-
 
 #[cfg(test)]
 mod test {

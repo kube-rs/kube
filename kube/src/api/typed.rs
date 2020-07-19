@@ -1,7 +1,7 @@
 use either::Either;
 use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
-use std::marker::PhantomData;
+use std::iter;
 
 use crate::{
     api::{DeleteParams, ListParams, Meta, ObjectList, PatchParams, PostParams, Resource, WatchEvent},
@@ -26,7 +26,11 @@ pub struct Api<K> {
     /// The client to use (from this library)
     pub(crate) client: Client,
     /// Underlying Object unstored
-    pub(crate) phantom: PhantomData<K>,
+    ///
+    /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
+    /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
+    /// is `Send`, even if `K` may not be).
+    pub(crate) phantom: iter::Empty<K>,
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
@@ -40,7 +44,7 @@ where
         Self {
             resource,
             client,
-            phantom: PhantomData,
+            phantom: iter::empty(),
         }
     }
 
@@ -50,7 +54,7 @@ where
         Self {
             resource,
             client,
-            phantom: PhantomData,
+            phantom: iter::empty(),
         }
     }
 

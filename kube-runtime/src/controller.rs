@@ -208,7 +208,7 @@ where
 
 impl<K> Controller<K>
 where
-    K: Clone + Meta + DeserializeOwned + 'static,
+    K: Clone + Meta + DeserializeOwned + Send + 'static,
 {
     /// Create a Controller on a type `K`
     ///
@@ -235,7 +235,7 @@ where
     /// You can customize the parameters used by the underlying watcher if
     /// only a subset of `Child` entries are required.
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
-    pub fn owns<Child: Clone + Meta + DeserializeOwned + 'static>(
+    pub fn owns<Child: Clone + Meta + DeserializeOwned + Send + 'static>(
         mut self,
         api: Api<Child>,
         lp: ListParams,
@@ -249,7 +249,7 @@ where
     ///
     /// This mapper should return something like Option<ObjectRef<K>>
     pub fn watches<
-        Other: Clone + Meta + DeserializeOwned + 'static,
+        Other: Clone + Meta + DeserializeOwned + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
     >(
         mut self,
