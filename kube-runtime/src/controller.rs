@@ -17,7 +17,8 @@ use futures::{
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
-use std::{pin::Pin, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
+use stream::BoxStream;
 use tokio::time::Instant;
 
 #[derive(Snafu, Debug)]
@@ -202,13 +203,13 @@ where
 {
     // NB: Need to Unpin for stream::select_all
     // TODO: get an arbitrary std::error::Error in here?
-    selector: SelectAll<Pin<Box<dyn Stream<Item = Result<ObjectRef<K>, watcher::Error>>>>>,
+    selector: SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
     reader: Store<K>,
 }
 
 impl<K> Controller<K>
 where
-    K: Clone + Meta + DeserializeOwned + 'static,
+    K: Clone + Meta + DeserializeOwned + Send + Sync + 'static,
 {
     /// Create a Controller on a type `K`
     ///
@@ -219,7 +220,7 @@ where
         let reader = writer.as_reader();
         let mut selector = stream::SelectAll::new();
         let self_watcher =
-            trigger_self(try_flatten_applied(reflector(writer, watcher(owned_api, lp)))).boxed_local();
+            trigger_self(try_flatten_applied(reflector(writer, watcher(owned_api, lp)))).boxed();
         selector.push(self_watcher);
         Self { selector, reader }
     }
@@ -235,13 +236,13 @@ where
     /// You can customize the parameters used by the underlying watcher if
     /// only a subset of `Child` entries are required.
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
-    pub fn owns<Child: Clone + Meta + DeserializeOwned + 'static>(
+    pub fn owns<Child: Clone + Meta + DeserializeOwned + Send + 'static>(
         mut self,
         api: Api<Child>,
         lp: ListParams,
     ) -> Self {
         let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)));
-        self.selector.push(Box::pin(child_watcher));
+        self.selector.push(child_watcher.boxed());
         self
     }
 
@@ -249,16 +250,19 @@ where
     ///
     /// This mapper should return something like Option<ObjectRef<K>>
     pub fn watches<
-        Other: Clone + Meta + DeserializeOwned + 'static,
+        Other: Clone + Meta + DeserializeOwned + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
     >(
         mut self,
         api: Api<Other>,
         lp: ListParams,
-        mapper: impl Fn(Other) -> I + 'static,
-    ) -> Self {
+        mapper: impl Fn(Other) -> I + Send + 'static,
+    ) -> Self
+    where
+        I::IntoIter: Send,
+    {
         let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), mapper);
-        self.selector.push(Box::pin(other_watcher));
+        self.selector.push(other_watcher.boxed());
         self
     }
 
@@ -279,5 +283,35 @@ where
         ReconcilerFut::Error: std::error::Error + 'static,
     {
         applier(reconciler, error_policy, context, self.reader, self.selector)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Context, ReconcilerAction};
+    use crate::Controller;
+    use k8s_openapi::api::core::v1::ConfigMap;
+    use kube::Api;
+
+    fn assert_send<T: Send>(x: T) -> T {
+        x
+    }
+
+    fn mock_type<T>() -> T {
+        unimplemented!(
+            "mock_type is not supposed to be called, only used for filling holes in type assertions"
+        )
+    }
+
+    // not #[test] because we don't want to actually run it, we just want to assert that it typechecks
+    #[allow(dead_code, unused_must_use)]
+    fn test_controller_should_be_send() {
+        assert_send(
+            Controller::new(mock_type::<Api<ConfigMap>>(), Default::default()).run(
+                |_, _| async { Ok(mock_type::<ReconcilerAction>()) },
+                |_: &std::io::Error, _| mock_type::<ReconcilerAction>(),
+                Context::new(()),
+            ),
+        );
     }
 }

@@ -1,5 +1,5 @@
 use derivative::Derivative;
-use futures::{stream::LocalBoxStream, Stream, StreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt};
 use kube::{
     api::{ListParams, Meta, WatchEvent},
     Api,
@@ -98,7 +98,7 @@ pub enum State<K: Meta + Clone> {
     Watching {
         resource_version: String,
         #[derivative(Debug = "ignore")]
-        stream: LocalBoxStream<'static, kube::Result<WatchEvent<K>>>,
+        stream: BoxStream<'static, kube::Result<WatchEvent<K>>>,
     },
 }
 
@@ -106,26 +106,33 @@ pub enum State<K: Meta + Clone> {
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
-async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
+async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     state: State<K>,
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
         State::Empty => match api.list(&list_params).await {
-            Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                resource_version: list.metadata.resource_version.unwrap(),
-            }),
+            Ok(list) => (
+                Some(Ok(Event::Restarted(list.items))),
+                State::InitListed {
+                    resource_version: list.metadata.resource_version.unwrap(),
+                },
+            ),
             Err(err) => (Some(Err(err).context(InitialListFailed)), State::Empty),
         },
         State::InitListed { resource_version } => match api.watch(&list_params, &resource_version).await {
-            Ok(stream) => (None, State::Watching {
-                resource_version,
-                stream: stream.boxed_local(),
-            }),
-            Err(err) => (Some(Err(err).context(WatchStartFailed)), State::InitListed {
-                resource_version,
-            }),
+            Ok(stream) => (
+                None,
+                State::Watching {
+                    resource_version,
+                    stream: stream.boxed(),
+                },
+            ),
+            Err(err) => (
+                Some(Err(err).context(WatchStartFailed)),
+                State::InitListed { resource_version },
+            ),
         },
         State::Watching {
             resource_version,
@@ -133,22 +140,31 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
         } => match stream.next().await {
             Some(Ok(WatchEvent::Added(obj))) | Some(Ok(WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_ver().unwrap();
-                (Some(Ok(Event::Applied(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Ok(Event::Applied(obj))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
                 let resource_version = obj.resource_ver().unwrap();
-                (Some(Ok(Event::Deleted(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Ok(Event::Deleted(obj))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
-            Some(Ok(WatchEvent::Bookmark(obj))) => (None, State::Watching {
-                resource_version: obj.resource_ver().unwrap(),
-                stream,
-            }),
+            Some(Ok(WatchEvent::Bookmark(obj))) => (
+                None,
+                State::Watching {
+                    resource_version: obj.resource_ver().unwrap(),
+                    stream,
+                },
+            ),
             Some(Ok(WatchEvent::Error(err))) => {
                 // HTTP GONE, means we have desynced and need to start over and re-list :(
                 let new_state = if err.code == 410 {
@@ -161,17 +177,20 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + 'static>(
                 };
                 (Some(Err(err).context(WatchError)), new_state)
             }
-            Some(Err(err)) => (Some(Err(err).context(WatchFailed)), State::Watching {
-                resource_version,
-                stream,
-            }),
+            Some(Err(err)) => (
+                Some(Err(err).context(WatchFailed)),
+                State::Watching {
+                    resource_version,
+                    stream,
+                },
+            ),
             None => (None, State::InitListed { resource_version }),
         },
     }
 }
 
 /// Trampoline helper for `step_trampolined`
-async fn step<K: Meta + Clone + DeserializeOwned + 'static>(
+async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     mut state: State<K>,
@@ -191,10 +210,10 @@ async fn step<K: Meta + Clone + DeserializeOwned + 'static>(
 ///
 /// This is similar to kube-rs 0.33's `Informer`, or the watching half of client-go's `Reflector`.
 /// Renamed to avoid confusion with client-go's `Informer`.
-pub fn watcher<K: Meta + Clone + DeserializeOwned + 'static>(
+pub fn watcher<K: Meta + Clone + DeserializeOwned + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
-) -> impl Stream<Item = Result<Event<K>>> {
+) -> impl Stream<Item = Result<Event<K>>> + Send {
     futures::stream::unfold(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {
