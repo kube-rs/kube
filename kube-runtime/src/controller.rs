@@ -196,7 +196,71 @@ where
     })
 }
 
-/// A builder for controller
+/// Controller
+///
+/// A controller is made up of:
+/// - 1 `reflector` (for the core object)
+/// - N `watcher` objects for each object child object
+/// - user defined `reconcile` + `error_policy` callbacks
+/// - a generated input stream considering all sources
+///
+/// And all reconcile requests  through an internal scheduler
+///
+/// Pieces:
+/// ```no_run
+/// use kube::{Client, api::{Api, ListParams}};
+/// use kube_derive::CustomResource;
+/// use serde::{Deserialize, Serialize};
+/// use tokio::time::Duration;
+/// use futures::StreamExt;
+/// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+/// use k8s_openapi::api::core::v1::ConfigMap;
+///
+/// use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
+/// #[derive(Debug, Snafu)]
+/// enum Error {}
+/// /// A custom resource
+/// #[derive(CustomResource, Debug, Clone, Deserialize, Serialize)]
+/// #[kube(group = "nullable.se", version = "v1", namespaced)]
+/// struct ConfigMapGeneratorSpec {
+///     content: String,
+/// }
+///
+/// /// The reconciler that will be called when either object change
+/// async fn reconcile(g: ConfigMapGenerator, _ctx: Context<()>) -> Result<ReconcilerAction, Error> {
+///     // .. use api here to reconcile a child ConfigMap with ownerreferences
+///     // see configmapgen_controller example for full info
+///     Ok(ReconcilerAction {
+///         requeue_after: Some(Duration::from_secs(300)),
+///     })
+/// }
+/// /// an error handler that will be called when the reconciler fails
+/// fn error_policy(_error: &Error, _ctx: Context<()>) -> ReconcilerAction {
+///     ReconcilerAction {
+///         requeue_after: Some(Duration::from_secs(60)),
+///     }
+/// }
+///
+/// /// something to drive the controller
+/// #[tokio::main]
+/// async fn main() -> Result<(), kube::Error> {
+///     let client = Client::try_default().await?;
+///     let context = Context::new(()); // bad empty context - put client in here
+///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
+///     let cms = Api::<ConfigMap>::all(client.clone());
+///     let drainer = Controller::new(cmgs, ListParams::default())
+///         .owns(cms, ListParams::default())
+///         .run(reconcile, error_policy, context)
+///         .for_each(|res| async move {
+///             match res {
+///                 Ok(o) => println!("reconciled {:?}", o),
+///                 Err(e) => println!("reconcile failed: {:?}", e),
+///             }
+///         });
+///     drainer.await; // reconciler does nothing unless polled
+///     Ok(())
+/// }
+/// ```
 pub struct Controller<K>
 where
     K: Clone + Meta + 'static,

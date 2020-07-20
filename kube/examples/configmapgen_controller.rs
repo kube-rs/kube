@@ -80,12 +80,9 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     );
     cm_api
         .patch(
-            cm.metadata
-                .name
-                .as_ref()
-                .context(MissingObjectKey {
-                    name: ".metadata.name",
-                })?,
+            cm.metadata.name.as_ref().context(MissingObjectKey {
+                name: ".metadata.name",
+            })?,
             &PatchParams {
                 patch_strategy: PatchStrategy::Apply,
                 field_manager: Some("configmapgenerator.kube-rt.nullable.se".to_string()),

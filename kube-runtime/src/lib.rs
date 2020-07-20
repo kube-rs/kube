@@ -1,3 +1,9 @@
+//! Crate with kubernetes runtime components
+//!
+//! This crate contains the core building blocks to allow users to build
+//! controllers/operators/watchers that need to synchronize/reconcile kubernetes
+//! state.
+//!
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 // Makes for confusing SNAFU context selectors
