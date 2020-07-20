@@ -7,7 +7,7 @@ use k8s_openapi::{
 };
 use kube::{
     api::{ListParams, Meta, PatchParams, PatchStrategy},
-    Api, Client, Config,
+    Api, Client,
 };
 use kube_derive::CustomResource;
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
@@ -112,19 +112,16 @@ struct Data {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    let config = Config::infer().await?;
-    let client = Client::new(config);
-    let context = Context::new(Data {
-        client: client.clone(),
-    });
+    std::env::set_var("RUST_LOG", "info,kube-runtime=debug,kube=debug");
+    env_logger::init();
+    let client = Client::try_default().await?;
 
     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
     let cms = Api::<ConfigMap>::all(client.clone());
 
     Controller::new(cmgs, ListParams::default())
         .owns(cms, ListParams::default())
-        .run(reconcile, error_policy, context)
+        .run(reconcile, error_policy, Context::new(Data { client }))
         .for_each(|res| async move {
             match res {
                 Ok(o) => info!("reconciled {:?}", o),
