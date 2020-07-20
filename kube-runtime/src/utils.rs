@@ -5,7 +5,12 @@ use futures::{
     Future, Stream, StreamExt, TryStream, TryStreamExt,
 };
 use pin_project::pin_project;
-use std::{cell::RefCell, fmt::Debug, pin::Pin, rc::Rc, task::Poll};
+use std::{
+    fmt::Debug,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::Poll,
+};
 use stream::IntoStream;
 
 /// Flattens each item in the list following the rules of `watcher::Event::into_iter_applied`
@@ -35,7 +40,8 @@ pub fn try_flatten_touched<K, S: TryStream<Ok = watcher::Event<K>>>(
 /// NOTE: The whole set of cases will deadlock if there is ever an item that no live case wants to consume.
 #[pin_project]
 pub(crate) struct SplitCase<S: Stream, Case> {
-    inner: Rc<RefCell<Peekable<S>>>,
+    // Future-unaware `Mutex` is OK because it's only taken inside single poll()s
+    inner: Arc<Mutex<Peekable<S>>>,
     /// Tests whether an item from the stream should be consumed
     ///
     /// NOTE: This MUST be total over all `SplitCase`s, otherwise the input stream
@@ -60,7 +66,8 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = self.project();
-        let mut inner = Pin::new(this.inner.borrow_mut());
+        let mut inner = this.inner.lock().unwrap();
+        let mut inner = Pin::new(&mut *inner);
         let inner_peek = inner.as_mut().peek();
         pin_mut!(inner_peek);
         match inner_peek.poll(cx) {
@@ -100,7 +107,7 @@ where
     S::Ok: Debug,
     S::Error: Debug,
 {
-    let stream = Rc::new(RefCell::new(stream.into_stream().peekable()));
+    let stream = Arc::new(Mutex::new(stream.into_stream().peekable()));
     (
         SplitCase {
             inner: stream.clone(),
