@@ -77,6 +77,11 @@ main() {
     echo "Bumping from ${VERSION} -> ${NEWVER}"
     bump-files
     bump-path-deps
+    # really need to stash the last change
+    # commit that
+    # publish first two crates
+    # git stash pop
+    # commit + publish last crate
     git diff
     exit 0
   fi

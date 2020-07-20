@@ -1,6 +1,6 @@
 [package]
 name = "kube-runtime"
-version = "0.36.0"
+version = "0.37.0"
 description = "Kubernetes futures controller runtime"
 authors = [
   "Teo Klestrup Röijezon <teo@nullable.se>",

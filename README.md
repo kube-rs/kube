@@ -16,9 +16,9 @@ Select a version of `kube` along with the [generated k8s api types](https://gith
 
 ```toml
 [dependencies]
-kube = "0.36.0"
-kube-derive = "0.36.0"
-kube-runtime = "0.36.0"
+kube = "0.37.0"
+kube-derive = "0.37.0"
+kube-runtime = "0.37.0"
 k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
 
@@ -203,8 +203,8 @@ or in `Cargo.toml`:
 
 ```toml
 [dependencies]
-kube = { version = "0.36.0", default-features = false, features = ["rustls-tls"] }
-kube-runtime = { version = "0.36.0", default-features = false, features = ["rustls-tls"] }
+kube = { version = "0.37.0", default-features = false, features = ["rustls-tls"] }
+kube-runtime = { version = "0.37.0", default-features = false, features = ["rustls-tls"] }
 k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
 
