@@ -13,8 +13,8 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3.5"
-kube = { path = "../kube", default-features = false }
-#kube = { version = "0.36.0", default-features = false }
+#kube = { path = "../kube", default-features = false }
+kube = { version = "0.37.0", default-features = false }
 k8s-openapi = "0.9.0"
 derivative = "2.1.1"
 serde = "1.0.110"
@@ -35,7 +35,7 @@ default-features = false
 features = ["v1_18"]
 
 [dev-dependencies]
-kube-derive = { path = "../kube-derive" }
-#kube-derive = "0.36.0"
+#kube-derive = { path = "../kube-derive" }
+kube-derive = "0.37.0"
 serde_json = "1.0.53"
 tokio = { version = "0.2.21", features = ["full"] }
