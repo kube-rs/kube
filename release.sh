@@ -21,19 +21,38 @@ publish-changed-crate() {
   fi
 }
 
-publish() {
-  git-tag
+publish-1() {
   publish-changed-crate kube
   publish-changed-crate kube-derive
-  # TODO: change kube-derive to pin a version of kube
-  #publish-changed-crate kube-runtime
+}
+publish-2() {
+  git-tag
+  publish-changed-crate kube-runtime
 }
 
 bump-files() {
   sed -i "s/${VERSION}/${NEWVER}/g" README.md
   sed -i "0,/version/s/version = \".*\"/version = \"${NEWVER}\"/" kube/Cargo.toml
   sed -i "0,/version/s/version = \".*\"/version = \"${NEWVER}\"/" kube-derive/Cargo.toml
- # sed -i "0,/version/s/version = \".*\"/version = \"${NEWVER}\"/" kube-runtime/Cargo.toml
+  sed -i "0,/version/s/version = \".*\"/version = \"${NEWVER}\"/" kube-runtime/Cargo.toml
+}
+
+bump-path-deps() {
+  # Comment out kube path dependencies in kube-runtime for publish
+  sd "kube-derive = \{ path" "#kube-derive = { path" kube-runtime/Cargo.toml
+  sd "kube = \{ path" "#kube = { path" kube-runtime/Cargo.toml
+  # Uncomment + bump the explicit version
+  sd "#kube-derive = \"${VERSION}\"" "kube-derive = \"${NEWVER}\"" kube-runtime/Cargo.toml
+  sd "#kube = \{ version = \"${VERSION}\"" "kube = { version = \"${NEWVER}\"" kube-runtime/Cargo.toml
+}
+
+unpin-path-deps() {
+  # Uncomment kube path dependencies in kube-runtime for development
+  sd "#kube-derive = \{ path" "kube-derive = { path" kube-runtime/Cargo.toml
+  sd "#kube = \{ path" "kube = { path" kube-runtime/Cargo.toml
+  # Comment out the explicit version
+  sd "kube-derive = \"${VERSION}\"" "#kube-derive = \"${NEWVER}\"" kube-runtime/Cargo.toml
+  sd "kube = \{ version = \"${VERSION}\"" "#kube = { version = \"${NEWVER}\"" kube-runtime/Cargo.toml
 }
 
 main() {
@@ -52,29 +71,40 @@ main() {
     NEWVER="${SEMVER[0]}.${SEMVER[1]}.$((SEMVER[2]+1))"
   fi
 
-  # bumping something:
+  # bumping stage
   if [ -n "${NEWVER}" ]; then
     [ -z "$(git status --porcelain)" ] || fail "deal with changes first"
     echo "Bumping from ${VERSION} -> ${NEWVER}"
     bump-files
+    bump-path-deps
     git diff
     exit 0
   fi
 
-  # publish
-  if [[ "${mode}" == "publish" ]]; then
+  # publish stage
+  if [[ "${mode}" == "publish1" ]]; then
     [ -n "$(git diff --name-only origin/master ./*/Cargo.toml)" ] || fail "./release.sh minor" first
     publish
   fi
+
+
+  # clean
+  if [[ "${mode}" == "clean" ]]; then
+    unpin-path-deps
+  fi
 }
 
-# Usage: 2 stage
+# Usage:
 #
 # ./release.sh minor
 #
 # Then check git output, and:
 #
-# ./release.sh publish
+# ./release.sh publish1
+#
+# Afterwards clean up hardcoded pins:
+#
+# ./release.sh clean
 #
 # shellcheck disable=SC2068
 main $@

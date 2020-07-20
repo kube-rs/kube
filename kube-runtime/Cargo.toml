@@ -36,5 +36,6 @@ features = ["v1_18"]
 
 [dev-dependencies]
 kube-derive = { path = "../kube-derive" }
+#kube-derive = "0.36.0"
 serde_json = "1.0.53"
 tokio = { version = "0.2.21", features = ["full"] }
