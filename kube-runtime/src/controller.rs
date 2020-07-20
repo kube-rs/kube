@@ -248,7 +248,7 @@ where
 ///     let context = Context::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
-///     let drainer = Controller::new(cmgs, ListParams::default())
+///     Controller::new(cmgs, ListParams::default())
 ///         .owns(cms, ListParams::default())
 ///         .run(reconcile, error_policy, context)
 ///         .for_each(|res| async move {
@@ -256,8 +256,8 @@ where
 ///                 Ok(o) => println!("reconciled {:?}", o),
 ///                 Err(e) => println!("reconcile failed: {:?}", e),
 ///             }
-///         });
-///     drainer.await; // reconciler does nothing unless polled
+///         })
+///         .await; // controller does nothing unless polled
 ///     Ok(())
 /// }
 /// ```
