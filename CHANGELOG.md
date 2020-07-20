@@ -1,6 +1,8 @@
-Unreleased
-==========
+0.37.0 / 2020-06-20
+===================
   * Bump `k8s-openapi` to `0.9.0`
+  * All runtime components now require `Sync` objects
+  * reflector/watcher/Controller streams can be shared in threaded environments
 
 0.36.0 / 2020-06-19
 ===================

@@ -33,6 +33,8 @@ Some real world examples:
 
 - [version-rs](https://github.com/clux/version-rs): super lightweight reflector deployment with actix 2 and prometheus metrics
 
+- [controller-rs](https://github.com/clux/controller-rs): `Controller` owned by a `Manager` inside actix
+
 - [krustlet](https://github.com/deislabs/krustlet): a complete `WASM` running `kubelet`
 
 ## Api
@@ -85,7 +87,7 @@ There are a ton of kubebuilder like instructions that you can annotate with here
 ## Runtime
 The `kube_runtime` create contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
 
-### watcher
+### Watchers
 A low level streaming interface (similar to informers) that presents `Applied`, `Deleted` or `Restarted` events.
 
 
@@ -105,22 +107,22 @@ while let Some(event) = watcher.try_next().await? {
 
 NB: the plain stream items a `watcher` returns are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities like `try_flatten_applied` or `try_flatten_touched`.
 
-## reflector
-A `reflector` is a `watcher` with `Store` on `K`. It uses all the `Event<K>` exposed by `watcher` to ensure that the state therein is as accurate as possible.
-
+## Reflectors
+A `reflector` is a `watcher` with `Store` on `K`. It acts on all the `Event<K>` exposed by `watcher` to ensure that the state in the `Store` is as accurate as possible.
 
 ```rust
 let nodes: Api<Node> = Api::namespaced(client, &namespace);
 let lp = ListParams::default()
     .labels("beta.kubernetes.io/instance-type=m4.2xlarge");
 let store = reflector::store::Writer::<Node>::default();
+let reader = store.as_reader();
 let rf = reflector(store, watcher(nodes, lp));
 ```
 
-At this point you can listen to the `reflector` as if it was a `watcher`, but you can also query the store at any point.
+At this point you can listen to the `reflector` as if it was a `watcher`, but you can also query the `reader` at any point.
 
-### controller
-A `reflector` with an arbitrary number of watchers that schedule events internally to send events through a reconciler:
+### Controllers
+A `Controller` is a `reflector` along with an arbitrary number of watchers that schedule events internally to send events through a reconciler:
 
 ```rust
 Controller::new(root_kind_api, ListParams::default())
@@ -138,9 +140,13 @@ Controller::new(root_kind_api, ListParams::default())
 Here `reconcile` and `error_policy` refer to functions you define. The first will be called when the root or child elements change, and the second when the `reconciler` returns an `Err`.
 
 ## Examples
-Examples that show a little common flows. These all have logging of this library set up to `debug`, and where possible pick up on the `NAMSEPACE` evar.
+Examples that show a little common flows. These all have logging of this library set up to `debug`, and where possible pick up on the `NAMESPACE` evar.
+
+**NB:** not all examples have been migrated to the new runtime yet. If it uses `kube-runtime` it's new.
 
 ```sh
+# watch configmap events
+cargo run --example configmap_watcher
 # watch pod events
 cargo run --example pod_informer
 # watch event events
@@ -167,6 +173,14 @@ cargo run --example crd_reflector
 ```
 
 then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
+
+ditto for a controller:
+
+```sh
+kubectl apply -f kube/examples/configmapgen_controller_crd.yaml
+cargo run --example configmapgen_controller &
+kubectl apply -f kube/examples/configmapgen_controller_object.yaml
+```
 
 For straight API use examples, try:
 

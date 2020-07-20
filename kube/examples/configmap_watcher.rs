@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ListParams},
@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let cms: Api<ConfigMap> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().allow_bookmarks().timeout(10); // short watch timeout in this example
 
-    let mut w = Box::pin(watcher(cms, lp));
+    let mut w = watcher(cms, lp).boxed();
     while let Some(event) = w.try_next().await? {
         info!("Got: {:?}", event);
     }
