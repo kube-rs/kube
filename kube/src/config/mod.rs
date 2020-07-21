@@ -104,7 +104,7 @@ impl Config {
             default_ns: String::from("default"),
             root_cert: None,
             headers: HeaderMap::new(),
-            timeout: None,
+            timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             proxy: None,
             identity: None,
@@ -164,7 +164,7 @@ impl Config {
             default_ns,
             root_cert: Some(root_cert),
             headers: HeaderMap::new(),
-            timeout: None,
+            timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             proxy: None,
             identity: None,
@@ -233,7 +233,7 @@ impl Config {
             default_ns,
             root_cert,
             headers: HeaderMap::new(),
-            timeout: None,
+            timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             proxy: None,
             identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
@@ -331,7 +331,7 @@ fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
 
 // https://github.com/clux/kube-rs/issues/146#issuecomment-590924397
 /// Default Timeout
-pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const IDENTITY_PASSWORD: &str = " ";
 
 // temporary catalina hack for openssl only
