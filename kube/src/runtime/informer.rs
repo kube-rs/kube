@@ -24,6 +24,7 @@ use std::{sync::Arc, time::Duration};
 /// Because of https://github.com/clux/kube-rs/issues/219 we recommend you use this
 /// with kubernetes >= 1.16 and watch bookmarks enabled.
 #[derive(Clone)]
+#[deprecated(note = "Replaced by kube_runtime::watcher", since = "0.38.0")]
 pub struct Informer<K>
 where
     K: Clone + DeserializeOwned + Meta,

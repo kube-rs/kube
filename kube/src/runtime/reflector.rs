@@ -25,6 +25,7 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 ///
 /// The internal state is exposed readably through a getter.
 #[derive(Clone)]
+#[deprecated(note = "Replaced by kube_runtime::reflector", since = "0.38.0")]
 pub struct Reflector<K>
 where
     K: Clone + DeserializeOwned + Meta,
