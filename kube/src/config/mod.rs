@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use reqwest::header::{self, HeaderMap};
 use tokio::sync::Mutex;
 
-use std::{sync::Arc};
+use std::{sync::Arc, time::Duration};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Authentication {
@@ -330,7 +330,8 @@ fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
 }
 
 // https://github.com/clux/kube-rs/issues/146#issuecomment-590924397
-// const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
+/// Default Timeout
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const IDENTITY_PASSWORD: &str = " ";
 
 // temporary catalina hack for openssl only
