@@ -337,8 +337,11 @@ impl From<Config> for reqwest::ClientBuilder {
             }
         }
 
+        if let Some(t) = config.timeout {
+            builder = builder.timeout(t);
+        }
+
         builder = builder.default_headers(config.headers);
-        builder = builder.timeout(config.timeout);
         builder = builder.danger_accept_invalid_certs(config.accept_invalid_certs);
 
         builder

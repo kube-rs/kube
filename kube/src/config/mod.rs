@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use reqwest::header::{self, HeaderMap};
 use tokio::sync::Mutex;
 
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Authentication {
@@ -75,7 +75,7 @@ pub struct Config {
     /// Timeout for calls to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
-    pub timeout: std::time::Duration,
+    pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
     /// Proxy to send requests to Kubernetes API through
@@ -104,7 +104,7 @@ impl Config {
             default_ns: String::from("default"),
             root_cert: None,
             headers: HeaderMap::new(),
-            timeout: DEFAULT_TIMEOUT,
+            timeout: None,
             accept_invalid_certs: false,
             proxy: None,
             identity: None,
@@ -164,7 +164,7 @@ impl Config {
             default_ns,
             root_cert: Some(root_cert),
             headers: HeaderMap::new(),
-            timeout: DEFAULT_TIMEOUT,
+            timeout: None,
             accept_invalid_certs: false,
             proxy: None,
             identity: None,
@@ -233,7 +233,7 @@ impl Config {
             default_ns,
             root_cert,
             headers: HeaderMap::new(),
-            timeout: DEFAULT_TIMEOUT,
+            timeout: None,
             accept_invalid_certs,
             proxy: None,
             identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
@@ -330,7 +330,7 @@ fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
 }
 
 // https://github.com/clux/kube-rs/issues/146#issuecomment-590924397
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
+// const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const IDENTITY_PASSWORD: &str = " ";
 
 // temporary catalina hack for openssl only
