@@ -79,6 +79,7 @@ impl<K: 'static + Clone + Resource> Store<K> {
     }
 
     /// Return a full snapshot of the current values
+    #[must_use]
     pub fn state(&self) -> Vec<K> {
         self.store.iter().map(|eg| eg.value().clone()).collect()
     }
@@ -88,6 +89,7 @@ impl<K: 'static + Clone + Resource> Store<K> {
     /// This creates an iterator over all entries in the map.
     /// This does not take a snapshot of the map and thus changes during the lifetime
     /// of the iterator may or may not become visible in the iterator.
+    #[must_use]
     pub fn iter(&self) -> dashmap::Iter<ObjectRef<K>, K> {
         self.store.iter()
     }

@@ -103,16 +103,19 @@ pub struct Context<T>(Arc<T>);
 
 impl<T> Context<T> {
     /// Create new `Data` instance.
+    #[must_use]
     pub fn new(state: T) -> Context<T> {
         Context(Arc::new(state))
     }
 
     /// Get reference to inner controller data.
+    #[must_use]
     pub fn get_ref(&self) -> &T {
         self.0.as_ref()
     }
 
     /// Convert to the internal Arc<T>
+    #[must_use]
     pub fn into_inner(self) -> Arc<T> {
         self.0
     }
@@ -286,7 +289,7 @@ where
     /// Create a Controller on a type `K`
     ///
     /// Configure `ListParams` and `Api` so you only get reconcile events
-    /// for the correct Api scope (cluster/all/namespaced), or ListParams subset
+    /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
     pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
         let writer = Writer::<K>::default();
         let reader = writer.as_reader();
@@ -302,10 +305,10 @@ where
         self.reader.clone()
     }
 
-    /// Indicate child objets K owns and be notified when they change
+    /// Indicate child objets `K` owns and be notified when they change
     ///
-    /// This type `Child` must have OwnerReferences set to point back to `K`.
-    /// You can customize the parameters used by the underlying watcher if
+    /// This type `Child` must have `OwnerReference`s set to point back to `K`.
+    /// You can customize the parameters used by the underlying `watcher` if
     /// only a subset of `Child` entries are required.
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
     pub fn owns<Child: Clone + Meta + DeserializeOwned + Send + 'static>(

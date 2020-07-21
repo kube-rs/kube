@@ -51,7 +51,7 @@ impl<K: Meta> ObjectRef<K> {
     }
 
     #[must_use]
-    /// Create an ObjectRef from an OwnerReference
+    /// Create an `ObjectRef` from an `OwnerReference`
     ///
     /// Returns `None` if the types do not match.
     pub fn from_owner_ref(namespace: Option<&str>, owner: &OwnerReference) -> Option<Self> {

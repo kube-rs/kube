@@ -186,7 +186,7 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 /// Errors are propagated to the client as `Err`. Tries to recover (by reconnecting and resyncing as required)
 /// if polled again after an error.
 ///
-/// # Migration from kube::runtime
+/// # Migration from `kube::runtime`
 ///
 /// This is similar to the legacy `kube::runtime::Informer`, or the watching half of client-go's `Reflector`.
 /// Renamed to avoid confusion with client-go's `Informer` (which watches a `Reflector` for updates, rather

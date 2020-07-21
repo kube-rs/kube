@@ -14,7 +14,7 @@ pub use store::Store;
 /// Note: It is a bad idea to feed a single `reflector` from multiple `watcher`s, since
 /// the whole `Store` will be cleared whenever any of them emits a `Restarted` event.
 ///
-/// # Migration from kube::runtime
+/// # Migration from `kube::runtime`
 ///
 /// Similar to the legacy `kube::runtime::Reflector`, and the caching half of client-go's `Reflector`
 pub fn reflector<K: Meta + Clone, W: Stream<Item = watcher::Result<watcher::Event<K>>>>(
