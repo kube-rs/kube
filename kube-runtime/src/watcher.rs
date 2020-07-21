@@ -80,11 +80,8 @@ impl<K> Event<K> {
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-/// The internal FSM driving the [`Watcher`](struct.Watcher.html)
-///
-/// NOTE: This isn't intended to be used externally or part of the external API,
-/// but it's published to document the internal workings.
-pub enum State<K: Meta + Clone> {
+/// The internal finite state machine driving the [`Watcher`](struct.Watcher.html)
+enum State<K: Meta + Clone> {
     /// The Watcher is empty, and the next poll() will start the initial LIST to get all existing objects
     Empty,
     /// The initial LIST was successful, so we should move on to starting the actual watch.
@@ -186,11 +183,14 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 
 /// Watches a Kubernetes Resource for changes
 ///
-/// Errors are propagated to the client, but can continue to be polled, in which case it tries to recover
-/// from the error.
+/// Errors are propagated to the client as `Err`. Tries to recover (by reconnecting and resyncing as required)
+/// if polled again after an error.
 ///
-/// This is similar to kube-rs 0.33's `Informer`, or the watching half of client-go's `Reflector`.
-/// Renamed to avoid confusion with client-go's `Informer`.
+/// # Migration from kube::runtime
+///
+/// This is similar to the legacy `kube::runtime::Informer`, or the watching half of client-go's `Reflector`.
+/// Renamed to avoid confusion with client-go's `Informer` (which watches a `Reflector` for updates, rather
+/// the Kubernetes API).
 pub fn watcher<K: Meta + Clone + DeserializeOwned + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,

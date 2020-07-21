@@ -41,8 +41,13 @@ pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error:
     },
 }
 
+/// Results of the reconciliation attempt
 #[derive(Debug, Clone)]
 pub struct ReconcilerAction {
+    /// Whether (and when) to next trigger the reconciliation if no external watch triggers hit
+    ///
+    /// For example, use this to query external systems for updates, expire time-limited resources, or
+    /// (in your `error_policy`) retry after errors.
     pub requeue_after: Option<Duration>,
 }
 
@@ -113,13 +118,16 @@ impl<T> Context<T> {
     }
 }
 
-/// Apply a reconciler to an input stream
+/// Apply a reconciler to an input stream, with a given retry policy
 ///
 /// Takes a `store` parameter for the main object which should be updated by a `reflector`.
 ///
 /// The `queue` is a source of external events that trigger the reconciler,
 /// usually taken from a `reflector` and then passed through a trigger function such as
 /// `trigger_self`.
+///
+/// This is the "hard-mode" version of `Controller`, which allows you some more customization
+/// (such as triggering from arbitrary `Stream`s), at the cost of some more verbosity.
 pub fn applier<K, QueueStream, ReconcilerFut, T>(
     mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
     mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
