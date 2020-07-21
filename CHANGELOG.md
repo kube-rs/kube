@@ -1,3 +1,8 @@
+0.38.0 / 2020-06-XX
+===================
+  * Marked `kube::runtime` module as deprecated
+  * `Config::timeout` can now be overridden to `None` (with caveats) #280
+
 0.37.0 / 2020-06-20
 ===================
   * Bump `k8s-openapi` to `0.9.0`
