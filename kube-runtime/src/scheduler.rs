@@ -27,12 +27,14 @@ pub enum Error {
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+/// A request to re-emit `message` at a given `Instant` (`run_at`).
 #[derive(Debug)]
 pub struct ScheduleRequest<T> {
     pub message: T,
     pub run_at: Instant,
 }
 
+/// Internal metadata for a scheduled message.
 struct ScheduledEntry {
     run_at: Instant,
     queue_key: delay_queue::Key,
@@ -40,8 +42,14 @@ struct ScheduledEntry {
 
 #[pin_project(project = SchedulerProj)]
 struct Scheduler<T, R> {
+    /// Queue of already-scheduled messages.
+    ///
+    /// To ensure that the metadata is kept up-to-date, use `schedule_message` and
+    /// `poll_pop_queue_message` rather than manipulating this directly.
     queue: DelayQueue<T>,
+    /// Metadata for all currently scheduled messages. Used to detect duplicate messages.
     scheduled: HashMap<T, ScheduledEntry>,
+    /// Incoming queue of scheduling requests.
     #[pin]
     requests: Fuse<R>,
 }
@@ -57,6 +65,9 @@ impl<T, R: Stream> Scheduler<T, R> {
 }
 
 impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
+    /// Attempt to schedule a message into the queue.
+    ///
+    /// If the message is already in the queue then the earlier `request.run_at` takes precedence.
     fn schedule_message(&mut self, request: ScheduleRequest<T>) {
         match self.scheduled.entry(request.message) {
             Entry::Occupied(mut old_entry) if old_entry.get().run_at >= request.run_at => {
@@ -80,6 +91,7 @@ impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
         }
     }
 
+    /// Attempt to retrieve a message from the queue.
     fn poll_pop_queue_message(
         &mut self,
         cx: &mut Context<'_>,
@@ -126,9 +138,112 @@ where
     }
 }
 
-/// Stream transformer that schedules each item to be performed at a given time.
+/// Stream transformer that takes a message and `Instant` (in the form of a `ScheduleRequest`), and emits
+/// the message at the specified `Instant`.
+///
+/// Objects are de-duplicated: if a message is submitted twice before being emitted then it will only be
+/// emitted at the earlier of the two `Instant`s.
 pub fn scheduler<T: Eq + Hash + Clone>(
     requests: impl Stream<Item = ScheduleRequest<T>>,
 ) -> impl Stream<Item = Result<T>> {
     Scheduler::new(requests)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{scheduler, ScheduleRequest};
+    use futures::{channel::mpsc, poll, stream, FutureExt, SinkExt, StreamExt};
+    use tokio::time::{advance, pause, Duration, Instant};
+
+    #[tokio::test]
+    async fn scheduler_should_emit_items_as_requested() {
+        pause();
+        let mut scheduler = scheduler(stream::iter(vec![
+            ScheduleRequest {
+                message: 1u8,
+                run_at: Instant::now() + Duration::from_secs(1),
+            },
+            ScheduleRequest {
+                message: 2,
+                run_at: Instant::now() + Duration::from_secs(3),
+            },
+        ]));
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(2)).await;
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), 1);
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(2)).await;
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), 2);
+        // Stream has terminated
+        assert!(scheduler.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn scheduler_dedupe_should_keep_earlier_item() {
+        pause();
+        let mut scheduler = scheduler(stream::iter(vec![
+            ScheduleRequest {
+                message: (),
+                run_at: Instant::now() + Duration::from_secs(1),
+            },
+            ScheduleRequest {
+                message: (),
+                run_at: Instant::now() + Duration::from_secs(3),
+            },
+        ]));
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(2)).await;
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), ());
+        // Stream has terminated
+        assert!(scheduler.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn scheduler_dedupe_should_replace_later_item() {
+        pause();
+        let mut scheduler = scheduler(stream::iter(vec![
+            ScheduleRequest {
+                message: (),
+                run_at: Instant::now() + Duration::from_secs(3),
+            },
+            ScheduleRequest {
+                message: (),
+                run_at: Instant::now() + Duration::from_secs(1),
+            },
+        ]));
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(2)).await;
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), ());
+        // Stream has terminated
+        assert!(scheduler.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn scheduler_dedupe_should_allow_rescheduling_emitted_item() {
+        pause();
+        let (mut schedule_tx, schedule_rx) = mpsc::unbounded();
+        let mut scheduler = scheduler(schedule_rx);
+        schedule_tx
+            .send(ScheduleRequest {
+                message: (),
+                run_at: Instant::now() + Duration::from_secs(1),
+            })
+            .await
+            .unwrap();
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(2)).await;
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), ());
+        assert!(poll!(scheduler.next()).is_pending());
+        schedule_tx
+            .send(ScheduleRequest {
+                message: (),
+                run_at: Instant::now() + Duration::from_secs(1),
+            })
+            .await
+            .unwrap();
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(2)).await;
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), ());
+        assert!(poll!(scheduler.next()).is_pending());
+    }
 }

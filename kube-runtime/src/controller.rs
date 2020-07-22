@@ -41,8 +41,13 @@ pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error:
     },
 }
 
+/// Results of the reconciliation attempt
 #[derive(Debug, Clone)]
 pub struct ReconcilerAction {
+    /// Whether (and when) to next trigger the reconciliation if no external watch triggers hit
+    ///
+    /// For example, use this to query external systems for updates, expire time-limited resources, or
+    /// (in your `error_policy`) retry after errors.
     pub requeue_after: Option<Duration>,
 }
 
@@ -98,28 +103,34 @@ pub struct Context<T>(Arc<T>);
 
 impl<T> Context<T> {
     /// Create new `Data` instance.
+    #[must_use]
     pub fn new(state: T) -> Context<T> {
         Context(Arc::new(state))
     }
 
     /// Get reference to inner controller data.
+    #[must_use]
     pub fn get_ref(&self) -> &T {
         self.0.as_ref()
     }
 
     /// Convert to the internal Arc<T>
+    #[must_use]
     pub fn into_inner(self) -> Arc<T> {
         self.0
     }
 }
 
-/// Apply a reconciler to an input stream
+/// Apply a reconciler to an input stream, with a given retry policy
 ///
 /// Takes a `store` parameter for the main object which should be updated by a `reflector`.
 ///
 /// The `queue` is a source of external events that trigger the reconciler,
 /// usually taken from a `reflector` and then passed through a trigger function such as
 /// `trigger_self`.
+///
+/// This is the "hard-mode" version of `Controller`, which allows you some more customization
+/// (such as triggering from arbitrary `Stream`s), at the cost of some more verbosity.
 pub fn applier<K, QueueStream, ReconcilerFut, T>(
     mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
     mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
@@ -278,7 +289,7 @@ where
     /// Create a Controller on a type `K`
     ///
     /// Configure `ListParams` and `Api` so you only get reconcile events
-    /// for the correct Api scope (cluster/all/namespaced), or ListParams subset
+    /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
     pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
         let writer = Writer::<K>::default();
         let reader = writer.as_reader();
@@ -294,10 +305,10 @@ where
         self.reader.clone()
     }
 
-    /// Indicate child objets K owns and be notified when they change
+    /// Indicate child objets `K` owns and be notified when they change
     ///
-    /// This type `Child` must have OwnerReferences set to point back to `K`.
-    /// You can customize the parameters used by the underlying watcher if
+    /// This type `Child` must have `OwnerReference`s set to point back to `K`.
+    /// You can customize the parameters used by the underlying `watcher` if
     /// only a subset of `Child` entries are required.
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
     pub fn owns<Child: Clone + Meta + DeserializeOwned + Send + 'static>(
