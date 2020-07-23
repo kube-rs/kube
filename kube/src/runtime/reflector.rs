@@ -121,7 +121,7 @@ where
                     }
                 }
                 WatchEvent::Bookmark(bm) => {
-                    let rv = bm.version();
+                    let rv = &bm.metadata.resource_version;
                     trace!("Updating reflector version for {} to {}", kind, rv);
                     state.version = rv.clone();
                 }
@@ -144,7 +144,7 @@ where
                     data.remove(&ObjectId::key_for(&o));
                 }
                 WatchEvent::Bookmark(bm) => {
-                    debug!("Bookmarking {}", bm.kind());
+                    debug!("Bookmarking {}", &bm.types.kind);
                 }
                 WatchEvent::Error(e) => {
                     warn!("Failed to watch {}: {:?}", kind, e);

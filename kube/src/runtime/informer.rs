@@ -138,7 +138,7 @@ where
                     }
                     Ok(WatchEvent::Bookmark(bm)) => {
                         // always store the last seen resourceVersion
-                        *version.lock().await = bm.version().clone();
+                        *version.lock().await = bm.metadata.resource_version.clone();
                     }
                     Ok(WatchEvent::Error(e)) => {
                         // 410 Gone => we need to restart from latest next call

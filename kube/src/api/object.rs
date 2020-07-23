@@ -59,15 +59,7 @@ pub struct Bookmark {
     /// Basically empty metadata
     pub metadata: BookmarkMeta,
 }
-impl Bookmark {
-    pub fn kind(&self) -> &String {
-        &self.types.kind
-    }
 
-    pub fn version(&self) -> &String {
-        &self.metadata.resource_version
-    }
-}
 /// Slimed down Metadata for WatchEvent::Bookmark
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
