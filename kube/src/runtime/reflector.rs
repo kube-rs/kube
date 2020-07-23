@@ -113,15 +113,17 @@ where
             let mut state = self.state.lock().await;
             // Informer-like version tracking:
             match &ev {
-                WatchEvent::Added(o)
-                | WatchEvent::Modified(o)
-                | WatchEvent::Deleted(o)
-                | WatchEvent::Bookmark(o) => {
+                WatchEvent::Added(o) | WatchEvent::Modified(o) | WatchEvent::Deleted(o) => {
                     // always store the last seen resourceVersion
                     if let Some(nv) = Meta::resource_ver(o) {
                         trace!("Updating reflector version for {} to {}", kind, nv);
                         state.version = nv.clone();
                     }
+                }
+                WatchEvent::Bookmark(bm) => {
+                    let rv = &bm.metadata.resource_version;
+                    trace!("Updating reflector version for {} to {}", kind, rv);
+                    state.version = rv.clone();
                 }
                 _ => {}
             }
@@ -141,8 +143,8 @@ where
                     debug!("Removing {} from {}", Meta::name(&o), kind);
                     data.remove(&ObjectId::key_for(&o));
                 }
-                WatchEvent::Bookmark(o) => {
-                    debug!("Bookmarking {} from {}", Meta::name(&o), kind);
+                WatchEvent::Bookmark(bm) => {
+                    debug!("Bookmarking {}", &bm.types.kind);
                 }
                 WatchEvent::Error(e) => {
                     warn!("Failed to watch {}: {:?}", kind, e);
