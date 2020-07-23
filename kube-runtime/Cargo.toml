@@ -22,7 +22,7 @@ smallvec = "1.4.0"
 pin-project = "0.4.16"
 tokio = { version = "0.2.21", features = ["time"] }
 snafu = { version = "0.6.8", features = ["futures"] }
-dashmap = "4.0.0-rc6"
+dashmap = "3.11.7"
 
 [features]
 default = ["native-tls"]
@@ -39,3 +39,4 @@ kube-derive = { path = "../kube-derive" }
 #kube-derive = "0.37.0"
 serde_json = "1.0.53"
 tokio = { version = "0.2.21", features = ["full", "test-util"] }
+rand = "0.7.3"
