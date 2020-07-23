@@ -1,7 +1,12 @@
-0.38.0 / 2020-06-XX
+0.38.0 / 2020-06-23
 ===================
-  * Marked `kube::runtime` module as deprecated
+  * Marked `kube::runtime` module as deprecated - #281
   * `Config::timeout` can now be overridden to `None` (with caveats) #280
+  * Bug: reflector stores could have multiple copies inside datastore - #286
+     - `dashmap` backend Store driver downgraded - #286
+     - `Store::iter` temporarily removed
+  * Bug: Specialize WatchEvent::Bookmark so they can be deserialized - #285
+  * Docs: Tons of docs for kube-runtime
 
 0.37.0 / 2020-06-20
 ===================
