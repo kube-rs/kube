@@ -28,9 +28,13 @@ pub fn reflector<K: Meta + Clone, W: Stream<Item = watcher::Result<watcher::Even
 mod tests {
     use super::{reflector, store, ObjectRef};
     use crate::watcher;
-    use futures::{stream, StreamExt};
+    use futures::{stream, StreamExt, TryStreamExt};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-    use std::collections::BTreeMap;
+    use rand::{
+        distributions::{Bernoulli, Uniform},
+        Rng,
+    };
+    use std::collections::{BTreeMap, HashMap};
 
     #[tokio::test]
     async fn reflector_applied_should_add_object() {
@@ -139,5 +143,44 @@ mod tests {
         .await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm_a)), None);
         assert_eq!(store.get(&ObjectRef::from_obj(&cm_b)), Some(cm_b));
+    }
+
+    #[tokio::test]
+    async fn reflector_store_should_not_contain_duplicates() {
+        let mut rng = rand::thread_rng();
+        let item_dist = Uniform::new(0u8, 100);
+        let deleted_dist = Bernoulli::new(0.40).unwrap();
+        let store_w = store::Writer::default();
+        let store = store_w.as_reader();
+        reflector(
+            store_w,
+            stream::iter((0u32..100000).map(|gen| {
+                let item = rng.sample(item_dist);
+                let deleted = rng.sample(deleted_dist);
+                let obj = ConfigMap {
+                    metadata: ObjectMeta {
+                        name: Some(item.to_string()),
+                        resource_version: Some(gen.to_string()),
+                        ..ObjectMeta::default()
+                    },
+                    ..ConfigMap::default()
+                };
+                Ok(if deleted {
+                    watcher::Event::Deleted(obj)
+                } else {
+                    watcher::Event::Applied(obj)
+                })
+            })),
+        )
+        .map_ok(|_| ())
+        .try_collect::<()>()
+        .await
+        .unwrap();
+
+        let mut seen_objects = HashMap::new();
+        for obj in store.state() {
+            assert_eq!(seen_objects.get(obj.metadata.name.as_ref().unwrap()), None);
+            seen_objects.insert(obj.metadata.name.clone().unwrap(), obj);
+        }
     }
 }

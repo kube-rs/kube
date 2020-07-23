@@ -39,3 +39,4 @@ kube-derive = { path = "../kube-derive" }
 #kube-derive = "0.37.0"
 serde_json = "1.0.53"
 tokio = { version = "0.2.21", features = ["full", "test-util"] }
+rand = "0.7.3"
