@@ -22,7 +22,7 @@ smallvec = "1.4.0"
 pin-project = "0.4.16"
 tokio = { version = "0.2.21", features = ["time"] }
 snafu = { version = "0.6.8", features = ["futures"] }
-dashmap = "4.0.0-rc6"
+dashmap = "3.11.7"
 
 [features]
 default = ["native-tls"]
