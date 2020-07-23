@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
@@ -12,7 +13,7 @@ fn spawn_periodic_reader(reader: Store<ConfigMap>) {
         loop {
             // Periodically read our state
             tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-            let cms: Vec<_> = reader.iter().map(|eg| Meta::name(eg.value()).clone()).collect();
+            let cms: Vec<_> = reader.state().iter().map(|obj| Meta::name(obj).clone()).collect();
             info!("Current configmaps: {:?}", cms);
         }
     });
