@@ -24,7 +24,10 @@ where
     ///
     /// From [Watch bookmarks](https://kubernetes.io/docs/reference/using-api/api-concepts/#watch-bookmarks)
     /// NB: This became Beta first in Kubernetes 1.16
-    Bookmark(K),
+    Bookmark {
+        /// Slimmed down K for Bookmark WatchEvents due to #285
+        resource_version: String,
+    },
     /// There was some kind of error
     Error(ErrorResponse),
 }
@@ -38,7 +41,7 @@ where
             WatchEvent::Added(_) => write!(f, "Added event"),
             WatchEvent::Modified(_) => write!(f, "Modified event"),
             WatchEvent::Deleted(_) => write!(f, "Deleted event"),
-            WatchEvent::Bookmark(_) => write!(f, "Bookmark event"),
+            WatchEvent::Bookmark { resource_version: _ } => write!(f, "Bookmark event"),
             WatchEvent::Error(e) => write!(f, "Error event: {:?}", e),
         }
     }

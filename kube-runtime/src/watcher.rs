@@ -142,8 +142,8 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
                     stream,
                 })
             }
-            Some(Ok(WatchEvent::Bookmark(obj))) => (None, State::Watching {
-                resource_version: obj.resource_ver().unwrap(),
+            Some(Ok(WatchEvent::Bookmark { resource_version })) => (None, State::Watching {
+                resource_version: resource_version,
                 stream,
             }),
             Some(Ok(WatchEvent::Error(err))) => {
