@@ -136,9 +136,9 @@ where
                             *version.lock().await = nv.clone();
                         }
                     }
-                    Ok(WatchEvent::Bookmark { resource_version }) => {
+                    Ok(WatchEvent::Bookmark(bm)) => {
                         // always store the last seen resourceVersion
-                        *version.lock().await = resource_version.clone();
+                        *version.lock().await = bm.version().clone();
                     }
                     Ok(WatchEvent::Error(e)) => {
                         // 410 Gone => we need to restart from latest next call

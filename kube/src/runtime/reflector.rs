@@ -120,9 +120,10 @@ where
                         state.version = nv.clone();
                     }
                 }
-                WatchEvent::Bookmark { resource_version } => {
-                    trace!("Updating reflector version for {} to {}", kind, resource_version);
-                    state.version = resource_version.clone()
+                WatchEvent::Bookmark(bm) => {
+                    let rv = bm.version();
+                    trace!("Updating reflector version for {} to {}", kind, rv);
+                    state.version = rv.clone();
                 }
                 _ => {}
             }
@@ -142,8 +143,8 @@ where
                     debug!("Removing {} from {}", Meta::name(&o), kind);
                     data.remove(&ObjectId::key_for(&o));
                 }
-                WatchEvent::Bookmark { resource_version: _ } => {
-                    debug!("Bookmarking");
+                WatchEvent::Bookmark(bm) => {
+                    debug!("Bookmarking {}", bm.kind());
                 }
                 WatchEvent::Error(e) => {
                     warn!("Failed to watch {}: {:?}", kind, e);

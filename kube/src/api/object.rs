@@ -24,10 +24,8 @@ where
     ///
     /// From [Watch bookmarks](https://kubernetes.io/docs/reference/using-api/api-concepts/#watch-bookmarks)
     /// NB: This became Beta first in Kubernetes 1.16
-    Bookmark {
-        /// Slimmed down K for Bookmark WatchEvents due to #285
-        resource_version: String,
-    },
+    /// Slimmed down K for Bookmark WatchEvents due to #285
+    Bookmark(Bookmark),
     /// There was some kind of error
     Error(ErrorResponse),
 }
@@ -41,10 +39,40 @@ where
             WatchEvent::Added(_) => write!(f, "Added event"),
             WatchEvent::Modified(_) => write!(f, "Modified event"),
             WatchEvent::Deleted(_) => write!(f, "Deleted event"),
-            WatchEvent::Bookmark { resource_version: _ } => write!(f, "Bookmark event"),
+            WatchEvent::Bookmark(_) => write!(f, "Bookmark event"),
             WatchEvent::Error(e) => write!(f, "Error event: {:?}", e),
         }
     }
+}
+
+/// Slimed down K for WatchEvent::Bookmark
+///
+/// Can only be relied upon to have metadata with resource version
+/// Slimmed down K for Bookmark WatchEvents due to #285
+/// Bookmarks contain apiVersion + kind + basically empty metadata
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Bookmark {
+    /// apiVersion + kind
+    #[serde(flatten)]
+    pub types: TypeMeta,
+
+    /// Basically empty metadata
+    pub metadata: BookmarkMeta,
+}
+impl Bookmark {
+    pub fn kind(&self) -> &String {
+        &self.types.kind
+    }
+
+    pub fn version(&self) -> &String {
+        &self.metadata.resource_version
+    }
+}
+/// Slimed down Metadata for WatchEvent::Bookmark
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BookmarkMeta {
+    pub resource_version: String,
 }
 
 // -------------------------------------------------------
