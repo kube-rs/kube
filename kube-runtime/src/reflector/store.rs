@@ -67,6 +67,8 @@ pub struct Store<K: 'static + Resource> {
 impl<K: 'static + Clone + Resource> Store<K> {
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
     ///
+    /// `key.namespace` is ignored for cluster-scoped resources.
+    ///
     /// Note that this is a cache and may be stale. Deleted objects may still exist in the cache
     /// despite having been deleted in the cluster, and new objects may not yet exist in the cache.
     /// If any of these are a problem for you then you should abort your reconciler and retry later.
@@ -74,13 +76,99 @@ impl<K: 'static + Clone + Resource> Store<K> {
     /// reasonable `error_policy`.
     #[must_use]
     pub fn get(&self, key: &ObjectRef<K>) -> Option<K> {
-        // Clone to let go of the entry lock ASAP
-        self.store.get(key).map(|entry| entry.value().clone())
+        self.store
+            .get(key)
+            // Try to erase the namespace and try again, in case the object is cluster-scoped
+            .or_else(|| {
+                self.store.get(&{
+                    let mut cluster_key = key.clone();
+                    cluster_key.namespace = None;
+                    cluster_key
+                })
+            })
+            // Clone to let go of the entry lock ASAP
+            .map(|entry| entry.value().clone())
     }
 
     /// Return a full snapshot of the current values
     #[must_use]
     pub fn state(&self) -> Vec<K> {
         self.store.iter().map(|eg| eg.value().clone()).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Writer;
+    use crate::{reflector::ObjectRef, watcher};
+    use k8s_openapi::api::core::v1::ConfigMap;
+    use kube::api::ObjectMeta;
+
+    #[test]
+    fn should_allow_getting_namespaced_object_by_namespaced_ref() {
+        let cm = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("obj".to_string()),
+                namespace: Some("ns".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let mut store_w = Writer::default();
+        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        let store = store_w.as_reader();
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)), Some(cm));
+    }
+
+    #[test]
+    fn should_not_allow_getting_namespaced_object_by_clusterscoped_ref() {
+        let cm = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("obj".to_string()),
+                namespace: Some("ns".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let mut cluster_cm = cm.clone();
+        cluster_cm.metadata.namespace = None;
+        let mut store_w = Writer::default();
+        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        let store = store_w.as_reader();
+        assert_eq!(store.get(&ObjectRef::from_obj(&cluster_cm)), None);
+    }
+
+    #[test]
+    fn should_allow_getting_clusterscoped_object_by_clusterscoped_ref() {
+        let cm = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("obj".to_string()),
+                namespace: None,
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let mut store_w = Writer::default();
+        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        let store = store_w.as_reader();
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)), Some(cm));
+    }
+
+    #[test]
+    fn should_allow_getting_clusterscoped_object_by_namespaced_ref() {
+        let cm = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("obj".to_string()),
+                namespace: None,
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let mut nsed_cm = cm.clone();
+        nsed_cm.metadata.namespace = Some("ns".to_string());
+        let mut store_w = Writer::default();
+        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        let store = store_w.as_reader();
+        assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)), Some(cm));
     }
 }
