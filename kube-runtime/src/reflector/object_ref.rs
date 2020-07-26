@@ -21,11 +21,23 @@ use std::{fmt::Debug, hash::Hash};
 /// ```
 pub struct ObjectRef<K: RuntimeResource> {
     kind: K::State,
+    /// The name of the object
     pub name: String,
+    /// The namespace of the object
+    ///
+    /// May only be `None` if the kind is cluster-scoped (not located in a namespace).
+    /// Note that it *is* acceptable for an `ObjectRef` to a cluster-scoped resource to
+    /// have a namespace. These are, however, not considered equal:
+    ///
+    /// ```
+    /// # use kube_runtime::reflector::ObjectRef;
+    /// # use k8s_openapi::api::core::v1::ConfigMap;
+    /// assert_ne!(ObjectRef::<ConfigMap>::new("foo"), ObjectRef::new("foo").within("bar"));
+    /// ```
     pub namespace: Option<String>,
 }
 
-impl<K: Meta> ObjectRef<K> {
+impl<K: Resource> ObjectRef<K> {
     #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
@@ -42,7 +54,10 @@ impl<K: Meta> ObjectRef<K> {
     }
 
     #[must_use]
-    pub fn from_obj(obj: &K) -> Self {
+    pub fn from_obj(obj: &K) -> Self
+    where
+        K: Meta,
+    {
         Self {
             kind: (),
             name: obj.name(),
