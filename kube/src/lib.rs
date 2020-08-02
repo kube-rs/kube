@@ -96,8 +96,7 @@ pub mod runtime;
 pub mod error;
 mod oauth2;
 
-#[cfg(feature = "derive")]
-pub use kube_derive::CustomResource;
+#[cfg(feature = "derive")] pub use kube_derive::CustomResource;
 
 pub use api::{Api, Resource};
 #[doc(inline)] pub use client::Client;

@@ -22,6 +22,7 @@ test:
 	cargo test --example crd_api crd_reflector
 	cargo test -j4
 	cd kube && cargo test --lib --features=rustls-tls --no-default-features
+	cd kube && cargo test --lib --features=derive
 
 readme:
 	rustdoc README.md --test --edition=2018
