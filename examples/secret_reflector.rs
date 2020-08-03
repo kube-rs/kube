@@ -1,12 +1,12 @@
 #[macro_use] extern crate log;
-use std::collections::BTreeMap;
-
+use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{Api, ListParams, Meta},
-    runtime::Reflector,
     Client,
 };
+use kube_runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher};
+use std::collections::BTreeMap;
 
 /// Example way to read secrets
 #[derive(Debug)]
@@ -32,6 +32,21 @@ fn decode(secret: &Secret) -> BTreeMap<String, Decoded> {
     res
 }
 
+fn spawn_periodic_reader(reader: Store<Secret>) {
+    tokio::spawn(async move {
+        loop {
+            // Periodically read our state
+            let cms: Vec<_> = reader
+                .state()
+                .iter()
+                .map(|s| format!("{}: {:?}", Meta::name(s), decode(s).keys()))
+                .collect();
+            info!("Current secrets: {:?}", cms);
+            tokio::time::delay_for(std::time::Duration::from_secs(15)).await;
+        }
+    });
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
@@ -41,24 +56,17 @@ async fn main() -> anyhow::Result<()> {
 
     let secrets: Api<Secret> = Api::namespaced(client, &namespace);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf = Reflector::new(secrets).params(lp);
 
-    let rf2 = rf.clone(); // read from a clone in a task
-    tokio::spawn(async move {
-        loop {
-            // Periodically read our state
-            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-            let secrets: Vec<_> = rf2
-                .state()
-                .await
-                .unwrap()
-                .iter()
-                .map(|s| format!("{}: {:?}", Meta::name(s), decode(s).keys()))
-                .collect();
-            info!("Current secrets: {:?}", secrets);
-        }
-    });
+    let store = reflector::store::Writer::<Secret>::default();
+    let reader = store.as_reader();
+    let rf = reflector(store, watcher(secrets, lp));
+    spawn_periodic_reader(reader); // read from a reader in the background
 
-    rf.run().await?; // run reflector and listen for signals
+    try_flatten_applied(rf)
+        .try_for_each(|s| async move {
+            log::info!("Applied: {}", Meta::name(&s));
+            Ok(())
+        })
+        .await?;
     Ok(())
 }

@@ -1,0 +1,111 @@
+[package]
+name = "examples"
+version = "0.1.0"
+authors = [
+  "clux <sszynrae@gmail.com>",
+  "Teo Klestrup Röijezon <teo@nullable.se>",
+]
+publish = false
+edition = "2018"
+
+[[bin]]
+name = "configmapgen_controller"
+path = "configmapgen_controller.rs"
+
+[[bin]]
+name = "configmap_watcher"
+path = "configmap_watcher.rs"
+
+[[bin]]
+name = "configmap_reflector"
+path = "configmap_reflector.rs"
+
+[[bin]]
+name = "crd_api"
+path = "crd_api.rs"
+
+[[bin]]
+name = "crd_apply"
+path = "crd_apply.rs"
+
+[[bin]]
+name = "crd_derive"
+path = "crd_derive.rs"
+
+[[bin]]
+name = "crd_reflector"
+path = "crd_reflector.rs"
+
+[[bin]]
+name = "deployment_reflector"
+path = "deployment_reflector.rs"
+
+[[bin]]
+name = "event_watcher"
+path = "event_watcher.rs"
+
+[[bin]]
+name = "job_api"
+path = "job_api.rs"
+
+[[bin]]
+name = "log_stream"
+path = "log_stream.rs"
+
+[[bin]]
+name = "pod_api"
+path = "pod_api.rs"
+
+[[bin]]
+name = "proxy"
+path = "proxy.rs"
+
+[[bin]]
+name = "pod_reflector_live"
+path = "pod_reflector_live.rs"
+
+[[bin]]
+name = "pod_watcher"
+path = "pod_watcher.rs"
+
+[[bin]]
+name = "secret_reflector"
+path = "secret_reflector.rs"
+
+# OLD STYLE
+[[bin]]
+name = "node_informer"
+path = "node_informer.rs"
+[[bin]]
+name = "node_reflector"
+path = "node_reflector.rs"
+[[bin]]
+name = "pod_informer"
+path = "pod_informer.rs"
+[[bin]]
+name = "pod_reflector"
+path = "pod_reflector.rs"
+
+[features]
+default = ["native-tls"]
+native-tls = ["reqwest/native-tls"]
+rustls-tls = ["reqwest/rustls-tls"]
+
+[dependencies]
+anyhow = "1.0.31"
+env_logger = "0.7.1"
+futures = "0.3.5"
+kube = { path = "../kube", version = "0.38.0", features = ["derive"] }
+kube-runtime = { path = "../kube-runtime", version = "0.38.0" }
+k8s-openapi = { version = "0.9.0", features = ["v1_18"], default-features = false }
+log = "0.4.8"
+serde = { version = "1.0.111", features = ["derive"] }
+serde_json = "1.0.55"
+serde_yaml = "0.8.12"
+tokio = { version = "0.2.21", features = ["full"] }
+color-eyre = "0.5.0"
+snafu = { version = "0.6.8", features = ["futures"] }
+# Some Api::delete methods use Either
+either = "1.5.3"
+# Some configuration tweaking require reqwest atm
+reqwest = { version = "0.10.6", default-features = false, features = ["json", "gzip", "stream"] }

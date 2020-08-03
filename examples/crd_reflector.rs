@@ -2,9 +2,8 @@
 use futures::{StreamExt, TryStreamExt};
 use kube::{
     api::{Api, ListParams, Meta},
-    Client,
+    Client, CustomResource,
 };
-use kube_derive::CustomResource;
 use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
 use serde::{Deserialize, Serialize};
 

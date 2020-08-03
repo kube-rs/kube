@@ -1,5 +1,5 @@
 use k8s_openapi::Resource;
-use kube_derive::CustomResource;
+use kube::CustomResource;
 use serde::{Deserialize, Serialize};
 
 /// Our spec for Foo

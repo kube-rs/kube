@@ -5,4 +5,5 @@ members = [
   "kube-derive",
   "kube-runtime",
   "tests",
+  "examples",
 ]
