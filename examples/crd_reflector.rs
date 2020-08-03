@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
             info!("Current crds: {:?}", crds);
         }
     });
-    let mut rfa = try_flatten_applied(rf).boxed_local();
+    let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
         info!("Applied {}", Meta::name(&event));
     }
