@@ -213,7 +213,7 @@ where
     /// use kube::{api::{Api, PatchParams, Meta}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), anyhow::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let ss_apply = PatchParams::default_apply().force();
@@ -226,7 +226,7 @@ where
     ///         "spec": {
     ///             "activeDeadlineSeconds": 5
     ///         }
-    ///     }))?;
+    ///     })).unwrap();
     ///     let o_patched = pods.patch("blog", &ss_apply, patch).await?;
     ///     Ok(())
     /// }
