@@ -16,11 +16,11 @@ doc:
 	xdg-open target/doc/kube/index.html
 
 test:
-	cargo test --lib
-	cargo test --doc
+	cargo test --lib --all
+	cargo test --doc --all
 	cargo test --lib -- --ignored # also run tests that fail on circleci
 	cargo test --example crd_api crd_reflector
-	cargo test -j4
+	cargo test -j4 --all
 	cd kube && cargo test --lib --features=rustls-tls --no-default-features
 	cd kube && cargo test --lib --features=derive
 
