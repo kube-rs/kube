@@ -147,30 +147,30 @@ From the examples directory:
 
 ```sh
 # watch configmap events
-cargo run --bin configmap_watcher
+cargo run --example configmap_watcher
 # watch pod events
-cargo run --bin pod_informer
+cargo run --example pod_informer
 # watch event events
-cargo run --bin event_informer
+cargo run --example event_informer
 # watch for broken nodes
-cargo run --bin node_informer
+cargo run --example node_informer
 ```
 
 or for the reflectors:
 
 ```sh
-cargo run --bin pod_reflector
-cargo run --bin node_reflector
-cargo run --bin deployment_reflector
-cargo run --bin secret_reflector
-cargo run --bin configmap_reflector
+cargo run --example pod_reflector
+cargo run --example node_reflector
+cargo run --example deployment_reflector
+cargo run --example secret_reflector
+cargo run --example configmap_reflector
 ```
 
 for one based on a CRD, you need to create the CRD first:
 
 ```sh
 kubectl apply -f foo.yaml
-cargo run --bin crd_reflector
+cargo run --example crd_reflector
 ```
 
 then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
@@ -179,25 +179,25 @@ ditto for a controller:
 
 ```sh
 kubectl apply -f configmapgen_controller_crd.yaml
-cargo run --bin configmapgen_controller &
+cargo run --example configmapgen_controller &
 kubectl apply -f configmapgen_controller_object.yaml
 ```
 
 For straight API use examples, try:
 
 ```sh
-cargo run --bin crd_api
-cargo run --bin job_api
-cargo run --bin log_stream
-cargo run --bin pod_api
-NAMESPACE=dev cargo run --bin log_stream -- kafka-manager-7d4f4bd8dc-f6c44
+cargo run --example crd_api
+cargo run --example job_api
+cargo run --example log_stream
+cargo run --example pod_api
+NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
 ## Rustls
 Kube has basic support ([with caveats](https://github.com/clux/kube-rs/issues?q=is%3Aissue+is%3Aopen+rustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
 
 ```sh
-cargo run --bin pod_informer --no-default-features --features=rustls-tls
+cargo run --example pod_informer --no-default-features --features=rustls-tls
 ```
 
 or in `Cargo.toml`:
