@@ -17,10 +17,11 @@ pub use store::Store;
 /// # Migration from `kube::runtime`
 ///
 /// Similar to the legacy `kube::runtime::Reflector`, and the caching half of client-go's `Reflector`
-pub fn reflector<K: Meta + Clone, W: Stream<Item = watcher::Result<watcher::Event<K>>>>(
-    mut store: store::Writer<K>,
-    stream: W,
-) -> impl Stream<Item = W::Item> {
+pub fn reflector<K, W>(mut store: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
+where
+    K: Meta + Clone,
+    W: Stream<Item = watcher::Result<watcher::Event<K>>>,
+{
     stream.inspect_ok(move |event| store.apply_watcher_event(event))
 }
 

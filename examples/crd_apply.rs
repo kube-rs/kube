@@ -1,6 +1,5 @@
 #[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
-use kube_derive::CustomResource;
 use serde::{Deserialize, Serialize};
 
 use apiexts::CustomResourceDefinition;
@@ -8,7 +7,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as a
 
 use kube::{
     api::{Api, ListParams, Meta, PatchParams, PatchStrategy, WatchEvent},
-    Client,
+    Client, CustomResource,
 };
 
 // NB: This example uses server side apply and beta1 customresources

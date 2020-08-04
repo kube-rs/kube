@@ -180,12 +180,13 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "derive")]
     #[tokio::test]
     #[ignore] // circle has no kubeconfig
     async fn convenient_custom_resource() {
-        use crate::{Api, Client};
+        use crate::{Api, Client, CustomResource};
         use serde::{Deserialize, Serialize};
-        #[derive(Clone, Debug, kube_derive::CustomResource, Deserialize, Serialize)]
+        #[derive(Clone, Debug, CustomResource, Deserialize, Serialize)]
         #[kube(group = "clux.dev", version = "v1", namespaced)]
         struct FooSpec {
             foo: String,

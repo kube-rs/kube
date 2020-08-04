@@ -1,6 +1,6 @@
 [package]
 name = "kube-derive"
-description = "Custom derives for the kube kubernetes client library"
+description = "Custom derives for the kube kubernetes crates"
 version = "0.38.0"
 authors = ["clux <sszynrae@gmail.com>"]
 edition = "2018"

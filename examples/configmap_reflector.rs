@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
     let reader = store.as_reader();
     let rf = reflector(store, watcher(cms, lp));
 
-    spawn_periodic_reader(reader); // read from a clone in a task
+    spawn_periodic_reader(reader); // read from a reader in the background
 
     let mut applied_events = try_flatten_applied(rf).boxed_local();
     while let Some(event) = applied_events.try_next().await? {

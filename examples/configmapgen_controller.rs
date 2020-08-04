@@ -7,9 +7,8 @@ use k8s_openapi::{
 };
 use kube::{
     api::{ListParams, Meta, PatchParams, PatchStrategy},
-    Api, Client,
+    Api, Client, CustomResource,
 };
-use kube_derive::CustomResource;
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};

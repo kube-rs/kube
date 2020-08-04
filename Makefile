@@ -16,12 +16,10 @@ doc:
 	xdg-open target/doc/kube/index.html
 
 test:
-	cargo test --lib
-	cargo test --doc
-	cargo test --lib -- --ignored # also run tests that fail on circleci
-	cargo test --example crd_api crd_reflector
-	cargo test -j4
+	cargo test --all
+	cargo test --lib --all -- --ignored # also run tests that fail on circleci
 	cd kube && cargo test --lib --features=rustls-tls --no-default-features
+	cd kube && cargo test --lib --features=derive
 
 readme:
 	rustdoc README.md --test --edition=2018

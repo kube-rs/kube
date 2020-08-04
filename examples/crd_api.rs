@@ -1,6 +1,5 @@
 #[macro_use] extern crate log;
 use either::Either::{Left, Right};
-use kube_derive::CustomResource;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
@@ -11,7 +10,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as a
 
 use kube::{
     api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
-    Client,
+    Client, CustomResource,
 };
 
 // Own custom resource

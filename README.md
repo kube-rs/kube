@@ -17,7 +17,6 @@ Select a version of `kube` along with the [generated k8s api types](https://gith
 ```toml
 [dependencies]
 kube = "0.38.0"
-kube-derive = "0.38.0"
 kube-runtime = "0.38.0"
 k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
@@ -25,7 +24,7 @@ k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"
 Note that turning off `default-features` for `k8s-openapi` is recommended to speed up your compilation (and we provide an api anyway).
 
 ## Usage
-See the [examples directory](./kube/examples) for how to watch over resources in a simplistic way.
+See the [examples directory](./examples) for how to use the api in simplistic ways.
 
 **[API Docs](https://docs.rs/kube/)**
 
@@ -82,7 +81,7 @@ println!("foo: {:?}", f)
 println!("crd: {}", serde_yaml::to_string(Foo::crd());
 ```
 
-There are a ton of kubebuilder like instructions that you can annotate with here. See the `crd_` prefixed [examples](./kube/examples) for more.
+There are a ton of kubebuilder like instructions that you can annotate with here. See the `crd_` prefixed [examples](./examples) for more.
 
 ## Runtime
 The `kube_runtime` create contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
@@ -144,6 +143,8 @@ Examples that show a little common flows. These all have logging of this library
 
 **NB:** not all examples have been migrated to the new runtime yet. If it uses `kube-runtime` it's new.
 
+From the examples directory:
+
 ```sh
 # watch configmap events
 cargo run --example configmap_watcher
@@ -168,7 +169,7 @@ cargo run --example configmap_reflector
 for one based on a CRD, you need to create the CRD first:
 
 ```sh
-kubectl apply -f examples/foo.yaml
+kubectl apply -f foo.yaml
 cargo run --example crd_reflector
 ```
 
@@ -177,9 +178,9 @@ then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f c
 ditto for a controller:
 
 ```sh
-kubectl apply -f kube/examples/configmapgen_controller_crd.yaml
+kubectl apply -f configmapgen_controller_crd.yaml
 cargo run --example configmapgen_controller &
-kubectl apply -f kube/examples/configmapgen_controller_object.yaml
+kubectl apply -f configmapgen_controller_object.yaml
 ```
 
 For straight API use examples, try:

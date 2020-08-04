@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
     api::{Api, ListParams, Meta},
@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // We can look at the events we want and use it as a watcher
-    let mut rfa = Box::pin(try_flatten_applied(rf));
+    let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
         info!("Applied {}", Meta::name(&event));
     }

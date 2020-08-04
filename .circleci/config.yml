@@ -96,9 +96,13 @@ jobs:
           keys:
             - cache-{{ checksum "deps_checksum" }}
       - run: cargo build
-      - run: cargo test --lib
-      - run: cargo test --example crd_api crd_reflector
-      - run: cargo test -j4
+      - run: cargo test -p kube-runtime
+      - run: cargo test -p kube
+      - run: cargo test -p kube-derive
+      - run: cargo test --lib --all -j4
+      - run: cargo test --doc --all -j4
+      - run: cargo test -p examples --example crd_api configmapgen_controller
+      - run: cargo test -j4 -p examples
       #- run: cd kube && cargo test --lib --no-default-features --features=rustls-tls
       - save_cache:
           paths:
