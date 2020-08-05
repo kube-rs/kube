@@ -73,6 +73,7 @@
 //! ```
 
 #![deny(missing_docs)]
+#![deny(unsafe_code)]
 
 #[macro_use] extern crate static_assertions;
 assert_cfg!(

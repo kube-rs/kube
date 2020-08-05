@@ -6,6 +6,8 @@
 //!
 //! Newcomers should generally get started with the `Controller` builder, which manages
 //! all state internals for you.
+
+#![deny(unsafe_code)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 // Makes for confusing SNAFU context selectors

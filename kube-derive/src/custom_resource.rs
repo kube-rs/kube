@@ -4,7 +4,7 @@ use proc_macro2::{Ident, Span};
 use syn::{Data, DeriveInput, Result, Visibility};
 
 #[derive(Debug)]
-pub struct CustomResource {
+pub(crate) struct CustomResource {
     tokens: proc_macro2::TokenStream,
     ident: proc_macro2::Ident,
     visibility: Visibility,
