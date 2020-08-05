@@ -38,28 +38,7 @@ cargo run --example event_watcher
 cargo run --example node_watcher
 ```
 
-### reflectors
-
-```sh
-cargo run --example pod_reflector
-cargo run --example node_reflector
-cargo run --example deployment_reflector
-cargo run --example secret_reflector
-cargo run --example configmap_reflector
-```
-
-### crd based reflector
-For the [`crd_reflector](crd_reflector.rs) you need to create the CRD first:
-
-```sh
-kubectl apply -f foo.yaml
-cargo run --example crd_reflector
-```
-
-then you can `kubectl apply -f crd-baz.yaml`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
-
-
-### controller example
+### controllers
 Requires you creating the custom resource first:
 
 ```sh
@@ -67,6 +46,33 @@ kubectl apply -f configmapgen_controller_crd.yaml
 cargo run --example configmapgen_controller &
 kubectl apply -f configmapgen_controller_object.yaml
 ```
+
+### reflectors
+These examples watch resources as well as give a store access point:
+
+```sh
+# Watch namespace pods and print the current pod count every event
+cargo run --example pod_reflector
+# Watch nodes for applied events and current active nodes
+cargo run --example node_reflector
+# Watch namespace deployments for applied events and current deployments
+cargo run --example deployment_reflector
+# Watch namespaced secrets for applied events and print secret keys in a task
+cargo run --example secret_reflector
+# Watch namespaced configmaps for applied events and print store info in task
+cargo run --example configmap_reflector
+# Watch namespaced foo crs for applied events and print store info in task
+cargo run --example crd_reflector
+```
+
+For the [`crd_reflector](crd_reflector.rs) you need to create the `Foo` CRD first:
+
+```sh
+kubectl apply -f foo.yaml
+cargo run --example crd_reflector
+```
+
+then you can `kubectl apply -f crd-baz.yaml`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
 
 ## rustls
 Disable default features and enable `rustls-tls`:
