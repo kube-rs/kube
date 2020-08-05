@@ -17,9 +17,31 @@ async fn main() -> Result<()> {
     let watcher = watcher(api, ListParams::default());
     try_flatten_applied(watcher)
         .try_for_each(|p| async move {
-            log::info!("Applied: {}", Meta::name(&p));
+            log::debug!("Applied: {}", Meta::name(&p));
+            if let Some(unready_reason) = pod_unready(&p) {
+                log::warn!("{}", unready_reason);
+            }
             Ok(())
         })
         .await?;
     Ok(())
+}
+
+fn pod_unready(p: &Pod) -> Option<String> {
+    let status = p.status.as_ref().unwrap();
+    if let Some(conds) = &status.conditions {
+        let failed = conds
+            .into_iter()
+            .filter(|c| c.type_ == "Ready" && c.status == "False")
+            .map(|c| c.message.clone().unwrap_or_default())
+            .collect::<Vec<_>>()
+            .join(",");
+        if !failed.is_empty() {
+            if p.metadata.labels.as_ref().unwrap().contains_key("job-name") {
+                return None; // ignore job based pods, they are meant to exit 0
+            }
+            return Some(format!("Unready pod {}: {}", Meta::name(p), failed));
+        }
+    }
+    None
 }
