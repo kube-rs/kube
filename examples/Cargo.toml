@@ -17,8 +17,8 @@ rustls-tls = ["reqwest/rustls-tls", "kube/rustls-tls", "kube-runtime/rustls-tls"
 anyhow = "1.0.31"
 env_logger = "0.7.1"
 futures = "0.3.5"
-kube = { path = "../kube", version = "0.38.0", default-features = false, features = ["derive"] }
-kube-runtime = { path = "../kube-runtime", version = "0.38.0", default-features = false }
+kube = { path = "../kube", version = "^0.39.0", default-features = false, features = ["derive"] }
+kube-runtime = { path = "../kube-runtime", version = "^0.39.0", default-features = false }
 k8s-openapi = { version = "0.9.0", features = ["v1_18"], default-features = false }
 log = "0.4.8"
 serde = { version = "1.0.111", features = ["derive"] }
