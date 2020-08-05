@@ -10,8 +10,8 @@ git-tag() {
   [ -z "$(git ls-files . --exclude-standard --others)" ] || fail "remove untracked files first"
   git commit -am "${VERSION}"
   git tag -a "${VERSION}" -m "${VERSION}"
-  #git push
-  #git push --tags
+  git push
+  git push --tags
 }
 
 
