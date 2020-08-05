@@ -9,16 +9,11 @@ use crate::{
     Result,
 };
 
-/// An easy Api interaction helper
+/// A generic Api abstraction
 ///
-/// The upsides of working with this rather than a `Resource` directly are:
-/// - easiers serialization interface (no figuring out return types)
-/// - client hidden within, less arguments
-///
-/// But the downsides are:
-/// - openapi types can take up a large amount of memory
-/// - openapi types can be annoying to wrangle with their heavy Option use
-/// - no control over requests (opinionated)
+/// This abstracts over a `Resource` and a type `K` so that
+/// we get automatic serialization/deserialization on the api calls
+/// implemented by the dynamic `Resource`.
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request creator object

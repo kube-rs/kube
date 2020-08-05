@@ -9,10 +9,8 @@ Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generi
 
 These crate makes certain assumptions about the kubernetes api to allow writing generic abstractions, and as such contains rust reinterpretations of reflectors, informers, and controller so that you can writing kubernetes controllers/watchers/operators more easily.
 
-NB: This library is currently undergoing a lot of changes with async/await stabilizing. Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
-
 ## Installation
-Select a version of `kube` along with the [generated k8s api types](https://github.com/Arnavion/k8s-openapi) that corresponds to your cluster version:
+Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) types corresponding for your cluster version:
 
 ```toml
 [dependencies]
@@ -21,7 +19,12 @@ kube-runtime = "0.39.0"
 k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
 
-Note that turning off `default-features` for `k8s-openapi` is recommended to speed up your compilation (and we provide an api anyway).
+[Features are available](https://github.com/clux/kube-rs/blob/master/kube/Cargo.toml).
+
+We recommend turning off `default-features` for `k8s-openapi` to speed up your compilation.
+
+## Upgrading
+Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
 
 ## Usage
 See the [examples directory](./examples) for how to use any of these crates.
@@ -59,7 +62,7 @@ pods.delete("blog", &DeleteParams::default()).await?;
 See the examples ending in `_api` examples for more detail.
 
 ## Custom Resource Definitions
-Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](./kube-derive).
+Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](https://docs.rs/kube/latest/kube/derive.CustomResource.html).
 
 You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec struct:
 
@@ -82,7 +85,9 @@ println!("foo: {:?}", f)
 println!("crd: {}", serde_yaml::to_string(Foo::crd());
 ```
 
-There are a ton of kubebuilder like instructions that you can annotate with here. See the `crd_` prefixed [examples](./examples) for more.
+There are a ton of kubebuilder like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](./examples) for more.
+
+**NB:** `#[derive(CustomResource)]` requires the `derive` feature enabled on `kube`.
 
 ## Runtime
 The `kube_runtime` create contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.

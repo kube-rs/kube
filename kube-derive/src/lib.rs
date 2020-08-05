@@ -164,10 +164,15 @@ use custom_resource::CustomResource;
 /// }
 /// ```
 ///
-/// And the `Foo::crd` will contribute to the largest amount of generated code.
-///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.
+///
+/// ## Installation
+/// Enable the `derive` feature on the `kube` crate:
+///
+/// ```toml
+/// kube = { version = "...", features = ["derive"] }
+/// ```
 #[proc_macro_derive(CustomResource, attributes(kube))]
 pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     run_custom_derive::<CustomResource>(input)

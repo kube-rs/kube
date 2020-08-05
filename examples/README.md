@@ -65,7 +65,7 @@ cargo run --example configmap_reflector
 cargo run --example crd_reflector
 ```
 
-For the [`crd_reflector](crd_reflector.rs) you need to create the `Foo` CRD first:
+For the [`crd_reflector`](crd_reflector.rs) you need to create the `Foo` CRD first:
 
 ```sh
 kubectl apply -f foo.yaml
