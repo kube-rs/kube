@@ -4,6 +4,8 @@ members = [
   "kube",
   "kube-derive",
   "kube-runtime",
+
+  # internal
   "tests",
   "examples",
 ]
