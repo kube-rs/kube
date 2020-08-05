@@ -19,7 +19,7 @@ kube-runtime = "0.39.0"
 k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
 
-[Features are available](https://github.com/clux/kube-rs/blob/master/kube/Cargo.toml).
+[Features are available](https://github.com/clux/kube-rs/blob/master/kube/Cargo.toml#L17).
 
 We recommend turning off `default-features` for `k8s-openapi` to speed up your compilation.
 

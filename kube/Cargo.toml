@@ -14,6 +14,12 @@ keywords = ["kubernetes", "client", "runtime", "reflector", "informer"]
 categories = ["web-programming::http-client"]
 edition = "2018"
 
+[features]
+default = ["native-tls"]
+native-tls = ["openssl", "reqwest/native-tls"]
+rustls-tls = ["rustls", "reqwest/rustls-tls"]
+derive = ["kube-derive"]
+
 [package.metadata.docs.rs]
 features = ["derive"]
 
@@ -50,12 +56,6 @@ features = ["json", "gzip", "stream"]
 version = "0.9.0"
 default-features = false
 features = []
-
-[features]
-default = ["native-tls"]
-native-tls = ["openssl", "reqwest/native-tls"]
-rustls-tls = ["rustls", "reqwest/rustls-tls"]
-derive = ["kube-derive"]
 
 [dev-dependencies]
 tempfile = "3.1.0"
