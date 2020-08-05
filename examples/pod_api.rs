@@ -1,9 +1,10 @@
 #[macro_use] extern crate log;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams, WatchEvent},
     Client,
 };
 
@@ -42,6 +43,25 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
         Err(e) => return Err(e.into()),                        // any other case is probably bad
+    }
+
+    // Watch it phase for a few seconds
+    let lp = ListParams::default()
+        .fields(&format!("metadata.name={}", "blog"))
+        .timeout(10);
+    let mut stream = pods.watch(&lp, "0").await?.boxed();
+    while let Some(status) = stream.try_next().await? {
+        match status {
+            WatchEvent::Added(o) => info!("Added {}", Meta::name(&o)),
+            WatchEvent::Modified(o) => {
+                let s = o.status.as_ref().expect("status exists on pod");
+                let phase = s.phase.clone().unwrap_or_default();
+                info!("Modified: {} with phase: {}", Meta::name(&o), phase);
+            }
+            WatchEvent::Deleted(o) => info!("Deleted {}", Meta::name(&o)),
+            WatchEvent::Error(e) => error!("Error {}", e),
+            _ => {}
+        }
     }
 
     // Verify we can get it
