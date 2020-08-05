@@ -1,32 +1,25 @@
-#[macro_use] extern crate log;
+use color_eyre::Result;
+use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
-use kube::{
-    api::{Api, ListParams, Meta},
-    runtime::Reflector,
-    Client,
-};
+use kube::{api::ListParams, Api, Client, Config};
+use kube_runtime::{reflector, watcher};
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
-    let client = Client::try_default().await?;
+async fn main() -> Result<()> {
+    let config = Config::infer().await?;
+    let client = Client::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
-    let lp = ListParams::default().timeout(10); // short watch timeout in this example
-    let rf = Reflector::new(pods).params(lp);
-
-    let rf2 = rf.clone(); // read from a clone in a task
-    tokio::spawn(async move {
-        loop {
-            // Periodically read our state
-            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-            let pods: Vec<_> = rf2.state().await.unwrap().iter().map(Meta::name).collect();
-            info!("Current pods: {:?}", pods);
-        }
-    });
-
-    rf.run().await?; // run reflector and listen for signals
+    let api: Api<Pod> = Api::namespaced(client, &namespace);
+    let store_w = reflector::store::Writer::default();
+    let store = store_w.as_reader();
+    let reflector = reflector(store_w, watcher(api, ListParams::default()));
+    // Use try_for_each to fail on first error, use for_each to keep retrying
+    reflector
+        .try_for_each(|_event| async {
+            println!("Current pod count: {}", store.state().len());
+            Ok(())
+        })
+        .await?;
     Ok(())
 }

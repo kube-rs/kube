@@ -24,9 +24,10 @@ k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"
 Note that turning off `default-features` for `k8s-openapi` is recommended to speed up your compilation (and we provide an api anyway).
 
 ## Usage
-See the [examples directory](./examples) for how to use the api in simplistic ways.
+See the [examples directory](./examples) for how to use any of these crates.
 
-**[API Docs](https://docs.rs/kube/)**
+- **[kube API Docs](https://docs.rs/kube/)**
+- **[kube-runtime API Docs](https://docs.rs/kube-runtime/)**
 
 Some real world examples:
 
@@ -138,69 +139,8 @@ Controller::new(root_kind_api, ListParams::default())
 
 Here `reconcile` and `error_policy` refer to functions you define. The first will be called when the root or child elements change, and the second when the `reconciler` returns an `Err`.
 
-## Examples
-Examples that show a little common flows. These all have logging of this library set up to `debug`, and where possible pick up on the `NAMESPACE` evar.
-
-**NB:** not all examples have been migrated to the new runtime yet. If it uses `kube-runtime` it's new.
-
-From the examples directory:
-
-```sh
-# watch configmap events
-cargo run --example configmap_watcher
-# watch pod events
-cargo run --example pod_informer
-# watch event events
-cargo run --example event_informer
-# watch for broken nodes
-cargo run --example node_informer
-```
-
-or for the reflectors:
-
-```sh
-cargo run --example pod_reflector
-cargo run --example node_reflector
-cargo run --example deployment_reflector
-cargo run --example secret_reflector
-cargo run --example configmap_reflector
-```
-
-for one based on a CRD, you need to create the CRD first:
-
-```sh
-kubectl apply -f foo.yaml
-cargo run --example crd_reflector
-```
-
-then you can `kubectl apply -f crd-baz.yaml -n default`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
-
-ditto for a controller:
-
-```sh
-kubectl apply -f configmapgen_controller_crd.yaml
-cargo run --example configmapgen_controller &
-kubectl apply -f configmapgen_controller_object.yaml
-```
-
-For straight API use examples, try:
-
-```sh
-cargo run --example crd_api
-cargo run --example job_api
-cargo run --example log_stream
-cargo run --example pod_api
-NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
-```
-
 ## Rustls
 Kube has basic support ([with caveats](https://github.com/clux/kube-rs/issues?q=is%3Aissue+is%3Aopen+rustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
-
-```sh
-cargo run --example pod_informer --no-default-features --features=rustls-tls
-```
-
-or in `Cargo.toml`:
 
 ```toml
 [dependencies]

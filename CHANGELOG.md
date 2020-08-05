@@ -1,3 +1,9 @@
+0.39.0 / 2020-07-05
+===================
+  * Bug: `ObjectRef` tweak in `kube-runtime` to allow controllers triggering across cluster and namespace scopes - #293 via #294
+  * Feature: `kube` now has a `derive` feature which will re-export `kube::CustomResource` from `kube-derive::CustomResource`.
+  * Examples: revamp examples for `kube-runtime` - #201
+
 0.38.0 / 2020-06-23
 ===================
   * Marked `kube::runtime` module as deprecated - #281
