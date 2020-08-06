@@ -77,6 +77,10 @@ name = "log_stream"
 path = "log_stream.rs"
 
 [[example]]
+name = "multi_watcher"
+path = "multi_watcher.rs"
+
+[[example]]
 name = "pod_api"
 path = "pod_api.rs"
 

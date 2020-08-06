@@ -29,11 +29,13 @@ These example watch a single resource and does some basic filtering on the watch
 
 ```sh
 # watch all configmap events in a namespace
-cargo run --example configmap_watcher
+NAMESPACE=dev cargo run --example configmap_watcher
 # watch unready pods in a namespace
 NAMESPACE=dev cargo run --example pod_watcher
 # watch all event events
 cargo run --example event_watcher
+# watch deployments, configmaps, secrets in one namespace
+NAMESPACE=dev cargo run --example multi_watcher
 # watch broken nodes and cross reference with events api
 cargo run --example node_watcher
 ```
