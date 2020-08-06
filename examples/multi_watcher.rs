@@ -12,7 +12,7 @@ use kube_runtime::{utils::try_flatten_applied, watcher};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,node_watcher=debug,kube=debug");
+    std::env::set_var("RUST_LOG", "info,multi_watcher=debug,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
@@ -25,16 +25,17 @@ async fn main() -> anyhow::Result<()> {
     let sec_watcher = watcher(secret, ListParams::default());
 
     // select on applied events from all watchers
-    enum Watched {
-        Config(ConfigMap),
-        Deploy(Deployment),
-        Secret(Secret),
-    }
     let mut combo_stream = stream::select_all(vec![
         try_flatten_applied(dep_watcher).map_ok(Watched::Deploy).boxed(),
         try_flatten_applied(cm_watcher).map_ok(Watched::Config).boxed(),
         try_flatten_applied(sec_watcher).map_ok(Watched::Secret).boxed(),
     ]);
+    // SelectAll Stream elements must have the same Item, so all packed in this:
+    enum Watched {
+        Config(ConfigMap),
+        Deploy(Deployment),
+        Secret(Secret),
+    }
     while let Some(o) = combo_stream.try_next().await? {
         match o {
             Watched::Config(cm) => info!("Got configmap: {}", Meta::name(&cm)),
