@@ -270,19 +270,21 @@ impl Client {
     }
 
     /// Returns apiserver version.
-    async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
+    pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
         self.request(Request::builder().uri("/version").body(Vec::new())?)
             .await
     }
 
     /// Lists api groups that apiserver serves.
-    async fn list_api_groups(&self) -> Result<k8s_openapi::apimachinery::pkg::apis::meta::v1::APIGroupList> {
+    pub async fn list_api_groups(&self) -> Result<k8s_openapi::apimachinery::pkg::apis::meta::v1::APIGroupList> {
         self.request(Request::builder().uri("/apis").body(Vec::new())?)
             .await
     }
 
-    /// Lists resources served in gived API group.
-    async fn list_api_group_resources(
+    /// Lists resources served in given API group.
+    /// There resources can be then converted to `kube::api::DynamicResource`
+    /// using the `from_metav1_api_resource` method.
+    pub async fn list_api_group_resources(
         &self,
         group: &str,
         version: &str,
@@ -292,7 +294,7 @@ impl Client {
     }
 
     /// Lists versions of `core` a.k.a. `""` API group.
-    async fn list_core_api_versions(
+    pub async fn list_core_api_versions(
         &self,
     ) -> Result<k8s_openapi::apimachinery::pkg::apis::meta::v1::APIVersions> {
         self.request(Request::builder().uri("/api").body(Vec::new())?)
@@ -300,7 +302,9 @@ impl Client {
     }
 
     /// Lists resources served in particular `core` group version.
-    async fn list_core_api_resources(
+    /// There resources can be then converted to `kube::api::DynamicResource`
+    /// using the `from_metav1_api_resource` method.
+    pub async fn list_core_api_resources(
         &self,
         version: &str,
     ) -> Result<k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResourceList> {
