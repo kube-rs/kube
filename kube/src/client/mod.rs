@@ -276,24 +276,23 @@ impl Client {
     }
 
     /// Lists api groups that apiserver serves.
-    pub async fn list_api_groups(&self) -> Result<k8s_openapi::apimachinery::pkg::apis::meta::v1::APIGroupList> {
+    pub async fn list_api_groups(
+        &self,
+    ) -> Result<k8s_openapi::apimachinery::pkg::apis::meta::v1::APIGroupList> {
         self.request(Request::builder().uri("/apis").body(Vec::new())?)
             .await
     }
 
     /// Lists resources served in given API group.
-    /// There resources can be then converted to `kube::api::DynamicResource`
-    /// using the `from_metav1_api_resource` method.
     pub async fn list_api_group_resources(
         &self,
-        group: &str,
-        version: &str,
+        apiversion: &str,
     ) -> Result<k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResourceList> {
-        let url = format!("/apis/{}/{}", group, version);
+        let url = format!("/apis/{}", apiversion);
         self.request(Request::builder().uri(url).body(Vec::new())?).await
     }
 
-    /// Lists versions of `core` a.k.a. `""` API group.
+    /// Lists versions of `core` a.k.a. `""` legacy API group.
     pub async fn list_core_api_versions(
         &self,
     ) -> Result<k8s_openapi::apimachinery::pkg::apis::meta::v1::APIVersions> {
@@ -302,8 +301,6 @@ impl Client {
     }
 
     /// Lists resources served in particular `core` group version.
-    /// There resources can be then converted to `kube::api::DynamicResource`
-    /// using the `from_metav1_api_resource` method.
     pub async fn list_core_api_resources(
         &self,
         version: &str,

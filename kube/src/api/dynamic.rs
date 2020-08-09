@@ -5,7 +5,10 @@ use crate::{
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource;
 use std::convert::TryFrom;
 
-use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
+use inflector::{
+    cases::pascalcase::{is_pascal_case, to_pascal_case},
+    string::pluralize::to_plural,
+};
 
 use std::iter;
 
@@ -103,45 +106,33 @@ impl DynamicResource {
 
     /// Creates `DynamicResource`, based on `metav1::APIResource`.
     /// If it does not specify version and/or group, they will be taken
-    /// from `api_resource_list_group_version`.
+    /// from `group_version`.
     /// Example usage:
     /// ```
     /// use kube::api::DynamicResource;
     /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
-    /// let apps_apis = client.list_api_group_resources("apps", "v1").await?;
-    /// for api_res in &apps_apis.resources {
-    ///     let kube_resource = DynamicResource::from_metav1_api_resource(api_res, &apps_apis.group_version);
-    ///     // do not forget to select a namespace
-    ///     let kube_resource = kube_resource.within("kube-system").into_resource();
-    ///     dbg!(kube_resource);
-    /// } 
+    /// let apps_apis = client.list_api_group_resources("apps/v1").await?;
+    /// for ar in &apps_apis.resources {
+    ///     let dr = DynamicResource::from_api_resource(ar, &apps_apis.group_version);
+    ///     let r = dr.within("kube-system").into_resource();
+    ///     dbg!(r);
+    /// }
     /// # Ok(())
-    /// # }   
+    /// # }
     /// ```
-    pub fn from_metav1_api_resource(
-        k8s_resource: &APIResource,
-        api_resource_list_group_version: &str,
-    ) -> Self {
-        let (default_group, default_version) = if api_resource_list_group_version.contains('/') {
-            let mut iter = api_resource_list_group_version.splitn(2, '/');
-            let g = iter.next().unwrap();
-            let v = iter.next().unwrap();
-            (g, v)
-        } else {
-            ("", api_resource_list_group_version)
+    pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
+        let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
+        let (default_group, default_version) = match gvsplit.as_slice() {
+            &[g, v] => (g, v), // standard case
+            &[v] => ("", v),   // core v1 case
+            _ => unreachable!(),
         };
-        let version = k8s_resource
-            .version
-            .clone()
-            .unwrap_or_else(|| default_version.to_string());
-        let group = k8s_resource
-            .group
-            .clone()
-            .unwrap_or_else(|| default_group.to_string());
+        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
+        let group = ar.group.clone().unwrap_or_else(|| default_group.into());
         DynamicResource {
-            kind: k8s_resource.kind.clone(),
-            version: Some(version),
-            group: Some(group),
+            kind: to_pascal_case(&ar.kind),
+            version: Some(version.to_string()),
+            group: Some(group.to_string()),
             namespace: None,
         }
     }
@@ -152,10 +143,22 @@ impl TryFrom<DynamicResource> for Resource {
 
     fn try_from(rb: DynamicResource) -> Result<Self> {
         if to_plural(&rb.kind) == rb.kind {
-            return Err(Error::DynamicResource(format!(
-                "DynamicResource kind '{}' must not be pluralized",
-                rb.kind
-            )));
+            // allow actually broken plural kinds (last checked 1.18)
+            let broken_plurals = vec![
+                "Endpoints",
+                "NodeProxyOptions",
+                "PodAttachOptions",
+                "PodExecOptions",
+                "PodPortForwardOptions",
+                "PodProxyOptions",
+                "ServiceProxyOptions",
+            ];
+            if !broken_plurals.contains(&rb.kind.as_str()) {
+                return Err(Error::DynamicResource(format!(
+                    "DynamicResource kind '{}' must not be pluralized",
+                    rb.kind
+                )));
+            }
         }
         if !is_pascal_case(&rb.kind) {
             return Err(Error::DynamicResource(format!(
