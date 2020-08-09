@@ -2,6 +2,7 @@ use crate::{
     api::{typed::Api, Resource},
     Client, Error, Result,
 };
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource;
 use std::convert::TryFrom;
 
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
@@ -98,6 +99,51 @@ impl DynamicResource {
             resource,
             phantom: iter::empty(),
         })
+    }
+
+    /// Creates `DynamicResource`, based on `metav1::APIResource`.
+    /// If it does not specify version and/or group, they will be taken
+    /// from `api_resource_list_group_version`.
+    /// Example usage:
+    /// ```
+    /// use kube::api::DynamicResource;
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// let apps_apis = client.list_api_group_resources("apps", "v1").await?;
+    /// for api_res in &apps_apis.resources {
+    ///     let kube_resource = DynamicResource::from_metav1_api_resource(api_res, &apps_apis.group_version);
+    ///     // do not forget to select a namespace
+    ///     let kube_resource = kube_resource.within("kube-system").into_resource();
+    ///     dbg!(kube_resource);
+    /// } 
+    /// # Ok(())
+    /// # }   
+    /// ```
+    pub fn from_metav1_api_resource(
+        k8s_resource: &APIResource,
+        api_resource_list_group_version: &str,
+    ) -> Self {
+        let (default_group, default_version) = if api_resource_list_group_version.contains('/') {
+            let mut iter = api_resource_list_group_version.splitn(2, '/');
+            let g = iter.next().unwrap();
+            let v = iter.next().unwrap();
+            (g, v)
+        } else {
+            ("", api_resource_list_group_version)
+        };
+        let version = k8s_resource
+            .version
+            .clone()
+            .unwrap_or_else(|| default_version.to_string());
+        let group = k8s_resource
+            .group
+            .clone()
+            .unwrap_or_else(|| default_group.to_string());
+        DynamicResource {
+            kind: k8s_resource.kind.clone(),
+            version: Some(version),
+            group: Some(group),
+            namespace: None,
+        }
     }
 }
 
