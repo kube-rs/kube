@@ -5,10 +5,7 @@ use crate::{
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource;
 use std::convert::TryFrom;
 
-use inflector::{
-    cases::pascalcase::{is_pascal_case, to_pascal_case},
-    string::pluralize::to_plural,
-};
+use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 
 use std::iter;
 
@@ -130,7 +127,7 @@ impl DynamicResource {
         let version = ar.version.clone().unwrap_or_else(|| default_version.into());
         let group = ar.group.clone().unwrap_or_else(|| default_group.into());
         DynamicResource {
-            kind: to_pascal_case(&ar.kind),
+            kind: ar.kind.to_string(),
             version: Some(version),
             group: Some(group),
             namespace: None,
@@ -142,30 +139,6 @@ impl TryFrom<DynamicResource> for Resource {
     type Error = crate::Error;
 
     fn try_from(rb: DynamicResource) -> Result<Self> {
-        if to_plural(&rb.kind) == rb.kind {
-            // allow actually broken plural kinds (last checked 1.18)
-            let broken_plurals = vec![
-                "Endpoints",
-                "NodeProxyOptions",
-                "PodAttachOptions",
-                "PodExecOptions",
-                "PodPortForwardOptions",
-                "PodProxyOptions",
-                "ServiceProxyOptions",
-            ];
-            if !broken_plurals.contains(&rb.kind.as_str()) {
-                return Err(Error::DynamicResource(format!(
-                    "DynamicResource kind '{}' must not be pluralized",
-                    rb.kind
-                )));
-            }
-        }
-        if !is_pascal_case(&rb.kind) {
-            return Err(Error::DynamicResource(format!(
-                "DynamicResource kind '{}' must be PascalCase",
-                rb.kind
-            )));
-        }
         if rb.version.is_none() {
             return Err(Error::DynamicResource(format!(
                 "DynamicResource '{}' must have a version",
@@ -180,6 +153,36 @@ impl TryFrom<DynamicResource> for Resource {
         }
         let version = rb.version.unwrap();
         let group = rb.group.unwrap();
+
+        if to_plural(&rb.kind) == rb.kind {
+            // allow actually broken plural kinds (last checked 1.18)
+            let broken_plurals = vec![
+                "Endpoints",
+                "NodeProxyOptions",
+                "PodAttachOptions",
+                "PodExecOptions",
+                "PodPortForwardOptions",
+                "PodProxyOptions",
+                "ServiceProxyOptions",
+                "NodeMetrics",
+                "PodMetrics",
+            ];
+            if !broken_plurals.contains(&rb.kind.as_str()) && !group.contains("istio") {
+                return Err(Error::DynamicResource(format!(
+                    "DynamicResource kind '{}' must not be pluralized",
+                    rb.kind
+                )));
+            }
+        }
+        if !is_pascal_case(&rb.kind) {
+            let broken_pascals = vec!["APIResource", "APIService", "CSIDriver", "CSINode", "ENIConfig"];
+            if !broken_pascals.contains(&rb.kind.as_str()) && !group.contains("istio") {
+                return Err(Error::DynamicResource(format!(
+                    "DynamicResource kind '{}' must be PascalCase",
+                    rb.kind
+                )));
+            }
+        }
         Ok(Self {
             api_version: if group == "" {
                 version.clone()

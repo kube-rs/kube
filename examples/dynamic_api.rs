@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
             .expect("preferred or versions exists");
         info!("polling: {} at {:?}", g.name, ver);
         let apis = client.list_api_group_resources(&ver.group_version).await?;
-        debug!("Got {:?}", apis);
+        dbg!(&apis);
         for ar in apis.resources {
             let r = DynamicResource::from_api_resource(&ar, &apis.group_version).into_resource();
             dbg!(r);
