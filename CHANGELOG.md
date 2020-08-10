@@ -1,3 +1,12 @@
+0.40.0 / 2020-07-XX
+===================
+  * `DynamicResource::from_api_resource` added to allow apiserver returned resources - #305 via #301
+  * `Client::list_api_groups` added
+  * `Client::list_ap_group_resources` added
+  * `Client::list_core_api_versions` added
+  * `Client::list_core_api_resources` added
+  * `kube::DynamicResource` exposed at top level
+
 0.39.0 / 2020-07-05
 ===================
   * Bug: `ObjectRef` tweak in `kube-runtime` to allow controllers triggering across cluster and namespace scopes - #293 via #294

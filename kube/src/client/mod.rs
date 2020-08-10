@@ -272,32 +272,47 @@ impl Client {
 
     /// Returns apiserver version.
     pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
-        self.request(Request::builder().uri("/version").body(Vec::new())?)
+        self.request(Request::builder().uri("/version").body(vec![])?)
             .await
     }
 
     /// Lists api groups that apiserver serves.
     pub async fn list_api_groups(&self) -> Result<k8s_meta_v1::APIGroupList> {
-        self.request(Request::builder().uri("/apis").body(Vec::new())?)
-            .await
+        self.request(Request::builder().uri("/apis").body(vec![])?).await
     }
 
     /// Lists resources served in given API group.
+    ///
+    /// ### Example usage:
+    /// ```rust
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// let apigroups = client.list_api_groups().await?;
+    /// for g in apigroups.groups {
+    ///     let ver = g
+    ///         .preferred_version
+    ///         .as_ref()
+    ///         .or_else(|| g.versions.first())
+    ///         .expect("preferred or versions exists");
+    ///     let apis = client.list_api_group_resources(&ver.group_version).await?;
+    ///     dbg!(apis);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/apis/{}", apiversion);
-        self.request(Request::builder().uri(url).body(Vec::new())?).await
+        self.request(Request::builder().uri(url).body(vec![])?).await
     }
 
     /// Lists versions of `core` a.k.a. `""` legacy API group.
     pub async fn list_core_api_versions(&self) -> Result<k8s_meta_v1::APIVersions> {
-        self.request(Request::builder().uri("/api").body(Vec::new())?)
-            .await
+        self.request(Request::builder().uri("/api").body(vec![])?).await
     }
 
     /// Lists resources served in particular `core` group version.
     pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/api/{}", version);
-        self.request(Request::builder().uri(url).body(Vec::new())?).await
+        self.request(Request::builder().uri(url).body(vec![])?).await
     }
 }
 

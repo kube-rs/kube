@@ -11,19 +11,23 @@ use std::iter;
 
 /// A dynamic builder for Resource
 ///
+/// Can be used to interact with a dynamic api resources.
+/// Can be constructed either from [`DynamicResource::from_api_resource`], or directly.
+///
+/// ### Direct usage
 /// ```
 /// use kube::api::Resource;
-/// struct FooSpec {};
-/// struct FooStatus {};
-/// struct Foo {
-///     spec: FooSpec,
-///     status: FooStatus
-/// };
 /// let foos = Resource::dynamic("Foo") // <.spec.kind>
 ///    .group("clux.dev") // <.spec.group>
 ///    .version("v1")
 ///    .into_resource();
 /// ```
+///
+/// It is recommended to use [`kube::CustomResource`] (from kube's `derive` feature)
+/// for CRD cases where you own a struct rather than this.
+///
+/// **Note:** You will need to implement `k8s_openapi` traits yourself to use the typed `Api`
+/// with a `Resource` built from a `DynamicResource` (and this is not always feasible).
 #[derive(Default)]
 pub struct DynamicResource {
     pub(crate) kind: String,
@@ -33,6 +37,42 @@ pub struct DynamicResource {
 }
 
 impl DynamicResource {
+    /// Creates `DynamicResource` from an [`APIResource`](https://docs.rs/k8s-openapi/0.9.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.APIResource.html)
+    ///
+    /// `APIResource` objects can be extracted from [`Client::list_api_group_resources`].
+    /// If it does not specify version and/or group, they will be taken
+    /// from `group_version`.
+    ///
+    /// ### Example usage:
+    /// ```
+    /// use kube::api::DynamicResource;
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// let apps = client.list_api_group_resources("apps/v1").await?;
+    /// for ar in &apps.resources {
+    ///     let dr = DynamicResource::from_api_resource(ar, &apps.group_version);
+    ///     let r = dr.within("kube-system").into_resource();
+    ///     dbg!(r);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
+        let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
+        let (default_group, default_version) = match gvsplit.as_slice() {
+            &[g, v] => (g, v), // standard case
+            &[v] => ("", v),   // core v1 case
+            &_ => unreachable!(),
+        };
+        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
+        let group = ar.group.clone().unwrap_or_else(|| default_group.into());
+        DynamicResource {
+            kind: ar.kind.to_string(),
+            version: Some(version),
+            group: Some(group),
+            namespace: None,
+        }
+    }
+
     /// Create a DynamicResource specifying the kind
     ///
     /// The kind must not be plural and it must be in PascalCase
@@ -100,39 +140,6 @@ impl DynamicResource {
             phantom: iter::empty(),
         })
     }
-
-    /// Creates `DynamicResource`, based on `metav1::APIResource`.
-    /// If it does not specify version and/or group, they will be taken
-    /// from `group_version`.
-    /// Example usage:
-    /// ```
-    /// use kube::api::DynamicResource;
-    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
-    /// let apps_apis = client.list_api_group_resources("apps/v1").await?;
-    /// for ar in &apps_apis.resources {
-    ///     let dr = DynamicResource::from_api_resource(ar, &apps_apis.group_version);
-    ///     let r = dr.within("kube-system").into_resource();
-    ///     dbg!(r);
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
-        let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
-        let (default_group, default_version) = match gvsplit.as_slice() {
-            &[g, v] => (g, v), // standard case
-            &[v] => ("", v),   // core v1 case
-            &_ => unreachable!(),
-        };
-        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
-        let group = ar.group.clone().unwrap_or_else(|| default_group.into());
-        DynamicResource {
-            kind: ar.kind.to_string(),
-            version: Some(version),
-            group: Some(group),
-            namespace: None,
-        }
-    }
 }
 
 impl TryFrom<DynamicResource> for Resource {
@@ -154,34 +161,14 @@ impl TryFrom<DynamicResource> for Resource {
         let version = rb.version.unwrap();
         let group = rb.group.unwrap();
 
+        // pedantic conventions we enforce internally in kube-derive
+        // but are broken by a few native / common custom resources such as istio, or
+        // kinds matching: CRI*, *Options, *Metrics, CSI*, ENI*, API*
         if to_plural(&rb.kind) == rb.kind {
-            // allow actually broken plural kinds (last checked 1.18)
-            let broken_plurals = vec![
-                "Endpoints",
-                "NodeProxyOptions",
-                "PodAttachOptions",
-                "PodExecOptions",
-                "PodPortForwardOptions",
-                "PodProxyOptions",
-                "ServiceProxyOptions",
-                "NodeMetrics",
-                "PodMetrics",
-            ];
-            if !broken_plurals.contains(&rb.kind.as_str()) && !group.contains("istio") {
-                return Err(Error::DynamicResource(format!(
-                    "DynamicResource kind '{}' must not be pluralized",
-                    rb.kind
-                )));
-            }
+            debug!("DynamicResource kind '{}' should be singular", rb.kind);
         }
         if !is_pascal_case(&rb.kind) {
-            let broken_pascals = vec!["APIResource", "APIService", "CSIDriver", "CSINode", "ENIConfig"];
-            if !broken_pascals.contains(&rb.kind.as_str()) && !group.contains("istio") {
-                return Err(Error::DynamicResource(format!(
-                    "DynamicResource kind '{}' must be PascalCase",
-                    rb.kind
-                )));
-            }
+            debug!("DynamicResource kind '{}' should be PascalCase", rb.kind);
         }
         Ok(Self {
             api_version: if group == "" {
