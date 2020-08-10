@@ -164,11 +164,8 @@ impl TryFrom<DynamicResource> for Resource {
         // pedantic conventions we enforce internally in kube-derive
         // but are broken by a few native / common custom resources such as istio, or
         // kinds matching: CRI*, *Options, *Metrics, CSI*, ENI*, API*
-        if to_plural(&rb.kind) == rb.kind {
-            debug!("DynamicResource kind '{}' should be singular", rb.kind);
-        }
-        if !is_pascal_case(&rb.kind) {
-            debug!("DynamicResource kind '{}' should be PascalCase", rb.kind);
+        if to_plural(&rb.kind) == rb.kind || !is_pascal_case(&rb.kind) {
+            debug!("DynamicResource '{}' should be singular + PascalCase", rb.kind);
         }
         Ok(Self {
             api_version: if group == "" {

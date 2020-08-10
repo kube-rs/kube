@@ -47,11 +47,12 @@ use custom_resource::CustomResource;
 
 /// A custom derive for kubernetes custom resource definitions.
 ///
-/// This will generate a root object that implements the `k8s_openapi::Metadata` and
-/// `k8s_openapi::Resource` traits for this type so it can be used with `kube::Api`
+/// This will generate a **root object** containing your spec and metadata.
+/// This root object will implement the `k8s_openapi::Metadata` + `k8s_openapi::Resource`
+/// traits so it can be used with `kube::Api`.
 ///
-/// Additionally, it will implement a `Foo::crd` function which will generate the,
-/// CustomResourceDefinition at the specified api version (or v1 if unspecified).
+/// The generated type will also implement a `::crd` method to generate the crd
+/// at the specified api version (or v1 if unspecified).
 ///
 /// # Example
 ///
@@ -77,8 +78,21 @@ use custom_resource::CustomResource;
 /// ```
 ///
 /// This example creates a `struct Foo` containing metadata, the spec,
-/// and optionally status. The generated type `Foo` can be used with the `kube` crate
-/// as an `Api<Foo>` object.
+/// and optionally status. The **generated** type `Foo` can be used with the `kube` crate
+/// as an `Api<Foo>` object (`FooSpec` can not be used with `Api`).
+///
+/// ```rust,ignore
+///  let client = Client::try_default().await?;
+///  let foos: Api<Foo> = Api::namespaced(client.clone(), "default");
+///
+///  let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+///  crds.patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?).await
+///  ```
+///
+/// This example posts the generated `::crd` to the `CustomResourceDefinition` API.
+/// After this has been accepted (few secs max), you can start using `foos` as a normal
+/// kube `Api` object. See the `crd_` prefixed [examples](https://github.com/clux/kube-rs/blob/master/examples/)
+/// for details on this.
 ///
 /// ## Required properties
 ///
@@ -92,6 +106,13 @@ use custom_resource::CustomResource;
 /// Name of your kind and your generated root type.
 ///
 /// ## Optional `#[kube]` attributes
+///
+/// ### `#[kube(apiextensions = "v1beta1")]`
+/// The version for `CustomResourceDefinition` desired in the `apiextensions.k8s.io` group.
+/// Default is `v1` (for clusters >= 1.17). If using kubernetes <= 1.16 pluase use `v1beta1`.
+///
+/// **NOTE**: Support for `v1` is still a bit limited. We have an open issue on the openapi
+/// [schema generation](https://github.com/clux/kube-rs/issues/264).
 ///
 /// ### `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
