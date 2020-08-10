@@ -223,10 +223,10 @@ impl PatchParams {
     }
 
     /// Construct PatchParams for server-side apply
-    pub fn default_apply() -> Self {
+    pub fn apply(manager: &str) -> Self {
         Self {
             patch_strategy: PatchStrategy::Apply,
-            field_manager: Some(env!("CARGO_PKG_NAME").into()),
+            field_manager: Some(manager.into()),
             ..Self::default()
         }
     }

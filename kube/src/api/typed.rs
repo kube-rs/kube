@@ -211,7 +211,7 @@ where
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let ss_apply = PatchParams::default_apply().force();
+    ///     let ss_apply = PatchParams::apply("myapp").force();
     ///     let patch = serde_yaml::to_vec(&serde_json::json!({
     ///         "apiVersion": "v1",
     ///         "kind": "Pod",

@@ -38,14 +38,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
-    let ssapply = PatchParams {
-        patch_strategy: PatchStrategy::Apply,
-        // always override on conflicts
-        force: true,
-        // owner of the fields: (us)
-        field_manager: Some("crd_apply_example".to_string()),
-        ..Default::default()
-    };
+    let ssapply = PatchParams::apply("crd_apply_example").force();
 
     // 0. Apply the CRD
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());

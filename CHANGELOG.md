@@ -6,6 +6,7 @@
   * `Client::list_core_api_versions` added
   * `Client::list_core_api_resources` added
   * `kube::DynamicResource` exposed at top level
+  * Bug: `PatchParams::default_apply()` now requires a manager and renamed to `PatchParams::apply(manager: &str)` for #300
 
 0.39.0 / 2020-07-05
 ===================
