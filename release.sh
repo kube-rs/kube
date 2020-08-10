@@ -40,6 +40,7 @@ main() {
 # Usage:
 #
 # cargo release minor --exclude tests --exclude examples --skip-tag --skip-push --no-dev-version
+# TODO: --consolidate-commits
 # Then amend commits / squash.
 # Finally run this script to bump readme's and then tag.
 #

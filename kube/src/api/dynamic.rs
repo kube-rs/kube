@@ -11,19 +11,23 @@ use std::iter;
 
 /// A dynamic builder for Resource
 ///
+/// Can be used to interact with a dynamic api resources.
+/// Can be constructed either from [`DynamicResource::from_api_resource`], or directly.
+///
+/// ### Direct usage
 /// ```
 /// use kube::api::Resource;
-/// struct FooSpec {};
-/// struct FooStatus {};
-/// struct Foo {
-///     spec: FooSpec,
-///     status: FooStatus
-/// };
 /// let foos = Resource::dynamic("Foo") // <.spec.kind>
 ///    .group("clux.dev") // <.spec.group>
 ///    .version("v1")
 ///    .into_resource();
 /// ```
+///
+/// It is recommended to use [`kube::CustomResource`] (from kube's `derive` feature)
+/// for CRD cases where you own a struct rather than this.
+///
+/// **Note:** You will need to implement `k8s_openapi` traits yourself to use the typed `Api`
+/// with a `Resource` built from a `DynamicResource` (and this is not always feasible).
 #[derive(Default)]
 pub struct DynamicResource {
     pub(crate) kind: String,
@@ -33,6 +37,42 @@ pub struct DynamicResource {
 }
 
 impl DynamicResource {
+    /// Creates `DynamicResource` from an [`APIResource`](https://docs.rs/k8s-openapi/0.9.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.APIResource.html)
+    ///
+    /// `APIResource` objects can be extracted from [`Client::list_api_group_resources`].
+    /// If it does not specify version and/or group, they will be taken
+    /// from `group_version`.
+    ///
+    /// ### Example usage:
+    /// ```
+    /// use kube::api::DynamicResource;
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// let apps = client.list_api_group_resources("apps/v1").await?;
+    /// for ar in &apps.resources {
+    ///     let dr = DynamicResource::from_api_resource(ar, &apps.group_version);
+    ///     let r = dr.within("kube-system").into_resource();
+    ///     dbg!(r);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
+        let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
+        let (default_group, default_version) = match *gvsplit.as_slice() {
+            [g, v] => (g, v), // standard case
+            [v] => ("", v),   // core v1 case
+            _ => unreachable!(),
+        };
+        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
+        let group = ar.group.clone().unwrap_or_else(|| default_group.into());
+        DynamicResource {
+            kind: ar.kind.to_string(),
+            version: Some(version),
+            group: Some(group),
+            namespace: None,
+        }
+    }
+
     /// Create a DynamicResource specifying the kind
     ///
     /// The kind must not be plural and it must be in PascalCase
@@ -100,69 +140,12 @@ impl DynamicResource {
             phantom: iter::empty(),
         })
     }
-
-    /// Creates `DynamicResource`, based on `metav1::APIResource`.
-    /// If it does not specify version and/or group, they will be taken
-    /// from `api_resource_list_group_version`.
-    /// Example usage:
-    /// ```
-    /// use kube::api::DynamicResource;
-    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
-    /// let apps_apis = client.list_api_group_resources("apps", "v1").await?;
-    /// for api_res in &apps_apis.resources {
-    ///     let kube_resource = DynamicResource::from_metav1_api_resource(api_res, &apps_apis.group_version);
-    ///     // do not forget to select a namespace
-    ///     let kube_resource = kube_resource.within("kube-system").into_resource();
-    ///     dbg!(kube_resource);
-    /// } 
-    /// # Ok(())
-    /// # }   
-    /// ```
-    pub fn from_metav1_api_resource(
-        k8s_resource: &APIResource,
-        api_resource_list_group_version: &str,
-    ) -> Self {
-        let (default_group, default_version) = if api_resource_list_group_version.contains('/') {
-            let mut iter = api_resource_list_group_version.splitn(2, '/');
-            let g = iter.next().unwrap();
-            let v = iter.next().unwrap();
-            (g, v)
-        } else {
-            ("", api_resource_list_group_version)
-        };
-        let version = k8s_resource
-            .version
-            .clone()
-            .unwrap_or_else(|| default_version.to_string());
-        let group = k8s_resource
-            .group
-            .clone()
-            .unwrap_or_else(|| default_group.to_string());
-        DynamicResource {
-            kind: k8s_resource.kind.clone(),
-            version: Some(version),
-            group: Some(group),
-            namespace: None,
-        }
-    }
 }
 
 impl TryFrom<DynamicResource> for Resource {
     type Error = crate::Error;
 
     fn try_from(rb: DynamicResource) -> Result<Self> {
-        if to_plural(&rb.kind) == rb.kind {
-            return Err(Error::DynamicResource(format!(
-                "DynamicResource kind '{}' must not be pluralized",
-                rb.kind
-            )));
-        }
-        if !is_pascal_case(&rb.kind) {
-            return Err(Error::DynamicResource(format!(
-                "DynamicResource kind '{}' must be PascalCase",
-                rb.kind
-            )));
-        }
         if rb.version.is_none() {
             return Err(Error::DynamicResource(format!(
                 "DynamicResource '{}' must have a version",
@@ -177,6 +160,16 @@ impl TryFrom<DynamicResource> for Resource {
         }
         let version = rb.version.unwrap();
         let group = rb.group.unwrap();
+
+        // pedantic conventions we enforce internally in kube-derive
+        // but are broken by a few native / common custom resources such as istio, or
+        // kinds matching: CRI*, *Options, *Metrics, CSI*, ENI*, API*
+        if to_plural(&rb.kind) == rb.kind {
+            debug!("DynamicResource kind '{}' should be singular", rb.kind);
+        }
+        if !is_pascal_case(&rb.kind) {
+            debug!("DynamicResource kind '{}' should be PascalCase", rb.kind);
+        }
         Ok(Self {
             api_version: if group == "" {
                 version.clone()
