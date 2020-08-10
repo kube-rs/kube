@@ -21,6 +21,7 @@ use tokio::sync::Mutex;
 use std::{sync::Arc, time::Duration};
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Authentication {
     None,
     Basic(String),

@@ -125,14 +125,14 @@ impl DynamicResource {
         let (default_group, default_version) = match gvsplit.as_slice() {
             &[g, v] => (g, v), // standard case
             &[v] => ("", v),   // core v1 case
-            _ => unreachable!(),
+            &_ => unreachable!(),
         };
         let version = ar.version.clone().unwrap_or_else(|| default_version.into());
         let group = ar.group.clone().unwrap_or_else(|| default_group.into());
         DynamicResource {
             kind: to_pascal_case(&ar.kind),
-            version: Some(version.to_string()),
-            group: Some(group.to_string()),
+            version: Some(version),
+            group: Some(group),
             namespace: None,
         }
     }
