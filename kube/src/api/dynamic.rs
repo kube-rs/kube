@@ -58,10 +58,10 @@ impl DynamicResource {
     /// ```
     pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
         let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
-        let (default_group, default_version) = match gvsplit.as_slice() {
-            &[g, v] => (g, v), // standard case
-            &[v] => ("", v),   // core v1 case
-            &_ => unreachable!(),
+        let (default_group, default_version) = match *gvsplit.as_slice() {
+            [g, v] => (g, v), // standard case
+            [v] => ("", v),   // core v1 case
+            _ => unreachable!(),
         };
         let version = ar.version.clone().unwrap_or_else(|| default_version.into());
         let group = ar.group.clone().unwrap_or_else(|| default_group.into());
