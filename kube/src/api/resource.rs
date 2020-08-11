@@ -88,9 +88,6 @@ impl Resource {
 }
 
 /// Common query parameters used in watch/list/delete calls on collections
-///
-/// Constructed internally with a builder on Informer and Reflector,
-/// but can be passed to the helper function of Resource.
 #[derive(Default, Clone)]
 #[allow(missing_docs)]
 pub struct ListParams {
