@@ -7,7 +7,7 @@
 
 Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go) plus a runtime abstraction inspired by [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime).
 
-These crate makes certain assumptions about the kubernetes api to allow writing generic abstractions, and as such contains rust reinterpretations of reflectors, informers, and controller so that you can writing kubernetes controllers/watchers/operators more easily.
+These crate makes certain assumptions about the kubernetes [apimachinery](https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go) to enable generic abstractions, and as a result contains rust reinterpretations of reflectors, informers, and controllers so that you can write applications easily.
 
 ## Installation
 Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) types corresponding for your cluster version:
