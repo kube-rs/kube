@@ -14,21 +14,21 @@ native-tls = ["reqwest/native-tls", "kube/native-tls", "kube-runtime/native-tls"
 rustls-tls = ["reqwest/rustls-tls", "kube/rustls-tls", "kube-runtime/rustls-tls"]
 
 [dev-dependencies]
-anyhow = "1.0.31"
+anyhow = "1.0.32"
 env_logger = "0.7.1"
 futures = "0.3.5"
 kube = { path = "../kube", version = "^0.39.0", default-features = false, features = ["derive"] }
 kube-runtime = { path = "../kube-runtime", version = "^0.39.0", default-features = false }
 k8s-openapi = { version = "0.9.0", features = ["v1_18"], default-features = false }
-log = "0.4.8"
+log = "0.4.11"
 serde = { version = "1.0.111", features = ["derive"] }
-serde_json = "1.0.55"
-serde_yaml = "0.8.12"
-tokio = { version = "0.2.21", features = ["full"] }
-color-eyre = "0.5.0"
+serde_json = "1.0.57"
+serde_yaml = "0.8.13"
+tokio = { version = "0.2.22", features = ["full"] }
+color-eyre = "0.5.1"
 snafu = { version = "0.6.8", features = ["futures"] }
 # Some Api::delete methods use Either
-either = "1.5.3"
+either = "1.6.0"
 # Some configuration tweaking require reqwest atm
 reqwest = { version = "0.10.7", default-features = false, features = ["json", "gzip", "stream"] }
 

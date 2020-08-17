@@ -1,4 +1,4 @@
-0.40.0 / 2020-07-XX
+0.40.0 / 2020-07-17
 ===================
   * `DynamicResource::from_api_resource` added to allow apiserver returned resources - #305 via #301
   * `Client::list_api_groups` added
