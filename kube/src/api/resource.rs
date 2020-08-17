@@ -1,5 +1,6 @@
 use crate::{api::DynamicResource, Error, Result};
 use inflector::string::pluralize::to_plural;
+use serde::Serialize;
 
 /// A Kubernetes resource that can be accessed through the API
 #[derive(Clone, Debug)]
@@ -280,7 +281,8 @@ impl Default for PatchStrategy {
 }
 
 /// Common query parameters for delete calls
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DeleteParams {
     /// When present, indicates that modifications should not be persisted.
     ///
@@ -298,10 +300,23 @@ pub struct DeleteParams {
     /// The default policy is decided by the existing finalizer set in
     /// metadata.finalizers, and the resource-specific default policy.
     pub propagation_policy: Option<PropagationPolicy>,
+
+    /// Condtions that must be fulfilled before a deletion is carried out
+    ///
+    /// If not possible, a 409 Conflict status will be returned.
+    pub preconditions: Option<Preconditions>,
+}
+
+/// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+#[derive(Default, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Preconditions {
+    pub resource_version: Option<String>,
+    pub uid: Option<String>,
 }
 
 /// Propagation policy when deleting single objects
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum PropagationPolicy {
     /// Orphan dependents
     Orphan,
@@ -387,22 +402,14 @@ impl Resource {
     pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
-        if dp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
-        if let Some(grace) = dp.grace_period_seconds {
-            qp.append_pair("gracePeriodSeconds", &grace.to_string());
-        }
-        if let Some(ref prop) = dp.propagation_policy {
-            qp.append_pair("propagationPolicy", &format!("{:?}", prop));
-        }
         let urlstr = qp.finish();
+        let body = serde_json::to_vec(&dp)?;
         let req = http::Request::delete(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(body).map_err(Error::HttpError)
     }
 
     /// Delete a collection of a resource
-    pub fn delete_collection(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn delete_collection(&self, dp: &DeleteParams, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if let Some(fields) = &lp.field_selector {
@@ -415,8 +422,9 @@ impl Resource {
             qp.append_pair("labelSelector", &labels);
         }
         let urlstr = qp.finish();
+        let body = serde_json::to_vec(&dp)?;
         let req = http::Request::delete(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(body).map_err(Error::HttpError)
     }
 
     /// Patch an instance of a resource
@@ -718,7 +726,8 @@ mod test {
     fn delete_collection_path() {
         let r = Resource::namespaced::<appsv1::ReplicaSet>("ns");
         let lp = ListParams::default();
-        let req = r.delete_collection(&lp).unwrap();
+        let dp = DeleteParams::default();
+        let req = r.delete_collection(&dp, &lp).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets");
         assert_eq!(req.method(), "DELETE")
     }
