@@ -288,22 +288,30 @@ pub struct DeleteParams {
     ///
     /// An invalid or unrecognized dryRun directive will result in an error response
     /// and no further processing of the request.
-    pub dry_run: bool,
+    /// Valid values are:
+    /// - All: all dry run stages will be processed
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dry_run: Vec<String>,
+
     /// The duration in seconds before the object should be deleted.
     ///
     /// Value must be non-negative integer. The value zero indicates delete immediately.
     /// If this value is None, the default grace period for the specified type will be used.
     /// Defaults to a per object value if not specified. Zero means delete immediately.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub grace_period_seconds: Option<u32>,
+
     /// Whether or how garbage collection is performed.
     ///
     /// The default policy is decided by the existing finalizer set in
     /// metadata.finalizers, and the resource-specific default policy.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub propagation_policy: Option<PropagationPolicy>,
 
     /// Condtions that must be fulfilled before a deletion is carried out
     ///
     /// If not possible, a 409 Conflict status will be returned.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub preconditions: Option<Preconditions>,
 }
 
@@ -311,7 +319,9 @@ pub struct DeleteParams {
 #[derive(Default, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Preconditions {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub resource_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub uid: Option<String>,
 }
 
