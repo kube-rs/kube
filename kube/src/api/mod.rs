@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Deserialize, Serialize, Default, Debug)]
 pub struct NotUsed {}
 
-pub(crate) mod resource;
-pub use resource::{
-    DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy, Resource,
-};
+pub(crate) mod params;
+pub use params::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy};
+mod resource;
+pub use resource::Resource;
 
 pub(crate) mod typed;
 pub use typed::Api;
