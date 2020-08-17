@@ -7,6 +7,9 @@
   * `Client::list_core_api_resources` added
   * `kube::DynamicResource` exposed at top level
   * Bug: `PatchParams::default_apply()` now requires a manager and renamed to `PatchParams::apply(manager: &str)` for #300
+  * Bug: `DeleteParams` no longer missing for `Api::delete_collection` - #53
+  * Removed paramter `ListParams::include_uninitialized` deprecated since 1.14
+  * Added optional `PostParams::field_manager` was missing for `Api::create` case
 
 0.39.0 / 2020-07-05
 ===================

@@ -6,7 +6,7 @@ use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 
 use kube::{
-    api::{Api, ListParams, Meta, PatchParams, PatchStrategy, WatchEvent},
+    api::{Api, ListParams, Meta, PatchParams, WatchEvent},
     Client, CustomResource,
 };
 

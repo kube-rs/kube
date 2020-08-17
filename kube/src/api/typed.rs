@@ -166,13 +166,13 @@ where
     /// 4XX and 5XX status types are returned as an `Err(kube::Error::Api)`
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, Meta}, Client};
+    /// use kube::{api::{Api, DeleteParams, ListParams, Meta}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     match pods.delete_collection(&ListParams::default()).await? {
+    ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
     ///         either::Left(list) => {
     ///             let names: Vec<_> = list.iter().map(Meta::name).collect();
     ///             println!("Deleting collection of pods: {:?}", names);
@@ -184,8 +184,12 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn delete_collection(&self, lp: &ListParams) -> Result<Either<ObjectList<K>, Status>> {
-        let req = self.resource.delete_collection(&lp)?;
+    pub async fn delete_collection(
+        &self,
+        dp: &DeleteParams,
+        lp: &ListParams,
+    ) -> Result<Either<ObjectList<K>, Status>> {
+        let req = self.resource.delete_collection(&dp, &lp)?;
         self.client.request_status::<ObjectList<K>>(req).await
     }
 

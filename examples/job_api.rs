@@ -71,7 +71,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Clean up the old job record..
     info!("Deleting the job record.");
-    let dp = DeleteParams::default();
-    jobs.delete("empty-job", &dp).await.expect("failed to delete job");
+    let mut dp = DeleteParams::default();
+    dp.dry_run = true;
+    jobs.delete("empty-job", &dp).await?;
+    dp.dry_run = false;
+    jobs.delete("empty-job", &dp).await?;
     Ok(())
 }

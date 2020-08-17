@@ -199,7 +199,7 @@ async fn main() -> anyhow::Result<()> {
     assert!(foos.delete("qux", &dp).await?.is_right());
 
     // Cleanup the full collection - expect a wait
-    match foos.delete_collection(&lp).await? {
+    match foos.delete_collection(&dp, &lp).await? {
         Left(list) => {
             let deleted: Vec<_> = list.iter().map(Meta::name).collect();
             info!("Deleting collection of foos: {:?}", deleted);
