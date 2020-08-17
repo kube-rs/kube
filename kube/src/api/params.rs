@@ -230,7 +230,10 @@ impl Default for PatchStrategy {
 #[serde(rename_all = "camelCase")]
 pub struct DeleteParams {
     /// When present, indicates that modifications should not be persisted.
-    #[serde(serialize_with = "true_as_all", skip_serializing_if = "std::ops::Not::not")]
+    #[serde(
+        serialize_with = "dry_run_all_ser",
+        skip_serializing_if = "std::ops::Not::not"
+    )]
     pub dry_run: bool,
 
     /// The duration in seconds before the object should be deleted.
@@ -255,8 +258,14 @@ pub struct DeleteParams {
     pub preconditions: Option<Preconditions>,
 }
 
-
-fn true_as_all<S>(t: &bool, s: S) -> std::result::Result<S::Ok, S::Error>
+// dryRun seriization differ when used as body parameters and query strings:
+// query strings are either true/false
+// body params allow only: missing field, or ["All"]
+// The latter is a very awkward API causing users to do to
+// dp.dry_run = vec!["All".into()];
+// just to turn on dry_run..
+// so we hide this detail for now.
+fn dry_run_all_ser<S>(t: &bool, s: S) -> std::result::Result<S::Ok, S::Error>
 where
     S: serde::ser::Serializer,
 {
@@ -266,11 +275,10 @@ where
             let mut map = s.serialize_tuple(1)?;
             map.serialize_element("All")?;
             map.end()
-        },
+        }
         false => s.serialize_none(),
     }
 }
-
 #[cfg(test)]
 mod test {
     use super::DeleteParams;
