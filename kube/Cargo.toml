@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.39.0"
+version = "0.40.0"
 description = "Kubernetes client in futures controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -45,7 +45,7 @@ bytes = "0.5.6"
 Inflector = "0.11.4"
 tokio = { version = "0.2.22", features = ["time", "signal", "sync"] }
 static_assertions = "1.1.0"
-kube-derive = { path = "../kube-derive", version = "^0.39.0", optional = true }
+kube-derive = { path = "../kube-derive", version = "^0.40.0", optional = true }
 
 [dependencies.reqwest]
 version = "0.10.7"

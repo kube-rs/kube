@@ -40,8 +40,10 @@ main() {
 # Usage:
 #
 # cargo release minor --exclude tests --exclude examples --skip-tag --skip-push --no-dev-version
-# TODO: --consolidate-commits
-# Then amend commits / squash.
+# TODO: figure out why it needs waiting between publishing..
+# TODO: consolidate-commits (release.toml option only, cant use because it lack other things)
+# Then amend commits / squash. Maybe publish manually if it broke halfway through.
+#
 # Finally run this script to bump readme's and then tag.
 #
 # ./release.sh
