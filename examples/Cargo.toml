@@ -30,7 +30,7 @@ snafu = { version = "0.6.8", features = ["futures"] }
 # Some Api::delete methods use Either
 either = "1.5.3"
 # Some configuration tweaking require reqwest atm
-reqwest = { version = "0.10.6", default-features = false, features = ["json", "gzip", "stream"] }
+reqwest = { version = "0.10.7", default-features = false, features = ["json", "gzip", "stream"] }
 
 [[example]]
 name = "configmapgen_controller"

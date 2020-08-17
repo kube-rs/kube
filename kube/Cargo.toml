@@ -48,7 +48,7 @@ static_assertions = "1.1.0"
 kube-derive = { path = "../kube-derive", version = "^0.39.0", optional = true }
 
 [dependencies.reqwest]
-version = "0.10.6"
+version = "0.10.7"
 default-features = false
 features = ["json", "gzip", "stream"]
 
