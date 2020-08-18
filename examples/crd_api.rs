@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
             info!(
                 "Deleting {}: ({:?})",
                 Meta::name(&o),
-                o.status.unwrap().conditions.unwrap().last()
+                o.status.as_ref().unwrap().conditions.as_ref().unwrap().last()
             );
         })
         .map_right(|s| {
@@ -68,7 +68,7 @@ async fn main() -> anyhow::Result<()> {
     let patch_params = PatchParams::default();
     match crds.create(&pp, &foocrd).await {
         Ok(o) => {
-            info!("Created {} ({:?})", Meta::name(&o), o.status.unwrap());
+            info!("Created {} ({:?})", Meta::name(&o), o.status.as_ref().unwrap());
             debug!("Created CRD: {:?}", o.spec);
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
@@ -215,7 +215,7 @@ async fn main() -> anyhow::Result<()> {
             info!(
                 "Deleting {} CRD definition: {:?}",
                 Meta::name(&o),
-                o.status.unwrap().conditions.unwrap().last()
+                o.status.as_ref().unwrap().conditions.as_ref().unwrap().last()
             );
         }
         Right(status) => {

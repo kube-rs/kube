@@ -22,6 +22,6 @@ pub mod utils;
 pub mod watcher;
 
 pub use controller::{applier, Controller};
-pub use reflector::reflector;
+pub use reflector::{reflector, Store};
 pub use scheduler::scheduler;
 pub use watcher::watcher;

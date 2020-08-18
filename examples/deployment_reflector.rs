@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
             // Periodically read our state
-            let deploys: Vec<_> = reader.state().iter().map(Meta::name).collect();
+            let deploys: Vec<_> = reader.state().iter().map(|o| Meta::name(o).clone()).collect();
             info!("Current deploys: {:?}", deploys);
             tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
         }

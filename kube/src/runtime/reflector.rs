@@ -252,8 +252,8 @@ impl ToString for ObjectId {
 impl ObjectId {
     fn key_for<K: Meta>(o: &K) -> Self {
         ObjectId {
-            name: Meta::name(o),
-            namespace: Meta::namespace(o),
+            name: Meta::name(o).to_string(),
+            namespace: Meta::namespace(o).clone(),
         }
     }
 }

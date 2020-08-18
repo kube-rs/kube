@@ -60,8 +60,8 @@ impl<K: Resource> ObjectRef<K> {
     {
         Self {
             kind: (),
-            name: obj.name(),
-            namespace: obj.namespace(),
+            name: obj.name().to_string(),
+            namespace: obj.namespace().clone(),
         }
     }
 

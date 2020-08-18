@@ -11,17 +11,15 @@ use serde::{Deserialize, Serialize};
 /// And these optional properties:
 /// - .metadata.namespace
 /// - .metadata.resource_version
-///
-/// This avoids a bunch of the unnecessary unwrap mechanics for apps
 pub trait Meta: Metadata {
     /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
     /// The name of the resource
-    fn name(&self) -> String;
+    fn name(&self) -> &String;
     /// The namespace the resource is in
-    fn namespace(&self) -> Option<String>;
+    fn namespace(&self) -> &Option<String>;
     /// Tthe resource version
-    fn resource_ver(&self) -> Option<String>;
+    fn resource_ver(&self) -> &Option<String>;
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
@@ -33,16 +31,16 @@ where
         self.metadata()
     }
 
-    fn name(&self) -> String {
-        self.meta().name.clone().expect("kind has metadata.name")
+    fn name(&self) -> &String {
+        self.meta().name.as_ref().expect("kind has metadata.name")
     }
 
-    fn resource_ver(&self) -> Option<String> {
-        self.meta().resource_version.clone()
+    fn resource_ver(&self) -> &Option<String> {
+        &self.meta().resource_version
     }
 
-    fn namespace(&self) -> Option<String> {
-        self.meta().namespace.clone()
+    fn namespace(&self) -> &Option<String> {
+        &self.meta().namespace
     }
 }
 
