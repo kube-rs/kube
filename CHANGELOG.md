@@ -1,4 +1,4 @@
-0.40.0 / 2020-07-17
+0.40.0 / 2020-08-17
 ===================
   * `DynamicResource::from_api_resource` added to allow apiserver returned resources - #305 via #301
   * `Client::list_api_groups` added
@@ -11,13 +11,13 @@
   * Removed paramter `ListParams::include_uninitialized` deprecated since 1.14
   * Added optional `PostParams::field_manager` was missing for `Api::create` case
 
-0.39.0 / 2020-07-05
+0.39.0 / 2020-08-05
 ===================
   * Bug: `ObjectRef` tweak in `kube-runtime` to allow controllers triggering across cluster and namespace scopes - #293 via #294
   * Feature: `kube` now has a `derive` feature which will re-export `kube::CustomResource` from `kube-derive::CustomResource`.
   * Examples: revamp examples for `kube-runtime` - #201
 
-0.38.0 / 2020-06-23
+0.38.0 / 2020-07-23
 ===================
   * Marked `kube::runtime` module as deprecated - #281
   * `Config::timeout` can now be overridden to `None` (with caveats) #280
@@ -27,13 +27,13 @@
   * Bug: Specialize WatchEvent::Bookmark so they can be deserialized - #285
   * Docs: Tons of docs for kube-runtime
 
-0.37.0 / 2020-06-20
+0.37.0 / 2020-07-20
 ===================
   * Bump `k8s-openapi` to `0.9.0`
   * All runtime components now require `Sync` objects
   * reflector/watcher/Controller streams can be shared in threaded environments
 
-0.36.0 / 2020-06-19
+0.36.0 / 2020-07-19
 ===================
   * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate #258
   * `Controller<K>` added (#148 via #258)
