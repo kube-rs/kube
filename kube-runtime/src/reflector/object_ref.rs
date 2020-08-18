@@ -61,7 +61,7 @@ impl<K: Resource> ObjectRef<K> {
         Self {
             kind: (),
             name: obj.name().to_string(),
-            namespace: obj.namespace().clone(),
+            namespace: obj.namespace().map(String::from),
         }
     }
 

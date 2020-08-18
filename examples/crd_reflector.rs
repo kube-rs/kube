@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
             let crds = reader
                 .state()
                 .iter()
-                .map(|o| Meta::name(o).clone())
+                .map(|o| Meta::name(o).to_string())
                 .collect::<Vec<_>>();
             info!("Current crds: {:?}", crds);
         }

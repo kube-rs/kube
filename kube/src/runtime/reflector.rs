@@ -117,7 +117,7 @@ where
                     // always store the last seen resourceVersion
                     if let Some(nv) = Meta::resource_ver(o) {
                         trace!("Updating reflector version for {} to {}", kind, nv);
-                        state.version = nv.clone();
+                        state.version = nv.to_string();
                     }
                 }
                 WatchEvent::Bookmark(bm) => {
@@ -253,7 +253,7 @@ impl ObjectId {
     fn key_for<K: Meta>(o: &K) -> Self {
         ObjectId {
             name: Meta::name(o).to_string(),
-            namespace: Meta::namespace(o).clone(),
+            namespace: Meta::namespace(o).map(String::from),
         }
     }
 }

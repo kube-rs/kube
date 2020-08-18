@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
             let nodes = reader
                 .state()
                 .iter()
-                .map(|o| Meta::name(o).clone())
+                .map(|o| Meta::name(o).to_string())
                 .collect::<Vec<_>>();
             info!("Current {} nodes: {:?}", nodes.len(), nodes);
             tokio::time::delay_for(std::time::Duration::from_secs(10)).await;

@@ -133,7 +133,7 @@ where
                     Ok(WatchEvent::Added(o)) | Ok(WatchEvent::Modified(o)) | Ok(WatchEvent::Deleted(o)) => {
                         // always store the last seen resourceVersion
                         if let Some(nv) = Meta::resource_ver(o) {
-                            *version.lock().await = nv.clone();
+                            *version.lock().await = nv.to_string();
                         }
                     }
                     Ok(WatchEvent::Bookmark(bm)) => {

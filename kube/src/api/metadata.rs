@@ -15,11 +15,11 @@ pub trait Meta: Metadata {
     /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
     /// The name of the resource
-    fn name(&self) -> &String;
+    fn name(&self) -> &str;
     /// The namespace the resource is in
-    fn namespace(&self) -> &Option<String>;
+    fn namespace(&self) -> Option<&str>;
     /// Tthe resource version
-    fn resource_ver(&self) -> &Option<String>;
+    fn resource_ver(&self) -> Option<&str>;
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
@@ -31,16 +31,16 @@ where
         self.metadata()
     }
 
-    fn name(&self) -> &String {
+    fn name(&self) -> &str {
         self.meta().name.as_ref().expect("kind has metadata.name")
     }
 
-    fn resource_ver(&self) -> &Option<String> {
-        &self.meta().resource_version
+    fn resource_ver(&self) -> Option<&str> {
+        self.meta().resource_version.as_ref().map(|rv| rv.as_ref())
     }
 
-    fn namespace(&self) -> &Option<String> {
-        &self.meta().namespace
+    fn namespace(&self) -> Option<&str> {
+        self.meta().namespace.as_ref().map(|ns| ns.as_ref())
     }
 }
 
