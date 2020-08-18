@@ -36,11 +36,11 @@ where
     }
 
     fn resource_ver(&self) -> Option<&str> {
-        self.meta().resource_version.as_ref().map(|rv| rv.as_ref())
+        self.meta().resource_version.as_deref()
     }
 
     fn namespace(&self) -> Option<&str> {
-        self.meta().namespace.as_ref().map(|ns| ns.as_ref())
+        self.meta().namespace.as_deref()
     }
 }
 
