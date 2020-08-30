@@ -350,12 +350,6 @@ where
 ///         requeue_after: Some(Duration::from_secs(300)),
 ///     })
 /// }
-/// /// an error handler that will be called when the reconciler fails
-/// fn error_policy(_error: &Error, _ctx: Context<()>) -> ReconcilerAction {
-///     ReconcilerAction {
-///         requeue_after: Some(Duration::from_secs(60)),
-///     }
-/// }
 ///
 /// /// something to drive the controller
 /// #[tokio::main]
@@ -366,7 +360,7 @@ where
 ///     let cms = Api::<ConfigMap>::all(client.clone());
 ///     Controller::new(cmgs, ListParams::default())
 ///         .owns(cms, ListParams::default())
-///         .run(reconcile, error_policy, context)
+///         .run(reconcile, || backoff::backoff::Constant::new(Duration::from_secs(60)), context)
 ///         .for_each(|res| async move {
 ///             match res {
 ///                 Ok(o) => println!("reconciled {:?}", o),
