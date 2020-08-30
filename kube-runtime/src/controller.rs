@@ -18,7 +18,7 @@ use futures::{
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
-use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt::Debug, marker::PhantomData, sync::Arc, time::Duration};
 use stream::BoxStream;
 use tokio::time::Instant;
 
@@ -99,28 +99,71 @@ where
     })
 }
 
+/// A policy for when to retry reconciliation, after an error has occurred.
+pub trait ErrorPolicy {
+    type Err;
+    type K: RuntimeResource;
+    type Ctx;
+
+    /// Notifies that the state for an object should be removed, for example if it is reconciled successfully.
+    fn reset_object(&mut self, obj_ref: &ObjectRef<Self::K>, ctx: Context<Self::Ctx>);
+    /// Queries for when to next retry after an error.
+    fn on_error(
+        &mut self,
+        obj_ref: ObjectRef<Self::K>,
+        error: &Self::Err,
+        ctx: Context<Self::Ctx>,
+    ) -> ReconcilerAction;
+}
+
 /// Retries errors based on a `Backoff` policy.
 ///
 /// A separate backoff tracker is used for each object, and it is
 /// reset whenever the object is reconciled successfully.
-pub fn backoff_error_policy<B: Backoff, K: k8s_openapi::Resource, Err: std::error::Error, T>(
-    mut make_backoff: impl FnMut() -> B,
-) -> impl FnMut(Result<ReconcilerAction, &Err>, ObjectRef<K>, Context<T>) -> ReconcilerAction {
-    let mut backoffs = HashMap::new();
-    move |reconcile_result, obj_ref, _| {
-        match reconcile_result {
-            Ok(action) => {
-                // Action was successful, reset backoff timer
-                backoffs.remove(&obj_ref);
-                action
-            }
-            Err(_err) => {
-                // Action failed, so trip the backoff timer
-                let obj_backoff = backoffs.entry(obj_ref).or_insert_with(&mut make_backoff);
-                ReconcilerAction {
-                    requeue_after: obj_backoff.next_backoff(),
-                }
-            }
+#[derive(Debug)]
+pub struct BackoffErrorPolicy<MkBackoff, B, K: RuntimeResource, Err, Ctx> {
+    make_backoff: MkBackoff,
+    backoffs: HashMap<ObjectRef<K>, B>,
+    _err: PhantomData<Err>,
+    _ctx: PhantomData<Ctx>,
+}
+
+impl<MkBackoff: FnMut() -> B, B: Backoff, K: RuntimeResource, Err, Ctx>
+    BackoffErrorPolicy<MkBackoff, B, K, Err, Ctx>
+{
+    fn new(make_backoff: MkBackoff) -> Self {
+        BackoffErrorPolicy {
+            make_backoff,
+            backoffs: HashMap::new(),
+            _err: PhantomData,
+            _ctx: PhantomData,
+        }
+    }
+}
+
+impl<MkBackoff: FnMut() -> B, B: Backoff, K: RuntimeResource, Err, Ctx> ErrorPolicy
+    for BackoffErrorPolicy<MkBackoff, B, K, Err, Ctx>
+{
+    type Err = Err;
+    type K = K;
+    type Ctx = Ctx;
+
+    fn reset_object(&mut self, obj_ref: &ObjectRef<Self::K>, _ctx: Context<Self::Ctx>) {
+        self.backoffs.remove(obj_ref);
+    }
+
+    fn on_error(
+        &mut self,
+        obj_ref: ObjectRef<Self::K>,
+        _error: &Self::Err,
+        _ctx: Context<Self::Ctx>,
+    ) -> ReconcilerAction {
+        let obj_backoff = self
+            .backoffs
+            .entry(obj_ref)
+            .or_insert_with(&mut self.make_backoff);
+        ReconcilerAction {
+            requeue_after: obj_backoff.next_backoff(),
         }
     }
 }
@@ -166,11 +209,7 @@ impl<T> Context<T> {
 /// (such as triggering from arbitrary `Stream`s), at the cost of some more verbosity.
 pub fn applier<K, QueueStream, ReconcilerFut, T>(
     mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
-    mut error_policy: impl FnMut(
-        Result<ReconcilerAction, &ReconcilerFut::Error>,
-        ObjectRef<K>,
-        Context<T>,
-    ) -> ReconcilerAction,
+    mut error_policy: impl ErrorPolicy<K = K, Err = ReconcilerFut::Error, Ctx = T>,
     context: Context<T>,
     store: Store<K>,
     queue: QueueStream,
@@ -223,11 +262,10 @@ where
     .then(move |reconciler_result| {
         let (obj_ref, action, error) = match reconciler_result {
             // tell the error policy about the success (to reset backoff timers, for example)
-            Ok((obj_ref, action)) => (
-                obj_ref.clone(),
-                error_policy(Ok(action.clone()), obj_ref.clone(), err_context.clone()),
-                None,
-            ),
+            Ok((obj_ref, action)) => {
+                error_policy.reset_object(&obj_ref, err_context.clone());
+                (obj_ref.clone(), action, None)
+            }
             // reconciler fn call failed
             Err(Error::ReconcilerFailed {
                 obj_ref,
@@ -235,7 +273,7 @@ where
                 backtrace,
             }) => (
                 obj_ref.clone(),
-                error_policy(Err(&source), obj_ref.clone(), err_context.clone()),
+                error_policy.on_error(obj_ref.clone(), &source, err_context.clone()),
                 Some(Error::ReconcilerFailed {
                     obj_ref,
                     source,
@@ -243,15 +281,14 @@ where
                 }),
             ),
             // object was deleted, fake a "success" to the error policy, so that it can clean up any bookkeeping and avoid leaking memory
-            Err(Error::ObjectNotFound { obj_ref, backtrace }) => (
-                obj_ref.clone(),
-                error_policy(
-                    Ok(ReconcilerAction { requeue_after: None }),
+            Err(Error::ObjectNotFound { obj_ref, backtrace }) => {
+                error_policy.reset_object(&obj_ref, err_context.clone());
+                (
                     obj_ref.clone(),
-                    err_context.clone(),
-                ),
-                Some(Error::ObjectNotFound { obj_ref, backtrace }),
-            ),
+                    ReconcilerAction { requeue_after: None },
+                    Some(Error::ObjectNotFound { obj_ref, backtrace }),
+                )
+            }
             // Upstream or internal error, propagate
             Err(_) => return future::Either::Left(future::ready(reconciler_result)),
         };
@@ -268,7 +305,7 @@ where
                     .expect("Message could not be sent to scheduler_rx");
             }
             match error {
-                None => Ok((obj_ref.clone(), action)),
+                None => Ok((obj_ref, action)),
                 Some(err) => Err(err),
             }
         })
@@ -428,7 +465,7 @@ where
     {
         applier(
             reconciler,
-            backoff_error_policy(make_backoff),
+            BackoffErrorPolicy::new(make_backoff),
             context,
             self.reader,
             self.selector,
