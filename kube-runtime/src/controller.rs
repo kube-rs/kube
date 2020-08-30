@@ -2,12 +2,13 @@ use crate::{
     reflector::{
         reflector,
         store::{Store, Writer},
-        ErasedResource, ObjectRef,
+        ObjectRef, RuntimeResource,
     },
     scheduler::{self, scheduler, ScheduleRequest},
     utils::{try_flatten_applied, try_flatten_touched, trystream_try_via},
     watcher::{self, watcher},
 };
+use backoff::backoff::Backoff;
 use derivative::Derivative;
 use futures::{
     channel, future,
@@ -17,17 +18,23 @@ use futures::{
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 use stream::BoxStream;
 use tokio::time::Instant;
 
-#[derive(Snafu, Debug)]
-pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
+#[derive(Snafu, Derivative)]
+#[derivative(Debug(bound = ""))]
+pub enum Error<
+    K: RuntimeResource,
+    ReconcilerErr: std::error::Error + 'static,
+    QueueErr: std::error::Error + 'static,
+> {
     ObjectNotFound {
-        obj_ref: ObjectRef<ErasedResource>,
+        obj_ref: ObjectRef<K>,
         backtrace: Backtrace,
     },
     ReconcilerFailed {
+        obj_ref: ObjectRef<K>,
         source: ReconcilerErr,
         backtrace: Backtrace,
     },
@@ -92,6 +99,32 @@ where
     })
 }
 
+/// Retries errors based on a `Backoff` policy.
+///
+/// A separate backoff tracker is used for each object, and it is
+/// reset whenever the object is reconciled successfully.
+pub fn backoff_error_policy<B: Backoff, K: k8s_openapi::Resource, Err: std::error::Error, T>(
+    mut make_backoff: impl FnMut() -> B,
+) -> impl FnMut(Result<ReconcilerAction, &Err>, ObjectRef<K>, Context<T>) -> ReconcilerAction {
+    let mut backoffs = HashMap::new();
+    move |reconcile_result, obj_ref, _| {
+        match reconcile_result {
+            Ok(action) => {
+                // Action was successful, reset backoff timer
+                backoffs.remove(&obj_ref);
+                action
+            }
+            Err(_err) => {
+                // Action failed, so trip the backoff timer
+                let obj_backoff = backoffs.entry(obj_ref).or_insert_with(&mut make_backoff);
+                ReconcilerAction {
+                    requeue_after: obj_backoff.next_backoff(),
+                }
+            }
+        }
+    }
+}
+
 /// A context data type that's passed through to the controllers callbacks
 ///
 /// Context<T> gets passed to both the `reconciler` and the `error_policy` callbacks.
@@ -133,11 +166,15 @@ impl<T> Context<T> {
 /// (such as triggering from arbitrary `Stream`s), at the cost of some more verbosity.
 pub fn applier<K, QueueStream, ReconcilerFut, T>(
     mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
-    mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
+    mut error_policy: impl FnMut(
+        Result<ReconcilerAction, &ReconcilerFut::Error>,
+        ObjectRef<K>,
+        Context<T>,
+    ) -> ReconcilerAction,
     context: Context<T>,
     store: Store<K>,
     queue: QueueStream,
-) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
+) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<K, ReconcilerFut::Error, QueueStream::Error>>>
 where
     K: Clone + Meta + 'static,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
@@ -175,22 +212,53 @@ where
     })
     // then reconcile every object
     .and_then(move |(obj_ref, obj)| {
-        reconciler(obj, context.clone()) // TODO: add a context argument to the reconcile
+        reconciler(obj, context.clone())
             .into_future() // TryFuture -> impl Future
-            .map(|result| (obj_ref, result)) // turn into pair and ok wrap
-            .map(Ok) // (this lets us deal with errors from reconciler below)
+            .map(|result| match result {
+                Ok(action) => Ok((obj_ref, action)),
+                Err(err) => Err(err).context(ReconcilerFailed { obj_ref }),
+            })
     })
     // finally, for each completed reconcile call:
-    .and_then(move |(obj_ref, reconciler_result)| {
-        let ReconcilerAction { requeue_after } = match &reconciler_result {
-            Ok(action) => action.clone(),                       // do what user told us
-            Err(err) => error_policy(err, err_context.clone()), // reconciler fn call failed
+    .then(move |reconciler_result| {
+        let (obj_ref, action, error) = match reconciler_result {
+            // tell the error policy about the success (to reset backoff timers, for example)
+            Ok((obj_ref, action)) => (
+                obj_ref.clone(),
+                error_policy(Ok(action.clone()), obj_ref.clone(), err_context.clone()),
+                None,
+            ),
+            // reconciler fn call failed
+            Err(Error::ReconcilerFailed {
+                obj_ref,
+                source,
+                backtrace,
+            }) => (
+                obj_ref.clone(),
+                error_policy(Err(&source), obj_ref.clone(), err_context.clone()),
+                Some(Error::ReconcilerFailed {
+                    obj_ref,
+                    source,
+                    backtrace,
+                }),
+            ),
+            // object was deleted, fake a "success" to the error policy, so that it can clean up any bookkeeping and avoid leaking memory
+            Err(Error::ObjectNotFound { obj_ref, backtrace }) => (
+                obj_ref.clone(),
+                error_policy(
+                    Ok(ReconcilerAction { requeue_after: None }),
+                    obj_ref.clone(),
+                    err_context.clone(),
+                ),
+                Some(Error::ObjectNotFound { obj_ref, backtrace }),
+            ),
+            // Upstream or internal error, propagate
+            Err(_) => return future::Either::Left(future::ready(reconciler_result)),
         };
-        // we should always requeue at some point in case of network errors ^
         let mut scheduler_tx = scheduler_tx.clone();
-        async move {
+        future::Either::Right(async move {
             // Transmit the requeue request to the scheduler (picked up again at top)
-            if let Some(delay) = requeue_after {
+            if let Some(delay) = action.requeue_after {
                 scheduler_tx
                     .send(ScheduleRequest {
                         message: obj_ref.clone(),
@@ -199,11 +267,11 @@ where
                     .await
                     .expect("Message could not be sent to scheduler_rx");
             }
-            // NB: no else clause ^ because we don't allow not requeuing atm.
-            reconciler_result
-                .map(|action| (obj_ref, action))
-                .context(ReconcilerFailed)
-        }
+            match error {
+                None => Ok((obj_ref.clone(), action)),
+                Some(err) => Err(err),
+            }
+        })
     })
 }
 
@@ -346,18 +414,25 @@ where
     /// This creates a stream from all builder calls and starts an applier with
     /// a specified `reconciler` and `error_policy` callbacks. Each of these will be called
     /// with a configurable `Context`.
-    pub fn run<ReconcilerFut, T>(
+    pub fn run<ReconcilerFut, T, B>(
         self,
         reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
-        error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
+        make_backoff: impl Fn() -> B,
         context: Context<T>,
-    ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, watcher::Error>>>
+    ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<K, ReconcilerFut::Error, watcher::Error>>>
     where
         K: Clone + Meta + 'static,
         ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
         ReconcilerFut::Error: std::error::Error + 'static,
+        B: Backoff,
     {
-        applier(reconciler, error_policy, context, self.reader, self.selector)
+        applier(
+            reconciler,
+            backoff_error_policy(make_backoff),
+            context,
+            self.reader,
+            self.selector,
+        )
     }
 }
 
@@ -367,6 +442,7 @@ mod tests {
     use crate::Controller;
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube::Api;
+    use snafu::Snafu;
 
     fn assert_send<T: Send>(x: T) -> T {
         x
@@ -378,13 +454,16 @@ mod tests {
         )
     }
 
+    #[derive(Snafu, Debug)]
+    enum NoError {}
+
     // not #[test] because we don't want to actually run it, we just want to assert that it typechecks
     #[allow(dead_code, unused_must_use)]
     fn test_controller_should_be_send() {
         assert_send(
             Controller::new(mock_type::<Api<ConfigMap>>(), Default::default()).run(
-                |_, _| async { Ok(mock_type::<ReconcilerAction>()) },
-                |_: &std::io::Error, _| mock_type::<ReconcilerAction>(),
+                |_, _| async { Ok::<_, NoError>(mock_type::<ReconcilerAction>()) },
+                || backoff::backoff::Zero {},
                 Context::new(()),
             ),
         );
