@@ -234,23 +234,25 @@ impl CustomDerive for CustomResource {
         let rootident = Ident::new(&kind, Span::call_site());
 
         // if status set, also add that
-        let (statusq, statusdef) = if let Some(status_name) = &status {
+        let (statusq, statusdef, fnum, statusser) = if let Some(status_name) = &status {
             let ident = format_ident!("{}", status_name);
             let fst = quote! {
                 #[serde(skip_serializing_if = "Option::is_none")]
                 #visibility status: Option<#ident>,
             };
             let snd = quote! { status: None, };
-            (fst, snd)
+            let sdef = quote! { resource.serialize_entry("spec", &self.status)?; };
+            (fst, snd, quote!{4}, sdef)
         } else {
             let fst = quote! {};
             let snd = quote! {};
-            (fst, snd)
+            let sdef = quote! {};
+            (fst, snd, quote!{3}, sdef)
         };
         let has_status = status.is_some();
 
         let mut derive_idents = vec![];
-        for d in &["Serialize", "Deserialize", "Clone", "Debug"] {
+        for d in &["Deserialize", "Clone", "Debug"] {
             derive_idents.push(format_ident!("{}", d));
         }
         for d in derives {
@@ -263,8 +265,6 @@ impl CustomDerive for CustomResource {
             #[derive(#(#derive_idents),*)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
-                #visibility api_version: String,
-                #visibility kind: String,
                 #visibility metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
                 #visibility spec: #ident,
                 #statusq
@@ -272,8 +272,6 @@ impl CustomDerive for CustomResource {
             impl #rootident {
                 pub fn new(name: &str, spec: #ident) -> Self {
                     Self {
-                        api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
-                        kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                             name: Some(name.to_string()),
                             ..Default::default()
@@ -405,12 +403,34 @@ impl CustomDerive for CustomResource {
             }
         };
 
+        // 5. Implement Serializer trait
+        let impl_serializer = quote!{
+
+            use serde::ser::{Serializer, SerializeMap};
+
+            impl Serialize for #rootident {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: Serializer
+                {
+                    let mut resource = serializer.serialize_map(Some(#fnum))?;
+                    resource.serialize_entry("apiVersion", #api_ver)?;
+                    resource.serialize_entry("kind", #kind)?;
+                    resource.serialize_entry("metadata", &self.metadata)?;
+                    resource.serialize_entry("spec", &self.spec)?;
+                    #statusser
+                    resource.end()
+                }
+            }
+        };
+
         // Concat output
         let output = quote! {
             #root_obj
             #impl_resource
             #impl_metadata
             #impl_crd
+            #impl_serializer
         };
         // Try to convert to a TokenStream
         let res = syn::parse(output.into())
