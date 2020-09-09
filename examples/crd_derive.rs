@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Our spec for Foo
 ///
 /// A struct with our chosen Kind will be created for us, using the following kube attrs
-#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone)]
 #[kube(
     group = "clux.dev",
     version = "v1",
@@ -13,13 +13,15 @@ use serde::{Deserialize, Serialize};
     namespaced,
     status = "FooStatus",
     derive = "PartialEq",
+    derive = "Default",
     shortname = "f",
     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 )]
-//#[kube(apiextensions = "v1beta1")] // kubernetes <= 1.16
+#[kube(apiextensions = "v1beta1")] // kubernetes <= 1.16
 pub struct MyFoo {
     name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     info: Option<String>,
 }
 
@@ -92,4 +94,17 @@ fn verify_resource() {
     assert_eq!(Foo::GROUP, "clux.dev");
     assert_eq!(Foo::VERSION, "v1");
     assert_eq!(Foo::API_VERSION, "clux.dev/v1");
+}
+
+#[test]
+fn verify_serialize() {
+  let fdef = Foo::default();
+  let ser = serde_yaml::to_string(&fdef).unwrap();
+  let exp = r#"---
+apiVersion: "clux.dev/v1"
+kind: "Foo"
+metadata: {}
+spec:
+  name: """#;
+  assert_eq!(exp, ser);
 }
