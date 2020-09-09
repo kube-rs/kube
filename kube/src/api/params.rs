@@ -33,6 +33,18 @@ pub struct ListParams {
     /// If the feature gate WatchBookmarks is not enabled in apiserver,
     /// this field is ignored.
     pub allow_bookmarks: bool,
+
+    /// Limit the number of results.
+    /// 
+    /// If there are more results, the server will respond with a continue token which can be used to fetch another page
+    /// of results. See the [kubernetes API docs](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks)
+    /// for pagination details.
+    pub limit: Option<u32>,
+
+    /// Fetch a second page of results.
+    /// 
+    /// After listing results with a limit, a continue token can be used to fetch another page of results.
+    pub continue_token: Option<String>,
 }
 
 impl ListParams {
@@ -90,6 +102,18 @@ impl ListParams {
     /// Enables watch bookmarks from the api server if supported
     pub fn allow_bookmarks(mut self) -> Self {
         self.allow_bookmarks = true;
+        self
+    }
+
+    /// Sets a result limit.
+    pub fn limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    /// Sets a continue token.
+    pub fn continue_token(mut self, token: &str) -> Self {
+        self.continue_token = Some(token.to_string());
         self
     }
 }
