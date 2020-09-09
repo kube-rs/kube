@@ -97,14 +97,14 @@ fn verify_resource() {
 }
 
 #[test]
-fn verify_serialize() {
-  let fdef = Foo::default();
-  let ser = serde_yaml::to_string(&fdef).unwrap();
-  let exp = r#"---
-apiVersion: "clux.dev/v1"
-kind: "Foo"
+fn verify_default() {
+    let fdef = Foo::default();
+    let ser = serde_yaml::to_string(&fdef).unwrap();
+    let exp = r#"---
+apiVersion: clux.dev/v1
+kind: Foo
 metadata: {}
 spec:
   name: """#;
-  assert_eq!(exp, ser);
+    assert_eq!(exp, ser);
 }
