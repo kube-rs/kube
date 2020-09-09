@@ -1,3 +1,7 @@
+0.40.1 / 2020-09-XX
+===================
+  * `kube-derive`'s `Default` derive now sets typemeta correctly - #315
+
 0.40.0 / 2020-08-17
 ===================
   * `DynamicResource::from_api_resource` added to allow apiserver returned resources - #305 via #301

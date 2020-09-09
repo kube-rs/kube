@@ -298,7 +298,7 @@ fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
         None => {
             if let Some(exec) = &loader.user.exec {
                 let creds = exec::auth_exec(exec)?;
-                let status = creds.status.ok_or_else(|| ConfigError::ExecPluginFailed)?;
+                let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
                 let expiration = match status.expiration_timestamp {
                     Some(ts) => Some(
                         ts.parse::<DateTime<Utc>>()
