@@ -35,14 +35,14 @@ pub struct ListParams {
     pub allow_bookmarks: bool,
 
     /// Limit the number of results.
-    /// 
+    ///
     /// If there are more results, the server will respond with a continue token which can be used to fetch another page
     /// of results. See the [kubernetes API docs](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks)
     /// for pagination details.
     pub limit: Option<u32>,
 
     /// Fetch a second page of results.
-    /// 
+    ///
     /// After listing results with a limit, a continue token can be used to fetch another page of results.
     pub continue_token: Option<String>,
 }
