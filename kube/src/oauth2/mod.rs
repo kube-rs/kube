@@ -70,7 +70,7 @@ impl Credentials {
     pub fn load() -> Result<Credentials> {
         let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
             .map(PathBuf::from)
-            .ok_or_else(|| ConfigError::MissingGoogleCredentials)?;
+            .ok_or(ConfigError::MissingGoogleCredentials)?;
         let f = File::open(path).map_err(ConfigError::OAuth2LoadCredentials)?;
         let config = serde_json::from_reader(f).map_err(ConfigError::OAuth2ParseCredentials)?;
         Ok(config)

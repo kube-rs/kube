@@ -248,13 +248,18 @@ impl CustomDerive for CustomResource {
             (fst, snd)
         };
         let has_status = status.is_some();
+        let mut has_default = false;
 
         let mut derive_idents = vec![];
         for d in &["Serialize", "Deserialize", "Clone", "Debug"] {
             derive_idents.push(format_ident!("{}", d));
         }
         for d in derives {
-            derive_idents.push(format_ident!("{}", d));
+            if d == "Default" {
+                has_default = true; // overridden manually to avoid confusion
+            } else {
+                derive_idents.push(format_ident!("{}", d));
+            }
         }
 
         let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
@@ -308,8 +313,26 @@ impl CustomDerive for CustomResource {
                 }
             }
         };
+        // 4. Implement Default if requested
+        let impl_default = if has_default {
+            quote! {
+                impl Default for #rootident {
+                    fn default() -> Self {
+                        Self {
+                            api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
+                            kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
+                            metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
+                            spec: Default::default(),
+                            #statusdef
+                        }
+                    }
+                }
+            }
+        } else {
+            quote! {}
+        };
 
-        // 4. Implement CustomResource
+        // 5. Implement CustomResource
         let name = kind.to_ascii_lowercase();
         let plural = to_plural(&name);
         let scope = if namespaced { "Namespaced" } else { "Cluster" };
@@ -410,6 +433,7 @@ impl CustomDerive for CustomResource {
             #root_obj
             #impl_resource
             #impl_metadata
+            #impl_default
             #impl_crd
         };
         // Try to convert to a TokenStream
