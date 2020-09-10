@@ -1,4 +1,4 @@
-0.40.1 / 2020-09-XX
+0.40.1 / 2020-09-10
 ===================
   * `kube-derive`'s `Default` derive now sets typemeta correctly - #315
   * `ListParams` now supports `continue_token` and `limit` - #320
