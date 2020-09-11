@@ -1,7 +1,8 @@
-0.42.1 / 2020-09-XX
+0.43.0 / 2020-09-XX
 ===================
   * bug: `kube-derive` attr `#[kube(shortname)]` now working correctly
   * bug: `kube-derive` now working with badly cased existing types - #313
+  * `kube-derive` now actually requires GVK (in particular `#[kube(kind = "Foo")]` which we sometimes inferred earlier, despite documenting the contrary)
 
 0.42.0 / 2020-09-10
 ===================
