@@ -223,7 +223,7 @@ mod test {
         use crate::{Api, Client, CustomResource};
         use serde::{Deserialize, Serialize};
         #[derive(Clone, Debug, CustomResource, Deserialize, Serialize)]
-        #[kube(group = "clux.dev", version = "v1", namespaced)]
+        #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
         struct FooSpec {
             foo: String,
         };

@@ -232,7 +232,7 @@ where
 /// enum Error {}
 /// /// A custom resource
 /// #[derive(CustomResource, Debug, Clone, Deserialize, Serialize)]
-/// #[kube(group = "nullable.se", version = "v1", namespaced)]
+/// #[kube(group = "nullable.se", version = "v1", kind = "ConfigMapGenerator", namespaced)]
 /// struct ConfigMapGeneratorSpec {
 ///     content: String,
 /// }

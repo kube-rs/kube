@@ -59,7 +59,7 @@ fn verify_crd() {
         "names": {
           "kind": "Foo",
           "plural": "foos",
-          "shortNames": [],
+          "shortNames": ["f"],
           "singular": "foo"
         },
         "additionalPrinterColumns": [
