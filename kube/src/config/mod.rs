@@ -353,6 +353,6 @@ fn hacky_cert_lifetime_for_macos(_: &Der) -> bool {
 
 // Expose raw config structs
 pub use file_config::{
-    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedCluster, NamedContext,
-    NamedExtension, Preferences, NamedAuthInfo,
+    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedAuthInfo, NamedCluster,
+    NamedContext, NamedExtension, Preferences,
 };
