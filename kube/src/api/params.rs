@@ -320,7 +320,6 @@ mod test {
     }
 }
 
-
 /// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 #[derive(Default, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
