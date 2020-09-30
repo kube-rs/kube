@@ -103,4 +103,4 @@ pub use api::{Api, DynamicResource, Resource};
 #[doc(inline)] pub use error::Error;
 
 /// Convient alias for `Result<T, Error>`
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;

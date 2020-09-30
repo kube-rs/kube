@@ -32,7 +32,7 @@ pub struct ExecCredentialStatus {
     pub client_key_data: Option<String>,
 }
 
-pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential> {
+pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, ConfigError> {
     let mut cmd = Command::new(&auth.command);
     if let Some(args) = &auth.args {
         cmd.args(args);
@@ -52,8 +52,7 @@ pub fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential> {
             cmd: format!("{:?}", cmd),
             status: out.status,
             out,
-        }
-        .into());
+        });
     }
     let creds = serde_json::from_slice(&out.stdout).map_err(ConfigError::AuthExecParse)?;
 
