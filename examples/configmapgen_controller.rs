@@ -97,13 +97,6 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     })
 }
 
-/// The controller triggers this on reconcile errors
-fn error_policy(_error: &Error, _ctx: Context<Data>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(1)),
-    }
-}
-
 // Data we want access to in error/reconcile calls
 struct Data {
     client: Client,
@@ -120,7 +113,11 @@ async fn main() -> Result<()> {
 
     Controller::new(cmgs, ListParams::default())
         .owns(cms, ListParams::default())
-        .run(reconcile, error_policy, Context::new(Data { client }))
+        .run(
+            reconcile,
+            || backoff::backoff::Constant::new(Duration::from_secs(1)),
+            Context::new(Data { client }),
+        )
         .for_each(|res| async move {
             match res {
                 Ok(o) => info!("reconciled {:?}", o),

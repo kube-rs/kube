@@ -31,6 +31,7 @@ snafu = { version = "0.6.8", features = ["futures"] }
 either = "1.6.0"
 # Some configuration tweaking require reqwest atm
 reqwest = { version = "0.10.7", default-features = false, features = ["json", "gzip", "stream"] }
+backoff = "0.2.1"
 
 [[example]]
 name = "configmapgen_controller"

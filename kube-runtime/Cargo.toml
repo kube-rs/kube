@@ -23,6 +23,7 @@ pin-project = "0.4.23"
 tokio = { version = "0.2.21", features = ["time"] }
 snafu = { version = "0.6.8", features = ["futures"] }
 dashmap = "3.11.10"
+backoff = "0.2.1"
 
 [features]
 default = ["native-tls"]
