@@ -83,6 +83,19 @@ impl<K: Resource> ObjectRef<K> {
             None
         }
     }
+
+    /// Convert into a reference to `K2`
+    ///
+    /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
+    /// has a corresponding `Endpoints`, but it wouldn't make sense to convert a `Pod` into a `Deployment`.
+    #[must_use]
+    pub fn into_kind_unchecked<K2: Resource>(self) -> ObjectRef<K2> {
+        ObjectRef {
+            kind: (),
+            name: self.name,
+            namespace: self.namespace,
+        }
+    }
 }
 
 impl<K: RuntimeResource> Display for ObjectRef<K> {
