@@ -179,6 +179,65 @@ impl AuthInfo {
                 if let Some(id_token) = provider.config.get("id-token") {
                     self.token = Some(id_token.clone());
                 }
+
+                if self.token.is_none() {
+                    if let Some(cmd) = provider.config.get("cmd-path") {
+                        let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
+
+                        let output = std::process::Command::new(cmd)
+                            .args(params.trim().split(" "))
+                            .output()
+                            .map_err(|e|
+                                ConfigError::AuthExec(format!("Executing {:} failed: {:?}", cmd,  e))
+                            )?;
+
+                        if !output.status.success() {
+                            return Err(ConfigError::AuthExecRun {
+                                cmd: format!{"{} {}", cmd, params},
+                                status: output.status,
+                                out: output,
+                            }.into());
+                        }
+
+                        if let Some(field) = provider.config.get("token-key") {
+                             // incredbly naive JSONPath impl
+                            let splitted = field
+                                .trim_matches(|c| c == '"' || c == '{' || c == '}')
+                                .split("." )
+                                .filter(|a| a.len() > 0);
+                            let mut current : serde_json::Value = serde_json::from_slice(&output.stdout)?;
+                            for item in splitted {
+                                if let serde_json::Value::Object(mut map) = current {
+                                    if let Some(v) = map.remove(item) {
+                                        current = v;
+                                    } else {
+                                        return Err(ConfigError::AuthExec(
+                                            format!("could not find '{:}' in result of command", item)).into());
+                                    }
+
+                                } else {
+                                    return Err(ConfigError::AuthExec(
+                                        format!("Can't lookup {:?} in result of command: not an object", item)
+                                    ).into());
+                                }
+                            }
+
+                            if let serde_json::Value::String(res) = current  {
+                                self.token = Some(res);
+                            } else {
+                                return Err(ConfigError::AuthExec(
+                                    format!("Target key is not a string {:?} ", current)).into());
+                            }
+                        } else {
+                            self.token = Some(
+                                std::str::from_utf8(&output.stdout).map_err(|e|
+                                        ConfigError::AuthExec(format!("Result is not a string {:?} ", e))
+                                )?.to_owned());
+                        }
+                    }
+                } else {
+                    return Err(ConfigError::AuthExec(format!("no token or command provided. Authoring mechanism {:} not supported", provider.name)).into());
+                }
             }
             None => {}
         };
