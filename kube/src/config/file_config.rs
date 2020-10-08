@@ -6,6 +6,8 @@ use crate::{config::utils, error::ConfigError, oauth2, Result};
 
 use serde::{Deserialize, Serialize};
 
+use jsonpath_lib::select as jsonpath_select;
+
 /// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
 /// that is normally stored in `~/.kube/config`
 ///
@@ -200,34 +202,27 @@ impl AuthInfo {
                         }
 
                         if let Some(field) = provider.config.get("token-key") {
-                             // incredbly naive JSONPath impl
-                            let splitted = field
-                                .trim_matches(|c| c == '"' || c == '{' || c == '}')
-                                .split("." )
-                                .filter(|a| a.len() > 0);
-                            let mut current : serde_json::Value = serde_json::from_slice(&output.stdout)?;
-                            for item in splitted {
-                                if let serde_json::Value::Object(mut map) = current {
-                                    if let Some(v) = map.remove(item) {
-                                        current = v;
+                            let pure_path = field
+                                .trim_matches(|c| c == '"' || c == '{' || c == '}');
+                            let json_output : serde_json::Value = serde_json::from_slice(&output.stdout)?;
+                            match jsonpath_select(&json_output, &format!("${}", pure_path)) {
+                                Ok(v) if v.len() > 0 => {
+                                    if let serde_json::Value::String(res) = v[0]  {
+                                        self.token = Some(res.clone());
                                     } else {
                                         return Err(ConfigError::AuthExec(
-                                            format!("could not find '{:}' in result of command", item)).into());
+                                            format!("Target value at {:} is not a string", pure_path)).into());
                                     }
-
-                                } else {
-                                    return Err(ConfigError::AuthExec(
-                                        format!("Can't lookup {:?} in result of command: not an object", item)
-                                    ).into());
                                 }
-                            }
-
-                            if let serde_json::Value::String(res) = current  {
-                                self.token = Some(res);
-                            } else {
-                                return Err(ConfigError::AuthExec(
-                                    format!("Target key is not a string {:?} ", current)).into());
-                            }
+                                Err(e) => {
+                                    return Err(ConfigError::AuthExec(
+                                        format!("Could not extract JSON value: {:}", e)).into());
+                                }
+                                _ => {
+                                    return Err(ConfigError::AuthExec(
+                                        format!("Target value {:} not found", pure_path)).into());
+                                }
+                            };
                         } else {
                             self.token = Some(
                                 std::str::from_utf8(&output.stdout).map_err(|e|
