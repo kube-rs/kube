@@ -252,3 +252,45 @@ impl AuthInfo {
         utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[tokio::test]
+    async fn exec_auth_command() -> Result<()> {
+        let test_file = "
+        apiVersion: v1
+        clusters:
+        - cluster:
+            certificate-authority-data: XXXXXXX
+            server: https://36.XXX.XXX.XX
+          name: generic-name
+        contexts:
+        - context:
+            cluster: generic-name
+            user: generic-name
+          name: generic-name
+        current-context: generic-name
+        kind: Config
+        preferences: {}
+        users:
+        - name: generic-name
+          user:
+            auth-provider:
+              config:
+                cmd-args: '{\"something\": \"else\", \"credential\" : {\"access_token\" : \"my_token\"} }'
+                cmd-path: echo
+                expiry-key: '{.credential.token_expiry}'
+                token-key: '{.credential.access_token}'
+              name: gcp
+        ";
+
+        let mut config : Kubeconfig = serde_yaml::from_str(test_file).map_err(ConfigError::ParseYaml)?;
+        let auth_info = &mut config.auth_infos[0].auth_info;
+        assert!(auth_info.token.is_none());
+        auth_info.load_gcp().await?;
+        assert_eq!(auth_info.token, Some("my_token".to_owned()));
+
+        Ok(())
+    }
+}
