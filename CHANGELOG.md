@@ -1,8 +1,10 @@
-0.43.0 / 2020-10-XX
+0.43.0 / 2020-10-08
 ===================
   * bug: `kube-derive` attr `#[kube(shortname)]` now working correctly
   * bug: `kube-derive` now working with badly cased existing types - #313
   * missing: `kube` now correctly exports `config::NamedAuthInfo` - #323
+  * feat: `kube`: expose `Config::get_auth_header` for istio use cases - #322
+  * feat: `kube`: local config now tackles gcloud auth exec params - #328 and #84
   * `kube-derive` now actually requires GVK (in particular `#[kube(kind = "Foo")]` which we sometimes inferred earlier, despite documenting the contrary)
 
 0.42.0 / 2020-09-10

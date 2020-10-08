@@ -189,48 +189,64 @@ impl AuthInfo {
                         let output = std::process::Command::new(cmd)
                             .args(params.trim().split(" "))
                             .output()
-                            .map_err(|e|
-                                ConfigError::AuthExec(format!("Executing {:} failed: {:?}", cmd,  e))
-                            )?;
+                            .map_err(|e| {
+                                ConfigError::AuthExec(format!("Executing {:} failed: {:?}", cmd, e))
+                            })?;
 
                         if !output.status.success() {
                             return Err(ConfigError::AuthExecRun {
-                                cmd: format!{"{} {}", cmd, params},
+                                cmd: format! {"{} {}", cmd, params},
                                 status: output.status,
                                 out: output,
-                            }.into());
+                            }
+                            .into());
                         }
 
                         if let Some(field) = provider.config.get("token-key") {
-                            let pure_path = field
-                                .trim_matches(|c| c == '"' || c == '{' || c == '}');
-                            let json_output : serde_json::Value = serde_json::from_slice(&output.stdout)?;
+                            let pure_path = field.trim_matches(|c| c == '"' || c == '{' || c == '}');
+                            let json_output: serde_json::Value = serde_json::from_slice(&output.stdout)?;
                             match jsonpath_select(&json_output, &format!("${}", pure_path)) {
                                 Ok(v) if v.len() > 0 => {
-                                    if let serde_json::Value::String(res) = v[0]  {
+                                    if let serde_json::Value::String(res) = v[0] {
                                         self.token = Some(res.clone());
                                     } else {
-                                        return Err(ConfigError::AuthExec(
-                                            format!("Target value at {:} is not a string", pure_path)).into());
+                                        return Err(ConfigError::AuthExec(format!(
+                                            "Target value at {:} is not a string",
+                                            pure_path
+                                        ))
+                                        .into());
                                     }
                                 }
                                 Err(e) => {
-                                    return Err(ConfigError::AuthExec(
-                                        format!("Could not extract JSON value: {:}", e)).into());
+                                    return Err(ConfigError::AuthExec(format!(
+                                        "Could not extract JSON value: {:}",
+                                        e
+                                    ))
+                                    .into());
                                 }
                                 _ => {
-                                    return Err(ConfigError::AuthExec(
-                                        format!("Target value {:} not found", pure_path)).into());
+                                    return Err(ConfigError::AuthExec(format!(
+                                        "Target value {:} not found",
+                                        pure_path
+                                    ))
+                                    .into());
                                 }
                             };
                         } else {
                             self.token = Some(
-                                std::str::from_utf8(&output.stdout).map_err(|e|
+                                std::str::from_utf8(&output.stdout)
+                                    .map_err(|e| {
                                         ConfigError::AuthExec(format!("Result is not a string {:?} ", e))
-                                )?.to_owned());
+                                    })?
+                                    .to_owned(),
+                            );
                         }
                     } else {
-                        return Err(ConfigError::AuthExec(format!("no token or command provided. Authoring mechanism {:} not supported", provider.name)).into());
+                        return Err(ConfigError::AuthExec(format!(
+                            "no token or command provided. Authoring mechanism {:} not supported",
+                            provider.name
+                        ))
+                        .into());
                     }
                 }
             }
@@ -280,7 +296,7 @@ mod test {
               name: gcp
         ";
 
-        let mut config : Kubeconfig = serde_yaml::from_str(test_file).map_err(ConfigError::ParseYaml)?;
+        let mut config: Kubeconfig = serde_yaml::from_str(test_file).map_err(ConfigError::ParseYaml)?;
         let auth_info = &mut config.auth_infos[0].auth_info;
         assert!(auth_info.token.is_none());
         auth_info.load_gcp().await?;
