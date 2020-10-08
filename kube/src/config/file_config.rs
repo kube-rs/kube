@@ -234,9 +234,9 @@ impl AuthInfo {
                                         ConfigError::AuthExec(format!("Result is not a string {:?} ", e))
                                 )?.to_owned());
                         }
+                    } else {
+                        return Err(ConfigError::AuthExec(format!("no token or command provided. Authoring mechanism {:} not supported", provider.name)).into());
                     }
-                } else {
-                    return Err(ConfigError::AuthExec(format!("no token or command provided. Authoring mechanism {:} not supported", provider.name)).into());
                 }
             }
             None => {}
