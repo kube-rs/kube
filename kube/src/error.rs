@@ -175,6 +175,8 @@ pub enum ConfigError {
     },
     #[error("Failed to parse auth exec output: {0}")]
     AuthExecParse(#[source] serde_json::Error),
+    #[error("Failed exec auth: {0}")]
+    AuthExec(String),
 }
 
 /// An Error response from the API
