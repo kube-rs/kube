@@ -1,7 +1,7 @@
 use crate::{CustomDerive, ResultExt};
 use inflector::string::pluralize::to_plural;
 use proc_macro2::{Ident, Span};
-use syn::{Data, DeriveInput, Result, Visibility};
+use syn::{Data, DeriveInput, Path, Result, Visibility};
 
 #[derive(Debug)]
 pub(crate) struct CustomResource {
@@ -250,22 +250,22 @@ impl CustomDerive for CustomResource {
         let has_status = status.is_some();
         let mut has_default = false;
 
-        let mut derive_idents = vec![];
-        for d in &["Serialize", "Deserialize", "Clone", "Debug"] {
-            derive_idents.push(format_ident!("{}", d));
+        let mut derive_paths: Vec<Path> = vec![];
+        for d in ["Serialize", "Deserialize", "Clone", "Debug"].iter() {
+            derive_paths.push(syn::parse_str(*d)?);
         }
-        for d in derives {
+        for d in &derives {
             if d == "Default" {
                 has_default = true; // overridden manually to avoid confusion
             } else {
-                derive_idents.push(format_ident!("{}", d));
+                derive_paths.push(syn::parse_str(d)?);
             }
         }
 
         let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
         let root_obj = quote! {
             #[doc = #docstr]
-            #[derive(#(#derive_idents),*)]
+            #[derive(#(#derive_paths),*)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
                 #visibility api_version: String,
