@@ -117,6 +117,9 @@ use custom_resource::CustomResource;
 /// ### `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
 ///
+/// ### `#[kube(kind_struct = "KindStructName")]`
+/// Customize the name of the generated root struct (defaults to `kind`).
+///
 /// ### `#[kube(status = "StatusStructName")]`
 /// Adds a status struct to the top level generated type and enables the status
 /// subresource in your crd.

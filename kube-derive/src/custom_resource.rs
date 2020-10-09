@@ -17,6 +17,7 @@ struct KubeAttrs {
     group: String,
     version: String,
     kind: String,
+    kind_struct: String,
     /// lowercase plural of kind (inferred if omitted)
     plural: Option<String>,
     namespaced: bool,
@@ -42,6 +43,7 @@ impl CustomDerive for CustomResource {
         // Outputs
         let mut ka = KubeAttrs::default();
         let (mut group, mut version, mut kind) = (None, None, None); // mandatory GVK
+        let mut kind_struct = None;
         ka.apiextensions = "v1".to_string(); // implicit stable crd version expected
 
         // Arg parsing
@@ -83,6 +85,14 @@ impl CustomDerive for CustomResource {
                                 continue;
                             } else {
                                 return Err(r#"#[kube(kind = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
+                        } else if meta.path.is_ident("kind_struct") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                kind_struct = Some(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(kind_struct = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
                         } else if meta.path.is_ident("plural") {
@@ -176,9 +186,10 @@ impl CustomDerive for CustomResource {
         ka.group = group.ok_or_else(|| mkerror("group")).spanning(&tokens)?;
         ka.version = version.ok_or_else(|| mkerror("version")).spanning(&tokens)?;
         ka.kind = kind.ok_or_else(|| mkerror("kind")).spanning(&tokens)?;
+        ka.kind_struct = kind_struct.unwrap_or_else(|| ka.kind.clone());
 
         let struct_name = ident.to_string();
-        if ka.kind == struct_name {
+        if ka.kind_struct == struct_name {
             return Err(r#"#[derive(CustomResource)] `kind = "..."` must not equal the struct name (this is generated)"#)
                     .spanning(ident);
         }
@@ -202,6 +213,7 @@ impl CustomDerive for CustomResource {
         let KubeAttrs {
             group,
             kind,
+            kind_struct,
             version,
             namespaced,
             derives,
@@ -219,7 +231,7 @@ impl CustomDerive for CustomResource {
         // Default generics is no generics (makes little sense to re-use CRD kind?)
         // We enforce metadata + spec's existence (always there)
         // => No default impl
-        let rootident = Ident::new(&kind, Span::call_site());
+        let rootident = Ident::new(&kind_struct, Span::call_site());
 
         // if status set, also add that
         let (statusq, statusdef) = if let Some(status_name) = &status {
