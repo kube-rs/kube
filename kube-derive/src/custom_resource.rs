@@ -251,7 +251,7 @@ impl CustomDerive for CustomResource {
         let mut has_default = false;
 
         let mut derive_paths: Vec<Path> = vec![];
-        for d in ["Serialize", "Deserialize", "Clone", "Debug"].iter() {
+        for d in ["::serde::Serialize", "::serde::Deserialize", "Clone", "Debug"].iter() {
             derive_paths.push(syn::parse_str(*d)?);
         }
         for d in &derives {
