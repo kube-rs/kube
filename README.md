@@ -156,5 +156,8 @@ k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"
 
 This will pull in the variant of `reqwest` that also uses its `rustls-tls` feature.
 
+## musl-libc
+Kube will work with [distroless](https://github.com/clux/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/clux/kube-rs/issues/331#issuecomment-715962188)).
+
 ## License
 Apache 2.0 licensed. See LICENSE for details.
