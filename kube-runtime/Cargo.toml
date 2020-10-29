@@ -15,7 +15,6 @@ edition = "2018"
 [dependencies]
 futures = "0.3.5"
 kube = { path = "../kube", version = "^0.43.0", default-features = false }
-k8s-openapi = "0.10.0"
 derivative = "2.1.1"
 serde = "1.0.115"
 smallvec = "1.4.2"
@@ -23,6 +22,10 @@ pin-project = "0.4.23"
 tokio = { version = "0.2.21", features = ["time"] }
 snafu = { version = "0.6.8", features = ["futures"] }
 dashmap = "3.11.10"
+
+[dependencies.k8s-openapi]
+version = "0.10.0"
+default-features = false
 
 [features]
 default = ["native-tls"]
