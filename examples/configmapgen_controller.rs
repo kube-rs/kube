@@ -92,16 +92,12 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
         )
         .await
         .context(ConfigMapCreationFailed)?;
-    Ok(ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(300)),
-    })
+    Ok(ReconcilerAction::Requeue(Duration::from_secs(300)))
 }
 
 /// The controller triggers this on reconcile errors
 fn error_policy(_error: &Error, _ctx: Context<Data>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(1)),
-    }
+    ReconcilerAction::Requeue(Duration::from_secs(1))
 }
 
 // Data we want access to in error/reconcile calls

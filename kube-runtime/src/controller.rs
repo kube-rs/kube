@@ -41,14 +41,17 @@ pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error:
     },
 }
 
-/// Results of the reconciliation attempt
+/// A result of reconciliation attempt.
 #[derive(Debug, Clone)]
-pub struct ReconcilerAction {
-    /// Whether (and when) to next trigger the reconciliation if no external watch triggers hit
-    ///
-    /// For example, use this to query external systems for updates, expire time-limited resources, or
-    /// (in your `error_policy`) retry after errors.
-    pub requeue_after: Option<Duration>,
+pub enum ReconcilerAction {
+    /// Action to trigger the reconciliation after given `Duration` if no external watch triggers hit.
+   /// For example, use this to query external systems for updates, expire time-limited resources, or
+   /// (in your `error_policy`) retry after errors.
+    Requeue(Duration),
+    /// No additional action to to taken/scheduled for reconciliation.
+    /// The previous reconciliation round was either successful, or there is no possible
+    /// `error_policy` in case of an error.
+    None,
 }
 
 /// Helper for building custom trigger filters, see `trigger_self` and `trigger_owners` for some examples
@@ -182,7 +185,7 @@ where
     })
     // finally, for each completed reconcile call:
     .and_then(move |(obj_ref, reconciler_result)| {
-        let ReconcilerAction { requeue_after } = match &reconciler_result {
+        let reconciler_action = match &reconciler_result {
             Ok(action) => action.clone(),                       // do what user told us
             Err(err) => error_policy(err, err_context.clone()), // reconciler fn call failed
         };
@@ -190,7 +193,8 @@ where
         let mut scheduler_tx = scheduler_tx.clone();
         async move {
             // Transmit the requeue request to the scheduler (picked up again at top)
-            if let Some(delay) = requeue_after {
+
+            if let ReconcilerAction::Requeue(delay) = reconciler_action {
                 scheduler_tx
                     .send(ScheduleRequest {
                         message: obj_ref.clone(),
@@ -241,15 +245,11 @@ where
 /// async fn reconcile(g: ConfigMapGenerator, _ctx: Context<()>) -> Result<ReconcilerAction, Error> {
 ///     // .. use api here to reconcile a child ConfigMap with ownerreferences
 ///     // see configmapgen_controller example for full info
-///     Ok(ReconcilerAction {
-///         requeue_after: Some(Duration::from_secs(300)),
-///     })
+///     Ok(ReconcilerAction::Requeue(Duration::from_secs(300)))
 /// }
 /// /// an error handler that will be called when the reconciler fails
 /// fn error_policy(_error: &Error, _ctx: Context<()>) -> ReconcilerAction {
-///     ReconcilerAction {
-///         requeue_after: Some(Duration::from_secs(60)),
-///     }
+///     ReconcilerAction::Requeue(Duration::from_secs(60))
 /// }
 ///
 /// /// something to drive the controller
