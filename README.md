@@ -90,7 +90,7 @@ There are a ton of kubebuilder like instructions that you can annotate with here
 **NB:** `#[derive(CustomResource)]` requires the `derive` feature enabled on `kube`.
 
 ## Runtime
-The `kube_runtime` create contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
+The `kube_runtime` crate contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
 
 ### Watchers
 A low level streaming interface (similar to informers) that presents `Applied`, `Deleted` or `Restarted` events.
