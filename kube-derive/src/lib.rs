@@ -131,7 +131,7 @@ use custom_resource::CustomResource;
 /// ### `#[kube(scale = r#"json"#)]`
 /// Allow customizing the scale struct for the [scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources).
 ///
-/// ### `#[kube(printcoloum = r#"json"#)]`
+/// ### `#[kube(printcolumn = r#"json"#)]`
 /// Allows adding straight json to [printcolumns](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns).
 ///
 /// ### `#[kube(shortname = "sn")]`
