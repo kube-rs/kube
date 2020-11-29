@@ -49,7 +49,7 @@ where
 /// A convenience struct for ad-hoc serialization
 ///
 /// Mostly useful for `Object`
-#[derive(Deserialize, Serialize, Clone, Default)]
+#[derive(Deserialize, Serialize, Clone, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TypeMeta {
     /// The version of the API
