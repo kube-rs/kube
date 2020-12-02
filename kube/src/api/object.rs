@@ -222,3 +222,22 @@ impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
         self.items.iter_mut()
     }
 }
+
+impl<T: Clone> k8s_openapi::Resource for ObjectList<T> {
+    const API_VERSION: &'static str = "v1";
+    const GROUP: &'static str = "";
+    const KIND: &'static str = "List";
+    const VERSION: &'static str = "v1";
+}
+
+impl<T: Clone> k8s_openapi::Metadata for ObjectList<T> {
+    type Ty = k8s_openapi::apimachinery::pkg::apis::meta::v1::ListMeta;
+
+    fn metadata(&self) -> &<Self as k8s_openapi::Metadata>::Ty {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut <Self as k8s_openapi::Metadata>::Ty {
+        &mut self.metadata
+    }
+}
