@@ -1,4 +1,22 @@
-0.40.0 / 2020-07-17
+0.43.0 / 2020-10-08
+===================
+  * bug: `kube-derive` attr `#[kube(shortname)]` now working correctly
+  * bug: `kube-derive` now working with badly cased existing types - #313
+  * missing: `kube` now correctly exports `config::NamedAuthInfo` - #323
+  * feat: `kube`: expose `Config::get_auth_header` for istio use cases - #322
+  * feat: `kube`: local config now tackles gcloud auth exec params - #328 and #84
+  * `kube-derive` now actually requires GVK (in particular `#[kube(kind = "Foo")]` which we sometimes inferred earlier, despite documenting the contrary)
+
+0.42.0 / 2020-09-10
+===================
+  * bug: `kube-derive`'s `Default` derive now sets typemeta correctly - #315
+  * feat: `ListParams` now supports `continue_token` and `limit` - #320
+
+0.41.0 / 2020-09-10
+===================
+  * yanked release. failed publish.
+
+0.40.0 / 2020-08-17
 ===================
   * `DynamicResource::from_api_resource` added to allow apiserver returned resources - #305 via #301
   * `Client::list_api_groups` added
@@ -11,13 +29,13 @@
   * Removed paramter `ListParams::include_uninitialized` deprecated since 1.14
   * Added optional `PostParams::field_manager` was missing for `Api::create` case
 
-0.39.0 / 2020-07-05
+0.39.0 / 2020-08-05
 ===================
   * Bug: `ObjectRef` tweak in `kube-runtime` to allow controllers triggering across cluster and namespace scopes - #293 via #294
   * Feature: `kube` now has a `derive` feature which will re-export `kube::CustomResource` from `kube-derive::CustomResource`.
   * Examples: revamp examples for `kube-runtime` - #201
 
-0.38.0 / 2020-06-23
+0.38.0 / 2020-07-23
 ===================
   * Marked `kube::runtime` module as deprecated - #281
   * `Config::timeout` can now be overridden to `None` (with caveats) #280
@@ -27,13 +45,13 @@
   * Bug: Specialize WatchEvent::Bookmark so they can be deserialized - #285
   * Docs: Tons of docs for kube-runtime
 
-0.37.0 / 2020-06-20
+0.37.0 / 2020-07-20
 ===================
   * Bump `k8s-openapi` to `0.9.0`
   * All runtime components now require `Sync` objects
   * reflector/watcher/Controller streams can be shared in threaded environments
 
-0.36.0 / 2020-06-19
+0.36.0 / 2020-07-19
 ===================
   * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate #258
   * `Controller<K>` added (#148 via #258)

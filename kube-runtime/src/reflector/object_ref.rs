@@ -1,7 +1,10 @@
 use derivative::Derivative;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::OwnerReference, Resource};
 use kube::api::Meta;
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash, Clone)]
@@ -80,6 +83,36 @@ impl<K: Resource> ObjectRef<K> {
             None
         }
     }
+
+    /// Convert into a reference to `K2`
+    ///
+    /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
+    /// has a corresponding `Endpoints`, but it wouldn't make sense to convert a `Pod` into a `Deployment`.
+    #[must_use]
+    pub fn into_kind_unchecked<K2: Resource>(self) -> ObjectRef<K2> {
+        ObjectRef {
+            kind: (),
+            name: self.name,
+            namespace: self.namespace,
+        }
+    }
+}
+
+impl<K: RuntimeResource> Display for ObjectRef<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}.{}.{}/{}",
+            K::kind(&self.kind),
+            K::version(&self.kind),
+            K::group(&self.kind),
+            self.name
+        )?;
+        if let Some(namespace) = &self.namespace {
+            write!(f, ".{}", namespace)?;
+        }
+        Ok(())
+    }
 }
 
 /// A Kubernetes type that is known at runtime
@@ -152,5 +185,52 @@ impl<K: Resource> From<ObjectRef<K>> for ObjectRef<ErasedResource> {
             name: old.name,
             namespace: old.namespace,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ErasedResource, ObjectRef};
+    use k8s_openapi::api::{
+        apps::v1::Deployment,
+        core::v1::{Node, Pod},
+    };
+
+    #[test]
+    fn display_should_follow_expected_format() {
+        assert_eq!(
+            format!("{}", ObjectRef::<Pod>::new("my-pod").within("my-namespace")),
+            "Pod.v1./my-pod.my-namespace"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                ObjectRef::<Deployment>::new("my-deploy").within("my-namespace")
+            ),
+            "Deployment.v1.apps/my-deploy.my-namespace"
+        );
+        assert_eq!(
+            format!("{}", ObjectRef::<Node>::new("my-node")),
+            "Node.v1./my-node"
+        );
+    }
+
+    #[test]
+    fn display_should_be_transparent_to_representation() {
+        let pod_ref = ObjectRef::<Pod>::new("my-pod").within("my-namespace");
+        assert_eq!(
+            format!("{}", pod_ref),
+            format!("{}", ObjectRef::<ErasedResource>::from(pod_ref))
+        );
+        let deploy_ref = ObjectRef::<Deployment>::new("my-deploy").within("my-namespace");
+        assert_eq!(
+            format!("{}", deploy_ref),
+            format!("{}", ObjectRef::<ErasedResource>::from(deploy_ref))
+        );
+        let node_ref = ObjectRef::<Node>::new("my-node");
+        assert_eq!(
+            format!("{}", node_ref),
+            format!("{}", ObjectRef::<ErasedResource>::from(node_ref))
+        );
     }
 }

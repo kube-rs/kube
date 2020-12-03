@@ -33,8 +33,8 @@ enum Error {
 }
 
 #[derive(CustomResource, Debug, Clone, Deserialize, Serialize)]
-#[kube(group = "nullable.se", version = "v1", namespaced)]
-#[kube(shortname = "cmg")]
+#[kube(group = "nullable.se", version = "v1", kind = "ConfigMapGenerator")]
+#[kube(shortname = "cmg", namespaced)]
 struct ConfigMapGeneratorSpec {
     content: String,
 }

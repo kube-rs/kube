@@ -1,21 +1,30 @@
 use crate::{CustomDerive, ResultExt};
-use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
+use inflector::string::pluralize::to_plural;
 use proc_macro2::{Ident, Span};
-use syn::{Data, DeriveInput, Result, Visibility};
+use syn::{Data, DeriveInput, Path, Result, Visibility};
 
 #[derive(Debug)]
 pub(crate) struct CustomResource {
     tokens: proc_macro2::TokenStream,
     ident: proc_macro2::Ident,
     visibility: Visibility,
-    kind: String,
+    kubeattrs: KubeAttrs,
+}
+
+/// Values we can parse from #[kube(attrs)]
+#[derive(Debug, Default)]
+struct KubeAttrs {
     group: String,
     version: String,
+    kind: String,
+    kind_struct: String,
+    /// lowercase plural of kind (inferred if omitted)
+    plural: Option<String>,
     namespaced: bool,
+    apiextensions: String,
     derives: Vec<String>,
     status: Option<String>,
     shortnames: Vec<String>,
-    apiextensions: String,
     printcolums: Vec<String>,
     scale: Option<String>,
 }
@@ -32,16 +41,10 @@ impl CustomDerive for CustomResource {
         };
 
         // Outputs
-        let mut group = None;
-        let mut version = None;
-        let mut namespaced = false;
-        let mut derives = vec![];
-        let mut status = None;
-        let mut apiextensions = "v1".to_string();
-        let mut scale = None;
-        let mut printcolums = vec![];
-        let mut shortnames = vec![];
-        let mut kind = None;
+        let mut ka = KubeAttrs::default();
+        let (mut group, mut version, mut kind) = (None, None, None); // mandatory GVK
+        let mut kind_struct = None;
+        ka.apiextensions = "v1".to_string(); // implicit stable crd version expected
 
         // Arg parsing
         for attr in &input.attrs {
@@ -76,25 +79,41 @@ impl CustomDerive for CustomResource {
                                 return Err(r#"#[kube(version = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
-                        } else if meta.path.is_ident("scale") {
+                        } else if meta.path.is_ident("kind") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                scale = Some(lit.value());
+                                kind = Some(lit.value());
                                 continue;
                             } else {
-                                return Err(r#"#[kube(scale = "...")] expects a string literal value"#)
+                                return Err(r#"#[kube(kind = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
+                        } else if meta.path.is_ident("kind_struct") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                kind_struct = Some(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(kind_struct = "...")] expects a string literal value"#)
+                                    .spanning(meta);
+                            }
+                        } else if meta.path.is_ident("plural") {
+                            if let syn::Lit::Str(lit) = &meta.lit {
+                                ka.plural = Some(lit.value());
+                                continue;
+                            } else {
+                                return Err(r#"#[kube(plural = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
                         } else if meta.path.is_ident("shortname") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                shortnames.push(lit.value());
+                                ka.shortnames.push(lit.value());
                                 continue;
                             } else {
                                 return Err(r#"#[kube(shortname = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
-                        } else if meta.path.is_ident("kind") {
+                        } else if meta.path.is_ident("scale") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                kind = Some(lit.value());
+                                ka.scale = Some(lit.value());
                                 continue;
                             } else {
                                 return Err(r#"#[kube(scale = "...")] expects a string literal value"#)
@@ -102,7 +121,7 @@ impl CustomDerive for CustomResource {
                             }
                         } else if meta.path.is_ident("status") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                status = Some(lit.value());
+                                ka.status = Some(lit.value());
                                 continue;
                             } else {
                                 return Err(r#"#[kube(status = "...")] expects a string literal value"#)
@@ -110,7 +129,7 @@ impl CustomDerive for CustomResource {
                             }
                         } else if meta.path.is_ident("apiextensions") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                apiextensions = lit.value();
+                                ka.apiextensions = lit.value();
                                 continue;
                             } else {
                                 return Err(
@@ -120,7 +139,7 @@ impl CustomDerive for CustomResource {
                             }
                         } else if meta.path.is_ident("printcolumn") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                printcolums.push(lit.value());
+                                ka.printcolums.push(lit.value());
                                 continue;
                             } else {
                                 return Err(r#"#[kube(printcolumn = "...")] expects a string literal value"#)
@@ -128,7 +147,7 @@ impl CustomDerive for CustomResource {
                             }
                         } else if meta.path.is_ident("derive") {
                             if let syn::Lit::Str(lit) = &meta.lit {
-                                derives.push(lit.value());
+                                ka.derives.push(lit.value());
                                 continue;
                             } else {
                                 return Err(r#"#[kube(derive = "...")] expects a string literal value"#)
@@ -142,7 +161,7 @@ impl CustomDerive for CustomResource {
                     // indicator arguments
                     syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
                         if path.is_ident("namespaced") {
-                            namespaced = true;
+                            ka.namespaced = true;
                             continue;
                         } else {
                             &meta
@@ -157,53 +176,28 @@ impl CustomDerive for CustomResource {
             }
         }
 
-        // Find our Kind
-        let struct_name = ident.to_string();
-        let kind = if let Some(k) = kind {
-            if k == struct_name {
-                return Err(r#"#[derive(CustomResource)] `kind = "..."` must not equal the struct name (this is generated)"#)
-                    .spanning(ident);
-            }
-            k
-        } else {
-            // Fallback, infer from struct name
-
-            if !struct_name.ends_with("Spec") {
-                return Err(r#"#[derive(CustomResource)] requires either a `kind = "..."` or the struct to end with `Spec`"#)
-                    .spanning(ident);
-            }
-            struct_name[..(struct_name.len() - 4)].to_owned()
-        };
-        if !is_pascal_case(&kind) || to_plural(&kind) == kind {
-            return Err(
-                r#"#[derive(CustomResource)] requires a non-plural PascalCase `kind = "..."` or non-plural PascalCase struct name"#,
-            )
-            .spanning(ident);
-        }
-
+        // Unpack the mandatory GVK
         let mkerror = |arg| {
             format!(
                 r#"#[derive(CustomResource)] did not find a #[kube({} = "...")] attribute on the struct"#,
                 arg
             )
         };
-        let group = group.ok_or_else(|| mkerror("group")).spanning(&tokens)?;
-        let version = version.ok_or_else(|| mkerror("version")).spanning(&tokens)?;
+        ka.group = group.ok_or_else(|| mkerror("group")).spanning(&tokens)?;
+        ka.version = version.ok_or_else(|| mkerror("version")).spanning(&tokens)?;
+        ka.kind = kind.ok_or_else(|| mkerror("kind")).spanning(&tokens)?;
+        ka.kind_struct = kind_struct.unwrap_or_else(|| ka.kind.clone());
 
+        let struct_name = ident.to_string();
+        if ka.kind_struct == struct_name {
+            return Err(r#"#[derive(CustomResource)] `kind = "..."` must not equal the struct name (this is generated)"#)
+                    .spanning(ident);
+        }
         Ok(CustomResource {
+            kubeattrs: ka,
             tokens,
             ident,
             visibility,
-            kind,
-            group,
-            version,
-            namespaced,
-            derives,
-            printcolums,
-            status,
-            shortnames,
-            apiextensions,
-            scale,
         })
     }
 
@@ -213,17 +207,23 @@ impl CustomDerive for CustomResource {
             tokens,
             ident,
             visibility,
+            kubeattrs,
+        } = self;
+
+        let KubeAttrs {
             group,
             kind,
+            kind_struct,
             version,
             namespaced,
             derives,
             status,
+            plural,
             shortnames,
             printcolums,
             apiextensions,
             scale,
-        } = self;
+        } = kubeattrs;
 
         // 1. Create root object Foo and truncate name from FooSpec
 
@@ -231,7 +231,7 @@ impl CustomDerive for CustomResource {
         // Default generics is no generics (makes little sense to re-use CRD kind?)
         // We enforce metadata + spec's existence (always there)
         // => No default impl
-        let rootident = Ident::new(&kind, Span::call_site());
+        let rootident = Ident::new(&kind_struct, Span::call_site());
 
         // if status set, also add that
         let (statusq, statusdef) = if let Some(status_name) = &status {
@@ -248,19 +248,24 @@ impl CustomDerive for CustomResource {
             (fst, snd)
         };
         let has_status = status.is_some();
+        let mut has_default = false;
 
-        let mut derive_idents = vec![];
-        for d in &["Serialize", "Deserialize", "Clone", "Debug"] {
-            derive_idents.push(format_ident!("{}", d));
+        let mut derive_paths: Vec<Path> = vec![];
+        for d in ["::serde::Serialize", "::serde::Deserialize", "Clone", "Debug"].iter() {
+            derive_paths.push(syn::parse_str(*d)?);
         }
-        for d in derives {
-            derive_idents.push(format_ident!("{}", d));
+        for d in &derives {
+            if d == "Default" {
+                has_default = true; // overridden manually to avoid confusion
+            } else {
+                derive_paths.push(syn::parse_str(d)?);
+            }
         }
 
         let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
         let root_obj = quote! {
             #[doc = #docstr]
-            #[derive(#(#derive_idents),*)]
+            #[derive(#(#derive_paths),*)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
                 #visibility api_version: String,
@@ -308,10 +313,28 @@ impl CustomDerive for CustomResource {
                 }
             }
         };
+        // 4. Implement Default if requested
+        let impl_default = if has_default {
+            quote! {
+                impl Default for #rootident {
+                    fn default() -> Self {
+                        Self {
+                            api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
+                            kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
+                            metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
+                            spec: Default::default(),
+                            #statusdef
+                        }
+                    }
+                }
+            }
+        } else {
+            quote! {}
+        };
 
-        // 4. Implement CustomResource
+        // 5. Implement CustomResource
         let name = kind.to_ascii_lowercase();
-        let plural = to_plural(&name);
+        let plural = plural.unwrap_or_else(|| to_plural(&name));
         let scope = if namespaced { "Namespaced" } else { "Cluster" };
 
         // Compute a bunch of crd props
@@ -410,6 +433,7 @@ impl CustomDerive for CustomResource {
             #root_obj
             #impl_resource
             #impl_metadata
+            #impl_default
             #impl_crd
         };
         // Try to convert to a TokenStream

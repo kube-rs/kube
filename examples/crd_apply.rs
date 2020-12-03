@@ -15,7 +15,7 @@ use kube::{
 
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
-#[kube(group = "clux.dev", version = "v1", namespaced)]
+#[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
 #[kube(apiextensions = "v1beta1")] // remove this if using Kubernetes >= 1.17
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]

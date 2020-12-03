@@ -117,6 +117,9 @@ use custom_resource::CustomResource;
 /// ### `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
 ///
+/// ### `#[kube(kind_struct = "KindStructName")]`
+/// Customize the name of the generated root struct (defaults to `kind`).
+///
 /// ### `#[kube(status = "StatusStructName")]`
 /// Adds a status struct to the top level generated type and enables the status
 /// subresource in your crd.
@@ -128,7 +131,7 @@ use custom_resource::CustomResource;
 /// ### `#[kube(scale = r#"json"#)]`
 /// Allow customizing the scale struct for the [scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources).
 ///
-/// ### `#[kube(printcoloum = r#"json"#)]`
+/// ### `#[kube(printcolumn = r#"json"#)]`
 /// Allows adding straight json to [printcolumns](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns).
 ///
 /// ### `#[kube(shortname = "sn")]`

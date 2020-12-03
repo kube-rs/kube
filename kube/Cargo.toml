@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.40.0"
+version = "0.43.0"
 description = "Kubernetes client in futures controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -26,7 +26,7 @@ features = ["derive"]
 [dependencies]
 base64 = "0.12.1"
 chrono = "0.4.15"
-dirs = "3.0.1"
+dirs = { package = "dirs-next", version = "2.0.0" }
 serde = { version = "1.0.111", features = ["derive"] }
 serde_json = "1.0.53"
 serde_yaml = "0.8.13"
@@ -45,15 +45,16 @@ bytes = "0.5.6"
 Inflector = "0.11.4"
 tokio = { version = "0.2.22", features = ["time", "signal", "sync"] }
 static_assertions = "1.1.0"
-kube-derive = { path = "../kube-derive", version = "^0.40.0", optional = true }
+kube-derive = { path = "../kube-derive", version = "^0.43.0", optional = true }
+jsonpath_lib = "0.2.5"
 
 [dependencies.reqwest]
-version = "0.10.7"
+version = "0.10.8"
 default-features = false
 features = ["json", "gzip", "stream"]
 
 [dependencies.k8s-openapi]
-version = "0.9.0"
+version = "0.10.0"
 default-features = false
 features = []
 
@@ -62,6 +63,6 @@ tempfile = "3.1.0"
 tokio = { version = "0.2.21", features = ["full"] }
 
 [dev-dependencies.k8s-openapi]
-version = "0.9.0"
+version = "0.10.0"
 default-features = false
 features = ["v1_18"]

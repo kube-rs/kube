@@ -101,6 +101,12 @@ impl Resource {
         if let Some(labels) = &lp.label_selector {
             qp.append_pair("labelSelector", &labels);
         }
+        if let Some(limit) = &lp.limit {
+            qp.append_pair("limit", &limit.to_string());
+        }
+        if let Some(continue_token) = &lp.continue_token {
+            qp.append_pair("continue", continue_token);
+        }
 
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
@@ -112,6 +118,16 @@ impl Resource {
         let base_url = self.make_url() + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         lp.validate()?;
+        if lp.limit.is_some() {
+            return Err(Error::RequestValidation(
+                "ListParams::limit cannot be used with a watch.".into(),
+            ));
+        }
+        if lp.continue_token.is_some() {
+            return Err(Error::RequestValidation(
+                "ListParams::continue_token cannot be used with a watch.".into(),
+            ));
+        }
 
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);

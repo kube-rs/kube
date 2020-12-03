@@ -30,7 +30,7 @@ pub(crate) enum Authentication {
 }
 
 impl Authentication {
-    async fn to_header(&self) -> Result<Option<header::HeaderValue>> {
+    async fn to_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
         match self {
             Self::None => Ok(None),
             Self::Basic(value) => Ok(Some(
@@ -51,7 +51,7 @@ impl Authentication {
                         locked_data.0 = new_token;
                         locked_data.1 = new_expire;
                     } else {
-                        return Err(ConfigError::UnrefreshableTokenResponse.into());
+                        return Err(ConfigError::UnrefreshableTokenResponse);
                     }
                 }
                 Ok(Some(
@@ -242,7 +242,13 @@ impl Config {
         })
     }
 
-    pub(crate) async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>> {
+    /// Get a valid HTTP `Authorization` header that can authenticate to the cluster
+    ///
+    /// Will renew tokens if required (and configured to).
+    ///
+    /// NOTE: This is `None` if the `Config` isn't configured to use token-based authentication
+    /// (such as anonymous access, or certificate-based authentication).
+    pub async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
         self.auth_header.to_header().await
     }
 
@@ -292,13 +298,13 @@ impl Config {
 /// Loads the authentication header from the credentials available in the kubeconfig. This supports
 /// exec plugins as well as specified in
 /// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
-fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication> {
+fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication, ConfigError> {
     let (raw_token, expiration) = match &loader.user.token {
         Some(token) => (Some(token.clone()), None),
         None => {
             if let Some(exec) = &loader.user.exec {
                 let creds = exec::auth_exec(exec)?;
-                let status = creds.status.ok_or_else(|| ConfigError::ExecPluginFailed)?;
+                let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
                 let expiration = match status.expiration_timestamp {
                     Some(ts) => Some(
                         ts.parse::<DateTime<Utc>>()
@@ -353,6 +359,6 @@ fn hacky_cert_lifetime_for_macos(_: &Der) -> bool {
 
 // Expose raw config structs
 pub use file_config::{
-    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedCluster, NamedContext,
-    NamedExtension, Preferences,
+    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedAuthInfo, NamedCluster,
+    NamedContext, NamedExtension, Preferences,
 };

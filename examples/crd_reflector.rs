@@ -8,7 +8,7 @@ use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
 use serde::{Deserialize, Serialize};
 
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
-#[kube(group = "clux.dev", version = "v1", namespaced)]
+#[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 pub struct FooSpec {
     name: String,
     info: String,
