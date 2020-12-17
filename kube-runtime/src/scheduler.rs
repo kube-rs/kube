@@ -48,7 +48,7 @@ pub struct Scheduler<T, R> {
     queue: DelayQueue<T>,
     /// Metadata for all currently scheduled messages. Used to detect duplicate messages.
     scheduled: HashMap<T, ScheduledEntry>,
-    /// Messages that are scheduled to have happened, but have been held using `next_if_allowed`.
+    /// Messages that are scheduled to have happened, but have been held using `hold_unless`.
     pending: HashSet<T>,
     /// Incoming queue of scheduling requests.
     #[pin]
