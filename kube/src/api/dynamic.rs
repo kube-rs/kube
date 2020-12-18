@@ -221,8 +221,9 @@ mod test {
     #[ignore] // circle has no kubeconfig
     async fn convenient_custom_resource() {
         use crate::{Api, Client, CustomResource};
+        use schemars::JsonSchema;
         use serde::{Deserialize, Serialize};
-        #[derive(Clone, Debug, CustomResource, Deserialize, Serialize)]
+        #[derive(Clone, Debug, CustomResource, Deserialize, Serialize, JsonSchema)]
         #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
         struct FooSpec {
             foo: String,

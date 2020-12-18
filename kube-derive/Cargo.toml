@@ -22,3 +22,4 @@ proc-macro = true
 serde = { version = "1.0.111", features = ["derive"] }
 serde_yaml = "0.8.14"
 k8s-openapi = { version = "0.10.0", default-features = false, features = ["v1_19"] }
+schemars = "0.8.0"

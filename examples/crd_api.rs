@@ -1,5 +1,6 @@
 #[macro_use] extern crate log;
 use either::Either::{Left, Right};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
@@ -14,7 +15,7 @@ use kube::{
 };
 
 // Own custom resource
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(apiextensions = "v1beta1")]
 #[kube(status = "FooStatus")]
@@ -26,7 +27,7 @@ pub struct FooSpec {
     replicas: i32,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct FooStatus {
     is_bad: bool,
     replicas: i32,

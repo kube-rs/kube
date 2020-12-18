@@ -60,8 +60,9 @@ use custom_resource::CustomResource;
 /// use serde::{Serialize, Deserialize};
 /// use k8s_openapi::Resource;
 /// use kube_derive::CustomResource;
+/// use schemars::JsonSchema;
 ///
-/// #[derive(CustomResource, Clone, Debug, Deserialize, Serialize)]
+/// #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
 /// #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 /// struct FooSpec {
 ///     info: String,
@@ -140,8 +141,9 @@ use custom_resource::CustomResource;
 /// ```rust
 /// use serde::{Serialize, Deserialize};
 /// use kube_derive::CustomResource;
+/// use schemars::JsonSchema;
 ///
-/// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 /// #[kube(
 ///     group = "clux.dev",
 ///     version = "v1",
@@ -158,7 +160,7 @@ use custom_resource::CustomResource;
 ///     replicas: i32
 /// }
 ///
-/// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 /// struct FooStatus {
 ///     replicas: i32
 /// }
