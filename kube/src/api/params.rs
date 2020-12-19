@@ -282,7 +282,7 @@ pub struct DeleteParams {
     pub preconditions: Option<Preconditions>,
 }
 
-// dryRun seriization differ when used as body parameters and query strings:
+// dryRun serialization differ when used as body parameters and query strings:
 // query strings are either true/false
 // body params allow only: missing field, or ["All"]
 // The latter is a very awkward API causing users to do to
