@@ -78,11 +78,11 @@ where
             // Then pin then futures to the stack, and wait for any of them
             pin_mut!(ctrlc_fut, sigterm_fut, poll_fut);
             select! {
-                ctrlc = ctrlc_fut => {
+                _ctrlc = ctrlc_fut => {
                     info!("Received ctrl_c, exiting");
                     return Ok(());
                 },
-                sigterm = sigterm_fut => {
+                _sigterm = sigterm_fut => {
                     info!("Received SIGTERM, exiting");
                     return Ok(());
                 }
