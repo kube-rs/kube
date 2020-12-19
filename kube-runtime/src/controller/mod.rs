@@ -21,6 +21,8 @@ use std::{sync::Arc, time::Duration};
 use stream::BoxStream;
 use tokio::time::Instant;
 
+mod runner;
+
 #[derive(Snafu, Debug)]
 pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
     ObjectNotFound {
