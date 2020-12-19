@@ -1,3 +1,9 @@
+0.44.0 / ???
+===================
+  * feat: `kube_runtime::controller`: reconcile objects in parallel - #346
+    * BREAKING: `kube_runtime::controller::applier` now requires that the `reconciler`'s `Future` is `Unpin`,
+                `Box::pin` it or submit it to a runtime if this is not the case
+
 0.43.0 / 2020-10-08
 ===================
   * bug: `kube-derive` attr `#[kube(shortname)]` now working correctly
