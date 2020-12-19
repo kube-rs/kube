@@ -96,6 +96,7 @@ where
 /// Splits a `TryStream` into separate `Ok` and `Error` streams.
 ///
 /// Note: This will deadlock if one branch outlives the other
+#[allow(clippy::type_complexity)]
 fn trystream_split_result<S>(
     stream: S,
 ) -> (
