@@ -15,12 +15,12 @@ pub struct Runner<T, R, F, MkF> {
     #[pin]
     scheduler: Scheduler<T, R>,
     run_msg: MkF,
-    slots: StreamHashMap<T, futures::stream::Once<Pin<Box<F>>>>,
+    slots: StreamHashMap<T, futures::stream::Once<F>>,
 }
 
 impl<T, R, F, MkF> Runner<T, R, F, MkF>
 where
-    F: Future,
+    F: Future + Unpin,
     MkF: FnMut(&T) -> F,
 {
     pub fn new(scheduler: Scheduler<T, R>, run_msg: MkF) -> Self {
@@ -36,7 +36,7 @@ impl<T, R, F, MkF> Stream for Runner<T, R, F, MkF>
 where
     T: Eq + Hash + Clone + Unpin,
     R: Stream<Item = ScheduleRequest<T>>,
-    F: Future,
+    F: Future + Unpin,
     MkF: FnMut(&T) -> F,
 {
     type Item = scheduler::Result<F::Output>;
@@ -57,7 +57,7 @@ where
                 .poll_next_unpin(cx);
             match next_msg_poll {
                 Poll::Ready(Some(Ok(msg))) => {
-                    let msg_fut = Box::pin((this.run_msg)(&msg));
+                    let msg_fut = (this.run_msg)(&msg);
                     assert!(
                         !slots.insert_future(msg, msg_fut),
                         "Runner tried to replace a running future.. please report this as a kube-rs bug!"
@@ -98,10 +98,10 @@ mod tests {
                 count += 1;
                 // Panic if this ref is already held, to simulate some unsafe action..
                 let mutex_ref = rc.borrow_mut();
-                async move {
+                Box::pin(async move {
                     delay_for(Duration::from_secs(1)).await;
                     drop(mutex_ref);
-                }
+                })
             })
             .try_for_each(|_| async { Ok(()) }),
         );

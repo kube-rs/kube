@@ -171,7 +171,7 @@ where
                     obj_ref: obj_ref.clone(),
                 });
                 let reconciler_fut = obj.map(|obj| reconciler(obj, context.clone()));
-                async move { Ok((obj_ref, reconciler_fut?.into_future().await)) }
+                Box::pin(async move { Ok((obj_ref, reconciler_fut?.into_future().await)) })
             })
             .context(SchedulerDequeueFailed)
             .map(|res| res.and_then(|x| x))
