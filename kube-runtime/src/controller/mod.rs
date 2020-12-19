@@ -1,3 +1,4 @@
+use self::runner::Runner;
 use crate::{
     reflector::{
         reflector,
@@ -10,9 +11,9 @@ use crate::{
 };
 use derivative::Derivative;
 use futures::{
-    channel, future,
+    channel,
     stream::{self, SelectAll},
-    FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
+    SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
@@ -161,27 +162,20 @@ where
             // 2. requests sent to scheduler_tx
             scheduler_rx.map(Ok),
         )),
-        // all the Oks from the select gets passed through the scheduler stream
-        |s| scheduler(s).context(SchedulerDequeueFailed),
-    )
-    // now have ObjectRefs that we turn into pairs inside (no extra waiting introduced)
-    .and_then(move |obj_ref| {
-        future::ready(
-            store
-                .get(&obj_ref)
-                .context(ObjectNotFound {
+        // all the Oks from the select gets passed through the scheduler stream, and are then executed
+        move |s| {
+            Runner::new(scheduler(s), move |obj_ref| {
+                let obj_ref = obj_ref.clone();
+                let obj = store.get(&obj_ref).context(ObjectNotFound {
                     obj_ref: obj_ref.clone(),
-                })
-                .map(|obj| (obj_ref, obj)),
-        )
-    })
-    // then reconcile every object
-    .and_then(move |(obj_ref, obj)| {
-        reconciler(obj, context.clone()) // TODO: add a context argument to the reconcile
-            .into_future() // TryFuture -> impl Future
-            .map(|result| (obj_ref, result)) // turn into pair and ok wrap
-            .map(Ok) // (this lets us deal with errors from reconciler below)
-    })
+                });
+                let reconciler_fut = obj.map(|obj| reconciler(obj, context.clone()));
+                async move { Ok((obj_ref, reconciler_fut?.into_future().await)) }
+            })
+            .context(SchedulerDequeueFailed)
+            .map(|res| res.and_then(|x| x))
+        },
+    )
     // finally, for each completed reconcile call:
     .and_then(move |(obj_ref, reconciler_result)| {
         let ReconcilerAction { requeue_after } = match &reconciler_result {
