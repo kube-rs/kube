@@ -6,7 +6,7 @@ use crate::{
         ErasedResource, ObjectRef,
     },
     scheduler::{self, scheduler, ScheduleRequest},
-    utils::{try_flatten_applied, try_flatten_touched, trystream_try_via},
+    utils::{try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle},
     watcher::{self, watcher},
 };
 use derivative::Derivative;
@@ -20,7 +20,7 @@ use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
 use std::{sync::Arc, time::Duration};
 use stream::BoxStream;
-use tokio::time::Instant;
+use tokio::{runtime::Handle, time::Instant};
 
 mod runner;
 mod stream_hash_map;
@@ -355,11 +355,13 @@ where
     ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, watcher::Error>>>
     where
         K: Clone + Meta + 'static,
-        ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
-        ReconcilerFut::Error: std::error::Error + 'static,
+        ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Send + 'static,
+        ReconcilerFut::Error: std::error::Error + Send + 'static,
     {
         applier(
-            move |obj, ctx| Box::pin(reconciler(obj, ctx).into_future()),
+            move |obj, ctx| {
+                CancelableJoinHandle::spawn(reconciler(obj, ctx).into_future(), &Handle::current())
+            },
             error_policy,
             context,
             self.reader,

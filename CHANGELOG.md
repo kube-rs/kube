@@ -1,8 +1,10 @@
 0.44.0 / ???
 ===================
-  * feat: `kube_runtime::controller`: reconcile objects in parallel - #346
+  * feat: `kube_runtime::controller`: now reconciles objects in parallel - #346
     * BREAKING: `kube_runtime::controller::applier` now requires that the `reconciler`'s `Future` is `Unpin`,
-                `Box::pin` it or submit it to a runtime if this is not the case
+                `Box::pin` it or submit it to a runtime if this is not acceptable
+    * BREAKING: `kube_runtime::controller::Controller` now requires that the `reconciler`'s `Future` is `Send + 'static`,
+                use the low-level `applier` interface instead if this is not acceptable
 
 0.43.0 / 2020-10-08
 ===================
