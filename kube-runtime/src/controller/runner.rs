@@ -1,3 +1,4 @@
+use super::stream_hash_map::StreamHashMap;
 use crate::scheduler::{self, ScheduleRequest, Scheduler};
 use futures::{Future, Stream, StreamExt};
 use pin_project::pin_project;
@@ -6,7 +7,6 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::stream::StreamMap;
 
 /// Pulls messages from a [`Scheduler`], and runs an action for each message in parallel,
 /// while making sure to not run the same message multiple times at once.
@@ -15,7 +15,7 @@ pub struct Runner<T, R, F, MkF> {
     #[pin]
     scheduler: Scheduler<T, R>,
     run_msg: MkF,
-    slots: StreamMap<T, futures::stream::Once<Pin<Box<F>>>>,
+    slots: StreamHashMap<T, futures::stream::Once<Pin<Box<F>>>>,
 }
 
 impl<T, R, F, MkF> Runner<T, R, F, MkF>
@@ -27,7 +27,7 @@ where
         Self {
             scheduler,
             run_msg,
-            slots: StreamMap::new(),
+            slots: StreamHashMap::default(),
         }
     }
 }
@@ -46,7 +46,7 @@ where
         let slots = this.slots;
         let scheduler = &mut this.scheduler;
         let has_active_slots = match slots.poll_next_unpin(cx) {
-            Poll::Ready(Some((_msg, result))) => return Poll::Ready(Some(Ok(result))),
+            Poll::Ready(Some(result)) => return Poll::Ready(Some(Ok(result))),
             Poll::Ready(None) => false,
             Poll::Pending => true,
         };
@@ -58,7 +58,10 @@ where
             match next_msg_poll {
                 Poll::Ready(Some(Ok(msg))) => {
                     let msg_fut = Box::pin((this.run_msg)(&msg));
-                    assert!(slots.insert(msg, futures::stream::once(msg_fut)).is_none());
+                    assert!(
+                        !slots.insert_future(msg, msg_fut),
+                        "Runner tried to replace a running future.. please report this as a kube-rs bug!"
+                    );
                 }
                 Poll::Ready(Some(Err(err))) => break Poll::Ready(Some(Err(err))),
                 Poll::Ready(None) => {

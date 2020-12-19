@@ -23,6 +23,7 @@ use stream::BoxStream;
 use tokio::time::Instant;
 
 mod runner;
+mod stream_hash_map;
 
 #[derive(Snafu, Debug)]
 pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
