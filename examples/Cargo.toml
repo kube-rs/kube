@@ -58,6 +58,10 @@ name = "crd_derive"
 path = "crd_derive.rs"
 
 [[example]]
+name = "crd_derive_schema"
+path = "crd_derive_schema.rs"
+
+[[example]]
 name = "crd_reflector"
 path = "crd_reflector.rs"
 
