@@ -1,16 +1,16 @@
+use chrono::{DateTime, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[kube(
     group = "clux.dev",
     version = "v1",
     kind = "Foo",
     namespaced,
-    derive = "PartialEq",
-    derive = "Default"
+    derive = "PartialEq"
 )]
 #[kube(apiextensions = "v1")]
 struct FooSpec {
@@ -29,6 +29,9 @@ struct FooSpec {
 
     #[serde(default = "default_nullable")]
     nullable_with_default: Option<String>,
+
+    // Using feature `chrono`
+    timestamp: DateTime<Utc>,
 }
 
 fn default_value() -> String {
@@ -96,9 +99,15 @@ fn test_crd_schema_matches_expected() {
                                                 "nullable": true,
                                                 "type": "string"
                                             },
+
+                                            "timestamp": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            }
                                         },
                                         "required": [
-                                            "non_nullable"
+                                            "non_nullable",
+                                            "timestamp"
                                         ],
                                         "type": "object"
                                     }
