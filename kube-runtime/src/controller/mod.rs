@@ -22,8 +22,8 @@ use std::{sync::Arc, time::Duration};
 use stream::BoxStream;
 use tokio::{runtime::Handle, time::Instant};
 
+mod future_hash_map;
 mod runner;
-mod stream_hash_map;
 
 #[derive(Snafu, Debug)]
 pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {

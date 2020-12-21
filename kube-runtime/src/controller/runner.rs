@@ -1,4 +1,4 @@
-use super::stream_hash_map::StreamHashMap;
+use super::future_hash_map::FutureHashMap;
 use crate::scheduler::{self, ScheduleRequest, Scheduler};
 use futures::{Future, Stream, StreamExt};
 use pin_project::pin_project;
@@ -15,7 +15,7 @@ pub struct Runner<T, R, F, MkF> {
     #[pin]
     scheduler: Scheduler<T, R>,
     run_msg: MkF,
-    slots: StreamHashMap<T, futures::stream::Once<F>>,
+    slots: FutureHashMap<T, F>,
 }
 
 impl<T, R, F, MkF> Runner<T, R, F, MkF>
@@ -27,7 +27,7 @@ where
         Self {
             scheduler,
             run_msg,
-            slots: StreamHashMap::default(),
+            slots: FutureHashMap::default(),
         }
     }
 }
@@ -62,7 +62,7 @@ where
                 Poll::Ready(Some(Ok(msg))) => {
                     let msg_fut = (this.run_msg)(&msg);
                     assert!(
-                        !slots.insert_future(msg, msg_fut),
+                        slots.insert(msg, msg_fut).is_none(),
                         "Runner tried to replace a running future.. please report this as a kube-rs bug!"
                     );
                 }
