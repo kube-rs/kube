@@ -51,6 +51,9 @@ where
             Poll::Pending => true,
         };
         loop {
+            // Try to take take a new message that isn't already being processed
+            // leave the already-processing ones in the queue, so that we can take them once
+            // we're free again.
             let next_msg_poll = scheduler
                 .as_mut()
                 .hold_unless(|msg| !slots.contains_key(msg))
