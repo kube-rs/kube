@@ -1,10 +1,9 @@
 use anyhow::{anyhow, Result};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use kube::CustomResource;
 use kube::{
     api::{Api, DeleteParams, ListParams, PostParams, Resource, WatchEvent},
-    Client,
+    Client, CustomResource,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -103,24 +102,21 @@ async fn main() -> Result<()> {
     // Nullables defaults to `None` and only sent if it's not configured to skip.
     let bar = Foo::new("bar", FooSpec { ..FooSpec::default() });
     let bar = foos.create(&PostParams::default(), &bar).await?;
-    assert_eq!(
-        bar.spec,
-        FooSpec {
-            // Nonnullable without default is required.
-            non_nullable: String::default(),
-            // Defaulting didn't happen because an empty string was sent.
-            non_nullable_with_default: String::default(),
-            // `nullable_skipped` field does not exist in the object (see below).
-            nullable_skipped: None,
-            // `nullable` field exists in the object (see below).
-            nullable: None,
-            // Defaulting happened because serialization was skipped.
-            nullable_skipped_with_default: default_nullable(),
-            // Defaulting did not happen because `null` was sent.
-            // Deserialization does not apply the default either.
-            nullable_with_default: None,
-        }
-    );
+    assert_eq!(bar.spec, FooSpec {
+        // Nonnullable without default is required.
+        non_nullable: String::default(),
+        // Defaulting didn't happen because an empty string was sent.
+        non_nullable_with_default: String::default(),
+        // `nullable_skipped` field does not exist in the object (see below).
+        nullable_skipped: None,
+        // `nullable` field exists in the object (see below).
+        nullable: None,
+        // Defaulting happened because serialization was skipped.
+        nullable_skipped_with_default: default_nullable(),
+        // Defaulting did not happen because `null` was sent.
+        // Deserialization does not apply the default either.
+        nullable_with_default: None,
+    });
 
     // Set up dynamic resource to test using raw values.
     let resource = Resource::dynamic("Foo")
