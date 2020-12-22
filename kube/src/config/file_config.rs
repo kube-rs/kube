@@ -187,7 +187,7 @@ impl AuthInfo {
                         let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
 
                         let output = std::process::Command::new(cmd)
-                            .args(params.trim().split(" "))
+                            .args(params.trim().split(' '))
                             .output()
                             .map_err(|e| {
                                 ConfigError::AuthExec(format!("Executing {:} failed: {:?}", cmd, e))
@@ -206,7 +206,7 @@ impl AuthInfo {
                             let pure_path = field.trim_matches(|c| c == '"' || c == '{' || c == '}');
                             let json_output: serde_json::Value = serde_json::from_slice(&output.stdout)?;
                             match jsonpath_select(&json_output, &format!("${}", pure_path)) {
-                                Ok(v) if v.len() > 0 => {
+                                Ok(v) if !v.is_empty() => {
                                     if let serde_json::Value::String(res) = v[0] {
                                         self.token = Some(res.clone());
                                     } else {

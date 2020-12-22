@@ -10,6 +10,7 @@ use kube::{
     Api, Client, CustomResource,
 };
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
 use std::collections::BTreeMap;
@@ -32,7 +33,7 @@ enum Error {
     },
 }
 
-#[derive(CustomResource, Debug, Clone, Deserialize, Serialize)]
+#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[kube(group = "nullable.se", version = "v1", kind = "ConfigMapGenerator")]
 #[kube(shortname = "cmg", namespaced)]
 struct ConfigMapGeneratorSpec {

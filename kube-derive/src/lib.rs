@@ -58,23 +58,22 @@ use custom_resource::CustomResource;
 ///
 /// ```rust
 /// use serde::{Serialize, Deserialize};
+/// use k8s_openapi::Resource;
 /// use kube_derive::CustomResource;
+/// use schemars::JsonSchema;
 ///
-/// #[derive(CustomResource, Clone, Debug, Deserialize, Serialize)]
+/// #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
 /// #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 /// struct FooSpec {
 ///     info: String,
 /// }
 ///
-/// fn main() {
-///     use k8s_openapi::Resource;
-///     println!("kind = {}", Foo::KIND); // impl k8s_openapi::Resource
-///     let f = Foo::new("foo-1", FooSpec {
-///         info: "informative info".into(),
-///     });
-///     println!("foo: {:?}", f); // debug print on generated type
-///     println!("crd: {}", serde_yaml::to_string(&Foo::crd()).unwrap()); // crd yaml
-/// }
+/// println!("kind = {}", Foo::KIND); // impl k8s_openapi::Resource
+/// let f = Foo::new("foo-1", FooSpec {
+///     info: "informative info".into(),
+/// });
+/// println!("foo: {:?}", f); // debug print on generated type
+/// println!("crd: {}", serde_yaml::to_string(&Foo::crd()).unwrap()); // crd yaml
 /// ```
 ///
 /// This example creates a `struct Foo` containing metadata, the spec,
@@ -142,8 +141,9 @@ use custom_resource::CustomResource;
 /// ```rust
 /// use serde::{Serialize, Deserialize};
 /// use kube_derive::CustomResource;
+/// use schemars::JsonSchema;
 ///
-/// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 /// #[kube(
 ///     group = "clux.dev",
 ///     version = "v1",
@@ -160,7 +160,7 @@ use custom_resource::CustomResource;
 ///     replicas: i32
 /// }
 ///
-/// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 /// struct FooStatus {
 ///     replicas: i32
 /// }

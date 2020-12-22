@@ -227,12 +227,13 @@ where
 /// use futures::StreamExt;
 /// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 /// use k8s_openapi::api::core::v1::ConfigMap;
+/// use schemars::JsonSchema;
 ///
 /// use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
 /// #[derive(Debug, Snafu)]
 /// enum Error {}
 /// /// A custom resource
-/// #[derive(CustomResource, Debug, Clone, Deserialize, Serialize)]
+/// #[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
 /// #[kube(group = "nullable.se", version = "v1", kind = "ConfigMapGenerator", namespaced)]
 /// struct ConfigMapGeneratorSpec {
 ///     content: String,

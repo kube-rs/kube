@@ -1,5 +1,6 @@
 #[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use apiexts::CustomResourceDefinition;
@@ -14,7 +15,7 @@ use kube::{
 // Please test against Kubernetes 1.16.X!
 
 // Own custom resource
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
 #[kube(apiextensions = "v1beta1")] // remove this if using Kubernetes >= 1.17
@@ -25,7 +26,7 @@ pub struct FooSpec {
     replicas: i32,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct FooStatus {
     is_bad: bool,
     replicas: i32,

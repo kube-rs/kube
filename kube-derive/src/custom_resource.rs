@@ -262,14 +262,32 @@ impl CustomDerive for CustomResource {
             }
         }
 
+        // Schema generation is always enabled for v1 because it's mandatory.
+        // TODO Enable schema generation for v1beta1 if the spec derives `JsonSchema`.
+        let schema_gen_enabled = apiextensions == "v1";
+        // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
+        // these are validated by the API server implicitly. Also, we can't generate the
+        // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
+        let schemars_skip = if schema_gen_enabled {
+            quote! { #[schemars(skip)] }
+        } else {
+            quote! {}
+        };
+        if schema_gen_enabled {
+            derive_paths.push(syn::parse_str("::schemars::JsonSchema")?);
+        }
+
         let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
         let root_obj = quote! {
             #[doc = #docstr]
             #[derive(#(#derive_paths),*)]
             #[serde(rename_all = "camelCase")]
             #visibility struct #rootident {
+                #schemars_skip
                 #visibility api_version: String,
+                #schemars_skip
                 #visibility kind: String,
+                #schemars_skip
                 #visibility metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
                 #visibility spec: #ident,
                 #statusq
@@ -354,6 +372,65 @@ impl CustomDerive for CustomResource {
         let short_json = serde_json::to_string(&shortnames).unwrap();
         let crd_meta_name = format!("{}.{}", plural, group);
         let crd_meta = quote! { { "name": #crd_meta_name } };
+        let jsondata = if apiextensions == "v1" {
+            quote! {
+                // Don't use definitions and don't include `$schema` because these are not allowed.
+                let gen = schemars::gen::SchemaSettings::openapi3().with(|s| {
+                    s.inline_subschemas = true;
+                    s.meta_schema = None;
+                }).into_generator();
+                let schema = gen.into_root_schema_for::<Self>();
+                let jsondata = serde_json::json!({
+                    "metadata": #crd_meta,
+                    "spec": {
+                        "group": #group,
+                        "scope": #scope,
+                        "names": {
+                            "plural": #plural,
+                            "singular": #name,
+                            "kind": #kind,
+                            "shortNames": shorts
+                        },
+                        "versions": [{
+                            "name": #version,
+                            "served": true,
+                            "storage": true,
+                            "schema": {
+                                "openAPIV3Schema": schema,
+                            },
+                            "additionalPrinterColumns": columns,
+                            "subresources": subres,
+                        }],
+                    }
+                });
+            }
+        } else {
+            // TODO Include schema if enabled
+            quote! {
+                let jsondata = serde_json::json!({
+                    "metadata": #crd_meta,
+                    "spec": {
+                        "group": #group,
+                        "scope": #scope,
+                        "names": {
+                            "plural": #plural,
+                            "singular": #name,
+                            "kind": #kind,
+                            "shortNames": shorts
+                        },
+                        // printer columns can't be on versions reliably in v1beta..
+                        "additionalPrinterColumns": columns,
+                        "versions": [{
+                            "name": #version,
+                            "served": true,
+                            "storage": true,
+                        }],
+                        "subresources": subres,
+                    }
+                });
+            }
+        };
+
         // TODO: should ::crd be from a trait?
         let impl_crd = quote! {
             impl #rootident {
@@ -378,50 +455,7 @@ impl CustomDerive for CustomResource {
                         serde_json::json!({})
                     };
 
-                    let jsondata = if #apiextensions == "v1beta1" {
-                        serde_json::json!({
-                            "metadata": #crd_meta,
-                            "spec": {
-                                "group": #group,
-                                "scope": #scope,
-                                "names": {
-                                    "plural": #plural,
-                                    "singular": #name,
-                                    "kind": #kind,
-                                    "shortNames": shorts
-                                },
-                                // printer columns can't be on versions reliably in v1beta..
-                                "additionalPrinterColumns": columns,
-                                "versions": [{
-                                  "name": #version,
-                                  "served": true,
-                                  "storage": true,
-                                }],
-                                "subresources": subres,
-                            }
-                        })
-                    } else {
-                        serde_json::json!({
-                            "metadata": #crd_meta,
-                            "spec": {
-                                "group": #group,
-                                "scope": #scope,
-                                "names": {
-                                    "plural": #plural,
-                                    "singular": #name,
-                                    "kind": #kind,
-                                    "shortNames": shorts
-                                },
-                                "versions": [{
-                                  "name": #version,
-                                  "served": true,
-                                  "storage": true,
-                                }],
-                                "additionalPrinterColumns": columns,
-                                "subresources": subres,
-                            }
-                        })
-                    };
+                    #jsondata
                     serde_json::from_value(jsondata)
                         .expect("valid custom resource from #[kube(attrs..)]")
                 }

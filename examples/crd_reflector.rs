@@ -5,9 +5,10 @@ use kube::{
     Client, CustomResource,
 };
 use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug)]
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 pub struct FooSpec {
     name: String,
