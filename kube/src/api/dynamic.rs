@@ -168,7 +168,7 @@ impl TryFrom<DynamicResource> for Resource {
             debug!("DynamicResource '{}' should be singular + PascalCase", rb.kind);
         }
         Ok(Self {
-            api_version: if group == "" {
+            api_version: if group.is_empty() {
                 version.clone()
             } else {
                 format!("{}/{}", group, version)
