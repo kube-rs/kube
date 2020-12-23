@@ -10,7 +10,7 @@ workflows:
     jobs:
       - cargo_test
       # windows executor costs money :/
-      #- windows_test
+      - windows_test
       # kubernetes flow:
       - kind_compile
       - kind_k8s:
@@ -101,7 +101,6 @@ jobs:
       - run: cargo test -p kube-derive
       - run: cargo test --lib --all -j4
       - run: cargo test --doc --all -j4
-      - run: cargo test -p examples --example crd_api configmapgen_controller
       - run: cargo test -j4 -p examples
       - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls
       - save_cache:
