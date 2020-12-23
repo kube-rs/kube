@@ -1,3 +1,4 @@
+use self::runner::Runner;
 use crate::{
     reflector::{
         reflector,
@@ -5,7 +6,7 @@ use crate::{
         ErasedResource, ObjectRef,
     },
     scheduler::{self, scheduler, ScheduleRequest},
-    utils::{try_flatten_applied, try_flatten_touched, trystream_try_via},
+    utils::{try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle},
     watcher::{self, watcher},
 };
 use derivative::Derivative;
@@ -16,10 +17,13 @@ use futures::{
 };
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
-use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, OptionExt, ResultExt, Snafu};
+use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
 use std::{sync::Arc, time::Duration};
 use stream::BoxStream;
-use tokio::time::Instant;
+use tokio::{runtime::Handle, time::Instant};
+
+mod future_hash_map;
+mod runner;
 
 #[derive(Snafu, Debug)]
 pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
@@ -140,7 +144,7 @@ pub fn applier<K, QueueStream, ReconcilerFut, T>(
 ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
     K: Clone + Meta + 'static,
-    ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
+    ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
     QueueStream: TryStream<Ok = ObjectRef<K>>,
     QueueStream::Error: std::error::Error + 'static,
@@ -159,27 +163,24 @@ where
             // 2. requests sent to scheduler_tx
             scheduler_rx.map(Ok),
         )),
-        // all the Oks from the select gets passed through the scheduler stream
-        |s| scheduler(s).context(SchedulerDequeueFailed),
+        // all the Oks from the select gets passed through the scheduler stream, and are then executed
+        move |s| {
+            Runner::new(scheduler(s), move |obj_ref| {
+                let obj_ref = obj_ref.clone();
+                match store.get(&obj_ref) {
+                    Some(obj) => reconciler(obj, context.clone())
+                        .into_future()
+                        // Reconciler errors are OK from the applier's PoV, we need to apply the error policy
+                        // to them separately
+                        .map(|res| Ok((obj_ref, res)))
+                        .left_future(),
+                    None => future::err(ObjectNotFound { obj_ref }.build()).right_future(),
+                }
+            })
+            .context(SchedulerDequeueFailed)
+            .map(|res| res.and_then(|x| x))
+        },
     )
-    // now have ObjectRefs that we turn into pairs inside (no extra waiting introduced)
-    .and_then(move |obj_ref| {
-        future::ready(
-            store
-                .get(&obj_ref)
-                .context(ObjectNotFound {
-                    obj_ref: obj_ref.clone(),
-                })
-                .map(|obj| (obj_ref, obj)),
-        )
-    })
-    // then reconcile every object
-    .and_then(move |(obj_ref, obj)| {
-        reconciler(obj, context.clone()) // TODO: add a context argument to the reconcile
-            .into_future() // TryFuture -> impl Future
-            .map(|result| (obj_ref, result)) // turn into pair and ok wrap
-            .map(Ok) // (this lets us deal with errors from reconciler below)
-    })
     // finally, for each completed reconcile call:
     .and_then(move |(obj_ref, reconciler_result)| {
         let ReconcilerAction { requeue_after } = match &reconciler_result {
@@ -349,16 +350,24 @@ where
     /// with a configurable `Context`.
     pub fn run<ReconcilerFut, T>(
         self,
-        reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
+        mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
         error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
         context: Context<T>,
     ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, watcher::Error>>>
     where
         K: Clone + Meta + 'static,
-        ReconcilerFut: TryFuture<Ok = ReconcilerAction>,
-        ReconcilerFut::Error: std::error::Error + 'static,
+        ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Send + 'static,
+        ReconcilerFut::Error: std::error::Error + Send + 'static,
     {
-        applier(reconciler, error_policy, context, self.reader, self.selector)
+        applier(
+            move |obj, ctx| {
+                CancelableJoinHandle::spawn(reconciler(obj, ctx).into_future(), &Handle::current())
+            },
+            error_policy,
+            context,
+            self.reader,
+            self.selector,
+        )
     }
 }
 

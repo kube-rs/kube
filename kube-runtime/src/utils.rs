@@ -1,8 +1,9 @@
 use crate::watcher;
 use futures::{
+    future::{abortable, AbortHandle, Aborted},
     pin_mut,
     stream::{self, Peekable},
-    Future, Stream, StreamExt, TryStream, TryStreamExt,
+    Future, FutureExt, Stream, StreamExt, TryStream, TryStreamExt,
 };
 use pin_project::pin_project;
 use std::{
@@ -12,6 +13,7 @@ use std::{
     task::Poll,
 };
 use stream::IntoStream;
+use tokio::{runtime::Handle, task::JoinHandle};
 
 /// Flattens each item in the list following the rules of `watcher::Event::into_iter_applied`
 pub fn try_flatten_applied<K, S: TryStream<Ok = watcher::Event<K>>>(
@@ -137,4 +139,44 @@ where
     let (oks, errs) = trystream_split_result(input_stream); // the select -> SplitCase
     let via = make_via_stream(oks); // the map_ok/err function
     stream::select(via.into_stream(), errs.map(Err)) // recombine
+}
+
+/// A [`JoinHandle`] that cancels the [`Future`] when dropped, rather than detaching it
+pub struct CancelableJoinHandle<T> {
+    inner: JoinHandle<Result<T, Aborted>>,
+    abort_handle: AbortHandle,
+}
+
+impl<T> CancelableJoinHandle<T>
+where
+    T: Send + 'static,
+{
+    pub fn spawn(future: impl Future<Output = T> + Send + 'static, runtime: &Handle) -> Self {
+        let (abortable, abort_handle) = abortable(future);
+        CancelableJoinHandle {
+            inner: runtime.spawn(abortable),
+            abort_handle,
+        }
+    }
+}
+
+impl<T> Drop for CancelableJoinHandle<T> {
+    fn drop(&mut self) {
+        self.abort_handle.abort()
+    }
+}
+
+impl<T> Future for CancelableJoinHandle<T> {
+    type Output = T;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        self.inner.poll_unpin(cx).map(|x| {
+            x
+                // JoinError => underlying future panicked, so propagate
+                .unwrap()
+                // Aborted => somehow the underlying future was aborted, which should only happen when the handle is dropped
+                // (in which case poll would never be called again)
+                .unwrap()
+        })
+    }
 }
