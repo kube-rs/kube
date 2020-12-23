@@ -47,9 +47,8 @@ fn main() {
 // Verify Foo::crd
 #[test]
 fn verify_crd() {
-    use serde_json::{self, json};
     let crd = Foo::crd();
-    let output = json!({
+    let output = serde_json::json!({
       "apiVersion": "apiextensions.k8s.io/v1",
       "kind": "CustomResourceDefinition",
       "metadata": {
