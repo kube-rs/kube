@@ -58,7 +58,7 @@ where
                     Poll::Ready(msg) => Some((key.clone(), msg)),
                     Poll::Pending => None,
                 });
-        dbg!((key_and_msg.is_some(), &self.futures.len()));
+        //dbg!((key_and_msg.is_some(), &self.futures.len()));
         match key_and_msg {
             Some((key, msg)) => {
                 self.as_mut().futures.remove(&key);

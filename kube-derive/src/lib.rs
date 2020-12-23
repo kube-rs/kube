@@ -110,8 +110,7 @@ use custom_resource::CustomResource;
 /// The version for `CustomResourceDefinition` desired in the `apiextensions.k8s.io` group.
 /// Default is `v1` (for clusters >= 1.17). If using kubernetes <= 1.16 pluase use `v1beta1`.
 ///
-/// **NOTE**: Support for `v1` is still a bit limited. We have an open issue on the openapi
-/// [schema generation](https://github.com/clux/kube-rs/issues/264).
+/// **NOTE**: Support for `v1` requires deriving the openapi v3 `JsonSchema` via the `schemars` dependency.
 ///
 /// ### `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
