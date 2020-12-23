@@ -1,10 +1,17 @@
-0.44.0 / ???
+0.44.0 / 2020-12-23
 ===================
+  * feat: `kube-derive` now generates openapi v3 schemas and is thus usable with v1 `CustomResourceDefinition` - #129 and #264 via #348
+    * BREAKING: `kube-derive` types now require `JsonSchema` derived via `schemars` libray
   * feat: `kube_runtime::controller`: now reconciles objects in parallel - #346
     * BREAKING: `kube_runtime::controller::applier` now requires that the `reconciler`'s `Future` is `Unpin`,
                 `Box::pin` it or submit it to a runtime if this is not acceptable
     * BREAKING: `kube_runtime::controller::Controller` now requires that the `reconciler`'s `Future` is `Send + 'static`,
                 use the low-level `applier` interface instead if this is not acceptable
+  * bug: `kube-runtime`: removed accidentally included `k8s-openapi` default features (you have to opt in to them yourself)
+  * feat: `kube`: `TypeMeta` now derives additionally `Debug, Eq, PartialEq, Hash`
+  * bump: `k8s-openapi` to `0.10.0` - #330
+  * bump: `serde_yaml` - #349
+  * bump: `dirs` to `dirs-next` - #340
 
 0.43.0 / 2020-10-08
 ===================
