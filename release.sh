@@ -39,8 +39,8 @@ main() {
 
 # Usage:
 #
+# TODO: check if cargo-release has fixed sleep issue between publishing
 # cargo release minor --exclude tests --exclude examples --skip-tag --skip-push --no-dev-version
-# TODO: figure out why it needs waiting between publishing..
 # TODO: consolidate-commits (release.toml option only, cant use because it lack other things)
 # Then amend commits / squash. Maybe publish manually if it broke halfway through.
 #
