@@ -129,12 +129,13 @@ jobs:
       - restore_cache:
           keys:
             - cache-{{ checksum "deps_checksum" }}
-      # To avoid openssl dependencies on windows, we need to set the rustls-tls feature, which
-      # requires being at the crate level rather than the workspace level
-      - run: cd kube && cargo test --example crd_api crd_reflector --no-default-features --features=rustls-tls
-      - run: cd kube-derive && cargo test -j4
-      - run: cd kube && cargo test -j4 --no-default-features --features=rustls-tls
-      - run: cd kube-derive && cargo test --lib
+      - run: cargo build
+      - run: cargo test -p kube-runtime
+      - run: cargo test -p kube
+      - run: cargo test -p kube-derive
+      - run: cargo test --lib --all -j4
+      - run: cargo test --doc --all -j4
+      - run: cargo test -j4 -p examples
       - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls
       - save_cache:
           paths:
