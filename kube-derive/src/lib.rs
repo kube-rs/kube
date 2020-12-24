@@ -112,6 +112,9 @@ use custom_resource::CustomResource;
 ///
 /// **NOTE**: Support for `v1` requires deriving the openapi v3 `JsonSchema` via the `schemars` dependency.
 ///
+/// ### `#[kube(skip_crd)]`
+/// To indicate that the generated `::crd()` method is not required. Allow eliding the `schemars` dependency.
+///
 /// ### `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
 ///

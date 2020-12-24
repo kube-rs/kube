@@ -20,6 +20,7 @@ struct KubeAttrs {
     kind_struct: String,
     /// lowercase plural of kind (inferred if omitted)
     plural: Option<String>,
+    skip_crdgen: bool,
     namespaced: bool,
     apiextensions: String,
     derives: Vec<String>,
@@ -163,6 +164,9 @@ impl CustomDerive for CustomResource {
                         if path.is_ident("namespaced") {
                             ka.namespaced = true;
                             continue;
+                        } else if path.is_ident("skip_crd") {
+                            ka.skip_crdgen = true;
+                            continue;
                         } else {
                             &meta
                         }
@@ -216,6 +220,7 @@ impl CustomDerive for CustomResource {
             kind_struct,
             version,
             namespaced,
+            skip_crdgen,
             derives,
             status,
             plural,
@@ -264,7 +269,7 @@ impl CustomDerive for CustomResource {
 
         // Schema generation is always enabled for v1 because it's mandatory.
         // TODO Enable schema generation for v1beta1 if the spec derives `JsonSchema`.
-        let schema_gen_enabled = apiextensions == "v1";
+        let schema_gen_enabled = apiextensions == "v1" && !skip_crdgen;
         // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
         // these are validated by the API server implicitly. Also, we can't generate the
         // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
@@ -372,7 +377,9 @@ impl CustomDerive for CustomResource {
         let short_json = serde_json::to_string(&shortnames).unwrap();
         let crd_meta_name = format!("{}.{}", plural, group);
         let crd_meta = quote! { { "name": #crd_meta_name } };
-        let jsondata = if apiextensions == "v1" {
+        let jsondata = if skip_crdgen {
+            quote! {}
+        } else if apiextensions == "v1" {
             quote! {
                 // Don't use definitions and don't include `$schema` because these are not allowed.
                 let gen = schemars::gen::SchemaSettings::openapi3().with(|s| {
@@ -432,32 +439,36 @@ impl CustomDerive for CustomResource {
         };
 
         // TODO: should ::crd be from a trait?
-        let impl_crd = quote! {
-            impl #rootident {
-                pub fn crd() -> #apiext::CustomResourceDefinition {
-                    let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
-                    let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
-                        None
-                    } else {
-                        serde_json::from_str(#scale_code).expect("valid scale subresource json")
-                    };
-                    let shorts : Vec<String> = serde_json::from_str(#short_json).expect("valid shortnames");
-                    let subres = if #has_status {
-                        if let Some(s) = &scale {
-                            serde_json::json!({
-                                "status": {},
-                                "scale": scale
-                            })
+        let impl_crd = if skip_crdgen {
+            quote! {}
+        } else {
+            quote! {
+                impl #rootident {
+                    pub fn crd() -> #apiext::CustomResourceDefinition {
+                        let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
+                        let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
+                            None
                         } else {
-                            serde_json::json!({"status": {} })
-                        }
-                    } else {
-                        serde_json::json!({})
-                    };
+                            serde_json::from_str(#scale_code).expect("valid scale subresource json")
+                        };
+                        let shorts : Vec<String> = serde_json::from_str(#short_json).expect("valid shortnames");
+                        let subres = if #has_status {
+                            if let Some(s) = &scale {
+                                serde_json::json!({
+                                    "status": {},
+                                    "scale": scale
+                                })
+                            } else {
+                                serde_json::json!({"status": {} })
+                            }
+                        } else {
+                            serde_json::json!({})
+                        };
 
-                    #jsondata
-                    serde_json::from_value(jsondata)
-                        .expect("valid custom resource from #[kube(attrs..)]")
+                        #jsondata
+                        serde_json::from_value(jsondata)
+                            .expect("valid custom resource from #[kube(attrs..)]")
+                    }
                 }
             }
         };
