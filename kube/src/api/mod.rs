@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Empty struct for when data should be discarded
 ///
 /// Not using [`()`](https://doc.rust-lang.org/stable/std/primitive.unit.html), because serde's
-/// [`Deserialize`](https://docs.rs/serde/1.0.104/serde/trait.Deserialize.html) `impl` is too strict.
+/// [`Deserialize`](serde::Deserialize) `impl` is too strict.
 #[derive(Clone, Deserialize, Serialize, Default, Debug)]
 pub struct NotUsed {}
 

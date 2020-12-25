@@ -15,7 +15,7 @@ use std::{
 use stream::IntoStream;
 use tokio::{runtime::Handle, task::JoinHandle};
 
-/// Flattens each item in the list following the rules of `watcher::Event::into_iter_applied`
+/// Flattens each item in the list following the rules of [`watcher::Event::into_iter_applied`].
 pub fn try_flatten_applied<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,
 ) -> impl Stream<Item = Result<K, S::Error>> {
@@ -24,7 +24,7 @@ pub fn try_flatten_applied<K, S: TryStream<Ok = watcher::Event<K>>>(
         .try_flatten()
 }
 
-/// Flattens each item in the list following the rules of `watcher::Event::into_iter_touched`
+/// Flattens each item in the list following the rules of [`watcher::Event::into_iter_touched`].
 pub fn try_flatten_touched<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,
 ) -> impl Stream<Item = Result<K, S::Error>> {

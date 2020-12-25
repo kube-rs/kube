@@ -37,7 +37,7 @@ pub struct ListParams {
     /// Limit the number of results.
     ///
     /// If there are more results, the server will respond with a continue token which can be used to fetch another page
-    /// of results. See the [kubernetes API docs](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks)
+    /// of results. See the [Kubernetes API docs](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks)
     /// for pagination details.
     pub limit: Option<u32>,
 
@@ -83,7 +83,7 @@ impl ListParams {
     /// Configure the selector to restrict the list of returned objects by their fields.
     ///
     /// Defaults to everything.
-    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
+    /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
     /// The server only supports a limited number of field queries per type.
     pub fn fields(mut self, field_selector: &str) -> Self {
         self.field_selector = Some(field_selector.to_string());
@@ -93,7 +93,7 @@ impl ListParams {
     /// Configure the selector to restrict the list of returned objects by their labels.
     ///
     /// Defaults to everything.
-    /// Supports '=', '==', and '!=', and can comma separate: key1=value1,key2=value2
+    /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
     pub fn labels(mut self, label_selector: &str) -> Self {
         self.label_selector = Some(label_selector.to_string());
         self
@@ -147,12 +147,12 @@ impl PostParams {
 pub struct PatchParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
-    /// Strategy which will be used. Defaults to `PatchStrategy::Strategic`
+    /// Strategy which will be used. Defaults to [`PatchStrategy::Strategic`].
     pub patch_strategy: PatchStrategy,
-    /// force Apply requests. Applicable only to `PatchStrategy::Apply`
+    /// force Apply requests. Applicable only to [`PatchStrategy::Apply`].
     pub force: bool,
-    /// fieldManager is a name of the actor that is making changes. Required for `PatchStrategy::Apply`
-    /// optional for everything else
+    /// fieldManager is a name of the actor that is making changes. Required for [`PatchStrategy::Apply`]
+    /// optional for everything else.
     pub field_manager: Option<String>,
 }
 impl PatchParams {
@@ -189,7 +189,7 @@ impl PatchParams {
         }
     }
 
-    /// Construct PatchParams for server-side apply
+    /// Construct `PatchParams` for server-side apply
     pub fn apply(manager: &str) -> Self {
         Self {
             patch_strategy: PatchStrategy::Apply,
@@ -263,7 +263,7 @@ pub struct DeleteParams {
     /// The duration in seconds before the object should be deleted.
     ///
     /// Value must be non-negative integer. The value zero indicates delete immediately.
-    /// If this value is None, the default grace period for the specified type will be used.
+    /// If this value is `None`, the default grace period for the specified type will be used.
     /// Defaults to a per object value if not specified. Zero means delete immediately.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grace_period_seconds: Option<u32>,
@@ -271,13 +271,13 @@ pub struct DeleteParams {
     /// Whether or how garbage collection is performed.
     ///
     /// The default policy is decided by the existing finalizer set in
-    /// metadata.finalizers, and the resource-specific default policy.
+    /// `metadata.finalizers`, and the resource-specific default policy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub propagation_policy: Option<PropagationPolicy>,
 
     /// Condtions that must be fulfilled before a deletion is carried out
     ///
-    /// If not possible, a 409 Conflict status will be returned.
+    /// If not possible, a `409 Conflict` status will be returned.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preconditions: Option<Preconditions>,
 }

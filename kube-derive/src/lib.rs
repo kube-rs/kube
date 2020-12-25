@@ -48,11 +48,11 @@ use custom_resource::CustomResource;
 /// A custom derive for kubernetes custom resource definitions.
 ///
 /// This will generate a **root object** containing your spec and metadata.
-/// This root object will implement the `k8s_openapi::Metadata` + `k8s_openapi::Resource`
-/// traits so it can be used with `kube::Api`.
+/// This root object will implement the [`k8s_openapi::Metadata`] + [`k8s_openapi::Resource`]
+/// traits so it can be used with [`kube::Api`].
 ///
 /// The generated type will also implement a `::crd` method to generate the crd
-/// at the specified api version (or v1 if unspecified).
+/// at the specified api version (or `v1` if unspecified).
 ///
 /// # Example
 ///
@@ -77,8 +77,8 @@ use custom_resource::CustomResource;
 /// ```
 ///
 /// This example creates a `struct Foo` containing metadata, the spec,
-/// and optionally status. The **generated** type `Foo` can be used with the `kube` crate
-/// as an `Api<Foo>` object (`FooSpec` can not be used with `Api`).
+/// and optionally status. The **generated** type `Foo` can be used with the [`kube`] crate
+/// as an `Api<Foo>` object (`FooSpec` can not be used with [`Api`][`kube::Api`]).
 ///
 /// ```rust,ignore
 ///  let client = Client::try_default().await?;
@@ -169,7 +169,7 @@ use custom_resource::CustomResource;
 ///
 /// The example above will roughly generate:
 /// ```ignore
-/// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 /// #[serde(rename_all = "camelCase")]
 /// pub struct Foo {
 ///     api_version: String,
@@ -196,6 +196,10 @@ use custom_resource::CustomResource;
 /// ```toml
 /// kube = { version = "...", features = ["derive"] }
 /// ```
+/// [`kube`]: https://docs.rs/kube
+/// [`kube::Api`]: https://docs.rs/kube/*/kube/struct.Api.html
+/// [`k8s_openapi::Metadata`]: https://docs.rs/k8s-openapi/*/k8s_openapi/trait.Metadata.html
+/// [`k8s_openapi::Resource`]: https://docs.rs/k8s-openapi/*/k8s_openapi/trait.Resource.html
 #[proc_macro_derive(CustomResource, attributes(kube))]
 pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     run_custom_derive::<CustomResource>(input)

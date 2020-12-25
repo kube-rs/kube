@@ -11,9 +11,9 @@ use crate::{
 
 /// A generic Api abstraction
 ///
-/// This abstracts over a `Resource` and a type `K` so that
+/// This abstracts over a [`Resource`] and a type `K` so that
 /// we get automatic serialization/deserialization on the api calls
-/// implemented by the dynamic `Resource`.
+/// implemented by the dynamic [`Resource`].
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request creator object
@@ -108,19 +108,19 @@ where
     /// Create a resource
     ///
     /// This function requires a type that Serializes to `K`, which can be:
-    /// 1. Raw string yaml
-    ///   - easy to port from existing files
-    ///   - error prone (run-time errors on typos due to failed serialize attempts)
-    ///   - very error prone (can write invalid yaml)
+    /// 1. Raw string YAML
+    ///     - easy to port from existing files
+    ///     - error prone (run-time errors on typos due to failed serialize attempts)
+    ///     - very error prone (can write invalid YAML)
     /// 2. An instance of the struct itself
-    ///   - easy to instantiate for CRDs (you define the struct)
-    ///   - dense to instantiate for k8s-openapi types (due to many optionals)
-    ///   - compile-time safety
-    ///   - but still possible to write invalid native types (validation at apiserver)
-    /// 3. `serde_json::json!` macro instantiated `serde_json::Value`
-    ///   - Tradeoff between the two
-    ///   - Easy partially filling of native k8s-openapi types (most fields optional)
-    ///   - Partial safety against runtime errors (at least you must write valid json)
+    ///     - easy to instantiate for CRDs (you define the struct)
+    ///     - dense to instantiate for [`k8s_openapi`] types (due to many optionals)
+    ///     - compile-time safety
+    ///     - but still possible to write invalid native types (validation at apiserver)
+    /// 3. [`serde_json::json!`] macro instantiated [`serde_json::Value`]
+    ///     - Tradeoff between the two
+    ///     - Easy partially filling of native [`k8s_openapi`] types (most fields optional)
+    ///     - Partial safety against runtime errors (at least you must write valid JSON)
     pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
@@ -136,7 +136,7 @@ where
     /// When you get a `Status` via `Right`, this should be a a 2XX style
     /// confirmation that the object being gone.
     ///
-    /// 4XX and 5XX status types are returned as an `Err(kube::Error::Api)`
+    /// 4XX and 5XX status types are returned as an [`Err(kube::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
     /// use kube::{api::{Api, DeleteParams}, Client};
@@ -163,7 +163,7 @@ where
     /// When you get a `Status` via `Right`, this should be a a 2XX style
     /// confirmation that the object being gone.
     ///
-    /// 4XX and 5XX status types are returned as an `Err(kube::Error::Api)`
+    /// 4XX and 5XX status types are returned as an [`Err(kube::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
     /// use kube::{api::{Api, DeleteParams, ListParams, Meta}, Client};
@@ -195,19 +195,10 @@ where
 
     /// Patch a resource a subset of its properties
     ///
-    /// Note that some of the [`PatchStrategy`](crate::api::PatchStrategy) variants require different serialization.
-    ///
-    /// The original strategies such as `PatchStrategy::Merge`, `PatchStrategy::JSON`
-    /// and `PatchStrategy::Merge` should be serialized using `serde_json::to_vec`.
-    ///
-    /// See [kubernetes json patch types](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
-    /// for more information about their distinction.
-    ///
-    ///
-    /// When using `PatchStrategy::Apply`, you **must** serialize your
-    /// data using `serde_yaml`:
-    ///
-    ///
+    /// Note that some of the [`PatchStrategy`](super::PatchStrategy) variants require different
+    /// serialization. The original strategies such as [`Merge`], [`JSON`] and [`Strategic`] should be
+    /// serialized using [`serde_json::to_vec`].
+    /// When using [`Apply`], you **must** serialize your data using [`serde_yaml::to_vec`]:
     /// ```no_run
     /// use kube::{api::{Api, PatchParams, Meta}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
@@ -230,8 +221,15 @@ where
     ///     Ok(())
     /// }
     /// ```
-    ///
     /// Note that you can still create the data any way you like (like with `serde_json`).
+    ///
+    /// See [kubernetes json patch types](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    /// for more information about their distinction.
+    ///
+    /// [`Merge`]: super::PatchStrategy::Merge
+    /// [`JSON`]: super::PatchStrategy::JSON
+    /// [`Strategic`]: super::PatchStrategy::Strategic
+    /// [`Apply`]: super::PatchStrategy::Apply
     pub async fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
         let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
@@ -239,7 +237,7 @@ where
 
     /// Replace a resource entirely with a new one
     ///
-    /// This is used just like `Api::create`, but with one additional instruction:
+    /// This is used just like [`Api::create`], but with one additional instruction:
     /// You must set `metadata.resourceVersion` in the provided data because k8s
     /// will not accept an update unless you actually knew what the last version was.
     ///
