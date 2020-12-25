@@ -1,8 +1,8 @@
-//! Kubernetes configuration objects from ~/.kube/config or in cluster environment
+//! Kubernetes configuration objects from `~/.kube/config` or in cluster environment.
 //!
 //! Used to populate [`Config`] that is ultimately used to construct a [`Client`][crate::Client].
 //!
-//! Unless you have issues, prefer using `Config::infer` and pass it to a [`Client`][crate::Client].
+//! Unless you have issues, prefer using [`Config::infer`] and pass it to a [`Client`][crate::Client].
 
 mod exec;
 mod file_config;
@@ -62,7 +62,7 @@ impl Authentication {
     }
 }
 
-/// Configuration object detailing things like cluster_url, default namespace, root certificates, and timeouts
+/// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
 #[derive(Debug, Clone)]
 pub struct Config {
     /// The configured cluster url

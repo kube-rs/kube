@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! The following example will create a [`Pod`][k8s_openapi::api::core::v1::Pod]
-//! and then watch for it to become available using a manual `Api::watch` call.
+//! and then watch for it to become available using a manual [`Api::watch`] call.
 //!
 //! ```rust,no_run
 //! use futures::{StreamExt, TryStreamExt};

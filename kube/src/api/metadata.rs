@@ -2,17 +2,18 @@ pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use k8s_openapi::Metadata;
 use serde::{Deserialize, Serialize};
 
-/// An accessor trait for Metadata
+/// An accessor trait for Metadata.
 ///
-/// This for a subset of Kubernetes type that do not end in List
-/// These types, using ObjectMeta, SHOULD all have required properties:
-/// - .metadata
-/// - .metadata.name
+/// This is for a subset of Kubernetes type that do not end in `List`.
+/// These types, using [`ObjectMeta`], SHOULD all have required properties:
+/// - `.metadata`
+/// - `.metadata.name`
+///
 /// And these optional properties:
-/// - .metadata.namespace
-/// - .metadata.resource_version
+/// - `.metadata.namespace`
+/// - `.metadata.resource_version`
 ///
-/// This avoids a bunch of the unnecessary unwrap mechanics for apps
+/// This avoids a bunch of the unnecessary unwrap mechanics for apps.
 pub trait Meta: Metadata {
     /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
@@ -20,7 +21,7 @@ pub trait Meta: Metadata {
     fn name(&self) -> String;
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
-    /// Tthe resource version
+    /// The resource version
     fn resource_ver(&self) -> Option<String>;
 }
 
@@ -46,9 +47,9 @@ where
     }
 }
 
-/// A convenience struct for ad-hoc serialization
+/// A convenience struct for ad-hoc serialization.
 ///
-/// Mostly useful for `Object`
+/// Mostly useful for [`Object`](super::Object).
 #[derive(Deserialize, Serialize, Clone, Default, Debug, Eq, PartialEq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct TypeMeta {

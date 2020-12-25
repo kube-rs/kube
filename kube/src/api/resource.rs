@@ -7,10 +7,10 @@ use inflector::string::pluralize::to_plural;
 pub struct Resource {
     /// The API version of the resource.
     ///
-    /// This is a composite of Resource::GROUP and Resource::VERSION
+    /// This is a composite of `Resource::GROUP` and `Resource::VERSION`
     /// (eg "apiextensions.k8s.io/v1beta1")
     /// or just the version for resources without a group (eg "v1").
-    /// This is the string used in the apiVersion field of the resource's serialized form.
+    /// This is the string used in the `apiVersion` field of the resource's serialized form.
     pub api_version: String,
 
     /// The group of the resource
@@ -61,9 +61,9 @@ impl Resource {
 
     /// Manually configured resource or custom resource
     ///
-    /// This is the only entrypoint to `Resource` that bypasses `k8s-openapi` entirely.
+    /// This is the only entrypoint to `Resource` that bypasses [`k8s_openapi`] entirely.
     /// If you need a `CustomResource` consider using `kube-derive` for its
-    /// #[derive(CustomResource)] proc-macro.
+    /// `#[derive(CustomResource)]` proc-macro.
     pub fn dynamic(kind: &str) -> DynamicResource {
         DynamicResource::new(kind)
     }
@@ -216,7 +216,7 @@ impl Resource {
 
     /// Replace an instance of a resource
     ///
-    /// Requires metadata.resourceVersion set in data
+    /// Requires `metadata.resourceVersion` set in data
     pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);

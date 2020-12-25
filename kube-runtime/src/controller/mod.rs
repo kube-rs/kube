@@ -55,7 +55,7 @@ pub struct ReconcilerAction {
     pub requeue_after: Option<Duration>,
 }
 
-/// Helper for building custom trigger filters, see `trigger_self` and `trigger_owners` for some examples
+/// Helper for building custom trigger filters, see [`trigger_self`] and [`trigger_owners`] for some examples.
 pub fn trigger_with<T, K, I, S>(
     stream: S,
     mapper: impl Fn(T) -> I,
@@ -98,15 +98,15 @@ where
 
 /// A context data type that's passed through to the controllers callbacks
 ///
-/// Context<T> gets passed to both the `reconciler` and the `error_policy` callbacks.
+/// `Context` gets passed to both the `reconciler` and the `error_policy` callbacks,
 /// allowing a read-only view of the world without creating a big nested lambda.
-/// More or less the same as actix's Data<T>
+/// More or less the same as Actix's [`Data`](https://docs.rs/actix-web/3.x/actix_web/web/struct.Data.html).
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 pub struct Context<T>(Arc<T>);
 
 impl<T> Context<T> {
-    /// Create new `Data` instance.
+    /// Create new `Context` instance.
     #[must_use]
     pub fn new(state: T) -> Context<T> {
         Context(Arc::new(state))
@@ -118,7 +118,7 @@ impl<T> Context<T> {
         self.0.as_ref()
     }
 
-    /// Convert to the internal Arc<T>
+    /// Convert to the internal `Arc<T>`.
     #[must_use]
     pub fn into_inner(self) -> Arc<T> {
         self.0
@@ -131,9 +131,9 @@ impl<T> Context<T> {
 ///
 /// The `queue` is a source of external events that trigger the reconciler,
 /// usually taken from a `reflector` and then passed through a trigger function such as
-/// `trigger_self`.
+/// [`trigger_self`].
 ///
-/// This is the "hard-mode" version of `Controller`, which allows you some more customization
+/// This is the "hard-mode" version of [`Controller`], which allows you some more customization
 /// (such as triggering from arbitrary `Stream`s), at the cost of some more verbosity.
 pub fn applier<K, QueueStream, ReconcilerFut, T>(
     mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
@@ -309,10 +309,12 @@ where
 
     /// Indicate child objets `K` owns and be notified when they change
     ///
-    /// This type `Child` must have `OwnerReference`s set to point back to `K`.
+    /// This type `Child` must have [`OwnerReference`] set to point back to `K`.
     /// You can customize the parameters used by the underlying `watcher` if
     /// only a subset of `Child` entries are required.
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
+    ///
+    /// [`OwnerReference`]: https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.OwnerReference.html
     pub fn owns<Child: Clone + Meta + DeserializeOwned + Send + 'static>(
         mut self,
         api: Api<Child>,
@@ -325,7 +327,7 @@ where
 
     /// Indicate an object to watch with a custom mapper
     ///
-    /// This mapper should return something like Option<ObjectRef<K>>
+    /// This mapper should return something like `Option<ObjectRef<K>>`
     pub fn watches<
         Other: Clone + Meta + DeserializeOwned + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
@@ -347,7 +349,7 @@ where
     ///
     /// This creates a stream from all builder calls and starts an applier with
     /// a specified `reconciler` and `error_policy` callbacks. Each of these will be called
-    /// with a configurable `Context`.
+    /// with a configurable [`Context`].
     pub fn run<ReconcilerFut, T>(
         self,
         mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,

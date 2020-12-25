@@ -11,11 +11,11 @@ pub enum Error {
     /// ApiError for when things fail
     ///
     /// This can be parsed into as an error handling fallback.
-    /// Replacement data for reqwest::Response::error_for_status,
+    /// Replacement data for [`reqwest::Response::error_for_status`],
     /// which is often lacking in good permission errors.
     /// It's also used in `WatchEvent` from watch calls.
     ///
-    /// It's quite common to get a `410 Gone` when the resourceVersion is too old.
+    /// It's quite common to get a `410 Gone` when the `resourceVersion` is too old.
     #[error("ApiError: {0} ({0:?})")]
     Api(#[source] ErrorResponse),
 
@@ -179,7 +179,7 @@ pub enum ConfigError {
     AuthExec(String),
 }
 
-/// An Error response from the API
+/// An error response from the API.
 #[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[error("{message}: {reason}")]
 pub struct ErrorResponse {

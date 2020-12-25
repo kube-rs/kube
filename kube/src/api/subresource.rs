@@ -9,9 +9,7 @@ use crate::{
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
-/// Scale subresource
-///
-/// https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource
+/// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned,
@@ -37,11 +35,9 @@ where
 
 // ----------------------------------------------------------------------------
 
-/// Status subresource
-///
-/// https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource
-/// TODO: Replace examples with owned custom resources. Bad practice to write to owned objects
-/// These examples work, but the job controller will totally overwrite what we do.
+// TODO: Replace examples with owned custom resources. Bad practice to write to owned objects
+// These examples work, but the job controller will totally overwrite what we do.
+/// Methods for [status subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource).
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned,
@@ -84,8 +80,8 @@ where
 
     /// Replace every field on the status object
     ///
-    /// This works similarly to the `Api::replace` method, but .spec is ignored.
-    /// You can leave out the .spec entirely from the serialized output.
+    /// This works similarly to the [`Api::replace`] method, but `.spec` is ignored.
+    /// You can leave out the `.spec` entirely from the serialized output.
     ///
     /// ```no_run
     /// use kube::{api::{Api, PostParams}, Client};
@@ -116,14 +112,14 @@ where
 pub struct LogParams {
     /// The container for which to stream logs. Defaults to only container if there is one container in the pod.
     pub container: Option<String>,
-    /// Follow the log stream of the pod. Defaults to false.
+    /// Follow the log stream of the pod. Defaults to `false`.
     pub follow: bool,
     /// If set, the number of bytes to read from the server before terminating the log output.
     /// This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.
     pub limit_bytes: Option<i64>,
-    /// If 'true', then the output is pretty printed.
+    /// If `true`, then the output is pretty printed.
     pub pretty: bool,
-    /// Return previous terminated container logs. Defaults to false.
+    /// Return previous terminated container logs. Defaults to `false`.
     pub previous: bool,
     /// A relative time in seconds before the current time from which to show logs.
     /// If this value precedes the time a pod was started, only logs since the pod start will be returned.
@@ -132,7 +128,7 @@ pub struct LogParams {
     /// If set, the number of lines from the end of the logs to show.
     /// If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime
     pub tail_lines: Option<i64>,
-    /// If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.
+    /// If `true`, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to `false`.
     pub timestamps: bool,
 }
 

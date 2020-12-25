@@ -184,11 +184,11 @@ where
     /// they are ready.
     ///
     /// The returned [`HoldUnless`] is designed to be short-lived: it has no allocations, and
-    /// no messages will be lost, even if it is reconstructed on each call to [`poll_next`].
+    /// no messages will be lost, even if it is reconstructed on each call to [`poll_next`](Self::poll_next).
     /// In fact, this is often desirable, to avoid long-lived borrows in `can_take_message`'s closure.
     ///
     /// NOTE: `can_take_message` should be considered fairly performance-sensitive, since
-    /// it will generally be executed for each pending message, for each [`poll_next`].
+    /// it will generally be executed for each pending message, for each [`poll_next`](Self::poll_next).
     pub fn hold_unless<C: Fn(&T) -> bool>(self: Pin<&mut Self>, can_take_message: C) -> HoldUnless<T, R, C> {
         HoldUnless {
             scheduler: self,
