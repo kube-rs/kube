@@ -26,8 +26,10 @@ use std::iter;
 /// It is recommended to use [`kube::CustomResource`] (from kube's `derive` feature)
 /// for CRD cases where you own a struct rather than this.
 ///
-/// **Note:** You will need to implement `k8s_openapi` traits yourself to use the typed `Api`
-/// with a `Resource` built from a `DynamicResource` (and this is not always feasible).
+/// **Note:** You will need to implement [`k8s_openapi`] traits yourself to use the typed [`Api`]
+/// with a [`Resource`] built from a [`DynamicResource`] (and this is not always feasible).
+///
+/// [`kube::CustomResource`]: crate::CustomResource
 #[derive(Default)]
 pub struct DynamicResource {
     pub(crate) kind: String,
@@ -37,7 +39,7 @@ pub struct DynamicResource {
 }
 
 impl DynamicResource {
-    /// Creates `DynamicResource` from an [`APIResource`](https://docs.rs/k8s-openapi/0.9.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.APIResource.html)
+    /// Creates `DynamicResource` from an [`APIResource`].
     ///
     /// `APIResource` objects can be extracted from [`Client::list_api_group_resources`].
     /// If it does not specify version and/or group, they will be taken
@@ -56,6 +58,8 @@ impl DynamicResource {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [`API Resource`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource
     pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
         let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
         let (default_group, default_version) = match *gvsplit.as_slice() {
@@ -73,11 +77,14 @@ impl DynamicResource {
         }
     }
 
-    /// Create a DynamicResource specifying the kind
+    /// Create a `DynamicResource` specifying the kind.
     ///
     /// The kind must not be plural and it must be in PascalCase
-    /// **Note:** You **must** call `group` and `version` to successfully convert
-    /// this object into something useful
+    /// **Note:** You **must** call [`group`] and [`version`] to successfully convert
+    /// this object into something useful.
+    ///
+    /// [`group`]: Self::group
+    /// [`version`]: Self::version
     pub fn new(kind: &str) -> Self {
         Self {
             kind: kind.into(),
@@ -103,18 +110,18 @@ impl DynamicResource {
         self
     }
 
-    /// Consume the DynamicResource and build a Resource
+    /// Consume the `DynamicResource` and build a `Resource`.
     ///
     /// Note this crashes on invalid group/version/kinds.
-    /// Use `try_into_resource` to handle the errors.
+    /// Use [`try_into_resource`](Self::try_into_resource) to handle the errors.
     pub fn into_resource(self) -> Resource {
         Resource::try_from(self).unwrap()
     }
 
-    /// Consume the DynamicResource and convert to an Api object
+    /// Consume the `DynamicResource` and convert to an `Api` object.
     ///
     /// Note this crashes on invalid group/version/kinds.
-    /// Use `try_into_api` to handle the errors.
+    /// Use [`try_into_api`](Self::try_into_api) to handle the errors.
     pub fn into_api<K>(self, client: Client) -> Api<K> {
         let resource = Resource::try_from(self).unwrap();
         Api {
@@ -124,14 +131,14 @@ impl DynamicResource {
         }
     }
 
-    /// Consume the `DynamicResource` and attempt to build a `Resource`
+    /// Consume the `DynamicResource` and attempt to build a `Resource`.
     ///
     /// Equivalent to importing TryFrom trait into scope.
     pub fn try_into_resource(self) -> Result<Resource> {
         Resource::try_from(self)
     }
 
-    /// Consume the `DynamicResource` and and attempt to convert to an Api object
+    /// Consume the `DynamicResource` and and attempt to convert to an `Api` object.
     pub fn try_into_api<K>(self, client: Client) -> Result<Api<K>> {
         let resource = Resource::try_from(self)?;
         Ok(Api {

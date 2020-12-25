@@ -4,7 +4,7 @@
 //!
 //! This client can be used on its own or in conjuction with
 //! the [`Api`][crate::api::Api] type for more structured
-//! interaction with the kuberneres API
+//! interaction with the kuberneres API.
 
 use crate::{
     api::{Meta, WatchEvent},
@@ -46,7 +46,7 @@ impl Client {
     /// Panics if the configuration supplied leads to an invalid HTTP client.
     /// Refer to the [`reqwest::ClientBuilder::build`] docs for information
     /// on situations where this might fail. If you want to handle this error case
-    /// use `Config::try_from` (note that this requires [`std::convert::TryFrom`]
+    /// use [`Config::try_from`](Self::try_from) (note that this requires [`std::convert::TryFrom`]
     /// to be in scope.)
     pub fn new(config: Config) -> Self {
         Self::try_from(config).expect("Could not create a client from the supplied config")
@@ -60,7 +60,7 @@ impl Client {
     ///
     /// Will fail if neither configuration could be loaded.
     ///
-    /// If you already have a [`Config`] then use `Client::try_from`
+    /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead
     pub async fn try_default() -> Result<Self> {
         let client_config = Config::infer().await?;

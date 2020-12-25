@@ -4,7 +4,7 @@
 //! controllers/operators/watchers that need to synchronize/reconcile kubernetes
 //! state.
 //!
-//! Newcomers should generally get started with the `Controller` builder, which manages
+//! Newcomers should generally get started with the [`Controller`] builder, which manages
 //! all state internals for you.
 
 #![deny(unsafe_code)]

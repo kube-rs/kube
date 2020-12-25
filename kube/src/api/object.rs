@@ -7,7 +7,7 @@ use std::fmt::Debug;
 
 /// A raw event returned from a watch query
 ///
-/// Note that a watch query returns many of these as newline separated json.
+/// Note that a watch query returns many of these as newline separated JSON.
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
 pub enum WatchEvent<K>
@@ -20,11 +20,11 @@ where
     Modified(K),
     /// Resource was deleted
     Deleted(K),
-    /// Resource bookmark
+    /// Resource bookmark. `Bookmark` is a slimmed down `K` due to [#285](https://github.com/clux/kube-rs/issues/285).
     ///
-    /// From [Watch bookmarks](https://kubernetes.io/docs/reference/using-api/api-concepts/#watch-bookmarks)
-    /// NB: This became Beta first in Kubernetes 1.16
-    /// Slimmed down K for Bookmark WatchEvents due to #285
+    /// From [Watch bookmarks](https://kubernetes.io/docs/reference/using-api/api-concepts/#watch-bookmarks).
+    ///
+    /// NB: This became Beta first in Kubernetes 1.16.
     Bookmark(Bookmark),
     /// There was some kind of error
     Error(ErrorResponse),
@@ -45,11 +45,10 @@ where
     }
 }
 
-/// Slimed down K for WatchEvent::Bookmark
+/// Slimed down K for [`WatchEvent::Bookmark`] due to [#285](https://github.com/clux/kube-rs/issues/285).
 ///
-/// Can only be relied upon to have metadata with resource version
-/// Slimmed down K for Bookmark WatchEvents due to #285
-/// Bookmarks contain apiVersion + kind + basically empty metadata
+/// Can only be relied upon to have metadata with resource version.
+/// Bookmarks contain apiVersion + kind + basically empty metadata.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Bookmark {
     /// apiVersion + kind
@@ -69,11 +68,11 @@ pub struct BookmarkMeta {
 
 // -------------------------------------------------------
 
-/// A standard Kubernetes object with .spec and .status
+/// A standard Kubernetes object with `.spec` and `.status`.
 ///
 /// This is a convenience struct provided for serialization/deserialization
 /// It is not useful within the library anymore, because it can not easily implement
-/// the k8s_openapi traits.
+/// the [`k8s_openapi`] traits.
 ///
 /// This is what Kubernetes maintainers tell you the world looks like.
 /// It's.. generally true.
@@ -131,24 +130,24 @@ where
 /// A generic Kubernetes object list
 ///
 /// This is used instead of a full struct for `DeploymentList`, `PodList`, etc.
-/// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.4.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
+/// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
 ///
 /// Note that this is only used internally within reflectors and informers,
-/// and is generally produced from list/watch/delete collection queries on an `Resource`.
+/// and is generally produced from list/watch/delete collection queries on an [`Resource`](super::Resource).
 ///
-/// This almost equivalent to k8s_openapi::List<T>, but iterable
+/// This is almost equivalent to [`k8s_openapi::List<T>`](k8s_openapi::List), but iterable.
 #[derive(Deserialize, Debug)]
 pub struct ObjectList<T>
 where
     T: Clone,
 {
     // NB: kind and apiVersion can be set here, but no need for it atm
-    /// ListMeta - only really used for its resourceVersion
+    /// ListMeta - only really used for its `resourceVersion`
     ///
-    /// See [ListMeta](https://arnavion.github.io/k8s-openapi/v0.7.x/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ListMeta.html)
+    /// See [ListMeta](k8s_openapi::apimachinery::pkg::apis::meta::v1::ListMeta)
     pub metadata: ListMeta,
 
-    /// The items we are actually interested in. In practice; T:= Resource<T,U>.
+    /// The items we are actually interested in. In practice; `T := Resource<T,U>`.
     #[serde(bound(deserialize = "Vec<T>: Deserialize<'de>"))]
     pub items: Vec<T>,
 }
