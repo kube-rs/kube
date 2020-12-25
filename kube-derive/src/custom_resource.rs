@@ -264,7 +264,7 @@ impl CustomDerive for CustomResource {
 
         // Schema generation is always enabled for v1 because it's mandatory.
         // TODO Enable schema generation for v1beta1 if the spec derives `JsonSchema`.
-        let schema_gen_enabled = apiextensions == "v1";
+        let schema_gen_enabled = apiextensions == "v1" && cfg!(feature = "schema");
         // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
         // these are validated by the API server implicitly. Also, we can't generate the
         // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
@@ -372,7 +372,8 @@ impl CustomDerive for CustomResource {
         let short_json = serde_json::to_string(&shortnames).unwrap();
         let crd_meta_name = format!("{}.{}", plural, group);
         let crd_meta = quote! { { "name": #crd_meta_name } };
-        let jsondata = if apiextensions == "v1" {
+
+        let schemagen = if schema_gen_enabled {
             quote! {
                 // Don't use definitions and don't include `$schema` because these are not allowed.
                 let gen = schemars::gen::SchemaSettings::openapi3().with(|s| {
@@ -380,6 +381,20 @@ impl CustomDerive for CustomResource {
                     s.meta_schema = None;
                 }).into_generator();
                 let schema = gen.into_root_schema_for::<Self>();
+            }
+        } else {
+            // we could issue a compile time warning for this, but it would hit EVERY compile, which would be noisy
+            // eprintln!("warning: kube-derive configured with manual schema generation");
+            // users must manually set a valid schema in crd.spec.versions[*].schema - see examples: crd_derive_no_schema
+            quote! {
+                let schema: Option<k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::JSONSchemaProps> = None;
+            }
+        };
+
+        let jsondata = if apiextensions == "v1" {
+            quote! {
+                #schemagen
+
                 let jsondata = serde_json::json!({
                     "metadata": #crd_meta,
                     "spec": {

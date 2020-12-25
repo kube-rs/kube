@@ -133,10 +133,13 @@ fn verify_crd() {
 
 #[test]
 fn verify_resource() {
+    use static_assertions::{assert_impl_all, assert_impl_one};
     assert_eq!(Foo::KIND, "Foo");
     assert_eq!(Foo::GROUP, "clux.dev");
     assert_eq!(Foo::VERSION, "v1");
     assert_eq!(Foo::API_VERSION, "clux.dev/v1");
+    assert_impl_all!(Foo: k8s_openapi::Resource, k8s_openapi::Metadata, Default);
+    assert_impl_one!(MyFoo: JsonSchema);
 }
 
 #[test]
