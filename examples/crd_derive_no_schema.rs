@@ -1,6 +1,8 @@
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
+    CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps,
+};
 use kube_derive::CustomResource;
 use serde::{Deserialize, Serialize};
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps};
 
 
 /// CustomResource with manually implemented schema
@@ -31,7 +33,9 @@ impl Bar {
 
         let mut crd = Self::crd();
         crd.spec.versions.iter_mut().for_each(|v| {
-            v.schema = Some(CustomResourceValidation { open_api_v3_schema: Some(schema.clone()) })
+            v.schema = Some(CustomResourceValidation {
+                open_api_v3_schema: Some(schema.clone()),
+            })
         });
         crd
     }
