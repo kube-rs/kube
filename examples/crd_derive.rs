@@ -2,7 +2,6 @@ use k8s_openapi::Resource;
 use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-#[macro_use] extern crate static_assertions;
 
 /// Our spec for Foo
 ///
@@ -134,6 +133,7 @@ fn verify_crd() {
 
 #[test]
 fn verify_resource() {
+    use static_assertions::{assert_impl_all, assert_impl_one};
     assert_eq!(Foo::KIND, "Foo");
     assert_eq!(Foo::GROUP, "clux.dev");
     assert_eq!(Foo::VERSION, "v1");
