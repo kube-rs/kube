@@ -139,6 +139,7 @@ fn verify_resource() {
     assert_eq!(Foo::VERSION, "v1");
     assert_eq!(Foo::API_VERSION, "clux.dev/v1");
     assert_impl_all!(Foo: k8s_openapi::Resource, k8s_openapi::Metadata, Default);
+    assert_impl_one!(MyFoo: JsonSchema);
 }
 
 #[test]
@@ -152,22 +153,4 @@ metadata: {}
 spec:
   name: """#;
     assert_eq!(exp, ser);
-}
-
-/// CustomResource without ::crd generated (skip_crd)
-#[derive(CustomResource, Serialize, Deserialize, Debug, Clone)]
-#[kube(group = "clux.dev", version = "v1", kind = "Bar", namespaced)]
-#[kube(skip_crd)]
-pub struct MyBar {
-    bars: u32,
-}
-
-// Verify CustomResource derivable with skip_crd
-#[test]
-fn verify_bar_is_a_custom_resource() {
-    println!("Kind {}", Bar::KIND);
-    let bar = Bar::new("five", MyBar { bars: 5 });
-    println!("Spec: {:?}", bar.spec);
-    assert_impl_all!(Bar: k8s_openapi::Resource, k8s_openapi::Metadata);
-    // TODO: not asserting crd trait (if we make it a trait)
 }
