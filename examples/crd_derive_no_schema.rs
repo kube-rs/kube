@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// But here, we simply drop in a valid schema from a string and avoid schemars from the dependency tree entirely.
 #[cfg(not(feature = "schema"))]
 #[derive(CustomResource, Serialize, Deserialize, Debug, Clone)]
-#[kube(group = "clux.dev", version = "v1", kind = "Bar", struct = "BarCr", namespaced)]
+#[kube(group = "clux.dev", version = "v1", kind = "Bar", namespaced)]
 pub struct MyBar {
     bars: u32,
 }
@@ -30,7 +30,7 @@ properties:
 "#;
 
 #[cfg(not(feature = "schema"))]
-impl BarCr {
+impl Bar {
     fn crd_with_manual_schema() -> CustomResourceDefinition {
         let schema: JSONSchemaProps = serde_yaml::from_str(MANUAL_SCHEMA).expect("invalid schema");
 
@@ -47,7 +47,7 @@ impl BarCr {
 
 #[cfg(not(feature = "schema"))]
 fn main() {
-    let crd = BarCr::crd_with_manual_schema();
+    let crd = Bar::crd_with_manual_schema();
     println!("{}", serde_yaml::to_string(&crd).unwrap());
 }
 #[cfg(feature = "schema")]
@@ -63,13 +63,13 @@ fn verify_bar_is_a_custom_resource() {
     use schemars::JsonSchema; // only for ensuring it's not implemented
     use static_assertions::{assert_impl_all, assert_not_impl_any};
 
-    println!("Kind {}", BarCr::KIND);
-    let bar = BarCr::new("five", MyBar { bars: 5 });
+    println!("Kind {}", Bar::KIND);
+    let bar = Bar::new("five", MyBar { bars: 5 });
     println!("Spec: {:?}", bar.spec);
-    assert_impl_all!(BarCr: k8s_openapi::Resource, k8s_openapi::Metadata);
+    assert_impl_all!(Bar: k8s_openapi::Resource, k8s_openapi::Metadata);
     assert_not_impl_any!(MyBar: JsonSchema); // but no schemars schema implemented
 
-    let crd = BarCr::crd_with_manual_schema();
+    let crd = Bar::crd_with_manual_schema();
     for v in crd.spec.versions {
         assert!(v.schema.unwrap().open_api_v3_schema.is_some());
     }

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
     group = "clux.dev",
     version = "v1",
     kind = "Foo",
+    struct = "FooCrd",
     namespaced,
     status = "FooStatus",
     derive = "PartialEq",
@@ -31,22 +32,21 @@ pub struct FooStatus {
 }
 
 fn main() {
-    println!("Kind {}", Foo::KIND);
-    let mut foo = Foo::new("hi", MyFoo {
+    println!("Kind {}", FooCrd::KIND);
+    let mut foo = FooCrd::new("hi", MyFoo {
         name: "hi".into(),
         info: None,
     });
     foo.status = Some(FooStatus { is_bad: true });
     println!("Spec: {:?}", foo.spec);
-    let crd = serde_json::to_string_pretty(&Foo::crd()).unwrap();
+    let crd = serde_json::to_string_pretty(&FooCrd::crd()).unwrap();
     println!("Foo CRD: \n{}", crd);
 }
 
 // some tests
-// Verify Foo::crd
+// Verify FooCrd::crd
 #[test]
 fn verify_crd() {
-    let crd = Foo::crd();
     let output = serde_json::json!({
       "apiVersion": "apiextensions.k8s.io/v1",
       "kind": "CustomResourceDefinition",
@@ -111,7 +111,7 @@ fn verify_crd() {
                 "required": [
                   "spec"
                 ],
-                "title": "Foo",
+                "title": "FooCrd",
                 "type": "object"
               }
             },
@@ -126,24 +126,24 @@ fn verify_crd() {
         ]
       }
     });
-    let outputcrd = serde_json::from_value(output).expect("expected output is valid");
-    assert_eq!(crd, outputcrd);
+    let crd = serde_json::to_value(FooCrd::crd()).unwrap();
+    assert_eq!(crd, output);
 }
 
 #[test]
 fn verify_resource() {
     use static_assertions::{assert_impl_all, assert_impl_one};
-    assert_eq!(Foo::KIND, "Foo");
-    assert_eq!(Foo::GROUP, "clux.dev");
-    assert_eq!(Foo::VERSION, "v1");
-    assert_eq!(Foo::API_VERSION, "clux.dev/v1");
-    assert_impl_all!(Foo: k8s_openapi::Resource, k8s_openapi::Metadata, Default);
+    assert_eq!(FooCrd::KIND, "Foo");
+    assert_eq!(FooCrd::GROUP, "clux.dev");
+    assert_eq!(FooCrd::VERSION, "v1");
+    assert_eq!(FooCrd::API_VERSION, "clux.dev/v1");
+    assert_impl_all!(FooCrd: k8s_openapi::Resource, k8s_openapi::Metadata, Default);
     assert_impl_one!(MyFoo: JsonSchema);
 }
 
 #[test]
 fn verify_default() {
-    let fdef = Foo::default();
+    let fdef = FooCrd::default();
     let ser = serde_yaml::to_string(&fdef).unwrap();
     let exp = r#"---
 apiVersion: clux.dev/v1
