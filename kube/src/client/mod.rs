@@ -21,7 +21,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{self, Value};
 
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 /// Client for connecting with a Kubernetes cluster.
 ///
@@ -355,7 +355,7 @@ impl TryFrom<Config> for Client {
         let cluster_url = config.cluster_url.clone();
         let default_ns = config.default_ns.clone();
         let config_clone = config.clone();
-        let builder: reqwest::ClientBuilder = config.into();
+        let builder: reqwest::ClientBuilder = config.try_into()?;
         Ok(Self {
             cluster_url,
             default_ns,
@@ -365,8 +365,9 @@ impl TryFrom<Config> for Client {
     }
 }
 
-impl From<Config> for reqwest::ClientBuilder {
-    fn from(config: Config) -> Self {
+impl TryFrom<Config> for reqwest::ClientBuilder {
+    type Error = Error;
+    fn try_from(config: Config) -> Result<Self> {
         let mut builder = Self::new();
 
         if let Some(i) = &config.proxy {
@@ -377,9 +378,9 @@ impl From<Config> for reqwest::ClientBuilder {
             builder = builder.identity(i)
         }
 
-        if let Some(c) = config.root_cert {
-            for cert in c {
-                builder = builder.add_root_certificate(cert);
+        if let Some(ders) = config.root_cert {
+            for der in ders {
+                builder = builder.add_root_certificate(der.try_into()?);
             }
         }
 
@@ -390,7 +391,7 @@ impl From<Config> for reqwest::ClientBuilder {
         builder = builder.default_headers(config.headers);
         builder = builder.danger_accept_invalid_certs(config.accept_invalid_certs);
 
-        builder
+        Ok(builder)
     }
 }
 
