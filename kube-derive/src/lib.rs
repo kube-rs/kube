@@ -196,6 +196,17 @@ use custom_resource::CustomResource;
 /// ```toml
 /// kube = { version = "...", features = ["derive"] }
 /// ```
+///
+/// ## Runtime dependencies
+/// Due to [rust-lang/rust#54363](https://github.com/rust-lang/rust/issues/54363), we cannot be resilient against crate renames within our generated code.
+/// It's therefore **required** that you have the following crates in scope, not renamed:
+///
+/// - `serde_json`
+/// - `k8s_openapi`
+/// - `schemars` (by default, unless `schema` feature disabled)
+///
+/// You are ultimately responsible for maintaining the versions and feature flags of these libraries.
+///
 /// [`kube`]: https://docs.rs/kube
 /// [`kube::Api`]: https://docs.rs/kube/*/kube/struct.Api.html
 /// [`k8s_openapi::Metadata`]: https://docs.rs/k8s-openapi/*/k8s_openapi/trait.Metadata.html
