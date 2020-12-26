@@ -2,7 +2,7 @@
 ===================
   * feat: `kube-derive` now has a default enabled `schema` feature
     * allows opting out of `schemars` dependency for handwriting crds - #355
-  * breaking: `kube-derive` attr `struct_name` renamed to `struct`
+  * breaking: `kube-derive` attr `struct_name` renamed to `struct` - #359
   * docs: improvements on `kube`, `kube-runtime`, `kube-derive`
 
 0.44.0 / 2020-12-23
