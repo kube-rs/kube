@@ -147,6 +147,7 @@ use custom_resource::CustomResource;
 ///     group = "clux.dev",
 ///     version = "v1",
 ///     kind = "Foo",
+///     struct = "FooCrd",
 ///     namespaced,
 ///     status = "FooStatus",
 ///     derive = "PartialEq",
@@ -171,17 +172,17 @@ use custom_resource::CustomResource;
 /// ```ignore
 /// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 /// #[serde(rename_all = "camelCase")]
-/// pub struct Foo {
+/// pub struct FooCrd {
 ///     api_version: String,
 ///     kind: String,
 ///     metadata: ObjectMeta,
 ///     spec: FooSpec,
 ///     status: Option<FooStatus>,
 /// }
-/// impl k8s_openapi::Resource for Foo {...}
-/// impl k8s_openapi::Metadata for Foo {...}
+/// impl k8s_openapi::Resource for FooCrd {...}
+/// impl k8s_openapi::Metadata for FooCrd {...}
 ///
-/// impl Foo {
+/// impl FooCrd {
 ///     pub fn new(name: &str, spec: FooSpec) -> Self { ... }
 ///     pub fn crd() -> k8s_openapi::...::CustomResourceDefinition { ... }
 /// }
