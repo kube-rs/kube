@@ -87,12 +87,12 @@ impl CustomDerive for CustomResource {
                                 return Err(r#"#[kube(kind = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
-                        } else if meta.path.is_ident("kind_struct") {
+                        } else if meta.path.is_ident("struct") {
                             if let syn::Lit::Str(lit) = &meta.lit {
                                 kind_struct = Some(lit.value());
                                 continue;
                             } else {
-                                return Err(r#"#[kube(kind_struct = "...")] expects a string literal value"#)
+                                return Err(r#"#[kube(struct = "...")] expects a string literal value"#)
                                     .spanning(meta);
                             }
                         } else if meta.path.is_ident("plural") {
