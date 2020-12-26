@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 )]
-#[kube(apiextensions = "v1")]
 pub struct MyFoo {
     name: String,
     #[serde(skip_serializing_if = "Option::is_none")]

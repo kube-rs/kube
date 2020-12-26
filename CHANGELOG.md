@@ -1,3 +1,10 @@
+0.45.0 / 2020-12-26
+===================
+  * feat: `kube-derive` now has a default enabled `schema` feature
+    * allows opting out of `schemars` dependency for handwriting crds - #355
+  * breaking: `kube-derive` attr `struct_name` renamed to `struct`
+  * docs: improvements on `kube`, `kube-runtime`, `kube-derive`
+
 0.44.0 / 2020-12-23
 ===================
   * feat: `kube-derive` now generates openapi v3 schemas and is thus usable with v1 `CustomResourceDefinition` - #129 and #264 via #348

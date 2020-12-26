@@ -115,7 +115,7 @@ use custom_resource::CustomResource;
 /// ### `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
 ///
-/// ### `#[kube(kind_struct = "KindStructName")]`
+/// ### `#[kube(struct = "StructName")]`
 /// Customize the name of the generated root struct (defaults to `kind`).
 ///
 /// ### `#[kube(status = "StatusStructName")]`
