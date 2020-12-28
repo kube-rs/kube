@@ -9,6 +9,13 @@ use crate::{
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
+#[cfg(feature = "ws")]
+use async_tungstenite::tungstenite::{self as ws, Message};
+#[cfg(feature = "ws")]
+use futures::StreamExt;
+#[cfg(feature = "ws")]
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>
 where
@@ -206,5 +213,145 @@ where
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
         let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Attach subresource
+// ----------------------------------------------------------------------------
+/// Params for attaching
+///
+/// Note that the server rejects when none of `stdin`, `stdout`, `stderr` are attached.
+#[cfg(feature = "ws")]
+pub struct AttachParams {
+    /// The container in which to execute the command.
+    /// Defaults to only container if there is only one container in the pod.
+    pub container: Option<String>,
+    /// If provided, the contents will be redirected to the standard input stream of the pod. Defaults to `None`.
+    pub stdin: Option<Box<dyn AsyncRead + Unpin>>,
+    /// If provided, the standard out stream of the pod will be redirected to it. Defaults to `Some(stdout)`.
+    pub stdout: Option<Box<dyn AsyncWrite + Unpin>>,
+    /// If provided, the standard error stream of the pod will be redirected to it. Defaults to `Some(stderr)`.
+    pub stderr: Option<Box<dyn AsyncWrite + Unpin>>,
+    /// If `true`, TTY will be allocated for the attach call. Defaults to `false`.
+    pub tty: bool,
+}
+
+#[cfg(feature = "ws")]
+impl Default for AttachParams {
+    // Default matching the server's defaults.
+    fn default() -> Self {
+        Self {
+            container: None,
+            stdin: None,
+            stdout: Some(Box::new(tokio::io::stdout())),
+            stderr: Some(Box::new(tokio::io::stderr())),
+            tty: false,
+        }
+    }
+}
+
+#[cfg(feature = "ws")]
+impl Resource {
+    /// Attach to a pod
+    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
+        let base_url = self.make_url() + "/" + name + "/" + "attach?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+
+        if ap.stdin.is_some() {
+            qp.append_pair("stdin", "true");
+        }
+        if ap.stdout.is_some() {
+            qp.append_pair("stdout", "true");
+        }
+        if ap.stderr.is_some() {
+            qp.append_pair("stderr", "true");
+        }
+        if ap.tty {
+            qp.append_pair("tty", "true");
+        }
+        if let Some(container) = &ap.container {
+            qp.append_pair("container", &container);
+        }
+
+        let req = http::Request::get(qp.finish());
+        req.body(()).map_err(Error::HttpError)
+    }
+}
+
+/// Marker trait for objects that has attach
+#[cfg(feature = "ws")]
+pub trait AttachingObject {}
+
+#[cfg(feature = "ws")]
+impl AttachingObject for k8s_openapi::api::core::v1::Pod {}
+
+#[cfg(feature = "ws")]
+impl<K> Api<K>
+where
+    K: Clone + DeserializeOwned + AttachingObject,
+{
+    /// Attach to pod
+    pub async fn attach(&self, name: &str, mut ap: AttachParams) -> Result<()> {
+        let req = self.resource.attach(name, &ap)?;
+        let stream = self.client.connect(req).await?;
+
+        let (mut _send, mut recv) = stream.split();
+        let mut p_msg = recv.next();
+
+        loop {
+            // TODO Handle stdin and tty
+            match p_msg.await {
+                Some(Ok(msg)) => {
+                    match msg {
+                        Message::Binary(bin) if !bin.is_empty() => {
+                            // Write to appropriate channel
+                            match bin[0] {
+                                // stdin
+                                0 => {}
+                                // stdout
+                                1 => {
+                                    if let Some(stdout) = ap.stdout.as_mut() {
+                                        stdout.write_all(&bin[1..]).await?;
+                                    }
+                                }
+                                // stderr
+                                2 => {
+                                    if let Some(stderr) = ap.stderr.as_mut() {
+                                        stderr.write_all(&bin[1..]).await?;
+                                    }
+                                }
+                                // error?
+                                3 => {}
+                                // resize?
+                                4 => {}
+                                _ => {}
+                            }
+                        }
+
+                        Message::Binary(_) => {}
+                        Message::Text(_) => {}
+                        Message::Ping(_) => {}
+                        Message::Pong(_) => {}
+                        Message::Close(_) => {
+                            // Connection will terminate when None is received.
+                        }
+                    }
+                    p_msg = recv.next();
+                }
+
+                Some(Err(ws::Error::ConnectionClosed)) => {
+                    // not actually an error
+                    break;
+                }
+
+                Some(Err(err)) => return Err(Error::from(err)),
+
+                None => {
+                    break;
+                }
+            }
+        }
+        Ok(())
     }
 }

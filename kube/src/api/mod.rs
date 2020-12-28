@@ -21,6 +21,8 @@ mod dynamic;
 pub use dynamic::DynamicResource;
 
 mod subresource;
+#[cfg(feature = "ws")]
+pub use subresource::{AttachParams, AttachingObject};
 pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};
 
 pub(crate) mod object;

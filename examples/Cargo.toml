@@ -9,11 +9,12 @@ publish = false
 edition = "2018"
 
 [features]
-default = ["native-tls", "schema", "kubederive"]
+default = ["native-tls", "schema", "kubederive", "ws"]
 kubederive = ["kube/derive"] # by default import kube-derive with its default features
 schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
 native-tls = ["reqwest/native-tls", "kube/native-tls", "kube-runtime/native-tls"]
 rustls-tls = ["reqwest/rustls-tls", "kube/rustls-tls", "kube-runtime/rustls-tls"]
+ws = ["kube/ws", "kube/ws-native-tls"]
 
 [dev-dependencies]
 anyhow = "1.0.32"
@@ -100,6 +101,10 @@ path = "multi_watcher.rs"
 [[example]]
 name = "pod_api"
 path = "pod_api.rs"
+
+[[example]]
+name = "pod_attach"
+path = "pod_attach.rs"
 
 [[example]]
 name = "proxy"
