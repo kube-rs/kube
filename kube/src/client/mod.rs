@@ -121,6 +121,12 @@ impl Client {
         if let Some(auth_header) = self.config.get_auth_header().await? {
             parts.headers.insert(http::header::AUTHORIZATION, auth_header);
         }
+        // Use the binary subprotocol v4.
+        // v4 is the current and sends JSON `metav1.Status` to `error` channel.
+        parts.headers.insert(
+            "sec-websocket-protocol",
+            "v4.channel.k8s.io".parse().expect("valid header value"),
+        );
         // Replace scheme to ws(s).
         let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
         parts.uri = finalize_url(&self.cluster_url, &pandq)
