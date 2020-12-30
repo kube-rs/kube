@@ -27,7 +27,7 @@ pub use streaming::AttachedProcess;
 
 mod subresource;
 #[cfg(feature = "ws")]
-pub use subresource::{AttachParams, AttachingObject};
+pub use subresource::{AttachParams, AttachingObject, ExecParams, ExecutingObject};
 pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};
 
 pub(crate) mod object;

@@ -294,3 +294,94 @@ where
         Ok(AttachedProcess::new(stream, ap.stdin, ap.stdout, ap.stderr))
     }
 }
+
+// ----------------------------------------------------------------------------
+// Exec subresource
+// ----------------------------------------------------------------------------
+/// Params for execution
+///
+/// Note that the server rejects when none of `stdin`, `stdout`, `stderr` are attached.
+#[cfg(feature = "ws")]
+pub struct ExecParams {
+    /// The container in which to execute the command.
+    /// Defaults to only container if there is only one container in the pod.
+    pub container: Option<String>,
+    /// Command to execute.
+    pub command: Option<Vec<String>>,
+    /// If `true`, the contents will be redirected to the standard input stream of the pod. Defaults to `false`.
+    pub stdin: bool,
+    /// If `true`, the standard out stream of the pod will be redirected to it. Defaults to `true`.
+    pub stdout: bool,
+    /// If `true`, the standard error stream of the pod will be redirected to it. Defaults to `true`.
+    pub stderr: bool,
+    /// If `true`, TTY will be allocated for the attach call. Defaults to `false`.
+    pub tty: bool,
+}
+
+#[cfg(feature = "ws")]
+impl Default for ExecParams {
+    // Default matching the server's defaults.
+    fn default() -> Self {
+        Self {
+            container: None,
+            command: None,
+            stdin: false,
+            stdout: true,
+            stderr: true,
+            tty: false,
+        }
+    }
+}
+
+#[cfg(feature = "ws")]
+impl Resource {
+    /// Execute command in a pod
+    pub fn exec(&self, name: &str, ep: &ExecParams) -> Result<http::Request<()>> {
+        let base_url = self.make_url() + "/" + name + "/" + "exec?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+
+        if ep.stdin {
+            qp.append_pair("stdin", "true");
+        }
+        if ep.stdout {
+            qp.append_pair("stdout", "true");
+        }
+        if ep.stderr {
+            qp.append_pair("stderr", "true");
+        }
+        if ep.tty {
+            qp.append_pair("tty", "true");
+        }
+        if let Some(container) = &ep.container {
+            qp.append_pair("container", &container);
+        }
+        if let Some(command) = &ep.command {
+            for c in command.iter() {
+                qp.append_pair("command", &c);
+            }
+        }
+
+        let req = http::Request::get(qp.finish());
+        req.body(()).map_err(Error::HttpError)
+    }
+}
+
+/// Marker trait for objects that has exec
+#[cfg(feature = "ws")]
+pub trait ExecutingObject {}
+
+#[cfg(feature = "ws")]
+impl ExecutingObject for k8s_openapi::api::core::v1::Pod {}
+
+#[cfg(feature = "ws")]
+impl<K> Api<K>
+where
+    K: Clone + DeserializeOwned + ExecutingObject,
+{
+    /// Execute a command in a pod
+    pub async fn exec(&self, name: &str, ep: &ExecParams) -> Result<AttachedProcess> {
+        let req = self.resource.exec(name, ep)?;
+        let stream = self.client.connect(req).await?;
+        Ok(AttachedProcess::new(stream, ep.stdin, ep.stdout, ep.stderr))
+    }
+}
