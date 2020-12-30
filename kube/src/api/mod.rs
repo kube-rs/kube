@@ -20,6 +20,11 @@ pub use typed::Api;
 mod dynamic;
 pub use dynamic::DynamicResource;
 
+#[cfg(feature = "ws")]
+mod streaming;
+#[cfg(feature = "ws")]
+pub use streaming::AttachedProcess;
+
 mod subresource;
 #[cfg(feature = "ws")]
 pub use subresource::{AttachParams, AttachingObject};
