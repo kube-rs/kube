@@ -21,9 +21,9 @@ mod dynamic;
 pub use dynamic::DynamicResource;
 
 #[cfg(feature = "ws")]
-mod streaming;
+mod remote_command;
 #[cfg(feature = "ws")]
-pub use streaming::AttachedProcess;
+pub use remote_command::AttachedProcess;
 
 mod subresource;
 #[cfg(feature = "ws")]

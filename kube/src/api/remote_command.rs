@@ -1,4 +1,3 @@
-// Code to support streaming resources (attach/exec/portforward)
 use std::{
     future::Future,
     pin::Pin,
