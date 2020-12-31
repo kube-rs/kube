@@ -339,6 +339,21 @@ impl Resource {
     }
 }
 
+#[cfg(feature = "ws")]
+#[test]
+fn attach_path() {
+    use crate::api::Resource;
+    use k8s_openapi::api::core::v1 as corev1;
+    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let mut ap = AttachParams::default();
+    ap.container = Some("blah".into());
+    let req = r.attach("foo", &ap).unwrap();
+    assert_eq!(
+        req.uri(),
+        "/api/v1/namespaces/ns/pods/foo/attach?&stdout=true&stderr=true&container=blah"
+    );
+}
+
 /// Marker trait for objects that has attach
 #[cfg(feature = "ws")]
 pub trait AttachableObject {}
@@ -383,6 +398,21 @@ impl Resource {
         let req = http::Request::get(qp.finish());
         req.body(()).map_err(Error::HttpError)
     }
+}
+
+#[cfg(feature = "ws")]
+#[test]
+fn exec_path() {
+    use crate::api::Resource;
+    use k8s_openapi::api::core::v1 as corev1;
+    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let mut ap = AttachParams::default();
+    ap.container = Some("blah".into());
+    let req = r.exec("foo", vec!["echo", "foo", "bar"], &ap).unwrap();
+    assert_eq!(
+        req.uri(),
+        "/api/v1/namespaces/ns/pods/foo/exec?&stdout=true&stderr=true&container=blah&command=echo&command=foo&command=bar"
+    );
 }
 
 /// Marker trait for objects that has exec
