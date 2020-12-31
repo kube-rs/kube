@@ -284,6 +284,18 @@ impl AttachParams {
 impl Resource {
     /// Attach to a pod
     pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
+        if !ap.stdin && !ap.stdout && !ap.stderr {
+            return Err(Error::RequestValidation(
+                "AttachParams: one of stdin, stdout, or stderr must be true".into(),
+            ));
+        }
+        if ap.stderr && ap.tty {
+            // Multiplexing is not supported with TTY
+            return Err(Error::RequestValidation(
+                "AttachParams: tty and stderr cannot both be true".into(),
+            ));
+        }
+
         let base_url = self.make_url() + "/" + name + "/" + "attach?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
@@ -413,6 +425,18 @@ impl ExecParams {
 impl Resource {
     /// Execute command in a pod
     pub fn exec(&self, name: &str, ep: &ExecParams) -> Result<http::Request<()>> {
+        if !ep.stdin && !ep.stdout && !ep.stderr {
+            return Err(Error::RequestValidation(
+                "ExecParams: one of stdin, stdout, or stderr must be true".into(),
+            ));
+        }
+        if ep.stderr && ep.tty {
+            // Multiplexing is not supported with TTY
+            return Err(Error::RequestValidation(
+                "ExecParams: tty and stderr cannot both be true".into(),
+            ));
+        }
+
         let base_url = self.make_url() + "/" + name + "/" + "exec?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
 
