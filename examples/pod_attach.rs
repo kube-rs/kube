@@ -3,7 +3,7 @@ extern crate log;
 
 use std::io::Write;
 
-use futures::{future, join, stream::select, FutureExt, StreamExt, TryStreamExt};
+use futures::{join, stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
@@ -75,26 +75,18 @@ async fn main() -> anyhow::Result<()> {
 
 #[allow(dead_code)]
 async fn separate_outputs(mut attached: AttachedProcess) {
-    let stdout_stream = attached.stdout().take().unwrap();
-    let stdouts = stdout_stream
-        .for_each(|out| {
-            if let Ok(bytes) = out {
-                let out = std::io::stdout();
-                out.lock().write_all(&bytes[..]).unwrap();
-            }
-            future::ready(())
-        })
-        .fuse();
-    let stderr_stream = attached.stderr().take().unwrap();
-    let stderrs = stderr_stream
-        .for_each(|out| {
-            if let Ok(bytes) = out {
-                let out = std::io::stderr();
-                out.lock().write_all(&bytes[..]).unwrap();
-            }
-            future::ready(())
-        })
-        .fuse();
+    let stdouts = attached.stdout().unwrap().for_each(|res| async {
+        if let Ok(bytes) = res {
+            let out = std::io::stdout();
+            out.lock().write_all(&bytes).unwrap();
+        }
+    });
+    let stderrs = attached.stderr().unwrap().for_each(|res| async {
+        if let Ok(bytes) = res {
+            let out = std::io::stderr();
+            out.lock().write_all(&bytes).unwrap();
+        }
+    });
 
     join!(stdouts, stderrs);
 
@@ -105,14 +97,13 @@ async fn separate_outputs(mut attached: AttachedProcess) {
 
 #[allow(dead_code)]
 async fn combined_output(mut attached: AttachedProcess) {
-    let stdout_stream = attached.stdout().take().unwrap();
-    let stderr_stream = attached.stderr().take().unwrap();
-    let outputs = select(stdout_stream, stderr_stream).for_each(|out| {
-        if let Ok(bytes) = out {
+    let stdout = attached.stdout().unwrap();
+    let stderr = attached.stderr().unwrap();
+    let outputs = stream::select(stdout, stderr).for_each(|res| async {
+        if let Ok(bytes) = res {
             let out = std::io::stdout();
-            out.lock().write_all(&bytes[..]).unwrap();
+            out.lock().write_all(&bytes).unwrap();
         }
-        future::ready(())
     });
     outputs.await;
 

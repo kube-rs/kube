@@ -106,13 +106,11 @@ async fn main() -> anyhow::Result<()> {
                 },
             )
             .await?;
-        let mut stdin_writer = attached.stdin().take().unwrap();
-        let mut stdout_stream = attached.stdout().take().unwrap();
+        let mut stdin_writer = attached.stdin().unwrap();
+        let mut stdout_stream = attached.stdout().unwrap();
         let next_stdout = stdout_stream.next();
         stdin_writer.write(b"echo test string 1\n").await?;
-        let stdout = String::from_utf8(next_stdout.await.unwrap().ok().unwrap())
-            .ok()
-            .unwrap();
+        let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap()).unwrap();
         println!("{}", stdout);
         assert_eq!(stdout, "test string 1\n");
 
@@ -139,7 +137,6 @@ async fn main() -> anyhow::Result<()> {
 async fn get_output(mut attached: AttachedProcess) -> String {
     let out = attached
         .stdout()
-        .take()
         .unwrap()
         .filter_map(|r| async { r.ok().and_then(|v| String::from_utf8(v).ok()) })
         .collect::<Vec<_>>()
