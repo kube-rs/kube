@@ -277,15 +277,15 @@ impl Resource {
 
 /// Marker trait for objects that has attach
 #[cfg(feature = "ws")]
-pub trait AttachingObject {}
+pub trait AttachableObject {}
 
 #[cfg(feature = "ws")]
-impl AttachingObject for k8s_openapi::api::core::v1::Pod {}
+impl AttachableObject for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + AttachingObject,
+    K: Clone + DeserializeOwned + AttachableObject,
 {
     /// Attach to pod
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
