@@ -248,6 +248,39 @@ impl Default for AttachParams {
 }
 
 #[cfg(feature = "ws")]
+impl AttachParams {
+    /// Specify the container to execute in.
+    pub fn container<T: Into<String>>(&mut self, container: T) -> &mut Self {
+        self.container = Some(container.into());
+        self
+    }
+
+    /// Set `stdin` field.
+    pub fn stdin(&mut self, enable: bool) -> &mut Self {
+        self.stdin = enable;
+        self
+    }
+
+    /// Set `stdout` field.
+    pub fn stdout(&mut self, enable: bool) -> &mut Self {
+        self.stdout = enable;
+        self
+    }
+
+    /// Set `stderr` field.
+    pub fn stderr(&mut self, enable: bool) -> &mut Self {
+        self.stderr = enable;
+        self
+    }
+
+    /// Set `tty` field.
+    pub fn tty(&mut self, enable: bool) -> &mut Self {
+        self.tty = enable;
+        self
+    }
+}
+
+#[cfg(feature = "ws")]
 impl Resource {
     /// Attach to a pod
     pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
@@ -330,6 +363,49 @@ impl Default for ExecParams {
             stderr: true,
             tty: false,
         }
+    }
+}
+
+#[cfg(feature = "ws")]
+impl ExecParams {
+    /// Specify the command to execute.
+    pub fn command<I, T>(&mut self, command: I) -> &mut Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        self.command = Some(command.into_iter().map(Into::into).collect());
+        self
+    }
+
+    /// Specify the container to execute in.
+    pub fn container<T: Into<String>>(&mut self, container: T) -> &mut Self {
+        self.container = Some(container.into());
+        self
+    }
+
+    /// Set `stdin` field.
+    pub fn stdin(&mut self, enable: bool) -> &mut Self {
+        self.stdin = enable;
+        self
+    }
+
+    /// Set `stdout` field.
+    pub fn stdout(&mut self, enable: bool) -> &mut Self {
+        self.stdout = enable;
+        self
+    }
+
+    /// Set `stderr` field.
+    pub fn stderr(&mut self, enable: bool) -> &mut Self {
+        self.stderr = enable;
+        self
+    }
+
+    /// Set `tty` field.
+    pub fn tty(&mut self, enable: bool) -> &mut Self {
+        self.tty = enable;
+        self
     }
 }
 

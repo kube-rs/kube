@@ -59,16 +59,9 @@ async fn main() -> anyhow::Result<()> {
         let attached = pods
             .exec(
                 "example",
-                &ExecParams {
-                    command: Some(
-                        vec!["sh", "-c", "for i in $(seq 1 3); do date; done"]
-                            .into_iter()
-                            .map(|s| s.to_owned())
-                            .collect::<Vec<_>>(),
-                    ),
-                    stderr: false,
-                    ..ExecParams::default()
-                },
+                &ExecParams::default()
+                    .command(vec!["sh", "-c", "for i in $(seq 1 3); do date; done"])
+                    .stderr(false),
             )
             .await?;
         let output = get_output(attached).await;
@@ -80,11 +73,7 @@ async fn main() -> anyhow::Result<()> {
         let attached = pods
             .exec(
                 "example",
-                &ExecParams {
-                    command: Some(vec!["uptime".to_owned()]),
-                    stderr: false,
-                    ..ExecParams::default()
-                },
+                &ExecParams::default().command(vec!["uptime"]).stderr(false),
             )
             .await?;
         let output = get_output(attached).await;
@@ -97,13 +86,10 @@ async fn main() -> anyhow::Result<()> {
         let mut attached = pods
             .exec(
                 "example",
-                &ExecParams {
-                    command: Some(vec!["sh".to_owned()]),
-                    stdin: true,
-                    stdout: true,
-                    stderr: false,
-                    ..ExecParams::default()
-                },
+                &ExecParams::default()
+                    .command(vec!["sh"])
+                    .stdin(true)
+                    .stderr(false),
             )
             .await?;
         let mut stdin_writer = attached.stdin().unwrap();
