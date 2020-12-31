@@ -5,7 +5,7 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
-    api::{Api, AttachedProcess, DeleteParams, ExecParams, ListParams, Meta, PostParams, WatchEvent},
+    api::{Api, AttachParams, AttachedProcess, DeleteParams, ListParams, Meta, PostParams, WatchEvent},
     Client,
 };
 use tokio::io::AsyncWriteExt;
@@ -59,9 +59,8 @@ async fn main() -> anyhow::Result<()> {
         let attached = pods
             .exec(
                 "example",
-                &ExecParams::default()
-                    .command(vec!["sh", "-c", "for i in $(seq 1 3); do date; done"])
-                    .stderr(false),
+                vec!["sh", "-c", "for i in $(seq 1 3); do date; done"],
+                &AttachParams::default().stderr(false),
             )
             .await?;
         let output = get_output(attached).await;
@@ -71,10 +70,7 @@ async fn main() -> anyhow::Result<()> {
 
     {
         let attached = pods
-            .exec(
-                "example",
-                &ExecParams::default().command(vec!["uptime"]).stderr(false),
-            )
+            .exec("example", vec!["uptime"], &AttachParams::default().stderr(false))
             .await?;
         let output = get_output(attached).await;
         println!("{}", output);
@@ -86,10 +82,8 @@ async fn main() -> anyhow::Result<()> {
         let mut attached = pods
             .exec(
                 "example",
-                &ExecParams::default()
-                    .command(vec!["sh"])
-                    .stdin(true)
-                    .stderr(false),
+                vec!["sh"],
+                &AttachParams::default().stdin(true).stderr(false),
             )
             .await?;
         let mut stdin_writer = attached.stdin().unwrap();

@@ -278,42 +278,52 @@ impl AttachParams {
         self.tty = enable;
         self
     }
-}
 
-#[cfg(feature = "ws")]
-impl Resource {
-    /// Attach to a pod
-    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
-        if !ap.stdin && !ap.stdout && !ap.stderr {
+    fn validate(&self) -> Result<()> {
+        if !self.stdin && !self.stdout && !self.stderr {
             return Err(Error::RequestValidation(
                 "AttachParams: one of stdin, stdout, or stderr must be true".into(),
             ));
         }
-        if ap.stderr && ap.tty {
+
+        if self.stderr && self.tty {
             // Multiplexing is not supported with TTY
             return Err(Error::RequestValidation(
                 "AttachParams: tty and stderr cannot both be true".into(),
             ));
         }
 
-        let base_url = self.make_url() + "/" + name + "/" + "attach?";
-        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        Ok(())
+    }
 
-        if ap.stdin {
+    fn append_to_url_serializer(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
+        if self.stdin {
             qp.append_pair("stdin", "true");
         }
-        if ap.stdout {
+        if self.stdout {
             qp.append_pair("stdout", "true");
         }
-        if ap.stderr {
+        if self.stderr {
             qp.append_pair("stderr", "true");
         }
-        if ap.tty {
+        if self.tty {
             qp.append_pair("tty", "true");
         }
-        if let Some(container) = &ap.container {
+        if let Some(container) = &self.container {
             qp.append_pair("container", &container);
         }
+    }
+}
+
+#[cfg(feature = "ws")]
+impl Resource {
+    /// Attach to a pod
+    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
+        ap.validate()?;
+
+        let base_url = self.make_url() + "/" + name + "/" + "attach?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        ap.append_to_url_serializer(&mut qp);
 
         let req = http::Request::get(qp.finish());
         req.body(()).map_err(Error::HttpError)
@@ -343,122 +353,22 @@ where
 // ----------------------------------------------------------------------------
 // Exec subresource
 // ----------------------------------------------------------------------------
-/// Params for execution
-///
-/// Note that the server rejects when none of `stdin`, `stdout`, `stderr` are attached.
 #[cfg(feature = "ws")]
-pub struct ExecParams {
-    /// The container in which to execute the command.
-    /// Defaults to only container if there is only one container in the pod.
-    pub container: Option<String>,
-    /// Command to execute.
-    pub command: Option<Vec<String>>,
-    /// If `true`, the contents will be redirected to the standard input stream of the pod. Defaults to `false`.
-    pub stdin: bool,
-    /// If `true`, the standard out stream of the pod will be redirected to it. Defaults to `true`.
-    pub stdout: bool,
-    /// If `true`, the standard error stream of the pod will be redirected to it. Defaults to `true`.
-    pub stderr: bool,
-    /// If `true`, TTY will be allocated for the attach call. Defaults to `false`.
-    pub tty: bool,
-}
-
-#[cfg(feature = "ws")]
-impl Default for ExecParams {
-    // Default matching the server's defaults.
-    fn default() -> Self {
-        Self {
-            container: None,
-            command: None,
-            stdin: false,
-            stdout: true,
-            stderr: true,
-            tty: false,
-        }
-    }
-}
-
-#[cfg(feature = "ws")]
-impl ExecParams {
-    /// Specify the command to execute.
-    pub fn command<I, T>(&mut self, command: I) -> &mut Self
+impl Resource {
+    /// Execute command in a pod
+    pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<()>>
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
-        self.command = Some(command.into_iter().map(Into::into).collect());
-        self
-    }
-
-    /// Specify the container to execute in.
-    pub fn container<T: Into<String>>(&mut self, container: T) -> &mut Self {
-        self.container = Some(container.into());
-        self
-    }
-
-    /// Set `stdin` field.
-    pub fn stdin(&mut self, enable: bool) -> &mut Self {
-        self.stdin = enable;
-        self
-    }
-
-    /// Set `stdout` field.
-    pub fn stdout(&mut self, enable: bool) -> &mut Self {
-        self.stdout = enable;
-        self
-    }
-
-    /// Set `stderr` field.
-    pub fn stderr(&mut self, enable: bool) -> &mut Self {
-        self.stderr = enable;
-        self
-    }
-
-    /// Set `tty` field.
-    pub fn tty(&mut self, enable: bool) -> &mut Self {
-        self.tty = enable;
-        self
-    }
-}
-
-#[cfg(feature = "ws")]
-impl Resource {
-    /// Execute command in a pod
-    pub fn exec(&self, name: &str, ep: &ExecParams) -> Result<http::Request<()>> {
-        if !ep.stdin && !ep.stdout && !ep.stderr {
-            return Err(Error::RequestValidation(
-                "ExecParams: one of stdin, stdout, or stderr must be true".into(),
-            ));
-        }
-        if ep.stderr && ep.tty {
-            // Multiplexing is not supported with TTY
-            return Err(Error::RequestValidation(
-                "ExecParams: tty and stderr cannot both be true".into(),
-            ));
-        }
+        ap.validate()?;
 
         let base_url = self.make_url() + "/" + name + "/" + "exec?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        ap.append_to_url_serializer(&mut qp);
 
-        if ep.stdin {
-            qp.append_pair("stdin", "true");
-        }
-        if ep.stdout {
-            qp.append_pair("stdout", "true");
-        }
-        if ep.stderr {
-            qp.append_pair("stderr", "true");
-        }
-        if ep.tty {
-            qp.append_pair("tty", "true");
-        }
-        if let Some(container) = &ep.container {
-            qp.append_pair("container", &container);
-        }
-        if let Some(command) = &ep.command {
-            for c in command.iter() {
-                qp.append_pair("command", &c);
-            }
+        for c in command.into_iter() {
+            qp.append_pair("command", &c.into());
         }
 
         let req = http::Request::get(qp.finish());
@@ -479,9 +389,13 @@ where
     K: Clone + DeserializeOwned + ExecutingObject,
 {
     /// Execute a command in a pod
-    pub async fn exec(&self, name: &str, ep: &ExecParams) -> Result<AttachedProcess> {
-        let req = self.resource.exec(name, ep)?;
+    pub async fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        let req = self.resource.exec(name, command, ap)?;
         let stream = self.client.connect(req).await?;
-        Ok(AttachedProcess::new(stream, ep.stdin, ep.stdout, ep.stderr))
+        Ok(AttachedProcess::new(stream, ap.stdin, ap.stdout, ap.stderr))
     }
 }
