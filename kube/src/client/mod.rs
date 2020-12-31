@@ -121,8 +121,11 @@ impl Client {
         if let Some(auth_header) = self.config.get_auth_header().await? {
             parts.headers.insert(http::header::AUTHORIZATION, auth_header);
         }
-        // Use the binary subprotocol v4.
-        // v4 is the current and sends JSON `metav1.Status` to `error` channel.
+        // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
+        // There's no official documentation about this protocol, but it's described in
+        // [`k8s.io/apiserver/pkg/util/wsstream/conn.go`](https://git.io/JLQED).
+        // There's a comment about v4 and `Status` object in
+        // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
         parts.headers.insert(
             "sec-websocket-protocol",
             "v4.channel.k8s.io".parse().expect("valid header value"),
