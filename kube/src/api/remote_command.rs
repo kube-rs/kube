@@ -28,11 +28,13 @@ struct AttachedProcessState {
     stderr_reader: Option<DuplexStream>,
 }
 
-/// Represents an attached process in a container for `attach` and `exec`.
+/// Represents an attached process in a container for [`attach`] and [`exec`].
 ///
-/// Provides access to stdin/stdout/stderr if attached.
 /// Resolves when the connection terminates with an optional [`Status`].
+/// Provides access to `stdin`, `stdout`, and `stderr` if attached.
 ///
+/// [`attach`]: crate::Api::attach
+/// [`exec`]: crate::Api::exec
 /// [`Status`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::Status
 pub struct AttachedProcess {
     has_stdin: bool,
@@ -95,7 +97,12 @@ impl AttachedProcess {
         }
     }
 
-    /// Async writer to write to stdin of the attached process.
+    /// Async writer to stdin.
+    /// ```ignore
+    /// let mut stdin_writer = attached.stdin().unwrap();
+    /// stdin_writer.write(b"foo\n").await?;
+    /// ```
+    /// Only available if [`AttachParams`](super::AttachParams) had `stdin`.
     pub fn stdin(&mut self) -> Option<impl AsyncWrite + Unpin> {
         if !self.has_stdin {
             return None;
@@ -109,7 +116,12 @@ impl AttachedProcess {
         }
     }
 
-    /// Stream of outputs from stdout of the attached process.
+    /// Stream of stdout outputs.
+    /// ```ignore
+    /// let mut stdout_stream = attached.stdout().unwrap();
+    /// let next_stdout = stdout_stream.next().await?;
+    /// ```
+    /// Only available if [`AttachParams`](super::AttachParams) had `stdout`.
     pub fn stdout(&mut self) -> Option<impl Stream<Item = Result<Vec<u8>, std::io::Error>>> {
         if !self.has_stdout {
             return None;
@@ -123,7 +135,12 @@ impl AttachedProcess {
         }
     }
 
-    /// Stream of outputs from stderr of the attached process.
+    /// Stream of stderr outputs.
+    /// ```ignore
+    /// let mut stderr_stream = attached.stderr().unwrap();
+    /// let next_stderr = stderr_stream.next().await?;
+    /// ```
+    /// Only available if [`AttachParams`](super::AttachParams) had `stderr`.
     pub fn stderr(&mut self) -> Option<impl Stream<Item = Result<Vec<u8>, std::io::Error>>> {
         if !self.has_stderr {
             return None;

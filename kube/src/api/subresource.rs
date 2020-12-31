@@ -215,21 +215,30 @@ where
 // ----------------------------------------------------------------------------
 // Attach subresource
 // ----------------------------------------------------------------------------
-/// Params for attaching
+/// Parameters for attaching to a container in a Pod.
 ///
-/// Note that the server rejects when none of `stdin`, `stdout`, `stderr` are attached.
+/// - One of `stdin`, `stdout`, or `stderr` must be `true`.
+/// - `stderr` and `tty` cannot both be `true` because multiplexing is not supported with TTY.
 #[cfg(feature = "ws")]
 pub struct AttachParams {
-    /// The container in which to execute the command.
-    /// Defaults to only container if there is only one container in the pod.
+    /// The name of the container to attach.
+    /// Defaults to the only container if there is only one container in the pod.
     pub container: Option<String>,
-    /// If `true`, the contents will be redirected to the standard input stream of the pod. Defaults to `false`.
+    /// Attach to the container's standard input. Defaults to `false`.
+    ///
+    /// Call [`AttachedProcess::stdin`] to obtain a writer.
     pub stdin: bool,
-    /// If `true`, the standard out stream of the pod will be redirected to it. Defaults to `true`.
+    /// Attach to the container's standard output. Defaults to `true`.
+    ///
+    /// Call [`AttachedProcess::stdout`] to obtain a stream.
     pub stdout: bool,
-    /// If `true`, the standard error stream of the pod will be redirected to it. Defaults to `true`.
+    /// Attach to the container's standard error. Defaults to `true`.
+    ///
+    /// Call [`AttachedProcess::stderr`] to obtain a stream.
     pub stderr: bool,
-    /// If `true`, TTY will be allocated for the attach call. Defaults to `false`.
+    /// Allocate TTY. Defaults to `false`.
+    ///
+    /// NOTE: Terminal resizing is not implemented yet.
     pub tty: bool,
 }
 
