@@ -1,3 +1,8 @@
+UNRELEASED
+===================
+  * chore: upgrade `tokio` to `1.0`
+    * BREAKING: This requires the whole application to upgrade to `tokio` 1.0
+
 0.45.0 / 2020-12-26
 ===================
   * feat: `kube-derive` now has a default enabled `schema` feature
