@@ -17,6 +17,8 @@ use futures_util::future::select;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
 use tokio_util::codec;
 
+use super::AttachParams;
+
 // Internal state of an attached process
 struct AttachedProcessState {
     waker: Option<Waker>,
@@ -26,6 +28,8 @@ struct AttachedProcessState {
     stdout_reader: Option<DuplexStream>,
     stderr_reader: Option<DuplexStream>,
 }
+
+const MAX_BUF_SIZE: usize = 1024;
 
 /// Represents an attached process in a container for [`attach`] and [`exec`].
 ///
@@ -43,24 +47,18 @@ pub struct AttachedProcess {
 }
 
 impl AttachedProcess {
-    pub(crate) fn new(
-        stream: WebSocketStream<ConnectStream>,
-        stdin: bool,
-        stdout: bool,
-        stderr: bool,
-    ) -> Self {
+    pub(crate) fn new(stream: WebSocketStream<ConnectStream>, ap: &AttachParams) -> Self {
         // To simplify the implementation, always create a pipe for stdin.
         // The caller does not have access to it unless they had requested.
-        // REVIEW Make internal buffer size configurable?
-        let (stdin_writer, stdin_reader) = tokio::io::duplex(1024);
-        let (stdout_writer, stdout_reader) = if stdout {
-            let (w, r) = tokio::io::duplex(1024);
+        let (stdin_writer, stdin_reader) = tokio::io::duplex(ap.max_stdin_buf_size.unwrap_or(MAX_BUF_SIZE));
+        let (stdout_writer, stdout_reader) = if ap.stdout {
+            let (w, r) = tokio::io::duplex(ap.max_stdout_buf_size.unwrap_or(MAX_BUF_SIZE));
             (Some(w), Some(r))
         } else {
             (None, None)
         };
-        let (stderr_writer, stderr_reader) = if stderr {
-            let (w, r) = tokio::io::duplex(1024);
+        let (stderr_writer, stderr_reader) = if ap.stderr {
+            let (w, r) = tokio::io::duplex(ap.max_stderr_buf_size.unwrap_or(MAX_BUF_SIZE));
             (Some(w), Some(r))
         } else {
             (None, None)
@@ -87,9 +85,9 @@ impl AttachedProcess {
         });
 
         AttachedProcess {
-            has_stdin: stdin,
-            has_stdout: stdout,
-            has_stderr: stderr,
+            has_stdin: ap.stdin,
+            has_stdout: ap.stdout,
+            has_stderr: ap.stderr,
             state,
         }
     }

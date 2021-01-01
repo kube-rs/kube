@@ -240,6 +240,25 @@ pub struct AttachParams {
     ///
     /// NOTE: Terminal resizing is not implemented yet.
     pub tty: bool,
+
+    /// The maximum amount of bytes that can be written to the internal `stdin`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stdin_buf_size: Option<usize>,
+    /// The maximum amount of bytes that can be written to the internal `stdout`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stdout_buf_size: Option<usize>,
+    /// The maximum amount of bytes that can be written to the internal `stderr`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stderr_buf_size: Option<usize>,
 }
 
 #[cfg(feature = "ws")]
@@ -252,6 +271,9 @@ impl Default for AttachParams {
             stdout: true,
             stderr: true,
             tty: false,
+            max_stdin_buf_size: None,
+            max_stdout_buf_size: None,
+            max_stderr_buf_size: None,
         }
     }
 }
@@ -285,6 +307,24 @@ impl AttachParams {
     /// Set `tty` field.
     pub fn tty(&mut self, enable: bool) -> &mut Self {
         self.tty = enable;
+        self
+    }
+
+    /// Set `max_stdin_buf_size` field.
+    pub fn max_stdin_buf_size(&mut self, size: usize) -> &mut Self {
+        self.max_stdin_buf_size = Some(size);
+        self
+    }
+
+    /// Set `max_stdout_buf_size` field.
+    pub fn max_stdout_buf_size(&mut self, size: usize) -> &mut Self {
+        self.max_stdout_buf_size = Some(size);
+        self
+    }
+
+    /// Set `max_stderr_buf_size` field.
+    pub fn max_stderr_buf_size(&mut self, size: usize) -> &mut Self {
+        self.max_stderr_buf_size = Some(size);
         self
     }
 
@@ -370,7 +410,7 @@ where
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
         let req = self.resource.attach(name, ap)?;
         let stream = self.client.connect(req).await?;
-        Ok(AttachedProcess::new(stream, ap.stdin, ap.stdout, ap.stderr))
+        Ok(AttachedProcess::new(stream, ap))
     }
 }
 
@@ -435,6 +475,6 @@ where
     {
         let req = self.resource.exec(name, command, ap)?;
         let stream = self.client.connect(req).await?;
-        Ok(AttachedProcess::new(stream, ap.stdin, ap.stdout, ap.stderr))
+        Ok(AttachedProcess::new(stream, ap))
     }
 }
