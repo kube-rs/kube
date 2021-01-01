@@ -70,15 +70,6 @@ pub enum Error {
     #[cfg(feature = "native-tls")]
     #[error("OpensslError: {0}")]
     OpensslError(#[from] openssl::error::ErrorStack),
-
-    /// An error from `tokio::io`
-    #[error("IO Error: {0}")]
-    IoError(#[from] tokio::io::Error),
-
-    /// An error from `async_tungstenite::tungstenite`
-    #[cfg(feature = "ws")]
-    #[error("WebSocket Error: {0}")]
-    WebSocket(#[from] async_tungstenite::tungstenite::Error),
 }
 
 #[derive(Error, Debug)]
