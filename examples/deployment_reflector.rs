@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
             // Periodically read our state
             let deploys: Vec<_> = reader.state().iter().map(Meta::name).collect();
             info!("Current deploys: {:?}", deploys);
-            tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
         }
     });
 

@@ -11,7 +11,7 @@ fn spawn_periodic_reader(reader: Store<ConfigMap>) {
     tokio::spawn(async move {
         loop {
             // Periodically read our state
-            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             let cms: Vec<_> = reader.state().iter().map(|obj| Meta::name(obj).clone()).collect();
             info!("Current configmaps: {:?}", cms);
         }

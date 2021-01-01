@@ -10,17 +10,14 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::time::{
-    self,
-    delay_queue::{self, DelayQueue},
-    Instant,
-};
+use tokio::time::{self, Instant};
+use tokio_util::time::delay_queue::{self, DelayQueue};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("timer failure: {}", source))]
     TimerError {
-        source: time::Error,
+        source: time::error::Error,
         backtrace: Backtrace,
     },
 }
@@ -102,7 +99,7 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
         &mut self,
         cx: &mut Context<'_>,
         can_take_message: impl Fn(&T) -> bool,
-    ) -> Poll<Option<Result<T, time::Error>>> {
+    ) -> Poll<Option<Result<T, time::error::Error>>> {
         if let Some(msg) = self.pending.iter().find(|msg| can_take_message(*msg)).cloned() {
             return Poll::Ready(Some(Ok(self.pending.take(&msg).unwrap())));
         }
@@ -344,7 +341,7 @@ mod tests {
         ]));
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), ());
+        scheduler.next().now_or_never().unwrap().unwrap().unwrap();
         // Stream has terminated
         assert!(scheduler.next().await.is_none());
     }
@@ -364,7 +361,7 @@ mod tests {
         ]));
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), ());
+        scheduler.next().now_or_never().unwrap().unwrap().unwrap();
         // Stream has terminated
         assert!(scheduler.next().await.is_none());
     }
@@ -383,7 +380,7 @@ mod tests {
             .unwrap();
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), ());
+        scheduler.next().now_or_never().unwrap().unwrap().unwrap();
         assert!(poll!(scheduler.next()).is_pending());
         schedule_tx
             .send(ScheduleRequest {
@@ -394,7 +391,7 @@ mod tests {
             .unwrap();
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), ());
+        scheduler.next().now_or_never().unwrap().unwrap().unwrap();
         assert!(poll!(scheduler.next()).is_pending());
     }
 }
