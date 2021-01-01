@@ -8,12 +8,11 @@ use std::{
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
-use async_tungstenite::{
-    tokio::ConnectStream,
-    tungstenite::{self as ws, Message},
-    WebSocketStream,
+use async_tungstenite::{tokio::ConnectStream, tungstenite as ws, WebSocketStream};
+use futures::{
+    future::Either::{Left, Right},
+    SinkExt, Stream, StreamExt, TryStreamExt,
 };
-use futures::{future::Either, SinkExt, Stream, StreamExt, TryStreamExt};
 use futures_util::future::select;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
 use tokio_util::codec;
@@ -77,9 +76,7 @@ impl AttachedProcess {
         }));
         let shared_state = state.clone();
         tokio::spawn(async move {
-            let status = start(stream, stdin_reader, stdout_writer, stderr_writer)
-                .await
-                .unwrap();
+            let status = start_message_loop(stream, stdin_reader, stdout_writer, stderr_writer).await;
 
             let mut shared = shared_state.lock().unwrap();
             shared.finished = true;
@@ -179,112 +176,132 @@ impl Future for AttachedProcess {
 const STDIN_CHANNEL: u8 = 0;
 const STDOUT_CHANNEL: u8 = 1;
 const STDERR_CHANNEL: u8 = 2;
-const ERROR_CHANNEL: u8 = 3;
-const RESIZE_CHANNEL: u8 = 4;
+// status channel receives `Status` object on exit.
+const STATUS_CHANNEL: u8 = 3;
+// const RESIZE_CHANNEL: u8 = 4;
 
-async fn start(
+async fn start_message_loop(
     stream: WebSocketStream<ConnectStream>,
     stdin: impl AsyncRead + Unpin,
     mut stdout: Option<impl AsyncWrite + Unpin>,
     mut stderr: Option<impl AsyncWrite + Unpin>,
-) -> Result<Option<Status>, std::io::Error> {
+) -> Option<Status> {
     let mut stdin_stream = into_bytes_stream(stdin);
-    let (mut server_send, mut server_recv) = stream.split();
+    let (mut server_send, raw_server_recv) = stream.split();
+    // Work with filtered messages to reduce noise.
+    let mut server_recv = raw_server_recv.filter_map(filter_message).boxed();
     let mut server_msg = server_recv.next();
     let mut next_stdin = stdin_stream.next();
     let mut status: Option<Status> = None;
+
     loop {
         match select(server_msg, next_stdin).await {
-            Either::Left((message, p_next_stdin)) => {
+            // from server
+            Left((Some(message), p_next_stdin)) => {
                 match message {
-                    Some(Ok(Message::Binary(bin))) if !bin.is_empty() => {
-                        // Write to appropriate channel
-                        match bin[0] {
-                            // stdin
-                            STDIN_CHANNEL => {}
-                            // stdout
-                            STDOUT_CHANNEL => {
-                                if let Some(stdout) = stdout.as_mut() {
-                                    stdout.write_all(&bin[1..]).await?;
-                                }
-                            }
-                            // stderr
-                            STDERR_CHANNEL => {
-                                if let Some(stderr) = stderr.as_mut() {
-                                    stderr.write_all(&bin[1..]).await?;
-                                }
-                            }
-                            // status
-                            ERROR_CHANNEL => {
-                                if let Ok(s) = serde_json::from_slice::<Status>(&bin[1..]) {
-                                    status = Some(s);
-                                }
-                            }
-                            // resize?
-                            RESIZE_CHANNEL => {}
-                            _ => {}
+                    Ok(Message::Stdout(bin)) => {
+                        if let Some(stdout) = stdout.as_mut() {
+                            stdout
+                                .write_all(&bin[1..])
+                                .await
+                                .expect("stdout pipe is writable");
                         }
                     }
-                    // Ignore empty binary message.
-                    // Message of length 1 (only channel number) is sent on connection.
-                    Some(Ok(Message::Binary(_))) => {}
 
-                    // Ignore anything else.
-                    // The protocol we use never sends text frame.
-                    Some(Ok(Message::Text(_))) => {}
-                    Some(Ok(Message::Ping(_))) => {}
-                    Some(Ok(Message::Pong(_))) => {}
-                    Some(Ok(Message::Close(_))) => {
-                        // Connection will terminate when None is received.
+                    Ok(Message::Stderr(bin)) => {
+                        if let Some(stderr) = stderr.as_mut() {
+                            stderr
+                                .write_all(&bin[1..])
+                                .await
+                                .expect("stderr pipe is writable");
+                        }
                     }
 
-                    Some(Err(ws::Error::ConnectionClosed)) => {
-                        // not actually an error
-                        break;
+                    Ok(Message::Status(bin)) => {
+                        if let Ok(s) = serde_json::from_slice::<Status>(&bin[1..]) {
+                            status = Some(s);
+                        }
                     }
 
-                    Some(Err(_err)) => {
-                        // TODO Log and clean up
-                        break;
-                    }
-
-                    None => {
-                        // Connection closed
-                        break;
+                    // Fatal error
+                    Err(err) => {
+                        panic!("AttachedProcess: fatal WebSocket error: {:?}", err);
                     }
                 }
                 server_msg = server_recv.next();
                 next_stdin = p_next_stdin;
             }
 
-            Either::Right((input, p_server_msg)) => {
-                match input {
-                    Some(Ok(bytes)) if !bytes.is_empty() => {
-                        let mut vec = Vec::with_capacity(bytes.len() + 1);
-                        vec.push(STDIN_CHANNEL);
-                        vec.extend_from_slice(&bytes[..]);
-                        server_send.send(ws::Message::binary(vec)).await.unwrap();
-                    }
+            Left((None, _)) => {
+                // Connection closed properly
+                break;
+            }
 
-                    Some(Ok(_)) => {}
-
-                    Some(Err(_)) => {
-                        // TODO Handle error?
-                    }
-
-                    None => {
-                        // Stdin closed
-                    }
+            // from stdin
+            Right((Some(Ok(bytes)), p_server_msg)) => {
+                if !bytes.is_empty() {
+                    let mut vec = Vec::with_capacity(bytes.len() + 1);
+                    vec.push(STDIN_CHANNEL);
+                    vec.extend_from_slice(&bytes[..]);
+                    server_send
+                        .send(ws::Message::binary(vec))
+                        .await
+                        .expect("send stdin");
                 }
                 server_msg = p_server_msg;
                 next_stdin = stdin_stream.next();
             }
+
+            Right((Some(Err(err)), _)) => {
+                server_send.close().await.expect("send close message");
+                panic!("AttachedProcess: failed to read from stdin pipe: {:?}", err);
+            }
+
+            Right((None, _)) => {
+                // Stdin closed (writer half dropped).
+                // Let the server know and disconnect.
+                // REVIEW warn?
+                server_send.close().await.expect("send close message");
+                break;
+            }
         }
     }
 
-    Ok(status)
+    status
 }
 
 fn into_bytes_stream<R: AsyncRead>(reader: R) -> impl Stream<Item = Result<Vec<u8>, std::io::Error>> {
     codec::FramedRead::new(reader, codec::BytesCodec::new()).map_ok(|bs| bs.freeze()[..].to_vec())
+}
+
+/// Channeled messages from the server.
+enum Message {
+    /// To Stdout channel (1)
+    Stdout(Vec<u8>),
+    /// To stderr channel (2)
+    Stderr(Vec<u8>),
+    /// To error/status channel (3)
+    Status(Vec<u8>),
+}
+
+// Filter to reduce all the possible WebSocket messages into a few we expect to receive.
+async fn filter_message(wsm: Result<ws::Message, ws::Error>) -> Option<Result<Message, ws::Error>> {
+    match wsm {
+        // The protocol only sends binary frames.
+        // Message of size 1 (only channel number) is sent on connection.
+        Ok(ws::Message::Binary(bin)) if bin.len() > 1 => match bin[0] {
+            STDOUT_CHANNEL => Some(Ok(Message::Stdout(bin))),
+            STDERR_CHANNEL => Some(Ok(Message::Stderr(bin))),
+            STATUS_CHANNEL => Some(Ok(Message::Status(bin))),
+            // We don't receive messages to stdin and resize channels.
+            _ => None,
+        },
+        // Ignore any other message types.
+        // We can ignore close message because the server never sends anything special.
+        // The connection terminates on `None`.
+        Ok(_) => None,
+        // Fatal errors. `WebSocketStream` turns `ConnectionClosed` and `AlreadyClosed` into `None`.
+        // So these are unrecoverables.
+        Err(err) => Some(Err(err)),
+    }
 }
