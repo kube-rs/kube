@@ -9,11 +9,11 @@ repository = "https://github.com/clux/kube-rs"
 readme = "../README.md"
 
 [dependencies]
-proc-macro2 = "1.0.19"
-quote = "1.0.7"
-syn = { version = "1.0.30", features = ["extra-traits"] }
+proc-macro2 = "1.0.24"
+quote = "1.0.8"
+syn = { version = "1.0.56", features = ["extra-traits"] }
 Inflector = "0.11.4"
-serde_json = "1.0.53"
+serde_json = "1.0.61"
 
 [lib]
 proc-macro = true
@@ -23,8 +23,8 @@ default = ["schema"]
 schema = []
 
 [dev-dependencies]
-serde = { version = "1.0.111", features = ["derive"] }
+serde = { version = "1.0.118", features = ["derive"] }
 serde_yaml = "0.8.14"
 k8s-openapi = { version = "0.10.0", default-features = false, features = ["v1_19"] }
 schemars = { version = "0.8.0", features = ["chrono"] }
-chrono = "0.4"
+chrono = "0.4.19"
