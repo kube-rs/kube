@@ -75,13 +75,15 @@ async fn main() -> anyhow::Result<()> {
 
 #[allow(dead_code)]
 async fn separate_outputs(mut attached: AttachedProcess) {
-    let stdouts = attached.stdout().unwrap().for_each(|res| async {
+    let stdout = tokio::io::reader_stream(attached.stdout().unwrap());
+    let stdouts = stdout.for_each(|res| async {
         if let Ok(bytes) = res {
             let out = std::io::stdout();
             out.lock().write_all(&bytes).unwrap();
         }
     });
-    let stderrs = attached.stderr().unwrap().for_each(|res| async {
+    let stderr = tokio::io::reader_stream(attached.stderr().unwrap());
+    let stderrs = stderr.for_each(|res| async {
         if let Ok(bytes) = res {
             let out = std::io::stderr();
             out.lock().write_all(&bytes).unwrap();
@@ -97,8 +99,8 @@ async fn separate_outputs(mut attached: AttachedProcess) {
 
 #[allow(dead_code)]
 async fn combined_output(mut attached: AttachedProcess) {
-    let stdout = attached.stdout().unwrap();
-    let stderr = attached.stderr().unwrap();
+    let stdout = tokio::io::reader_stream(attached.stdout().unwrap());
+    let stderr = tokio::io::reader_stream(attached.stderr().unwrap());
     let outputs = stream::select(stdout, stderr).for_each(|res| async {
         if let Ok(bytes) = res {
             let out = std::io::stdout();

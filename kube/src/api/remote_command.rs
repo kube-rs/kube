@@ -11,11 +11,10 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use async_tungstenite::{tokio::ConnectStream, tungstenite as ws, WebSocketStream};
 use futures::{
     future::Either::{Left, Right},
-    SinkExt, Stream, StreamExt, TryStreamExt,
+    SinkExt, StreamExt,
 };
 use futures_util::future::select;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
-use tokio_util::codec;
 
 use super::AttachParams;
 
@@ -104,49 +103,36 @@ impl AttachedProcess {
         }
 
         let mut state = self.state.lock().unwrap();
-        if let Some(writer) = state.stdin_writer.take() {
-            Some(writer)
-        } else {
-            None
-        }
+        state.stdin_writer.take()
     }
 
-    /// Stream of stdout outputs.
+    /// Async reader for stdout outputs.
     /// ```ignore
-    /// let mut stdout_stream = attached.stdout().unwrap();
-    /// let next_stdout = stdout_stream.next().await?;
+    /// let mut stdout_reader = attached.stdout().unwrap();
+    /// let next_stdout = stdout_reader.read().await?;
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stdout`.
-    pub fn stdout(&mut self) -> Option<impl Stream<Item = Result<Vec<u8>, std::io::Error>>> {
+    pub fn stdout(&mut self) -> Option<impl AsyncRead + Unpin> {
         if !self.has_stdout {
             return None;
         }
-
         let mut state = self.state.lock().unwrap();
-        if let Some(reader) = state.stdout_reader.take() {
-            Some(into_bytes_stream(reader))
-        } else {
-            None
-        }
+        state.stdout_reader.take()
     }
 
-    /// Stream of stderr outputs.
+    /// Async reader for stderr outputs.
     /// ```ignore
-    /// let mut stderr_stream = attached.stderr().unwrap();
-    /// let next_stderr = stderr_stream.next().await?;
+    /// let mut stderr_reader = attached.stderr().unwrap();
+    /// let next_stderr = stderr_reader.read().await?;
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stderr`.
-    pub fn stderr(&mut self) -> Option<impl Stream<Item = Result<Vec<u8>, std::io::Error>>> {
+    pub fn stderr(&mut self) -> Option<impl AsyncRead + Unpin> {
         if !self.has_stderr {
             return None;
         }
 
         let mut state = self.state.lock().unwrap();
-        if let Some(reader) = state.stderr_reader.take() {
-            Some(into_bytes_stream(reader))
-        } else {
-            None
-        }
+        state.stderr_reader.take()
     }
 }
 
@@ -184,7 +170,7 @@ async fn start_message_loop(
     mut stdout: Option<impl AsyncWrite + Unpin>,
     mut stderr: Option<impl AsyncWrite + Unpin>,
 ) -> Option<Status> {
-    let mut stdin_stream = into_bytes_stream(stdin);
+    let mut stdin_stream = tokio::io::reader_stream(stdin);
     let (mut server_send, raw_server_recv) = stream.split();
     // Work with filtered messages to reduce noise.
     let mut server_recv = raw_server_recv.filter_map(filter_message).boxed();
@@ -266,10 +252,6 @@ async fn start_message_loop(
     }
 
     status
-}
-
-fn into_bytes_stream<R: AsyncRead>(reader: R) -> impl Stream<Item = Result<Vec<u8>, std::io::Error>> {
-    codec::FramedRead::new(reader, codec::BytesCodec::new()).map_ok(|bs| bs.freeze()[..].to_vec())
 }
 
 /// Channeled messages from the server.

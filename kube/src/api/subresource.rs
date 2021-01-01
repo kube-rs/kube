@@ -230,11 +230,11 @@ pub struct AttachParams {
     pub stdin: bool,
     /// Attach to the container's standard output. Defaults to `true`.
     ///
-    /// Call [`AttachedProcess::stdout`] to obtain a stream.
+    /// Call [`AttachedProcess::stdout`] to obtain a reader.
     pub stdout: bool,
     /// Attach to the container's standard error. Defaults to `true`.
     ///
-    /// Call [`AttachedProcess::stderr`] to obtain a stream.
+    /// Call [`AttachedProcess::stderr`] to obtain a reader.
     pub stderr: bool,
     /// Allocate TTY. Defaults to `false`.
     ///
