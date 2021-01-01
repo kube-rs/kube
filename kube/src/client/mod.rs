@@ -21,7 +21,7 @@ use ws::AsyncTlsConnector;
 #[cfg(feature = "ws")]
 use async_tungstenite::{
     tokio::{connect_async_with_tls_connector, ConnectStream},
-    WebSocketStream,
+    tungstenite as ws2, WebSocketStream,
 };
 use bytes::Bytes;
 use either::{Either, Left, Right};
@@ -127,13 +127,40 @@ impl Client {
             .replacen("http", "ws", 1)
             .parse()
             .expect("valid URL");
-        let (stream, _) = connect_async_with_tls_connector(
-            http::Request::from_parts(parts, ()),
-            Some(self.tls_connector.clone()),
-        )
-        .await
-        .expect("handshake error");
-        Ok(stream)
+
+        let tls = Some(self.tls_connector.clone());
+        match connect_async_with_tls_connector(http::Request::from_parts(parts, ()), tls).await {
+            Ok((stream, _)) => Ok(stream),
+
+            // tungstenite only gives us the status code.
+            Err(ws2::Error::Http(code)) => Err(Error::Api(ErrorResponse {
+                status: code.to_string(),
+                code: code.as_u16(),
+                message: "".to_owned(),
+                reason: "".to_owned(),
+            })),
+
+            Err(ws2::Error::HttpFormat(err)) => Err(Error::HttpError(err)),
+            Err(ws2::Error::Tls(err)) => Err(Error::SslError(format!("{}", err))),
+
+            // URL errors:
+            // - No host found in URL
+            // - Unsupported scheme (not ws/wss)
+            // shouldn't happen in our case
+            Err(ws2::Error::Url(msg)) => Err(Error::RequestValidation(msg.into())),
+
+            // Protocol errors:
+            // - Only GET is supported
+            // - Only HTTP version >= 1.1 is supported
+            // shouldn't happen in our case
+            Err(ws2::Error::Protocol(msg)) => Err(Error::RequestValidation(msg.into())),
+
+            // Fatal error with undelying connection.
+            Err(ws2::Error::Io(err)) => panic!("WebSocket connection error: {}", err),
+
+            // Unknown error. `tungstenite::Error` includes those that only happens after connecting.
+            Err(err) => panic!("Unknown WebSocket error: {}", err),
+        }
     }
 
     /// Perform a raw HTTP request against the API and deserialize the response
