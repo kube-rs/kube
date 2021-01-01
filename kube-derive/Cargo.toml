@@ -2,7 +2,10 @@
 name = "kube-derive"
 description = "Custom derives for the kube kubernetes crates"
 version = "0.45.0"
-authors = ["clux <sszynrae@gmail.com>"]
+authors = [
+  "clux <sszynrae@gmail.com>",
+  "kazk <kazk.dev@gmail.com>",
+]
 edition = "2018"
 license = "Apache-2.0"
 repository = "https://github.com/clux/kube-rs"

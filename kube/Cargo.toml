@@ -5,6 +5,7 @@ description = "Kubernetes client in futures controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
   "Teo Klestrup Röijezon <teo@nullable.se>",
+  "kazk <kazk.dev@gmail.com>",
   "ynqa <un.pensiero.vano@gmail.com>",
 ]
 license = "Apache-2.0"
