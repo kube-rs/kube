@@ -13,10 +13,8 @@ use crate::{
     Error, Result,
 };
 
-#[cfg(feature = "ws")]
-mod ws;
-#[cfg(feature = "ws")]
-use ws::AsyncTlsConnector;
+#[cfg(feature = "ws")] mod ws;
+#[cfg(feature = "ws")] use ws::AsyncTlsConnector;
 
 #[cfg(feature = "ws")]
 use async_tungstenite::{
@@ -441,6 +439,7 @@ impl TryFrom<Config> for Client {
 
 impl TryFrom<Config> for reqwest::ClientBuilder {
     type Error = Error;
+
     fn try_from(config: Config) -> Result<Self> {
         let mut builder = Self::new();
 

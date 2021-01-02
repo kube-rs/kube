@@ -1,8 +1,7 @@
 use std::{
     future::Future,
     pin::Pin,
-    sync::Arc,
-    sync::Mutex,
+    sync::{Arc, Mutex},
     task::{Context, Poll, Waker},
 };
 

@@ -8,8 +8,7 @@ use super::{
 };
 use crate::{error::ConfigError, Result};
 
-#[cfg(feature = "rustls-tls")]
-use crate::Error;
+#[cfg(feature = "rustls-tls")] use crate::Error;
 
 /// KubeConfigOptions stores options used when loading kubeconfig file.
 #[derive(Default, Clone)]

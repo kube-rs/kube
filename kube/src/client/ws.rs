@@ -12,6 +12,7 @@ mod tls {
 
     impl TryFrom<Config> for AsyncTlsConnector {
         type Error = Error;
+
         fn try_from(config: Config) -> Result<Self> {
             let mut builder = TlsConnector::builder();
             if let Some((identity, identity_password)) = config.identity.as_ref() {
@@ -38,8 +39,7 @@ mod tls {
 
 #[cfg(feature = "ws-rustls-tls")]
 mod tls {
-    use std::convert::TryFrom;
-    use std::sync::Arc;
+    use std::{convert::TryFrom, sync::Arc};
 
     use tokio_rustls::rustls::{self, Certificate, ClientConfig};
     pub use tokio_rustls::TlsConnector as AsyncTlsConnector;
@@ -48,6 +48,7 @@ mod tls {
 
     impl TryFrom<Config> for AsyncTlsConnector {
         type Error = Error;
+
         fn try_from(config: Config) -> Result<Self> {
             use rustls::internal::pemfile;
             use std::io::Cursor;
