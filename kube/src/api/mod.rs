@@ -20,7 +20,12 @@ pub use typed::Api;
 mod dynamic;
 pub use dynamic::DynamicResource;
 
+#[cfg(feature = "ws")] mod remote_command;
+#[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
+
 mod subresource;
+#[cfg(feature = "ws")]
+pub use subresource::{AttachParams, AttachableObject, ExecutingObject};
 pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};
 
 pub(crate) mod object;

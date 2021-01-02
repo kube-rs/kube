@@ -2,7 +2,10 @@
 name = "kube-derive"
 description = "Custom derives for the kube kubernetes crates"
 version = "0.45.0"
-authors = ["clux <sszynrae@gmail.com>"]
+authors = [
+  "clux <sszynrae@gmail.com>",
+  "kazk <kazk.dev@gmail.com>",
+]
 edition = "2018"
 license = "Apache-2.0"
 repository = "https://github.com/clux/kube-rs"
@@ -11,7 +14,7 @@ readme = "../README.md"
 [dependencies]
 proc-macro2 = "1.0.24"
 quote = "1.0.8"
-syn = { version = "1.0.56", features = ["extra-traits"] }
+syn = { version = "1.0.57", features = ["extra-traits"] }
 Inflector = "0.11.4"
 serde_json = "1.0.61"
 

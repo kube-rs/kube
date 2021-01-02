@@ -1,12 +1,14 @@
 #[cfg(feature = "native-tls")]
 use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
-use reqwest::{Certificate, Identity};
+use reqwest::Identity;
 
 use super::{
     file_config::{AuthInfo, Cluster, Context, Kubeconfig},
-    utils,
+    utils, Der,
 };
-use crate::{error::ConfigError, Error, Result};
+use crate::{error::ConfigError, Result};
+
+#[cfg(feature = "rustls-tls")] use crate::Error;
 
 /// KubeConfigOptions stores options used when loading kubeconfig file.
 #[derive(Default, Clone)]
@@ -17,18 +19,6 @@ pub struct KubeConfigOptions {
     pub cluster: Option<String>,
     /// The user to load
     pub user: Option<String>,
-}
-
-/// Regardless of tls type, a Certificate Der is always a byte array
-pub struct Der(pub Vec<u8>);
-
-use std::convert::TryFrom;
-impl TryFrom<Der> for Certificate {
-    type Error = Error;
-
-    fn try_from(val: Der) -> Result<Certificate> {
-        Certificate::from_der(&val.0).map_err(Error::ReqwestError)
-    }
 }
 
 /// ConfigLoader loads current context, cluster, and authentication information
