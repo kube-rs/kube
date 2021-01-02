@@ -280,49 +280,49 @@ impl Default for AttachParams {
 #[cfg(feature = "ws")]
 impl AttachParams {
     /// Specify the container to execute in.
-    pub fn container<T: Into<String>>(&mut self, container: T) -> &mut Self {
+    pub fn container<T: Into<String>>(mut self, container: T) -> Self {
         self.container = Some(container.into());
         self
     }
 
     /// Set `stdin` field.
-    pub fn stdin(&mut self, enable: bool) -> &mut Self {
+    pub fn stdin(mut self, enable: bool) -> Self {
         self.stdin = enable;
         self
     }
 
     /// Set `stdout` field.
-    pub fn stdout(&mut self, enable: bool) -> &mut Self {
+    pub fn stdout(mut self, enable: bool) -> Self {
         self.stdout = enable;
         self
     }
 
     /// Set `stderr` field.
-    pub fn stderr(&mut self, enable: bool) -> &mut Self {
+    pub fn stderr(mut self, enable: bool) -> Self {
         self.stderr = enable;
         self
     }
 
     /// Set `tty` field.
-    pub fn tty(&mut self, enable: bool) -> &mut Self {
+    pub fn tty(mut self, enable: bool) -> Self {
         self.tty = enable;
         self
     }
 
     /// Set `max_stdin_buf_size` field.
-    pub fn max_stdin_buf_size(&mut self, size: usize) -> &mut Self {
+    pub fn max_stdin_buf_size(mut self, size: usize) -> Self {
         self.max_stdin_buf_size = Some(size);
         self
     }
 
     /// Set `max_stdout_buf_size` field.
-    pub fn max_stdout_buf_size(&mut self, size: usize) -> &mut Self {
+    pub fn max_stdout_buf_size(mut self, size: usize) -> Self {
         self.max_stdout_buf_size = Some(size);
         self
     }
 
     /// Set `max_stderr_buf_size` field.
-    pub fn max_stderr_buf_size(&mut self, size: usize) -> &mut Self {
+    pub fn max_stderr_buf_size(mut self, size: usize) -> Self {
         self.max_stderr_buf_size = Some(size);
         self
     }
