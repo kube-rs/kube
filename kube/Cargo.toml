@@ -27,7 +27,7 @@ ws-native-tls = ["real-native-tls", "tokio-native-tls", "async-tungstenite/tokio
 ws-rustls-tls = ["tokio-rustls", "async-tungstenite/tokio-rustls"]
 
 [package.metadata.docs.rs]
-features = ["derive", "ws"]
+features = ["derive", "ws", "ws-native-tls"]
 
 [dependencies]
 base64 = "0.12.1"
