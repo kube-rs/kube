@@ -1,3 +1,10 @@
+0.46.0 / 2021-01-02
+===================
+  * feat: `kube` now has __optional__ websocket support with `async_tungstenite` under `ws` and `ws-*-tls` features #360
+  * feat: `AttachableObject` marker trait added and implemented for `k8s_openapi::api::core::v1::Pod` #360
+  * feat: `AttachParams` added for `Api::exec` and `Api::attach` for `AttachableObject`s #360
+  * examples: `pod_shell`, `pod_attach`, `pod_exec` demonstrating the new features #360
+
 0.45.0 / 2020-12-26
 ===================
   * feat: `kube-derive` now has a default enabled `schema` feature

@@ -1,7 +1,7 @@
 [package]
 name = "kube"
 version = "0.45.0"
-description = "Kubernetes client in futures controller runtime"
+description = "Kubernetes client and futures controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
   "Teo Klestrup Röijezon <teo@nullable.se>",
@@ -27,7 +27,7 @@ ws-native-tls = ["real-native-tls", "tokio-native-tls", "async-tungstenite/tokio
 ws-rustls-tls = ["tokio-rustls", "async-tungstenite/tokio-rustls"]
 
 [package.metadata.docs.rs]
-features = ["derive"]
+features = ["derive", "ws"]
 
 [dependencies]
 base64 = "0.12.1"
