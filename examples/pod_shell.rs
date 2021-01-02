@@ -60,6 +60,8 @@ async fn main() -> anyhow::Result<()> {
     let mut stdin_writer = attached.stdin().unwrap();
     let mut stdout_reader = attached.stdout().unwrap();
 
+    // > For interactive uses, it is recommended to spawn a thread dedicated to user input and use blocking IO directly in that thread.
+    // > https://docs.rs/tokio/0.2.24/tokio/io/fn.stdin.html
     let mut stdin = tokio::io::stdin();
     let mut stdout = tokio::io::stdout();
     // pipe current stdin to the stdin writer from ws
