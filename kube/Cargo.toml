@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.45.0"
+version = "0.46.0"
 description = "Kubernetes client and futures controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -54,7 +54,7 @@ bytes = "0.5.6"
 Inflector = "0.11.4"
 tokio = { version = "0.2.24", features = ["time", "signal", "sync"] }
 static_assertions = "1.1.0"
-kube-derive = { path = "../kube-derive", version = "^0.45.0", optional = true }
+kube-derive = { path = "../kube-derive", version = "^0.46.0", optional = true }
 jsonpath_lib = "0.2.5"
 
 [dependencies.async-tungstenite]
