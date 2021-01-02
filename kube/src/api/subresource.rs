@@ -9,6 +9,9 @@ use crate::{
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
+#[cfg(feature = "ws")]
+use crate::api::remote_command::AttachedProcess;
+
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>
 where
@@ -206,5 +209,272 @@ where
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
         let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Attach subresource
+// ----------------------------------------------------------------------------
+/// Parameters for attaching to a container in a Pod.
+///
+/// - One of `stdin`, `stdout`, or `stderr` must be `true`.
+/// - `stderr` and `tty` cannot both be `true` because multiplexing is not supported with TTY.
+#[cfg(feature = "ws")]
+pub struct AttachParams {
+    /// The name of the container to attach.
+    /// Defaults to the only container if there is only one container in the pod.
+    pub container: Option<String>,
+    /// Attach to the container's standard input. Defaults to `false`.
+    ///
+    /// Call [`AttachedProcess::stdin`] to obtain a writer.
+    pub stdin: bool,
+    /// Attach to the container's standard output. Defaults to `true`.
+    ///
+    /// Call [`AttachedProcess::stdout`] to obtain a reader.
+    pub stdout: bool,
+    /// Attach to the container's standard error. Defaults to `true`.
+    ///
+    /// Call [`AttachedProcess::stderr`] to obtain a reader.
+    pub stderr: bool,
+    /// Allocate TTY. Defaults to `false`.
+    ///
+    /// NOTE: Terminal resizing is not implemented yet.
+    pub tty: bool,
+
+    /// The maximum amount of bytes that can be written to the internal `stdin`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stdin_buf_size: Option<usize>,
+    /// The maximum amount of bytes that can be written to the internal `stdout`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stdout_buf_size: Option<usize>,
+    /// The maximum amount of bytes that can be written to the internal `stderr`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stderr_buf_size: Option<usize>,
+}
+
+#[cfg(feature = "ws")]
+impl Default for AttachParams {
+    // Default matching the server's defaults.
+    fn default() -> Self {
+        Self {
+            container: None,
+            stdin: false,
+            stdout: true,
+            stderr: true,
+            tty: false,
+            max_stdin_buf_size: None,
+            max_stdout_buf_size: None,
+            max_stderr_buf_size: None,
+        }
+    }
+}
+
+#[cfg(feature = "ws")]
+impl AttachParams {
+    /// Specify the container to execute in.
+    pub fn container<T: Into<String>>(&mut self, container: T) -> &mut Self {
+        self.container = Some(container.into());
+        self
+    }
+
+    /// Set `stdin` field.
+    pub fn stdin(&mut self, enable: bool) -> &mut Self {
+        self.stdin = enable;
+        self
+    }
+
+    /// Set `stdout` field.
+    pub fn stdout(&mut self, enable: bool) -> &mut Self {
+        self.stdout = enable;
+        self
+    }
+
+    /// Set `stderr` field.
+    pub fn stderr(&mut self, enable: bool) -> &mut Self {
+        self.stderr = enable;
+        self
+    }
+
+    /// Set `tty` field.
+    pub fn tty(&mut self, enable: bool) -> &mut Self {
+        self.tty = enable;
+        self
+    }
+
+    /// Set `max_stdin_buf_size` field.
+    pub fn max_stdin_buf_size(&mut self, size: usize) -> &mut Self {
+        self.max_stdin_buf_size = Some(size);
+        self
+    }
+
+    /// Set `max_stdout_buf_size` field.
+    pub fn max_stdout_buf_size(&mut self, size: usize) -> &mut Self {
+        self.max_stdout_buf_size = Some(size);
+        self
+    }
+
+    /// Set `max_stderr_buf_size` field.
+    pub fn max_stderr_buf_size(&mut self, size: usize) -> &mut Self {
+        self.max_stderr_buf_size = Some(size);
+        self
+    }
+
+    fn validate(&self) -> Result<()> {
+        if !self.stdin && !self.stdout && !self.stderr {
+            return Err(Error::RequestValidation(
+                "AttachParams: one of stdin, stdout, or stderr must be true".into(),
+            ));
+        }
+
+        if self.stderr && self.tty {
+            // Multiplexing is not supported with TTY
+            return Err(Error::RequestValidation(
+                "AttachParams: tty and stderr cannot both be true".into(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn append_to_url_serializer(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
+        if self.stdin {
+            qp.append_pair("stdin", "true");
+        }
+        if self.stdout {
+            qp.append_pair("stdout", "true");
+        }
+        if self.stderr {
+            qp.append_pair("stderr", "true");
+        }
+        if self.tty {
+            qp.append_pair("tty", "true");
+        }
+        if let Some(container) = &self.container {
+            qp.append_pair("container", &container);
+        }
+    }
+}
+
+#[cfg(feature = "ws")]
+impl Resource {
+    /// Attach to a pod
+    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
+        ap.validate()?;
+
+        let base_url = self.make_url() + "/" + name + "/" + "attach?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        ap.append_to_url_serializer(&mut qp);
+
+        let req = http::Request::get(qp.finish());
+        req.body(()).map_err(Error::HttpError)
+    }
+}
+
+#[cfg(feature = "ws")]
+#[test]
+fn attach_path() {
+    use crate::api::Resource;
+    use k8s_openapi::api::core::v1 as corev1;
+    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let mut ap = AttachParams::default();
+    ap.container = Some("blah".into());
+    let req = r.attach("foo", &ap).unwrap();
+    assert_eq!(
+        req.uri(),
+        "/api/v1/namespaces/ns/pods/foo/attach?&stdout=true&stderr=true&container=blah"
+    );
+}
+
+/// Marker trait for objects that has attach
+#[cfg(feature = "ws")]
+pub trait AttachableObject {}
+
+#[cfg(feature = "ws")]
+impl AttachableObject for k8s_openapi::api::core::v1::Pod {}
+
+#[cfg(feature = "ws")]
+impl<K> Api<K>
+where
+    K: Clone + DeserializeOwned + AttachableObject,
+{
+    /// Attach to pod
+    pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
+        let req = self.resource.attach(name, ap)?;
+        let stream = self.client.connect(req).await?;
+        Ok(AttachedProcess::new(stream, ap))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Exec subresource
+// ----------------------------------------------------------------------------
+#[cfg(feature = "ws")]
+impl Resource {
+    /// Execute command in a pod
+    pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<()>>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        ap.validate()?;
+
+        let base_url = self.make_url() + "/" + name + "/" + "exec?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        ap.append_to_url_serializer(&mut qp);
+
+        for c in command.into_iter() {
+            qp.append_pair("command", &c.into());
+        }
+
+        let req = http::Request::get(qp.finish());
+        req.body(()).map_err(Error::HttpError)
+    }
+}
+
+#[cfg(feature = "ws")]
+#[test]
+fn exec_path() {
+    use crate::api::Resource;
+    use k8s_openapi::api::core::v1 as corev1;
+    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let mut ap = AttachParams::default();
+    ap.container = Some("blah".into());
+    let req = r.exec("foo", vec!["echo", "foo", "bar"], &ap).unwrap();
+    assert_eq!(
+        req.uri(),
+        "/api/v1/namespaces/ns/pods/foo/exec?&stdout=true&stderr=true&container=blah&command=echo&command=foo&command=bar"
+    );
+}
+
+/// Marker trait for objects that has exec
+#[cfg(feature = "ws")]
+pub trait ExecutingObject {}
+
+#[cfg(feature = "ws")]
+impl ExecutingObject for k8s_openapi::api::core::v1::Pod {}
+
+#[cfg(feature = "ws")]
+impl<K> Api<K>
+where
+    K: Clone + DeserializeOwned + ExecutingObject,
+{
+    /// Execute a command in a pod
+    pub async fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        let req = self.resource.exec(name, command, ap)?;
+        let stream = self.client.connect(req).await?;
+        Ok(AttachedProcess::new(stream, ap))
     }
 }

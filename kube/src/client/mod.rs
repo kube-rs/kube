@@ -13,6 +13,16 @@ use crate::{
     Error, Result,
 };
 
+#[cfg(feature = "ws")]
+mod ws;
+#[cfg(feature = "ws")]
+use ws::AsyncTlsConnector;
+
+#[cfg(feature = "ws")]
+use async_tungstenite::{
+    tokio::{connect_async_with_tls_connector, ConnectStream},
+    tungstenite as ws2, WebSocketStream,
+};
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, TryStream, TryStreamExt};
@@ -21,7 +31,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{self, Value};
 
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 /// Client for connecting with a Kubernetes cluster.
 ///
@@ -35,6 +45,8 @@ pub struct Client {
     default_ns: String,
     inner: reqwest::Client,
     config: Config,
+    #[cfg(feature = "ws")]
+    tls_connector: AsyncTlsConnector,
 }
 
 impl Client {
@@ -91,6 +103,64 @@ impl Client {
         let req = request.headers(headers).body(body).build()?;
         let res = self.inner.execute(req).await?;
         Ok(res)
+    }
+
+    /// Make WebSocket connection.
+    #[cfg(feature = "ws")]
+    pub async fn connect(&self, request: http::Request<()>) -> Result<WebSocketStream<ConnectStream>> {
+        let (mut parts, _) = request.into_parts();
+        if let Some(auth_header) = self.config.get_auth_header().await? {
+            parts.headers.insert(http::header::AUTHORIZATION, auth_header);
+        }
+        // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
+        // There's no official documentation about this protocol, but it's described in
+        // [`k8s.io/apiserver/pkg/util/wsstream/conn.go`](https://git.io/JLQED).
+        // There's a comment about v4 and `Status` object in
+        // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
+        parts.headers.insert(
+            "sec-websocket-protocol",
+            "v4.channel.k8s.io".parse().expect("valid header value"),
+        );
+        // Replace scheme to ws(s).
+        let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
+        parts.uri = finalize_url(&self.cluster_url, &pandq)
+            .replacen("http", "ws", 1)
+            .parse()
+            .expect("valid URL");
+
+        let tls = Some(self.tls_connector.clone());
+        match connect_async_with_tls_connector(http::Request::from_parts(parts, ()), tls).await {
+            Ok((stream, _)) => Ok(stream),
+
+            // tungstenite only gives us the status code.
+            Err(ws2::Error::Http(code)) => Err(Error::Api(ErrorResponse {
+                status: code.to_string(),
+                code: code.as_u16(),
+                message: "".to_owned(),
+                reason: "".to_owned(),
+            })),
+
+            Err(ws2::Error::HttpFormat(err)) => Err(Error::HttpError(err)),
+            Err(ws2::Error::Tls(err)) => Err(Error::SslError(format!("{}", err))),
+
+            // URL errors:
+            // - No host found in URL
+            // - Unsupported scheme (not ws/wss)
+            // shouldn't happen in our case
+            Err(ws2::Error::Url(msg)) => Err(Error::RequestValidation(msg.into())),
+
+            // Protocol errors:
+            // - Only GET is supported
+            // - Only HTTP version >= 1.1 is supported
+            // shouldn't happen in our case
+            Err(ws2::Error::Protocol(msg)) => Err(Error::RequestValidation(msg.into())),
+
+            // Fatal error with undelying connection.
+            Err(ws2::Error::Io(err)) => panic!("WebSocket connection error: {}", err),
+
+            // Unknown error. `tungstenite::Error` includes those that only happens after connecting.
+            Err(err) => panic!("Unknown WebSocket error: {}", err),
+        }
     }
 
     /// Perform a raw HTTP request against the API and deserialize the response
@@ -355,18 +425,23 @@ impl TryFrom<Config> for Client {
         let cluster_url = config.cluster_url.clone();
         let default_ns = config.default_ns.clone();
         let config_clone = config.clone();
-        let builder: reqwest::ClientBuilder = config.into();
+        #[cfg(feature = "ws")]
+        let tls_connector: AsyncTlsConnector = config.clone().try_into()?;
+        let builder: reqwest::ClientBuilder = config.try_into()?;
         Ok(Self {
             cluster_url,
             default_ns,
             inner: builder.build()?,
+            #[cfg(feature = "ws")]
+            tls_connector,
             config: config_clone,
         })
     }
 }
 
-impl From<Config> for reqwest::ClientBuilder {
-    fn from(config: Config) -> Self {
+impl TryFrom<Config> for reqwest::ClientBuilder {
+    type Error = Error;
+    fn try_from(config: Config) -> Result<Self> {
         let mut builder = Self::new();
 
         if let Some(i) = &config.proxy {
@@ -377,9 +452,9 @@ impl From<Config> for reqwest::ClientBuilder {
             builder = builder.identity(i)
         }
 
-        if let Some(c) = config.root_cert {
-            for cert in c {
-                builder = builder.add_root_certificate(cert);
+        if let Some(ders) = config.root_cert {
+            for der in ders {
+                builder = builder.add_root_certificate(der.try_into()?);
             }
         }
 
@@ -390,7 +465,7 @@ impl From<Config> for reqwest::ClientBuilder {
         builder = builder.default_headers(config.headers);
         builder = builder.danger_accept_invalid_certs(config.accept_invalid_certs);
 
-        builder
+        Ok(builder)
     }
 }
 
