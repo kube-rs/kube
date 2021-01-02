@@ -279,6 +279,16 @@ impl Default for AttachParams {
 
 #[cfg(feature = "ws")]
 impl AttachParams {
+    /// Default parameters for an tty exec with stdin and stdout
+    pub fn interactive_tty() -> Self {
+        Self {
+            stdin: true,
+            stdout: true,
+            stderr: false,
+            tty: true,
+            ..Default::default()
+        }
+    }
     /// Specify the container to execute in.
     pub fn container<T: Into<String>>(mut self, container: T) -> Self {
         self.container = Some(container.into());

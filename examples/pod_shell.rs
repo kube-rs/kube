@@ -52,8 +52,8 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    // Do an exec to a blog pod with the `sh` command and allow an input (stdin) stream
-    let ap = AttachParams::default().stdin(true).stdout(true).stderr(false).tty(true);
+    // Do an interactive exec to a blog pod with the `sh` command
+    let ap = AttachParams::interactive_tty();
     let mut attached = pods.exec("example", vec!["sh"], &ap).await?;
 
     // The received streams from `AttachedProcess`
