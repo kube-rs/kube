@@ -14,12 +14,12 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = "0.45.0"
-kube-runtime = "0.45.0"
+kube = "0.46.0"
+kube-runtime = "0.46.0"
 k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
 
-[Features are available](https://github.com/clux/kube-rs/blob/master/kube/Cargo.toml#L17).
+[Features are available](https://github.com/clux/kube-rs/blob/master/kube/Cargo.toml#L18).
 
 We recommend turning off `default-features` for `k8s-openapi` to speed up your compilation.
 
@@ -149,8 +149,8 @@ Kube has basic support ([with caveats](https://github.com/clux/kube-rs/issues?q=
 
 ```toml
 [dependencies]
-kube = { version = "0.45.0", default-features = false, features = ["rustls-tls"] }
-kube-runtime = { version = "0.45.0", default-features = false, features = ["rustls-tls"] }
+kube = { version = "0.46.0", default-features = false, features = ["rustls-tls"] }
+kube-runtime = { version = "0.46.0", default-features = false, features = ["rustls-tls"] }
 k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
 ```
 
