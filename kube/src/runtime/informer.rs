@@ -105,7 +105,7 @@ where
             if *needs_resync {
                 // Try again in a bit
                 let dur = Duration::from_secs(10);
-                tokio::time::delay_for(dur).await;
+                tokio::time::sleep(dur).await;
                 // If we are outside history, start over from latest
                 if *needs_resync {
                     self.reset().await;

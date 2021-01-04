@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
         let mut stdin_writer = attached.stdin().unwrap();
-        let mut stdout_stream = tokio::io::reader_stream(attached.stdout().unwrap());
+        let mut stdout_stream = tokio_util::io::ReaderStream::new(attached.stdout().unwrap());
         let next_stdout = stdout_stream.next();
         stdin_writer.write(b"echo test string 1\n").await?;
         let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
@@ -114,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn get_output(mut attached: AttachedProcess) -> String {
-    let stdout = tokio::io::reader_stream(attached.stdout().unwrap());
+    let stdout = tokio_util::io::ReaderStream::new(attached.stdout().unwrap());
     let out = stdout
         .filter_map(|r| async { r.ok().and_then(|v| String::from_utf8(v.to_vec()).ok()) })
         .collect::<Vec<_>>()

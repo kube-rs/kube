@@ -1,3 +1,8 @@
+UNRELEASED
+===================
+  * chore: upgrade `tokio` to `1.0`
+    * BREAKING: This requires the whole application to upgrade to `tokio` 1.0
+
 0.46.0 / 2021-01-02
 ===================
   * feat: `kube` now has __optional__ websocket support with `async_tungstenite` under `ws` and `ws-*-tls` features #360

@@ -4,7 +4,7 @@ use crate::{
 };
 use futures::{future::FutureExt, lock::Mutex, pin_mut, select, TryStreamExt};
 use serde::de::DeserializeOwned;
-use tokio::{signal::ctrl_c, time::delay_for};
+use tokio::{signal::ctrl_c, time::sleep};
 
 #[cfg(not(target_family = "windows"))] use tokio::signal;
 
@@ -92,7 +92,7 @@ where
                         warn!("Poll error on {}: {}: {:?}", self.api.resource.kind, e, e);
                         // If desynched due to mismatching resourceVersion, retry in a bit
                         let dur = Duration::from_secs(10);
-                        delay_for(dur).await;
+                        sleep(dur).await;
                         self.reset().await?; // propagate error if this failed..
                     }
                 }

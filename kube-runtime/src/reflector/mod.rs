@@ -149,13 +149,13 @@ mod tests {
     #[tokio::test]
     async fn reflector_store_should_not_contain_duplicates() {
         let mut rng = rand::thread_rng();
-        let item_dist = Uniform::new(0u8, 100);
+        let item_dist = Uniform::new(0_u8, 100);
         let deleted_dist = Bernoulli::new(0.40).unwrap();
         let store_w = store::Writer::default();
         let store = store_w.as_reader();
         reflector(
             store_w,
-            stream::iter((0u32..100000).map(|gen| {
+            stream::iter((0_u32..100_000).map(|gen| {
                 let item = rng.sample(item_dist);
                 let deleted = rng.sample(deleted_dist);
                 let obj = ConfigMap {

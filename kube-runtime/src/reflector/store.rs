@@ -133,7 +133,7 @@ mod tests {
         let mut cluster_cm = cm.clone();
         cluster_cm.metadata.namespace = None;
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        store_w.apply_watcher_event(&watcher::Event::Applied(cm));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&cluster_cm)), None);
     }

@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
             // Periodically read our state
-            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             let crds = reader.state().iter().map(Meta::name).collect::<Vec<_>>();
             info!("Current crds: {:?}", crds);
         }

@@ -85,7 +85,7 @@ mod tests {
             fhm.insert(i, future::ready(i));
         }
         let mut values = fhm.collect::<Vec<u16>>().await;
-        values.sort();
+        values.sort_unstable();
         assert_eq!(values, (0..count).collect::<Vec<u16>>());
     }
 

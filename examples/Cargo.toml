@@ -18,24 +18,24 @@ rustls-tls = ["reqwest/rustls-tls", "kube/rustls-tls", "kube-runtime/rustls-tls"
 ws = ["kube/ws", "kube/ws-native-tls"]
 
 [dev-dependencies]
-anyhow = "1.0.32"
-env_logger = "0.7.1"
-futures = "0.3.5"
+anyhow = "1.0.37"
+env_logger = "0.8.2"
+futures = "0.3.8"
 kube = { path = "../kube", version = "^0.46.0", default-features = false }
 kube-derive = { path = "../kube-derive", version = "^0.46.0", default-features = false } # only needed to opt out of schema
 kube-runtime = { path = "../kube-runtime", version = "^0.46.0", default-features = false }
 k8s-openapi = { version = "0.10.0", features = ["v1_19"], default-features = false }
 log = "0.4.11"
-serde = { version = "1.0.111", features = ["derive"] }
-serde_json = "1.0.57"
+serde = { version = "1.0.118", features = ["derive"] }
+serde_json = "1.0.61"
 serde_yaml = "0.8.14"
-tokio = { version = "0.2.24", features = ["full"] }
-color-eyre = "0.5.1"
-snafu = { version = "0.6.8", features = ["futures"] }
+tokio = { version = "1.0.1", features = ["full"] }
+color-eyre = "0.5.10"
+snafu = { version = "0.6.10", features = ["futures"] }
 # Some Api::delete methods use Either
-either = "1.6.0"
+either = "1.6.1"
 # Some configuration tweaking require reqwest atm
-reqwest = { version = "0.10.8", default-features = false, features = ["json", "gzip", "stream"] }
+reqwest = { version = "0.10.10", default-features = false, features = ["json", "gzip", "stream"] }
 schemars = "0.8.0"
 static_assertions = "1.1.0"
 
@@ -138,3 +138,6 @@ path = "node_watcher.rs"
 [[example]]
 name = "secret_reflector"
 path = "secret_reflector.rs"
+
+[dependencies]
+tokio-util = "0.6.0"

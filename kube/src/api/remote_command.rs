@@ -169,7 +169,7 @@ async fn start_message_loop(
     mut stdout: Option<impl AsyncWrite + Unpin>,
     mut stderr: Option<impl AsyncWrite + Unpin>,
 ) -> Option<Status> {
-    let mut stdin_stream = tokio::io::reader_stream(stdin);
+    let mut stdin_stream = tokio_util::io::ReaderStream::new(stdin);
     let (mut server_send, raw_server_recv) = stream.split();
     // Work with filtered messages to reduce noise.
     let mut server_recv = raw_server_recv.filter_map(filter_message).boxed();

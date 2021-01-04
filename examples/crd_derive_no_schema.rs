@@ -1,8 +1,9 @@
+#[cfg(not(feature = "schema"))]
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
     CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps,
 };
-use kube_derive::CustomResource;
-use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "schema"))] use kube_derive::CustomResource;
+#[cfg(not(feature = "schema"))] use serde::{Deserialize, Serialize};
 
 /// CustomResource with manually implemented schema
 ///
@@ -17,6 +18,7 @@ pub struct MyBar {
     bars: u32,
 }
 
+#[cfg(not(feature = "schema"))]
 const MANUAL_SCHEMA: &'static str = r#"
 type: object
 properties:
