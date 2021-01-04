@@ -10,17 +10,14 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::time::{
-    self,
-    delay_queue::{self, DelayQueue},
-    Instant,
-};
+use tokio::time::{Instant, error::Error as TimeError};
+use tokio_util::time::{DelayQueue, delay_queue::Key};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("timer failure: {}", source))]
     TimerError {
-        source: time::Error,
+        source: TimeError,
         backtrace: Backtrace,
     },
 }
@@ -36,7 +33,7 @@ pub struct ScheduleRequest<T> {
 /// Internal metadata for a scheduled message.
 struct ScheduledEntry {
     run_at: Instant,
-    queue_key: delay_queue::Key,
+    queue_key: Key,
 }
 
 #[pin_project(project = SchedulerProj)]
@@ -102,7 +99,7 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
         &mut self,
         cx: &mut Context<'_>,
         can_take_message: impl Fn(&T) -> bool,
-    ) -> Poll<Option<Result<T, time::Error>>> {
+    ) -> Poll<Option<Result<T, TimeError>>> {
         if let Some(msg) = self.pending.iter().find(|msg| can_take_message(*msg)).cloned() {
             return Poll::Ready(Some(Ok(self.pending.take(&msg).unwrap())));
         }

@@ -42,7 +42,7 @@ fn spawn_periodic_reader(reader: Store<Secret>) {
                 .map(|s| format!("{}: {:?}", Meta::name(s), decode(s).keys()))
                 .collect();
             info!("Current secrets: {:?}", cms);
-            tokio::time::delay_for(std::time::Duration::from_secs(15)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
         }
     });
 }

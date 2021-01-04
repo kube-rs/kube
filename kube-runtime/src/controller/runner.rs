@@ -88,7 +88,7 @@ mod tests {
     use crate::scheduler::{scheduler, ScheduleRequest};
     use futures::{channel::mpsc, poll, SinkExt, TryStreamExt};
     use std::{cell::RefCell, time::Duration};
-    use tokio::time::{delay_for, pause, Instant};
+    use tokio::time::{sleep, pause, Instant};
 
     #[tokio::test]
     async fn runner_should_never_run_two_instances_at_once() {
@@ -102,7 +102,7 @@ mod tests {
                 // Panic if this ref is already held, to simulate some unsafe action..
                 let mutex_ref = rc.borrow_mut();
                 Box::pin(async move {
-                    delay_for(Duration::from_secs(1)).await;
+                    sleep(Duration::from_secs(1)).await;
                     drop(mutex_ref);
                 })
             })

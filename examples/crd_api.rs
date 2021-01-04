@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
@@ -60,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
         })
     });
     // Wait for the delete to take place (map-left case or delete from previous run)
-    delay_for(Duration::from_secs(2)).await;
+    sleep(Duration::from_secs(2)).await;
 
     // Create the CRD so we can create Foos in kube
     let foocrd = Foo::crd();
@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
         Err(e) => return Err(e.into()),                        // any other case is probably bad
     }
     // Wait for the api to catch up
-    delay_for(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(1)).await;
 
     // Manage the Foo CR
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
