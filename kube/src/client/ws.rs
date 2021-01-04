@@ -4,8 +4,7 @@ pub use tls::AsyncTlsConnector;
 mod tls {
     use std::convert::TryFrom;
 
-    // TODO Newer version of tokio_native_tls re-exports native_tls.
-    use real_native_tls::{Certificate, Identity, TlsConnector};
+    use tokio_native_tls::native_tls::{Certificate, Identity, TlsConnector};
     pub use tokio_native_tls::TlsConnector as AsyncTlsConnector;
 
     use crate::{config::Config, Error, Result};

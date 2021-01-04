@@ -23,7 +23,7 @@ derive = ["kube-derive"]
 ws = ["async-tungstenite", "tokio-util"]
 # We can merge these with `native-tls`/`rustls-tls` when `dep?/feature` syntax becomes stable.
 # https://doc.rust-lang.org/nightly/cargo/reference/unstable.html#weak-dependency-features
-ws-native-tls = ["real-native-tls", "tokio-native-tls", "async-tungstenite/tokio-native-tls"]
+ws-native-tls = ["tokio-native-tls", "async-tungstenite/tokio-native-tls"]
 ws-rustls-tls = ["tokio-rustls", "async-tungstenite/tokio-rustls"]
 
 [package.metadata.docs.rs]
@@ -47,7 +47,6 @@ futures = "0.3.8"
 pem = "0.8.2"
 openssl = { version = "0.10.32", optional = true }
 rustls = { version = "0.19.0", optional = true }
-real-native-tls = { version = "0.2.7", optional = true, package = "native-tls" }
 tokio-native-tls = { version = "0.3.0", optional = true }
 tokio-rustls = { version = "0.22.0", optional = true }
 bytes = "1.0.0"
