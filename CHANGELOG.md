@@ -1,7 +1,10 @@
 UNRELEASED
 ===================
-  * chore: upgrade `tokio` to `1.0`
+  * chore: upgrade `tokio` to `1.0` - #363 - awaiting last details in #339
     * BREAKING: This requires the whole application to upgrade to `tokio` 1.0
+  * docs: fix broken documentation for `kube` 0.46.0 - #367
+  * bug: `AttachParams` now fixes owned method chaining (slightly breaks from 0.46 if using &mut ref before) - #364
+  * feat: `AttachParams::interactive_tty` convenience method added - #364
 
 0.46.0 / 2021-01-02
 ===================
