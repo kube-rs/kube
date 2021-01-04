@@ -139,6 +139,7 @@ impl Client {
             })),
 
             Err(ws2::Error::HttpFormat(err)) => Err(Error::HttpError(err)),
+            #[cfg(feature = "ws-native-tls")]
             Err(ws2::Error::Tls(err)) => Err(Error::SslError(format!("{}", err))),
 
             // URL errors:
