@@ -130,35 +130,48 @@ impl Client {
         match connect_async_with_tls_connector(http::Request::from_parts(parts, ()), tls).await {
             Ok((stream, _)) => Ok(stream),
 
-            // tungstenite only gives us the status code.
-            Err(ws2::Error::Http(code)) => Err(Error::Api(ErrorResponse {
-                status: code.to_string(),
-                code: code.as_u16(),
-                message: "".to_owned(),
-                reason: "".to_owned(),
-            })),
+            Err(err) => match err {
+                // tungstenite only gives us the status code.
+                ws2::Error::Http(code) => Err(Error::Api(ErrorResponse {
+                    status: code.to_string(),
+                    code: code.as_u16(),
+                    message: "".to_owned(),
+                    reason: "".to_owned(),
+                })),
 
-            Err(ws2::Error::HttpFormat(err)) => Err(Error::HttpError(err)),
-            #[cfg(feature = "ws-native-tls")]
-            Err(ws2::Error::Tls(err)) => Err(Error::SslError(format!("{}", err))),
+                ws2::Error::HttpFormat(err) => Err(Error::HttpError(err)),
 
-            // URL errors:
-            // - No host found in URL
-            // - Unsupported scheme (not ws/wss)
-            // shouldn't happen in our case
-            Err(ws2::Error::Url(msg)) => Err(Error::RequestValidation(msg.into())),
+                // `tungstenite::Error::Tls` is only available when using `ws-native-tls` (`async-tungstenite/tokio-native-tls`)
+                // because it comes from `tungstenite/tls` feature.
+                #[cfg(feature = "ws-native-tls")]
+                ws2::Error::Tls(err) => Err(Error::SslError(format!("{}", err))),
 
-            // Protocol errors:
-            // - Only GET is supported
-            // - Only HTTP version >= 1.1 is supported
-            // shouldn't happen in our case
-            Err(ws2::Error::Protocol(msg)) => Err(Error::RequestValidation(msg.into())),
+                // URL errors:
+                // - No host found in URL
+                // - Unsupported scheme (not ws/wss)
+                // shouldn't happen in our case
+                ws2::Error::Url(msg) => Err(Error::RequestValidation(msg.into())),
 
-            // Fatal error with undelying connection.
-            Err(ws2::Error::Io(err)) => panic!("WebSocket connection error: {}", err),
+                // Protocol errors:
+                // - Only GET is supported
+                // - Only HTTP version >= 1.1 is supported
+                // shouldn't happen in our case
+                ws2::Error::Protocol(msg) => Err(Error::RequestValidation(msg.into())),
 
-            // Unknown error. `tungstenite::Error` includes those that only happens after connecting.
-            Err(err) => panic!("Unknown WebSocket error: {}", err),
+                // `tungstenite` docs says that `Error::Io` should probably be considered fatal.
+                // However, `async-tungstenite` seems to use it for some recoverable errors we don't want to panic.
+                // TODO Figure out how to extract those cases or fix upstream. See https://github.com/clux/kube-rs/issues/369
+                ws2::Error::Io(err) => panic!("WebSocket connection error: {}", err),
+
+                // Unexpected errors. `tungstenite::Error` contains errors that doesn't happen when trying to conect.
+                ws2::Error::ConnectionClosed
+                | ws2::Error::AlreadyClosed
+                | ws2::Error::Utf8
+                | ws2::Error::Capacity(_)
+                | ws2::Error::SendQueueFull(_) => {
+                    panic!("Unexpected {}", err);
+                }
+            },
         }
     }
 
