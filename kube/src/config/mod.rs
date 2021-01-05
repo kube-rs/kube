@@ -107,7 +107,7 @@ pub struct Config {
     pub(crate) identity: Option<(Vec<u8>, String)>,
     /// The authentication header from the credentials available in the kubeconfig. This supports
     /// exec plugins as well as specified in
-    /// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
+    /// <https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins>
     pub(crate) auth_header: Authentication,
 }
 
