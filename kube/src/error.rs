@@ -74,6 +74,11 @@ pub enum Error {
     #[cfg(feature = "native-tls")]
     #[error("OpensslError: {0}")]
     OpensslError(#[from] openssl::error::ErrorStack),
+
+    /// Unexpected error from making WebSocket connection.
+    #[cfg(feature = "ws")]
+    #[error("Unexpected WebSocket error: {0}")]
+    WsOther(String),
 }
 
 #[derive(Error, Debug)]

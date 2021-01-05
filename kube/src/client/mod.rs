@@ -166,9 +166,7 @@ impl Client {
                 | ws2::Error::AlreadyClosed
                 | ws2::Error::Utf8
                 | ws2::Error::Capacity(_)
-                | ws2::Error::SendQueueFull(_) => {
-                    panic!("Unexpected {}", err);
-                }
+                | ws2::Error::SendQueueFull(_) => Err(Error::WsOther(err.to_string())),
             },
         }
     }
