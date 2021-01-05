@@ -37,6 +37,7 @@ const MAX_BUF_SIZE: usize = 1024;
 /// [`attach`]: crate::Api::attach
 /// [`exec`]: crate::Api::exec
 /// [`Status`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::Status
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub struct AttachedProcess {
     has_stdin: bool,
     has_stdout: bool,

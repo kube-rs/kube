@@ -28,6 +28,8 @@ ws-rustls-tls = ["tokio-rustls", "async-tungstenite/tokio-rustls"]
 
 [package.metadata.docs.rs]
 features = ["derive", "ws", "ws-native-tls"]
+# Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 base64 = "0.13.0"

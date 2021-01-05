@@ -105,6 +105,7 @@ impl Client {
 
     /// Make WebSocket connection.
     #[cfg(feature = "ws")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
     pub async fn connect(&self, request: http::Request<()>) -> Result<WebSocketStream<ConnectStream>> {
         let (mut parts, _) = request.into_parts();
         if let Some(auth_header) = self.config.get_auth_header().await? {
