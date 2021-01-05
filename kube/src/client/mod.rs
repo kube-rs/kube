@@ -39,7 +39,7 @@ use std::convert::{TryFrom, TryInto};
 /// using [`Client::new`]
 #[derive(Clone)]
 pub struct Client {
-    cluster_url: reqwest::Url,
+    cluster_url: url::Url,
     default_ns: String,
     inner: reqwest::Client,
     config: Config,
@@ -86,7 +86,7 @@ impl Client {
         let mut headers = parts.headers;
         // If we have auth headers set, make sure they are updated and attached to the request
         if let Some(auth_header) = self.config.get_auth_header().await? {
-            headers.insert(reqwest::header::AUTHORIZATION, auth_header);
+            headers.insert(http::header::AUTHORIZATION, auth_header);
         }
 
         let request = match parts.method {
@@ -535,7 +535,7 @@ pub struct StatusCause {
 /// - config module produces a url::Url from user input (sometimes contains path segments)
 ///
 /// This deals with that in a pretty easy way (tested below)
-fn finalize_url(cluster_url: &reqwest::Url, request_pandq: &http::uri::PathAndQuery) -> String {
+fn finalize_url(cluster_url: &url::Url, request_pandq: &http::uri::PathAndQuery) -> String {
     let base = cluster_url.as_str().trim_end_matches('/'); // pandq always starts with a slash
     format!("{}{}", base, request_pandq)
 }
@@ -559,7 +559,7 @@ mod test {
     #[test]
     fn normal_host() {
         let minikube_host = "https://192.168.1.65:8443";
-        let cluster_url = reqwest::Url::parse(minikube_host).unwrap();
+        let cluster_url = url::Url::parse(minikube_host).unwrap();
         let apipath: http::Uri = "/api/v1/nodes?hi=yes".parse().unwrap();
         let pandq = apipath.path_and_query().expect("could pandq apipath");
         let final_url = super::finalize_url(&cluster_url, &pandq);
@@ -573,7 +573,7 @@ mod test {
     fn rancher_host() {
         // in rancher, kubernetes server names are not hostnames, but a host with a path:
         let rancher_host = "https://hostname/foo/bar";
-        let cluster_url = reqwest::Url::parse(rancher_host).unwrap();
+        let cluster_url = url::Url::parse(rancher_host).unwrap();
         assert_eq!(cluster_url.host_str().unwrap(), "hostname");
         assert_eq!(cluster_url.path(), "/foo/bar");
         // we must be careful when using Url::join on our http::Uri result

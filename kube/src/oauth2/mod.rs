@@ -8,7 +8,7 @@ use std::{
 #[cfg(feature = "rustls-tls")] use crate::error::Error;
 use crate::{error::ConfigError, Result};
 
-use reqwest::header::CONTENT_TYPE;
+use http::header::CONTENT_TYPE;
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded::Serializer;
 
@@ -144,7 +144,7 @@ impl CredentialsClient {
             .await
             .map_err(ConfigError::OAuth2RequestToken)
             .and_then(|response| {
-                if response.status() != reqwest::StatusCode::OK {
+                if response.status() != http::StatusCode::OK {
                     Err(ConfigError::OAuth2RetrieveCredentials(Box::new(response)))
                 } else {
                     Ok(response)

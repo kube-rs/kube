@@ -15,10 +15,8 @@ use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 
 use chrono::{DateTime, Utc};
-use reqwest::{
-    header::{self, HeaderMap},
-    Certificate,
-};
+use http::header::{self, HeaderMap};
+use reqwest::Certificate;
 use tokio::sync::Mutex;
 
 use std::{sync::Arc, time::Duration};
@@ -84,7 +82,7 @@ impl Authentication {
 #[derive(Debug, Clone)]
 pub struct Config {
     /// The configured cluster url
-    pub cluster_url: reqwest::Url,
+    pub cluster_url: url::Url,
     /// The configured default namespace
     pub default_ns: String,
     /// The configured root certificate
@@ -117,7 +115,7 @@ impl Config {
     ///
     /// Most likely you want to use [`Config::infer`] to infer the config from
     /// the environment.
-    pub fn new(cluster_url: reqwest::Url) -> Self {
+    pub fn new(cluster_url: url::Url) -> Self {
         Self {
             cluster_url,
             default_ns: String::from("default"),
@@ -165,7 +163,7 @@ impl Config {
             hostenv: incluster_config::SERVICE_HOSTENV,
             portenv: incluster_config::SERVICE_PORTENV,
         })?;
-        let cluster_url = reqwest::Url::parse(&cluster_url)?;
+        let cluster_url = url::Url::parse(&cluster_url)?;
 
         let default_ns = incluster_config::load_default_ns()
             .map_err(Box::new)
@@ -210,7 +208,7 @@ impl Config {
     }
 
     fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
-        let cluster_url = reqwest::Url::parse(&loader.cluster.server)?;
+        let cluster_url = url::Url::parse(&loader.cluster.server)?;
 
         let default_ns = loader
             .current_context
