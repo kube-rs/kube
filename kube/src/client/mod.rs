@@ -159,10 +159,7 @@ impl Client {
                 // shouldn't happen in our case
                 ws2::Error::Protocol(msg) => Err(Error::RequestValidation(msg.into())),
 
-                // `tungstenite` docs says that `Error::Io` should probably be considered fatal.
-                // However, `async-tungstenite` seems to use it for some recoverable errors we don't want to panic.
-                // TODO Figure out how to extract those cases or fix upstream. See https://github.com/clux/kube-rs/issues/369
-                ws2::Error::Io(err) => panic!("WebSocket connection error: {}", err),
+                ws2::Error::Io(err) => Err(Error::Connection(err)),
 
                 // Unexpected errors. `tungstenite::Error` contains errors that doesn't happen when trying to conect.
                 ws2::Error::ConnectionClosed

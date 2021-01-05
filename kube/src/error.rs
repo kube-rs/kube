@@ -19,6 +19,10 @@ pub enum Error {
     #[error("ApiError: {0} ({0:?})")]
     Api(#[source] ErrorResponse),
 
+    /// ConnectionError for when TcpStream fails to connect.
+    #[error("ConnectionError: {0}")]
+    Connection(std::io::Error),
+
     /// Reqwest error
     #[error("ReqwestError: {0}")]
     ReqwestError(#[from] reqwest::Error),
