@@ -4,8 +4,7 @@ pub use tls::AsyncTlsConnector;
 mod tls {
     use std::convert::TryFrom;
 
-    // TODO Newer version of tokio_native_tls re-exports native_tls.
-    use real_native_tls::{Certificate, Identity, TlsConnector};
+    use tokio_native_tls::native_tls::{Certificate, Identity, TlsConnector};
     pub use tokio_native_tls::TlsConnector as AsyncTlsConnector;
 
     use crate::{config::Config, Error, Result};
@@ -41,8 +40,11 @@ mod tls {
 mod tls {
     use std::{convert::TryFrom, sync::Arc};
 
-    use tokio_rustls::rustls::{self, Certificate, ClientConfig};
     pub use tokio_rustls::TlsConnector as AsyncTlsConnector;
+    use tokio_rustls::{
+        rustls::{self, Certificate, ClientConfig},
+        webpki,
+    };
 
     use crate::{config::Config, Error, Result};
 
@@ -97,29 +99,27 @@ mod tls {
                 }
             }
 
-            // TODO Need rustls 0.17.0+. Need to update tokio first.
-            // if config.accept_invalid_certs {
-            //     client_config
-            //         .dangerous()
-            //         .set_certificate_verifier(Arc::new(NoCertificateVerification {}));
-            // }
+            if config.accept_invalid_certs {
+                client_config
+                    .dangerous()
+                    .set_certificate_verifier(Arc::new(NoCertificateVerification {}));
+            }
 
             Ok(AsyncTlsConnector::from(Arc::new(client_config)))
         }
     }
 
-    // TODO Need rustls 0.17.0+. Need to update tokio first.
-    // struct NoCertificateVerification {}
-    //
-    // impl rustls::ServerCertVerifier for NoCertificateVerification {
-    //     fn verify_server_cert(
-    //         &self,
-    //         _roots: &rustls::RootCertStore,
-    //         _presented_certs: &[rustls::Certificate],
-    //         _dns_name: webpki::DNSNameRef<'_>,
-    //         _ocsp: &[u8],
-    //     ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
-    //         Ok(rustls::ServerCertVerified::assertion())
-    //     }
-    // }
+    struct NoCertificateVerification {}
+
+    impl rustls::ServerCertVerifier for NoCertificateVerification {
+        fn verify_server_cert(
+            &self,
+            _roots: &rustls::RootCertStore,
+            _presented_certs: &[rustls::Certificate],
+            _dns_name: webpki::DNSNameRef<'_>,
+            _ocsp: &[u8],
+        ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
+            Ok(rustls::ServerCertVerified::assertion())
+        }
+    }
 }

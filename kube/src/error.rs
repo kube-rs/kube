@@ -19,6 +19,10 @@ pub enum Error {
     #[error("ApiError: {0} ({0:?})")]
     Api(#[source] ErrorResponse),
 
+    /// ConnectionError for when TcpStream fails to connect.
+    #[error("ConnectionError: {0}")]
+    Connection(std::io::Error),
+
     /// Reqwest error
     #[error("ReqwestError: {0}")]
     ReqwestError(#[from] reqwest::Error),
@@ -70,6 +74,11 @@ pub enum Error {
     #[cfg(feature = "native-tls")]
     #[error("OpensslError: {0}")]
     OpensslError(#[from] openssl::error::ErrorStack),
+
+    /// Unexpected error from making WebSocket connection.
+    #[cfg(feature = "ws")]
+    #[error("Unexpected WebSocket error: {0}")]
+    WsOther(String),
 }
 
 #[derive(Error, Debug)]

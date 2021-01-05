@@ -219,6 +219,7 @@ where
 /// - One of `stdin`, `stdout`, or `stderr` must be `true`.
 /// - `stderr` and `tty` cannot both be `true` because multiplexing is not supported with TTY.
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub struct AttachParams {
     /// The name of the container to attach.
     /// Defaults to the only container if there is only one container in the pod.
@@ -375,6 +376,7 @@ impl AttachParams {
 }
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Resource {
     /// Attach to a pod
     pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
@@ -406,12 +408,15 @@ fn attach_path() {
 
 /// Marker trait for objects that has attach
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub trait AttachableObject {}
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl AttachableObject for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + AttachableObject,
@@ -428,6 +433,7 @@ where
 // Exec subresource
 // ----------------------------------------------------------------------------
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Resource {
     /// Execute command in a pod
     pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<()>>
@@ -467,12 +473,15 @@ fn exec_path() {
 
 /// Marker trait for objects that has exec
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub trait ExecutingObject {}
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl ExecutingObject for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + ExecutingObject,
