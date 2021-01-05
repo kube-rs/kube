@@ -76,7 +76,19 @@ pub enum Error {
     OpensslError(#[from] openssl::error::ErrorStack),
 
     /// Unexpected error from making WebSocket connection.
+    ///
+    /// Only returned from [`Client::connect`](crate::Client::connect) when it failed to connect with
+    /// the following _unexpected_ errors that's only possible _after_ connecting:
+    ///
+    /// - `ConnectionClosed`
+    /// - `AlreadyClosed`
+    /// - `Utf8`
+    /// - `Capacity`
+    /// - `SendQueueFull`
+    ///
+    /// `WsOther` exists to give you a choice to retry or panic depending on your need when this happens.
     #[cfg(feature = "ws")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
     #[error("Unexpected WebSocket error: {0}")]
     WsOther(String),
 }
