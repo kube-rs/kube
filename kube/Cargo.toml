@@ -66,7 +66,7 @@ features = ["tokio-runtime"]
 optional = true
 
 [dependencies.reqwest]
-version = "0.10.10"
+version = "0.11.0"
 default-features = false
 features = ["json", "gzip", "stream"]
 

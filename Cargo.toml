@@ -9,7 +9,3 @@ members = [
   "tests",
   "examples",
 ]
-
-[patch.crates-io]
-# https://github.com/seanmonstar/reqwest/pull/1076 hasn't been released yet
-reqwest = { git = "https://github.com/seanmonstar/reqwest.git", rev = "1f425a0244bcd7b4565dceb9076450d951f2ec03" }
