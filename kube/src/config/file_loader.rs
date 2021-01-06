@@ -4,8 +4,6 @@ use super::{
 };
 use crate::{error::ConfigError, Result};
 
-#[cfg(feature = "rustls-tls")] use crate::Error;
-
 /// KubeConfigOptions stores options used when loading kubeconfig file.
 #[derive(Default, Clone)]
 pub struct KubeConfigOptions {
@@ -109,38 +107,11 @@ impl ConfigLoader {
         Ok(buffer)
     }
 
-    #[cfg(feature = "native-tls")]
     pub fn ca_bundle(&self) -> Result<Option<Vec<Der>>> {
-        use openssl::x509::X509;
-        let bundle = self.cluster.load_certificate_authority()?;
-
-        if let Some(bundle) = bundle {
-            let bundle = X509::stack_from_pem(&bundle)?;
-
-            let mut stack = vec![];
-            for ca in bundle {
-                let der = ca.to_der()?;
-                stack.push(Der(der))
-            }
-            return Ok(Some(stack));
-        }
-        Ok(None)
-    }
-
-    #[cfg(feature = "rustls-tls")]
-    pub fn ca_bundle(&self) -> Result<Option<Vec<Der>>> {
-        use rustls::internal::pemfile;
-        use std::io::Cursor;
         if let Some(bundle) = self.cluster.load_certificate_authority()? {
-            let mut pem = Cursor::new(bundle);
-            pem.set_position(0);
-
-            let mut stack = vec![];
-            for ca in pemfile::certs(&mut pem).map_err(|e| Error::SslError(format!("{:?}", e)))? {
-                stack.push(Der(ca.0))
-            }
-            return Ok(Some(stack));
+            Ok(Some(utils::certs(&bundle)))
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 }
