@@ -9,10 +9,12 @@
 use crate::{
     api::{Meta, WatchEvent},
     config::Config,
-    error::ErrorResponse,
+    error::{ConfigError, ErrorResponse},
     Error, Result,
 };
 
+#[cfg(feature = "native-tls")] mod tls;
+#[cfg(feature = "native-tls")] use tls::pkcs12_from_pem;
 #[cfg(feature = "ws")] mod ws;
 #[cfg(feature = "ws")] use ws::AsyncTlsConnector;
 
@@ -457,13 +459,31 @@ impl TryFrom<Config> for reqwest::ClientBuilder {
             builder = builder.proxy(i.clone())
         }
 
-        if let Some(i) = config.identity() {
-            builder = builder.identity(i)
+        #[cfg(feature = "native-tls")]
+        {
+            if let Some((pem, password)) = config.identity.as_ref() {
+                let der = pkcs12_from_pem(pem, password)?;
+                if let Ok(id) = reqwest::Identity::from_pkcs12_der(&der, password) {
+                    builder = builder.identity(id);
+                }
+            }
+        }
+        #[cfg(feature = "rustls-tls")]
+        {
+            if let Some((pem, _)) = config.identity.as_ref() {
+                if let Ok(id) = reqwest::Identity::from_pem(&pem) {
+                    builder = builder.identity(id);
+                }
+            }
         }
 
         if let Some(ders) = config.root_cert {
             for der in ders {
-                builder = builder.add_root_certificate(der.try_into()?);
+                builder = builder.add_root_certificate(
+                    reqwest::Certificate::from_der(&der.0)
+                        .map_err(ConfigError::LoadCert)
+                        .map_err(Error::from)?,
+                );
             }
         }
 

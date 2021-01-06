@@ -10,13 +10,12 @@ mod file_loader;
 mod incluster_config;
 mod utils;
 
-use crate::{error::ConfigError, Error, Result};
+use crate::{error::ConfigError, Result};
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 
 use chrono::{DateTime, Utc};
 use http::header::{self, HeaderMap};
-use reqwest::Certificate;
 use tokio::sync::Mutex;
 
 use std::{sync::Arc, time::Duration};
@@ -24,17 +23,6 @@ use std::{sync::Arc, time::Duration};
 /// Regardless of tls type, a Certificate Der is always a byte array
 #[derive(Debug, Clone)]
 pub struct Der(pub Vec<u8>);
-
-use std::convert::TryFrom;
-impl TryFrom<Der> for Certificate {
-    type Error = Error;
-
-    fn try_from(val: Der) -> Result<Certificate> {
-        Certificate::from_der(&val.0)
-            .map_err(ConfigError::LoadCert)
-            .map_err(Error::from)
-    }
-}
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -97,11 +85,8 @@ pub struct Config {
     pub accept_invalid_certs: bool,
     /// Proxy to send requests to Kubernetes API through
     pub(crate) proxy: Option<reqwest::Proxy>,
-    /// The identity to use for communicating with the Kubernetes API
-    /// along wit the password to decrypt it.
-    ///
-    /// This is stored in a raw buffer form so that Config can implement `Clone`
-    /// (since [`reqwest::Identity`] does not currently implement `Clone`)
+    /// Client certs and key in PEM format and a password for a client to create `reqwest::Identity` with.
+    /// Password is only used with `native_tls` to create a PKCS12 archive.
     pub(crate) identity: Option<(Vec<u8>, String)>,
     /// The authentication header from the credentials available in the kubeconfig. This supports
     /// exec plugins as well as specified in
@@ -218,7 +203,7 @@ impl Config {
 
         let mut accept_invalid_certs = false;
         let mut root_cert = None;
-        let mut identity = None;
+        let mut identity_pem = None;
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
             for ca in &ca_bundle {
@@ -227,8 +212,9 @@ impl Config {
             root_cert = Some(ca_bundle);
         }
 
-        match loader.identity(IDENTITY_PASSWORD) {
-            Ok(id) => identity = Some(id),
+        // REVIEW Changed behavior. This no longer fails with invalid data in PEM.
+        match loader.identity_pem() {
+            Ok(id) => identity_pem = Some(id),
             Err(e) => {
                 debug!("failed to load client identity from kubeconfig: {}", e);
                 // last resort only if configs ask for it, and no client certs
@@ -246,7 +232,7 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             proxy: None,
-            identity: identity.map(|i| (i, String::from(IDENTITY_PASSWORD))),
+            identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
             auth_header: load_auth_header(&loader)?,
         })
     }
@@ -259,31 +245,6 @@ impl Config {
     /// (such as anonymous access, or certificate-based authentication).
     pub async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
         self.auth_header.to_header().await
-    }
-
-    // The identity functions are used to parse the stored identity buffer
-    // into an `reqwest::Identity` type. We do this because `reqwest::Identity`
-    // is not `Clone`. This allows us to store and clone the buffer and supply
-    // the `Identity` in a just-in-time fashion.
-    //
-    // Note: this should be removed if/when reqwest implements [`Clone` for
-    // `Identity`](https://github.com/seanmonstar/reqwest/issues/871)
-
-    // feature = "rustls-tls" assumes the buffer is pem
-    #[cfg(feature = "rustls-tls")]
-    pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
-        let (identity, _identity_password) = self.identity.as_ref()?;
-        Some(reqwest::Identity::from_pem(identity).expect("Identity buffer was not valid identity"))
-    }
-
-    // feature = "native-tls" assumes the buffer is pkcs12 der
-    #[cfg(feature = "native-tls")]
-    pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
-        let (identity, identity_password) = self.identity.as_ref()?;
-        Some(
-            reqwest::Identity::from_pkcs12_der(identity, identity_password)
-                .expect("Identity buffer was not valid identity"),
-        )
     }
 
     /// Configure a proxy for this kube config
