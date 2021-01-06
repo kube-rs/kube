@@ -1,7 +1,3 @@
-#[cfg(feature = "native-tls")]
-use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
-use reqwest::Identity;
-
 use super::{
     file_config::{AuthInfo, Cluster, Context, Kubeconfig},
     utils, Der,
@@ -105,36 +101,17 @@ impl ConfigLoader {
         })
     }
 
-    #[cfg(feature = "native-tls")]
-    pub fn identity(&self, password: &str) -> Result<Vec<u8>> {
+    pub fn identity_pem(&self) -> Result<Vec<u8>> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
-
-        let x509 = X509::from_pem(&client_cert)?;
-        let pkey = PKey::private_key_from_pem(&client_key)?;
-
-        let p12 = Pkcs12::builder().build(password, "kubeconfig", &pkey, &x509)?;
-
-        let der = p12.to_der()?;
-        // Make sure the buffer can be parsed properly but throw away the result
-        let _identity = Identity::from_pkcs12_der(&der, password)?;
-        Ok(der)
-    }
-
-    #[cfg(feature = "rustls-tls")]
-    pub fn identity(&self, _password: &str) -> Result<Vec<u8>> {
-        let client_cert = &self.user.load_client_certificate()?;
-        let client_key = &self.user.load_client_key()?;
-
         let mut buffer = client_key.clone();
         buffer.extend_from_slice(client_cert);
-        // Make sure the buffer can be parsed properly but throw away the result
-        let _identity = Identity::from_pem(&buffer.as_slice())?;
         Ok(buffer)
     }
 
     #[cfg(feature = "native-tls")]
     pub fn ca_bundle(&self) -> Result<Option<Vec<Der>>> {
+        use openssl::x509::X509;
         let bundle = self.cluster.load_certificate_authority()?;
 
         if let Some(bundle) = bundle {

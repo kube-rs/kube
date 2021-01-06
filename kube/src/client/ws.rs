@@ -1,12 +1,13 @@
-pub use tls::AsyncTlsConnector;
+pub use async_tls::AsyncTlsConnector;
 
 #[cfg(feature = "ws-native-tls")]
-mod tls {
+mod async_tls {
     use std::convert::TryFrom;
 
     use tokio_native_tls::native_tls::{Certificate, Identity, TlsConnector};
     pub use tokio_native_tls::TlsConnector as AsyncTlsConnector;
 
+    use super::super::tls::pkcs12_from_pem;
     use crate::{config::Config, Error, Result};
 
     impl TryFrom<Config> for AsyncTlsConnector {
@@ -14,9 +15,10 @@ mod tls {
 
         fn try_from(config: Config) -> Result<Self> {
             let mut builder = TlsConnector::builder();
-            if let Some((identity, identity_password)) = config.identity.as_ref() {
+            if let Some((pem, identity_password)) = config.identity.as_ref() {
+                let identity = pkcs12_from_pem(pem, identity_password)?;
                 builder.identity(
-                    Identity::from_pkcs12(identity, identity_password)
+                    Identity::from_pkcs12(&identity, identity_password)
                         .map_err(|e| Error::SslError(format!("{}", e)))?,
                 );
             }
@@ -37,7 +39,7 @@ mod tls {
 }
 
 #[cfg(feature = "ws-rustls-tls")]
-mod tls {
+mod async_tls {
     use std::{convert::TryFrom, sync::Arc};
 
     pub use tokio_rustls::TlsConnector as AsyncTlsConnector;
