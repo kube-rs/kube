@@ -5,6 +5,7 @@ UNRELEASED
   * docs: fix broken documentation for `kube` 0.46.0 - #367
   * bug: `AttachParams` now fixes owned method chaining (slightly breaks from 0.46 if using &mut ref before) - #364
   * feat: `AttachParams::interactive_tty` convenience method added - #364
+  * bug: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - #375
 
 0.46.0 / 2021-01-02
 ===================
