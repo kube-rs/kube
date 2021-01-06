@@ -83,8 +83,6 @@ pub struct Config {
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
-    /// Proxy to send requests to Kubernetes API through
-    pub(crate) proxy: Option<reqwest::Proxy>,
     /// Client certs and key in PEM format and a password for a client to create `reqwest::Identity` with.
     /// Password is only used with `native_tls` to create a PKCS12 archive.
     pub(crate) identity: Option<(Vec<u8>, String)>,
@@ -108,7 +106,6 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
-            proxy: None,
             identity: None,
             auth_header: Authentication::None,
         }
@@ -167,7 +164,6 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
-            proxy: None,
             identity: None,
             auth_header: Authentication::Token(format!("Bearer {}", token)),
         })
@@ -231,7 +227,6 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
-            proxy: None,
             identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
             auth_header: load_auth_header(&loader)?,
         })
@@ -245,23 +240,6 @@ impl Config {
     /// (such as anonymous access, or certificate-based authentication).
     pub async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
         self.auth_header.to_header().await
-    }
-
-    /// Configure a proxy for this kube config
-    ///
-    /// ```no_run
-    /// use kube::{Config, config};
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
-    ///     let mut config = Config::from_kubeconfig(&config::KubeConfigOptions::default()).await?;
-    ///     let proxy = reqwest::Proxy::http("https://localhost:8080")?;
-    ///     let config = config.proxy(proxy);
-    ///     Ok(())
-    /// }
-    /// ```
-    pub fn proxy(mut self, proxy: reqwest::Proxy) -> Self {
-        self.proxy = Some(proxy);
-        self
     }
 }
 
