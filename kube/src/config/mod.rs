@@ -83,7 +83,7 @@ pub struct Config {
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
-    /// Client certs and key in PEM format and a password for a client to create `reqwest::Identity` with.
+    /// Client certs and key in PEM format and a password for a client to create `Identity` with.
     /// Password is only used with `native_tls` to create a PKCS12 archive.
     pub(crate) identity: Option<(Vec<u8>, String)>,
     /// The authentication header from the credentials available in the kubeconfig. This supports

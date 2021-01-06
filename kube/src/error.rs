@@ -11,8 +11,6 @@ pub enum Error {
     /// ApiError for when things fail
     ///
     /// This can be parsed into as an error handling fallback.
-    /// Replacement data for [`reqwest::Response::error_for_status`],
-    /// which is often lacking in good permission errors.
     /// It's also used in `WatchEvent` from watch calls.
     ///
     /// It's quite common to get a `410 Gone` when the `resourceVersion` is too old.
@@ -23,9 +21,14 @@ pub enum Error {
     #[error("ConnectionError: {0}")]
     Connection(std::io::Error),
 
-    /// Reqwest error
-    #[error("ReqwestError: {0}")]
-    ReqwestError(#[from] reqwest::Error),
+    /// Hyper error
+    #[error("HyperError: {0}")]
+    HyperError(#[from] hyper::Error),
+
+    /// UTF-8 Error
+    #[error("HyperError: {0}")]
+    FromUtf8(#[from] std::string::FromUtf8Error),
+
     /// Http based error
     #[error("HttpError: {0}")]
     HttpError(#[from] http::Error),
@@ -164,9 +167,6 @@ pub enum ConfigError {
     NoBase64FileOrData,
     #[error("Failed to get data/file")]
     NoFileOrData,
-
-    #[error("Failed to load certificate: {0}")]
-    LoadCert(#[source] reqwest::Error),
 
     #[error("Failed to parse Kubeconfig YAML: {0}")]
     ParseYaml(#[source] serde_yaml::Error),

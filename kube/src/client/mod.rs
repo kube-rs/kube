@@ -9,24 +9,25 @@
 use crate::{
     api::{Meta, WatchEvent},
     config::Config,
-    error::{ConfigError, ErrorResponse},
+    error::ErrorResponse,
     Error, Result,
 };
 
-#[cfg(feature = "native-tls")] mod tls;
-#[cfg(feature = "native-tls")] use tls::pkcs12_from_pem;
-#[cfg(feature = "ws")] mod ws;
-#[cfg(feature = "ws")] use ws::AsyncTlsConnector;
+mod tls;
+#[cfg(feature = "ws")] use tls::AsyncTlsConnector;
+use tls::{Connectors, HttpsConnector};
 
 #[cfg(feature = "ws")]
 use async_tungstenite::{
     tokio::{connect_async_with_tls_connector, ConnectStream},
     tungstenite as ws2, WebSocketStream,
 };
+
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, TryStream, TryStreamExt};
 use http::{self, Request, StatusCode};
+use hyper::{client::HttpConnector, Body, Client as HyperClient};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{self, Value};
@@ -43,7 +44,7 @@ use std::convert::{TryFrom, TryInto};
 pub struct Client {
     cluster_url: url::Url,
     default_ns: String,
-    inner: reqwest::Client,
+    inner: HyperClient<HttpsConnector<HttpConnector>, hyper::Body>,
     config: Config,
     #[cfg(feature = "ws")]
     tls_connector: AsyncTlsConnector,
@@ -55,11 +56,9 @@ impl Client {
     ///
     /// # Panics
     ///
-    /// Panics if the configuration supplied leads to an invalid HTTP client.
-    /// Refer to the [`reqwest::ClientBuilder::build`] docs for information
-    /// on situations where this might fail. If you want to handle this error case
-    /// use [`Config::try_from`](Self::try_from) (note that this requires [`std::convert::TryFrom`]
-    /// to be in scope.)
+    /// Panics if the configuration supplied leads to an invalid TlsConnector.
+    /// If you want to handle this error case use [`Config::try_from`](Self::try_from)
+    /// (note that this requires [`std::convert::TryFrom`] to be in scope.)
     pub fn new(config: Config) -> Self {
         Self::try_from(config).expect("Could not create a client from the supplied config")
     }
@@ -79,16 +78,22 @@ impl Client {
         Self::try_from(client_config)
     }
 
-    async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
-        let (parts, body) = request.into_parts();
+    async fn send(&self, request: http::Request<Vec<u8>>) -> Result<http::Response<Body>> {
+        let (mut parts, body) = request.into_parts();
         let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
         let uri_str = finalize_url(&self.cluster_url, &pandq);
+        parts.uri = uri_str.parse().expect("valid URL");
         //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
-
-        let mut headers = parts.headers;
+        for (name, value) in self.config.headers.clone() {
+            if let Some(key) = name {
+                if !parts.headers.contains_key(&key) {
+                    parts.headers.insert(key, value);
+                }
+            }
+        }
         // If we have auth headers set, make sure they are updated and attached to the request
         if let Some(auth_header) = self.config.get_auth_header().await? {
-            headers.insert(http::header::AUTHORIZATION, auth_header);
+            parts.headers.insert(http::header::AUTHORIZATION, auth_header);
         }
 
         let request = match parts.method {
@@ -96,12 +101,11 @@ impl Client {
             | http::Method::POST
             | http::Method::DELETE
             | http::Method::PUT
-            | http::Method::PATCH => self.inner.request(parts.method, &uri_str),
+            | http::Method::PATCH => Request::from_parts(parts, Body::from(body)),
             other => return Err(Error::InvalidMethod(other.to_string())),
         };
 
-        let req = request.headers(headers).body(body).build()?;
-        let res = self.inner.execute(req).await?;
+        let res = self.inner.request(request).await?;
         Ok(res)
     }
 
@@ -190,11 +194,12 @@ impl Client {
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
     pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String> {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Status = {:?} for {}", res.status(), res.url());
-        let s = res.status();
-        let text = res.text().await?;
-        handle_api_errors(&text, s)?;
+        let res = self.send(request).await?;
+        let status = res.status();
+        // trace!("Status = {:?} for {}", status, res.url());
+        let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
+        let text = String::from_utf8(body_bytes.to_vec())?;
+        handle_api_errors(&text, status)?;
 
         Ok(text)
     }
@@ -205,10 +210,9 @@ impl Client {
         &self,
         request: http::Request<Vec<u8>>,
     ) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Status = {:?} for {}", res.status(), res.url());
-
-        Ok(res.bytes_stream().map_err(Error::ReqwestError))
+        let res = self.send(request).await?;
+        // trace!("Status = {:?} for {}", res.status(), res.url());
+        Ok(res.into_body().map_err(Error::HyperError))
     }
 
     /// Perform a raw HTTP request against the API and get back either an object
@@ -217,10 +221,11 @@ impl Client {
     where
         T: DeserializeOwned,
     {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Status = {:?} for {}", res.status(), res.url());
+        let res = self.send(request).await?;
+        // trace!("Status = {:?} for {}", res.status(), res.url());
         let s = res.status();
-        let text = res.text().await?;
+        let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
+        let text = String::from_utf8(body_bytes.to_vec())?;
         handle_api_errors(&text, s)?;
 
         // It needs to be JSON:
@@ -247,8 +252,8 @@ impl Client {
     where
         T: DeserializeOwned,
     {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
+        let res = self.send(request).await?;
+        // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         trace!("headers: {:?}", res.headers());
 
         // Now unfold the chunked responses into a Stream
@@ -256,12 +261,12 @@ impl Client {
         // yield multiple objects per loop, then we flatten it to the Stream<Result<T>> as expected.
         // Any reqwest errors will terminate this stream early.
 
-        let stream = futures::stream::try_unfold((res, Vec::new()), |(mut resp, _buff)| {
+        let stream = futures::stream::try_unfold((res.into_body(), Vec::new()), |(mut resp, _buff)| {
             async {
                 let mut buff = _buff; // can be avoided, see #145
                 loop {
                     trace!("Await chunk");
-                    match resp.chunk().await {
+                    match resp.try_next().await {
                         Ok(Some(chunk)) => {
                             trace!("Some chunk of len {}", chunk.len());
                             //trace!("Chunk contents: {}", String::from_utf8_lossy(&chunk));
@@ -299,10 +304,7 @@ impl Client {
                                                     _ => {
                                                         let line = String::from_utf8_lossy(line);
                                                         warn!("Failed to parse: {}", line);
-                                                        match resp.error_for_status_ref() {
-                                                            Ok(_) => Error::SerdeError(e),
-                                                            Err(e) => Error::ReqwestError(e),
-                                                        }
+                                                        Error::SerdeError(e)
                                                     }
                                                 };
 
@@ -339,7 +341,7 @@ impl Client {
                                 // For now, if they happen, we hard error up
                                 // This causes a full re-list for Reflector
                                 error!("err poll: {:?} - {}", e, inner);
-                                return Err(Error::ReqwestError(e));
+                                return Err(Error::HyperError(e));
                             }
                         }
                     }
@@ -435,62 +437,22 @@ impl TryFrom<Config> for Client {
         let cluster_url = config.cluster_url.clone();
         let default_ns = config.default_ns.clone();
         let config_clone = config.clone();
-        #[cfg(feature = "ws")]
-        let tls_connector: AsyncTlsConnector = config.clone().try_into()?;
-        let builder: reqwest::ClientBuilder = config.try_into()?;
+        let conns: Connectors = config.clone().try_into()?;
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+        if let Some(t) = config.timeout {
+            http.set_connect_timeout(Some(t));
+        }
+        let client = HyperClient::builder().build::<_, hyper::Body>(conns.https);
+
         Ok(Self {
             cluster_url,
             default_ns,
-            inner: builder.build()?,
-            #[cfg(feature = "ws")]
-            tls_connector,
+            inner: client,
             config: config_clone,
+            #[cfg(feature = "ws")]
+            tls_connector: conns.wss,
         })
-    }
-}
-
-impl TryFrom<Config> for reqwest::ClientBuilder {
-    type Error = Error;
-
-    fn try_from(config: Config) -> Result<Self> {
-        let mut builder = Self::new();
-
-        #[cfg(feature = "native-tls")]
-        {
-            if let Some((pem, password)) = config.identity.as_ref() {
-                let der = pkcs12_from_pem(pem, password)?;
-                if let Ok(id) = reqwest::Identity::from_pkcs12_der(&der, password) {
-                    builder = builder.identity(id);
-                }
-            }
-        }
-        #[cfg(feature = "rustls-tls")]
-        {
-            if let Some((pem, _)) = config.identity.as_ref() {
-                if let Ok(id) = reqwest::Identity::from_pem(&pem) {
-                    builder = builder.identity(id);
-                }
-            }
-        }
-
-        if let Some(ders) = config.root_cert {
-            for der in ders {
-                builder = builder.add_root_certificate(
-                    reqwest::Certificate::from_der(&der.0)
-                        .map_err(ConfigError::LoadCert)
-                        .map_err(Error::from)?,
-                );
-            }
-        }
-
-        if let Some(t) = config.timeout {
-            builder = builder.timeout(t);
-        }
-
-        builder = builder.default_headers(config.headers);
-        builder = builder.danger_accept_invalid_certs(config.accept_invalid_certs);
-
-        Ok(builder)
     }
 }
 
