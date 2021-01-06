@@ -455,10 +455,6 @@ impl TryFrom<Config> for reqwest::ClientBuilder {
     fn try_from(config: Config) -> Result<Self> {
         let mut builder = Self::new();
 
-        if let Some(i) = &config.proxy {
-            builder = builder.proxy(i.clone())
-        }
-
         #[cfg(feature = "native-tls")]
         {
             if let Some((pem, password)) = config.identity.as_ref() {

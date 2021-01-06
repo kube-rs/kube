@@ -116,10 +116,6 @@ name = "pod_shell"
 path = "pod_shell.rs"
 
 [[example]]
-name = "proxy"
-path = "proxy.rs"
-
-[[example]]
 name = "pod_reflector"
 path = "pod_reflector.rs"
 
