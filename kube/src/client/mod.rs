@@ -43,6 +43,7 @@ use std::convert::{TryFrom, TryInto};
 #[derive(Clone)]
 pub struct Client {
     cluster_url: url::Url,
+    // REVIEW `default_ns` is never used?
     default_ns: String,
     inner: HyperClient<HttpsConnector<HttpConnector>, hyper::Body>,
     headers: HeaderMap,
