@@ -293,6 +293,12 @@ where
     /// This returns a future that awaits the initial response,
     /// then you can stream the remaining buffered `WatchEvent` objects.
     ///
+    /// Note that a `watch` call can terminate for many reasons (even before the specified
+    /// [`ListParams::timeout`] is triggered), and will have to be re-issued
+    /// with the last seen resource version when or if it closes.
+    ///
+    /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
+    ///
     /// ```no_run
     /// use kube::{api::{Api, ListParams, Meta, WatchEvent}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
@@ -317,6 +323,8 @@ where
     ///     Ok(())
     /// }
     /// ```
+    /// [`ListParams::timeout`]: super::ListParams::timeout
+    /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
     pub async fn watch(
         &self,
         lp: &ListParams,
