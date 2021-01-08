@@ -183,7 +183,7 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 
 /// Watches a Kubernetes Resource for changes continuously
 ///
-/// Creates an indefinite read stream through continual [`Api::watch`] calls, and keepint track
+/// Creates an indefinite read stream through continual [`Api::watch`] calls, and keeping track
 /// of [returned resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes).
 /// It tries to recover (by reconnecting and resyncing as required) if polled again after an error.
 ///
