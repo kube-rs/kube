@@ -187,8 +187,8 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 /// of [returned resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes).
 /// It tries to recover (by reconnecting and resyncing as required) if polled again after an error.
 ///
-/// This is intended to provide a safe input interface for a state store like a [`reflector`],
-/// so if used directly, it's recommended to use it with with [`try_flatten_applied`]:
+/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`],
+/// direct users may want to flatten composite events with [`try_flatten_applied`]:
 ///
 /// ```no_run
 /// use kube::{api::{Api, ListParams, Meta}, Client};
