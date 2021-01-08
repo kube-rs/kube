@@ -186,6 +186,8 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 /// Creates an indefinite read stream through continual [`Api::watch`] calls, and keeping track
 /// of [returned resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes).
 /// It tries to recover (by reconnecting and resyncing as required) if polled again after an error.
+/// However, keep in mind that most terminal `TryStream` combinators (such as [`TryFutureExt::try_for_each`)
+/// and [`TryFutureExt::try_concat`] will terminate eagerly if an `Error` reaches them.
 ///
 /// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`],
 /// direct users may want to flatten composite events with [`try_flatten_applied`]:
