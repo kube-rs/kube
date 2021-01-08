@@ -34,7 +34,7 @@ pub(crate) enum Authentication {
 }
 
 impl Authentication {
-    async fn to_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
+    pub(crate) async fn to_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
         match self {
             Self::None => Ok(None),
             Self::Basic(value) => Ok(Some(

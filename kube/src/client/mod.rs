@@ -8,7 +8,7 @@
 
 use crate::{
     api::{Meta, WatchEvent},
-    config::Config,
+    config::{self, Config},
     error::ErrorResponse,
     Error, Result,
 };
@@ -26,7 +26,7 @@ use async_tungstenite::{
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, TryStream, TryStreamExt};
-use http::{self, Request, StatusCode};
+use http::{self, request::Parts, HeaderMap, Request, StatusCode};
 use hyper::{client::HttpConnector, Body, Client as HyperClient};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -45,7 +45,10 @@ pub struct Client {
     cluster_url: url::Url,
     default_ns: String,
     inner: HyperClient<HttpsConnector<HttpConnector>, hyper::Body>,
-    config: Config,
+    headers: HeaderMap,
+    // REVIEW Factor out `config::Authentication`.
+    //        We need a way to set auth header on request. `Layer` in tower?
+    auth_header: config::Authentication,
     #[cfg(feature = "ws")]
     tls_connector: AsyncTlsConnector,
 }
@@ -84,17 +87,7 @@ impl Client {
         let uri_str = finalize_url(&self.cluster_url, &pandq);
         parts.uri = uri_str.parse().expect("valid URL");
         //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
-        for (name, value) in self.config.headers.clone() {
-            if let Some(key) = name {
-                if !parts.headers.contains_key(&key) {
-                    parts.headers.insert(key, value);
-                }
-            }
-        }
-        // If we have auth headers set, make sure they are updated and attached to the request
-        if let Some(auth_header) = self.config.get_auth_header().await? {
-            parts.headers.insert(http::header::AUTHORIZATION, auth_header);
-        }
+        self.set_common_headers(&mut parts).await?;
 
         let request = match parts.method {
             http::Method::GET
@@ -109,14 +102,23 @@ impl Client {
         Ok(res)
     }
 
+    async fn set_common_headers(&self, parts: &mut Parts) -> Result<()> {
+        let mut headers = self.headers.clone();
+        headers.extend(parts.headers.clone().into_iter());
+        // If we have auth headers set, make sure they are updated and attached to the request
+        if let Some(auth_header) = self.auth_header.to_header().await? {
+            headers.insert(http::header::AUTHORIZATION, auth_header);
+        }
+        parts.headers = headers;
+        Ok(())
+    }
+
     /// Make WebSocket connection.
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
     pub async fn connect(&self, request: http::Request<()>) -> Result<WebSocketStream<ConnectStream>> {
         let (mut parts, _) = request.into_parts();
-        if let Some(auth_header) = self.config.get_auth_header().await? {
-            parts.headers.insert(http::header::AUTHORIZATION, auth_header);
-        }
+        self.set_common_headers(&mut parts).await?;
         // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
         // There's no official documentation about this protocol, but it's described in
         // [`k8s.io/apiserver/pkg/util/wsstream/conn.go`](https://git.io/JLQED).
@@ -436,20 +438,23 @@ impl TryFrom<Config> for Client {
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
         let default_ns = config.default_ns.clone();
-        let config_clone = config.clone();
-        let conns: Connectors = config.clone().try_into()?;
+        let headers = config.headers.clone();
+        let auth_header = config.auth_header.clone();
+
         let mut http = HttpConnector::new();
         http.enforce_http(false);
         if let Some(t) = config.timeout {
             http.set_connect_timeout(Some(t));
         }
+        let conns: Connectors = config.try_into()?;
         let client = HyperClient::builder().build::<_, hyper::Body>(conns.https);
 
         Ok(Self {
             cluster_url,
             default_ns,
+            headers,
+            auth_header,
             inner: client,
-            config: config_clone,
             #[cfg(feature = "ws")]
             tls_connector: conns.wss,
         })
