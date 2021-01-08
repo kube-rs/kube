@@ -181,10 +181,37 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
     }
 }
 
-/// Watches a Kubernetes Resource for changes
+/// Watches a Kubernetes Resource for changes continuously
 ///
-/// Errors are propagated to the client as `Err`. Tries to recover (by reconnecting and resyncing as required)
-/// if polled again after an error.
+/// Creates an indefinite read stream through continual [`Api::watch`] calls, and keepint track
+/// of [returned resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes).
+/// It tries to recover (by reconnecting and resyncing as required) if polled again after an error.
+///
+/// This is intended to provide a safe input interface for a state store like a [`reflector`],
+/// so if used directly, it's recommended to use it with with [`try_flatten_applied`]:
+///
+/// ```no_run
+/// use kube::{api::{Api, ListParams, Meta}, Client};
+/// use kube_runtime::{utils::try_flatten_applied, watcher};
+/// use k8s_openapi::api::core::v1::Pod;
+/// use futures::{StreamExt, TryStreamExt};
+/// #[tokio::main]
+/// async fn main() -> Result<(), kube_runtime::watcher::Error> {
+///     let client = Client::try_default().await.unwrap();
+///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+///     let watcher = watcher(pods, ListParams::default());
+///     try_flatten_applied(watcher)
+///         .try_for_each(|p| async move {
+///          println!("Applied: {}", Meta::name(&p));
+///             Ok(())
+///         })
+///         .await?;
+///    Ok(())
+/// }
+/// ```
+/// [`try_flatten_applied`]: super::utils::try_flatten_applied
+/// [`reflector`]: super::reflector::reflector
+/// [`Api::watch`]: https://docs.rs/kube/*/kube/struct.Api.html#method.watch
 ///
 /// # Migration from `kube::runtime`
 ///

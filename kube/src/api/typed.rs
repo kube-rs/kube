@@ -293,6 +293,10 @@ where
     /// This returns a future that awaits the initial response,
     /// then you can stream the remaining buffered `WatchEvent` objects.
     ///
+    /// Note that a watch call __will terminate in <5 minutes__, based on [`ListParams::timeout`],
+    /// and as such, is best suited for __short term__ watches.
+    /// For continual tracking of resources, consider a managed [`watcher`].
+    ///
     /// ```no_run
     /// use kube::{api::{Api, ListParams, Meta, WatchEvent}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
@@ -317,6 +321,8 @@ where
     ///     Ok(())
     /// }
     /// ```
+    /// [`ListParams::timeout`]: super::ListParams::timeout
+    /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
     pub async fn watch(
         &self,
         lp: &ListParams,
