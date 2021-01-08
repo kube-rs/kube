@@ -43,7 +43,6 @@ use std::convert::{TryFrom, TryInto};
 #[derive(Clone)]
 pub struct Client {
     cluster_url: url::Url,
-    default_ns: String,
     inner: HyperClient<HttpsConnector<HttpConnector>, hyper::Body>,
     headers: HeaderMap,
     // REVIEW Factor out `config::Authentication`.
@@ -437,7 +436,6 @@ impl TryFrom<Config> for Client {
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
-        let default_ns = config.default_ns.clone();
         let headers = config.headers.clone();
         let auth_header = config.auth_header.clone();
         let conns: Connectors = config.try_into()?;
@@ -445,7 +443,6 @@ impl TryFrom<Config> for Client {
 
         Ok(Self {
             cluster_url,
-            default_ns,
             headers,
             auth_header,
             inner: client,
