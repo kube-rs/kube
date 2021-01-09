@@ -26,8 +26,18 @@ pub enum Error {
     HyperError(#[from] hyper::Error),
 
     /// UTF-8 Error
-    #[error("HyperError: {0}")]
+    #[error("UTF-8 Error: {0}")]
     FromUtf8(#[from] std::string::FromUtf8Error),
+
+    /// Returned when failed to find a newline character within max length.
+    /// Only returned by `Client::request_events` and this should never happen as
+    /// the max is `usize::MAX`.
+    #[error("Error finding newline character")]
+    LinesCodecMaxLineLengthExceeded,
+
+    /// Returned on `std::io::Error` when reading event stream.
+    #[error("Error reading events stream: {0}")]
+    ReadEvents(std::io::Error),
 
     /// Http based error
     #[error("HttpError: {0}")]
