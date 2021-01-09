@@ -84,7 +84,7 @@ impl Client {
         Self::try_from(client_config)
     }
 
-    async fn send(&self, request: http::Request<Vec<u8>>) -> Result<hyper::Response<Body>> {
+    async fn send(&self, request: http::Request<Vec<u8>>) -> Result<http::Response<Body>> {
         let (mut parts, body) = request.into_parts();
         let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
         let uri_str = finalize_url(&self.cluster_url, &pandq);
