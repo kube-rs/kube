@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
     match crds
-        .patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?)
+        .patch("foos.clux.dev", &ssapply, &Foo::crd())
         .await
     {
         Ok(o) => info!("Applied {}: ({:?})", Meta::name(&o), o.spec),
@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
         replicas: 3,
     });
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
-    let o = foos.patch("baz", &ssapply, serde_yaml::to_vec(&foo)?).await?;
+    let o = foos.patch("baz", &ssapply, &foo).await?;
     info!("Applied 1 {}: {:?}", Meta::name(&o), o.spec);
 
     // 2. Apply from partial json!
@@ -85,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     info!("Applying 2: \n{}", serde_yaml::to_string(&patch)?);
-    let o2 = foos.patch("baz", &ssapply, serde_yaml::to_vec(&patch)?).await?;
+    let o2 = foos.patch("baz", &ssapply, &patch).await?;
     info!("Applied 2 {}: {:?}", Meta::name(&o2), o2.spec);
 
     Ok(())

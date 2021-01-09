@@ -84,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
     });
     let patch_params = PatchParams::default();
     let p_patched = pods
-        .patch("blog", &patch_params, serde_json::to_vec(&patch)?)
+        .patch("blog", &patch_params, &patch)
         .await?;
     assert_eq!(p_patched.spec.unwrap().active_deadline_seconds, Some(5));
 

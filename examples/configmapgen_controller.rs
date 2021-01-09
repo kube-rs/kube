@@ -27,10 +27,6 @@ enum Error {
         name: &'static str,
         backtrace: Backtrace,
     },
-    SerializationFailed {
-        source: serde_json::Error,
-        backtrace: Backtrace,
-    },
 }
 
 #[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
@@ -89,7 +85,7 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
                 dry_run: false,
                 force: false,
             },
-            serde_json::to_vec(&cm).context(SerializationFailed)?,
+            &cm,
         )
         .await
         .context(ConfigMapCreationFailed)?;

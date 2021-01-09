@@ -185,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
         "spec": { "info": "patched qux" }
     });
     let o = foos
-        .patch("qux", &patch_params, serde_json::to_vec(&patch)?)
+        .patch("qux", &patch_params, &patch)
         .await?;
     info!("Patched {} with new name: {}", Meta::name(&o), o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
