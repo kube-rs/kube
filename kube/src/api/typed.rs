@@ -195,10 +195,13 @@ where
 
     /// Patch a resource a subset of its properties
     ///
-    /// Note that some of the [`PatchStrategy`](super::PatchStrategy) variants require different
-    /// serialization. The original strategies such as [`Merge`], [`JSON`] and [`Strategic`] should be
-    /// serialized using [`serde_json::to_vec`].
-    /// When using [`Apply`], you **must** serialize your data using [`serde_yaml::to_vec`]:
+    /// Note that actual `patch` value depends on what `PatchStrategy` is used.
+    /// It is configured in `PatchParams` and defauls to strategic merge
+    /// patch.
+    ///
+    /// See [kubernetes json patch types](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    /// for more information about their distinction.
+    ///
     /// ```no_run
     /// use kube::{api::{Api, PatchParams, Meta}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
@@ -207,7 +210,7 @@ where
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let ss_apply = PatchParams::apply("myapp").force();
-    ///     let patch = serde_yaml::to_vec(&serde_json::json!({
+    ///     let patch = serde_json::json!({
     ///         "apiVersion": "v1",
     ///         "kind": "Pod",
     ///         "metadata": {
@@ -216,21 +219,17 @@ where
     ///         "spec": {
     ///             "activeDeadlineSeconds": 5
     ///         }
-    ///     })).unwrap();
-    ///     let o_patched = pods.patch("blog", &ss_apply, patch).await?;
+    ///     });
+    ///     let o_patched = pods.patch("blog", &ss_apply, &patch).await?;
     ///     Ok(())
     /// }
     /// ```
-    /// Note that you can still create the data any way you like (like with `serde_json`).
-    ///
-    /// See [kubernetes json patch types](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
-    /// for more information about their distinction.
-    ///
     /// [`Merge`]: super::PatchStrategy::Merge
     /// [`JSON`]: super::PatchStrategy::JSON
     /// [`Strategic`]: super::PatchStrategy::Strategic
     /// [`Apply`]: super::PatchStrategy::Apply
-    pub async fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
+    pub async fn patch<T: Serialize>(&self, name: &str, pp: &PatchParams, patch: &T) -> Result<K> {
+        let patch = serde_json::to_vec(&patch)?;
         let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
