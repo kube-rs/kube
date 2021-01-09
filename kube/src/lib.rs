@@ -94,6 +94,7 @@ pub mod config;
 pub mod runtime;
 
 pub mod error;
+mod oauth2;
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]

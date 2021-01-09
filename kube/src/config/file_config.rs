@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fs::File, path::Path};
 
-use crate::{config::utils, error::ConfigError, Result};
+use crate::{config::utils, error::ConfigError, oauth2, Result};
 
 use serde::{Deserialize, Serialize};
 
@@ -171,14 +171,11 @@ impl AuthInfo {
                 if let Some(access_token) = provider.config.get("access-token") {
                     self.token = Some(access_token.clone());
                     if utils::is_expired(&provider.config["expiry"]) {
-                        // Use `yup-oauth2`. Maybe something like:
-                        // ```
-                        // use yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator};
-                        // let key = read_service_account_key(env::var_os(GOOGLE_APPLICATION_CREDENTIALS)).await?;
-                        // let mut auth = ServiceAccountAuthenticator::builder(key).grant_type(DEFAULT_GRANT_TYPE).build().await?;
-                        // let token = auth.token(&["https://www.googleapis.com/auth/cloud-platform"]).await.unwrap();
-                        // self.token = Some(token.as_str().to_owned());
-                        // ```
+                        let client = oauth2::CredentialsClient::new()?;
+                        let token = client
+                            .request_token(&["https://www.googleapis.com/auth/cloud-platform".to_string()])
+                            .await?;
+                        self.token = Some(token.access_token);
                     }
                 }
                 if let Some(id_token) = provider.config.get("id-token") {
