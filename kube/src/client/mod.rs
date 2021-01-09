@@ -25,12 +25,16 @@ use async_tungstenite::{
 
 use bytes::Bytes;
 use either::{Either, Left, Right};
-use futures::{self, Stream, TryStream, TryStreamExt};
+use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
 use http::{self, request::Parts, HeaderMap, Request, StatusCode};
 use hyper::{client::HttpConnector, Body, Client as HyperClient};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{self, Value};
+use tokio_util::{
+    codec::{FramedRead, LinesCodec, LinesCodecError},
+    io::StreamReader,
+};
 
 use std::convert::{TryFrom, TryInto};
 
@@ -257,100 +261,63 @@ impl Client {
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         trace!("headers: {:?}", res.headers());
 
-        // Now unfold the chunked responses into a Stream
-        // We first construct a Stream of Vec<Result<T>> as we potentially might need to
-        // yield multiple objects per loop, then we flatten it to the Stream<Result<T>> as expected.
-        // Any reqwest errors will terminate this stream early.
+        let frames = FramedRead::new(
+            StreamReader::new(res.into_body().map_err(|e| {
+                // Client timeout. This will be ignored.
+                if e.is_timeout() {
+                    return std::io::Error::new(std::io::ErrorKind::TimedOut, e);
+                }
+                // Unexpected EOF from chunked decoder.
+                // Tends to happen when watching for 300+s. This will be ignored.
+                if e.to_string().contains("unexpected EOF during chunk") {
+                    return std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e);
+                }
+                std::io::Error::new(std::io::ErrorKind::Other, e)
+            })),
+            LinesCodec::new(),
+        );
 
-        let stream = futures::stream::try_unfold((res.into_body(), Vec::new()), |(mut resp, _buff)| {
-            async {
-                let mut buff = _buff; // can be avoided, see #145
-                loop {
-                    trace!("Await chunk");
-                    match resp.try_next().await {
-                        Ok(Some(chunk)) => {
-                            trace!("Some chunk of len {}", chunk.len());
-                            //trace!("Chunk contents: {}", String::from_utf8_lossy(&chunk));
-                            buff.extend_from_slice(&chunk);
-
-                            //if buff.len() > 32000 { // TEST CASE
-                            //    return Err(Error::InvalidMethod(format!("{}", buff.len())));
-                            //}
-
-                            // If we've encountered a newline, see if we have any items to yield
-                            if chunk.contains(&b'\n') {
-                                let mut new_buff = Vec::new();
-                                let mut items = Vec::new();
-
-                                // Split on newlines
-                                for line in buff.split(|x| x == &b'\n') {
-                                    new_buff.extend_from_slice(&line);
-
-                                    match serde_json::from_slice(&new_buff) {
-                                        Ok(val) => {
-                                            // on success clear our buffer
-                                            new_buff.clear();
-                                            items.push(Ok(val));
-                                        }
-                                        Err(e) => {
-                                            // If this is not an eof error it's a parse error
-                                            // so log it and store it
-                                            // Otherwise we don't do anything as we've already
-                                            // added in the current partial line to our buffer for
-                                            // use in the next loop
-                                            if !e.is_eof() {
-                                                // Check if it's a general API error response
-                                                let e = match serde_json::from_slice(&new_buff) {
-                                                    Ok(e) => Error::Api(e),
-                                                    _ => {
-                                                        let line = String::from_utf8_lossy(line);
-                                                        warn!("Failed to parse: {}", line);
-                                                        Error::SerdeError(e)
-                                                    }
-                                                };
-
-                                                // Clear the buffer as this was a valid object
-                                                new_buff.clear();
-                                                items.push(Err(e));
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Now return our items and loop
-                                return Ok(Some((items, (resp, new_buff))));
-                            }
+        Ok(frames.filter_map(|res| async {
+            match res {
+                Ok(line) => match serde_json::from_str::<WatchEvent<T>>(&line) {
+                    Ok(event) => Some(Ok(event)),
+                    Err(e) => {
+                        // Ignore EOF error that can happen for incomplete line from `decode_eof`.
+                        if e.is_eof() {
+                            return None;
                         }
-                        Ok(None) => {
-                            trace!("None chunk");
-                            return Ok(None);
+
+                        // Got general error response
+                        if let Ok(e_resp) = serde_json::from_str::<ErrorResponse>(&line) {
+                            return Some(Err(Error::Api(e_resp)));
                         }
-                        Err(e) => {
-                            if e.is_timeout() {
-                                warn!("timeout in poll: {}", e); // our client timeout
-                                return Ok(None);
-                            }
-                            let inner = e.to_string();
-                            if inner.contains("unexpected EOF during chunk") {
-                                // ^ catches reqwest::Error from hyper::Error
-                                // where the inner.kind == UnexpectedEof
-                                // and the inner.error == "unexpected EOF during chunk size line"
-                                warn!("eof in poll: {}", e);
-                                return Ok(None);
-                            } else {
-                                // There might be other errors worth ignoring here
-                                // For now, if they happen, we hard error up
-                                // This causes a full re-list for Reflector
-                                error!("err poll: {:?} - {}", e, inner);
-                                return Err(Error::HyperError(e));
-                            }
-                        }
+                        // Parsing error
+                        Some(Err(Error::SerdeError(e)))
                     }
+                },
+
+                Err(LinesCodecError::Io(e)) => match e.kind() {
+                    // Client timeout
+                    std::io::ErrorKind::TimedOut => {
+                        warn!("timeout in poll: {}", e); // our client timeout
+                        None
+                    }
+                    // Unexpected EOF from chunked decoder.
+                    // Tends to happen after 300+s of watching.
+                    std::io::ErrorKind::UnexpectedEof => {
+                        warn!("eof in poll: {}", e);
+                        None
+                    }
+                    _ => Some(Err(Error::ReadEvents(e))),
+                },
+
+                // Reached the maximum line length without finding a newline.
+                // This should never happen because we're using the default `usize::MAX`.
+                Err(LinesCodecError::MaxLineLengthExceeded) => {
+                    Some(Err(Error::LinesCodecMaxLineLengthExceeded))
                 }
             }
-        });
-
-        Ok(stream.map_ok(futures::stream::iter).try_flatten())
+        }))
     }
 
     /// Returns apiserver version.
