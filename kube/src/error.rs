@@ -151,6 +151,21 @@ pub enum ConfigError {
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
+    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
+    /// Missing GOOGLE_APPLICATION_CREDENTIALS env
+    MissingGoogleCredentials,
+
+    #[error("Unable to load OAuth2 credentials file: {0}")]
+    OAuth2LoadCredentials(#[source] std::io::Error),
+    #[error("Unable to parse OAuth2 credentials file: {0}")]
+    OAuth2ParseCredentials(#[source] serde_json::Error),
+    #[error("Unable to request token: {0}")]
+    OAuth2RequestToken(#[source] hyper::Error),
+    #[error("Fail to retrieve new credential {0:?}")]
+    OAuth2RetrieveCredentials(Box<http::Response<hyper::Body>>),
+    #[error("Unable to parse token: {0}")]
+    OAuth2ParseToken(#[source] serde_json::Error),
+
     #[error("Unable to load config file: {0}")]
     LoadConfigFile(#[source] Box<Error>),
     #[error("Unable to load current context: {context_name}")]
