@@ -263,8 +263,14 @@ impl Client {
 
         let frames = FramedRead::new(
             StreamReader::new(res.into_body().map_err(|e| {
+                // Client timeout. This will be ignored.
                 if e.is_timeout() {
                     return std::io::Error::new(std::io::ErrorKind::TimedOut, e);
+                }
+                // Unexpected EOF from chunked decoder.
+                // Tends to happen when watching for 300+s. This will be ignored.
+                if e.to_string().contains("unexpected EOF during chunk") {
+                    return std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e);
                 }
                 std::io::Error::new(std::io::ErrorKind::Other, e)
             })),
@@ -294,6 +300,12 @@ impl Client {
                     // Client timeout
                     std::io::ErrorKind::TimedOut => {
                         warn!("timeout in poll: {}", e); // our client timeout
+                        None
+                    }
+                    // Unexpected EOF from chunked decoder.
+                    // Tends to happen after 300+s of watching.
+                    std::io::ErrorKind::UnexpectedEof => {
+                        warn!("eof in poll: {}", e);
                         None
                     }
                     _ => Some(Err(Error::ReadEvents(e))),
