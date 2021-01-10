@@ -161,6 +161,7 @@ pub enum Patch<T = ()> {
         patch: T,
     },
     /// [JSON patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    #[cfg(feature = "jsonpatch")]
     Json {
         /// Patch itself
         patch: json_patch::Patch,
@@ -206,6 +207,7 @@ impl<T> Patch<T> {
     pub(crate) fn content_type(&self) -> &'static str {
         match &self {
             Self::Apply { .. } => "application/apply-patch+yaml",
+            #[cfg(feature = "jsonpatch")]
             Self::Json { .. } => "application/json-patch+json",
             Self::Merge { .. } => "application/merge-patch+json",
             Self::Strategic { .. } => "application/strategic-merge-patch+json",
@@ -217,6 +219,7 @@ impl<T: serde::Serialize> Patch<T> {
     pub(crate) fn serialize(&self) -> Result<Vec<u8>> {
         match self {
             Self::Apply { patch, .. } => serde_json::to_vec(patch),
+            #[cfg(feature = "jsonpatch")]
             Self::Json { patch } => serde_json::to_vec(patch),
             Self::Strategic { patch } => serde_json::to_vec(patch),
             Self::Merge { patch } => serde_json::to_vec(patch),
