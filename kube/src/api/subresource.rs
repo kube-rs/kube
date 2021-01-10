@@ -9,8 +9,7 @@ use crate::{
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
-#[cfg(feature = "ws")]
-use crate::api::remote_command::AttachedProcess;
+#[cfg(feature = "ws")] use crate::api::remote_command::AttachedProcess;
 
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>

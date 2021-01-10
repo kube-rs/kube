@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use color_eyre::{Report, Result};
 use futures::StreamExt;
 use k8s_openapi::{

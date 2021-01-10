@@ -222,7 +222,7 @@ where
     ///     let patch = Patch::Apply {
     ///         patch: &patch,
     ///         field_manager: "myapp".to_string(),
-    ///         force: true 
+    ///         force: true
     ///     };
     ///     let o_patched = pods.patch("blog", &Default::default(), &patch).await?;
     ///     Ok(())

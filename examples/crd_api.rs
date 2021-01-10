@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use either::Either::{Left, Right};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -84,14 +83,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Foo baz
     info!("Creating Foo instance baz");
-    let f1 = Foo::new(
-        "baz",
-        FooSpec {
-            name: "baz".into(),
-            info: "old baz".into(),
-            replicas: 1,
-        },
-    );
+    let f1 = Foo::new("baz", FooSpec {
+        name: "baz".into(),
+        info: "old baz".into(),
+        replicas: 1,
+    });
     let o = foos.create(&pp, &f1).await?;
     assert_eq!(Meta::name(&f1), Meta::name(&o));
     info!("Created {}", Meta::name(&o));
@@ -125,14 +121,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Foo qux with status
     info!("Create Foo instance qux");
-    let mut f2 = Foo::new(
-        "qux",
-        FooSpec {
-            name: "qux".into(),
-            replicas: 0,
-            info: "unpatched qux".into(),
-        },
-    );
+    let mut f2 = Foo::new("qux", FooSpec {
+        name: "qux".into(),
+        replicas: 0,
+        info: "unpatched qux".into(),
+    });
     f2.status = Some(FooStatus::default());
 
     let o = foos.create(&pp, &f2).await?;

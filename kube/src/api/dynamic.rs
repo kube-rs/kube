@@ -206,7 +206,9 @@ mod test {
         let req = r.create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");
         let patch_params = PatchParams::default();
-        let req = r.patch("baz", &patch_params, &Patch::Merge { patch: () }).unwrap();
+        let req = r
+            .patch("baz", &patch_params, &Patch::Merge { patch: () })
+            .unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos/baz?");
         assert_eq!(req.method(), "PATCH");
     }

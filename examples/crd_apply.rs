@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -66,14 +65,11 @@ async fn main() -> anyhow::Result<()> {
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
     // 1. Apply from a full struct (e.g. equivalent to replace w/o resource_version)
-    let foo = Foo::new(
-        "baz",
-        FooSpec {
-            name: "baz".into(),
-            info: Some("old baz".into()),
-            replicas: 3,
-        },
-    );
+    let foo = Foo::new("baz", FooSpec {
+        name: "baz".into(),
+        info: Some("old baz".into()),
+        replicas: 3,
+    });
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
     let o = foos.patch("baz", &Default::default(), &make_patch(&foo)).await?;
     info!("Applied 1 {}: {:?}", Meta::name(&o), o.spec);
