@@ -63,7 +63,7 @@ where
     /// NB: Requires that the resource has a status subresource.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PatchParams}, Client};
+    /// use kube::{api::{Api, PatchParams, Patch}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -76,7 +76,7 @@ where
     ///             "succeeded": 2
     ///         }
     ///     });
-    ///     let o = jobs.patch_status("baz", &pp, serde_json::to_vec(&data)?).await?;
+    ///     let o = jobs.patch_status("baz", &pp, &Patch::Merge { patch: data }).await?;
     ///     assert_eq!(o.status.unwrap().succeeded, Some(2));
     ///     Ok(())
     /// }

@@ -203,13 +203,12 @@ where
     /// for more information about their distinction.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PatchParams, Meta}, Client};
+    /// use kube::{api::{Api, PatchParams, Patch, Meta}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let ss_apply = PatchParams::apply("myapp").force();
     ///     let patch = serde_json::json!({
     ///         "apiVersion": "v1",
     ///         "kind": "Pod",
@@ -220,7 +219,12 @@ where
     ///             "activeDeadlineSeconds": 5
     ///         }
     ///     });
-    ///     let o_patched = pods.patch("blog", &ss_apply, &patch).await?;
+    ///     let patch = Patch::Apply {
+    ///         patch: &patch,
+    ///         field_manager: "myapp".to_string(),
+    ///         force: true 
+    ///     };
+    ///     let o_patched = pods.patch("blog", &Default::default(), &patch).await?;
     ///     Ok(())
     /// }
     /// ```
