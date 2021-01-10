@@ -37,7 +37,7 @@ mod tls {
 }
 
 #[cfg(feature = "ws-rustls-tls")]
-mod tls {
+mod tls_rustls {
     use std::{convert::TryFrom, sync::Arc};
 
     pub use tokio_rustls::TlsConnector as AsyncTlsConnector;

@@ -74,14 +74,7 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-#[macro_use] extern crate static_assertions;
-assert_cfg!(
-    all(
-        not(all(feature = "native-tls", feature = "rustls-tls")),
-        any(feature = "native-tls", feature = "rustls-tls")
-    ),
-    "Must use exactly one of native-tls or rustls-tls features"
-);
+// #[macro_use] extern crate static_assertions;
 
 #[macro_use] extern crate log;
 
@@ -95,6 +88,9 @@ pub mod runtime;
 
 pub mod error;
 mod oauth2;
+mod tls;
+
+pub use tls::Tls;
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]

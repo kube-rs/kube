@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fs::File, path::Path};
 
-use crate::{config::utils, error::ConfigError, oauth2, Result};
+use crate::{Result, Tls, config::utils, error::ConfigError, oauth2};
 
 use serde::{Deserialize, Serialize};
 
@@ -165,13 +165,13 @@ impl Cluster {
 }
 
 impl AuthInfo {
-    pub(crate) async fn load_gcp(&mut self) -> Result<()> {
+    pub(crate) async fn load_gcp(&mut self, tls: Tls) -> Result<()> {
         match &self.auth_provider {
             Some(provider) => {
                 if let Some(access_token) = provider.config.get("access-token") {
                     self.token = Some(access_token.clone());
                     if utils::is_expired(&provider.config["expiry"]) {
-                        let client = oauth2::CredentialsClient::new()?;
+                        let client = oauth2::CredentialsClient::new(tls)?;
                         let token = client
                             .request_token(&["https://www.googleapis.com/auth/cloud-platform".to_string()])
                             .await?;
@@ -299,7 +299,7 @@ mod test {
         let mut config: Kubeconfig = serde_yaml::from_str(test_file).map_err(ConfigError::ParseYaml)?;
         let auth_info = &mut config.auth_infos[0].auth_info;
         assert!(auth_info.token.is_none());
-        auth_info.load_gcp().await?;
+        auth_info.load_gcp(Tls::pick()).await?;
         assert_eq!(auth_info.token, Some("my_token".to_owned()));
 
         Ok(())

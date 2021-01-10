@@ -3,16 +3,13 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 
-use kube::{
-    api::{Api, AttachParams, DeleteParams, ListParams, Meta, PostParams, WatchEvent},
-    Client,
-};
+use kube::{Client, Tls, api::{Api, AttachParams, DeleteParams, ListParams, Meta, PostParams, WatchEvent}};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let p: Pod = serde_json::from_value(serde_json::json!({

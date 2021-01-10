@@ -1,18 +1,14 @@
 #[macro_use] extern crate log;
 use k8s_openapi::api::core::v1::Namespace;
 
-use kube::{
-    api::{Api, ListParams},
-    config::KubeConfigOptions,
-    Client, Config,
-};
+use kube::{Client, Config, Tls, api::{Api, ListParams}, config::KubeConfigOptions};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
 
-    let mut config = Config::from_kubeconfig(&KubeConfigOptions::default()).await?;
+    let mut config = Config::from_kubeconfig(&KubeConfigOptions::default(), Tls::pick()).await?;
 
     if let Ok(proxy_url) = &std::env::var("PROXY_URL") {
         info!("PROXY_URL is {}", proxy_url);

@@ -1,11 +1,11 @@
 #[macro_use] extern crate log;
-use kube::{api::DynamicResource, Client};
+use kube::{Client, Tls, api::DynamicResource};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
 
     let v = client.apiserver_version().await?;
     info!("api version: {:?}", v);

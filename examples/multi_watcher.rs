@@ -4,17 +4,14 @@ use k8s_openapi::api::{
     apps::v1::Deployment,
     core::v1::{ConfigMap, Secret},
 };
-use kube::{
-    api::{Api, ListParams, Meta},
-    Client,
-};
+use kube::{Client, Tls, api::{Api, ListParams, Meta}};
 use kube_runtime::{utils::try_flatten_applied, watcher};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,multi_watcher=debug,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let deploys: Api<Deployment> = Api::namespaced(client.clone(), &namespace);

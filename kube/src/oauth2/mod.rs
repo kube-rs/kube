@@ -5,8 +5,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(feature = "rustls-tls")] use crate::error::Error;
-use crate::{error::ConfigError, Result};
+use crate::{error::ConfigError, Result, Tls};
 
 use reqwest::header::CONTENT_TYPE;
 use serde::{Deserialize, Serialize};
@@ -80,6 +79,7 @@ impl Credentials {
 pub struct CredentialsClient {
     pub credentials: Credentials,
     pub client: reqwest::Client,
+    pub tls: Tls,
 }
 
 // https://github.com/golang/oauth2/blob/c85d3e98c914e3a33234ad863dcbff5dbc425bb8/internal/token.go#L61-L66
@@ -111,10 +111,11 @@ pub struct Token {
 }
 
 impl CredentialsClient {
-    pub fn new() -> Result<CredentialsClient> {
+    pub fn new(tls: Tls) -> Result<CredentialsClient> {
         Ok(CredentialsClient {
             credentials: Credentials::load()?,
-            client: reqwest::Client::new(),
+            client: tls.reqwest(),
+            tls,
         })
     }
 
@@ -126,6 +127,7 @@ impl CredentialsClient {
                 typ: "JWT".to_string(),
             },
             &self.credentials.private_key,
+            self.tls
         )?;
 
         let body = Serializer::new(String::new())
@@ -157,45 +159,13 @@ impl CredentialsClient {
     }
 }
 
-fn jws_encode(claim: &Claim, header: &Header, private_key: &str) -> Result<String> {
+fn jws_encode(claim: &Claim, header: &Header, private_key: &str, tls: Tls) -> Result<String> {
     let encoded_header = base64_encode(serde_json::to_string(&header).unwrap().as_bytes());
     let encoded_claims = base64_encode(serde_json::to_string(&claim).unwrap().as_bytes());
     let signature_base = format!("{}.{}", encoded_header, encoded_claims);
-    let signature = sign(&signature_base, private_key)?;
+    let signature = tls.sign(&signature_base, private_key)?;
     let encoded_signature = base64_encode(&signature);
     Ok(format!("{}.{}", signature_base, encoded_signature))
-}
-
-#[cfg(feature = "native-tls")]
-fn sign(signature_base: &str, private_key: &str) -> Result<Vec<u8>> {
-    use openssl::{hash::MessageDigest, pkey::PKey, rsa::Padding, sign::Signer};
-    let key = PKey::private_key_from_pem(private_key.as_bytes())?;
-    let mut signer = Signer::new(MessageDigest::sha256(), &key)?;
-    signer.set_rsa_padding(Padding::PKCS1)?;
-    signer.update(signature_base.as_bytes())?;
-    Ok(signer.sign_to_vec()?)
-}
-
-#[cfg(feature = "rustls-tls")]
-fn sign(signature_base: &str, private_key: &str) -> Result<Vec<u8>> {
-    use rustls::{
-        internal::pemfile,
-        sign::{RSASigningKey, SigningKey},
-    };
-
-    let keys = pemfile::pkcs8_private_keys(&mut private_key.as_bytes())
-        .map_err(|_| Error::SslError("fail to parse private key".into()))?;
-    let key = keys
-        .get(0)
-        .ok_or_else(|| Error::SslError("no usable private key found to sign with RS256".into()))?;
-    let signing_key =
-        RSASigningKey::new(key).map_err(|_| Error::SslError("fail to make RSA signing key".into()))?;
-    let signer = signing_key
-        .choose_scheme(&[rustls::SignatureScheme::RSA_PKCS1_SHA256])
-        .ok_or_else(|| Error::SslError("scheme RSA_PKCS1_SHA256 not found into private key".into()))?;
-    signer
-        .sign(signature_base.as_bytes())
-        .map_err(|e| Error::SslError(format!("{}", e)))
 }
 
 fn base64_encode(bytes: &[u8]) -> String {
@@ -243,6 +213,6 @@ WpsqFXdkj9GLZt1s1Q/5SW5Twb7gxdR7cXrXOcATivN1/GDdhIHS1NEb3MM7EBXc
 "#;
         let msg = "foo bar";
         let expected = "h0H_U6SO_i1F7JwzzTBHL1DNTw-YD6jdMul9Uwo_5xB_TmztP9c7T8e5CVY1o5_vMfQ3SZJXZ9liwd7FK8a7NjNumWIWq0_KZvDxMK6D2SSkA8WAz4KsdUU1CNVxM51UYQgYnHpaJvtNmowgzCnahNQQso4hKsYCe7nNKlTiCP1yPzM4MWJYh2cekH1SGqSaOtgvQZz4GrOPG-hhcyMZMk_u-sZ0F3PUFj0-kfbhZPNVpvv4-wI_XA84q85Wech4nsgLbxO9397-whsmGVNlqqo2PwwxASn7dEqtrrvD7mkabf32OqmgJ-xXT_n4m67kvgzC7ausezX7E0zcnBj3RQ==".to_string();
-        assert_eq!(base64_encode(&sign(&msg, private_key).unwrap()), expected);
+        assert_eq!(base64_encode(&Tls::pick().sign(&msg, private_key).unwrap()), expected);
     }
 }

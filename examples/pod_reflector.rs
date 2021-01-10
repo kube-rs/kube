@@ -1,12 +1,12 @@
 use color_eyre::Result;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
-use kube::{api::ListParams, Api, Client, Config};
+use kube::{Api, Client, Config, Tls, api::ListParams};
 use kube_runtime::{reflector, watcher};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let config = Config::infer().await?;
+    let config = Config::infer(Tls::pick()).await?;
     let client = Client::new(config);
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 

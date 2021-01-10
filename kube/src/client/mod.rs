@@ -6,12 +6,7 @@
 //! the [`Api`][crate::api::Api] type for more structured
 //! interaction with the kuberneres API.
 
-use crate::{
-    api::{Meta, WatchEvent},
-    config::Config,
-    error::ErrorResponse,
-    Error, Result,
-};
+use crate::{Error, Result, Tls, api::{Meta, WatchEvent}, config::Config, error::ErrorResponse};
 
 #[cfg(feature = "ws")] mod ws;
 #[cfg(feature = "ws")] use ws::AsyncTlsConnector;
@@ -72,8 +67,8 @@ impl Client {
     ///
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead
-    pub async fn try_default() -> Result<Self> {
-        let client_config = Config::infer().await?;
+    pub async fn try_default(tls: Tls) -> Result<Self> {
+        let client_config = Config::infer(tls).await?;
         Self::try_from(client_config)
     }
 

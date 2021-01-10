@@ -5,10 +5,7 @@ use k8s_openapi::{
     api::core::v1::ConfigMap,
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
 };
-use kube::{
-    api::{ListParams, Meta, PatchParams, PatchStrategy},
-    Api, Client, CustomResource,
-};
+use kube::{Api, Client, CustomResource, Tls, api::{ListParams, Meta, PatchParams, PatchStrategy}};
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -114,7 +111,7 @@ struct Data {
 async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "info,kube-runtime=debug,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
 
     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
     let cms = Api::<ConfigMap>::all(client.clone());

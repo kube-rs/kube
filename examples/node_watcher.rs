@@ -1,17 +1,14 @@
 #[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
-use kube::{
-    api::{Api, ListParams, Meta},
-    Client,
-};
+use kube::{Client, Tls, api::{Api, ListParams, Meta}};
 use kube_runtime::{utils::try_flatten_applied, watcher};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,node_watcher=debug,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
     let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 

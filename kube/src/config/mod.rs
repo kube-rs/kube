@@ -10,7 +10,7 @@ mod file_loader;
 mod incluster_config;
 mod utils;
 
-use crate::{error::ConfigError, Error, Result};
+use crate::{Error, Result, Tls, error::ConfigError};
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 
@@ -137,12 +137,12 @@ impl Config {
     /// then if that fails, trying the local kubeconfig.
     ///
     /// Fails if inference from both sources fails
-    pub async fn infer() -> Result<Self> {
+    pub async fn infer(tls: Tls) -> Result<Self> {
         match Self::from_cluster_env() {
             Err(cluster_env_err) => {
                 trace!("No in-cluster config found: {}", cluster_env_err);
                 trace!("Falling back to local kubeconfig");
-                let config = Self::from_kubeconfig(&KubeConfigOptions::default())
+                let config = Self::from_kubeconfig(&KubeConfigOptions::default(), tls)
                     .await
                     .map_err(|kubeconfig_err| ConfigError::ConfigInferenceExhausted {
                         cluster_env: Box::new(cluster_env_err),
@@ -195,8 +195,8 @@ impl Config {
     /// This will respect the `$KUBECONFIG` evar, but otherwise default to `~/.kube/config`.
     /// You can also customize what context/cluster/user you want to use here,
     /// but it will default to the current-context.
-    pub async fn from_kubeconfig(options: &KubeConfigOptions) -> Result<Self> {
-        let loader = ConfigLoader::new_from_options(options).await?;
+    pub async fn from_kubeconfig(options: &KubeConfigOptions, tls: Tls) -> Result<Self> {
+        let loader = ConfigLoader::new_from_options(options, tls).await?;
         Self::new_from_loader(loader)
     }
 
@@ -204,8 +204,8 @@ impl Config {
     ///
     /// This bypasses kube's normal config parsing to obtain custom functionality.
     /// Like if you need stacked kubeconfigs for instance - see #132
-    pub async fn from_custom_kubeconfig(kubeconfig: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
-        let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
+    pub async fn from_custom_kubeconfig(kubeconfig: Kubeconfig, options: &KubeConfigOptions, tls: Tls) -> Result<Self> {
+        let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options, tls).await?;
         Self::new_from_loader(loader)
     }
 
@@ -273,7 +273,7 @@ impl Config {
 
     // feature = "rustls-tls" assumes the buffer is pem
     #[cfg(feature = "rustls-tls")]
-    pub(crate) fn identity(&self) -> Option<reqwest::Identity> {
+    pub(crate) fn _identity(&self) -> Option<reqwest::Identity> {
         let (identity, _identity_password) = self.identity.as_ref()?;
         Some(reqwest::Identity::from_pem(identity).expect("Identity buffer was not valid identity"))
     }

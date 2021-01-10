@@ -1,10 +1,7 @@
 #[macro_use] extern crate log;
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
-use kube::{
-    api::{Api, ListParams, Meta},
-    Client,
-};
+use kube::{Client, Tls, api::{Api, ListParams, Meta}};
 use kube_runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher};
 use std::collections::BTreeMap;
 
@@ -51,7 +48,7 @@ fn spawn_periodic_reader(reader: Store<Secret>) {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let secrets: Api<Secret> = Api::namespaced(client, &namespace);

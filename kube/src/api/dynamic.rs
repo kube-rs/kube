@@ -190,10 +190,7 @@ impl TryFrom<DynamicResource> for Resource {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        api::{PatchParams, PostParams, Resource},
-        Result,
-    };
+    use crate::{Result, Tls, api::{PatchParams, PostParams, Resource}};
     #[test]
     fn raw_custom_resource() {
         let r = Resource::dynamic("Foo")
@@ -235,7 +232,7 @@ mod test {
         struct FooSpec {
             foo: String,
         };
-        let client = Client::try_default().await.unwrap();
+        let client = Client::try_default(Tls::pick()).await.unwrap();
         let a1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
         let a2: Api<Foo> = Resource::dynamic("Foo")

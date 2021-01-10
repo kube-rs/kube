@@ -1,9 +1,6 @@
 #[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
-use kube::{
-    api::{Api, ListParams, Meta},
-    Client, CustomResource,
-};
+use kube::{Client, CustomResource, Tls, api::{Api, ListParams, Meta}};
 use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -19,7 +16,7 @@ pub struct FooSpec {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // This example requires `kubectl apply -f examples/foo.yaml` run first

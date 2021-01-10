@@ -1,10 +1,7 @@
 use anyhow::{anyhow, Result};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, Resource, WatchEvent},
-    Client, CustomResource,
-};
+use kube::{Client, CustomResource, Tls, api::{Api, DeleteParams, ListParams, PostParams, Resource, WatchEvent}};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -90,7 +87,7 @@ async fn main() -> Result<()> {
 
     // Creating CRD v1 works as expected.
     println!("Creating CRD v1");
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
     delete_crd(client.clone()).await?;
     assert!(create_crd(client.clone()).await.is_ok());
 

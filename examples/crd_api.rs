@@ -9,10 +9,7 @@ use tokio::time::sleep;
 use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 
-use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
-    Client, CustomResource,
-};
+use kube::{Client, CustomResource, Tls, api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams}};
 
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
@@ -37,7 +34,7 @@ pub struct FooStatus {
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Manage CRDs first

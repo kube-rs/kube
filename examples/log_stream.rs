@@ -2,17 +2,14 @@
 use anyhow::{anyhow, Result};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
-use kube::{
-    api::{Api, LogParams},
-    Client,
-};
+use kube::{Client, Tls, api::{Api, LogParams}};
 use std::env;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default(Tls::pick()).await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let mypod = env::args()
