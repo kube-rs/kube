@@ -148,7 +148,7 @@ impl PostParams {
 /// serializable value, such as `serde_json::Value`. You may also want to use
 /// a `k8s-openapi` definition for the resource for the better type safety.
 #[non_exhaustive]
-pub enum Patch<T = ()> {
+pub enum Patch<T> {
     /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
     ///
     /// Requires kubernetes >= 1.16
@@ -176,6 +176,44 @@ pub enum Patch<T = ()> {
         /// Patch itself
         patch: T,
     },
+}
+
+impl<T: serde::Serialize> Patch<T> {
+    /// Creates an Apply Patch
+    pub fn make_apply(patch: T, field_manager: &str) -> Self {
+        Patch::Apply {
+            patch,
+            field_manager: field_manager.to_string(),
+            force: false,
+        }
+    }
+
+    /// Creates an Apply patch with `force: true`.
+    pub fn make_apply_forced(patch: T, field_manager: &str) -> Self {
+        Patch::Apply {
+            patch,
+            field_manager: field_manager.to_string(),
+            force: true,
+        }
+    }
+
+    /// Creates a Merge patch
+    pub fn make_merge_patch(patch: T) -> Self {
+        Patch::Merge { patch }
+    }
+
+    /// Creates a Strategic merge patch
+    pub fn make_strategic_patch(patch: T) -> Self {
+        Patch::Strategic { patch }
+    }
+}
+
+#[cfg(feature = "jsonpatch")]
+impl Patch<()> {
+    /// Creates a Json patch
+    pub fn make_json_patch(patch: json_patch::Patch) -> Self {
+        Patch::Json { patch }
+    }
 }
 
 impl<T> Patch<T> {
