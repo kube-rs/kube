@@ -1,4 +1,4 @@
-use super::params::{DeleteParams, ListParams, PatchParams, PostParams};
+use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use crate::{api::DynamicResource, Error, Result};
 use inflector::string::pluralize::to_plural;
 
@@ -200,17 +200,23 @@ impl Resource {
     /// Patch an instance of a resource
     ///
     /// Requires a serialized merge-patch+json at the moment.
-    pub fn patch(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        pp.validate()?;
+    pub fn patch<P: serde::Serialize>(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<http::Request<Vec<u8>>> {
+        patch.validate()?;
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         pp.populate_qp(&mut qp);
+        patch.populate_qp(&mut qp);
         let urlstr = qp.finish();
 
         http::Request::patch(urlstr)
             .header("Accept", "application/json")
-            .header("Content-Type", pp.patch_strategy.to_string())
-            .body(patch)
+            .header("Content-Type", patch.content_type())
+            .body(patch.serialize()?)
             .map_err(Error::HttpError)
     }
 
@@ -241,21 +247,23 @@ impl Resource {
     }
 
     /// Patch an instance of the scale subresource
-    pub fn patch_scale(
+    pub fn patch_scale<P: serde::Serialize>(
         &self,
         name: &str,
         pp: &PatchParams,
-        patch: Vec<u8>,
+        patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>> {
-        pp.validate()?;
+        patch.validate()?;
         let base_url = self.make_url() + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         pp.populate_qp(&mut qp);
+        patch.populate_qp(&mut qp);
+
         let urlstr = qp.finish();
         http::Request::patch(urlstr)
             .header("Accept", "application/json")
-            .header("Content-Type", pp.patch_strategy.to_string())
-            .body(patch)
+            .header("Content-Type", patch.content_type())
+            .body(patch.serialize()?)
             .map_err(Error::HttpError)
     }
 
@@ -289,21 +297,22 @@ impl Resource {
     }
 
     /// Patch an instance of the status subresource
-    pub fn patch_status(
+    pub fn patch_status<P: serde::Serialize>(
         &self,
         name: &str,
         pp: &PatchParams,
-        patch: Vec<u8>,
+        patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>> {
-        pp.validate()?;
+        patch.validate()?;
         let base_url = self.make_url() + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         pp.populate_qp(&mut qp);
+        patch.populate_qp(&mut qp);
         let urlstr = qp.finish();
         http::Request::patch(urlstr)
             .header("Accept", "application/json")
-            .header("Content-Type", pp.patch_strategy.to_string())
-            .body(patch)
+            .header("Content-Type", patch.content_type())
+            .body(patch.serialize()?)
             .map_err(Error::HttpError)
     }
 
@@ -452,7 +461,7 @@ mod test {
 
     /// -----------------------------------------------------------------
     /// Tests that the misc mappings are also sensible
-    use crate::api::{DeleteParams, ListParams, PatchParams, PatchStrategy};
+    use crate::api::{DeleteParams, ListParams, Patch, PatchParams};
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiextsv1beta1;
 
     #[test]
@@ -510,32 +519,18 @@ mod test {
         assert_eq!(req.uri(), "/api/v1/namespaces")
     }
 
-    #[test]
-    fn patch_params_validation() {
-        let pp = PatchParams::default();
-        assert!(pp.validate().is_ok(), "default params should always be valid");
-
-        let patch_strategy_apply_true = PatchParams {
-            patch_strategy: PatchStrategy::Merge,
-            force: true,
-            ..Default::default()
-        };
-        assert!(
-            patch_strategy_apply_true.validate().is_err(),
-            "Merge strategy shouldn't be valid if `force` set to true"
-        );
-    }
-
     // subresources with weird version accuracy
     #[test]
     fn patch_status_path() {
         let r = Resource::all::<corev1::Node>();
         let pp = PatchParams::default();
-        let req = r.patch_status("mynode", &pp, vec![]).unwrap();
+        let req = r
+            .patch_status("mynode", &pp, &Patch::Merge { patch: () })
+            .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
         assert_eq!(
             req.headers().get("Content-Type").unwrap().to_str().unwrap(),
-            format!("{}", PatchStrategy::Merge)
+            Patch::Merge { patch: () }.content_type()
         );
         assert_eq!(req.method(), "PATCH");
     }
@@ -560,7 +555,9 @@ mod test {
             "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses?"
         );
         let patch_params = PatchParams::default();
-        let req = r.patch("baz", &patch_params, vec![]).unwrap();
+        let req = r
+            .patch("baz", &patch_params, &Patch::Merge { patch: () })
+            .unwrap();
         assert_eq!(
             req.uri(),
             "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses/baz?"
@@ -589,7 +586,7 @@ mod test {
     fn patch_scale_path() {
         let r = Resource::all::<corev1::Node>();
         let pp = PatchParams::default();
-        let req = r.patch_scale("mynode", &pp, vec![]).unwrap();
+        let req = r.patch_scale("mynode", &pp, &Patch::Merge { patch: () }).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
         assert_eq!(req.method(), "PATCH");
     }

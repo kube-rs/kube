@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::iter;
 
 use crate::{
-    api::{DeleteParams, ListParams, Meta, ObjectList, PatchParams, PostParams, Resource, WatchEvent},
+    api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Resource, WatchEvent},
     client::{Client, Status},
     Result,
 };
@@ -228,8 +228,7 @@ where
     /// [`JSON`]: super::PatchStrategy::JSON
     /// [`Strategic`]: super::PatchStrategy::Strategic
     /// [`Apply`]: super::PatchStrategy::Apply
-    pub async fn patch<T: Serialize>(&self, name: &str, pp: &PatchParams, patch: &T) -> Result<K> {
-        let patch = serde_json::to_vec(&patch)?;
+    pub async fn patch<P: Serialize>(&self, name: &str, pp: &PatchParams, patch: &Patch<P>) -> Result<K> {
         let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }

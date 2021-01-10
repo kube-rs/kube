@@ -3,13 +3,14 @@ use futures::Stream;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    api::{Api, PatchParams, PostParams, Resource},
+    api::{Api, Patch, PatchParams, PostParams, Resource},
     Error, Result,
 };
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
-#[cfg(feature = "ws")] use crate::api::remote_command::AttachedProcess;
+#[cfg(feature = "ws")]
+use crate::api::remote_command::AttachedProcess;
 
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>
@@ -23,7 +24,12 @@ where
     }
 
     /// Update the scale subresource
-    pub async fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
+    pub async fn patch_scale<P: serde::Serialize>(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<Scale> {
         let req = self.resource.patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
@@ -75,7 +81,12 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
+    pub async fn patch_status<P: serde::Serialize>(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<K> {
         let req = self.resource.patch_status(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }

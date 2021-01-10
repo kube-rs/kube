@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use color_eyre::{Report, Result};
 use futures::StreamExt;
 use k8s_openapi::{
@@ -6,7 +7,7 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
 };
 use kube::{
-    api::{ListParams, Meta, PatchParams, PatchStrategy},
+    api::{ListParams, Meta, Patch, PatchParams},
     Api, Client, CustomResource,
 };
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
@@ -79,13 +80,12 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
             cm.metadata.name.as_ref().context(MissingObjectKey {
                 name: ".metadata.name",
             })?,
-            &PatchParams {
-                patch_strategy: PatchStrategy::Apply,
-                field_manager: Some("configmapgenerator.kube-rt.nullable.se".to_string()),
-                dry_run: false,
+            &PatchParams { dry_run: false },
+            &Patch::Apply {
+                patch: &cm,
                 force: false,
+                field_manager: "configmapgenerator.kube-rt.nullable.se".to_string(),
             },
-            &cm,
         )
         .await
         .context(ConfigMapCreationFailed)?;

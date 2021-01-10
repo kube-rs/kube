@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use either::Either::{Left, Right};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,7 @@ use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, PatchParams, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, Patch, PatchParams, PostParams},
     Client, CustomResource,
 };
 
@@ -83,11 +84,14 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Foo baz
     info!("Creating Foo instance baz");
-    let f1 = Foo::new("baz", FooSpec {
-        name: "baz".into(),
-        info: "old baz".into(),
-        replicas: 1,
-    });
+    let f1 = Foo::new(
+        "baz",
+        FooSpec {
+            name: "baz".into(),
+            info: "old baz".into(),
+            replicas: 1,
+        },
+    );
     let o = foos.create(&pp, &f1).await?;
     assert_eq!(Meta::name(&f1), Meta::name(&o));
     info!("Created {}", Meta::name(&o));
@@ -121,11 +125,14 @@ async fn main() -> anyhow::Result<()> {
 
     // Create Foo qux with status
     info!("Create Foo instance qux");
-    let mut f2 = Foo::new("qux", FooSpec {
-        name: "qux".into(),
-        replicas: 0,
-        info: "unpatched qux".into(),
-    });
+    let mut f2 = Foo::new(
+        "qux",
+        FooSpec {
+            name: "qux".into(),
+            replicas: 0,
+            info: "unpatched qux".into(),
+        },
+    );
     f2.status = Some(FooStatus::default());
 
     let o = foos.create(&pp, &f2).await?;
@@ -152,7 +159,7 @@ async fn main() -> anyhow::Result<()> {
         "status": FooStatus { is_bad: false, replicas: 1 }
     });
     let o = foos
-        .patch_status("qux", &patch_params, serde_json::to_vec(&fs)?)
+        .patch_status("qux", &patch_params, &Patch::Merge { patch: &fs })
         .await?;
     info!("Patched status {:?} for {}", o.status, Meta::name(&o));
     assert!(!o.status.unwrap().is_bad);
@@ -173,7 +180,7 @@ async fn main() -> anyhow::Result<()> {
         "spec": { "replicas": 2 }
     });
     let o = foos
-        .patch_scale("qux", &patch_params, serde_json::to_vec(&fs)?)
+        .patch_scale("qux", &patch_params, &Patch::Merge { patch: &fs })
         .await?;
     info!("Patched scale {:?} for {}", o.spec, Meta::name(&o));
     assert_eq!(o.status.unwrap().replicas, 1);
@@ -185,7 +192,7 @@ async fn main() -> anyhow::Result<()> {
         "spec": { "info": "patched qux" }
     });
     let o = foos
-        .patch("qux", &patch_params, &patch)
+        .patch("qux", &patch_params, &Patch::Merge { patch: &patch })
         .await?;
     info!("Patched {} with new name: {}", Meta::name(&o), o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
