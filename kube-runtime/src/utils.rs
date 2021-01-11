@@ -1,6 +1,5 @@
 use crate::watcher;
 use futures::{
-    future::{abortable, AbortHandle, Aborted},
     pin_mut,
     stream::{self, Peekable},
     Future, FutureExt, Stream, StreamExt, TryStream, TryStreamExt,
@@ -143,8 +142,7 @@ where
 
 /// A [`JoinHandle`] that cancels the [`Future`] when dropped, rather than detaching it
 pub struct CancelableJoinHandle<T> {
-    inner: JoinHandle<Result<T, Aborted>>,
-    abort_handle: AbortHandle,
+    inner: JoinHandle<T>,
 }
 
 impl<T> CancelableJoinHandle<T>
@@ -152,17 +150,15 @@ where
     T: Send + 'static,
 {
     pub fn spawn(future: impl Future<Output = T> + Send + 'static, runtime: &Handle) -> Self {
-        let (abortable, abort_handle) = abortable(future);
         CancelableJoinHandle {
-            inner: runtime.spawn(abortable),
-            abort_handle,
+            inner: runtime.spawn(future),
         }
     }
 }
 
 impl<T> Drop for CancelableJoinHandle<T> {
     fn drop(&mut self) {
-        self.abort_handle.abort()
+        self.inner.abort()
     }
 }
 
@@ -170,13 +166,10 @@ impl<T> Future for CancelableJoinHandle<T> {
     type Output = T;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        self.inner.poll_unpin(cx).map(|x| {
-            x
-                // JoinError => underlying future panicked, so propagate
-                .unwrap()
-                // Aborted => somehow the underlying future was aborted, which should only happen when the handle is dropped
-                // (in which case poll would never be called again)
-                .unwrap()
-        })
+        self.inner.poll_unpin(cx).map(
+            // JoinError => underlying future was either aborted (which should only happen when the handle is dropped), or
+            // panicked (which should be propagated)
+            Result::unwrap,
+        )
     }
 }
