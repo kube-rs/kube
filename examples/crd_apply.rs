@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,7 @@ use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 
 use kube::{
-    api::{Api, ListParams, Meta, Patch, WatchEvent},
+    api::{Api, ListParams, Meta, Patch, PatchTemplate, WatchEvent},
     Client, CustomResource,
 };
 
@@ -31,13 +32,7 @@ pub struct FooStatus {
     is_bad: bool,
     replicas: i32,
 }
-fn make_patch<T>(obj: T) -> Patch<T> {
-    Patch::Apply {
-        patch: obj,
-        field_manager: "crd_apply_example".to_string(),
-        force: true,
-    }
-}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=info");
@@ -45,11 +40,17 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
+    let patch_template = PatchTemplate::make_apply_forced("crd_apply_example");
+
     // 0. Apply the CRD
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
     match crds
-        .patch("foos.clux.dev", &Default::default(), &make_patch(Foo::crd()))
+        .patch(
+            "foos.clux.dev",
+            &Default::default(),
+            &patch_template.to_patch(Foo::crd()),
+        )
         .await
     {
         Ok(o) => info!("Applied {}: ({:?})", Meta::name(&o), o.spec),
@@ -65,13 +66,18 @@ async fn main() -> anyhow::Result<()> {
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
     // 1. Apply from a full struct (e.g. equivalent to replace w/o resource_version)
-    let foo = Foo::new("baz", FooSpec {
-        name: "baz".into(),
-        info: Some("old baz".into()),
-        replicas: 3,
-    });
+    let foo = Foo::new(
+        "baz",
+        FooSpec {
+            name: "baz".into(),
+            info: Some("old baz".into()),
+            replicas: 3,
+        },
+    );
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
-    let o = foos.patch("baz", &Default::default(), &make_patch(&foo)).await?;
+    let o = foos
+        .patch("baz", &Default::default(), &patch_template.to_patch(&foo))
+        .await?;
     info!("Applied 1 {}: {:?}", Meta::name(&o), o.spec);
 
     // 2. Apply from partial json!
@@ -90,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Applying 2: \n{}", serde_yaml::to_string(&patch)?);
     let o2 = foos
-        .patch("baz", &Default::default(), &make_patch(&patch))
+        .patch("baz", &Default::default(), &patch_template.to_patch(&patch))
         .await?;
     info!("Applied 2 {}: {:?}", Meta::name(&o2), o2.spec);
 
