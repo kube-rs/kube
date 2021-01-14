@@ -266,6 +266,88 @@ impl<T: serde::Serialize> Patch<T> {
     }
 }
 
+/// Simple utility that simplifies creating multiple patches with the same settings
+#[non_exhaustive]
+pub enum PatchTemplate {
+    /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
+    ///
+    /// Requires kubernetes >= 1.16
+    Apply {
+        /// fieldManager to use for Apply patches.
+        field_manager: String,
+        /// force Apply patches.
+        force: bool,
+    },
+    /// [JSON patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    #[cfg(feature = "jsonpatch")]
+    Json {},
+    /// [JSON Merge patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    Merge {},
+    /// [Strategic JSON Merge patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-strategic-merge-patch-to-update-a-deployment)
+    Strategic {},
+}
+
+impl PatchTemplate {
+    /// Creates an Apply Patch template
+    pub fn make_apply(field_manager: &str) -> Self {
+        PatchTemplate::Apply {
+            field_manager: field_manager.to_string(),
+            force: false,
+        }
+    }
+
+    /// Creates an Apply patch template with `force: true`.
+    pub fn make_apply_forced(field_manager: &str) -> Self {
+        PatchTemplate::Apply {
+            field_manager: field_manager.to_string(),
+            force: true,
+        }
+    }
+
+    /// Creates a Merge patch template
+    pub fn make_merge_template() -> Self {
+        PatchTemplate::Merge {}
+    }
+
+    /// Creates a Strategic merge patch template
+    pub fn make_strategic_template() -> Self {
+        PatchTemplate::Strategic {}
+    }
+
+    /// Creates patch based on this template
+    /// # Panics
+    /// Panics if this is Json patch. Use `to_json_patch` instead
+    pub fn to_patch<T: serde::Serialize>(&self, patch: T) -> Patch<T> {
+        match self {
+            PatchTemplate::Apply { field_manager, force } => Patch::Apply {
+                field_manager: field_manager.clone(),
+                force: *force,
+                patch,
+            },
+            PatchTemplate::Merge {} => Patch::Merge { patch },
+            PatchTemplate::Strategic {} => Patch::Strategic { patch },
+            #[cfg(feature = "jsonpatch")]
+            PatchTemplate::Json {} => panic!("`to_patch` does not support JSON patch templates"),
+        }
+    }
+    /// Creates JSON patch based on this template
+    /// # Panics
+    /// Panics if this is not Json patch. Use `to_patch` instead
+    #[cfg(feature = "jsonpatch")]
+    pub fn to_json_patch(&self, patch: json_patch::Patch) -> Patch<()> {
+        match self {
+            PatchTemplate::Json {} => Patch::Json { patch },
+            _ => panic!("`to_json_patch` only supports JSON patch templates"),
+        }
+    }
+
+    /// Creates a Json patch template
+    #[cfg(feature = "jsonpatch")]
+    pub fn make_json_template() -> Self {
+        PatchTemplate::Json {}
+    }
+}
+
 /// Common query parameters for patch calls
 #[derive(Default, Clone)]
 pub struct PatchParams {
