@@ -2,21 +2,38 @@ use super::ObjectRef;
 use crate::watcher;
 use dashmap::DashMap;
 use derivative::Derivative;
-use k8s_openapi::Resource;
 use kube::api::Meta;
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 
 /// A writable Store handle
 ///
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct Writer<K: 'static + Resource> {
+#[derivative(Default(bound = "<K as Meta>::Family: Default"))]
+pub struct Writer<K: 'static + Meta>
+where
+    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+{
     store: Arc<DashMap<ObjectRef<K>, K>>,
+    family: K::Family,
 }
 
-impl<K: 'static + Meta + Clone> Writer<K> {
+impl<K: 'static + Meta + Clone> Writer<K>
+where
+    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+{
+    /// Creates a new Writer with the specified family.
+    ///
+    /// If family is default-able (for example when writer is used with
+    /// `k8s_openapi` types) you can use `Default` instead.
+    pub fn new(family: K::Family) -> Self {
+        Writer {
+            store: Default::default(),
+            family,
+        }
+    }
+
     /// Return a read handle to the store
     ///
     /// Multiple read handles may be obtained, by either calling `as_reader` multiple times,
@@ -32,15 +49,17 @@ impl<K: 'static + Meta + Clone> Writer<K> {
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
-                self.store.insert(ObjectRef::from_obj(&obj), obj.clone());
+                self.store
+                    .insert(ObjectRef::from_obj_with(&obj, self.family.clone()), obj.clone());
             }
             watcher::Event::Deleted(obj) => {
-                self.store.remove(&ObjectRef::from_obj(&obj));
+                self.store
+                    .remove(&ObjectRef::from_obj_with(&obj, self.family.clone()));
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| (ObjectRef::from_obj(obj), obj))
+                    .map(|obj| (ObjectRef::from_obj_with(obj, self.family.clone()), obj))
                     .collect::<HashMap<_, _>>();
                 // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
                 self.store.retain(|key, _old_value| new_objs.contains_key(key));
@@ -60,11 +79,17 @@ impl<K: 'static + Meta + Clone> Writer<K> {
 /// use `Writer::as_reader()` instead.
 #[derive(Debug, Derivative)]
 #[derivative(Clone)]
-pub struct Store<K: 'static + Resource> {
+pub struct Store<K: 'static + Meta>
+where
+    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+{
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
-impl<K: 'static + Clone + Resource> Store<K> {
+impl<K: 'static + Clone + Meta> Store<K>
+where
+    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+{
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
     ///
     /// `key.namespace` is ignored for cluster-scoped resources.

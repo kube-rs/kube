@@ -1,6 +1,7 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use k8s_openapi::Metadata;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 /// An accessor trait for Metadata.
 ///
@@ -14,7 +15,28 @@ use serde::{Deserialize, Serialize};
 /// - `.metadata.resource_version`
 ///
 /// This avoids a bunch of the unnecessary unwrap mechanics for apps.
-pub trait Meta: Metadata {
+pub trait Meta {
+    /// Types that know their metadata at compile time should select `Family = ()`.
+    /// Types that require some information at runtime should select `Family`
+    /// as type of this information.
+    type Family: Send + Sync + 'static;
+    /// Returns kind of this object
+    fn kind<'a>(f: &'a Self::Family) -> Cow<'a, str>;
+    /// Returns group of this object
+    fn group<'a>(f: &'a Self::Family) -> Cow<'a, str>;
+    /// Returns version of this object
+    fn version<'a>(f: &'a Self::Family) -> Cow<'a, str>;
+    /// Returns apiVersion of this object
+    fn api_version<'a>(f: &'a Self::Family) -> Cow<'a, str> {
+        let group = Self::group(f);
+        if group.is_empty() {
+            return Self::version(f);
+        }
+        let mut group = group.into_owned();
+        group.push('/');
+        group.push_str(&Self::version(f));
+        group.into()
+    }
     /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
     /// The name of the resource
@@ -30,6 +52,24 @@ impl<K> Meta for K
 where
     K: Metadata<Ty = ObjectMeta>,
 {
+    type Family = ();
+
+    fn kind<'a>(_: &'a ()) -> Cow<'a, str> {
+        K::KIND.into()
+    }
+
+    fn group<'a>(_: &'a ()) -> Cow<'a, str> {
+        K::GROUP.into()
+    }
+
+    fn version<'a>(_: &'a ()) -> Cow<'a, str> {
+        K::VERSION.into()
+    }
+
+    fn api_version<'a>(_: &'a ()) -> Cow<'a, str> {
+        K::API_VERSION.into()
+    }
+
     fn meta(&self) -> &ObjectMeta {
         self.metadata()
     }

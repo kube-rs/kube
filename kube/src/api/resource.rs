@@ -1,5 +1,8 @@
 use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
-use crate::{api::DynamicResource, Error, Result};
+use crate::{
+    api::{DynamicResource, Meta},
+    Error, Result,
+};
 use inflector::string::pluralize::to_plural;
 
 /// A Kubernetes resource that can be accessed through the API
@@ -32,31 +35,48 @@ pub struct Resource {
 
 impl Resource {
     /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all<K: k8s_openapi::Resource>() -> Self {
+    pub fn all_with<K: Meta>(f: &K::Family) -> Self {
         Self {
-            api_version: K::API_VERSION.to_string(),
-            kind: K::KIND.to_string(),
-            group: K::GROUP.to_string(),
-            version: K::VERSION.to_string(),
+            api_version: K::api_version(f).into_owned(),
+            kind: K::kind(f).into_owned(),
+            group: K::group(f).into_owned(),
+            version: K::version(f).into_owned(),
             namespace: None,
         }
     }
 
     /// Namespaced resource within a given namespace
-    pub fn namespaced<K: k8s_openapi::Resource>(ns: &str) -> Self {
-        match K::KIND {
+    pub fn namespaced_with<K: Meta>(ns: &str, f: &K::Family) -> Self {
+        let kind = K::kind(f);
+        match kind.as_ref() {
             "Node" | "Namespace" | "ClusterRole" | "CustomResourceDefinition" => {
-                panic!("{} is not a namespace scoped resource", K::KIND)
+                panic!("{} is not a namespace scoped resource", kind)
             }
             _ => {}
         }
         Self {
-            api_version: K::API_VERSION.to_string(),
-            kind: K::KIND.to_string(),
-            group: K::GROUP.to_string(),
-            version: K::VERSION.to_string(),
+            api_version: K::api_version(f).into_owned(),
+            kind: kind.into_owned(),
+            group: K::group(f).into_owned(),
+            version: K::version(f).into_owned(),
             namespace: Some(ns.to_string()),
         }
+    }
+
+    /// Cluster level resources, or resources viewed across all namespaces
+    pub fn all<K: Meta>() -> Self
+    where
+        <K as Meta>::Family: Default,
+    {
+        Self::all_with::<K>(&Default::default())
+    }
+
+    /// Namespaced resource within a given namespace
+    pub fn namespaced<K: Meta>(ns: &str) -> Self
+    where
+        <K as Meta>::Family: Default,
+    {
+        Self::namespaced_with::<K>(ns, &Default::default())
     }
 
     /// Manually configured resource or custom resource

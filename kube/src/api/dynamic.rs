@@ -1,9 +1,9 @@
 use crate::{
-    api::{typed::Api, Resource},
+    api::{typed::Api, Meta, Resource},
     Client, Error, Result,
 };
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource;
-use std::convert::TryFrom;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
+use std::{borrow::Cow, convert::TryFrom, sync::Arc};
 
 use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
 
@@ -122,7 +122,7 @@ impl DynamicResource {
     ///
     /// Note this crashes on invalid group/version/kinds.
     /// Use [`try_into_api`](Self::try_into_api) to handle the errors.
-    pub fn into_api<K>(self, client: Client) -> Api<K> {
+    pub fn into_api<K: Meta>(self, client: Client) -> Api<K> {
         let resource = Resource::try_from(self).unwrap();
         Api {
             client,
@@ -139,7 +139,7 @@ impl DynamicResource {
     }
 
     /// Consume the `DynamicResource` and and attempt to convert to an `Api` object.
-    pub fn try_into_api<K>(self, client: Client) -> Result<Api<K>> {
+    pub fn try_into_api<K: Meta>(self, client: Client) -> Result<Api<K>> {
         let resource = Resource::try_from(self)?;
         Ok(Api {
             client,
@@ -185,6 +185,115 @@ impl TryFrom<DynamicResource> for Resource {
             group,
             namespace: rb.namespace,
         })
+    }
+}
+
+/// Cheaply `Clone`-able string.
+// `String`: cloning requires additional allocation.
+// `StringRef::Dynamic`: cloning is one atomic operation.
+// `StringRef::Static`: cloning is essentially free.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum StringRef {
+    /// Should be used when string is known during compilation.
+    Static(&'static str),
+    /// Should be used when string is only known at runtime
+    Dynamic(Arc<str>),
+}
+
+impl StringRef {
+    fn as_str(&self) -> &str {
+        match self {
+            StringRef::Static(s) => *s,
+            StringRef::Dynamic(s) => &*s,
+        }
+    }
+}
+
+/// Represents a type-erased object kind
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GroupVersionKind {
+    /// API group
+    group: StringRef,
+    /// Version
+    version: StringRef,
+    /// Kind
+    kind: StringRef,
+    /// Concatenation of group and version
+    api_version: StringRef,
+}
+
+impl GroupVersionKind {
+    /// Creates `GroupVersionKind` from group, version and kind.
+    /// For `core` resources, group should be empty.
+    /// `api_version` will be created based on group and version
+    pub fn from_dynamic_gvk(group: &str, version: &str, kind: &str) -> Self {
+        let api_version = if group.is_empty() {
+            version.to_string()
+        } else {
+            format!("{}/{}", group, version)
+        };
+        GroupVersionKind {
+            group: StringRef::Dynamic(group.into()),
+            version: StringRef::Dynamic(version.into()),
+            kind: StringRef::Dynamic(kind.into()),
+            api_version: StringRef::Dynamic(api_version.into()),
+        }
+    }
+
+    /// Create `GroupVersionKind` for statically known resource.
+    pub fn for_resource<K: k8s_openapi::Resource>() -> Self {
+        GroupVersionKind {
+            group: StringRef::Static(K::GROUP),
+            version: StringRef::Static(K::VERSION),
+            kind: StringRef::Static(K::KIND),
+            api_version: StringRef::Static(K::API_VERSION),
+        }
+    }
+}
+
+/// The most generic representation of a single Kubernetes resource.
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct DynamicObject {
+    /// standard metadata
+    pub metadata: ObjectMeta,
+    /// All other data. Meaning of this field depends on specific object.
+    #[serde(flatten)]
+    pub data: serde_json::Value,
+}
+
+impl Meta for DynamicObject {
+    type Family = GroupVersionKind;
+
+    fn group<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
+        f.group.as_str().into()
+    }
+
+    fn version<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
+        f.version.as_str().into()
+    }
+
+    fn kind<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
+        f.kind.as_str().into()
+    }
+
+    fn api_version<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
+        f.api_version.as_str().into()
+    }
+
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn name(&self) -> String {
+        self.metadata.name.clone().expect("missing name")
+    }
+
+    fn namespace(&self) -> Option<String> {
+        self.metadata.namespace.clone()
+    }
+
+    fn resource_ver(&self) -> Option<String> {
+        self.metadata.resource_version.clone()
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::{
-    api::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta},
+    api::metadata::{ListMeta, ObjectMeta, TypeMeta},
     error::ErrorResponse,
 };
 use serde::{Deserialize, Serialize};
@@ -10,10 +10,7 @@ use std::fmt::Debug;
 /// Note that a watch query returns many of these as newline separated JSON.
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", content = "object", rename_all = "UPPERCASE")]
-pub enum WatchEvent<K>
-where
-    K: Clone + Meta,
-{
+pub enum WatchEvent<K> {
     /// Resource was added
     Added(K),
     /// Resource was modified
@@ -30,10 +27,7 @@ where
     Error(ErrorResponse),
 }
 
-impl<K> Debug for WatchEvent<K>
-where
-    K: Clone + Meta,
-{
+impl<K> Debug for WatchEvent<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
             WatchEvent::Added(_) => write!(f, "Added event"),

@@ -5,7 +5,7 @@ use crate::{
     reflector::{
         reflector,
         store::{Store, Writer},
-        ErasedResource, ObjectRef,
+        ObjectRef,
     },
     scheduler::{self, scheduler, ScheduleRequest},
     utils::{try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle},
@@ -17,10 +17,10 @@ use futures::{
     stream::{self, SelectAll},
     FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube::api::{Api, ListParams, Meta};
+use kube::api::{Api, DynamicObject, ListParams, Meta};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{fmt::Debug, hash::Hash, sync::Arc, time::Duration};
 use stream::BoxStream;
 use tokio::{runtime::Handle, time::Instant};
 
@@ -30,7 +30,7 @@ mod runner;
 #[derive(Snafu, Debug)]
 pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
     ObjectNotFound {
-        obj_ref: ObjectRef<ErasedResource>,
+        obj_ref: ObjectRef<DynamicObject>,
         backtrace: Backtrace,
     },
     ReconcilerFailed {
@@ -66,6 +66,7 @@ where
     S: TryStream<Ok = T>,
     I: IntoIterator<Item = ObjectRef<K>>,
     K: Meta,
+    <K as Meta>::Family: Debug + Eq + Hash + Clone,
 {
     stream
         .map_ok(move |obj| stream::iter(mapper(obj).into_iter().map(Ok)))
@@ -73,28 +74,38 @@ where
 }
 
 /// Enqueues the object itself for reconciliation
-pub fn trigger_self<S>(stream: S) -> impl Stream<Item = Result<ObjectRef<S::Ok>, S::Error>>
+pub fn trigger_self<S, F>(stream: S, family: F) -> impl Stream<Item = Result<ObjectRef<S::Ok>, S::Error>>
 where
     S: TryStream,
-    S::Ok: Meta,
+    S::Ok: Meta<Family = F>,
+    F: Debug + Eq + Hash + Clone,
 {
-    trigger_with(stream, |obj| Some(ObjectRef::from_obj(&obj)))
+    trigger_with(stream, move |obj| {
+        Some(ObjectRef::from_obj_with(&obj, family.clone()))
+    })
 }
 
 /// Enqueues any owners of type `KOwner` for reconciliation
-pub fn trigger_owners<KOwner, S>(stream: S) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
+pub fn trigger_owners<KOwner, S, F, FOwner>(
+    stream: S,
+    // family: F,
+    owner_family: FOwner,
+) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
 where
     S: TryStream,
-    S::Ok: Meta,
-    KOwner: Meta,
+    S::Ok: Meta<Family = F>,
+    F: Debug + Eq + Hash + Clone,
+    KOwner: Meta<Family = FOwner>,
+    FOwner: Debug + Eq + Hash + Clone,
 {
-    trigger_with(stream, |obj| {
+    trigger_with(stream, move |obj| {
         let meta = obj.meta().clone();
         let ns = meta.namespace;
+        let owner_family = owner_family.clone();
         meta.owner_references
             .into_iter()
             .flatten()
-            .flat_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
+            .flat_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_family.clone()))
     })
 }
 
@@ -147,6 +158,7 @@ pub fn applier<K, QueueStream, ReconcilerFut, T>(
 ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
     K: Clone + Meta + 'static,
+    <K as Meta>::Family: Debug + Eq + Hash + Clone + Unpin,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
     QueueStream: TryStream<Ok = ObjectRef<K>>,
@@ -177,7 +189,13 @@ where
                         // to them separately
                         .map(|res| Ok((obj_ref, res)))
                         .left_future(),
-                    None => future::err(ObjectNotFound { obj_ref }.build()).right_future(),
+                    None => future::err(
+                        ObjectNotFound {
+                            obj_ref: obj_ref.erase(),
+                        }
+                        .build(),
+                    )
+                    .right_future(),
                 }
             })
             .context(SchedulerDequeueFailed)
@@ -278,16 +296,19 @@ where
 pub struct Controller<K>
 where
     K: Clone + Meta + Debug + 'static,
+    <K as Meta>::Family: Debug + Eq + Hash + Clone,
 {
     // NB: Need to Unpin for stream::select_all
     // TODO: get an arbitrary std::error::Error in here?
     selector: SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
+    family: K::Family,
     reader: Store<K>,
 }
 
 impl<K> Controller<K>
 where
     K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
+    <K as Meta>::Family: Debug + Eq + Hash + Clone + Default,
 {
     /// Create a Controller on a type `K`
     ///
@@ -295,13 +316,37 @@ where
     /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
     #[must_use]
     pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
-        let writer = Writer::<K>::default();
+        Self::new_with(owned_api, lp, Default::default())
+    }
+}
+
+impl<K> Controller<K>
+where
+    K: Clone + Meta + DeserializeOwned + Send + Sync + 'static,
+    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+{
+    /// Create a Controller on a type `K`
+    ///
+    /// Configure `ListParams` and `Api` so you only get reconcile events
+    /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
+    ///
+    /// Unlike `new`, this function accepts `K::Family` so it can be used with dynamic
+    /// resources.
+    pub fn new_with(owned_api: Api<K>, lp: ListParams, family: K::Family) -> Self {
+        let writer = Writer::<K>::new(family.clone());
         let reader = writer.as_reader();
         let mut selector = stream::SelectAll::new();
-        let self_watcher =
-            trigger_self(try_flatten_applied(reflector(writer, watcher(owned_api, lp)))).boxed();
+        let self_watcher = trigger_self(
+            try_flatten_applied(reflector(writer, watcher(owned_api, lp))),
+            family.clone(),
+        )
+        .boxed();
         selector.push(self_watcher);
-        Self { selector, reader }
+        Self {
+            selector,
+            reader,
+            family,
+        }
     }
 
     /// Retrieve a copy of the reader before starting the controller
@@ -321,8 +366,11 @@ where
         mut self,
         api: Api<Child>,
         lp: ListParams,
-    ) -> Self {
-        let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)));
+    ) -> Self
+    where
+        <Child as Meta>::Family: Debug + Eq + Hash + Clone,
+    {
+        let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)), self.family.clone());
         self.selector.push(child_watcher.boxed());
         self
     }
@@ -360,6 +408,7 @@ where
     ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, watcher::Error>>>
     where
         K: Clone + Meta + 'static,
+        <K as Meta>::Family: Eq + Hash + Clone + Unpin,
         ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Send + 'static,
         ReconcilerFut::Error: std::error::Error + Send + 'static,
     {

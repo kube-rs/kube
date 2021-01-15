@@ -20,7 +20,7 @@ pub(crate) mod typed;
 pub use typed::Api;
 
 mod dynamic;
-pub use dynamic::DynamicResource;
+pub use dynamic::{DynamicObject, DynamicResource, GroupVersionKind};
 
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
