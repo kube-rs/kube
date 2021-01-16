@@ -206,11 +206,10 @@ impl Resource {
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>> {
-        patch.validate()?;
+        pp.validate(patch)?;
         let base_url = self.make_url() + "/" + name + "?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         pp.populate_qp(&mut qp);
-        patch.populate_qp(&mut qp);
         let urlstr = qp.finish();
 
         http::Request::patch(urlstr)
@@ -253,13 +252,12 @@ impl Resource {
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>> {
-        patch.validate()?;
+        pp.validate(patch)?;
         let base_url = self.make_url() + "/" + name + "/scale?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         pp.populate_qp(&mut qp);
-        patch.populate_qp(&mut qp);
-
         let urlstr = qp.finish();
+
         http::Request::patch(urlstr)
             .header("Accept", "application/json")
             .header("Content-Type", patch.content_type())
@@ -303,12 +301,12 @@ impl Resource {
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>> {
-        patch.validate()?;
+        pp.validate(patch)?;
         let base_url = self.make_url() + "/" + name + "/status?";
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         pp.populate_qp(&mut qp);
-        patch.populate_qp(&mut qp);
         let urlstr = qp.finish();
+
         http::Request::patch(urlstr)
             .header("Accept", "application/json")
             .header("Content-Type", patch.content_type())

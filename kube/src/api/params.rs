@@ -148,203 +148,53 @@ impl PostParams {
 /// serializable value, such as `serde_json::Value`. You may also want to use
 /// a `k8s-openapi` definition for the resource for the better type safety.
 #[non_exhaustive]
-pub enum Patch<T> {
+pub enum Patch<T: Serialize> {
     /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
     ///
     /// Requires kubernetes >= 1.16
-    Apply {
-        /// fieldManager to use for Apply patches.
-        field_manager: String,
-        /// force Apply patches.
-        force: bool,
-        /// Patch itself
-        patch: T,
-    },
+    Apply(T),
     /// [JSON patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
     #[cfg(feature = "jsonpatch")]
-    Json {
-        /// Patch itself
-        patch: json_patch::Patch,
-    },
+    #[cfg_attr(docsrs, doc(cfg(feature = "jsonpatch")))]
+    Json(json_patch::Patch),
+
     /// [JSON Merge patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
-    Merge {
-        /// Patch itself
-        patch: T,
-    },
+    Merge(T),
     /// [Strategic JSON Merge patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-strategic-merge-patch-to-update-a-deployment)
-    Strategic {
-        /// Patch itself
-        patch: T,
-    },
+    Strategic(T),
 }
 
-impl<T: serde::Serialize> Patch<T> {
-    /// Creates an Apply Patch
-    pub fn make_apply(patch: T, field_manager: &str) -> Self {
-        Patch::Apply {
-            patch,
-            field_manager: field_manager.to_string(),
-            force: false,
-        }
-    }
-
-    /// Creates an Apply patch with `force: true`.
-    pub fn make_apply_forced(patch: T, field_manager: &str) -> Self {
-        Patch::Apply {
-            patch,
-            field_manager: field_manager.to_string(),
-            force: true,
-        }
-    }
-
-    /// Creates a Merge patch
-    pub fn make_merge_patch(patch: T) -> Self {
-        Patch::Merge { patch }
-    }
-
-    /// Creates a Strategic merge patch
-    pub fn make_strategic_patch(patch: T) -> Self {
-        Patch::Strategic { patch }
-    }
-}
-
-#[cfg(feature = "jsonpatch")]
-impl Patch<()> {
-    /// Creates a Json patch
-    pub fn make_json_patch(patch: json_patch::Patch) -> Self {
-        Patch::Json { patch }
-    }
-}
-
-impl<T> Patch<T> {
-    pub(crate) fn validate(&self) -> Result<()> {
-        if let Patch::Apply { field_manager, .. } = self {
-            // Implement the easy part of validation, in future this may be extended to provide validation as in go code
-            // For now it's fine, because k8s API server will return an error
-            if field_manager.len() > 128 {
-                return Err(Error::RequestValidation(
-                    "Failed to validate PatchParams::field_manager!".into(),
-                ));
-            }
-        }
-        Ok(())
-    }
-
-    pub(crate) fn populate_qp(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
-        if let Patch::Apply {
-            force, field_manager, ..
-        } = self
-        {
-            if *force {
-                qp.append_pair("force", "true");
-            }
-            qp.append_pair("fieldManager", &field_manager);
+impl<T: Serialize> Patch<T> {
+    pub(crate) fn is_apply(&self) -> bool {
+        match self {
+            Patch::Apply(_) => true,
+            _ => false,
         }
     }
 
     pub(crate) fn content_type(&self) -> &'static str {
         match &self {
-            Self::Apply { .. } => "application/apply-patch+yaml",
+            Self::Apply(_) => "application/apply-patch+yaml",
             #[cfg(feature = "jsonpatch")]
-            Self::Json { .. } => "application/json-patch+json",
-            Self::Merge { .. } => "application/merge-patch+json",
-            Self::Strategic { .. } => "application/strategic-merge-patch+json",
+            #[cfg_attr(docsrs, doc(cfg(feature = "jsonpatch")))]
+            Self::Json(_) => "application/json-patch+json",
+            Self::Merge(_) => "application/merge-patch+json",
+            Self::Strategic(_) => "application/strategic-merge-patch+json",
         }
     }
 }
 
-impl<T: serde::Serialize> Patch<T> {
+impl<T: Serialize> Patch<T> {
     pub(crate) fn serialize(&self) -> Result<Vec<u8>> {
         match self {
-            Self::Apply { patch, .. } => serde_json::to_vec(patch),
+            Self::Apply(p) => serde_json::to_vec(p),
             #[cfg(feature = "jsonpatch")]
-            Self::Json { patch } => serde_json::to_vec(patch),
-            Self::Strategic { patch } => serde_json::to_vec(patch),
-            Self::Merge { patch } => serde_json::to_vec(patch),
+            #[cfg_attr(docsrs, doc(cfg(feature = "jsonpatch")))]
+            Self::Json(p) => serde_json::to_vec(p),
+            Self::Strategic(p) => serde_json::to_vec(p),
+            Self::Merge(p) => serde_json::to_vec(p),
         }
         .map_err(Into::into)
-    }
-}
-
-/// Simple utility that simplifies creating multiple patches with the same settings
-#[non_exhaustive]
-pub enum PatchTemplate {
-    /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
-    ///
-    /// Requires kubernetes >= 1.16
-    Apply {
-        /// fieldManager to use for Apply patches.
-        field_manager: String,
-        /// force Apply patches.
-        force: bool,
-    },
-    /// [JSON patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
-    #[cfg(feature = "jsonpatch")]
-    Json {},
-    /// [JSON Merge patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
-    Merge {},
-    /// [Strategic JSON Merge patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-strategic-merge-patch-to-update-a-deployment)
-    Strategic {},
-}
-
-impl PatchTemplate {
-    /// Creates an Apply Patch template
-    pub fn make_apply(field_manager: &str) -> Self {
-        PatchTemplate::Apply {
-            field_manager: field_manager.to_string(),
-            force: false,
-        }
-    }
-
-    /// Creates an Apply patch template with `force: true`.
-    pub fn make_apply_forced(field_manager: &str) -> Self {
-        PatchTemplate::Apply {
-            field_manager: field_manager.to_string(),
-            force: true,
-        }
-    }
-
-    /// Creates a Merge patch template
-    pub fn make_merge_template() -> Self {
-        PatchTemplate::Merge {}
-    }
-
-    /// Creates a Strategic merge patch template
-    pub fn make_strategic_template() -> Self {
-        PatchTemplate::Strategic {}
-    }
-
-    /// Creates patch based on this template
-    /// # Panics
-    /// Panics if this is Json patch. Use `to_json_patch` instead
-    pub fn to_patch<T: serde::Serialize>(&self, patch: T) -> Patch<T> {
-        match self {
-            PatchTemplate::Apply { field_manager, force } => Patch::Apply {
-                field_manager: field_manager.clone(),
-                force: *force,
-                patch,
-            },
-            PatchTemplate::Merge {} => Patch::Merge { patch },
-            PatchTemplate::Strategic {} => Patch::Strategic { patch },
-            #[cfg(feature = "jsonpatch")]
-            PatchTemplate::Json {} => panic!("`to_patch` does not support JSON patch templates"),
-        }
-    }
-    /// Creates JSON patch based on this template
-    /// # Panics
-    /// Panics if this is not Json patch. Use `to_patch` instead
-    #[cfg(feature = "jsonpatch")]
-    pub fn to_json_patch(&self, patch: json_patch::Patch) -> Patch<()> {
-        match self {
-            PatchTemplate::Json {} => Patch::Json { patch },
-            _ => panic!("`to_json_patch` only supports JSON patch templates"),
-        }
-    }
-
-    /// Creates a Json patch template
-    #[cfg(feature = "jsonpatch")]
-    pub fn make_json_template() -> Self {
-        PatchTemplate::Json {}
     }
 }
 
@@ -353,13 +203,56 @@ impl PatchTemplate {
 pub struct PatchParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
+    /// force Apply requests. Applicable only to [`Patch::Apply`].
+    pub force: bool,
+    /// fieldManager is a name of the actor that is making changes. Required for [`Patch::Apply`]
+    /// optional for everything else.
+    pub field_manager: Option<String>,
 }
 
 impl PatchParams {
+    pub(crate) fn validate<P: Serialize>(&self, patch: &Patch<P>) -> Result<()> {
+        if let Some(field_manager) = &self.field_manager {
+            // Implement the easy part of validation, in future this may be extended to provide validation as in go code
+            // For now it's fine, because k8s API server will return an error
+            if field_manager.len() > 128 {
+                return Err(Error::RequestValidation(
+                    "Failed to validate PatchParams::field_manager!".into(),
+                ));
+            }
+        }
+        if self.force && !patch.is_apply() {
+            warn!("PatchParams::force only works with Patch::Apply");
+        }
+        Ok(())
+    }
+
     pub(crate) fn populate_qp(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
         if self.dry_run {
             qp.append_pair("dryRun", "true");
         }
+        if self.force {
+            qp.append_pair("force", "true");
+        }
+        if let Some(ref field_manager) = self.field_manager {
+            qp.append_pair("fieldManager", &field_manager);
+        }
+    }
+
+    /// Construct `PatchParams` for server-side apply
+    pub fn apply(manager: &str) -> Self {
+        Self {
+            field_manager: Some(manager.into()),
+            ..Self::default()
+        }
+    }
+
+    /// Force the result through on conflicts
+    ///
+    /// NB: Force is a concept restricted to the server-side [`Patch::Apply`].
+    pub fn force(mut self) -> Self {
+        self.force = true;
+        self
     }
 
     /// Perform a dryRun only
