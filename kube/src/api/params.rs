@@ -166,10 +166,7 @@ pub enum Patch<T: Serialize> {
 
 impl<T: Serialize> Patch<T> {
     pub(crate) fn is_apply(&self) -> bool {
-        match self {
-            Patch::Apply(_) => true,
-            _ => false,
-        }
+        matches!(self, Patch::Apply(_))
     }
 
     pub(crate) fn content_type(&self) -> &'static str {

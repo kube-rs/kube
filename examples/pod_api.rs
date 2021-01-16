@@ -82,10 +82,8 @@ async fn main() -> anyhow::Result<()> {
             "activeDeadlineSeconds": 5
         }
     });
-    let patch_params = PatchParams::default();
-    let p_patched = pods
-        .patch("blog", &patch_params, &Patch::Merge { patch: &patch })
-        .await?;
+    let patchparams = PatchParams::default();
+    let p_patched = pods.patch("blog", &patchparams, &Patch::Merge(&patch)).await?;
     assert_eq!(p_patched.spec.unwrap().active_deadline_seconds, Some(5));
 
     let lp = ListParams::default().fields(&format!("metadata.name={}", "blog")); // only want results for our pod

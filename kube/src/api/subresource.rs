@@ -75,7 +75,7 @@ where
     ///             "succeeded": 2
     ///         }
     ///     });
-    ///     let o = jobs.patch_status("baz", &pp, &Patch::Merge { patch: data }).await?;
+    ///     let o = jobs.patch_status("baz", &pp, &Patch::Merge(data)).await?;
     ///     assert_eq!(o.status.unwrap().succeeded, Some(2));
     ///     Ok(())
     /// }

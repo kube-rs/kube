@@ -152,7 +152,7 @@ async fn main() -> anyhow::Result<()> {
         "status": FooStatus { is_bad: false, replicas: 1 }
     });
     let o = foos
-        .patch_status("qux", &patch_params, &Patch::Merge { patch: &fs })
+        .patch_status("qux", &patch_params, &Patch::Merge(&fs))
         .await?;
     info!("Patched status {:?} for {}", o.status, Meta::name(&o));
     assert!(!o.status.unwrap().is_bad);
@@ -172,9 +172,7 @@ async fn main() -> anyhow::Result<()> {
     let fs = json!({
         "spec": { "replicas": 2 }
     });
-    let o = foos
-        .patch_scale("qux", &patch_params, &Patch::Merge { patch: &fs })
-        .await?;
+    let o = foos.patch_scale("qux", &patch_params, &Patch::Merge(&fs)).await?;
     info!("Patched scale {:?} for {}", o.spec, Meta::name(&o));
     assert_eq!(o.status.unwrap().replicas, 1);
     assert_eq!(o.spec.unwrap().replicas.unwrap(), 2); // we only asked for more
@@ -184,9 +182,7 @@ async fn main() -> anyhow::Result<()> {
     let patch = json!({
         "spec": { "info": "patched qux" }
     });
-    let o = foos
-        .patch("qux", &patch_params, &Patch::Merge { patch: &patch })
-        .await?;
+    let o = foos.patch("qux", &patch_params, &Patch::Merge(&patch)).await?;
     info!("Patched {} with new name: {}", Meta::name(&o), o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params

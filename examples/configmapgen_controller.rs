@@ -79,12 +79,8 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
             cm.metadata.name.as_ref().context(MissingObjectKey {
                 name: ".metadata.name",
             })?,
-            &PatchParams { dry_run: false },
-            &Patch::Apply {
-                patch: &cm,
-                force: false,
-                field_manager: "configmapgenerator.kube-rt.nullable.se".to_string(),
-            },
+            &PatchParams::apply("configmapgenerator.kube-rt.nullable.se"),
+            &Patch::Apply(&cm),
         )
         .await
         .context(ConfigMapCreationFailed)?;

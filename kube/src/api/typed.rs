@@ -219,12 +219,9 @@ where
     ///             "activeDeadlineSeconds": 5
     ///         }
     ///     });
-    ///     let patch = Patch::Apply {
-    ///         patch: &patch,
-    ///         field_manager: "myapp".to_string(),
-    ///         force: true
-    ///     };
-    ///     let o_patched = pods.patch("blog", &Default::default(), &patch).await?;
+    ///     let params = PatchParams::apply("myapp");
+    ///     let patch = Patch::Apply(&patch);
+    ///     let o_patched = pods.patch("blog", &params, &patch).await?;
     ///     Ok(())
     /// }
     /// ```

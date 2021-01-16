@@ -522,13 +522,11 @@ mod test {
     fn patch_status_path() {
         let r = Resource::all::<corev1::Node>();
         let pp = PatchParams::default();
-        let req = r
-            .patch_status("mynode", &pp, &Patch::Merge { patch: () })
-            .unwrap();
+        let req = r.patch_status("mynode", &pp, &Patch::Merge(())).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
         assert_eq!(
             req.headers().get("Content-Type").unwrap().to_str().unwrap(),
-            Patch::Merge { patch: () }.content_type()
+            Patch::Merge(()).content_type()
         );
         assert_eq!(req.method(), "PATCH");
     }
@@ -553,9 +551,7 @@ mod test {
             "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses?"
         );
         let patch_params = PatchParams::default();
-        let req = r
-            .patch("baz", &patch_params, &Patch::Merge { patch: () })
-            .unwrap();
+        let req = r.patch("baz", &patch_params, &Patch::Merge(())).unwrap();
         assert_eq!(
             req.uri(),
             "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses/baz?"
@@ -584,7 +580,7 @@ mod test {
     fn patch_scale_path() {
         let r = Resource::all::<corev1::Node>();
         let pp = PatchParams::default();
-        let req = r.patch_scale("mynode", &pp, &Patch::Merge { patch: () }).unwrap();
+        let req = r.patch_scale("mynode", &pp, &Patch::Merge(())).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
         assert_eq!(req.method(), "PATCH");
     }
