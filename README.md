@@ -68,17 +68,17 @@ You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec st
 
 ```rust
 #[derive(CustomResource, Serialize, Deserialize, Default, Clone)]
-#[kube(group = "clux.dev", version = "v1", namespaced)]
+#[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 pub struct FooSpec {
     name: String,
     info: String,
 }
 ```
 
-Then you can use a lot of generated code as:
+Then you can use the generated wrapper struct `Foo`:
 
 ```rust
-println!("kind = {}", Foo::KIND); // impl k8s_openapi::Resource
+assert_eq!("Foo", Foo::KIND); // impl k8s_openapi::Resource for Foo
 let foos: Api<Foo> = Api::namespaced(client, "default");
 let f = Foo::new("my-foo");
 println!("foo: {:?}", f)

@@ -1,3 +1,10 @@
+0.48.0 / 2021-01-XX
+===================
+  * breaking: `kube`: no longer necessary to serialize patches yourself - #386
+    - `PatchParams` removes `PatchStrategy`
+    - `Api::patch*` methods now take an enum `Patch` type
+    - optional `jsonpatch` feature added for `Patch::Json`
+
 0.47.0 / 2021-01-06
 ===================
   * chore: upgrade `tokio` to `1.0` - #363
