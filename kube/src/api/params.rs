@@ -142,21 +142,73 @@ impl PostParams {
     }
 }
 
+/// Describes changes that should be applied to a resource
+///
+/// For all strategies except `Json`, patch can be represented with arbitrary
+/// serializable value, such as `serde_json::Value`. You may also want to use
+/// a `k8s-openapi` definition for the resource for the better type safety.
+#[non_exhaustive]
+pub enum Patch<T: Serialize> {
+    /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
+    ///
+    /// Requires kubernetes >= 1.16
+    Apply(T),
+    /// [JSON patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    #[cfg(feature = "jsonpatch")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "jsonpatch")))]
+    Json(json_patch::Patch),
+
+    /// [JSON Merge patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    Merge(T),
+    /// [Strategic JSON Merge patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-strategic-merge-patch-to-update-a-deployment)
+    Strategic(T),
+}
+
+impl<T: Serialize> Patch<T> {
+    pub(crate) fn is_apply(&self) -> bool {
+        matches!(self, Patch::Apply(_))
+    }
+
+    pub(crate) fn content_type(&self) -> &'static str {
+        match &self {
+            Self::Apply(_) => "application/apply-patch+yaml",
+            #[cfg(feature = "jsonpatch")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "jsonpatch")))]
+            Self::Json(_) => "application/json-patch+json",
+            Self::Merge(_) => "application/merge-patch+json",
+            Self::Strategic(_) => "application/strategic-merge-patch+json",
+        }
+    }
+}
+
+impl<T: Serialize> Patch<T> {
+    pub(crate) fn serialize(&self) -> Result<Vec<u8>> {
+        match self {
+            Self::Apply(p) => serde_json::to_vec(p),
+            #[cfg(feature = "jsonpatch")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "jsonpatch")))]
+            Self::Json(p) => serde_json::to_vec(p),
+            Self::Strategic(p) => serde_json::to_vec(p),
+            Self::Merge(p) => serde_json::to_vec(p),
+        }
+        .map_err(Into::into)
+    }
+}
+
 /// Common query parameters for patch calls
 #[derive(Default, Clone)]
 pub struct PatchParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
-    /// Strategy which will be used. Defaults to [`PatchStrategy::Strategic`].
-    pub patch_strategy: PatchStrategy,
-    /// force Apply requests. Applicable only to [`PatchStrategy::Apply`].
+    /// force Apply requests. Applicable only to [`Patch::Apply`].
     pub force: bool,
-    /// fieldManager is a name of the actor that is making changes. Required for [`PatchStrategy::Apply`]
+    /// fieldManager is a name of the actor that is making changes. Required for [`Patch::Apply`]
     /// optional for everything else.
     pub field_manager: Option<String>,
 }
+
 impl PatchParams {
-    pub(crate) fn validate(&self) -> Result<()> {
+    pub(crate) fn validate<P: Serialize>(&self, patch: &Patch<P>) -> Result<()> {
         if let Some(field_manager) = &self.field_manager {
             // Implement the easy part of validation, in future this may be extended to provide validation as in go code
             // For now it's fine, because k8s API server will return an error
@@ -166,15 +218,10 @@ impl PatchParams {
                 ));
             }
         }
-
-        if self.patch_strategy != PatchStrategy::Apply && self.force {
-            // if not force, all other fields are valid for all types of patch requests
-            Err(Error::RequestValidation(
-                "Force is applicable only for Apply strategy!".into(),
-            ))
-        } else {
-            Ok(())
+        if self.force && !patch.is_apply() {
+            warn!("PatchParams::force only works with Patch::Apply");
         }
+        Ok(())
     }
 
     pub(crate) fn populate_qp(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
@@ -192,13 +239,14 @@ impl PatchParams {
     /// Construct `PatchParams` for server-side apply
     pub fn apply(manager: &str) -> Self {
         Self {
-            patch_strategy: PatchStrategy::Apply,
             field_manager: Some(manager.into()),
             ..Self::default()
         }
     }
 
     /// Force the result through on conflicts
+    ///
+    /// NB: Force is a concept restricted to the server-side [`Patch::Apply`].
     pub fn force(mut self) -> Self {
         self.force = true;
         self
@@ -208,44 +256,6 @@ impl PatchParams {
     pub fn dry_run(mut self) -> Self {
         self.dry_run = true;
         self
-    }
-}
-
-/// Four different patch types are supported.
-///
-/// Apply strategy is kinda special
-#[derive(Clone, PartialEq)]
-pub enum PatchStrategy {
-    /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
-    ///
-    /// Requires kubernetes >=1.16
-    Apply,
-    /// A [JSON merge](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
-    JSON,
-    /// A regular merge
-    Merge,
-    /// A [stategic merge](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-strategic-merge-patch-to-update-a-deployment)
-    Strategic,
-}
-
-impl std::fmt::Display for PatchStrategy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let content_type = match &self {
-            Self::Apply => "application/apply-patch+yaml",
-            Self::JSON => "application/json-patch+json",
-            Self::Merge => "application/merge-patch+json",
-            Self::Strategic => "application/strategic-merge-patch+json",
-        };
-        f.write_str(content_type)
-    }
-}
-
-// Kubectl defaults to Strategic strategy, but doing so will break existing consumers
-// so, currently we still default to Merge it may change in future versions
-// Strategic merge doesn't work with CRD types https://github.com/kubernetes/kubernetes/issues/52772
-impl Default for PatchStrategy {
-    fn default() -> Self {
-        PatchStrategy::Merge
     }
 }
 

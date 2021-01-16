@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct NotUsed {}
 
 pub(crate) mod params;
-pub use params::{DeleteParams, ListParams, PatchParams, PatchStrategy, PostParams, PropagationPolicy};
+pub use params::{DeleteParams, ListParams, Patch, PatchParams, PostParams, PropagationPolicy};
 mod resource;
 pub use resource::Resource;
 

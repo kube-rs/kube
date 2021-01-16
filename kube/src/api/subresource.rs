@@ -3,7 +3,7 @@ use futures::Stream;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    api::{Api, PatchParams, PostParams, Resource},
+    api::{Api, Patch, PatchParams, PostParams, Resource},
     Error, Result,
 };
 
@@ -23,7 +23,12 @@ where
     }
 
     /// Update the scale subresource
-    pub async fn patch_scale(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<Scale> {
+    pub async fn patch_scale<P: serde::Serialize>(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<Scale> {
         let req = self.resource.patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
@@ -57,7 +62,7 @@ where
     /// NB: Requires that the resource has a status subresource.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PatchParams}, Client};
+    /// use kube::{api::{Api, PatchParams, Patch}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -70,12 +75,17 @@ where
     ///             "succeeded": 2
     ///         }
     ///     });
-    ///     let o = jobs.patch_status("baz", &pp, serde_json::to_vec(&data)?).await?;
+    ///     let o = jobs.patch_status("baz", &pp, &Patch::Merge(data)).await?;
     ///     assert_eq!(o.status.unwrap().succeeded, Some(2));
     ///     Ok(())
     /// }
     /// ```
-    pub async fn patch_status(&self, name: &str, pp: &PatchParams, patch: Vec<u8>) -> Result<K> {
+    pub async fn patch_status<P: serde::Serialize>(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<K> {
         let req = self.resource.patch_status(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }

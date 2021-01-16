@@ -46,7 +46,6 @@ impl Bar {
     }
 }
 
-
 #[cfg(not(feature = "schema"))]
 fn main() {
     let crd = Bar::crd_with_manual_schema();

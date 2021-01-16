@@ -4,10 +4,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use apiexts::CustomResourceDefinition;
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
 
 use kube::{
-    api::{Api, ListParams, Meta, PatchParams, WatchEvent},
+    api::{Api, ListParams, Meta, Patch, PatchParams, WatchEvent},
     Client, CustomResource,
 };
 
@@ -18,8 +18,7 @@ use kube::{
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
-#[kube(apiextensions = "v1beta1")] // remove this if using Kubernetes >= 1.17
-#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+//#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
     info: Option<String>,
@@ -45,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
     match crds
-        .patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?)
+        .patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
         .await
     {
         Ok(o) => info!("Applied {}: ({:?})", Meta::name(&o), o.spec),
@@ -67,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
         replicas: 3,
     });
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
-    let o = foos.patch("baz", &ssapply, serde_yaml::to_vec(&foo)?).await?;
+    let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
     info!("Applied 1 {}: {:?}", Meta::name(&o), o.spec);
 
     // 2. Apply from partial json!
@@ -85,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     info!("Applying 2: \n{}", serde_yaml::to_string(&patch)?);
-    let o2 = foos.patch("baz", &ssapply, serde_yaml::to_vec(&patch)?).await?;
+    let o2 = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
     info!("Applied 2 {}: {:?}", Meta::name(&o2), o2.spec);
 
     Ok(())

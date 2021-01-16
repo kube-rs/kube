@@ -6,7 +6,7 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
 };
 use kube::{
-    api::{ListParams, Meta, PatchParams, PatchStrategy},
+    api::{ListParams, Meta, Patch, PatchParams},
     Api, Client, CustomResource,
 };
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
@@ -25,10 +25,6 @@ enum Error {
     },
     MissingObjectKey {
         name: &'static str,
-        backtrace: Backtrace,
-    },
-    SerializationFailed {
-        source: serde_json::Error,
         backtrace: Backtrace,
     },
 }
@@ -83,13 +79,8 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
             cm.metadata.name.as_ref().context(MissingObjectKey {
                 name: ".metadata.name",
             })?,
-            &PatchParams {
-                patch_strategy: PatchStrategy::Apply,
-                field_manager: Some("configmapgenerator.kube-rt.nullable.se".to_string()),
-                dry_run: false,
-                force: false,
-            },
-            serde_json::to_vec(&cm).context(SerializationFailed)?,
+            &PatchParams::apply("configmapgenerator.kube-rt.nullable.se"),
+            &Patch::Apply(&cm),
         )
         .await
         .context(ConfigMapCreationFailed)?;
