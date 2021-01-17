@@ -403,14 +403,10 @@ impl TryFrom<Config> for Client {
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
+
+        // TODO? Create `KubeConnector` that is `hyper::Service<http::Uri>` and pass that into hyper client builder.
         let headers = config.headers.clone();
         let auth_header = config.auth_header.clone();
-
-        let mut http = HttpConnector::new();
-        http.enforce_http(false);
-        if let Some(t) = config.timeout {
-            http.set_connect_timeout(Some(t));
-        }
         let conns: Connectors = config.try_into()?;
         let client = HyperClient::builder().build::<_, hyper::Body>(conns.https);
 
