@@ -36,7 +36,7 @@ publish:
 minikube-create:
 	sudo rm -rf /tmp/juju-mk* /tmp/minikube*
 	minikube start --driver=docker \
-		--kubernetes-version v1.19.6 \
+		--kubernetes-version v1.20.2 \
 		--extra-config kubeadm.ignore-preflight-errors=SystemVerification
 
 minikube:

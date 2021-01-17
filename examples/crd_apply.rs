@@ -18,17 +18,17 @@ use kube::{
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
-//#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 pub struct FooSpec {
     name: String,
     info: Option<String>,
-    replicas: i32,
+    replicas: isize,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct FooStatus {
     is_bad: bool,
-    replicas: i32,
+    replicas: isize,
 }
 
 #[tokio::main]
@@ -43,17 +43,8 @@ async fn main() -> anyhow::Result<()> {
     // 0. Apply the CRD
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
-    match crds
-        .patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
-        .await
-    {
-        Ok(o) => info!("Applied {}: ({:?})", Meta::name(&o), o.spec),
-        Err(kube::Error::Api(ae)) => {
-            warn!("apply error: {:?}", ae);
-            assert_eq!(ae.code, 409); // if it's still there..
-        }
-        Err(e) => return Err(e.into()),
-    }
+    crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
+        .await?;
     wait_for_crd_ready(&crds).await?; // wait for k8s to deal with it
 
     // Start applying foos
@@ -67,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
     });
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
     let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
+    // NB: kubernetes < 1.20 will fail to admit scale subresources - see #387
     info!("Applied 1 {}: {:?}", Meta::name(&o), o.spec);
 
     // 2. Apply from partial json!
