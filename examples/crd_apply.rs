@@ -62,10 +62,6 @@ async fn main() -> anyhow::Result<()> {
     info!("Applied 1 {}: {:?}", Meta::name(&o), o.spec);
 
     // 2. Apply from partial json!
-    // NB: requires TypeMeta + everything non-optional in the spec
-    // NB: unfortunately optionals are nulled out by the apiserver...
-    // (Because this does not go through K::Serialize it's not related to serde annots)
-    // (it's actually defaulted by the server => crd schema needs to provide this info..)
     let patch = serde_json::json!({
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
