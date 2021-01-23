@@ -1,6 +1,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
+ * see https://github.com/clux/kube-rs/compare/0.48.0...master
+
+0.48.0 / 2021-01-23
+===================
   * bump `k8s-openapi` to `0.11.0` - #388
   * breaking: `kube`: no longer necessary to serialize patches yourself - #386
     - `PatchParams` removes `PatchStrategy`
