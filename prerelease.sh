@@ -13,7 +13,7 @@ sanity() {
   USED_K8S_OPENAPI="${CARGO_TREE_OPENAPI:1}"
   RECOMMENDED_K8S_OPENAPI="$(rg "k8s-openapi =" README.md | head -n 1)" # only check first instance
   if ! [[ $RECOMMENDED_K8S_OPENAPI =~ $USED_K8S_OPENAPI ]]; then
-    echo "release-hook: abort: recommending k8s-openapi pinned to a different version to what we use"
+    echo "prerelease: abort: recommending k8s-openapi pinned to a different version to what we use"
     exit 1
   fi
 }
@@ -25,9 +25,9 @@ main() {
 
   # If the main README has been bumped, assume we are done:
   if [[ "${NEW_VERSION}" = "${CURRENT_VER}" ]]; then
-    echo "release-hook: ${CRATE_NAME} nothing to do"
+    echo "prerelease: ${CRATE_NAME} nothing to do"
   else
-    echo "release-hook: ${CRATE_NAME} bumping docs from ${PREV_VERSION} -> ${NEW_VERSION}"
+    echo "prerelease: ${CRATE_NAME} bumping docs from ${PREV_VERSION} -> ${NEW_VERSION}"
     sanity
     replace-docs
   fi
