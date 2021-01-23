@@ -10,9 +10,9 @@ consolidate-commits = true
 disable-push = true # until we know it always works
 no-dev-version = true # bumps happen right before release
 pre-release-replacements = [
-  {file="README.md", search="kube = \"[a-z0-9\\.-]+\"", replace="kube = \"{{version}}\""}
-  {file="README.md", search="kube-runtime = \"[a-z0-9\\.-]+\"", replace="kube-runtime = \"{{version}}\""}
-  {file="kube-derive/README.md", search="version = \"[a-z0-9\\.-]+\"", replace="version = \"{{version}}\""}
+  {file="README.md", search="kube = \"[a-z0-9\\.-]+\"", replace="kube = \"{{version}}\""},
+  {file="README.md", search="kube-runtime = \"[a-z0-9\\.-]+\"", replace="kube-runtime = \"{{version}}\""},
+  {file="kube-derive/README.md", search="version = \"[a-z0-9\\.-]+\"", replace="version = \"{{version}}\""},
   {file="CHANGELOG.md", search="UNRELEASED", replace="{{version}} / {{date}}"},
   {file="CHANGELOG.md", search="<!-- next-header -->", replace="<!-- next-header -->\nUNRELEASED\n==================="},
 ]
