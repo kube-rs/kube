@@ -1,4 +1,5 @@
-0.48.0 / 2021-01-XX
+<!-- next-header -->
+UNRELEASED
 ===================
   * bump `k8s-openapi` to `0.11.0` - #388
   * breaking: `kube`: no longer necessary to serialize patches yourself - #386

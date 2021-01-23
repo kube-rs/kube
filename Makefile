@@ -24,15 +24,6 @@ test:
 readme:
 	rustdoc README.md --test --edition=2018
 
-bump-minor:
-	./release.sh minor
-
-bump-patch:
-	./release.sh patch
-
-publish:
-	./release.sh publish
-
 minikube-create:
 	sudo rm -rf /tmp/juju-mk* /tmp/minikube*
 	minikube start --driver=docker \

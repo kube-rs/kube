@@ -1,0 +1,19 @@
+# Release process:
+# 1. cargo release
+# 2. verify that all crates are bumped and versions are in-line before proceeding
+# 3a. await publishing - failures can happen due to still https://github.com/sunng87/cargo-release/issues/224
+# 3b. fix failures from 3a (resume publishing manually, cd into dir, cargo publish, wait, continue for next in line)
+# 4. check that the consolidated commit replaced everything, and that the tag is correct
+# 5. git push && git push --tags
+
+consolidate-commits = true
+disable-push = true # until we know it always works
+no-dev-version = true # bumps happen right before release
+pre-release-replacements = [
+  {file="README.md", search="kube = \"[a-z0-9\\.-]+\"", replace="kube = \"{{version}}\""}
+  {file="README.md", search="kube-runtime = \"[a-z0-9\\.-]+\"", replace="kube-runtime = \"{{version}}\""}
+  {file="kube-derive/README.md", search="version = \"[a-z0-9\\.-]+\"", replace="version = \"{{version}}\""}
+  {file="CHANGELOG.md", search="UNRELEASED", replace="{{version}} / {{date}}"},
+  {file="CHANGELOG.md", search="<!-- next-header -->", replace="<!-- next-header -->\nUNRELEASED\n==================="},
+]
+exclude-paths = ["examples", "tests"]
