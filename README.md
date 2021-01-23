@@ -16,7 +16,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 [dependencies]
 kube = "0.47.0"
 kube-runtime = "0.47.0"
-k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
+k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_20"] }
 ```
 
 [Features are available](https://github.com/clux/kube-rs/blob/master/kube/Cargo.toml#L18).
@@ -151,7 +151,7 @@ Kube has basic support ([with caveats](https://github.com/clux/kube-rs/issues?q=
 [dependencies]
 kube = { version = "0.47.0", default-features = false, features = ["rustls-tls"] }
 kube-runtime = { version = "0.47.0", default-features = false, features = ["rustls-tls"] }
-k8s-openapi = { version = "0.9.0", default-features = false, features = ["v1_17"] }
+k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_20"] }
 ```
 
 This will pull in the variant of `reqwest` that also uses its `rustls-tls` feature.
