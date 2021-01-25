@@ -78,7 +78,7 @@ pub struct FooSpec {
     #[serde(default)]
     default_listable: Vec<u32>,
 
-    // Listable field with specified set merge strategy
+    // Listable field with specified 'set' merge strategy
     #[serde(default)]
     set_listable: SetListable,
 }
@@ -146,7 +146,7 @@ async fn main() -> Result<()> {
         // Defaulting did not happen because `null` was sent.
         // Deserialization does not apply the default either.
         nullable_with_default: None,
-        // Listables all default
+        // Empty listables to be patched in later
         default_listable: Default::default(),
         set_listable: Default::default(),
     });
@@ -178,7 +178,10 @@ async fn main() -> Result<()> {
         "spec": {
             "non_nullable": "a required field",
             // `non_nullable_with_default` field is missing
-            "set_listable": SetListable(vec![2]), // a value patch later
+
+            // listable values to patch later to verify merge strategies
+            "default_listable": vec![2],
+            "set_listable": SetListable(vec![2]),
         }
     }))?;
     let val = client
@@ -187,7 +190,10 @@ async fn main() -> Result<()> {
     println!("{:?}", val["spec"]);
     // Defaulting happened for non-nullable field
     assert_eq!(val["spec"]["non_nullable_with_default"], default_value());
-    //assert_eq!(val["spec"]["atomic_listable"],  "[2]");
+
+    // Listables
+    assert_eq!(serde_json::to_string(&val["spec"]["default_listable"])?, "[2]");
+    assert_eq!(serde_json::to_string(&val["spec"]["set_listable"])?, "[2]");
 
     // Missing required field (non-nullable without default) is an error
     let data = serde_json::to_vec(&serde_json::json!({
@@ -221,10 +227,12 @@ async fn main() -> Result<()> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
+            "default_listable": vec![3],
             "set_listable": SetListable(vec![3])
         }
     });
     let pres = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
+    assert_eq!(pres.spec.default_listable, vec![3]);
     assert_eq!(pres.spec.set_listable, SetListable(vec![2, 3]));
     println!("{:?}", serde_json::to_value(pres.spec));
 
