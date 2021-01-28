@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, Resource, WatchEvent},
+    api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, Resource, WatchEvent},
     Client, CustomResource,
 };
 use schemars::JsonSchema;
@@ -73,6 +73,36 @@ pub struct FooSpec {
     // If the resource is created with `kubectl` and if this field was missing, defaulting will happen.
     #[serde(default = "default_nullable")]
     nullable_with_default: Option<String>,
+
+    /// Default listable field
+    #[serde(default)]
+    default_listable: Vec<u32>,
+
+    // Listable field with specified 'set' merge strategy
+    #[serde(default)]
+    set_listable: SetListable,
+}
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone)]
+struct SetListable(Vec<u32>);
+// https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
+use schemars::{gen::SchemaGenerator, schema::Schema};
+impl JsonSchema for SetListable {
+    fn schema_name() -> String {
+        "SetListable".into()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        serde_json::from_value(serde_json::json!({
+            "type": "array",
+            "items": {
+                "format": "u32",
+                "minium": 0,
+                "type": "integer"
+            },
+            "x-kubernetes-list-type": "set"
+        }))
+        .unwrap()
+    }
 }
 
 fn default_value() -> String {
@@ -116,6 +146,9 @@ async fn main() -> Result<()> {
         // Defaulting did not happen because `null` was sent.
         // Deserialization does not apply the default either.
         nullable_with_default: None,
+        // Empty listables to be patched in later
+        default_listable: Default::default(),
+        set_listable: Default::default(),
     });
 
     // Set up dynamic resource to test using raw values.
@@ -145,6 +178,10 @@ async fn main() -> Result<()> {
         "spec": {
             "non_nullable": "a required field",
             // `non_nullable_with_default` field is missing
+
+            // listable values to patch later to verify merge strategies
+            "default_listable": vec![2],
+            "set_listable": SetListable(vec![2]),
         }
     }))?;
     let val = client
@@ -153,6 +190,10 @@ async fn main() -> Result<()> {
     println!("{:?}", val["spec"]);
     // Defaulting happened for non-nullable field
     assert_eq!(val["spec"]["non_nullable_with_default"], default_value());
+
+    // Listables
+    assert_eq!(serde_json::to_string(&val["spec"]["default_listable"])?, "[2]");
+    assert_eq!(serde_json::to_string(&val["spec"]["set_listable"])?, "[2]");
 
     // Missing required field (non-nullable without default) is an error
     let data = serde_json::to_vec(&serde_json::json!({
@@ -179,6 +220,21 @@ async fn main() -> Result<()> {
         }
         _ => assert!(false),
     }
+
+    // Test the manually specified merge strategy
+    let ssapply = PatchParams::apply("crd_derive_schema_example").force();
+    let patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "default_listable": vec![3],
+            "set_listable": SetListable(vec![3])
+        }
+    });
+    let pres = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
+    assert_eq!(pres.spec.default_listable, vec![3]);
+    assert_eq!(pres.spec.set_listable, SetListable(vec![2, 3]));
+    println!("{:?}", serde_json::to_value(pres.spec));
 
     delete_crd(client.clone()).await?;
 
