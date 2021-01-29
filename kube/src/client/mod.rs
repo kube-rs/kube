@@ -21,7 +21,7 @@ use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
-use http::{self, request::Parts, HeaderMap, Request, StatusCode};
+use http::{self, HeaderMap, Request, Response, StatusCode};
 use hyper::{client::HttpConnector, Body, Client as HyperClient};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -77,28 +77,12 @@ impl Client {
         Self::try_from(client_config)
     }
 
-    async fn send(&self, request: http::Request<Vec<u8>>) -> Result<http::Response<Body>> {
+    async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
         let (mut parts, body) = request.into_parts();
         let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
         let uri_str = finalize_url(&self.cluster_url, &pandq);
         parts.uri = uri_str.parse().expect("valid URL");
         //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
-        self.set_common_headers(&mut parts).await?;
-
-        let request = match parts.method {
-            http::Method::GET
-            | http::Method::POST
-            | http::Method::DELETE
-            | http::Method::PUT
-            | http::Method::PATCH => Request::from_parts(parts, Body::from(body)),
-            other => return Err(Error::InvalidMethod(other.to_string())),
-        };
-
-        let res = self.inner.request(request).await?;
-        Ok(res)
-    }
-
-    async fn set_common_headers(&self, parts: &mut Parts) -> Result<()> {
         let mut headers = self.headers.clone();
         headers.extend(parts.headers.clone().into_iter());
         // If we have auth headers set, make sure they are updated and attached to the request
@@ -106,7 +90,18 @@ impl Client {
             headers.insert(http::header::AUTHORIZATION, auth_header);
         }
         parts.headers = headers;
-        Ok(())
+
+        let request = match parts.method {
+            http::Method::GET
+            | http::Method::POST
+            | http::Method::DELETE
+            | http::Method::PUT
+            | http::Method::PATCH => Request::from_parts(parts, body),
+            other => return Err(Error::InvalidMethod(other.to_string())),
+        };
+
+        let res = self.inner.request(request).await?;
+        Ok(res)
     }
 
     /// Make WebSocket connection.
@@ -117,7 +112,6 @@ impl Client {
         request: http::Request<()>,
     ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
         let (mut parts, _) = request.into_parts();
-        self.set_common_headers(&mut parts).await?;
         parts.headers.insert(
             http::header::CONNECTION,
             "Upgrade".parse().expect("valid header value"),
@@ -144,16 +138,8 @@ impl Client {
             http::header::SEC_WEBSOCKET_PROTOCOL,
             "v4.channel.k8s.io".parse().expect("valid header value"),
         );
-        let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
-        parts.uri = finalize_url(&self.cluster_url, &pandq)
-            .parse()
-            .expect("valid URL");
 
-        // TODO Use `send` after changing all methods to use `Request<Body>`.
-        let res = self
-            .inner
-            .request(http::Request::from_parts(parts, Body::empty()))
-            .await?;
+        let res = self.send(Request::from_parts(parts, Body::empty())).await?;
         if res.status() != StatusCode::SWITCHING_PROTOCOLS {
             return Err(Error::ProtocolSwitch(res.status()));
         }
@@ -184,7 +170,8 @@ impl Client {
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
     pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String> {
-        let res = self.send(request).await?;
+        let (parts, body) = request.into_parts();
+        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
         let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
@@ -200,7 +187,8 @@ impl Client {
         &self,
         request: http::Request<Vec<u8>>,
     ) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let res = self.send(request).await?;
+        let (parts, body) = request.into_parts();
+        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
         // trace!("Status = {:?} for {}", res.status(), res.url());
         Ok(res.into_body().map_err(Error::HyperError))
     }
@@ -211,7 +199,8 @@ impl Client {
     where
         T: DeserializeOwned,
     {
-        let res = self.send(request).await?;
+        let (parts, body) = request.into_parts();
+        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
         // trace!("Status = {:?} for {}", res.status(), res.url());
         let s = res.status();
         let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
@@ -242,7 +231,8 @@ impl Client {
     where
         T: DeserializeOwned,
     {
-        let res = self.send(request).await?;
+        let (parts, body) = request.into_parts();
+        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         trace!("headers: {:?}", res.headers());
 
