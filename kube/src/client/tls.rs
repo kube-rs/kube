@@ -1,16 +1,8 @@
-// Provides TLS connectors for Native TLS and Rustls TLS.
-//
-// Native TLS
-// - native_tls::TlsConnector from kube::Config
-// - tokio_native_tls::TlsConnector from native_tls::TlsConnector (used by ws)
+// Create `HttpsConnector` from `Config`.
 // - hyper_tls::HttpsConnector from (hyper::client::HttpConnector, tokio_native_tls::TlsConnector)
-//
-// Rust TLS
-// - Arc<rustls::ClientConfig> from kube::Config
-// - tokio_rustls::TlsConnector from Arc<rustls::ClientConfig> (used by ws)
 // - hyper_rustls::HttpsConnector from (hyper::client::HttpConnector, Arc<rustls::ClientConfig>)
 
-pub use connector::{AsyncTlsConnector, Connectors, HttpsConnector};
+pub use connector::HttpsConnector;
 
 #[cfg(feature = "native-tls")]
 mod connector {
@@ -22,13 +14,9 @@ mod connector {
     use crate::{Config, Error, Result};
 
     pub use hyper_tls::HttpsConnector;
-    pub use tokio_native_tls::TlsConnector as AsyncTlsConnector;
+    use tokio_native_tls::TlsConnector as AsyncTlsConnector;
 
-    pub struct Connectors {
-        pub https: HttpsConnector<HttpConnector>,
-    }
-
-    impl TryFrom<Config> for Connectors {
+    impl TryFrom<Config> for HttpsConnector<HttpConnector> {
         type Error = Error;
 
         fn try_from(config: Config) -> Result<Self> {
@@ -39,9 +27,7 @@ mod connector {
             }
             let tls: AsyncTlsConnector = config.try_into()?;
 
-            Ok(Self {
-                https: HttpsConnector::from((http, tls)),
-            })
+            Ok(HttpsConnector::from((http, tls)))
         }
     }
 
@@ -99,13 +85,9 @@ mod connector {
     use crate::{config::Config, Error, Result};
 
     pub use hyper_rustls::HttpsConnector;
-    pub use tokio_rustls::TlsConnector as AsyncTlsConnector;
+    use tokio_rustls::TlsConnector as AsyncTlsConnector;
 
-    pub struct Connectors {
-        pub https: HttpsConnector<HttpConnector>,
-    }
-
-    impl TryFrom<Config> for Connectors {
+    impl TryFrom<Config> for HttpsConnector<HttpConnector> {
         type Error = Error;
 
         fn try_from(config: Config) -> Result<Self> {
@@ -117,9 +99,7 @@ mod connector {
             let client_config: ClientConfig = config.try_into()?;
             let client_config = Arc::new(client_config);
 
-            Ok(Self {
-                https: HttpsConnector::from((http, client_config)),
-            })
+            Ok(HttpsConnector::from((http, client_config)))
         }
     }
 

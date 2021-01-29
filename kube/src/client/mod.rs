@@ -14,7 +14,7 @@ use crate::{
 };
 
 mod tls;
-use tls::{Connectors, HttpsConnector};
+use tls::HttpsConnector;
 #[cfg(feature = "ws")]
 use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 
@@ -392,8 +392,8 @@ impl TryFrom<Config> for Client {
         // TODO? Create `KubeConnector` that is `hyper::Service<http::Uri>` and pass that into hyper client builder.
         let headers = config.headers.clone();
         let auth_header = config.auth_header.clone();
-        let conns: Connectors = config.try_into()?;
-        let client = HyperClient::builder().build::<_, hyper::Body>(conns.https);
+        let connector = config.try_into()?;
+        let client = HyperClient::builder().build::<_, hyper::Body>(connector);
 
         Ok(Self {
             cluster_url,
