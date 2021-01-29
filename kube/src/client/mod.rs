@@ -21,7 +21,7 @@ use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
-use http::{self, HeaderMap, Request, Response, StatusCode};
+use http::{self, header::HeaderValue, HeaderMap, Request, Response, StatusCode};
 use hyper::{client::HttpConnector, Body, Client as HyperClient};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -112,22 +112,21 @@ impl Client {
         request: http::Request<()>,
     ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
         let (mut parts, _) = request.into_parts();
-        parts.headers.insert(
-            http::header::CONNECTION,
-            "Upgrade".parse().expect("valid header value"),
-        );
-        parts.headers.insert(
-            http::header::UPGRADE,
-            "websocket".parse().expect("valid header value"),
-        );
+        parts
+            .headers
+            .insert(http::header::CONNECTION, HeaderValue::from_static("Upgrade"));
+        parts
+            .headers
+            .insert(http::header::UPGRADE, HeaderValue::from_static("websocket"));
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_VERSION,
-            "13".parse().expect("valid header value"),
+            HeaderValue::from_static("13"),
         );
         // TODO generate random key and verify like tungstenite
+        let key = "kube";
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_KEY,
-            "kube".parse().expect("valid header value"),
+            key.parse().expect("valid header value"),
         );
         // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
         // There's no official documentation about this protocol, but it's described in
@@ -136,7 +135,7 @@ impl Client {
         // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_PROTOCOL,
-            "v4.channel.k8s.io".parse().expect("valid header value"),
+            HeaderValue::from_static("v4.channel.k8s.io"),
         );
 
         let res = self.send(Request::from_parts(parts, Body::empty())).await?;
