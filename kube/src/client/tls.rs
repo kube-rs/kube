@@ -26,8 +26,6 @@ mod connector {
 
     pub struct Connectors {
         pub https: HttpsConnector<HttpConnector>,
-        #[cfg(feature = "ws")]
-        pub wss: AsyncTlsConnector,
     }
 
     impl TryFrom<Config> for Connectors {
@@ -41,19 +39,9 @@ mod connector {
             }
             let tls: AsyncTlsConnector = config.try_into()?;
 
-            #[cfg(feature = "ws")]
-            {
-                Ok(Self {
-                    https: HttpsConnector::from((http, tls.clone())),
-                    wss: tls,
-                })
-            }
-            #[cfg(not(feature = "ws"))]
-            {
-                Ok(Self {
-                    https: HttpsConnector::from((http, tls)),
-                })
-            }
+            Ok(Self {
+                https: HttpsConnector::from((http, tls)),
+            })
         }
     }
 
@@ -115,8 +103,6 @@ mod connector {
 
     pub struct Connectors {
         pub https: HttpsConnector<HttpConnector>,
-        #[cfg(feature = "ws")]
-        pub wss: AsyncTlsConnector,
     }
 
     impl TryFrom<Config> for Connectors {
@@ -131,19 +117,9 @@ mod connector {
             let client_config: ClientConfig = config.try_into()?;
             let client_config = Arc::new(client_config);
 
-            #[cfg(feature = "ws")]
-            {
-                Ok(Self {
-                    https: HttpsConnector::from((http, client_config.clone())),
-                    wss: AsyncTlsConnector::from(client_config),
-                })
-            }
-            #[cfg(not(feature = "ws"))]
-            {
-                Ok(Self {
-                    https: HttpsConnector::from((http, client_config)),
-                })
-            }
+            Ok(Self {
+                https: HttpsConnector::from((http, client_config)),
+            })
         }
     }
 

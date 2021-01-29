@@ -14,14 +14,9 @@ use crate::{
 };
 
 mod tls;
-#[cfg(feature = "ws")] use tls::AsyncTlsConnector;
 use tls::{Connectors, HttpsConnector};
-
 #[cfg(feature = "ws")]
-use async_tungstenite::{
-    tokio::{connect_async_with_tls_connector, ConnectStream},
-    tungstenite as ws2, WebSocketStream,
-};
+use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 
 use bytes::Bytes;
 use either::{Either, Left, Right};
@@ -52,8 +47,6 @@ pub struct Client {
     // REVIEW Factor out `config::Authentication`.
     //        We need a way to set auth header on request. `Layer` in tower?
     auth_header: config::Authentication,
-    #[cfg(feature = "ws")]
-    tls_connector: AsyncTlsConnector,
 }
 
 impl Client {
@@ -119,66 +112,58 @@ impl Client {
     /// Make WebSocket connection.
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    pub async fn connect(&self, request: http::Request<()>) -> Result<WebSocketStream<ConnectStream>> {
+    pub async fn connect(
+        &self,
+        request: http::Request<()>,
+    ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
         let (mut parts, _) = request.into_parts();
         self.set_common_headers(&mut parts).await?;
+        parts.headers.insert(
+            http::header::CONNECTION,
+            "Upgrade".parse().expect("valid header value"),
+        );
+        parts.headers.insert(
+            http::header::UPGRADE,
+            "websocket".parse().expect("valid header value"),
+        );
+        parts.headers.insert(
+            http::header::SEC_WEBSOCKET_VERSION,
+            "13".parse().expect("valid header value"),
+        );
+        // TODO generate random key and verify like tungstenite
+        parts.headers.insert(
+            http::header::SEC_WEBSOCKET_KEY,
+            "kube".parse().expect("valid header value"),
+        );
         // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
         // There's no official documentation about this protocol, but it's described in
         // [`k8s.io/apiserver/pkg/util/wsstream/conn.go`](https://git.io/JLQED).
         // There's a comment about v4 and `Status` object in
         // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
         parts.headers.insert(
-            "sec-websocket-protocol",
+            http::header::SEC_WEBSOCKET_PROTOCOL,
             "v4.channel.k8s.io".parse().expect("valid header value"),
         );
-        // Replace scheme to ws(s).
         let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
         parts.uri = finalize_url(&self.cluster_url, &pandq)
-            .replacen("http", "ws", 1)
             .parse()
             .expect("valid URL");
 
-        let tls = Some(self.tls_connector.clone());
-        match connect_async_with_tls_connector(http::Request::from_parts(parts, ()), tls).await {
-            Ok((stream, _)) => Ok(stream),
+        // TODO Use `send` after changing all methods to use `Request<Body>`.
+        let res = self
+            .inner
+            .request(http::Request::from_parts(parts, Body::empty()))
+            .await?;
+        if res.status() != StatusCode::SWITCHING_PROTOCOLS {
+            return Err(Error::ProtocolSwitch(res.status()));
+        }
 
-            Err(err) => match err {
-                // tungstenite only gives us the status code.
-                ws2::Error::Http(code) => Err(Error::Api(ErrorResponse {
-                    status: code.to_string(),
-                    code: code.as_u16(),
-                    message: "".to_owned(),
-                    reason: "".to_owned(),
-                })),
+        match hyper::upgrade::on(res).await {
+            Ok(upgraded) => {
+                Ok(WebSocketStream::from_raw_socket(upgraded, ws::protocol::Role::Client, None).await)
+            }
 
-                ws2::Error::HttpFormat(err) => Err(Error::HttpError(err)),
-
-                // `tungstenite::Error::Tls` is only available when using `ws-native-tls` (`async-tungstenite/tokio-native-tls`)
-                // because it comes from `tungstenite/tls` feature.
-                #[cfg(feature = "ws-native-tls")]
-                ws2::Error::Tls(err) => Err(Error::SslError(format!("{}", err))),
-
-                // URL errors:
-                // - No host found in URL
-                // - Unsupported scheme (not ws/wss)
-                // shouldn't happen in our case
-                ws2::Error::Url(msg) => Err(Error::RequestValidation(msg.into())),
-
-                // Protocol errors:
-                // - Only GET is supported
-                // - Only HTTP version >= 1.1 is supported
-                // shouldn't happen in our case
-                ws2::Error::Protocol(msg) => Err(Error::RequestValidation(msg.into())),
-
-                ws2::Error::Io(err) => Err(Error::Connection(err)),
-
-                // Unexpected errors. `tungstenite::Error` contains errors that doesn't happen when trying to conect.
-                ws2::Error::ConnectionClosed
-                | ws2::Error::AlreadyClosed
-                | ws2::Error::Utf8
-                | ws2::Error::Capacity(_)
-                | ws2::Error::SendQueueFull(_) => Err(Error::WsOther(err.to_string())),
-            },
+            Err(e) => Err(Error::HyperError(e)),
         }
     }
 
@@ -415,8 +400,6 @@ impl TryFrom<Config> for Client {
             headers,
             auth_header,
             inner: client,
-            #[cfg(feature = "ws")]
-            tls_connector: conns.wss,
         })
     }
 }
