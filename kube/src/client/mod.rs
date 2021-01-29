@@ -197,13 +197,7 @@ impl Client {
     where
         T: DeserializeOwned,
     {
-        let res = self.send(request.map(Body::from)).await?;
-        // trace!("Status = {:?} for {}", res.status(), res.url());
-        let s = res.status();
-        let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
-        let text = String::from_utf8(body_bytes.to_vec())?;
-        handle_api_errors(&text, s)?;
-
+        let text = self.request_text(request).await?;
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text)?;
         if v["kind"] == "Status" {
