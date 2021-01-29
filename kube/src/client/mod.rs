@@ -170,8 +170,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
     pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String> {
-        let (parts, body) = request.into_parts();
-        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        let res = self.send(request.map(Body::from)).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
         let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
@@ -187,8 +186,7 @@ impl Client {
         &self,
         request: http::Request<Vec<u8>>,
     ) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let (parts, body) = request.into_parts();
-        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        let res = self.send(request.map(Body::from)).await?;
         // trace!("Status = {:?} for {}", res.status(), res.url());
         Ok(res.into_body().map_err(Error::HyperError))
     }
@@ -199,8 +197,7 @@ impl Client {
     where
         T: DeserializeOwned,
     {
-        let (parts, body) = request.into_parts();
-        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        let res = self.send(request.map(Body::from)).await?;
         // trace!("Status = {:?} for {}", res.status(), res.url());
         let s = res.status();
         let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
@@ -231,8 +228,7 @@ impl Client {
     where
         T: DeserializeOwned,
     {
-        let (parts, body) = request.into_parts();
-        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        let res = self.send(request.map(Body::from)).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         trace!("headers: {:?}", res.headers());
 
