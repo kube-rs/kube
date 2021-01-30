@@ -107,8 +107,11 @@ impl Client {
     /// Make WebSocket connection.
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    pub async fn connect(&self, request: Request<()>) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
-        let (mut parts, _) = request.into_parts();
+    pub async fn connect(
+        &self,
+        request: Request<Vec<u8>>,
+    ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
+        let (mut parts, body) = request.into_parts();
         parts
             .headers
             .insert(http::header::CONNECTION, HeaderValue::from_static("Upgrade"));
@@ -135,7 +138,7 @@ impl Client {
             HeaderValue::from_static("v4.channel.k8s.io"),
         );
 
-        let res = self.send(Request::from_parts(parts, Body::empty())).await?;
+        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
         if res.status() != StatusCode::SWITCHING_PROTOCOLS {
             return Err(Error::ProtocolSwitch(res.status()));
         }
