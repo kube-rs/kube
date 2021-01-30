@@ -107,10 +107,7 @@ impl Client {
     /// Make WebSocket connection.
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    pub async fn connect(
-        &self,
-        request: http::Request<()>,
-    ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
+    pub async fn connect(&self, request: Request<()>) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
         let (mut parts, _) = request.into_parts();
         parts
             .headers
@@ -154,7 +151,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and deserialize the response
     /// as JSON to some known type.
-    pub async fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
+    pub async fn request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
@@ -168,7 +165,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
-    pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String> {
+    pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
         let res = self.send(request.map(Body::from)).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
@@ -183,7 +180,7 @@ impl Client {
     /// as a stream of bytes
     pub async fn request_text_stream(
         &self,
-        request: http::Request<Vec<u8>>,
+        request: Request<Vec<u8>>,
     ) -> Result<impl Stream<Item = Result<Bytes>>> {
         let res = self.send(request.map(Body::from)).await?;
         // trace!("Status = {:?} for {}", res.status(), res.url());
@@ -192,7 +189,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back either an object
     /// deserialized as JSON or a [`Status`] Object.
-    pub async fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
+    pub async fn request_status<T>(&self, request: Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
@@ -216,7 +213,7 @@ impl Client {
     /// Perform a raw request and get back a stream of [`WatchEvent`] objects
     pub async fn request_events<T: Clone + Meta>(
         &self,
-        request: http::Request<Vec<u8>>,
+        request: Request<Vec<u8>>,
     ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>>>
     where
         T: DeserializeOwned,
