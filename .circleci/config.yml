@@ -102,6 +102,7 @@ jobs:
       - run: cargo test --lib --all -j4
       - run: cargo test --doc --all -j4
       - run: cargo test -j4 -p examples
+      - run: cd examples && cargo build --examples
       - run: cd examples && cargo test --example crd_derive_no_schema --no-default-features --features=native-tls
       - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls,ws
       - run: cd kube && cargo test --lib --no-default-features --features=native-tls,ws
