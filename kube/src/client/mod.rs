@@ -30,7 +30,7 @@ use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
-use tower::Service;
+use tower::{buffer::Buffer, util::BoxService, Service, ServiceBuilder, ServiceExt};
 
 use std::convert::{TryFrom, TryInto};
 
@@ -42,7 +42,7 @@ use std::convert::{TryFrom, TryInto};
 /// using [`Client::new`]
 #[derive(Clone)]
 pub struct Client {
-    inner: HyperService,
+    inner: Buffer<BoxService<Request<Body>, Response<Body>, hyper::Error>, Request<Body>>,
     // TODO Move these into `Service`.
     cluster_url: url::Url,
     headers: HeaderMap,
@@ -100,7 +100,20 @@ impl Client {
             other => return Err(Error::InvalidMethod(other.to_string())),
         };
 
-        let res = self.inner.call(request).await?;
+        let res = self
+            .inner
+            .ready_and()
+            .await
+            .map_err(Error::Service)?
+            .call(request)
+            .await
+            .map_err(|err| {
+                if err.is::<hyper::Error>() {
+                    Error::HyperError(*err.downcast::<hyper::Error>().expect("downcast"))
+                } else {
+                    Error::Service(err)
+                }
+            })?;
         Ok(res)
     }
 
@@ -375,41 +388,16 @@ impl TryFrom<Config> for Client {
         let headers = config.headers.clone();
         let auth_header = config.auth_header.clone();
         let connector = config.try_into()?;
-        let client = HyperClient::builder().build::<_, hyper::Body>(connector);
-
+        let client: HyperClient<HttpsConnector<HttpConnector>, Body> =
+            HyperClient::builder().build::<_, hyper::Body>(connector);
+        // `Buffer` so that it's `Clone`.
+        let inner = ServiceBuilder::new().buffer(5).service(BoxService::new(client));
         Ok(Self {
             cluster_url,
             headers,
             auth_header,
-            inner: HyperService::new(client),
+            inner,
         })
-    }
-}
-
-// A struct to experiment with `tower::Service` without adding type parameter to `kube::Client`.
-// Wraps `HyperClient`.
-#[derive(Clone)]
-struct HyperService {
-    inner: HyperClient<HttpsConnector<HttpConnector>, Body>,
-}
-
-impl HyperService {
-    fn new(inner: HyperClient<HttpsConnector<HttpConnector>, Body>) -> Self {
-        Self { inner }
-    }
-}
-
-impl Service<Request<Body>> for HyperService {
-    type Error = hyper::Error;
-    type Future = hyper::client::ResponseFuture;
-    type Response = Response<Body>;
-
-    fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
-        self.inner.call(req)
     }
 }
 

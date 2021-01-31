@@ -60,7 +60,7 @@ hyper = { version = "0.14.2", features = ["client", "http1", "stream", "tcp"] }
 hyper-tls = { version = "0.5.0", optional = true }
 hyper-rustls = { version = "0.22.1", optional = true }
 tokio-tungstenite = { version = "0.13.0", optional = true }
-tower = { version = "0.4.4", features = [] }
+tower = { version = "0.4.4", features = ["buffer", "util"] }
 tame-oauth = { version = "0.4.7", features = ["gcp"] }
 
 [dependencies.k8s-openapi]
