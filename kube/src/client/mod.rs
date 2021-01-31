@@ -21,7 +21,7 @@ use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
-use http::{self, header::HeaderValue, HeaderMap, Request, Response, StatusCode};
+use http::{self, HeaderMap, Request, Response, StatusCode};
 use hyper::{client::HttpConnector, Body, Client as HyperClient};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -111,6 +111,7 @@ impl Client {
         &self,
         request: Request<Vec<u8>>,
     ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
+        use http::header::HeaderValue;
         let (mut parts, body) = request.into_parts();
         parts
             .headers
