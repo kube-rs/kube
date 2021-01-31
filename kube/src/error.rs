@@ -24,6 +24,9 @@ pub enum Error {
     /// Hyper error
     #[error("HyperError: {0}")]
     HyperError(#[from] hyper::Error),
+    /// Service error
+    #[error("ServiceError: {0}")]
+    Service(tower::BoxError),
 
     /// UTF-8 Error
     #[error("UTF-8 Error: {0}")]

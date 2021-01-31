@@ -21,7 +21,7 @@ use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
-use http::{self, HeaderMap, Request, Response, StatusCode};
+use http::{self, Request, Response, StatusCode};
 use hyper::{client::HttpConnector, Body, Client as HyperClient};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -30,6 +30,7 @@ use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
+use tower::{buffer::Buffer, util::BoxService, Service, ServiceBuilder, ServiceExt};
 
 use std::convert::{TryFrom, TryInto};
 
@@ -41,11 +42,8 @@ use std::convert::{TryFrom, TryInto};
 /// using [`Client::new`]
 #[derive(Clone)]
 pub struct Client {
-    cluster_url: url::Url,
-    inner: HyperClient<HttpsConnector<HttpConnector>, hyper::Body>,
-    headers: HeaderMap,
-    // REVIEW Factor out `config::Authentication`.
-    //        We need a way to set auth header on request. `Layer` in tower?
+    inner: Buffer<BoxService<Request<Body>, Response<Body>, hyper::Error>, Request<Body>>,
+    // TODO Move these into `Service`.
     auth_header: config::Authentication,
 }
 
@@ -79,12 +77,8 @@ impl Client {
 
     async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
         let (mut parts, body) = request.into_parts();
-        let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
-        let uri_str = finalize_url(&self.cluster_url, &pandq);
-        parts.uri = uri_str.parse().expect("valid URL");
         //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
-        let mut headers = self.headers.clone();
-        headers.extend(parts.headers.clone().into_iter());
+        let mut headers = parts.headers;
         // If we have auth headers set, make sure they are updated and attached to the request
         if let Some(auth_header) = self.auth_header.to_header().await? {
             headers.insert(http::header::AUTHORIZATION, auth_header);
@@ -100,7 +94,20 @@ impl Client {
             other => return Err(Error::InvalidMethod(other.to_string())),
         };
 
-        let res = self.inner.request(request).await?;
+        let mut svc = self.inner.clone();
+        let res = svc
+            .ready_and()
+            .await
+            .map_err(Error::Service)?
+            .call(request)
+            .await
+            .map_err(|err| {
+                if err.is::<hyper::Error>() {
+                    Error::HyperError(*err.downcast::<hyper::Error>().expect("downcast"))
+                } else {
+                    Error::Service(err)
+                }
+            })?;
         Ok(res)
     }
 
@@ -368,17 +375,27 @@ impl TryFrom<Config> for Client {
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
-        let headers = config.headers.clone();
+        let default_headers = config.headers.clone();
+        // TODO Move these into `Service`.
         let auth_header = config.auth_header.clone();
         let connector = config.try_into()?;
-        let client = HyperClient::builder().build::<_, hyper::Body>(connector);
+        let client: HyperClient<HttpsConnector<HttpConnector>, Body> =
+            HyperClient::builder().build(connector);
+        let client = client.map_request(move |req: Request<Body>| {
+            let (mut parts, body) = req.into_parts();
+            let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
+            let uri_str = finalize_url(&cluster_url, &pandq);
+            parts.uri = uri_str.parse().expect("valid URL");
 
-        Ok(Self {
-            cluster_url,
-            headers,
-            auth_header,
-            inner: client,
-        })
+            let mut headers = default_headers.clone();
+            headers.extend(parts.headers.clone().into_iter());
+            parts.headers = headers;
+
+            Request::from_parts(parts, body)
+        });
+        // `Buffer` so that it's `Clone`.
+        let inner = ServiceBuilder::new().buffer(5).service(BoxService::new(client));
+        Ok(Self { auth_header, inner })
     }
 }
 
