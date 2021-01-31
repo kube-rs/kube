@@ -5,7 +5,7 @@ use kube::{api::DynamicResource, Client};
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let mut client = Client::try_default().await?;
 
     let v = client.apiserver_version().await?;
     info!("api version: {:?}", v);

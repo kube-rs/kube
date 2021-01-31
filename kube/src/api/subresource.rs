@@ -17,14 +17,14 @@ where
     K: Clone + DeserializeOwned,
 {
     /// Fetch the scale subresource
-    pub async fn get_scale(&self, name: &str) -> Result<Scale> {
+    pub async fn get_scale(&mut self, name: &str) -> Result<Scale> {
         let req = self.resource.get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
 
     /// Update the scale subresource
     pub async fn patch_scale<P: serde::Serialize>(
-        &self,
+        &mut self,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
@@ -34,7 +34,7 @@ where
     }
 
     /// Replace the scale subresource
-    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
+    pub async fn replace_scale(&mut self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
         let req = self.resource.replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await
     }
@@ -52,7 +52,7 @@ where
     /// Get the named resource with a status subresource
     ///
     /// This actually returns the whole K, with metadata, and spec.
-    pub async fn get_status(&self, name: &str) -> Result<K> {
+    pub async fn get_status(&mut self, name: &str) -> Result<K> {
         let req = self.resource.get_status(name)?;
         self.client.request::<K>(req).await
     }
@@ -67,7 +67,7 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
+    ///     let mut jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut j = jobs.get("baz").await?;
     ///     let pp = PatchParams::default(); // json merge patch
     ///     let data = serde_json::json!({
@@ -81,7 +81,7 @@ where
     /// }
     /// ```
     pub async fn patch_status<P: serde::Serialize>(
-        &self,
+        &mut self,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
@@ -101,7 +101,7 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
+    ///     let mut jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut o = jobs.get_status("baz").await?; // retrieve partial object
     ///     o.status = Some(JobStatus::default()); // update the job part
     ///     let pp = PostParams::default();
@@ -109,7 +109,7 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
+    pub async fn replace_status(&mut self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.resource.replace_status(name, &pp, data)?;
         self.client.request::<K>(req).await
     }
@@ -209,13 +209,17 @@ where
     K: Clone + DeserializeOwned + LoggingObject,
 {
     /// Fetch logs as a string
-    pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
+    pub async fn logs(&mut self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
 
     /// Fetch logs as a stream of bytes
-    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
+    pub async fn log_stream(
+        &mut self,
+        name: &str,
+        lp: &LogParams,
+    ) -> Result<impl Stream<Item = Result<Bytes>>> {
         let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
     }
@@ -432,7 +436,7 @@ where
     K: Clone + DeserializeOwned + AttachableObject,
 {
     /// Attach to pod
-    pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
+    pub async fn attach(&mut self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
         let req = self.resource.attach(name, ap)?;
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
@@ -497,7 +501,7 @@ where
     K: Clone + DeserializeOwned + ExecutingObject,
 {
     /// Execute a command in a pod
-    pub async fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
+    pub async fn exec<I, T>(&mut self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,

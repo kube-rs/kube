@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow!("Usage: log_follow <pod>"))?;
     info!("Fetching logs for {:?} in {}", mypod, namespace);
 
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let mut pods: Api<Pod> = Api::namespaced(client, &namespace);
     let mut lp = LogParams::default();
     lp.follow = true;
     lp.tail_lines = Some(1);

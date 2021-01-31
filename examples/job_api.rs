@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }))?;
 
-    let jobs: Api<Job> = Api::namespaced(client, &namespace);
+    let mut jobs: Api<Job> = Api::namespaced(client, &namespace);
     let pp = PostParams::default();
 
     jobs.create(&pp, &my_job).await?;

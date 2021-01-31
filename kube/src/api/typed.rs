@@ -72,12 +72,12 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+    ///     let mut pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let p: Pod = pods.get("blog").await?;
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get(&self, name: &str) -> Result<K> {
+    pub async fn get(&mut self, name: &str) -> Result<K> {
         let req = self.resource.get(name)?;
         self.client.request::<K>(req).await
     }
@@ -92,7 +92,7 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+    ///     let mut pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
     ///     for p in pods.list(&lp).await? {
     ///         println!("Found Pod: {}", Meta::name(&p));
@@ -100,7 +100,7 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
+    pub async fn list(&mut self, lp: &ListParams) -> Result<ObjectList<K>> {
         let req = self.resource.list(&lp)?;
         self.client.request::<ObjectList<K>>(req).await
     }
@@ -121,7 +121,7 @@ where
     ///     - Tradeoff between the two
     ///     - Easy partially filling of native [`k8s_openapi`] types (most fields optional)
     ///     - Partial safety against runtime errors (at least you must write valid JSON)
-    pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K>
+    pub async fn create(&mut self, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
     {
@@ -145,14 +145,14 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let crds: Api<CustomResourceDefinition> = Api::all(client);
+    ///     let mut crds: Api<CustomResourceDefinition> = Api::all(client);
     ///     crds.delete("foos.clux.dev", &DeleteParams::default()).await?
     ///         .map_left(|o| println!("Deleting CRD: {:?}", o.status))
     ///         .map_right(|s| println!("Deleted CRD: {:?}", s));
     ///     Ok(())
     /// }
     /// ```
-    pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
+    pub async fn delete(&mut self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
         let req = self.resource.delete(name, &dp)?;
         self.client.request_status::<K>(req).await
     }
@@ -171,7 +171,7 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+    ///     let mut pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
     ///         either::Left(list) => {
     ///             let names: Vec<_> = list.iter().map(Meta::name).collect();
@@ -185,7 +185,7 @@ where
     /// }
     /// ```
     pub async fn delete_collection(
-        &self,
+        &mut self,
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
@@ -208,7 +208,7 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+    ///     let mut pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let patch = serde_json::json!({
     ///         "apiVersion": "v1",
     ///         "kind": "Pod",
@@ -229,7 +229,7 @@ where
     /// [`JSON`]: super::PatchStrategy::JSON
     /// [`Strategic`]: super::PatchStrategy::Strategic
     /// [`Apply`]: super::PatchStrategy::Apply
-    pub async fn patch<P: Serialize>(&self, name: &str, pp: &PatchParams, patch: &Patch<P>) -> Result<K> {
+    pub async fn patch<P: Serialize>(&mut self, name: &str, pp: &PatchParams, patch: &Patch<P>) -> Result<K> {
         let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
@@ -248,7 +248,7 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
+    ///     let mut jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let j = jobs.get("baz").await?;
     ///     let j_new: Job = serde_json::from_value(serde_json::json!({
     ///         "apiVersion": "batch/v1",
@@ -278,7 +278,7 @@ where
     /// ```
     ///
     /// Consider mutating the result of `api.get` rather than recreating it.
-    pub async fn replace(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
+    pub async fn replace(&mut self, name: &str, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
     {
@@ -305,7 +305,7 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
+    ///     let mut jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default()
     ///         .fields("metadata.name=my_job")
     ///         .timeout(20); // upper bound of how long we watch for
@@ -325,7 +325,7 @@ where
     /// [`ListParams::timeout`]: super::ListParams::timeout
     /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
     pub async fn watch(
-        &self,
+        &mut self,
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {

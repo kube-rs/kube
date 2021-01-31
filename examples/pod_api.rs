@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Manage pods
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let mut pods: Api<Pod> = Api::namespaced(client, &namespace);
 
     // Create Pod blog
     info!("Creating Pod instance blog");

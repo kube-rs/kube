@@ -68,7 +68,7 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
         data: Some(contents),
         ..Default::default()
     };
-    let cm_api = Api::<ConfigMap>::namespaced(
+    let mut cm_api = Api::<ConfigMap>::namespaced(
         client.clone(),
         generator.metadata.namespace.as_ref().context(MissingObjectKey {
             name: ".metadata.namespace",

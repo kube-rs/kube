@@ -30,6 +30,7 @@ use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
+use tower::Service;
 
 use std::convert::{TryFrom, TryInto};
 
@@ -41,11 +42,10 @@ use std::convert::{TryFrom, TryInto};
 /// using [`Client::new`]
 #[derive(Clone)]
 pub struct Client {
+    inner: HyperService,
+    // TODO Move these into `Service`.
     cluster_url: url::Url,
-    inner: HyperClient<HttpsConnector<HttpConnector>, hyper::Body>,
     headers: HeaderMap,
-    // REVIEW Factor out `config::Authentication`.
-    //        We need a way to set auth header on request. `Layer` in tower?
     auth_header: config::Authentication,
 }
 
@@ -77,7 +77,7 @@ impl Client {
         Self::try_from(client_config)
     }
 
-    async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
+    async fn send(&mut self, request: Request<Body>) -> Result<Response<Body>> {
         let (mut parts, body) = request.into_parts();
         let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
         let uri_str = finalize_url(&self.cluster_url, &pandq);
@@ -100,7 +100,7 @@ impl Client {
             other => return Err(Error::InvalidMethod(other.to_string())),
         };
 
-        let res = self.inner.request(request).await?;
+        let res = self.inner.call(request).await?;
         Ok(res)
     }
 
@@ -108,7 +108,7 @@ impl Client {
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
     pub async fn connect(
-        &self,
+        &mut self,
         request: Request<Vec<u8>>,
     ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
         use http::header::HeaderValue;
@@ -155,7 +155,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and deserialize the response
     /// as JSON to some known type.
-    pub async fn request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
+    pub async fn request<T>(&mut self, request: Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
@@ -169,7 +169,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
-    pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
+    pub async fn request_text(&mut self, request: Request<Vec<u8>>) -> Result<String> {
         let res = self.send(request.map(Body::from)).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
@@ -183,7 +183,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and get back the response
     /// as a stream of bytes
     pub async fn request_text_stream(
-        &self,
+        &mut self,
         request: Request<Vec<u8>>,
     ) -> Result<impl Stream<Item = Result<Bytes>>> {
         let res = self.send(request.map(Body::from)).await?;
@@ -193,7 +193,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back either an object
     /// deserialized as JSON or a [`Status`] Object.
-    pub async fn request_status<T>(&self, request: Request<Vec<u8>>) -> Result<Either<T, Status>>
+    pub async fn request_status<T>(&mut self, request: Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
@@ -216,7 +216,7 @@ impl Client {
 
     /// Perform a raw request and get back a stream of [`WatchEvent`] objects
     pub async fn request_events<T: Clone + Meta>(
-        &self,
+        &mut self,
         request: Request<Vec<u8>>,
     ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>>>
     where
@@ -286,13 +286,13 @@ impl Client {
     }
 
     /// Returns apiserver version.
-    pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
+    pub async fn apiserver_version(&mut self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
         self.request(Request::builder().uri("/version").body(vec![])?)
             .await
     }
 
     /// Lists api groups that apiserver serves.
-    pub async fn list_api_groups(&self) -> Result<k8s_meta_v1::APIGroupList> {
+    pub async fn list_api_groups(&mut self) -> Result<k8s_meta_v1::APIGroupList> {
         self.request(Request::builder().uri("/apis").body(vec![])?).await
     }
 
@@ -300,7 +300,7 @@ impl Client {
     ///
     /// ### Example usage:
     /// ```rust
-    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn scope(mut client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// let apigroups = client.list_api_groups().await?;
     /// for g in apigroups.groups {
     ///     let ver = g
@@ -314,18 +314,21 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
+    pub async fn list_api_group_resources(
+        &mut self,
+        apiversion: &str,
+    ) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/apis/{}", apiversion);
         self.request(Request::builder().uri(url).body(vec![])?).await
     }
 
     /// Lists versions of `core` a.k.a. `""` legacy API group.
-    pub async fn list_core_api_versions(&self) -> Result<k8s_meta_v1::APIVersions> {
+    pub async fn list_core_api_versions(&mut self) -> Result<k8s_meta_v1::APIVersions> {
         self.request(Request::builder().uri("/api").body(vec![])?).await
     }
 
     /// Lists resources served in particular `core` group version.
-    pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
+    pub async fn list_core_api_resources(&mut self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/api/{}", version);
         self.request(Request::builder().uri(url).body(vec![])?).await
     }
@@ -367,9 +370,8 @@ impl TryFrom<Config> for Client {
 
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
+        // TODO Move these into `Service`.
         let cluster_url = config.cluster_url.clone();
-
-        // TODO? Create `KubeConnector` that is `hyper::Service<http::Uri>` and pass that into hyper client builder.
         let headers = config.headers.clone();
         let auth_header = config.auth_header.clone();
         let connector = config.try_into()?;
@@ -379,8 +381,35 @@ impl TryFrom<Config> for Client {
             cluster_url,
             headers,
             auth_header,
-            inner: client,
+            inner: HyperService::new(client),
         })
+    }
+}
+
+// A struct to experiment with `tower::Service` without adding type parameter to `kube::Client`.
+// Wraps `HyperClient`.
+#[derive(Clone)]
+struct HyperService {
+    inner: HyperClient<HttpsConnector<HttpConnector>, Body>,
+}
+
+impl HyperService {
+    fn new(inner: HyperClient<HttpsConnector<HttpConnector>, Body>) -> Self {
+        Self { inner }
+    }
+}
+
+impl Service<Request<Body>> for HyperService {
+    type Error = hyper::Error;
+    type Future = hyper::client::ResponseFuture;
+    type Response = Response<Body>;
+
+    fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Request<Body>) -> Self::Future {
+        self.inner.call(req)
     }
 }
 
