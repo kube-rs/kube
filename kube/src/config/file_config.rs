@@ -171,10 +171,7 @@ impl AuthInfo {
                 if let Some(access_token) = provider.config.get("access-token") {
                     self.token = Some(access_token.clone());
                     if utils::is_expired(&provider.config["expiry"]) {
-                        let client = oauth2::CredentialsClient::new()?;
-                        let token = client
-                            .request_token(&["https://www.googleapis.com/auth/cloud-platform".to_string()])
-                            .await?;
+                        let token = oauth2::get_token().await?;
                         self.token = Some(token.access_token);
                     }
                 }
