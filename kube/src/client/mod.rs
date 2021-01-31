@@ -21,7 +21,7 @@ use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
-use http::{self, HeaderMap, Request, Response, StatusCode};
+use http::{self, Request, Response, StatusCode};
 use hyper::{client::HttpConnector, Body, Client as HyperClient};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -44,7 +44,6 @@ use std::convert::{TryFrom, TryInto};
 pub struct Client {
     inner: Buffer<BoxService<Request<Body>, Response<Body>, hyper::Error>, Request<Body>>,
     // TODO Move these into `Service`.
-    headers: HeaderMap,
     auth_header: config::Authentication,
 }
 
@@ -79,8 +78,7 @@ impl Client {
     async fn send(&mut self, request: Request<Body>) -> Result<Response<Body>> {
         let (mut parts, body) = request.into_parts();
         //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
-        let mut headers = self.headers.clone();
-        headers.extend(parts.headers.clone().into_iter());
+        let mut headers = parts.headers;
         // If we have auth headers set, make sure they are updated and attached to the request
         if let Some(auth_header) = self.auth_header.to_header().await? {
             headers.insert(http::header::AUTHORIZATION, auth_header);
@@ -380,8 +378,8 @@ impl TryFrom<Config> for Client {
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
+        let default_headers = config.headers.clone();
         // TODO Move these into `Service`.
-        let headers = config.headers.clone();
         let auth_header = config.auth_header.clone();
         let connector = config.try_into()?;
         let client: HyperClient<HttpsConnector<HttpConnector>, Body> =
@@ -391,15 +389,16 @@ impl TryFrom<Config> for Client {
             let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
             let uri_str = finalize_url(&cluster_url, &pandq);
             parts.uri = uri_str.parse().expect("valid URL");
+
+            let mut headers = default_headers.clone();
+            headers.extend(parts.headers.clone().into_iter());
+            parts.headers = headers;
+
             Request::from_parts(parts, body)
         });
         // `Buffer` so that it's `Clone`.
         let inner = ServiceBuilder::new().buffer(5).service(BoxService::new(client));
-        Ok(Self {
-            headers,
-            auth_header,
-            inner,
-        })
+        Ok(Self { auth_header, inner })
     }
 }
 
