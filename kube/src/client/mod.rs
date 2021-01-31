@@ -386,48 +386,20 @@ impl TryFrom<Config> for Client {
         let connector = config.try_into()?;
         let client: HyperClient<HttpsConnector<HttpConnector>, Body> =
             HyperClient::builder().build(connector);
+        let client = client.map_request(move |req: Request<Body>| {
+            let (mut parts, body) = req.into_parts();
+            let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
+            let uri_str = finalize_url(&cluster_url, &pandq);
+            parts.uri = uri_str.parse().expect("valid URL");
+            Request::from_parts(parts, body)
+        });
         // `Buffer` so that it's `Clone`.
-        let inner = ServiceBuilder::new()
-            .buffer(5)
-            .service(BoxService::new(SetClusterUrl::new(client, cluster_url)));
+        let inner = ServiceBuilder::new().buffer(5).service(BoxService::new(client));
         Ok(Self {
             headers,
             auth_header,
             inner,
         })
-    }
-}
-
-#[derive(Debug)]
-struct SetClusterUrl<T> {
-    inner: T,
-    cluster_url: url::Url,
-}
-
-impl<T> SetClusterUrl<T> {
-    fn new(inner: T, cluster_url: url::Url) -> Self {
-        Self { inner, cluster_url }
-    }
-}
-
-impl<T, ReqBody> Service<Request<ReqBody>> for SetClusterUrl<T>
-where
-    T: Service<Request<ReqBody>>,
-{
-    type Error = T::Error;
-    type Future = T::Future;
-    type Response = T::Response;
-
-    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        let (mut parts, body) = req.into_parts();
-        let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
-        let uri_str = finalize_url(&self.cluster_url, &pandq);
-        parts.uri = uri_str.parse().expect("valid URL");
-        self.inner.call(Request::from_parts(parts, body))
     }
 }
 
