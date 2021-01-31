@@ -150,12 +150,18 @@ pub enum ConfigError {
     OAuth2LoadCredentials(#[source] std::io::Error),
     #[error("Unable to parse OAuth2 credentials file: {0}")]
     OAuth2ParseCredentials(#[source] serde_json::Error),
+    #[error("Credentials file had invalid key format: {0}")]
+    OAuth2InvalidKeyFormat(#[source] tame_oauth::Error),
+    #[error("Credentials file had invalid RSA key: {0}")]
+    OAuth2InvalidRsaKey(#[source] tame_oauth::Error),
     #[error("Unable to request token: {0}")]
     OAuth2RequestToken(#[source] hyper::Error),
     #[error("Fail to retrieve new credential {0:?}")]
-    OAuth2RetrieveCredentials(Box<http::Response<hyper::Body>>),
+    OAuth2RetrieveCredentials(#[source] tame_oauth::Error),
     #[error("Unable to parse token: {0}")]
     OAuth2ParseToken(#[source] serde_json::Error),
+    #[error("Unknown OAuth2 error: {0}")]
+    OAuth2Unknown(String),
 
     #[error("Unable to load config file: {0}")]
     LoadConfigFile(#[source] Box<Error>),
