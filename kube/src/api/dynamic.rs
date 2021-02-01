@@ -48,7 +48,7 @@ impl DynamicResource {
     /// ### Example usage:
     /// ```
     /// use kube::api::DynamicResource;
-    /// # async fn scope(mut client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// let apps = client.list_api_group_resources("apps/v1").await?;
     /// for ar in &apps.resources {
     ///     let dr = DynamicResource::from_api_resource(ar, &apps.group_version);

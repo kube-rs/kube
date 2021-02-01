@@ -120,13 +120,13 @@ async fn main() -> Result<()> {
 
     // Creating CRD v1 works as expected.
     println!("Creating CRD v1");
-    let mut client = Client::try_default().await?;
+    let client = Client::try_default().await?;
     delete_crd(client.clone()).await?;
     assert!(create_crd(client.clone()).await.is_ok());
 
     // Test creating Foo resource.
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
-    let mut foos = Api::<Foo>::namespaced(client.clone(), &namespace);
+    let foos = Api::<Foo>::namespaced(client.clone(), &namespace);
     // Create with defaults using typed Api first.
     // `non_nullable` and `non_nullable_with_default` are set to empty strings.
     // Nullables defaults to `None` and only sent if it's not configured to skip.
@@ -243,7 +243,7 @@ async fn main() -> Result<()> {
 
 // Create CRD and wait for it to be ready.
 async fn create_crd(client: Client) -> Result<CustomResourceDefinition> {
-    let mut api = Api::<CustomResourceDefinition>::all(client);
+    let api = Api::<CustomResourceDefinition>::all(client);
     api.create(&PostParams::default(), &Foo::crd()).await?;
 
     // Wait until ready
@@ -274,7 +274,7 @@ async fn create_crd(client: Client) -> Result<CustomResourceDefinition> {
 
 // Delete the CRD if it exists and wait until it's deleted.
 async fn delete_crd(client: Client) -> Result<()> {
-    let mut api = Api::<CustomResourceDefinition>::all(client);
+    let api = Api::<CustomResourceDefinition>::all(client);
     if api.get("foos.clux.dev").await.is_ok() {
         api.delete("foos.clux.dev", &DeleteParams::default()).await?;
 

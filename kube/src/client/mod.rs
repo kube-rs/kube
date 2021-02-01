@@ -75,7 +75,7 @@ impl Client {
         Self::try_from(client_config)
     }
 
-    async fn send(&mut self, request: Request<Body>) -> Result<Response<Body>> {
+    async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
         let (mut parts, body) = request.into_parts();
         //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
         let mut headers = parts.headers;
@@ -94,8 +94,8 @@ impl Client {
             other => return Err(Error::InvalidMethod(other.to_string())),
         };
 
-        let res = self
-            .inner
+        let mut svc = self.inner.clone();
+        let res = svc
             .ready_and()
             .await
             .map_err(Error::Service)?
@@ -115,7 +115,7 @@ impl Client {
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
     pub async fn connect(
-        &mut self,
+        &self,
         request: Request<Vec<u8>>,
     ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
         use http::header::HeaderValue;
@@ -162,7 +162,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and deserialize the response
     /// as JSON to some known type.
-    pub async fn request<T>(&mut self, request: Request<Vec<u8>>) -> Result<T>
+    pub async fn request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
@@ -176,7 +176,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
-    pub async fn request_text(&mut self, request: Request<Vec<u8>>) -> Result<String> {
+    pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
         let res = self.send(request.map(Body::from)).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
@@ -190,7 +190,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and get back the response
     /// as a stream of bytes
     pub async fn request_text_stream(
-        &mut self,
+        &self,
         request: Request<Vec<u8>>,
     ) -> Result<impl Stream<Item = Result<Bytes>>> {
         let res = self.send(request.map(Body::from)).await?;
@@ -200,7 +200,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back either an object
     /// deserialized as JSON or a [`Status`] Object.
-    pub async fn request_status<T>(&mut self, request: Request<Vec<u8>>) -> Result<Either<T, Status>>
+    pub async fn request_status<T>(&self, request: Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
@@ -223,7 +223,7 @@ impl Client {
 
     /// Perform a raw request and get back a stream of [`WatchEvent`] objects
     pub async fn request_events<T: Clone + Meta>(
-        &mut self,
+        &self,
         request: Request<Vec<u8>>,
     ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>>>
     where
@@ -293,13 +293,13 @@ impl Client {
     }
 
     /// Returns apiserver version.
-    pub async fn apiserver_version(&mut self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
+    pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
         self.request(Request::builder().uri("/version").body(vec![])?)
             .await
     }
 
     /// Lists api groups that apiserver serves.
-    pub async fn list_api_groups(&mut self) -> Result<k8s_meta_v1::APIGroupList> {
+    pub async fn list_api_groups(&self) -> Result<k8s_meta_v1::APIGroupList> {
         self.request(Request::builder().uri("/apis").body(vec![])?).await
     }
 
@@ -307,7 +307,7 @@ impl Client {
     ///
     /// ### Example usage:
     /// ```rust
-    /// # async fn scope(mut client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// let apigroups = client.list_api_groups().await?;
     /// for g in apigroups.groups {
     ///     let ver = g
@@ -321,21 +321,18 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn list_api_group_resources(
-        &mut self,
-        apiversion: &str,
-    ) -> Result<k8s_meta_v1::APIResourceList> {
+    pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/apis/{}", apiversion);
         self.request(Request::builder().uri(url).body(vec![])?).await
     }
 
     /// Lists versions of `core` a.k.a. `""` legacy API group.
-    pub async fn list_core_api_versions(&mut self) -> Result<k8s_meta_v1::APIVersions> {
+    pub async fn list_core_api_versions(&self) -> Result<k8s_meta_v1::APIVersions> {
         self.request(Request::builder().uri("/api").body(vec![])?).await
     }
 
     /// Lists resources served in particular `core` group version.
-    pub async fn list_core_api_resources(&mut self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
+    pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/api/{}", version);
         self.request(Request::builder().uri(url).body(vec![])?).await
     }

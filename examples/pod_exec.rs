@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }))?;
 
-    let mut pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods: Api<Pod> = Api::namespaced(client, &namespace);
     // Stop on error including a pod already exists or is still being deleted.
     pods.create(&PostParams::default(), &p).await?;
 

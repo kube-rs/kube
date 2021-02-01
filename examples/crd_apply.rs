@@ -41,14 +41,14 @@ async fn main() -> anyhow::Result<()> {
     let ssapply = PatchParams::apply("crd_apply_example").force();
 
     // 0. Apply the CRD
-    let mut crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
     crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
         .await?;
-    wait_for_crd_ready(&mut crds).await?; // wait for k8s to deal with it
+    wait_for_crd_ready(&crds).await?; // wait for k8s to deal with it
 
     // Start applying foos
-    let mut foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
+    let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
     // 1. Apply from a full struct (e.g. equivalent to replace w/o resource_version)
     let foo = Foo::new("baz", FooSpec {
@@ -78,7 +78,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn wait_for_crd_ready(crds: &mut Api<CustomResourceDefinition>) -> anyhow::Result<()> {
+async fn wait_for_crd_ready(crds: &Api<CustomResourceDefinition>) -> anyhow::Result<()> {
     if crds.get("foos.clux.dev").await.is_ok() {
         return Ok(());
     }

@@ -12,20 +12,20 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,node_watcher=debug,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
-    let mut events: Api<Event> = Api::all(client.clone());
+    let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 
     let lp = ListParams::default().labels("beta.kubernetes.io/os=linux");
 
     let mut apply_stream = try_flatten_applied(watcher(nodes, lp)).boxed();
     while let Some(n) = apply_stream.try_next().await? {
-        check_for_node_failures(&mut events, n).await?;
+        check_for_node_failures(&events, n).await?;
     }
     Ok(())
 }
 
 // A simple node problem detector
-async fn check_for_node_failures(events: &mut Api<Event>, o: Node) -> anyhow::Result<()> {
+async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result<()> {
     let name = Meta::name(&o);
     // Nodes often modify a lot - only print broken nodes
     if let Some(true) = o.spec.unwrap().unschedulable {

@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     // Manage CRDs first
-    let mut crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();
@@ -79,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
     sleep(Duration::from_secs(1)).await;
 
     // Manage the Foo CR
-    let mut foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
+    let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
     // Create Foo baz
     info!("Creating Foo instance baz");

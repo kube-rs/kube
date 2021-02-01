@@ -104,7 +104,7 @@ enum State<K: Meta + Clone> {
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
 async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
-    api: &mut Api<K>,
+    api: &Api<K>,
     list_params: &ListParams,
     state: State<K>,
 ) -> (Option<Result<Event<K>>>, State<K>) {
@@ -169,12 +169,12 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 
 /// Trampoline helper for `step_trampolined`
 async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
-    mut api: &mut Api<K>,
+    api: &Api<K>,
     list_params: &ListParams,
     mut state: State<K>,
 ) -> (Result<Event<K>>, State<K>) {
     loop {
-        match step_trampolined(&mut api, &list_params, state).await {
+        match step_trampolined(&api, &list_params, state).await {
             (Some(result), new_state) => return (result, new_state),
             (None, new_state) => state = new_state,
         }
@@ -226,8 +226,8 @@ pub fn watcher<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
     futures::stream::unfold(
         (api, list_params, State::Empty),
-        |(mut api, list_params, state)| async {
-            let (event, state) = step(&mut api, &list_params, state).await;
+        |(api, list_params, state)| async {
+            let (event, state) = step(&api, &list_params, state).await;
             Some((event, (api, list_params, state)))
         },
     )

@@ -23,7 +23,7 @@
 //!
 //!     // Get a strongly typed handle to the Kubernetes API for interacting
 //!     // with pods in the "default" namespace.
-//!     let mut pods: Api<Pod> = Api::namespaced(client, "default");
+//!     let pods: Api<Pod> = Api::namespaced(client, "default");
 //!
 //!     // Create a pod from JSON
 //!     let pod = serde_json::from_value(serde_json::json!({
