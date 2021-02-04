@@ -22,11 +22,7 @@ mod connector {
         fn try_from(config: Config) -> Result<Self> {
             let mut http = HttpConnector::new();
             http.enforce_http(false);
-            if let Some(t) = config.timeout {
-                http.set_connect_timeout(Some(t));
-            }
             let tls: AsyncTlsConnector = config.try_into()?;
-
             Ok(HttpsConnector::from((http, tls)))
         }
     }
@@ -93,9 +89,6 @@ mod connector {
         fn try_from(config: Config) -> Result<Self> {
             let mut http = HttpConnector::new();
             http.enforce_http(false);
-            if let Some(t) = config.timeout {
-                http.set_connect_timeout(Some(t));
-            }
             let client_config: ClientConfig = config.try_into()?;
             let client_config = Arc::new(client_config);
 

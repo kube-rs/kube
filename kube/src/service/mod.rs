@@ -15,7 +15,8 @@ use tls::HttpsConnector;
 use std::convert::{TryFrom, TryInto};
 
 use http::{Request, Response};
-use hyper::{client::HttpConnector, Body, Client as HyperClient};
+use hyper::{Body, Client as HyperClient};
+use hyper_timeout::TimeoutConnector;
 use tower::{buffer::Buffer, util::BoxService, ServiceBuilder};
 
 use crate::{Config, Error, Result};
@@ -64,10 +65,19 @@ impl TryFrom<Config> for Service {
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
         let default_headers = config.headers.clone();
+        let timeout = config.timeout;
 
-        let connector = config.try_into()?;
-        let client: HyperClient<HttpsConnector<HttpConnector>, Body> =
-            HyperClient::builder().build(connector);
+        let https: HttpsConnector<_> = config.try_into()?;
+        let mut connector = TimeoutConnector::new(https);
+        if let Some(timeout) = timeout {
+            // reqwest's timeout is applied from when the request stars connecting until
+            // the response body has finished.
+            // Setting both connect and read timeout should be close enough.
+            connector.set_connect_timeout(Some(timeout));
+            // Timeout for reading the response.
+            connector.set_read_timeout(Some(timeout));
+        }
+        let client: HyperClient<_, Body> = HyperClient::builder().build(connector);
 
         let inner = ServiceBuilder::new()
             .map_request(move |r| set_cluster_url(r, &cluster_url))
