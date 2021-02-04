@@ -4,63 +4,20 @@
 //!
 //! Unless you have issues, prefer using [`Config::infer`] and pass it to a [`Client`][crate::Client].
 
-mod exec;
+mod auth;
 mod file_config;
 mod file_loader;
 mod incluster_config;
 mod utils;
 
 use crate::{error::ConfigError, Result};
+pub(crate) use auth::Authentication;
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 
-use chrono::{DateTime, Utc};
 use http::header::{self, HeaderMap};
-use tokio::sync::Mutex;
 
-use std::{sync::Arc, time::Duration};
-
-#[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum Authentication {
-    None,
-    Basic(String),
-    Token(String),
-    RefreshableToken(Arc<Mutex<(String, DateTime<Utc>)>>, ConfigLoader),
-}
-
-impl Authentication {
-    pub(crate) async fn to_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
-        match self {
-            Self::None => Ok(None),
-            Self::Basic(value) => Ok(Some(
-                header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBasicAuth)?,
-            )),
-            Self::Token(value) => Ok(Some(
-                header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBearerToken)?,
-            )),
-            Self::RefreshableToken(data, loader) => {
-                let mut locked_data = data.lock().await;
-                // Add some wiggle room onto the current timestamp so we don't get any race
-                // conditions where the token expires while we are refreshing
-                if chrono::Utc::now() + chrono::Duration::seconds(60) >= locked_data.1 {
-                    if let Authentication::RefreshableToken(d, _) = load_auth_header(loader)? {
-                        let (new_token, new_expire) = Arc::try_unwrap(d)
-                            .expect("Unable to unwrap Arc, this is likely a programming error")
-                            .into_inner();
-                        locked_data.0 = new_token;
-                        locked_data.1 = new_expire;
-                    } else {
-                        return Err(ConfigError::UnrefreshableTokenResponse);
-                    }
-                }
-                Ok(Some(
-                    header::HeaderValue::from_str(&locked_data.0).map_err(ConfigError::InvalidBearerToken)?,
-                ))
-            }
-        }
-    }
-}
+use std::time::Duration;
 
 /// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
 #[derive(Debug, Clone)]
@@ -224,7 +181,7 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
-            auth_header: load_auth_header(&loader)?,
+            auth_header: auth::load_auth_header(&loader)?,
         })
     }
 
@@ -236,47 +193,6 @@ impl Config {
     /// (such as anonymous access, or certificate-based authentication).
     pub async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
         self.auth_header.to_header().await
-    }
-}
-
-/// Loads the authentication header from the credentials available in the kubeconfig. This supports
-/// exec plugins as well as specified in
-/// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
-fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication, ConfigError> {
-    let (raw_token, expiration) = match &loader.user.token {
-        Some(token) => (Some(token.clone()), None),
-        None => {
-            if let Some(exec) = &loader.user.exec {
-                let creds = exec::auth_exec(exec)?;
-                let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
-                let expiration = match status.expiration_timestamp {
-                    Some(ts) => Some(
-                        ts.parse::<DateTime<Utc>>()
-                            .map_err(ConfigError::MalformedTokenExpirationDate)?,
-                    ),
-                    None => None,
-                };
-                (status.token, expiration)
-            } else {
-                (None, None)
-            }
-        }
-    };
-    match (
-        utils::data_or_file(&raw_token, &loader.user.token_file),
-        (&loader.user.username, &loader.user.password),
-        expiration,
-    ) {
-        (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
-        (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(
-            Arc::new(Mutex::new((format!("Bearer {}", token), expire))),
-            loader.clone(),
-        )),
-        (_, (Some(u), Some(p)), _) => {
-            let encoded = base64::encode(&format!("{}:{}", u, p));
-            Ok(Authentication::Basic(format!("Basic {}", encoded)))
-        }
-        _ => Ok(Authentication::None),
     }
 }
 
