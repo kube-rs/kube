@@ -1,12 +1,16 @@
-use std::{process::Command, sync::Arc};
+use std::{
+    convert::{TryFrom, TryInto},
+    process::Command,
+    sync::Arc,
+};
 
 use chrono::{DateTime, Utc};
 use http::header;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use super::{file_loader::ConfigLoader, utils};
-use crate::{config::ExecConfig, error::ConfigError};
+use super::{utils, AuthInfo, ExecConfig};
+use crate::error::ConfigError;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -14,7 +18,7 @@ pub(crate) enum Authentication {
     None,
     Basic(String),
     Token(String),
-    RefreshableToken(Arc<Mutex<(String, DateTime<Utc>)>>, ConfigLoader),
+    RefreshableToken(Arc<Mutex<(String, DateTime<Utc>)>>, AuthInfo),
 }
 
 impl Authentication {
@@ -27,12 +31,12 @@ impl Authentication {
             Self::Token(value) => Ok(Some(
                 header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBearerToken)?,
             )),
-            Self::RefreshableToken(data, loader) => {
+            Self::RefreshableToken(data, auth_info) => {
                 let mut locked_data = data.lock().await;
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
                 if chrono::Utc::now() + chrono::Duration::seconds(60) >= locked_data.1 {
-                    if let Authentication::RefreshableToken(d, _) = load_auth_header(loader)? {
+                    if let Authentication::RefreshableToken(d, _) = auth_info.try_into()? {
                         let (new_token, new_expire) = Arc::try_unwrap(d)
                             .expect("Unable to unwrap Arc, this is likely a programming error")
                             .into_inner();
@@ -50,44 +54,49 @@ impl Authentication {
     }
 }
 
-/// Loads the authentication header from the credentials available in the kubeconfig. This supports
-/// exec plugins as well as specified in
-/// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
-pub(crate) fn load_auth_header(loader: &ConfigLoader) -> Result<Authentication, ConfigError> {
-    let (raw_token, expiration) = match &loader.user.token {
-        Some(token) => (Some(token.clone()), None),
-        None => {
-            if let Some(exec) = &loader.user.exec {
-                let creds = auth_exec(exec)?;
-                let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
-                let expiration = match status.expiration_timestamp {
-                    Some(ts) => Some(
-                        ts.parse::<DateTime<Utc>>()
-                            .map_err(ConfigError::MalformedTokenExpirationDate)?,
-                    ),
-                    None => None,
-                };
-                (status.token, expiration)
-            } else {
-                (None, None)
+impl TryFrom<&AuthInfo> for Authentication {
+    type Error = ConfigError;
+
+    /// Loads the authentication header from the credentials available in the kubeconfig. This supports
+    /// exec plugins as well as specified in
+    /// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
+    fn try_from(auth_info: &AuthInfo) -> Result<Self, Self::Error> {
+        let (raw_token, expiration) = match &auth_info.token {
+            Some(token) => (Some(token.clone()), None),
+            None => {
+                if let Some(exec) = &auth_info.exec {
+                    let creds = auth_exec(exec)?;
+                    let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
+                    let expiration = match status.expiration_timestamp {
+                        Some(ts) => Some(
+                            ts.parse::<DateTime<Utc>>()
+                                .map_err(ConfigError::MalformedTokenExpirationDate)?,
+                        ),
+                        None => None,
+                    };
+                    (status.token, expiration)
+                } else {
+                    (None, None)
+                }
             }
+        };
+
+        match (
+            utils::data_or_file(&raw_token, &auth_info.token_file),
+            (&auth_info.username, &auth_info.password),
+            expiration,
+        ) {
+            (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
+            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(
+                Arc::new(Mutex::new((format!("Bearer {}", token), expire))),
+                auth_info.clone(),
+            )),
+            (_, (Some(u), Some(p)), _) => {
+                let encoded = base64::encode(&format!("{}:{}", u, p));
+                Ok(Authentication::Basic(format!("Basic {}", encoded)))
+            }
+            _ => Ok(Authentication::None),
         }
-    };
-    match (
-        utils::data_or_file(&raw_token, &loader.user.token_file),
-        (&loader.user.username, &loader.user.password),
-        expiration,
-    ) {
-        (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
-        (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(
-            Arc::new(Mutex::new((format!("Bearer {}", token), expire))),
-            loader.clone(),
-        )),
-        (_, (Some(u), Some(p)), _) => {
-            let encoded = base64::encode(&format!("{}:{}", u, p));
-            Ok(Authentication::Basic(format!("Basic {}", encoded)))
-        }
-        _ => Ok(Authentication::None),
     }
 }
 
