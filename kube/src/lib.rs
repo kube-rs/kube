@@ -92,6 +92,7 @@ pub mod config;
 // Rust doesn't allow items within a deprecated module to interact with each other..
 #[allow(deprecated)]
 pub mod runtime;
+pub mod service;
 
 pub mod error;
 mod oauth2;

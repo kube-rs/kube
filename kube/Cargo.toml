@@ -62,6 +62,8 @@ hyper-rustls = { version = "0.22.1", optional = true }
 tokio-tungstenite = { version = "0.13.0", optional = true }
 tower = { version = "0.4.4", features = ["buffer", "util"] }
 tame-oauth = { version = "0.4.7", features = ["gcp"] }
+async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
+pin-project = "1.0.4"
 
 [dependencies.k8s-openapi]
 version = "0.11.0"
