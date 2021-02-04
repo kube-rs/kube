@@ -20,10 +20,6 @@ use tokio::sync::Mutex;
 
 use std::{sync::Arc, time::Duration};
 
-/// Regardless of tls type, a Certificate Der is always a byte array
-#[derive(Debug, Clone)]
-pub struct Der(pub Vec<u8>);
-
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Authentication {
@@ -74,7 +70,7 @@ pub struct Config {
     /// The configured default namespace
     pub default_ns: String,
     /// The configured root certificate
-    pub root_cert: Option<Vec<Der>>,
+    pub root_cert: Option<Vec<Vec<u8>>>,
     /// Default headers to be used to communicate with the Kubernetes API
     pub headers: HeaderMap,
     /// Timeout for calls to the Kubernetes API.
@@ -291,9 +287,9 @@ const IDENTITY_PASSWORD: &str = " ";
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]
-fn hacky_cert_lifetime_for_macos(ca: &Der) -> bool {
+fn hacky_cert_lifetime_for_macos(ca: &[u8]) -> bool {
     use openssl::x509::X509;
-    let ca = X509::from_der(&ca.0).expect("valid der is a der");
+    let ca = X509::from_der(ca).expect("valid der is a der");
     ca.not_before()
         .diff(ca.not_after())
         .map(|d| d.days.abs() > 824)
@@ -301,7 +297,7 @@ fn hacky_cert_lifetime_for_macos(ca: &Der) -> bool {
 }
 
 #[cfg(any(not(target_os = "macos"), not(feature = "native-tls")))]
-fn hacky_cert_lifetime_for_macos(_: &Der) -> bool {
+fn hacky_cert_lifetime_for_macos(_: &[u8]) -> bool {
     false
 }
 

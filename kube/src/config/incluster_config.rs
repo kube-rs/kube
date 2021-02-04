@@ -1,9 +1,6 @@
 use std::env;
 
-use crate::{
-    config::{utils, Der},
-    Result,
-};
+use crate::{config::utils, Result};
 
 pub const SERVICE_HOSTENV: &str = "KUBERNETES_SERVICE_HOST";
 pub const SERVICE_PORTENV: &str = "KUBERNETES_SERVICE_PORT";
@@ -32,7 +29,7 @@ pub fn load_token() -> Result<String> {
 }
 
 /// Returns certification from specified path in cluster.
-pub fn load_cert() -> Result<Vec<Der>> {
+pub fn load_cert() -> Result<Vec<Vec<u8>>> {
     let ca = utils::data_or_file_with_base64(&None, &Some(SERVICE_CERTFILE))?;
     Ok(utils::certs(&ca))
 }
