@@ -43,7 +43,7 @@ mod connector {
             if let Some(ders) = config.root_cert {
                 for der in ders {
                     builder.add_root_certificate(
-                        Certificate::from_der(&der.0).map_err(|e| Error::SslError(format!("{}", e)))?,
+                        Certificate::from_der(&der).map_err(|e| Error::SslError(format!("{}", e)))?,
                     );
                 }
             }
@@ -141,7 +141,7 @@ mod connector {
                 for der in ders {
                     client_config
                         .root_store
-                        .add(&Certificate(der.0))
+                        .add(&Certificate(der))
                         .map_err(|e| Error::SslError(format!("{}", e)))?;
                 }
             }

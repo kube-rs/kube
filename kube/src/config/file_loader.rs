@@ -1,6 +1,6 @@
 use super::{
     file_config::{AuthInfo, Cluster, Context, Kubeconfig},
-    utils, Der,
+    utils,
 };
 use crate::{error::ConfigError, Result};
 
@@ -107,7 +107,7 @@ impl ConfigLoader {
         Ok(buffer)
     }
 
-    pub fn ca_bundle(&self) -> Result<Option<Vec<Der>>> {
+    pub fn ca_bundle(&self) -> Result<Option<Vec<Vec<u8>>>> {
         if let Some(bundle) = self.cluster.load_certificate_authority()? {
             Ok(Some(utils::certs(&bundle)))
         } else {

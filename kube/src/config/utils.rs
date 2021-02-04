@@ -7,8 +7,6 @@ use crate::{error::ConfigError, Error, Result};
 use chrono::{DateTime, Utc};
 use dirs::home_dir;
 
-use super::Der;
-
 const KUBECONFIG: &str = "KUBECONFIG";
 
 /// Search the kubeconfig file
@@ -77,12 +75,12 @@ pub fn is_expired(timestamp: &str) -> bool {
     ts < now
 }
 
-pub fn certs(data: &[u8]) -> Vec<Der> {
+pub fn certs(data: &[u8]) -> Vec<Vec<u8>> {
     pem::parse_many(data)
         .into_iter()
         .filter_map(|p| {
             if p.tag == "CERTIFICATE" {
-                Some(Der(p.contents))
+                Some(p.contents)
             } else {
                 None
             }
