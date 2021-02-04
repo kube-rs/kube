@@ -81,7 +81,6 @@ mod connector {
     use crate::{config::Config, Error, Result};
 
     pub use hyper_rustls::HttpsConnector;
-    use tokio_rustls::TlsConnector as AsyncTlsConnector;
 
     impl TryFrom<Config> for HttpsConnector<HttpConnector> {
         type Error = Error;
