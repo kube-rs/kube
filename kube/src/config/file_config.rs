@@ -2,11 +2,9 @@
 
 use std::{collections::HashMap, fs::File, path::Path};
 
-use crate::{config::utils, error::ConfigError, oauth2, Result};
+use crate::{config::utils, error::ConfigError, Result};
 
 use serde::{Deserialize, Serialize};
-
-use jsonpath_lib::select as jsonpath_select;
 
 /// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
 /// that is normally stored in `~/.kube/config`
@@ -165,140 +163,11 @@ impl Cluster {
 }
 
 impl AuthInfo {
-    pub(crate) async fn load_gcp(&mut self) -> Result<()> {
-        match &self.auth_provider {
-            Some(provider) => {
-                if let Some(access_token) = provider.config.get("access-token") {
-                    self.token = Some(access_token.clone());
-                    if utils::is_expired(&provider.config["expiry"]) {
-                        let token = oauth2::get_token().await?;
-                        self.token = Some(token.access_token);
-                    }
-                }
-                if let Some(id_token) = provider.config.get("id-token") {
-                    self.token = Some(id_token.clone());
-                }
-
-                if self.token.is_none() {
-                    if let Some(cmd) = provider.config.get("cmd-path") {
-                        let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
-
-                        let output = std::process::Command::new(cmd)
-                            .args(params.trim().split(' '))
-                            .output()
-                            .map_err(|e| {
-                                ConfigError::AuthExec(format!("Executing {:} failed: {:?}", cmd, e))
-                            })?;
-
-                        if !output.status.success() {
-                            return Err(ConfigError::AuthExecRun {
-                                cmd: format! {"{} {}", cmd, params},
-                                status: output.status,
-                                out: output,
-                            }
-                            .into());
-                        }
-
-                        if let Some(field) = provider.config.get("token-key") {
-                            let pure_path = field.trim_matches(|c| c == '"' || c == '{' || c == '}');
-                            let json_output: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-                            match jsonpath_select(&json_output, &format!("${}", pure_path)) {
-                                Ok(v) if !v.is_empty() => {
-                                    if let serde_json::Value::String(res) = v[0] {
-                                        self.token = Some(res.clone());
-                                    } else {
-                                        return Err(ConfigError::AuthExec(format!(
-                                            "Target value at {:} is not a string",
-                                            pure_path
-                                        ))
-                                        .into());
-                                    }
-                                }
-                                Err(e) => {
-                                    return Err(ConfigError::AuthExec(format!(
-                                        "Could not extract JSON value: {:}",
-                                        e
-                                    ))
-                                    .into());
-                                }
-                                _ => {
-                                    return Err(ConfigError::AuthExec(format!(
-                                        "Target value {:} not found",
-                                        pure_path
-                                    ))
-                                    .into());
-                                }
-                            };
-                        } else {
-                            self.token = Some(
-                                std::str::from_utf8(&output.stdout)
-                                    .map_err(|e| {
-                                        ConfigError::AuthExec(format!("Result is not a string {:?} ", e))
-                                    })?
-                                    .to_owned(),
-                            );
-                        }
-                    } else {
-                        return Err(ConfigError::AuthExec(format!(
-                            "no token or command provided. Authoring mechanism {:} not supported",
-                            provider.name
-                        ))
-                        .into());
-                    }
-                }
-            }
-            None => {}
-        };
-        Ok(())
-    }
-
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
     }
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[tokio::test]
-    async fn exec_auth_command() -> Result<()> {
-        let test_file = "
-        apiVersion: v1
-        clusters:
-        - cluster:
-            certificate-authority-data: XXXXXXX
-            server: https://36.XXX.XXX.XX
-          name: generic-name
-        contexts:
-        - context:
-            cluster: generic-name
-            user: generic-name
-          name: generic-name
-        current-context: generic-name
-        kind: Config
-        preferences: {}
-        users:
-        - name: generic-name
-          user:
-            auth-provider:
-              config:
-                cmd-args: '{\"something\": \"else\", \"credential\" : {\"access_token\" : \"my_token\"} }'
-                cmd-path: echo
-                expiry-key: '{.credential.token_expiry}'
-                token-key: '{.credential.access_token}'
-              name: gcp
-        ";
-
-        let mut config: Kubeconfig = serde_yaml::from_str(test_file).map_err(ConfigError::ParseYaml)?;
-        let auth_info = &mut config.auth_infos[0].auth_info;
-        assert!(auth_info.token.is_none());
-        auth_info.load_gcp().await?;
-        assert_eq!(auth_info.token, Some("my_token".to_owned()));
-
-        Ok(())
     }
 }

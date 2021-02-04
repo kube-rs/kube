@@ -1,4 +1,5 @@
 use super::{
+    auth,
     file_config::{AuthInfo, Cluster, Context, Kubeconfig},
     utils,
 };
@@ -85,7 +86,9 @@ impl ConfigLoader {
         for named_user in config.auth_infos {
             if &named_user.name == user_name {
                 let mut user = named_user.auth_info.clone();
-                user.load_gcp().await?;
+                if let Some(provider) = &user.auth_provider {
+                    user.token = auth::token_from_provider(provider).await?;
+                }
                 user_opt = Some(user);
             }
         }
