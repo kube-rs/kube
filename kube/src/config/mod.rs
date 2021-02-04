@@ -17,7 +17,7 @@ pub use file_loader::KubeConfigOptions;
 
 use http::header::{self, HeaderMap};
 
-use std::time::Duration;
+use std::{convert::TryInto, time::Duration};
 
 /// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
 #[derive(Debug, Clone)]
@@ -181,7 +181,7 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
-            auth_header: auth::load_auth_header(&loader)?,
+            auth_header: (&loader.user).try_into()?,
         })
     }
 
