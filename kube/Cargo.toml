@@ -22,6 +22,7 @@ rustls-tls = ["rustls", "hyper-rustls", "tokio-rustls"]
 derive = ["kube-derive"]
 jsonpatch = ["json-patch"]
 ws = ["tokio-tungstenite"]
+oauth = ["tame-oauth"]
 
 [package.metadata.docs.rs]
 features = ["derive", "ws"]
@@ -61,7 +62,7 @@ hyper-tls = { version = "0.5.0", optional = true }
 hyper-rustls = { version = "0.22.1", optional = true }
 tokio-tungstenite = { version = "0.13.0", optional = true }
 tower = { version = "0.4.4", features = ["buffer", "util"] }
-tame-oauth = { version = "0.4.7", features = ["gcp"] }
+tame-oauth = { version = "0.4.7", features = ["gcp"], optional = true }
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
 pin-project = "1.0.4"
 hyper-timeout = "0.4.1"
