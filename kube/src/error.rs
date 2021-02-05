@@ -145,24 +145,33 @@ pub enum ConfigError {
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
+    #[cfg(feature = "oauth")]
     #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
     /// Missing GOOGLE_APPLICATION_CREDENTIALS env
     MissingGoogleCredentials,
 
+    #[cfg(feature = "oauth")]
     #[error("Unable to load OAuth2 credentials file: {0}")]
     OAuth2LoadCredentials(#[source] std::io::Error),
+    #[cfg(feature = "oauth")]
     #[error("Unable to parse OAuth2 credentials file: {0}")]
     OAuth2ParseCredentials(#[source] serde_json::Error),
+    #[cfg(feature = "oauth")]
     #[error("Credentials file had invalid key format: {0}")]
     OAuth2InvalidKeyFormat(#[source] tame_oauth::Error),
+    #[cfg(feature = "oauth")]
     #[error("Credentials file had invalid RSA key: {0}")]
     OAuth2InvalidRsaKey(#[source] tame_oauth::Error),
+    #[cfg(feature = "oauth")]
     #[error("Unable to request token: {0}")]
     OAuth2RequestToken(#[source] hyper::Error),
+    #[cfg(feature = "oauth")]
     #[error("Fail to retrieve new credential {0:?}")]
     OAuth2RetrieveCredentials(#[source] tame_oauth::Error),
+    #[cfg(feature = "oauth")]
     #[error("Unable to parse token: {0}")]
     OAuth2ParseToken(#[source] serde_json::Error),
+    #[cfg(feature = "oauth")]
     #[error("Unknown OAuth2 error: {0}")]
     OAuth2Unknown(String),
 

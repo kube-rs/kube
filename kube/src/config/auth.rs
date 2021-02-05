@@ -1,17 +1,21 @@
-use std::{env, path::PathBuf, process::Command, sync::Arc};
+#[cfg(feature = "oauth")] use std::{env, path::PathBuf};
+use std::{process::Command, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use http::header;
 use jsonpath_lib::select as jsonpath_select;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
+
+#[cfg(all(feature = "oauth", feature = "rustls-tls"))]
+use hyper_rustls::HttpsConnector;
+#[cfg(all(feature = "oauth", feature = "native-tls"))]
+use hyper_tls::HttpsConnector;
+#[cfg(feature = "oauth")]
 use tame_oauth::{
     gcp::{ServiceAccountAccess, ServiceAccountInfo, TokenOrRequest},
     Error as OauthError, Token,
 };
-use tokio::sync::Mutex;
-
-#[cfg(feature = "rustls-tls")] use hyper_rustls::HttpsConnector;
-#[cfg(feature = "native-tls")] use hyper_tls::HttpsConnector;
 
 use super::{utils, AuthInfo, AuthProviderConfig, ExecConfig};
 use crate::{
@@ -182,7 +186,8 @@ async fn token_from_provider(provider: &AuthProviderConfig) -> Result<(String, O
         }
     }
 
-    // Fall back to oautht2 if supported
+    // Try oauth if supported
+    #[cfg(feature = "oauth")]
     if provider.name == "gcp" {
         let token_res = request_gcp_token().await?;
         let expiry_date = token_res.expiry_date();
@@ -268,6 +273,7 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, ConfigError> {
     Ok(creds)
 }
 
+#[cfg(feature = "oauth")]
 pub async fn request_gcp_token() -> Result<Token> {
     let info = gcloud_account_info()?;
     let access = ServiceAccountAccess::new(info).map_err(ConfigError::OAuth2InvalidKeyFormat)?;
@@ -317,8 +323,10 @@ pub async fn request_gcp_token() -> Result<Token> {
     }
 }
 
+#[cfg(feature = "oauth")]
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
+#[cfg(feature = "oauth")]
 fn gcloud_account_info() -> Result<ServiceAccountInfo, ConfigError> {
     let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
         .map(PathBuf::from)
