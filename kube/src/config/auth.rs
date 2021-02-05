@@ -74,7 +74,7 @@ impl Authentication {
     pub(crate) async fn from_auth_info(auth_info: &AuthInfo) -> Result<Self> {
         if let Some(provider) = &auth_info.auth_provider {
             match token_from_provider(provider).await? {
-                (token, Some(expiry)) => {
+                ProviderToken::GCP(token, Some(expiry)) => {
                     let mut info = auth_info.clone();
                     let mut provider = provider.clone();
                     provider.config.insert("access-token".into(), token.clone());
@@ -87,7 +87,7 @@ impl Authentication {
                     )))));
                 }
 
-                (token, None) => {
+                ProviderToken::GCP(token, None) => {
                     return Ok(Self::Token(format!("Bearer {}", token)));
                 }
             }
@@ -133,22 +133,44 @@ impl Authentication {
     }
 }
 
-async fn token_from_provider(provider: &AuthProviderConfig) -> Result<(String, Option<DateTime<Utc>>)> {
+// We need to differentiate providers because the keys/formats to store token expiration differs.
+enum ProviderToken {
+    // "access-token", "expiry" (RFC3339)
+    GCP(String, Option<DateTime<Utc>>),
+    // "access-token", "expires-on" (timestamp)
+    // Azure(String, Option<DateTime<Utc>>),
+}
+
+async fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
+    if provider.name == "gcp" {
+        token_from_gcp_provider(provider).await
+    } else {
+        Err(ConfigError::AuthExec(format!(
+            "Authentication with provider {:} not supported",
+            provider.name
+        ))
+        .into())
+    }
+}
+
+async fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
     if let Some(id_token) = provider.config.get("id-token") {
-        return Ok((id_token.clone(), None));
+        return Ok(ProviderToken::GCP(id_token.clone(), None));
     }
 
+    // Return cached access token if it's still valid
     if let Some(access_token) = provider.config.get("access-token") {
         if let Some(expiry) = provider.config.get("expiry") {
             let expiry_date = expiry
                 .parse::<DateTime<Utc>>()
                 .map_err(ConfigError::MalformedTokenExpirationDate)?;
             if Utc::now() + Duration::seconds(60) < expiry_date {
-                return Ok((access_token.clone(), Some(expiry_date)));
+                return Ok(ProviderToken::GCP(access_token.clone(), Some(expiry_date)));
             }
         }
     }
 
+    // Command-based token source
     if let Some(cmd) = provider.config.get("cmd-path") {
         let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
 
@@ -175,31 +197,40 @@ async fn token_from_provider(provider: &AuthProviderConfig) -> Result<(String, O
                 let expiry = expiry
                     .parse::<DateTime<Utc>>()
                     .map_err(ConfigError::MalformedTokenExpirationDate)?;
-                return Ok((token, Some(expiry)));
+                return Ok(ProviderToken::GCP(token, Some(expiry)));
             } else {
-                return Ok((token, None));
+                return Ok(ProviderToken::GCP(token, None));
             }
         } else {
             let token = std::str::from_utf8(&output.stdout)
                 .map_err(|e| ConfigError::AuthExec(format!("Result is not a string {:?} ", e)))?
                 .to_owned();
-            return Ok((token, None));
+            return Ok(ProviderToken::GCP(token, None));
         }
     }
 
-    // Try oauth if supported
+    // Google Application Credentials-based token source
     #[cfg(feature = "oauth")]
-    if provider.name == "gcp" {
-        let token_res = request_gcp_token().await?;
+    {
+        let token_res = if let Some(scopes) = provider.config.get("scopes") {
+            request_gcp_token(&scopes.split(',').collect::<Vec<_>>()).await?
+        } else {
+            request_gcp_token(&[
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/userinfo.email",
+            ])
+            .await?
+        };
         let expiry_date = token_res.expiry_date();
-        return Ok((token_res.access_token, Some(expiry_date)));
+        Ok(ProviderToken::GCP(token_res.access_token, Some(expiry_date)))
     }
-
-    return Err(ConfigError::AuthExec(format!(
-        "no token or command provided. Authentication provider {:} not supported",
-        provider.name
-    ))
-    .into());
+    #[cfg(not(feature = "oauth"))]
+    {
+        Err(ConfigError::AuthExec(
+            "Enable oauth feature to use Google Application Credentials-based token source".into(),
+        )
+        .into())
+    }
 }
 
 fn extract_value(json: &serde_json::Value, path: &str) -> Result<String> {
@@ -275,10 +306,14 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, ConfigError> {
 }
 
 #[cfg(feature = "oauth")]
-pub async fn request_gcp_token() -> Result<Token> {
+pub async fn request_gcp_token<'a, S, I>(scopes: I) -> Result<Token>
+where
+    S: AsRef<str> + 'a,
+    I: IntoIterator<Item = &'a S>,
+{
     let info = gcloud_account_info()?;
     let access = ServiceAccountAccess::new(info).map_err(OAuthError::InvalidKeyFormat)?;
-    match access.get_token(&["https://www.googleapis.com/auth/cloud-platform"]) {
+    match access.get_token(scopes) {
         Ok(TokenOrRequest::Request {
             request, scope_hash, ..
         }) => {
