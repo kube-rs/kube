@@ -4,14 +4,14 @@ use std::{
     sync::Arc,
 };
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use http::header;
 use jsonpath_lib::select as jsonpath_select;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
 use super::{utils, AuthInfo, AuthProviderConfig, ExecConfig};
-use crate::{error::ConfigError, oauth2, Result};
+use crate::{error::ConfigError, oauth2, Error, Result};
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -19,11 +19,11 @@ pub(crate) enum Authentication {
     None,
     Basic(String),
     Token(String),
-    RefreshableToken(Arc<Mutex<(String, DateTime<Utc>)>>, AuthInfo),
+    RefreshableToken(Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>),
 }
 
 impl Authentication {
-    pub(crate) async fn to_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
+    pub(crate) async fn to_header(&self) -> Result<Option<header::HeaderValue>> {
         match self {
             Self::None => Ok(None),
             Self::Basic(value) => Ok(Some(
@@ -32,19 +32,22 @@ impl Authentication {
             Self::Token(value) => Ok(Some(
                 header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBearerToken)?,
             )),
-            Self::RefreshableToken(data, auth_info) => {
+            Self::RefreshableToken(data) => {
                 let mut locked_data = data.lock().await;
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
-                if chrono::Utc::now() + chrono::Duration::seconds(60) >= locked_data.1 {
-                    if let Authentication::RefreshableToken(d, _) = auth_info.try_into()? {
-                        let (new_token, new_expire) = Arc::try_unwrap(d)
+                if Utc::now() + Duration::seconds(60) >= locked_data.1 {
+                    if let Authentication::RefreshableToken(d) =
+                        Authentication::from_auth_info(&locked_data.2).await?
+                    {
+                        let (new_token, new_expire, new_info) = Arc::try_unwrap(d)
                             .expect("Unable to unwrap Arc, this is likely a programming error")
                             .into_inner();
                         locked_data.0 = new_token;
                         locked_data.1 = new_expire;
+                        locked_data.2 = new_info;
                     } else {
-                        return Err(ConfigError::UnrefreshableTokenResponse);
+                        return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
                     }
                 }
                 Ok(Some(
@@ -53,10 +56,120 @@ impl Authentication {
             }
         }
     }
+
+    pub(crate) async fn from_auth_info(auth_info: &AuthInfo) -> Result<Self> {
+        if let Some(provider) = &auth_info.auth_provider {
+            match token_from_provider(provider).await? {
+                (token, Some(expiry)) => {
+                    let mut info = auth_info.clone();
+                    let mut provider = provider.clone();
+                    provider.config.insert("access-token".into(), token.clone());
+                    provider.config.insert("expiry".into(), expiry.to_rfc3339());
+                    info.auth_provider = Some(provider);
+                    return Ok(Self::RefreshableToken(Arc::new(Mutex::new((
+                        format!("Bearer {}", token),
+                        expiry,
+                        info,
+                    )))));
+                }
+
+                (token, None) => {
+                    return Ok(Self::Token(format!("Bearer {}", token)));
+                }
+            }
+        }
+
+        auth_info.try_into()
+    }
+}
+
+async fn token_from_provider(provider: &AuthProviderConfig) -> Result<(String, Option<DateTime<Utc>>)> {
+    if let Some(id_token) = provider.config.get("id-token") {
+        return Ok((id_token.clone(), None));
+    }
+
+    if let Some(access_token) = provider.config.get("access-token") {
+        if let Some(expiry) = provider.config.get("expiry") {
+            let expiry_date = expiry
+                .parse::<DateTime<Utc>>()
+                .map_err(ConfigError::MalformedTokenExpirationDate)?;
+            if Utc::now() + Duration::seconds(60) < expiry_date {
+                return Ok((access_token.clone(), Some(expiry_date)));
+            }
+        }
+    }
+
+    if let Some(cmd) = provider.config.get("cmd-path") {
+        let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
+
+        // TODO splitting args by space is not safe
+        let output = Command::new(cmd)
+            .args(params.trim().split(' '))
+            .output()
+            .map_err(|e| ConfigError::AuthExec(format!("Executing {:} failed: {:?}", cmd, e)))?;
+
+        if !output.status.success() {
+            return Err(ConfigError::AuthExecRun {
+                cmd: format! {"{} {}", cmd, params},
+                status: output.status,
+                out: output,
+            }
+            .into());
+        }
+
+        if let Some(field) = provider.config.get("token-key") {
+            let json_output: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+            let token = extract_value(&json_output, &field)?;
+            if let Some(field) = provider.config.get("expiry-key") {
+                let expiry = extract_value(&json_output, &field)?;
+                let expiry = expiry
+                    .parse::<DateTime<Utc>>()
+                    .map_err(ConfigError::MalformedTokenExpirationDate)?;
+                return Ok((token, Some(expiry)));
+            } else {
+                return Ok((token, None));
+            }
+        } else {
+            let token = std::str::from_utf8(&output.stdout)
+                .map_err(|e| ConfigError::AuthExec(format!("Result is not a string {:?} ", e)))?
+                .to_owned();
+            return Ok((token, None));
+        }
+    }
+
+    // Fall back to oautht2 if supported
+    if provider.name == "gcp" {
+        let token_res = oauth2::get_token().await?;
+        let expiry_date = token_res.expiry_date();
+        return Ok((token_res.access_token, Some(expiry_date)));
+    }
+
+    return Err(ConfigError::AuthExec(format!(
+        "no token or command provided. Authentication provider {:} not supported",
+        provider.name
+    ))
+    .into());
+}
+
+fn extract_value(json: &serde_json::Value, path: &str) -> Result<String> {
+    let pure_path = path.trim_matches(|c| c == '"' || c == '{' || c == '}');
+    match jsonpath_select(json, &format!("${}", pure_path)) {
+        Ok(v) if !v.is_empty() => {
+            if let serde_json::Value::String(res) = v[0] {
+                Ok(res.clone())
+            } else {
+                Err(ConfigError::AuthExec(format!("Target value at {:} is not a string", pure_path)).into())
+            }
+        }
+
+        Err(e) => Err(ConfigError::AuthExec(format!("Could not extract JSON value: {:}", e)).into()),
+
+        _ => Err(ConfigError::AuthExec(format!("Target value {:} not found", pure_path)).into()),
+    }
 }
 
 impl TryFrom<&AuthInfo> for Authentication {
-    type Error = ConfigError;
+    type Error = Error;
 
     /// Loads the authentication header from the credentials available in the kubeconfig. This supports
     /// exec plugins as well as specified in
@@ -88,10 +201,11 @@ impl TryFrom<&AuthInfo> for Authentication {
             expiration,
         ) {
             (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
-            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(
-                Arc::new(Mutex::new((format!("Bearer {}", token), expire))),
+            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(Arc::new(Mutex::new((
+                format!("Bearer {}", token),
+                expire,
                 auth_info.clone(),
-            )),
+            ))))),
             (_, (Some(u), Some(p)), _) => {
                 let encoded = base64::encode(&format!("{}:{}", u, p));
                 Ok(Authentication::Basic(format!("Basic {}", encoded)))
@@ -100,7 +214,6 @@ impl TryFrom<&AuthInfo> for Authentication {
         }
     }
 }
-
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
 /// HTTP transports.
@@ -157,84 +270,6 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, ConfigError> {
     Ok(creds)
 }
 
-pub(crate) async fn token_from_provider(provider: &AuthProviderConfig) -> Result<Option<String>> {
-    let mut token = None;
-    if let Some(access_token) = provider.config.get("access-token") {
-        token = Some(access_token.clone());
-        if utils::is_expired(&provider.config["expiry"]) {
-            // TODO This is GCP only. Check provider.name == "gcp"?
-            let token_res = oauth2::get_token().await?;
-            token = Some(token_res.access_token);
-        }
-    }
-
-    if let Some(id_token) = provider.config.get("id-token") {
-        token = Some(id_token.clone());
-    }
-
-    if token.is_none() {
-        if let Some(cmd) = provider.config.get("cmd-path") {
-            let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
-
-            let output = Command::new(cmd)
-                .args(params.trim().split(' '))
-                .output()
-                .map_err(|e| ConfigError::AuthExec(format!("Executing {:} failed: {:?}", cmd, e)))?;
-
-            if !output.status.success() {
-                return Err(ConfigError::AuthExecRun {
-                    cmd: format! {"{} {}", cmd, params},
-                    status: output.status,
-                    out: output,
-                }
-                .into());
-            }
-
-            if let Some(field) = provider.config.get("token-key") {
-                let pure_path = field.trim_matches(|c| c == '"' || c == '{' || c == '}');
-                let json_output: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-                match jsonpath_select(&json_output, &format!("${}", pure_path)) {
-                    Ok(v) if !v.is_empty() => {
-                        if let serde_json::Value::String(res) = v[0] {
-                            token = Some(res.clone());
-                        } else {
-                            return Err(ConfigError::AuthExec(format!(
-                                "Target value at {:} is not a string",
-                                pure_path
-                            ))
-                            .into());
-                        }
-                    }
-                    Err(e) => {
-                        return Err(
-                            ConfigError::AuthExec(format!("Could not extract JSON value: {:}", e)).into(),
-                        );
-                    }
-                    _ => {
-                        return Err(
-                            ConfigError::AuthExec(format!("Target value {:} not found", pure_path)).into(),
-                        );
-                    }
-                };
-            } else {
-                token = Some(
-                    std::str::from_utf8(&output.stdout)
-                        .map_err(|e| ConfigError::AuthExec(format!("Result is not a string {:?} ", e)))?
-                        .to_owned(),
-                );
-            }
-        } else {
-            return Err(ConfigError::AuthExec(format!(
-                "no token or command provided. Authoring mechanism {:} not supported",
-                provider.name
-            ))
-            .into());
-        }
-    }
-
-    Ok(token)
-}
-
 #[cfg(test)]
 mod test {
     use crate::config::Kubeconfig;
@@ -242,7 +277,9 @@ mod test {
     use super::*;
     #[tokio::test]
     async fn exec_auth_command() -> Result<()> {
-        let test_file = "
+        let expiry = (Utc::now() + Duration::seconds(60 * 60)).to_rfc3339();
+        let test_file = format!(
+            r#"
         apiVersion: v1
         clusters:
         - cluster:
@@ -256,27 +293,32 @@ mod test {
           name: generic-name
         current-context: generic-name
         kind: Config
-        preferences: {}
+        preferences: {{}}
         users:
         - name: generic-name
           user:
             auth-provider:
               config:
-                cmd-args: '{\"something\": \"else\", \"credential\" : {\"access_token\" : \"my_token\"} }'
+                cmd-args: '{{"something": "else", "credential": {{"access_token": "my_token", "token_expiry": "{expiry}"}}}}'
                 cmd-path: echo
-                expiry-key: '{.credential.token_expiry}'
-                token-key: '{.credential.access_token}'
+                expiry-key: '{{.credential.token_expiry}}'
+                token-key: '{{.credential.access_token}}'
               name: gcp
-        ";
+        "#,
+            expiry = expiry
+        );
 
-        let mut config: Kubeconfig = serde_yaml::from_str(test_file).map_err(ConfigError::ParseYaml)?;
+        let mut config: Kubeconfig = serde_yaml::from_str(&test_file).map_err(ConfigError::ParseYaml)?;
         let auth_info = &mut config.auth_infos[0].auth_info;
-        assert!(auth_info.token.is_none());
-        if let Some(provider) = &auth_info.auth_provider {
-            auth_info.token = token_from_provider(provider).await?;
+        match Authentication::from_auth_info(&auth_info).await {
+            Ok(Authentication::RefreshableToken(data)) => {
+                let (token, _expire, info) = Arc::try_unwrap(data).unwrap().into_inner();
+                assert_eq!(token, "Bearer my_token".to_owned());
+                let config = info.auth_provider.unwrap().config;
+                assert_eq!(config.get("access-token"), Some(&"my_token".to_owned()));
+            }
+            _ => unreachable!(),
         }
-        assert_eq!(auth_info.token, Some("my_token".to_owned()));
-
         Ok(())
     }
 }

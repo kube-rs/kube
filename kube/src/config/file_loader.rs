@@ -1,5 +1,4 @@
 use super::{
-    auth,
     file_config::{AuthInfo, Cluster, Context, Kubeconfig},
     utils,
 };
@@ -71,6 +70,7 @@ impl ConfigLoader {
             .ok_or_else(|| ConfigError::LoadContext {
                 context_name: context_name.clone(),
             })?;
+
         let cluster_name = cluster.unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
@@ -80,23 +80,21 @@ impl ConfigLoader {
             .ok_or_else(|| ConfigError::LoadClusterOfContext {
                 cluster_name: cluster_name.clone(),
             })?;
-        let user_name = user.unwrap_or(&current_context.user);
 
-        let mut user_opt = None;
-        if let Some(named_user) = config.auth_infos.iter().find(|a| &a.name == user_name) {
-            let mut user = named_user.auth_info.clone();
-            if let Some(provider) = &user.auth_provider {
-                user.token = auth::token_from_provider(provider).await?;
-            }
-            user_opt = Some(user);
-        }
-        let user = user_opt.ok_or_else(|| ConfigError::FindUser {
-            user_name: user_name.clone(),
-        })?;
+        let user_name = user.unwrap_or(&current_context.user);
+        let user = config
+            .auth_infos
+            .iter()
+            .find(|named_user| &named_user.name == user_name)
+            .map(|named_user| &named_user.auth_info)
+            .ok_or_else(|| ConfigError::FindUser {
+                user_name: user_name.clone(),
+            })?;
+
         Ok(ConfigLoader {
             current_context: current_context.clone(),
             cluster: cluster.clone(),
-            user,
+            user: user.clone(),
         })
     }
 

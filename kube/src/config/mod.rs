@@ -17,7 +17,7 @@ pub use file_loader::KubeConfigOptions;
 
 use http::header::{self, HeaderMap};
 
-use std::{convert::TryInto, time::Duration};
+use std::time::Duration;
 
 /// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
 #[derive(Debug, Clone)]
@@ -129,7 +129,7 @@ impl Config {
     /// but it will default to the current-context.
     pub async fn from_kubeconfig(options: &KubeConfigOptions) -> Result<Self> {
         let loader = ConfigLoader::new_from_options(options).await?;
-        Self::new_from_loader(loader)
+        Self::new_from_loader(loader).await
     }
 
     /// Create configuration from a [`Kubeconfig`] struct
@@ -138,10 +138,10 @@ impl Config {
     /// Like if you need stacked kubeconfigs for instance - see #132
     pub async fn from_custom_kubeconfig(kubeconfig: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
         let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
-        Self::new_from_loader(loader)
+        Self::new_from_loader(loader).await
     }
 
-    fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
+    async fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
         let cluster_url = url::Url::parse(&loader.cluster.server)?;
 
         let default_ns = loader
@@ -181,7 +181,7 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
-            auth_header: (&loader.user).try_into()?,
+            auth_header: Authentication::from_auth_info(&loader.user).await?,
         })
     }
 
@@ -191,7 +191,7 @@ impl Config {
     ///
     /// NOTE: This is `None` if the `Config` isn't configured to use token-based authentication
     /// (such as anonymous access, or certificate-based authentication).
-    pub async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>, ConfigError> {
+    pub async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>> {
         self.auth_header.to_header().await
     }
 }
