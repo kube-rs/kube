@@ -14,10 +14,11 @@ use hyper_tls::HttpsConnector;
 #[cfg(feature = "oauth")]
 use tame_oauth::{
     gcp::{ServiceAccountAccess, ServiceAccountInfo, TokenOrRequest},
-    Error as OauthError, Token,
+    Token,
 };
 
 use super::{utils, AuthInfo, AuthProviderConfig, ExecConfig};
+#[cfg(feature = "oauth")] use crate::error::OAuthError;
 use crate::{
     error::{ConfigError, Error},
     Result,
@@ -276,7 +277,7 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, ConfigError> {
 #[cfg(feature = "oauth")]
 pub async fn request_gcp_token() -> Result<Token> {
     let info = gcloud_account_info()?;
-    let access = ServiceAccountAccess::new(info).map_err(ConfigError::OAuth2InvalidKeyFormat)?;
+    let access = ServiceAccountAccess::new(info).map_err(OAuthError::InvalidKeyFormat)?;
     match access.get_token(&["https://www.googleapis.com/auth/cloud-platform"]) {
         Ok(TokenOrRequest::Request {
             request, scope_hash, ..
@@ -290,7 +291,7 @@ pub async fn request_gcp_token() -> Result<Token> {
             let res = client
                 .request(request.map(hyper::Body::from))
                 .await
-                .map_err(ConfigError::OAuth2RequestToken)?;
+                .map_err(OAuthError::RequestToken)?;
             // Convert response body to `Vec<u8>` for parsing.
             let (parts, body) = res.into_parts();
             let bytes = hyper::body::to_bytes(body).await?;
@@ -299,11 +300,11 @@ pub async fn request_gcp_token() -> Result<Token> {
                 Ok(token) => Ok(token),
 
                 Err(err) => match err {
-                    OauthError::AuthError(_) | OauthError::HttpStatus(_) => {
-                        Err(ConfigError::OAuth2RetrieveCredentials(err)).map_err(Error::from)
+                    tame_oauth::Error::AuthError(_) | tame_oauth::Error::HttpStatus(_) => {
+                        Err(OAuthError::RetrieveCredentials(err).into())
                     }
-                    OauthError::Json(e) => Err(ConfigError::OAuth2ParseToken(e)).map_err(Error::from),
-                    err => Err(ConfigError::OAuth2Unknown(err.to_string())).map_err(Error::from),
+                    tame_oauth::Error::Json(e) => Err(OAuthError::ParseToken(e).into()),
+                    err => Err(OAuthError::Unknown(err.to_string()).into()),
                 },
             }
         }
@@ -313,12 +314,10 @@ pub async fn request_gcp_token() -> Result<Token> {
 
         Err(err) => match err {
             // Request builder failed.
-            OauthError::Http(e) => Err(Error::HttpError(e)),
-            OauthError::InvalidRsaKey => Err(ConfigError::OAuth2InvalidRsaKey(err)).map_err(Error::from),
-            OauthError::InvalidKeyFormat => {
-                Err(ConfigError::OAuth2InvalidKeyFormat(err)).map_err(Error::from)
-            }
-            e => Err(ConfigError::OAuth2Unknown(e.to_string())).map_err(Error::from),
+            tame_oauth::Error::Http(e) => Err(Error::HttpError(e)),
+            tame_oauth::Error::InvalidRsaKey => Err(OAuthError::InvalidRsaKey(err).into()),
+            tame_oauth::Error::InvalidKeyFormat => Err(OAuthError::InvalidKeyFormat(err).into()),
+            e => Err(OAuthError::Unknown(e.to_string()).into()),
         },
     }
 }
@@ -330,11 +329,11 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 fn gcloud_account_info() -> Result<ServiceAccountInfo, ConfigError> {
     let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
         .map(PathBuf::from)
-        .ok_or(ConfigError::MissingGoogleCredentials)?;
-    let data = std::fs::read_to_string(path).map_err(ConfigError::OAuth2LoadCredentials)?;
+        .ok_or(OAuthError::MissingGoogleCredentials)?;
+    let data = std::fs::read_to_string(path).map_err(OAuthError::LoadCredentials)?;
     ServiceAccountInfo::deserialize(data).map_err(|err| match err {
-        OauthError::Json(e) => ConfigError::OAuth2ParseCredentials(e),
-        _ => ConfigError::OAuth2Unknown(err.to_string()),
+        tame_oauth::Error::Json(e) => OAuthError::ParseCredentials(e).into(),
+        _ => OAuthError::Unknown(err.to_string()).into(),
     })
 }
 

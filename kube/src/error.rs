@@ -146,34 +146,8 @@ pub enum ConfigError {
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
     #[cfg(feature = "oauth")]
-    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
-    /// Missing GOOGLE_APPLICATION_CREDENTIALS env
-    MissingGoogleCredentials,
-
-    #[cfg(feature = "oauth")]
-    #[error("Unable to load OAuth2 credentials file: {0}")]
-    OAuth2LoadCredentials(#[source] std::io::Error),
-    #[cfg(feature = "oauth")]
-    #[error("Unable to parse OAuth2 credentials file: {0}")]
-    OAuth2ParseCredentials(#[source] serde_json::Error),
-    #[cfg(feature = "oauth")]
-    #[error("Credentials file had invalid key format: {0}")]
-    OAuth2InvalidKeyFormat(#[source] tame_oauth::Error),
-    #[cfg(feature = "oauth")]
-    #[error("Credentials file had invalid RSA key: {0}")]
-    OAuth2InvalidRsaKey(#[source] tame_oauth::Error),
-    #[cfg(feature = "oauth")]
-    #[error("Unable to request token: {0}")]
-    OAuth2RequestToken(#[source] hyper::Error),
-    #[cfg(feature = "oauth")]
-    #[error("Fail to retrieve new credential {0:?}")]
-    OAuth2RetrieveCredentials(#[source] tame_oauth::Error),
-    #[cfg(feature = "oauth")]
-    #[error("Unable to parse token: {0}")]
-    OAuth2ParseToken(#[source] serde_json::Error),
-    #[cfg(feature = "oauth")]
-    #[error("Unknown OAuth2 error: {0}")]
-    OAuth2Unknown(String),
+    #[error("OAuth Error: {0}")]
+    OAuth(#[from] OAuthError),
 
     #[error("Unable to load config file: {0}")]
     LoadConfigFile(#[source] Box<Error>),
@@ -217,6 +191,40 @@ pub enum ConfigError {
     AuthExecParse(#[source] serde_json::Error),
     #[error("Failed exec auth: {0}")]
     AuthExec(String),
+}
+
+#[cfg(feature = "oauth")]
+#[derive(Error, Debug)]
+// Redundant with the error messages and machine names
+#[allow(missing_docs)]
+/// Possible errors when requesting token with OAuth
+pub enum OAuthError {
+    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
+    /// Missing GOOGLE_APPLICATION_CREDENTIALS env
+    MissingGoogleCredentials,
+    #[error("Unable to load OAuth credentials file: {0}")]
+    LoadCredentials(#[source] std::io::Error),
+    #[error("Unable to parse OAuth credentials file: {0}")]
+    ParseCredentials(#[source] serde_json::Error),
+    #[error("Credentials file had invalid key format: {0}")]
+    InvalidKeyFormat(#[source] tame_oauth::Error),
+    #[error("Credentials file had invalid RSA key: {0}")]
+    InvalidRsaKey(#[source] tame_oauth::Error),
+    #[error("Unable to request token: {0}")]
+    RequestToken(#[source] hyper::Error),
+    #[error("Fail to retrieve new credential {0:?}")]
+    RetrieveCredentials(#[source] tame_oauth::Error),
+    #[error("Unable to parse token: {0}")]
+    ParseToken(#[source] serde_json::Error),
+    #[error("Unknown OAuth error: {0}")]
+    Unknown(String),
+}
+
+#[cfg(feature = "oauth")]
+impl From<OAuthError> for Error {
+    fn from(e: OAuthError) -> Self {
+        ConfigError::OAuth(e).into()
+    }
 }
 
 /// An error response from the API.
