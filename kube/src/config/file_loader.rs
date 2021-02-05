@@ -83,14 +83,12 @@ impl ConfigLoader {
         let user_name = user.unwrap_or(&current_context.user);
 
         let mut user_opt = None;
-        for named_user in config.auth_infos {
-            if &named_user.name == user_name {
-                let mut user = named_user.auth_info.clone();
-                if let Some(provider) = &user.auth_provider {
-                    user.token = auth::token_from_provider(provider).await?;
-                }
-                user_opt = Some(user);
+        if let Some(named_user) = config.auth_infos.iter().find(|a| &a.name == user_name) {
+            let mut user = named_user.auth_info.clone();
+            if let Some(provider) = &user.auth_provider {
+                user.token = auth::token_from_provider(provider).await?;
             }
+            user_opt = Some(user);
         }
         let user = user_opt.ok_or_else(|| ConfigError::FindUser {
             user_name: user_name.clone(),
