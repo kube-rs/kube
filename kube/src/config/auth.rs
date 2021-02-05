@@ -1,8 +1,4 @@
-use std::{
-    convert::{TryFrom, TryInto},
-    process::Command,
-    sync::Arc,
-};
+use std::{process::Command, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use http::header;
@@ -57,6 +53,9 @@ impl Authentication {
         }
     }
 
+    /// Loads the authentication header from the credentials available in the kubeconfig. This supports
+    /// exec plugins as well as specified in
+    /// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
     pub(crate) async fn from_auth_info(auth_info: &AuthInfo) -> Result<Self> {
         if let Some(provider) = &auth_info.auth_provider {
             match token_from_provider(provider).await? {
@@ -79,7 +78,43 @@ impl Authentication {
             }
         }
 
-        auth_info.try_into()
+        let (raw_token, expiration) = match &auth_info.token {
+            Some(token) => (Some(token.clone()), None),
+            None => {
+                if let Some(exec) = &auth_info.exec {
+                    let creds = auth_exec(exec)?;
+                    let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
+                    let expiration = match status.expiration_timestamp {
+                        Some(ts) => Some(
+                            ts.parse::<DateTime<Utc>>()
+                                .map_err(ConfigError::MalformedTokenExpirationDate)?,
+                        ),
+                        None => None,
+                    };
+                    (status.token, expiration)
+                } else {
+                    (None, None)
+                }
+            }
+        };
+
+        match (
+            utils::data_or_file(&raw_token, &auth_info.token_file),
+            (&auth_info.username, &auth_info.password),
+            expiration,
+        ) {
+            (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
+            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(Arc::new(Mutex::new((
+                format!("Bearer {}", token),
+                expire,
+                auth_info.clone(),
+            ))))),
+            (_, (Some(u), Some(p)), _) => {
+                let encoded = base64::encode(&format!("{}:{}", u, p));
+                Ok(Authentication::Basic(format!("Basic {}", encoded)))
+            }
+            _ => Ok(Authentication::None),
+        }
     }
 }
 
@@ -165,53 +200,6 @@ fn extract_value(json: &serde_json::Value, path: &str) -> Result<String> {
         Err(e) => Err(ConfigError::AuthExec(format!("Could not extract JSON value: {:}", e)).into()),
 
         _ => Err(ConfigError::AuthExec(format!("Target value {:} not found", pure_path)).into()),
-    }
-}
-
-impl TryFrom<&AuthInfo> for Authentication {
-    type Error = Error;
-
-    /// Loads the authentication header from the credentials available in the kubeconfig. This supports
-    /// exec plugins as well as specified in
-    /// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
-    fn try_from(auth_info: &AuthInfo) -> Result<Self, Self::Error> {
-        let (raw_token, expiration) = match &auth_info.token {
-            Some(token) => (Some(token.clone()), None),
-            None => {
-                if let Some(exec) = &auth_info.exec {
-                    let creds = auth_exec(exec)?;
-                    let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
-                    let expiration = match status.expiration_timestamp {
-                        Some(ts) => Some(
-                            ts.parse::<DateTime<Utc>>()
-                                .map_err(ConfigError::MalformedTokenExpirationDate)?,
-                        ),
-                        None => None,
-                    };
-                    (status.token, expiration)
-                } else {
-                    (None, None)
-                }
-            }
-        };
-
-        match (
-            utils::data_or_file(&raw_token, &auth_info.token_file),
-            (&auth_info.username, &auth_info.password),
-            expiration,
-        ) {
-            (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
-            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(Arc::new(Mutex::new((
-                format!("Bearer {}", token),
-                expire,
-                auth_info.clone(),
-            ))))),
-            (_, (Some(u), Some(p)), _) => {
-                let encoded = base64::encode(&format!("{}:{}", u, p));
-                Ok(Authentication::Basic(format!("Basic {}", encoded)))
-            }
-            _ => Ok(Authentication::None),
-        }
     }
 }
 
