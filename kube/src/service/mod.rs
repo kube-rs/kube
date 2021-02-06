@@ -8,6 +8,7 @@ mod tls;
 mod url;
 
 use self::{log::LogRequest, url::set_cluster_url};
+use auth::AuthLayer;
 use compression::{accept_compressed, maybe_decompress};
 use headers::set_default_headers;
 use tls::HttpsConnector;
@@ -17,13 +18,13 @@ use std::convert::{TryFrom, TryInto};
 use http::{Request, Response};
 use hyper::{Body, Client as HyperClient};
 use hyper_timeout::TimeoutConnector;
-use tower::{buffer::Buffer, util::BoxService, ServiceBuilder};
+use tower::{buffer::Buffer, util::BoxService, BoxError, ServiceBuilder};
 
 use crate::{Config, Error, Result};
 
 // - `Buffer` for cheap clone
 // - `BoxService` to avoid type parameters in `Client`
-type InnerService = Buffer<BoxService<Request<Body>, Response<Body>, hyper::Error>, Request<Body>>;
+type InnerService = Buffer<BoxService<Request<Body>, Response<Body>, BoxError>, Request<Body>>;
 
 #[derive(Clone)]
 /// `Service` abstracts how `Client` communicates with the Kubernetes API server.
@@ -35,7 +36,7 @@ impl Service {
     /// Create a custom `Service`.
     pub fn new<S>(inner: S) -> Self
     where
-        S: tower::Service<Request<Body>, Response = Response<Body>, Error = hyper::Error> + Send + 'static,
+        S: tower::Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
         S::Future: Send + 'static,
     {
         Self {
@@ -66,6 +67,7 @@ impl TryFrom<Config> for Service {
         let cluster_url = config.cluster_url.clone();
         let default_headers = config.headers.clone();
         let timeout = config.timeout;
+        let auth = config.auth_header.clone();
 
         let https: HttpsConnector<_> = config.try_into()?;
         let mut connector = TimeoutConnector::new(https);
@@ -84,6 +86,7 @@ impl TryFrom<Config> for Service {
             .map_request(move |r| set_default_headers(r, default_headers.clone()))
             .map_request(accept_compressed)
             .map_response(maybe_decompress)
+            .layer(AuthLayer::new(auth))
             .layer(tower::layer::layer_fn(LogRequest::new))
             .service(client);
         Ok(Self::new(inner))

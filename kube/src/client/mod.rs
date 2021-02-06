@@ -8,7 +8,7 @@
 
 use crate::{
     api::{Meta, WatchEvent},
-    config::{self, Config},
+    config::Config,
     error::ErrorResponse,
     service::Service,
     Error, Result,
@@ -42,8 +42,6 @@ use std::convert::{TryFrom, TryInto};
 #[derive(Clone)]
 pub struct Client {
     inner: Service,
-    // TODO Move these into `Service`.
-    auth_header: config::Authentication,
 }
 
 impl Client {
@@ -76,13 +74,10 @@ impl Client {
     }
 
     async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
-        let (mut parts, body) = request.into_parts();
+        let (parts, body) = request.into_parts();
         //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
-        // If we have auth headers set, make sure they are updated and attached to the request
-        if let Some(auth_header) = self.auth_header.to_header().await? {
-            parts.headers.insert(http::header::AUTHORIZATION, auth_header);
-        }
 
+        // REVIEW Is the following necessary? Was originally for reqwest's client builder having separate methods.
         let request = match parts.method {
             http::Method::GET
             | http::Method::POST
@@ -100,9 +95,14 @@ impl Client {
             .call(request)
             .await
             .map_err(|err| {
-                if err.is::<hyper::Error>() {
-                    Error::HyperError(*err.downcast::<hyper::Error>().expect("downcast"))
+                if err.is::<Error>() {
+                    // Error decorating request
+                    *err.downcast::<Error>().expect("kube::Error")
+                } else if err.is::<hyper::Error>() {
+                    // Error requesting
+                    Error::HyperError(*err.downcast::<hyper::Error>().expect("hyper::Error"))
                 } else {
+                    // Errors from other middlewares
                     Error::Service(err)
                 }
             })?;
@@ -372,10 +372,8 @@ impl TryFrom<Config> for Client {
 
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
-        // TODO Move this into `Service`.
-        let auth_header = config.auth_header.clone();
         let inner = config.try_into()?;
-        Ok(Self { auth_header, inner })
+        Ok(Self { inner })
     }
 }
 
