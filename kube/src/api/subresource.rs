@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use futures::Stream;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
 
 use crate::{
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, Resource},
@@ -226,47 +226,32 @@ where
 // Eviction subresource
 // ----------------------------------------------------------------------------
 
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-/// Eviction body
-#[derive(Default, Clone, Serialize)]
-pub struct Eviction {
+/// Params for evictable objects
+#[derive(Default, Clone)]
+pub struct EvictParams {
     /// How the eviction should occur
     pub delete_options: Option<DeleteParams>,
-    /// Metadata describing the pod being evicted
-    /// we somehow need this despite providing the name of the pod..
-    pub metadata: ObjectMeta,
-}
-
-impl Eviction {
-    /// Create an eviction object for a named resource
-    pub fn new(name: &str) -> Self {
-        Self {
-            metadata: ObjectMeta {
-                name: Some(name.to_string()),
-                ..ObjectMeta::default()
-            },
-            delete_options: None,
-        }
-    }
-
-    /// Attach DeleteParams to the eviction object
-    pub fn with_options(mut self, dp: DeleteParams) -> Self {
-        self.delete_options = Some(dp);
-        self
-    }
+    /// How the http post should occur
+    pub post_options: PostParams,
 }
 
 impl Resource {
     /// Create an eviction
-    pub fn evict(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn evict(&self, name: &str, ep: &EvictParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "eviction?";
         // This is technically identical to Resource::create, but different url
+        let pp = &ep.post_options;
         pp.validate()?;
         let mut qp = url::form_urlencoded::Serializer::new(base_url);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
+        // eviction body parameters are awkward, need metadata with name
+        let data = serde_json::to_vec(&serde_json::json!({
+            "delete_options": ep.delete_options,
+            "metadata": { "name": name }
+        }))?;
         let req = http::Request::post(urlstr);
         req.body(data).map_err(Error::HttpError)
     }
@@ -277,25 +262,23 @@ fn evict_path() {
     use crate::api::Resource;
     use k8s_openapi::api::core::v1 as corev1;
     let r = Resource::namespaced::<corev1::Pod>("ns");
-    let mut pp = PostParams::default();
-    pp.dry_run = true;
-    let req = r.evict("foo", &pp, vec![]).unwrap();
-    assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/eviction?&dryRun=All");
+    let ep = EvictParams::default();
+    let req = r.evict("foo", &ep).unwrap();
+    assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/eviction?");
 }
 
 /// Marker trait for objects that can be evicted
-pub trait EvictionObject {}
+pub trait Evictable {}
 
-impl EvictionObject for k8s_openapi::api::core::v1::Pod {}
+impl Evictable for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + EvictionObject,
+    K: Clone + DeserializeOwned + Evictable,
 {
     /// Create an eviction
-    pub async fn evict(&self, name: &str, pp: &PostParams, data: &Eviction) -> Result<Status> {
-        let bytes = serde_json::to_vec(data)?;
-        let req = self.resource.evict(name, pp, bytes)?;
+    pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
+        let req = self.resource.evict(name, ep)?;
         self.client.request::<Status>(req).await
     }
 }

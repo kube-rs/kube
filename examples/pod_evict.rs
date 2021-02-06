@@ -4,7 +4,7 @@ use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 
 use kube::{
-    api::{Api, Eviction, ListParams, Meta, PostParams, WatchEvent},
+    api::{Api, EvictParams, ListParams, Meta, PostParams, WatchEvent},
     Client,
 };
 
@@ -58,8 +58,8 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Clean up the old job record..
-    let ev = Eviction::new(pod_name);
-    let eres = pods.evict(pod_name, &pp, &ev).await?;
+    let ep = EvictParams::default();
+    let eres = pods.evict(pod_name, &ep).await?;
     println!("{:?}", eres);
     Ok(())
 }
