@@ -112,6 +112,10 @@ name = "pod_exec"
 path = "pod_exec.rs"
 
 [[example]]
+name = "pod_evict"
+path = "pod_evict.rs"
+
+[[example]]
 name = "pod_shell"
 path = "pod_shell.rs"
 

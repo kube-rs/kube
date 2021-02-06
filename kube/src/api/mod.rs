@@ -26,7 +26,7 @@ pub use dynamic::DynamicResource;
 mod subresource;
 #[cfg(feature = "ws")]
 pub use subresource::{AttachParams, AttachableObject, ExecutingObject};
-pub use subresource::{LogParams, LoggingObject, ScaleSpec, ScaleStatus};
+pub use subresource::{Eviction, EvictionObject, LogParams, LoggingObject, ScaleSpec, ScaleStatus};
 
 pub(crate) mod object;
 pub use self::object::{Object, ObjectList, WatchEvent};
