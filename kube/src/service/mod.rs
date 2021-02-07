@@ -1,12 +1,14 @@
 //! `Service` abstracts the connection to Kubernetes API server.
 
 mod auth;
+mod compression;
 mod headers;
 mod log;
 mod tls;
 mod url;
 
 use self::{log::LogRequest, url::set_cluster_url};
+use compression::{accept_compressed, maybe_decompress};
 use headers::set_default_headers;
 use tls::HttpsConnector;
 
@@ -70,6 +72,8 @@ impl TryFrom<Config> for Service {
         let inner = ServiceBuilder::new()
             .map_request(move |r| set_cluster_url(r, &cluster_url))
             .map_request(move |r| set_default_headers(r, default_headers.clone()))
+            .map_request(accept_compressed)
+            .map_response(maybe_decompress)
             .layer(tower::layer::layer_fn(LogRequest::new))
             .service(client);
         Ok(Self::new(inner))
