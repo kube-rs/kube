@@ -131,3 +131,61 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::matches;
+
+    use futures::pin_mut;
+    use http::{HeaderValue, Request, Response};
+    use hyper::Body;
+    use tokio_test::assert_ready_ok;
+    use tower_test::mock;
+
+    use crate::{error::ConfigError, Error};
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn valid_token() {
+        const TOKEN: &str = "Bearer test";
+        let auth = Authentication::Token(TOKEN.into());
+        let (mut service, handle) = mock::spawn_layer(AuthLayer::new(auth));
+
+        let spawned = tokio::spawn(async move {
+            // Receive the requests and respond
+            pin_mut!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert_eq!(
+                request.headers().get(AUTHORIZATION).unwrap(),
+                HeaderValue::from_static(TOKEN)
+            );
+            send.send_response(Response::builder().body(Body::empty()).unwrap());
+        });
+
+        assert_ready_ok!(service.poll_ready());
+        service
+            .call(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn invalid_token() {
+        const TOKEN: &str = "\n";
+        let auth = Authentication::Token(TOKEN.into());
+        let (mut service, _handle) =
+            mock::spawn_layer::<Request<Body>, Response<Body>, _>(AuthLayer::new(auth));
+        let err = service
+            .call(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap_err();
+
+        assert!(err.is::<Error>());
+        assert!(matches!(
+            *err.downcast::<Error>().unwrap(),
+            Error::Kubeconfig(ConfigError::InvalidBearerToken(_))
+        ));
+    }
+}
