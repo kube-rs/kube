@@ -69,7 +69,7 @@ pub struct NamedAuthInfo {
 }
 
 /// AuthInfo stores information to tell cluster who you are.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct AuthInfo {
     pub username: Option<String>,
     pub password: Option<String>,

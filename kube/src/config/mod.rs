@@ -11,7 +11,7 @@ mod incluster_config;
 mod utils;
 
 use crate::{error::ConfigError, Result};
-pub(crate) use auth::Authentication;
+pub(crate) use auth::{Authentication, RefreshableToken};
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 

@@ -30,7 +30,34 @@ pub(crate) enum Authentication {
     None,
     Basic(String),
     Token(String),
-    RefreshableToken(Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>),
+    RefreshableToken(RefreshableToken),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RefreshableToken(pub(crate) Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>);
+
+impl RefreshableToken {
+    pub(crate) async fn to_header(&self) -> Result<header::HeaderValue> {
+        let data = &self.0;
+        let mut locked_data = data.lock().await;
+        // Add some wiggle room onto the current timestamp so we don't get any race
+        // conditions where the token expires while we are refreshing
+        if Utc::now() + Duration::seconds(60) >= locked_data.1 {
+            if let Authentication::RefreshableToken(d) =
+                Authentication::from_auth_info(&locked_data.2).await?
+            {
+                let (new_token, new_expire, new_info) = Arc::try_unwrap(d.0)
+                    .expect("Unable to unwrap Arc, this is likely a programming error")
+                    .into_inner();
+                locked_data.0 = new_token;
+                locked_data.1 = new_expire;
+                locked_data.2 = new_info;
+            } else {
+                return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
+            }
+        }
+        Ok(header::HeaderValue::from_str(&locked_data.0).map_err(ConfigError::InvalidBearerToken)?)
+    }
 }
 
 impl Authentication {
@@ -43,28 +70,7 @@ impl Authentication {
             Self::Token(value) => Ok(Some(
                 header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBearerToken)?,
             )),
-            Self::RefreshableToken(data) => {
-                let mut locked_data = data.lock().await;
-                // Add some wiggle room onto the current timestamp so we don't get any race
-                // conditions where the token expires while we are refreshing
-                if Utc::now() + Duration::seconds(60) >= locked_data.1 {
-                    if let Authentication::RefreshableToken(d) =
-                        Authentication::from_auth_info(&locked_data.2).await?
-                    {
-                        let (new_token, new_expire, new_info) = Arc::try_unwrap(d)
-                            .expect("Unable to unwrap Arc, this is likely a programming error")
-                            .into_inner();
-                        locked_data.0 = new_token;
-                        locked_data.1 = new_expire;
-                        locked_data.2 = new_info;
-                    } else {
-                        return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
-                    }
-                }
-                Ok(Some(
-                    header::HeaderValue::from_str(&locked_data.0).map_err(ConfigError::InvalidBearerToken)?,
-                ))
-            }
+            Self::RefreshableToken(refreshable) => Ok(Some(refreshable.to_header().await?)),
         }
     }
 
@@ -80,11 +86,11 @@ impl Authentication {
                     provider.config.insert("access-token".into(), token.clone());
                     provider.config.insert("expiry".into(), expiry.to_rfc3339());
                     info.auth_provider = Some(provider);
-                    return Ok(Self::RefreshableToken(Arc::new(Mutex::new((
+                    return Ok(Self::RefreshableToken(RefreshableToken(Arc::new(Mutex::new((
                         format!("Bearer {}", token),
                         expiry,
                         info,
-                    )))));
+                    ))))));
                 }
 
                 ProviderToken::GCP(token, None) => {
@@ -119,11 +125,9 @@ impl Authentication {
             expiration,
         ) {
             (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
-            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(Arc::new(Mutex::new((
-                format!("Bearer {}", token),
-                expire,
-                auth_info.clone(),
-            ))))),
+            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken(Arc::new(
+                Mutex::new((format!("Bearer {}", token), expire, auth_info.clone())),
+            )))),
             (_, (Some(u), Some(p)), _) => {
                 let encoded = base64::encode(&format!("{}:{}", u, p));
                 Ok(Authentication::Basic(format!("Basic {}", encoded)))
@@ -413,8 +417,8 @@ mod test {
         let mut config: Kubeconfig = serde_yaml::from_str(&test_file).map_err(ConfigError::ParseYaml)?;
         let auth_info = &mut config.auth_infos[0].auth_info;
         match Authentication::from_auth_info(&auth_info).await {
-            Ok(Authentication::RefreshableToken(data)) => {
-                let (token, _expire, info) = Arc::try_unwrap(data).unwrap().into_inner();
+            Ok(Authentication::RefreshableToken(refreshable)) => {
+                let (token, _expire, info) = Arc::try_unwrap(refreshable.0).unwrap().into_inner();
                 assert_eq!(token, "Bearer my_token".to_owned());
                 let config = info.auth_provider.unwrap().config;
                 assert_eq!(config.get("access-token"), Some(&"my_token".to_owned()));
