@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let data = "write these bytes to remote pod";
+    let data = "data for pod";
     let file_name = "foo.txt";
 
     // Write the data to pod
@@ -69,35 +69,27 @@ async fn main() -> anyhow::Result<()> {
         ar.append(&header, &mut data.as_bytes()).unwrap();
         let data = ar.into_inner().unwrap();
 
-        let mut process = pods
-            .exec(
-                "example",
-                vec!["tar", "xf", "-", "-C", "/"],
-                &AttachParams::default().stdin(true).stderr(false),
-            )
+        let ap = AttachParams::default().stdin(true).stderr(false);
+        let mut tar = pods
+            .exec("example", vec!["tar", "xf", "-", "-C", "/"], &ap)
             .await?;
-
-        let mut stdin_writer = process.stdin().unwrap();
-        stdin_writer.write(&data).await?;
+        tar.stdin().unwrap().write(&data).await?;
     }
 
-    // Check that it is there.
+    // Check that the file was written
     {
-        let mut attached = pods
-            .exec(
-                "example",
-                vec!["cat", &format!("/{}", file_name)],
-                &AttachParams::default().stderr(false),
-            )
+        let ap = AttachParams::default().stderr(false);
+        let mut cat = pods
+            .exec("example", vec!["cat", &format!("/{}", file_name)], &ap)
             .await?;
-        let mut stdout_stream = tokio_util::io::ReaderStream::new(attached.stdout().unwrap());
-        let next_stdout = stdout_stream.next().await.unwrap()?;
+        let mut cat_out = tokio_util::io::ReaderStream::new(cat.stdout().unwrap());
+        let next_stdout = cat_out.next().await.unwrap()?;
 
         info!("Contents of the file on the pod: {:?}", next_stdout);
         assert_eq!(next_stdout, data);
     }
 
-    // Delete it
+    // Clean up the pod
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {
