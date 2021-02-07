@@ -7,13 +7,13 @@ use std::{
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
-use async_tungstenite::{tokio::ConnectStream, tungstenite as ws, WebSocketStream};
 use futures::{
     future::Either::{Left, Right},
     SinkExt, StreamExt,
 };
 use futures_util::future::select;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
+use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 
 use super::AttachParams;
 
@@ -46,7 +46,7 @@ pub struct AttachedProcess {
 }
 
 impl AttachedProcess {
-    pub(crate) fn new(stream: WebSocketStream<ConnectStream>, ap: &AttachParams) -> Self {
+    pub(crate) fn new(stream: WebSocketStream<hyper::upgrade::Upgraded>, ap: &AttachParams) -> Self {
         // To simplify the implementation, always create a pipe for stdin.
         // The caller does not have access to it unless they had requested.
         let (stdin_writer, stdin_reader) = tokio::io::duplex(ap.max_stdin_buf_size.unwrap_or(MAX_BUF_SIZE));
@@ -165,7 +165,7 @@ const STATUS_CHANNEL: u8 = 3;
 // const RESIZE_CHANNEL: u8 = 4;
 
 async fn start_message_loop(
-    stream: WebSocketStream<ConnectStream>,
+    stream: WebSocketStream<hyper::upgrade::Upgraded>,
     stdin: impl AsyncRead + Unpin,
     mut stdout: Option<impl AsyncWrite + Unpin>,
     mut stderr: Option<impl AsyncWrite + Unpin>,

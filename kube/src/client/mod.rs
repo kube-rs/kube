@@ -10,24 +10,26 @@ use crate::{
     api::{Meta, WatchEvent},
     config::Config,
     error::ErrorResponse,
+    service::Service,
     Error, Result,
 };
 
-#[cfg(feature = "ws")] mod ws;
-#[cfg(feature = "ws")] use ws::AsyncTlsConnector;
-
 #[cfg(feature = "ws")]
-use async_tungstenite::{
-    tokio::{connect_async_with_tls_connector, ConnectStream},
-    tungstenite as ws2, WebSocketStream,
-};
+use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
+
 use bytes::Bytes;
 use either::{Either, Left, Right};
-use futures::{self, Stream, TryStream, TryStreamExt};
-use http::{self, Request, StatusCode};
+use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
+use http::{self, Request, Response, StatusCode};
+use hyper::Body;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{self, Value};
+use tokio_util::{
+    codec::{FramedRead, LinesCodec, LinesCodecError},
+    io::StreamReader,
+};
+use tower::{Service as _, ServiceExt};
 
 use std::convert::{TryFrom, TryInto};
 
@@ -39,25 +41,19 @@ use std::convert::{TryFrom, TryInto};
 /// using [`Client::new`]
 #[derive(Clone)]
 pub struct Client {
-    cluster_url: reqwest::Url,
-    default_ns: String,
-    inner: reqwest::Client,
-    config: Config,
-    #[cfg(feature = "ws")]
-    tls_connector: AsyncTlsConnector,
+    inner: Service,
 }
 
 impl Client {
+    // TODO Change this to take `Service` instead after figuring out `auth_header`.
     /// Create and initialize a [`Client`] using the given
     /// configuration.
     ///
     /// # Panics
     ///
-    /// Panics if the configuration supplied leads to an invalid HTTP client.
-    /// Refer to the [`reqwest::ClientBuilder::build`] docs for information
-    /// on situations where this might fail. If you want to handle this error case
-    /// use [`Config::try_from`](Self::try_from) (note that this requires [`std::convert::TryFrom`]
-    /// to be in scope.)
+    /// Panics if the configuration supplied leads to an invalid TlsConnector.
+    /// If you want to handle this error case use [`Config::try_from`](Self::try_from)
+    /// (note that this requires [`std::convert::TryFrom`] to be in scope.)
     pub fn new(config: Config) -> Self {
         Self::try_from(config).expect("Could not create a client from the supplied config")
     }
@@ -77,103 +73,81 @@ impl Client {
         Self::try_from(client_config)
     }
 
-    async fn send(&self, request: http::Request<Vec<u8>>) -> Result<reqwest::Response> {
-        let (parts, body) = request.into_parts();
-        let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
-        let uri_str = finalize_url(&self.cluster_url, &pandq);
-        //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
-
-        let mut headers = parts.headers;
-        // If we have auth headers set, make sure they are updated and attached to the request
-        if let Some(auth_header) = self.config.get_auth_header().await? {
-            headers.insert(reqwest::header::AUTHORIZATION, auth_header);
-        }
-
-        let request = match parts.method {
-            http::Method::GET
-            | http::Method::POST
-            | http::Method::DELETE
-            | http::Method::PUT
-            | http::Method::PATCH => self.inner.request(parts.method, &uri_str),
-            other => return Err(Error::InvalidMethod(other.to_string())),
-        };
-
-        let req = request.headers(headers).body(body).build()?;
-        let res = self.inner.execute(req).await?;
+    async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
+        let mut svc = self.inner.clone();
+        let res = svc
+            .ready_and()
+            .await
+            .map_err(Error::Service)?
+            .call(request)
+            .await
+            .map_err(|err| {
+                if err.is::<Error>() {
+                    // Error decorating request
+                    *err.downcast::<Error>().expect("kube::Error")
+                } else if err.is::<hyper::Error>() {
+                    // Error requesting
+                    Error::HyperError(*err.downcast::<hyper::Error>().expect("hyper::Error"))
+                } else {
+                    // Errors from other middlewares
+                    Error::Service(err)
+                }
+            })?;
         Ok(res)
     }
 
     /// Make WebSocket connection.
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    pub async fn connect(&self, request: http::Request<()>) -> Result<WebSocketStream<ConnectStream>> {
-        let (mut parts, _) = request.into_parts();
-        if let Some(auth_header) = self.config.get_auth_header().await? {
-            parts.headers.insert(http::header::AUTHORIZATION, auth_header);
-        }
+    pub async fn connect(
+        &self,
+        request: Request<Vec<u8>>,
+    ) -> Result<WebSocketStream<hyper::upgrade::Upgraded>> {
+        use http::header::HeaderValue;
+        let (mut parts, body) = request.into_parts();
+        parts
+            .headers
+            .insert(http::header::CONNECTION, HeaderValue::from_static("Upgrade"));
+        parts
+            .headers
+            .insert(http::header::UPGRADE, HeaderValue::from_static("websocket"));
+        parts.headers.insert(
+            http::header::SEC_WEBSOCKET_VERSION,
+            HeaderValue::from_static("13"),
+        );
+        // TODO generate random key and verify like tungstenite
+        let key = "kube";
+        parts.headers.insert(
+            http::header::SEC_WEBSOCKET_KEY,
+            key.parse().expect("valid header value"),
+        );
         // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
         // There's no official documentation about this protocol, but it's described in
         // [`k8s.io/apiserver/pkg/util/wsstream/conn.go`](https://git.io/JLQED).
         // There's a comment about v4 and `Status` object in
         // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
         parts.headers.insert(
-            "sec-websocket-protocol",
-            "v4.channel.k8s.io".parse().expect("valid header value"),
+            http::header::SEC_WEBSOCKET_PROTOCOL,
+            HeaderValue::from_static("v4.channel.k8s.io"),
         );
-        // Replace scheme to ws(s).
-        let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
-        parts.uri = finalize_url(&self.cluster_url, &pandq)
-            .replacen("http", "ws", 1)
-            .parse()
-            .expect("valid URL");
 
-        let tls = Some(self.tls_connector.clone());
-        match connect_async_with_tls_connector(http::Request::from_parts(parts, ()), tls).await {
-            Ok((stream, _)) => Ok(stream),
+        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        if res.status() != StatusCode::SWITCHING_PROTOCOLS {
+            return Err(Error::ProtocolSwitch(res.status()));
+        }
 
-            Err(err) => match err {
-                // tungstenite only gives us the status code.
-                ws2::Error::Http(code) => Err(Error::Api(ErrorResponse {
-                    status: code.to_string(),
-                    code: code.as_u16(),
-                    message: "".to_owned(),
-                    reason: "".to_owned(),
-                })),
+        match hyper::upgrade::on(res).await {
+            Ok(upgraded) => {
+                Ok(WebSocketStream::from_raw_socket(upgraded, ws::protocol::Role::Client, None).await)
+            }
 
-                ws2::Error::HttpFormat(err) => Err(Error::HttpError(err)),
-
-                // `tungstenite::Error::Tls` is only available when using `ws-native-tls` (`async-tungstenite/tokio-native-tls`)
-                // because it comes from `tungstenite/tls` feature.
-                #[cfg(feature = "ws-native-tls")]
-                ws2::Error::Tls(err) => Err(Error::SslError(format!("{}", err))),
-
-                // URL errors:
-                // - No host found in URL
-                // - Unsupported scheme (not ws/wss)
-                // shouldn't happen in our case
-                ws2::Error::Url(msg) => Err(Error::RequestValidation(msg.into())),
-
-                // Protocol errors:
-                // - Only GET is supported
-                // - Only HTTP version >= 1.1 is supported
-                // shouldn't happen in our case
-                ws2::Error::Protocol(msg) => Err(Error::RequestValidation(msg.into())),
-
-                ws2::Error::Io(err) => Err(Error::Connection(err)),
-
-                // Unexpected errors. `tungstenite::Error` contains errors that doesn't happen when trying to conect.
-                ws2::Error::ConnectionClosed
-                | ws2::Error::AlreadyClosed
-                | ws2::Error::Utf8
-                | ws2::Error::Capacity(_)
-                | ws2::Error::SendQueueFull(_) => Err(Error::WsOther(err.to_string())),
-            },
+            Err(e) => Err(Error::HyperError(e)),
         }
     }
 
     /// Perform a raw HTTP request against the API and deserialize the response
     /// as JSON to some known type.
-    pub async fn request<T>(&self, request: http::Request<Vec<u8>>) -> Result<T>
+    pub async fn request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
@@ -187,12 +161,13 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
-    pub async fn request_text(&self, request: http::Request<Vec<u8>>) -> Result<String> {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Status = {:?} for {}", res.status(), res.url());
-        let s = res.status();
-        let text = res.text().await?;
-        handle_api_errors(&text, s)?;
+    pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
+        let res = self.send(request.map(Body::from)).await?;
+        let status = res.status();
+        // trace!("Status = {:?} for {}", status, res.url());
+        let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
+        let text = String::from_utf8(body_bytes.to_vec())?;
+        handle_api_errors(&text, status)?;
 
         Ok(text)
     }
@@ -201,26 +176,20 @@ impl Client {
     /// as a stream of bytes
     pub async fn request_text_stream(
         &self,
-        request: http::Request<Vec<u8>>,
+        request: Request<Vec<u8>>,
     ) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Status = {:?} for {}", res.status(), res.url());
-
-        Ok(res.bytes_stream().map_err(Error::ReqwestError))
+        let res = self.send(request.map(Body::from)).await?;
+        // trace!("Status = {:?} for {}", res.status(), res.url());
+        Ok(res.into_body().map_err(Error::HyperError))
     }
 
     /// Perform a raw HTTP request against the API and get back either an object
     /// deserialized as JSON or a [`Status`] Object.
-    pub async fn request_status<T>(&self, request: http::Request<Vec<u8>>) -> Result<Either<T, Status>>
+    pub async fn request_status<T>(&self, request: Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Status = {:?} for {}", res.status(), res.url());
-        let s = res.status();
-        let text = res.text().await?;
-        handle_api_errors(&text, s)?;
-
+        let text = self.request_text(request).await?;
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text)?;
         if v["kind"] == "Status" {
@@ -240,112 +209,72 @@ impl Client {
     /// Perform a raw request and get back a stream of [`WatchEvent`] objects
     pub async fn request_events<T: Clone + Meta>(
         &self,
-        request: http::Request<Vec<u8>>,
+        request: Request<Vec<u8>>,
     ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>>>
     where
         T: DeserializeOwned,
     {
-        let res: reqwest::Response = self.send(request).await?;
-        trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
+        let res = self.send(request.map(Body::from)).await?;
+        // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         trace!("headers: {:?}", res.headers());
 
-        // Now unfold the chunked responses into a Stream
-        // We first construct a Stream of Vec<Result<T>> as we potentially might need to
-        // yield multiple objects per loop, then we flatten it to the Stream<Result<T>> as expected.
-        // Any reqwest errors will terminate this stream early.
+        let frames = FramedRead::new(
+            StreamReader::new(res.into_body().map_err(|e| {
+                // Client timeout. This will be ignored.
+                if e.is_timeout() {
+                    return std::io::Error::new(std::io::ErrorKind::TimedOut, e);
+                }
+                // Unexpected EOF from chunked decoder.
+                // Tends to happen when watching for 300+s. This will be ignored.
+                if e.to_string().contains("unexpected EOF during chunk") {
+                    return std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e);
+                }
+                std::io::Error::new(std::io::ErrorKind::Other, e)
+            })),
+            LinesCodec::new(),
+        );
 
-        let stream = futures::stream::try_unfold((res, Vec::new()), |(mut resp, _buff)| {
-            async {
-                let mut buff = _buff; // can be avoided, see #145
-                loop {
-                    trace!("Await chunk");
-                    match resp.chunk().await {
-                        Ok(Some(chunk)) => {
-                            trace!("Some chunk of len {}", chunk.len());
-                            //trace!("Chunk contents: {}", String::from_utf8_lossy(&chunk));
-                            buff.extend_from_slice(&chunk);
-
-                            //if buff.len() > 32000 { // TEST CASE
-                            //    return Err(Error::InvalidMethod(format!("{}", buff.len())));
-                            //}
-
-                            // If we've encountered a newline, see if we have any items to yield
-                            if chunk.contains(&b'\n') {
-                                let mut new_buff = Vec::new();
-                                let mut items = Vec::new();
-
-                                // Split on newlines
-                                for line in buff.split(|x| x == &b'\n') {
-                                    new_buff.extend_from_slice(&line);
-
-                                    match serde_json::from_slice(&new_buff) {
-                                        Ok(val) => {
-                                            // on success clear our buffer
-                                            new_buff.clear();
-                                            items.push(Ok(val));
-                                        }
-                                        Err(e) => {
-                                            // If this is not an eof error it's a parse error
-                                            // so log it and store it
-                                            // Otherwise we don't do anything as we've already
-                                            // added in the current partial line to our buffer for
-                                            // use in the next loop
-                                            if !e.is_eof() {
-                                                // Check if it's a general API error response
-                                                let e = match serde_json::from_slice(&new_buff) {
-                                                    Ok(e) => Error::Api(e),
-                                                    _ => {
-                                                        let line = String::from_utf8_lossy(line);
-                                                        warn!("Failed to parse: {}", line);
-                                                        match resp.error_for_status_ref() {
-                                                            Ok(_) => Error::SerdeError(e),
-                                                            Err(e) => Error::ReqwestError(e),
-                                                        }
-                                                    }
-                                                };
-
-                                                // Clear the buffer as this was a valid object
-                                                new_buff.clear();
-                                                items.push(Err(e));
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Now return our items and loop
-                                return Ok(Some((items, (resp, new_buff))));
-                            }
+        Ok(frames.filter_map(|res| async {
+            match res {
+                Ok(line) => match serde_json::from_str::<WatchEvent<T>>(&line) {
+                    Ok(event) => Some(Ok(event)),
+                    Err(e) => {
+                        // Ignore EOF error that can happen for incomplete line from `decode_eof`.
+                        if e.is_eof() {
+                            return None;
                         }
-                        Ok(None) => {
-                            trace!("None chunk");
-                            return Ok(None);
+
+                        // Got general error response
+                        if let Ok(e_resp) = serde_json::from_str::<ErrorResponse>(&line) {
+                            return Some(Err(Error::Api(e_resp)));
                         }
-                        Err(e) => {
-                            if e.is_timeout() {
-                                warn!("timeout in poll: {}", e); // our client timeout
-                                return Ok(None);
-                            }
-                            let inner = e.to_string();
-                            if inner.contains("unexpected EOF during chunk") {
-                                // ^ catches reqwest::Error from hyper::Error
-                                // where the inner.kind == UnexpectedEof
-                                // and the inner.error == "unexpected EOF during chunk size line"
-                                warn!("eof in poll: {}", e);
-                                return Ok(None);
-                            } else {
-                                // There might be other errors worth ignoring here
-                                // For now, if they happen, we hard error up
-                                // This causes a full re-list for Reflector
-                                error!("err poll: {:?} - {}", e, inner);
-                                return Err(Error::ReqwestError(e));
-                            }
-                        }
+                        // Parsing error
+                        Some(Err(Error::SerdeError(e)))
                     }
+                },
+
+                Err(LinesCodecError::Io(e)) => match e.kind() {
+                    // Client timeout
+                    std::io::ErrorKind::TimedOut => {
+                        warn!("timeout in poll: {}", e); // our client timeout
+                        None
+                    }
+                    // Unexpected EOF from chunked decoder.
+                    // Tends to happen after 300+s of watching.
+                    std::io::ErrorKind::UnexpectedEof => {
+                        warn!("eof in poll: {}", e);
+                        None
+                    }
+                    _ => Some(Err(Error::ReadEvents(e))),
+                },
+
+                // Reached the maximum line length without finding a newline.
+                // This should never happen because we're using the default `usize::MAX`.
+                Err(LinesCodecError::MaxLineLengthExceeded) => {
+                    Some(Err(Error::LinesCodecMaxLineLengthExceeded))
                 }
             }
-        });
-
-        Ok(stream.map_ok(futures::stream::iter).try_flatten())
+        }))
     }
 
     /// Returns apiserver version.
@@ -430,51 +359,8 @@ impl TryFrom<Config> for Client {
 
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
-        let cluster_url = config.cluster_url.clone();
-        let default_ns = config.default_ns.clone();
-        let config_clone = config.clone();
-        #[cfg(feature = "ws")]
-        let tls_connector: AsyncTlsConnector = config.clone().try_into()?;
-        let builder: reqwest::ClientBuilder = config.try_into()?;
-        Ok(Self {
-            cluster_url,
-            default_ns,
-            inner: builder.build()?,
-            #[cfg(feature = "ws")]
-            tls_connector,
-            config: config_clone,
-        })
-    }
-}
-
-impl TryFrom<Config> for reqwest::ClientBuilder {
-    type Error = Error;
-
-    fn try_from(config: Config) -> Result<Self> {
-        let mut builder = Self::new();
-
-        if let Some(i) = &config.proxy {
-            builder = builder.proxy(i.clone())
-        }
-
-        if let Some(i) = config.identity() {
-            builder = builder.identity(i)
-        }
-
-        if let Some(ders) = config.root_cert {
-            for der in ders {
-                builder = builder.add_root_certificate(der.try_into()?);
-            }
-        }
-
-        if let Some(t) = config.timeout {
-            builder = builder.timeout(t);
-        }
-
-        builder = builder.default_headers(config.headers);
-        builder = builder.danger_accept_invalid_certs(config.accept_invalid_certs);
-
-        Ok(builder)
+        let inner = config.try_into()?;
+        Ok(Self { inner })
     }
 }
 
@@ -529,17 +415,6 @@ pub struct StatusCause {
     pub field: String,
 }
 
-/// An internal url joiner to deal with the two different interfaces
-///
-/// - api module produces a http::Uri which we can turn into a PathAndQuery (has a leading slash by construction)
-/// - config module produces a url::Url from user input (sometimes contains path segments)
-///
-/// This deals with that in a pretty easy way (tested below)
-fn finalize_url(cluster_url: &reqwest::Url, request_pandq: &http::uri::PathAndQuery) -> String {
-    let base = cluster_url.as_str().trim_end_matches('/'); // pandq always starts with a slash
-    format!("{}{}", base, request_pandq)
-}
-
 #[cfg(test)]
 mod test {
     use super::Status;
@@ -554,37 +429,5 @@ mod test {
         let statusnoname = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
         let s2: Status = serde_json::from_str::<Status>(statusnoname).unwrap();
         assert_eq!(s2.details.unwrap().name, ""); // optional probably better..
-    }
-
-    #[test]
-    fn normal_host() {
-        let minikube_host = "https://192.168.1.65:8443";
-        let cluster_url = reqwest::Url::parse(minikube_host).unwrap();
-        let apipath: http::Uri = "/api/v1/nodes?hi=yes".parse().unwrap();
-        let pandq = apipath.path_and_query().expect("could pandq apipath");
-        let final_url = super::finalize_url(&cluster_url, &pandq);
-        assert_eq!(
-            final_url.as_str(),
-            "https://192.168.1.65:8443/api/v1/nodes?hi=yes"
-        );
-    }
-
-    #[test]
-    fn rancher_host() {
-        // in rancher, kubernetes server names are not hostnames, but a host with a path:
-        let rancher_host = "https://hostname/foo/bar";
-        let cluster_url = reqwest::Url::parse(rancher_host).unwrap();
-        assert_eq!(cluster_url.host_str().unwrap(), "hostname");
-        assert_eq!(cluster_url.path(), "/foo/bar");
-        // we must be careful when using Url::join on our http::Uri result
-        // as a straight two Uri::join would trim away rancher's initial path
-        // case in point (discards original path):
-        assert_eq!(cluster_url.join("/api/v1/nodes").unwrap().path(), "/api/v1/nodes");
-
-        let apipath: http::Uri = "/api/v1/nodes?hi=yes".parse().unwrap();
-        let pandq = apipath.path_and_query().expect("could pandq apipath");
-
-        let final_url = super::finalize_url(&cluster_url, &pandq);
-        assert_eq!(final_url.as_str(), "https://hostname/foo/bar/api/v1/nodes?hi=yes");
     }
 }
