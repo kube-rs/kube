@@ -15,12 +15,12 @@ use tls::HttpsConnector;
 
 use std::convert::{TryFrom, TryInto};
 
-use http::{Request, Response};
+use http::{HeaderValue, Request, Response};
 use hyper::{Body, Client as HyperClient};
 use hyper_timeout::TimeoutConnector;
 use tower::{buffer::Buffer, util::BoxService, BoxError, ServiceBuilder};
 
-use crate::{Config, Error, Result};
+use crate::{config::Authentication, error::ConfigError, Config, Error, Result};
 
 // - `Buffer` for cheap clone
 // - `BoxService` to avoid type parameters in `Client`
@@ -65,9 +65,29 @@ impl TryFrom<Config> for Service {
     /// Convert [`Config`] into a [`Service`]
     fn try_from(config: Config) -> Result<Self> {
         let cluster_url = config.cluster_url.clone();
-        let default_headers = config.headers.clone();
+        let mut default_headers = config.headers.clone();
         let timeout = config.timeout;
         let auth = config.auth_header.clone();
+
+        // AuthLayer is not necessary unless `RefreshableToken`
+        if let Authentication::Basic(value) = &auth {
+            default_headers.insert(
+                http::header::AUTHORIZATION,
+                HeaderValue::from_str(value).map_err(ConfigError::InvalidBasicAuth)?,
+            );
+        } else if let Authentication::Token(value) = &auth {
+            default_headers.insert(
+                http::header::AUTHORIZATION,
+                HeaderValue::from_str(value).map_err(ConfigError::InvalidBearerToken)?,
+            );
+        }
+
+        let common = ServiceBuilder::new()
+            .map_request(move |r| set_cluster_url(r, &cluster_url))
+            .map_request(move |r| set_default_headers(r, default_headers.clone()))
+            .map_request(accept_compressed)
+            .map_response(maybe_decompress)
+            .into_inner();
 
         let https: HttpsConnector<_> = config.try_into()?;
         let mut connector = TimeoutConnector::new(https);
@@ -81,14 +101,20 @@ impl TryFrom<Config> for Service {
         }
         let client: HyperClient<_, Body> = HyperClient::builder().build(connector);
 
-        let inner = ServiceBuilder::new()
-            .map_request(move |r| set_cluster_url(r, &cluster_url))
-            .map_request(move |r| set_default_headers(r, default_headers.clone()))
-            .map_request(accept_compressed)
-            .map_response(maybe_decompress)
-            .layer(AuthLayer::new(auth))
-            .layer(tower::layer::layer_fn(LogRequest::new))
-            .service(client);
-        Ok(Self::new(inner))
+        if let Authentication::RefreshableToken(refreshable) = auth {
+            let inner = ServiceBuilder::new()
+                .layer(common)
+                .layer(AuthLayer::new(refreshable))
+                .layer(tower::layer::layer_fn(LogRequest::new))
+                .service(client);
+            Ok(Self::new(inner))
+        } else {
+            let inner = ServiceBuilder::new()
+                .layer(common)
+                .map_err(BoxError::from)
+                .layer(tower::layer::layer_fn(LogRequest::new))
+                .service(client);
+            Ok(Self::new(inner))
+        }
     }
 }

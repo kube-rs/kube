@@ -10,15 +10,15 @@ use hyper::Body;
 use pin_project::pin_project;
 use tower::{layer::Layer, BoxError, Service};
 
-use crate::{config::Authentication, Result};
+use crate::{config::RefreshableToken, Result};
 
 /// `Layer` to decorate the request with `Authorization` header.
 pub struct AuthLayer {
-    auth: Authentication,
+    auth: RefreshableToken,
 }
 
 impl AuthLayer {
-    pub(crate) fn new(auth: Authentication) -> Self {
+    pub(crate) fn new(auth: RefreshableToken) -> Self {
         Self { auth }
     }
 }
@@ -41,7 +41,7 @@ pub struct AuthService<S>
 where
     S: Service<Request<Body>>,
 {
-    auth: Authentication,
+    auth: RefreshableToken,
     service: S,
 }
 
@@ -69,11 +69,8 @@ where
 
         let auth = self.auth.clone();
         let request = async move {
-            // If using authorization header, attach the updated value.
-            auth.to_header().await.map_err(BoxError::from).map(|opt| {
-                if let Some(value) = opt {
-                    req.headers_mut().insert(AUTHORIZATION, value);
-                }
+            auth.to_header().await.map_err(BoxError::from).map(|value| {
+                req.headers_mut().insert(AUTHORIZATION, value);
                 req
             })
         };
@@ -136,20 +133,22 @@ where
 mod tests {
     use super::*;
 
-    use std::matches;
+    use std::{matches, sync::Arc};
 
+    use chrono::{Duration, Utc};
     use futures::pin_mut;
     use http::{HeaderValue, Request, Response};
     use hyper::Body;
+    use tokio::sync::Mutex;
     use tokio_test::assert_ready_ok;
     use tower_test::mock;
 
-    use crate::{error::ConfigError, Error};
+    use crate::{config::AuthInfo, error::ConfigError, Error};
 
     #[tokio::test(flavor = "current_thread")]
     async fn valid_token() {
         const TOKEN: &str = "Bearer test";
-        let auth = Authentication::Token(TOKEN.into());
+        let auth = test_token(TOKEN.into());
         let (mut service, handle) = mock::spawn_layer(AuthLayer::new(auth));
 
         let spawned = tokio::spawn(async move {
@@ -174,7 +173,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn invalid_token() {
         const TOKEN: &str = "\n";
-        let auth = Authentication::Token(TOKEN.into());
+        let auth = test_token(TOKEN.into());
         let (mut service, _handle) =
             mock::spawn_layer::<Request<Body>, Response<Body>, _>(AuthLayer::new(auth));
         let err = service
@@ -187,5 +186,24 @@ mod tests {
             *err.downcast::<Error>().unwrap(),
             Error::Kubeconfig(ConfigError::InvalidBearerToken(_))
         ));
+    }
+
+    fn test_token(token: String) -> RefreshableToken {
+        let expiry = Utc::now() + Duration::seconds(60 * 60);
+        let info = AuthInfo {
+            username: None,
+            password: None,
+            token: Some(token.clone()),
+            token_file: None,
+            client_certificate: None,
+            client_certificate_data: None,
+            client_key: None,
+            client_key_data: None,
+            impersonate: None,
+            impersonate_groups: None,
+            auth_provider: None,
+            exec: None,
+        };
+        RefreshableToken(Arc::new(Mutex::new((token, expiry, info))))
     }
 }
