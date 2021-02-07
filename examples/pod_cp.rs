@@ -1,0 +1,108 @@
+#[macro_use] extern crate log;
+
+use futures::{StreamExt, TryStreamExt};
+use k8s_openapi::api::core::v1::Pod;
+
+use kube::{
+    api::{Api, AttachParams, DeleteParams, ListParams, Meta, PostParams, WatchEvent},
+    Client,
+};
+use tokio::io::AsyncWriteExt;
+
+// A `kubectl cp` analog example.
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    std::env::set_var("RUST_LOG", "info,kube=debug");
+    env_logger::init();
+    let client = Client::try_default().await?;
+    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
+
+    let p: Pod = serde_json::from_value(serde_json::json!({
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": { "name": "example" },
+        "spec": {
+            "containers": [{
+                "name": "example",
+                "image": "alpine",
+                // Do nothing
+                "command": ["tail", "-f", "/dev/null"],
+            }],
+        }
+    }))?;
+
+    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    // Stop on error including a pod already exists or still being deleted.
+    pods.create(&PostParams::default(), &p).await?;
+
+    // Wait until the pod is running, otherwise we get 500 error.
+    let lp = ListParams::default().fields("metadata.name=example").timeout(10);
+    let mut stream = pods.watch(&lp, "0").await?.boxed();
+    while let Some(status) = stream.try_next().await? {
+        match status {
+            WatchEvent::Added(o) => {
+                info!("Added {}", Meta::name(&o));
+            }
+            WatchEvent::Modified(o) => {
+                let s = o.status.as_ref().expect("status exists on pod");
+                if s.phase.clone().unwrap_or_default() == "Running" {
+                    info!("Ready to attach to {}", Meta::name(&o));
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let data = "write these bytes to remote pod";
+    let file_name = "foo.txt";
+
+    // Write the data to pod
+    {
+        let mut header = tar::Header::new_gnu();
+        header.set_path(&file_name).unwrap();
+        header.set_size(data.len() as u64);
+        header.set_cksum();
+
+        let mut ar = tar::Builder::new(Vec::new());
+        ar.append(&header, &mut data.as_bytes()).unwrap();
+        let data = ar.into_inner().unwrap();
+
+        let mut process = pods
+            .exec(
+                "example",
+                vec!["tar", "xf", "-", "-C", "/"],
+                &AttachParams::default().stdin(true).stderr(false),
+            )
+            .await?;
+
+        let mut stdin_writer = process.stdin().unwrap();
+        stdin_writer.write(&data).await?;
+    }
+
+    // Check that it is there.
+    {
+        let mut attached = pods
+            .exec(
+                "example",
+                vec!["cat", &format!("/{}", file_name)],
+                &AttachParams::default().stderr(false),
+            )
+            .await?;
+        let mut stdout_stream = tokio_util::io::ReaderStream::new(attached.stdout().unwrap());
+        let next_stdout = stdout_stream.next().await.unwrap()?;
+
+        info!("Contents of the file on the pod: {:?}", next_stdout);
+        assert_eq!(next_stdout, data);
+    }
+
+    // Delete it
+    pods.delete("example", &DeleteParams::default())
+        .await?
+        .map_left(|pdel| {
+            assert_eq!(Meta::name(&pdel), "example");
+        });
+
+    Ok(())
+}
