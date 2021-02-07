@@ -2,8 +2,17 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.48.0...master
- * `kube` subresource support added for `Evictable` types (marked for `Pod`) - #393
- * `kube` subresource marker traits renamed to `Loggable`, `Executable`, `Attachable` (previously `LoggingObject`, `ExecutingObject`, `AttachableObject`) - #395
+ * dependency on `reqwest` + removed in favour of `hyper` + `tower` #394
+   - `kube`: `kube::Client` now uses `kube::Service` instead of `reqwest::Client`
+   - `kube::Service` struct is a `tower::Service<http::Request<hyper::Body>>` - handles all requests
+   - `async-tungstenite` ws feature dependency replaced with upgraded `hyper` connection
+   - `oauth2` module replaced with optional `tame-oauth` dependency (`oauth` feature)
+   - BREAKING: `oauth` is now opt-in
+   - `kube`: fix bug when loading config on non-GCP provider #238
+   - client now uses a `tokio_util::codec` for internal buffering
+  * new async `AuthLayer` only used when using `RefreshableToken`s - #396
+  * `kube`: subresource support added for `Evictable` types (marked for `Pod`) - #393
+ * `kube`: subresource marker traits renamed to `Loggable`, `Executable`, `Attachable` (previously `LoggingObject`, `ExecutingObject`, `AttachableObject`) - #395
  * `examples` showcasing `kubectl cp` like behaviour #381 via #392
 
 0.48.0 / 2021-01-23
