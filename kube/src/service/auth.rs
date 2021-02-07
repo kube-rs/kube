@@ -191,18 +191,8 @@ mod tests {
     fn test_token(token: String) -> RefreshableToken {
         let expiry = Utc::now() + Duration::seconds(60 * 60);
         let info = AuthInfo {
-            username: None,
-            password: None,
             token: Some(token.clone()),
-            token_file: None,
-            client_certificate: None,
-            client_certificate_data: None,
-            client_key: None,
-            client_key_data: None,
-            impersonate: None,
-            impersonate_groups: None,
-            auth_provider: None,
-            exec: None,
+            ..Default::default()
         };
         RefreshableToken(Arc::new(Mutex::new((token, expiry, info))))
     }
