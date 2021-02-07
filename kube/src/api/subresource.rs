@@ -3,7 +3,8 @@ use futures::Stream;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    api::{Api, Patch, PatchParams, PostParams, Resource},
+    api::{Api, DeleteParams, Patch, PatchParams, PostParams, Resource},
+    client::Status,
     Error, Result,
 };
 
@@ -222,6 +223,67 @@ where
 }
 
 // ----------------------------------------------------------------------------
+// Eviction subresource
+// ----------------------------------------------------------------------------
+
+/// Params for evictable objects
+#[derive(Default, Clone)]
+pub struct EvictParams {
+    /// How the eviction should occur
+    pub delete_options: Option<DeleteParams>,
+    /// How the http post should occur
+    pub post_options: PostParams,
+}
+
+impl Resource {
+    /// Create an eviction
+    pub fn evict(&self, name: &str, ep: &EvictParams) -> Result<http::Request<Vec<u8>>> {
+        let base_url = self.make_url() + "/" + name + "/" + "eviction?";
+        // This is technically identical to Resource::create, but different url
+        let pp = &ep.post_options;
+        pp.validate()?;
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        if pp.dry_run {
+            qp.append_pair("dryRun", "All");
+        }
+        let urlstr = qp.finish();
+        // eviction body parameters are awkward, need metadata with name
+        let data = serde_json::to_vec(&serde_json::json!({
+            "delete_options": ep.delete_options,
+            "metadata": { "name": name }
+        }))?;
+        let req = http::Request::post(urlstr);
+        req.body(data).map_err(Error::HttpError)
+    }
+}
+
+#[test]
+fn evict_path() {
+    use crate::api::Resource;
+    use k8s_openapi::api::core::v1 as corev1;
+    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let ep = EvictParams::default();
+    let req = r.evict("foo", &ep).unwrap();
+    assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/eviction?");
+}
+
+/// Marker trait for objects that can be evicted
+pub trait Evictable {}
+
+impl Evictable for k8s_openapi::api::core::v1::Pod {}
+
+impl<K> Api<K>
+where
+    K: Clone + DeserializeOwned + Evictable,
+{
+    /// Create an eviction
+    pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
+        let req = self.resource.evict(name, ep)?;
+        self.client.request::<Status>(req).await
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Attach subresource
 // ----------------------------------------------------------------------------
 /// Parameters for attaching to a container in a Pod.
@@ -389,7 +451,7 @@ impl AttachParams {
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Resource {
     /// Attach to a pod
-    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
+    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<Vec<u8>>> {
         ap.validate()?;
 
         let base_url = self.make_url() + "/" + name + "/" + "attach?";
@@ -397,7 +459,7 @@ impl Resource {
         ap.append_to_url_serializer(&mut qp);
 
         let req = http::Request::get(qp.finish());
-        req.body(()).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 }
 
@@ -446,7 +508,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Resource {
     /// Execute command in a pod
-    pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<()>>
+    pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<Vec<u8>>>
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,
@@ -462,7 +524,7 @@ impl Resource {
         }
 
         let req = http::Request::get(qp.finish());
-        req.body(()).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 }
 

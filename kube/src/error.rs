@@ -11,8 +11,6 @@ pub enum Error {
     /// ApiError for when things fail
     ///
     /// This can be parsed into as an error handling fallback.
-    /// Replacement data for [`reqwest::Response::error_for_status`],
-    /// which is often lacking in good permission errors.
     /// It's also used in `WatchEvent` from watch calls.
     ///
     /// It's quite common to get a `410 Gone` when the `resourceVersion` is too old.
@@ -23,9 +21,27 @@ pub enum Error {
     #[error("ConnectionError: {0}")]
     Connection(std::io::Error),
 
-    /// Reqwest error
-    #[error("ReqwestError: {0}")]
-    ReqwestError(#[from] reqwest::Error),
+    /// Hyper error
+    #[error("HyperError: {0}")]
+    HyperError(#[from] hyper::Error),
+    /// Service error
+    #[error("ServiceError: {0}")]
+    Service(tower::BoxError),
+
+    /// UTF-8 Error
+    #[error("UTF-8 Error: {0}")]
+    FromUtf8(#[from] std::string::FromUtf8Error),
+
+    /// Returned when failed to find a newline character within max length.
+    /// Only returned by `Client::request_events` and this should never happen as
+    /// the max is `usize::MAX`.
+    #[error("Error finding newline character")]
+    LinesCodecMaxLineLengthExceeded,
+
+    /// Returned on `std::io::Error` when reading event stream.
+    #[error("Error reading events stream: {0}")]
+    ReadEvents(std::io::Error),
+
     /// Http based error
     #[error("HttpError: {0}")]
     HttpError(#[from] http::Error),
@@ -50,10 +66,6 @@ pub enum Error {
     #[error("Error parsing response")]
     RequestParse,
 
-    /// An invalid method was used
-    #[error("Invalid API method {0}")]
-    InvalidMethod(String),
-
     /// A request validation failed
     #[error("Request validation failed with {0}")]
     RequestValidation(String),
@@ -75,22 +87,13 @@ pub enum Error {
     #[error("OpensslError: {0}")]
     OpensslError(#[from] openssl::error::ErrorStack),
 
-    /// Unexpected error from making WebSocket connection.
-    ///
-    /// Only returned from [`Client::connect`](crate::Client::connect) when it failed to connect with
-    /// the following _unexpected_ errors that's only possible _after_ connecting:
-    ///
-    /// - `ConnectionClosed`
-    /// - `AlreadyClosed`
-    /// - `Utf8`
-    /// - `Capacity`
-    /// - `SendQueueFull`
-    ///
-    /// `WsOther` exists to give you a choice to retry or panic depending on your need when this happens.
+    /// The server did not respond with [`SWITCHING_PROTOCOLS`] status when upgrading the
+    /// connection.
+    /// [`SWITCHING_PROTOCOLS`]: http::status::StatusCode::SWITCHING_PROTOCOLS
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Unexpected WebSocket error: {0}")]
-    WsOther(String),
+    #[error("Failed to switch protocol. Status code: {0}")]
+    ProtocolSwitch(http::status::StatusCode),
 }
 
 #[derive(Error, Debug)]
@@ -138,20 +141,9 @@ pub enum ConfigError {
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
-    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
-    /// Missing GOOGLE_APPLICATION_CREDENTIALS env
-    MissingGoogleCredentials,
-
-    #[error("Unable to load OAuth2 credentials file: {0}")]
-    OAuth2LoadCredentials(#[source] std::io::Error),
-    #[error("Unable to parse OAuth2 credentials file: {0}")]
-    OAuth2ParseCredentials(#[source] serde_json::Error),
-    #[error("Unable to request token: {0}")]
-    OAuth2RequestToken(#[source] reqwest::Error),
-    #[error("Fail to retrieve new credential {0:?}")]
-    OAuth2RetrieveCredentials(Box<reqwest::Response>),
-    #[error("Unable to parse token: {0}")]
-    OAuth2ParseToken(#[source] reqwest::Error),
+    #[cfg(feature = "oauth")]
+    #[error("OAuth Error: {0}")]
+    OAuth(#[from] OAuthError),
 
     #[error("Unable to load config file: {0}")]
     LoadConfigFile(#[source] Box<Error>),
@@ -180,9 +172,6 @@ pub enum ConfigError {
     #[error("Failed to get data/file")]
     NoFileOrData,
 
-    #[error("Failed to load certificate: {0}")]
-    LoadCert(#[source] reqwest::Error),
-
     #[error("Failed to parse Kubeconfig YAML: {0}")]
     ParseYaml(#[source] serde_yaml::Error),
 
@@ -198,6 +187,40 @@ pub enum ConfigError {
     AuthExecParse(#[source] serde_json::Error),
     #[error("Failed exec auth: {0}")]
     AuthExec(String),
+}
+
+#[cfg(feature = "oauth")]
+#[derive(Error, Debug)]
+// Redundant with the error messages and machine names
+#[allow(missing_docs)]
+/// Possible errors when requesting token with OAuth
+pub enum OAuthError {
+    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
+    /// Missing GOOGLE_APPLICATION_CREDENTIALS env
+    MissingGoogleCredentials,
+    #[error("Unable to load OAuth credentials file: {0}")]
+    LoadCredentials(#[source] std::io::Error),
+    #[error("Unable to parse OAuth credentials file: {0}")]
+    ParseCredentials(#[source] serde_json::Error),
+    #[error("Credentials file had invalid key format: {0}")]
+    InvalidKeyFormat(#[source] tame_oauth::Error),
+    #[error("Credentials file had invalid RSA key: {0}")]
+    InvalidRsaKey(#[source] tame_oauth::Error),
+    #[error("Unable to request token: {0}")]
+    RequestToken(#[source] hyper::Error),
+    #[error("Fail to retrieve new credential {0:?}")]
+    RetrieveCredentials(#[source] tame_oauth::Error),
+    #[error("Unable to parse token: {0}")]
+    ParseToken(#[source] serde_json::Error),
+    #[error("Unknown OAuth error: {0}")]
+    Unknown(String),
+}
+
+#[cfg(feature = "oauth")]
+impl From<OAuthError> for Error {
+    fn from(e: OAuthError) -> Self {
+        ConfigError::OAuth(e).into()
+    }
 }
 
 /// An error response from the API.

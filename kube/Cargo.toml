@@ -17,18 +17,15 @@ edition = "2018"
 
 [features]
 default = ["native-tls"]
-native-tls = ["openssl", "reqwest/native-tls"]
-rustls-tls = ["rustls", "reqwest/rustls-tls"]
+native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
+rustls-tls = ["rustls", "hyper-rustls", "tokio-rustls"]
 derive = ["kube-derive"]
 jsonpatch = ["json-patch"]
-ws = ["async-tungstenite", "tokio-util"]
-# We can merge these with `native-tls`/`rustls-tls` when `dep?/feature` syntax becomes stable.
-# https://doc.rust-lang.org/nightly/cargo/reference/unstable.html#weak-dependency-features
-ws-native-tls = ["tokio-native-tls", "async-tungstenite/tokio-native-tls"]
-ws-rustls-tls = ["tokio-rustls", "async-tungstenite/tokio-rustls"]
+ws = ["tokio-tungstenite"]
+oauth = ["tame-oauth"]
 
 [package.metadata.docs.rs]
-features = ["derive", "ws", "ws-native-tls"]
+features = ["derive", "ws"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -49,7 +46,7 @@ futures-util = "0.3.8"
 futures = "0.3.8"
 pem = "0.8.2"
 openssl = { version = "0.10.32", optional = true }
-rustls = { version = "0.19.0", optional = true }
+rustls = { version = "0.19.0", features = ["dangerous_configuration"], optional = true }
 tokio-native-tls = { version = "0.3.0", optional = true }
 tokio-rustls = { version = "0.22.0", optional = true }
 bytes = "1.0.0"
@@ -58,19 +55,17 @@ tokio = { version = "1.0.1", features = ["time", "signal", "sync"] }
 static_assertions = "1.1.0"
 kube-derive = { path = "../kube-derive", version = "^0.48.0", optional = true }
 jsonpath_lib = "0.2.6"
-tokio-util = { version = "0.6.0", optional = true, features = ["io"] }
+tokio-util = { version = "0.6.0", features = ["io", "codec"] }
 json-patch = { version = "0.2.6", optional = true }
-
-[dependencies.async-tungstenite]
-version = "0.11.0"
-default-features = false
-features = ["tokio-runtime"]
-optional = true
-
-[dependencies.reqwest]
-version = "0.11.0"
-default-features = false
-features = ["json", "gzip", "stream"]
+hyper = { version = "0.14.2", features = ["client", "http1", "stream", "tcp"] }
+hyper-tls = { version = "0.5.0", optional = true }
+hyper-rustls = { version = "0.22.1", optional = true }
+tokio-tungstenite = { version = "0.13.0", optional = true }
+tower = { version = "0.4.4", features = ["buffer", "util"] }
+async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
+hyper-timeout = "0.4.1"
+tame-oauth = { version = "0.4.7", features = ["gcp"], optional = true }
+pin-project = "1.0.4"
 
 [dependencies.k8s-openapi]
 version = "0.11.0"
@@ -81,6 +76,8 @@ features = []
 tempfile = "3.1.0"
 tokio = { version = "1.0.1", features = ["full"] }
 schemars = "0.8.0"
+tokio-test = "0.4.0"
+tower-test = "0.4.0"
 
 [dev-dependencies.k8s-openapi]
 version = "0.11.0"

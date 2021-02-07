@@ -102,10 +102,10 @@ jobs:
       - run: cargo test --lib --all -j4
       - run: cargo test --doc --all -j4
       - run: cargo test -j4 -p examples
+      - run: cd examples && cargo build --examples
       - run: cd examples && cargo test --example crd_derive_no_schema --no-default-features --features=native-tls
-      - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls
-      - run: cd kube && cargo test --lib --no-default-features --features=native-tls,ws,ws-native-tls
-      - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls,ws,ws-rustls-tls
+      - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls,ws,oauth
+      - run: cd kube && cargo test --lib --no-default-features --features=native-tls,ws,oauth
       - save_cache:
           paths:
             - /usr/local/cargo/registry
