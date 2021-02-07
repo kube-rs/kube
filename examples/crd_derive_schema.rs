@@ -81,6 +81,9 @@ pub struct FooSpec {
     // Listable field with specified 'set' merge strategy
     #[serde(default)]
     set_listable: SetListable,
+
+    // List of enum variants
+    variants: Vec<VariantType>,
 }
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone)]
 struct SetListable(Vec<u32>);
@@ -104,6 +107,11 @@ impl JsonSchema for SetListable {
         .unwrap()
     }
 }
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, JsonSchema)]
+enum VariantType {
+    VaraintA(u32),
+    VariantB(String),
+}
 
 fn default_value() -> String {
     "default_value".into()
@@ -122,7 +130,7 @@ async fn main() -> Result<()> {
     println!("Creating CRD v1");
     let client = Client::try_default().await?;
     delete_crd(client.clone()).await?;
-    assert!(create_crd(client.clone()).await.is_ok());
+    create_crd(client.clone()).await?;
 
     // Test creating Foo resource.
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
@@ -149,6 +157,8 @@ async fn main() -> Result<()> {
         // Empty listables to be patched in later
         default_listable: Default::default(),
         set_listable: Default::default(),
+        // empty variants
+        variants: vec![],
     });
 
     // Set up dynamic resource to test using raw values.
