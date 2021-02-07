@@ -2,6 +2,8 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.48.0...master
+ * `kube` subresource support added for `Evictable` types (marked for `Pod`) - #393
+ * `kube` subresource marker traits renamed to `Loggable`, `Executable`, `Attachable` (previously `LoggingObject`, `ExecutingObject`, `AttachableObject`) - #395
 
 0.48.0 / 2021-01-23
 ===================

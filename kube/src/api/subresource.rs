@@ -201,13 +201,13 @@ fn log_path() {
 }
 
 /// Marker trait for objects that has logs
-pub trait LoggingObject {}
+pub trait Loggable {}
 
-impl LoggingObject for k8s_openapi::api::core::v1::Pod {}
+impl Loggable for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + LoggingObject,
+    K: Clone + DeserializeOwned + Loggable,
 {
     /// Fetch logs as a string
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
@@ -481,17 +481,17 @@ fn attach_path() {
 /// Marker trait for objects that has attach
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub trait AttachableObject {}
+pub trait Attachable {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl AttachableObject for k8s_openapi::api::core::v1::Pod {}
+impl Attachable for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + AttachableObject,
+    K: Clone + DeserializeOwned + Attachable,
 {
     /// Attach to pod
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
@@ -546,17 +546,17 @@ fn exec_path() {
 /// Marker trait for objects that has exec
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub trait ExecutingObject {}
+pub trait Executable {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl ExecutingObject for k8s_openapi::api::core::v1::Pod {}
+impl Executable for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + ExecutingObject,
+    K: Clone + DeserializeOwned + Executable,
 {
     /// Execute a command in a pod
     pub async fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
