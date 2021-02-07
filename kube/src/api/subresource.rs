@@ -451,7 +451,7 @@ impl AttachParams {
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Resource {
     /// Attach to a pod
-    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<()>> {
+    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<Vec<u8>>> {
         ap.validate()?;
 
         let base_url = self.make_url() + "/" + name + "/" + "attach?";
@@ -459,7 +459,7 @@ impl Resource {
         ap.append_to_url_serializer(&mut qp);
 
         let req = http::Request::get(qp.finish());
-        req.body(()).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 }
 
@@ -508,7 +508,7 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Resource {
     /// Execute command in a pod
-    pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<()>>
+    pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<Vec<u8>>>
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,
@@ -524,7 +524,7 @@ impl Resource {
         }
 
         let req = http::Request::get(qp.finish());
-        req.body(()).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::HttpError)
     }
 }
 

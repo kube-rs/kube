@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::{error::ConfigError, Error, Result};
-use chrono::{DateTime, Utc};
 use dirs::home_dir;
 
 const KUBECONFIG: &str = "KUBECONFIG";
@@ -69,10 +68,17 @@ pub fn data_or_file<P: AsRef<Path>>(data: &Option<String>, file: &Option<P>) -> 
     }
 }
 
-pub fn is_expired(timestamp: &str) -> bool {
-    let ts = DateTime::parse_from_rfc3339(timestamp).unwrap();
-    let now = DateTime::parse_from_rfc3339(&Utc::now().to_rfc3339()).unwrap();
-    ts < now
+pub fn certs(data: &[u8]) -> Vec<Vec<u8>> {
+    pem::parse_many(data)
+        .into_iter()
+        .filter_map(|p| {
+            if p.tag == "CERTIFICATE" {
+                Some(p.contents)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
 }
 
 #[cfg(test)]
