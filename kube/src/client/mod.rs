@@ -74,19 +74,6 @@ impl Client {
     }
 
     async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
-        let (parts, body) = request.into_parts();
-        //trace!("Sending request => method = {} uri = {}", parts.method, &uri_str);
-
-        // REVIEW Is the following necessary? Was originally for reqwest's client builder having separate methods.
-        let request = match parts.method {
-            http::Method::GET
-            | http::Method::POST
-            | http::Method::DELETE
-            | http::Method::PUT
-            | http::Method::PATCH => Request::from_parts(parts, body),
-            other => return Err(Error::InvalidMethod(other.to_string())),
-        };
-
         let mut svc = self.inner.clone();
         let res = svc
             .ready_and()

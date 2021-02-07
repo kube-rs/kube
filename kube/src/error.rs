@@ -66,10 +66,6 @@ pub enum Error {
     #[error("Error parsing response")]
     RequestParse,
 
-    /// An invalid method was used
-    #[error("Invalid API method {0}")]
-    InvalidMethod(String),
-
     /// A request validation failed
     #[error("Request validation failed with {0}")]
     RequestValidation(String),
