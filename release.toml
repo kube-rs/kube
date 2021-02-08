@@ -14,4 +14,3 @@ pre-release-hook = ["../prerelease.sh"]
 # Because of the potential failures in 3, we have to tag and push ourselves
 disable-push = true
 disable-tag = true
-pre-release-commit-message = "Release {{version}}"
