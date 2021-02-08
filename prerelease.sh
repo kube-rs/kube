@@ -2,9 +2,15 @@
 set -euo pipefail
 
 replace-docs() {
+  # Swap UNRELEASED header with a versioned and dated one, and remove compare url in it
   sd "UNRELEASED" "${NEW_VERSION} / $(date +%Y-%m-%d)" CHANGELOG.md
   sd " \* see https://github.com/clux/kube-rs/compare/.*...master\n" "" CHANGELOG.md
+  # Create a new UNRELEASED header, and add compare url to it
   sd "<!-- next-header -->" "<!-- next-header -->\nUNRELEASED\n===================\n * see https://github.com/clux/kube-rs/compare/${NEW_VERSION}...master\n" CHANGELOG.md
+  # Replace all space-prefixed issue links with a dumb one to this repo
+  # This may link to an issue when it's a pull, but github redirects
+  # shellcheck disable=SC2016
+  sd ' \#(\d+)' ' [#$1](https://github.com/clux/kube-rs/issues/$1)' CHANGELOG.md
   sed -i "s/${PREV_VERSION}/${NEW_VERSION}/g" kube-derive/README.md
   sed -i "s/${PREV_VERSION}/${NEW_VERSION}/g" README.md
 }
