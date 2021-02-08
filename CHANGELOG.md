@@ -1,7 +1,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.48.0...master
+ * see https://github.com/clux/kube-rs/compare/0.49.0...master
+
+0.49.0 / 2021-02-08
+===================
  * dependency on `reqwest` + removed in favour of `hyper` + `tower` #394
    - refactor: `kube::Client` now uses `kube::Service` (a `tower::Service<http::Request<hyper::Body>>`) instead of `reqwest::Client` to handle all requests
    - refactor: `kube::Client` now uses a `tokio_util::codec` for internal buffering
