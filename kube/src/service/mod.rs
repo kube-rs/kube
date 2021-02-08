@@ -1,7 +1,7 @@
 //! `Service` abstracts the connection to Kubernetes API server.
 
 mod auth;
-mod compression;
+#[cfg(feature = "gzip")] mod compression;
 mod headers;
 mod log;
 mod tls;
@@ -9,7 +9,7 @@ mod url;
 
 use self::{log::LogRequest, url::set_cluster_url};
 use auth::AuthLayer;
-use compression::{accept_compressed, maybe_decompress};
+#[cfg(feature = "gzip")] use compression::{accept_compressed, maybe_decompress};
 use headers::set_default_headers;
 use tls::HttpsConnector;
 
@@ -82,11 +82,17 @@ impl TryFrom<Config> for Service {
             );
         }
 
+        #[cfg(feature = "gzip")]
         let common = ServiceBuilder::new()
             .map_request(move |r| set_cluster_url(r, &cluster_url))
             .map_request(move |r| set_default_headers(r, default_headers.clone()))
             .map_request(accept_compressed)
             .map_response(maybe_decompress)
+            .into_inner();
+        #[cfg(not(feature = "gzip"))]
+        let common = ServiceBuilder::new()
+            .map_request(move |r| set_cluster_url(r, &cluster_url))
+            .map_request(move |r| set_default_headers(r, default_headers.clone()))
             .into_inner();
 
         let https: HttpsConnector<_> = config.try_into()?;
