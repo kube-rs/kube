@@ -1,6 +1,7 @@
 //! Abstracts the connection to Kubernetes API server.
 
 mod auth;
+mod builder_ext;
 #[cfg(feature = "gzip")] mod compression;
 mod headers;
 mod log;
@@ -9,6 +10,7 @@ mod url;
 
 use self::{log::LogRequest, url::set_cluster_url};
 use auth::AuthLayer;
+use builder_ext::ServiceBuilderExt;
 #[cfg(feature = "gzip")] use compression::{accept_compressed, maybe_decompress};
 use headers::set_default_headers;
 use tls::HttpsConnector;
@@ -70,20 +72,26 @@ impl TryFrom<Config> for Service {
         let cluster_url = config.cluster_url.clone();
         let mut default_headers = config.headers.clone();
         let timeout = config.timeout;
-        let auth = config.auth_header.clone();
 
         // AuthLayer is not necessary unless `RefreshableToken`
-        if let Authentication::Basic(value) = &auth {
-            default_headers.insert(
-                http::header::AUTHORIZATION,
-                HeaderValue::from_str(value).map_err(ConfigError::InvalidBasicAuth)?,
-            );
-        } else if let Authentication::Token(value) = &auth {
-            default_headers.insert(
-                http::header::AUTHORIZATION,
-                HeaderValue::from_str(value).map_err(ConfigError::InvalidBearerToken)?,
-            );
-        }
+        let maybe_auth = match &config.auth_header {
+            Authentication::None => None,
+            Authentication::Basic(s) => {
+                default_headers.insert(
+                    http::header::AUTHORIZATION,
+                    HeaderValue::from_str(s).map_err(ConfigError::InvalidBasicAuth)?,
+                );
+                None
+            }
+            Authentication::Token(s) => {
+                default_headers.insert(
+                    http::header::AUTHORIZATION,
+                    HeaderValue::from_str(s).map_err(ConfigError::InvalidBearerToken)?,
+                );
+                None
+            }
+            Authentication::RefreshableToken(r) => Some(AuthLayer::new(r.clone())),
+        };
 
         let common = ServiceBuilder::new()
             .map_request(move |r| set_cluster_url(r, &cluster_url))
@@ -109,20 +117,11 @@ impl TryFrom<Config> for Service {
         }
         let client: HyperClient<_, Body> = HyperClient::builder().build(connector);
 
-        if let Authentication::RefreshableToken(refreshable) = auth {
-            let inner = ServiceBuilder::new()
-                .layer(common)
-                .layer(AuthLayer::new(refreshable))
-                .layer(tower::layer::layer_fn(LogRequest::new))
-                .service(client);
-            Ok(Self::new(inner))
-        } else {
-            let inner = ServiceBuilder::new()
-                .layer(common)
-                .map_err(BoxError::from)
-                .layer(tower::layer::layer_fn(LogRequest::new))
-                .service(client);
-            Ok(Self::new(inner))
-        }
+        let inner = ServiceBuilder::new()
+            .layer(common)
+            .optional_layer(maybe_auth)
+            .layer(tower::layer::layer_fn(LogRequest::new))
+            .service(client);
+        Ok(Self::new(inner))
     }
 }
