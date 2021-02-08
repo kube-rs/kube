@@ -3,6 +3,7 @@ set -euo pipefail
 
 replace-docs() {
   sd "UNRELEASED" "${NEW_VERSION} / $(date +%Y-%m-%d)" CHANGELOG.md
+  sd " \* see https://github.com/clux/kube-rs/compare/.*...master\n" "" CHANGELOG.md
   sd "<!-- next-header -->" "<!-- next-header -->\nUNRELEASED\n===================\n * see https://github.com/clux/kube-rs/compare/${NEW_VERSION}...master\n" CHANGELOG.md
   sed -i "s/${PREV_VERSION}/${NEW_VERSION}/g" kube-derive/README.md
   sed -i "s/${PREV_VERSION}/${NEW_VERSION}/g" README.md
