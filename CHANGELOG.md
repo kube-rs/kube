@@ -5,61 +5,61 @@ UNRELEASED
 
 0.49.0 / 2021-02-08
 ===================
- * dependency on `reqwest` + removed in favour of `hyper` + `tower` [#394](https://github.com/clux/kube-rs/issues/394)
+ * dependency on `reqwest` + removed in favour of `hyper` + `tower` [#394](https://github.com/clux/kube-rs/pull/394)
    - refactor: `kube::Client` now uses `kube::Service` (a `tower::Service<http::Request<hyper::Body>>`) instead of `reqwest::Client` to handle all requests
    - refactor: `kube::Client` now uses a `tokio_util::codec` for internal buffering
    - refactor: `async-tungstenite` ws feature dependency replaced with `tokio-tungstenite`. `WebSocketStream` is now created from a connection upgraded with `hyper`
    - refactor: `oauth2` module for GCP OAuth replaced with optional `tame-oauth` dependency
    - BREAKING: GCP OAuth is now opt-in (`oauth` feature). Note that GCP provider with command based token source is supported by default.
-   - BREAKING: Gzip decompression is now opt-in (`gzip` feature) because Kubernetes does not have compression enabled by default yet and this feature requires extra dependencies. [#399](https://github.com/clux/kube-rs/issues/399)
-   - BREAKING: `Client::new` now takes a `Service` instead of `Config` [#400](https://github.com/clux/kube-rs/issues/400). Allows custom service for features not supported out of the box and testing.
+   - BREAKING: Gzip decompression is now opt-in (`gzip` feature) because Kubernetes does not have compression enabled by default yet and this feature requires extra dependencies. [#399](https://github.com/clux/kube-rs/pull/399)
+   - BREAKING: `Client::new` now takes a `Service` instead of `Config` [#400](https://github.com/clux/kube-rs/pull/400). Allows custom service for features not supported out of the box and testing.
    - BREAKING: Removed `Config::proxy`. Proxy is no longer supported out of the box, but it should be possible by using a custom Service.
    - fix: Refreshable token from auth provider not refreshing
    - fix: Panic when loading config with non-GCP provider [#238](https://github.com/clux/kube-rs/issues/238)
- * feat: subresource support added for `Evictable` types (marked for `Pod`) - [#393](https://github.com/clux/kube-rs/issues/393)
- * `kube`: subresource marker traits renamed to `Loggable`, `Executable`, `Attachable` (previously `LoggingObject`, `ExecutingObject`, `AttachableObject`) - [#395](https://github.com/clux/kube-rs/issues/395)
- * `examples` showcasing `kubectl cp` like behaviour [#381](https://github.com/clux/kube-rs/issues/381) via [#392](https://github.com/clux/kube-rs/issues/392)
+ * feat: subresource support added for `Evictable` types (marked for `Pod`) - [#393](https://github.com/clux/kube-rs/pull/393)
+ * `kube`: subresource marker traits renamed to `Loggable`, `Executable`, `Attachable` (previously `LoggingObject`, `ExecutingObject`, `AttachableObject`) - [#395](https://github.com/clux/kube-rs/pull/395)
+ * `examples` showcasing `kubectl cp` like behaviour [#381](https://github.com/clux/kube-rs/issues/381) via [#392](https://github.com/clux/kube-rs/pull/392)
 
 0.48.0 / 2021-01-23
 ===================
-  * bump `k8s-openapi` to `0.11.0` - [#388](https://github.com/clux/kube-rs/issues/388)
-  * breaking: `kube`: no longer necessary to serialize patches yourself - [#386](https://github.com/clux/kube-rs/issues/386)
+  * bump `k8s-openapi` to `0.11.0` - [#388](https://github.com/clux/kube-rs/pull/388)
+  * breaking: `kube`: no longer necessary to serialize patches yourself - [#386](https://github.com/clux/kube-rs/pull/386)
     - `PatchParams` removes `PatchStrategy`
     - `Api::patch*` methods now take an enum `Patch` type
     - optional `jsonpatch` feature added for `Patch::Json`
 
 0.47.0 / 2021-01-06
 ===================
-  * chore: upgrade `tokio` to `1.0` - [#363](https://github.com/clux/kube-rs/issues/363)
+  * chore: upgrade `tokio` to `1.0` - [#363](https://github.com/clux/kube-rs/pull/363)
     * BREAKING: This requires the whole application to upgrade to `tokio` 1.0 and `reqwest` to 0.11.0
-  * docs: fix broken documentation in `kube` 0.46.0 [#367](https://github.com/clux/kube-rs/issues/367)
-  * bug: `kube`: removed panics from `ws` features, fix `rustls` support + improve docs [#369](https://github.com/clux/kube-rs/issues/369) via [#370](https://github.com/clux/kube-rs/issues/370) + [#373](https://github.com/clux/kube-rs/issues/373)
-  * bug: `AttachParams` now fixes owned method chaining (slightly breaks from 0.46 if using &mut ref before) - [#364](https://github.com/clux/kube-rs/issues/364)
-  * feat: `AttachParams::interactive_tty` convenience method added - [#364](https://github.com/clux/kube-rs/issues/364)
-  * bug: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - [#375](https://github.com/clux/kube-rs/issues/375)
+  * docs: fix broken documentation in `kube` 0.46.0 [#367](https://github.com/clux/kube-rs/pull/367)
+  * bug: `kube`: removed panics from `ws` features, fix `rustls` support + improve docs [#369](https://github.com/clux/kube-rs/issues/369) via [#370](https://github.com/clux/kube-rs/pull/370) + [#373](https://github.com/clux/kube-rs/pull/373)
+  * bug: `AttachParams` now fixes owned method chaining (slightly breaks from 0.46 if using &mut ref before) - [#364](https://github.com/clux/kube-rs/pull/364)
+  * feat: `AttachParams::interactive_tty` convenience method added - [#364](https://github.com/clux/kube-rs/pull/364)
+  * bug: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - [#375](https://github.com/clux/kube-rs/pull/375)
 
 0.46.1 / 2021-01-06
 ===================
   * maintenance release for 0.46 (last supported tokio 0.2 release) from `tokio02` branch
-  * bug backport: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - [#375](https://github.com/clux/kube-rs/issues/375)
+  * bug backport: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - [#375](https://github.com/clux/kube-rs/pull/375)
 
 0.46.0 / 2021-01-02
 ===================
-  * feat: `kube` now has __optional__ websocket support with `async_tungstenite` under `ws` and `ws-*-tls` features [#360](https://github.com/clux/kube-rs/issues/360)
-  * feat: `AttachableObject` marker trait added and implemented for `k8s_openapi::api::core::v1::Pod` [#360](https://github.com/clux/kube-rs/issues/360)
-  * feat: `AttachParams` added for `Api::exec` and `Api::attach` for `AttachableObject`s [#360](https://github.com/clux/kube-rs/issues/360)
-  * examples: `pod_shell`, `pod_attach`, `pod_exec` demonstrating the new features [#360](https://github.com/clux/kube-rs/issues/360)
+  * feat: `kube` now has __optional__ websocket support with `async_tungstenite` under `ws` and `ws-*-tls` features [#360](https://github.com/clux/kube-rs/pull/360)
+  * feat: `AttachableObject` marker trait added and implemented for `k8s_openapi::api::core::v1::Pod` [#360](https://github.com/clux/kube-rs/pull/360)
+  * feat: `AttachParams` added for `Api::exec` and `Api::attach` for `AttachableObject`s [#360](https://github.com/clux/kube-rs/pull/360)
+  * examples: `pod_shell`, `pod_attach`, `pod_exec` demonstrating the new features [#360](https://github.com/clux/kube-rs/pull/360)
 
 0.45.0 / 2020-12-26
 ===================
   * feat: `kube-derive` now has a default enabled `schema` feature
     * allows opting out of `schemars` dependency for handwriting crds - [#355](https://github.com/clux/kube-rs/issues/355)
-  * breaking: `kube-derive` attr `struct_name` renamed to `struct` - [#359](https://github.com/clux/kube-rs/issues/359)
+  * breaking: `kube-derive` attr `struct_name` renamed to `struct` - [#359](https://github.com/clux/kube-rs/pull/359)
   * docs: improvements on `kube`, `kube-runtime`, `kube-derive`
 
 0.44.0 / 2020-12-23
 ===================
-  * feat: `kube-derive` now generates openapi v3 schemas and is thus usable with v1 `CustomResourceDefinition` - [#129](https://github.com/clux/kube-rs/issues/129) and [#264](https://github.com/clux/kube-rs/issues/264) via [#348](https://github.com/clux/kube-rs/issues/348)
+  * feat: `kube-derive` now generates openapi v3 schemas and is thus usable with v1 `CustomResourceDefinition` - [#129](https://github.com/clux/kube-rs/issues/129) and [#264](https://github.com/clux/kube-rs/issues/264) via [#348](https://github.com/clux/kube-rs/pull/348)
     * BREAKING: `kube-derive` types now require `JsonSchema` derived via `schemars` libray (not breaking if going to 0.45.0)
   * feat: `kube_runtime::controller`: now reconciles objects in parallel - [#346](https://github.com/clux/kube-rs/issues/346)
     * BREAKING: `kube_runtime::controller::applier` now requires that the `reconciler`'s `Future` is `Unpin`,
@@ -68,23 +68,23 @@ UNRELEASED
                 use the low-level `applier` interface instead if this is not acceptable
   * bug: `kube-runtime`: removed accidentally included `k8s-openapi` default features (you have to opt in to them yourself)
   * feat: `kube`: `TypeMeta` now derives additionally `Debug, Eq, PartialEq, Hash`
-  * bump: `k8s-openapi` to `0.10.0` - [#330](https://github.com/clux/kube-rs/issues/330)
+  * bump: `k8s-openapi` to `0.10.0` - [#330](https://github.com/clux/kube-rs/pull/330)
   * bump: `serde_yaml` - [#349](https://github.com/clux/kube-rs/issues/349)
-  * bump: `dirs` to `dirs-next` - [#340](https://github.com/clux/kube-rs/issues/340)
+  * bump: `dirs` to `dirs-next` - [#340](https://github.com/clux/kube-rs/pull/340)
 
 0.43.0 / 2020-10-08
 ===================
   * bug: `kube-derive` attr `#[kube(shortname)]` now working correctly
   * bug: `kube-derive` now working with badly cased existing types - [#313](https://github.com/clux/kube-rs/issues/313)
-  * missing: `kube` now correctly exports `config::NamedAuthInfo` - [#323](https://github.com/clux/kube-rs/issues/323)
+  * missing: `kube` now correctly exports `config::NamedAuthInfo` - [#323](https://github.com/clux/kube-rs/pull/323)
   * feat: `kube`: expose `Config::get_auth_header` for istio use cases - [#322](https://github.com/clux/kube-rs/issues/322)
-  * feat: `kube`: local config now tackles gcloud auth exec params - [#328](https://github.com/clux/kube-rs/issues/328) and [#84](https://github.com/clux/kube-rs/issues/84)
+  * feat: `kube`: local config now tackles gcloud auth exec params - [#328](https://github.com/clux/kube-rs/pull/328) and [#84](https://github.com/clux/kube-rs/issues/84)
   * `kube-derive` now actually requires GVK (in particular `#[kube(kind = "Foo")]` which we sometimes inferred earlier, despite documenting the contrary)
 
 0.42.0 / 2020-09-10
 ===================
   * bug: `kube-derive`'s `Default` derive now sets typemeta correctly - [#315](https://github.com/clux/kube-rs/issues/315)
-  * feat: `ListParams` now supports `continue_token` and `limit` - [#320](https://github.com/clux/kube-rs/issues/320)
+  * feat: `ListParams` now supports `continue_token` and `limit` - [#320](https://github.com/clux/kube-rs/pull/320)
 
 0.41.0 / 2020-09-10
 ===================
@@ -92,7 +92,7 @@ UNRELEASED
 
 0.40.0 / 2020-08-17
 ===================
-  * `DynamicResource::from_api_resource` added to allow apiserver returned resources - [#305](https://github.com/clux/kube-rs/issues/305) via [#301](https://github.com/clux/kube-rs/issues/301)
+  * `DynamicResource::from_api_resource` added to allow apiserver returned resources - [#305](https://github.com/clux/kube-rs/pull/305) via [#301](https://github.com/clux/kube-rs/pull/301)
   * `Client::list_api_groups` added
   * `Client::list_ap_group_resources` added
   * `Client::list_core_api_versions` added
@@ -105,14 +105,14 @@ UNRELEASED
 
 0.39.0 / 2020-08-05
 ===================
-  * Bug: `ObjectRef` tweak in `kube-runtime` to allow controllers triggering across cluster and namespace scopes - [#293](https://github.com/clux/kube-rs/issues/293) via [#294](https://github.com/clux/kube-rs/issues/294)
+  * Bug: `ObjectRef` tweak in `kube-runtime` to allow controllers triggering across cluster and namespace scopes - [#293](https://github.com/clux/kube-rs/issues/293) via [#294](https://github.com/clux/kube-rs/pull/294)
   * Feature: `kube` now has a `derive` feature which will re-export `kube::CustomResource` from `kube-derive::CustomResource`.
   * Examples: revamp examples for `kube-runtime` - [#201](https://github.com/clux/kube-rs/issues/201)
 
 0.38.0 / 2020-07-23
 ===================
   * Marked `kube::runtime` module as deprecated - [#281](https://github.com/clux/kube-rs/issues/281)
-  * `Config::timeout` can now be overridden to `None` (with caveats) [#280](https://github.com/clux/kube-rs/issues/280)
+  * `Config::timeout` can now be overridden to `None` (with caveats) [#280](https://github.com/clux/kube-rs/pull/280)
   * Bug: reflector stores could have multiple copies inside datastore - [#286](https://github.com/clux/kube-rs/issues/286)
      - `dashmap` backend Store driver downgraded - [#286](https://github.com/clux/kube-rs/issues/286)
      - `Store::iter` temporarily removed
@@ -127,9 +127,9 @@ UNRELEASED
 
 0.36.0 / 2020-07-19
 ===================
-  * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate [#258](https://github.com/clux/kube-rs/issues/258)
-  * `Controller<K>` added ([#148](https://github.com/clux/kube-rs/issues/148) via [#258](https://github.com/clux/kube-rs/issues/258))
-  * `Reflector` api redesigned ([#102](https://github.com/clux/kube-rs/issues/102) via [#258](https://github.com/clux/kube-rs/issues/258))
+  * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate [#258](https://github.com/clux/kube-rs/pull/258)
+  * `Controller<K>` added ([#148](https://github.com/clux/kube-rs/issues/148) via [#258](https://github.com/clux/kube-rs/pull/258))
+  * `Reflector` api redesigned ([#102](https://github.com/clux/kube-rs/issues/102) via [#258](https://github.com/clux/kube-rs/pull/258))
   * Migration release for `Informer` -> `watcher` + `Reflector` -> `reflector`
   * `kube::api::CustomResource` removed in favour of `kube::api::Resource::dynamic`
   * `CrBuilder` removed in favour of `DynamicResource` (with new error handling)
@@ -141,9 +141,9 @@ UNRELEASED
 
 0.35.0 / 2020-06-15
 ===================
-  * `Config::proxy` support added - [#246](https://github.com/clux/kube-rs/issues/246)
-  * `PartialEq` can be derived with `kube-derive` - [#242](https://github.com/clux/kube-rs/issues/242)
-  * Windows builds no longer clashes with runtime - [#240](https://github.com/clux/kube-rs/issues/240)
+  * `Config::proxy` support added - [#246](https://github.com/clux/kube-rs/pull/246)
+  * `PartialEq` can be derived with `kube-derive` - [#242](https://github.com/clux/kube-rs/pull/242)
+  * Windows builds no longer clashes with runtime - [#240](https://github.com/clux/kube-rs/pull/240)
   * Rancher hosts (with path specifiers) now works - [#244](https://github.com/clux/kube-rs/issues/244)
 
 0.34.0 / 2020-05-08
@@ -151,13 +151,13 @@ UNRELEASED
   * Bump `k8s-openapi` to `0.8.0`
   * `Config::from_cluster_env` <- renamed from `Config::new_from_cluster_env`
   * `Config::from_kubeconfig` <- renamed from `Config::new_from_kubeconfig`
-  * `Config::from_custom_kubeconfig` added - [#236](https://github.com/clux/kube-rs/issues/236)
-  * Majorly overhauled error handlind in config module - [#237](https://github.com/clux/kube-rs/issues/237)
+  * `Config::from_custom_kubeconfig` added - [#236](https://github.com/clux/kube-rs/pull/236)
+  * Majorly overhauled error handlind in config module - [#237](https://github.com/clux/kube-rs/pull/237)
 
 0.33.0 / 2020-04-27
 ===================
   * documentation fixes for `Api::patch`
-  * Config: add automatic token refresh - [#72](https://github.com/clux/kube-rs/issues/72) / [#224](https://github.com/clux/kube-rs/issues/224) / [#234](https://github.com/clux/kube-rs/issues/234)
+  * Config: add automatic token refresh - [#72](https://github.com/clux/kube-rs/issues/72) / [#224](https://github.com/clux/kube-rs/issues/224) / [#234](https://github.com/clux/kube-rs/pull/234)
 
 0.32.1 / 2020-04-15
 ===================
@@ -250,20 +250,20 @@ UNRELEASED
 
 0.25.0 / 2020-02-09
 ===================
-  * initial rustls support [#114](https://github.com/clux/kube-rs/issues/114) (some local kube config issues know [#120](https://github.com/clux/kube-rs/issues/120))
+  * initial rustls support [#114](https://github.com/clux/kube-rs/pull/114) (some local kube config issues know [#120](https://github.com/clux/kube-rs/issues/120))
   * crate does better version checking against openapi features - [#106](https://github.com/clux/kube-rs/issues/106)
   * initial `log_stream` support - [#109](https://github.com/clux/kube-rs/issues/109)
 
 0.24.0 / 2020-01-26
 ===================
-  * Add support for ServiceAccount, Role, ClusterRole, RoleBinding, Endpoint - [#113](https://github.com/clux/kube-rs/issues/113) + [#111](https://github.com/clux/kube-rs/issues/111)
+  * Add support for ServiceAccount, Role, ClusterRole, RoleBinding, Endpoint - [#113](https://github.com/clux/kube-rs/pull/113) + [#111](https://github.com/clux/kube-rs/pull/111)
   * Upgrade k8s-openapi to 0.7 => breaking changes: https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v070-2020-01-23
 
 0.23.0 / 2019-12-31
 ===================
   * Bump tokio and reqwest to 0.2 and 0.10
-  * Fix bug in `log` fetcher - [#107](https://github.com/clux/kube-rs/issues/107)
-  * Temporarily allow invalid certs when testing on macosx - [#105](https://github.com/clux/kube-rs/issues/105)
+  * Fix bug in `log` fetcher - [#107](https://github.com/clux/kube-rs/pull/107)
+  * Temporarily allow invalid certs when testing on macosx - [#105](https://github.com/clux/kube-rs/pull/105)
 
 0.22.2 / 2019-12-04
 ===================
@@ -285,12 +285,12 @@ UNRELEASED
 
 0.21.0 / 2019-11-29
 ===================
-  * All watch calls returns a stream of `WatchEvent` - [#92](https://github.com/clux/kube-rs/issues/92)
-  * `Informer::poll` now returns a stream - [#92](https://github.com/clux/kube-rs/issues/92)
+  * All watch calls returns a stream of `WatchEvent` - [#92](https://github.com/clux/kube-rs/pull/92)
+  * `Informer::poll` now returns a stream - [#92](https://github.com/clux/kube-rs/pull/92)
 
 0.20.1 / 2019-11-21
 ===================
-  * ObjectList now implements Iterator - [#91](https://github.com/clux/kube-rs/issues/91)
+  * ObjectList now implements Iterator - [#91](https://github.com/clux/kube-rs/pull/91)
   * openapi feature no longer accidentally hardcoded to v1.15 feature - [#90](https://github.com/clux/kube-rs/issues/90)
 
 0.19.0 / 2019-11-15
@@ -312,11 +312,11 @@ UNRELEASED
 
 0.17.0 / 2019-10-22
 ==================
-  * Add support for oidc providerss with `auth-provider` w/o `access-token` - [#70](https://github.com/clux/kube-rs/issues/70)
+  * Add support for oidc providerss with `auth-provider` w/o `access-token` - [#70](https://github.com/clux/kube-rs/pull/70)
   * Bump most dependencies to more recent versions
   * Expose custom client creation
   * Added support for `v1beta1Ingress`
-  * Expose incluster_config::load_default_ns - [#74](https://github.com/clux/kube-rs/issues/74)
+  * Expose incluster_config::load_default_ns - [#74](https://github.com/clux/kube-rs/pull/74)
 
 0.16.1 / 2019-08-09
 ==================
@@ -325,7 +325,7 @@ UNRELEASED
 0.16.0 / 2019-08-09
 ==================
   * Add `Reflector::get` and `Reflector::get_within` as cheaper getters
-  * Add support for OpenShift kube configs with multiple CAs - via [#64](https://github.com/clux/kube-rs/issues/64)
+  * Add support for OpenShift kube configs with multiple CAs - via [#64](https://github.com/clux/kube-rs/pull/64)
   * Add missing `ObjectMeta::ownerReferences`
   * Reduced memory consumption during compile with `k8s-openapi@0.5.1` - [#62](https://github.com/clux/kube-rs/issues/62)
 
@@ -336,15 +336,15 @@ UNRELEASED
 
 0.15.0 / 2019-08-11
 ==================
-  * Added support for `v1Job` resources - via [#58](https://github.com/clux/kube-rs/issues/58)
-  * Added support for `v1Namespace`, `v1DaemonSet`, `v1ReplicaSet`, `v1PersistentVolumeClaim`, `v1PersistentVolume`, `v1ResourceQuota`, `v1HorizontalPodAutoscaler` - via [#59](https://github.com/clux/kube-rs/issues/59)
+  * Added support for `v1Job` resources - via [#58](https://github.com/clux/kube-rs/pull/58)
+  * Added support for `v1Namespace`, `v1DaemonSet`, `v1ReplicaSet`, `v1PersistentVolumeClaim`, `v1PersistentVolume`, `v1ResourceQuota`, `v1HorizontalPodAutoscaler` - via [#59](https://github.com/clux/kube-rs/pull/59)
   * Added support for `v1beta1CronJob`, `v1ReplicationController`, `v1VolumeAttachment`, `v1NetworkPolicy` - via [#60](https://github.com/clux/kube-rs/issues/60)
   * `k8s-openapi` optional dependency bumped to `0.5.0` (for kube 1.14 structs)
 
 0.14.0 / 2019-08-03
 ==================
   * `Reflector::read` now returns a `Vec<K>`` rather than a `Vec<(name, K)>`:
-    This fixes an unsoundness bug internally - [#56](https://github.com/clux/kube-rs/issues/56) via @gnieto
+    This fixes an unsoundness bug internally - [#56](https://github.com/clux/kube-rs/pull/56) via @gnieto
 
 0.13.0 / 2019-07-22
 ==================
@@ -354,8 +354,8 @@ UNRELEASED
 
 0.12.0 / 2019-07-18
 ==================
-  * Added support for `Log` subresource - via [#50](https://github.com/clux/kube-rs/issues/50)
-  * Added support for `v1ConfigMap` with example - via [#49](https://github.com/clux/kube-rs/issues/49)
+  * Added support for `Log` subresource - via [#50](https://github.com/clux/kube-rs/pull/50)
+  * Added support for `v1ConfigMap` with example - via [#49](https://github.com/clux/kube-rs/pull/49)
   * Demoted some spammy info messages from Reflector
 
 0.11.0 / 2019-07-10
