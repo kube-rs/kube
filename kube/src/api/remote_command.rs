@@ -11,7 +11,7 @@ use futures::{
     future::Either::{Left, Right},
     SinkExt, StreamExt,
 };
-use futures_util::future::select;
+use futures::future::select;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
 use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 
