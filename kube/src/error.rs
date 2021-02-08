@@ -89,6 +89,7 @@ pub enum Error {
 
     /// The server did not respond with [`SWITCHING_PROTOCOLS`] status when upgrading the
     /// connection.
+    ///
     /// [`SWITCHING_PROTOCOLS`]: http::status::StatusCode::SWITCHING_PROTOCOLS
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
