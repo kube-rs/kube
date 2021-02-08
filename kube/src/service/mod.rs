@@ -1,4 +1,4 @@
-//! `Service` abstracts the connection to Kubernetes API server.
+//! Abstracts the connection to Kubernetes API server.
 
 mod auth;
 mod compression;
@@ -27,7 +27,10 @@ use crate::{config::Authentication, error::ConfigError, Config, Error, Result};
 type InnerService = Buffer<BoxService<Request<Body>, Response<Body>, BoxError>, Request<Body>>;
 
 #[derive(Clone)]
-/// `Service` abstracts how `Client` communicates with the Kubernetes API server.
+/// Abstracts how [`Client`](crate::Client) communicates with the Kubernetes API server.
+///
+/// The default service uses [`hyper::Client`] and can be created from [`Config`](crate::Config)
+/// with [`Service::try_from`].
 pub struct Service {
     inner: InnerService,
 }
