@@ -89,6 +89,7 @@ pub enum Error {
 
     /// The server did not respond with [`SWITCHING_PROTOCOLS`] status when upgrading the
     /// connection.
+    ///
     /// [`SWITCHING_PROTOCOLS`]: http::status::StatusCode::SWITCHING_PROTOCOLS
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
@@ -142,6 +143,7 @@ pub enum ConfigError {
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
     #[cfg(feature = "oauth")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
     #[error("OAuth Error: {0}")]
     OAuth(#[from] OAuthError),
 
@@ -190,6 +192,7 @@ pub enum ConfigError {
 }
 
 #[cfg(feature = "oauth")]
+#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
 #[derive(Error, Debug)]
 // Redundant with the error messages and machine names
 #[allow(missing_docs)]
@@ -217,6 +220,7 @@ pub enum OAuthError {
 }
 
 #[cfg(feature = "oauth")]
+#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
 impl From<OAuthError> for Error {
     fn from(e: OAuthError) -> Self {
         ConfigError::OAuth(e).into()

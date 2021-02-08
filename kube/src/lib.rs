@@ -104,6 +104,7 @@ pub use api::{Api, DynamicResource, Resource};
 #[doc(inline)] pub use client::Client;
 #[doc(inline)] pub use config::Config;
 #[doc(inline)] pub use error::Error;
+#[doc(inline)] pub use service::Service;
 
 /// Convient alias for `Result<T, Error>`
 pub type Result<T, E = Error> = std::result::Result<T, E>;

@@ -3,15 +3,17 @@ UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.48.0...master
  * dependency on `reqwest` + removed in favour of `hyper` + `tower` #394
-   - `kube`: `kube::Client` now uses `kube::Service` instead of `reqwest::Client`
-   - `kube::Service` struct is a `tower::Service<http::Request<hyper::Body>>` - handles all requests
-   - `async-tungstenite` ws feature dependency replaced with upgraded `hyper` connection
-   - `oauth2` module replaced with optional `tame-oauth` dependency (`oauth` feature)
-   - BREAKING: `oauth` is now opt-in
-   - `kube`: fix bug when loading config on non-GCP provider #238
-   - client now uses a `tokio_util::codec` for internal buffering
-  * new async `AuthLayer` only used when using `RefreshableToken`s - #396
-  * `kube`: subresource support added for `Evictable` types (marked for `Pod`) - #393
+   - refactor: `kube::Client` now uses `kube::Service` (a `tower::Service<http::Request<hyper::Body>>`) instead of `reqwest::Client` to handle all requests
+   - refactor: `kube::Client` now uses a `tokio_util::codec` for internal buffering
+   - refactor: `async-tungstenite` ws feature dependency replaced with `tokio-tungstenite`. `WebSocketStream` is now created from a connection upgraded with `hyper`
+   - refactor: `oauth2` module for GCP OAuth replaced with optional `tame-oauth` dependency
+   - BREAKING: GCP OAuth is now opt-in (`oauth` feature). Note that GCP provider with command based token source is supported by default.
+   - BREAKING: Gzip decompression is now opt-in (`gzip` feature) because Kubernetes does not have compression enabled by default yet and this feature requires extra dependencies. #399
+   - BREAKING: `Client::new` now takes a `Service` instead of `Config` #400. Allows custom service for features not supported out of the box and testing.
+   - BREAKING: Removed `Config::proxy`. Proxy is no longer supported out of the box, but it should be possible by using a custom Service.
+   - fix: Refreshable token from auth provider not refreshing
+   - fix: Panic when loading config with non-GCP provider #238
+ * feat: subresource support added for `Evictable` types (marked for `Pod`) - #393
  * `kube`: subresource marker traits renamed to `Loggable`, `Executable`, `Attachable` (previously `LoggingObject`, `ExecutingObject`, `AttachableObject`) - #395
  * `examples` showcasing `kubectl cp` like behaviour #381 via #392
 
