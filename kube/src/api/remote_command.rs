@@ -8,10 +8,12 @@ use std::{
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
 use futures::{
-    future::Either::{Left, Right},
+    future::{
+        select,
+        Either::{Left, Right},
+    },
     SinkExt, StreamExt,
 };
-use futures::future::select;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
 use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 
