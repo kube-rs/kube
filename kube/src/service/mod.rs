@@ -85,17 +85,16 @@ impl TryFrom<Config> for Service {
             );
         }
 
+        let common = ServiceBuilder::new()
+            .map_request(move |r| set_cluster_url(r, &cluster_url))
+            .map_request(move |r| set_default_headers(r, default_headers.clone()))
+            .into_inner();
+
         #[cfg(feature = "gzip")]
         let common = ServiceBuilder::new()
-            .map_request(move |r| set_cluster_url(r, &cluster_url))
-            .map_request(move |r| set_default_headers(r, default_headers.clone()))
+            .layer(common)
             .map_request(accept_compressed)
             .map_response(maybe_decompress)
-            .into_inner();
-        #[cfg(not(feature = "gzip"))]
-        let common = ServiceBuilder::new()
-            .map_request(move |r| set_cluster_url(r, &cluster_url))
-            .map_request(move |r| set_default_headers(r, default_headers.clone()))
             .into_inner();
 
         let https: HttpsConnector<_> = config.try_into()?;
