@@ -25,7 +25,7 @@ ws = ["tokio-tungstenite"]
 oauth = ["tame-oauth"]
 
 [package.metadata.docs.rs]
-features = ["derive", "ws"]
+features = ["derive", "ws", "oauth", "jsonpatch"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
