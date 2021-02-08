@@ -38,24 +38,16 @@ use std::convert::{TryFrom, TryInto};
 /// The best way to instantiate the client is either by
 /// inferring the configuration from the environment using
 /// [`Client::try_default`] or with an existing [`Config`]
-/// using [`Client::new`]
+/// using [`Client::try_from`].
 #[derive(Clone)]
 pub struct Client {
     inner: Service,
 }
 
 impl Client {
-    // TODO Change this to take `Service` instead after figuring out `auth_header`.
-    /// Create and initialize a [`Client`] using the given
-    /// configuration.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the configuration supplied leads to an invalid TlsConnector.
-    /// If you want to handle this error case use [`Config::try_from`](Self::try_from)
-    /// (note that this requires [`std::convert::TryFrom`] to be in scope.)
-    pub fn new(config: Config) -> Self {
-        Self::try_from(config).expect("Could not create a client from the supplied config")
+    /// Create and initialize a [`Client`] using the given `Service`.
+    pub fn new(service: Service) -> Self {
+        Self { inner: service }
     }
 
     /// Create and initialize a [`Client`] using the inferred
@@ -359,8 +351,7 @@ impl TryFrom<Config> for Client {
 
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
-        let inner = config.try_into()?;
-        Ok(Self { inner })
+        Ok(Self::new(config.try_into()?))
     }
 }
 
