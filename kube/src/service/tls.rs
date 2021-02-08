@@ -75,8 +75,10 @@ mod connector {
     };
 
     use hyper::client::HttpConnector;
-    use rustls::{self, Certificate, ClientConfig, ServerCertVerified, ServerCertVerifier};
-    use tokio_rustls::webpki::DNSNameRef;
+    use tokio_rustls::{
+        rustls::{self, Certificate, ClientConfig, ServerCertVerified, ServerCertVerifier},
+        webpki::DNSNameRef,
+    };
 
     use crate::{config::Config, Error, Result};
 
