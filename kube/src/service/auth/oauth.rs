@@ -12,21 +12,21 @@ use crate::{
     Error, Result,
 };
 
-pub(crate) struct GcpOauth {
+pub(crate) struct Gcp {
     access: ServiceAccountAccess,
     scopes: Vec<String>,
 }
 
-impl std::fmt::Debug for GcpOauth {
+impl std::fmt::Debug for Gcp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GcpOauth")
+        f.debug_struct("Gcp")
             .field("access", &"{}".to_owned())
             .field("scopes", &self.scopes)
             .finish()
     }
 }
 
-impl GcpOauth {
+impl Gcp {
     pub(crate) fn new(access: ServiceAccountAccess, scopes: Vec<String>) -> Self {
         Self { access, scopes }
     }

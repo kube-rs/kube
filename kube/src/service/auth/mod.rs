@@ -13,7 +13,6 @@ use crate::{
 };
 
 #[cfg(feature = "oauth")] mod oauth;
-#[cfg(feature = "oauth")] use oauth::GcpOauth;
 
 mod layer;
 pub(crate) use layer::AuthLayer;
@@ -31,7 +30,7 @@ pub(crate) enum Authentication {
 pub(crate) enum RefreshableToken {
     Exec(Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>),
     #[cfg(feature = "oauth")]
-    GcpOauth(Arc<Mutex<GcpOauth>>),
+    GcpOauth(Arc<Mutex<oauth::Gcp>>),
 }
 
 impl RefreshableToken {
@@ -155,7 +154,7 @@ enum ProviderToken {
     // "access-token", "expiry" (RFC3339)
     GcpCommand(String, Option<DateTime<Utc>>),
     #[cfg(feature = "oauth")]
-    GcpOauth(GcpOauth),
+    GcpOauth(oauth::Gcp),
     // "access-token", "expires-on" (timestamp)
     // Azure(String, Option<DateTime<Utc>>),
 }
@@ -231,7 +230,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     // Google Application Credentials-based token source
     #[cfg(feature = "oauth")]
     {
-        Ok(ProviderToken::GcpOauth(GcpOauth::from_env_and_scopes(
+        Ok(ProviderToken::GcpOauth(oauth::Gcp::from_env_and_scopes(
             provider.config.get("scopes"),
         )?))
     }
