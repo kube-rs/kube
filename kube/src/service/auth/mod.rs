@@ -26,6 +26,12 @@ pub(crate) enum Authentication {
     RefreshableToken(RefreshableToken),
 }
 
+// See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth
+// for the list of auth-plugins supported by client-go.
+// We currently support the following:
+// - exec
+// - gcp: command based token source (exec)
+// - gcp: application credential based token source (requires `oauth` feature)
 #[derive(Debug, Clone)]
 pub(crate) enum RefreshableToken {
     Exec(Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>),
