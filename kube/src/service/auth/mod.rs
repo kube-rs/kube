@@ -1,5 +1,4 @@
 use std::{convert::TryFrom, process::Command, sync::Arc};
-#[cfg(feature = "oauth")] use std::{env, path::PathBuf};
 
 use chrono::{DateTime, Duration, Utc};
 use http::header;
@@ -7,22 +6,14 @@ use jsonpath_lib::select as jsonpath_select;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-#[cfg(all(feature = "oauth", feature = "rustls-tls"))]
-use hyper_rustls::HttpsConnector;
-#[cfg(all(feature = "oauth", feature = "native-tls"))]
-use hyper_tls::HttpsConnector;
-#[cfg(feature = "oauth")]
-use tame_oauth::{
-    gcp::{ServiceAccountAccess, ServiceAccountInfo, TokenOrRequest},
-    Token,
-};
-
-#[cfg(feature = "oauth")] use crate::error::OAuthError;
 use crate::{
     config::{data_or_file, AuthInfo, AuthProviderConfig, ExecConfig},
     error::{ConfigError, Error},
     Result,
 };
+
+#[cfg(feature = "oauth")] mod oauth;
+#[cfg(feature = "oauth")] use oauth::GcpOauth;
 
 mod layer;
 pub(crate) use layer::AuthLayer;
@@ -41,22 +32,6 @@ pub(crate) enum RefreshableToken {
     Exec(Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>),
     #[cfg(feature = "oauth")]
     GcpOauth(Arc<Mutex<GcpOauth>>),
-}
-
-#[cfg(feature = "oauth")]
-pub(crate) struct GcpOauth {
-    access: ServiceAccountAccess,
-    scopes: Vec<String>,
-}
-
-#[cfg(feature = "oauth")]
-impl std::fmt::Debug for GcpOauth {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GcpOauth")
-            .field("access", &"{}".to_owned())
-            .field("scopes", &self.scopes)
-            .finish()
-    }
 }
 
 impl RefreshableToken {
@@ -125,9 +100,9 @@ impl TryFrom<&AuthInfo> for Authentication {
                 }
 
                 #[cfg(feature = "oauth")]
-                ProviderToken::GcpOauth(access, scopes) => {
+                ProviderToken::GcpOauth(gcp) => {
                     return Ok(Self::RefreshableToken(RefreshableToken::GcpOauth(Arc::new(
-                        Mutex::new(GcpOauth { access, scopes }),
+                        Mutex::new(gcp),
                     ))));
                 }
             }
@@ -180,7 +155,7 @@ enum ProviderToken {
     // "access-token", "expiry" (RFC3339)
     GcpCommand(String, Option<DateTime<Utc>>),
     #[cfg(feature = "oauth")]
-    GcpOauth(ServiceAccountAccess, Vec<String>),
+    GcpOauth(GcpOauth),
     // "access-token", "expires-on" (timestamp)
     // Azure(String, Option<DateTime<Utc>>),
 }
@@ -256,20 +231,9 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     // Google Application Credentials-based token source
     #[cfg(feature = "oauth")]
     {
-        const DEFAULT_SCOPES: &str =
-            "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email";
-        // Initialize ServiceAccountAccess so we can request later when needed.
-        let info = gcloud_account_info()?;
-        let access = ServiceAccountAccess::new(info).map_err(OAuthError::InvalidKeyFormat)?;
-        let scopes = provider
-            .config
-            .get("scopes")
-            .map(String::to_owned)
-            .unwrap_or_else(|| DEFAULT_SCOPES.to_owned())
-            .split(',')
-            .map(str::to_owned)
-            .collect::<Vec<_>>();
-        Ok(ProviderToken::GcpOauth(access, scopes))
+        Ok(ProviderToken::GcpOauth(GcpOauth::from_env_and_scopes(
+            provider.config.get("scopes"),
+        )?))
     }
     #[cfg(not(feature = "oauth"))]
     {
@@ -350,69 +314,6 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, ConfigError> {
     let creds = serde_json::from_slice(&out.stdout).map_err(ConfigError::AuthExecParse)?;
 
     Ok(creds)
-}
-
-#[cfg(feature = "oauth")]
-impl GcpOauth {
-    pub async fn token(&self) -> Result<Token> {
-        match self.access.get_token(&self.scopes) {
-            Ok(TokenOrRequest::Request {
-                request, scope_hash, ..
-            }) => {
-                #[cfg(feature = "native-tls")]
-                let https = HttpsConnector::new();
-                #[cfg(feature = "rustls-tls")]
-                let https = HttpsConnector::with_native_roots();
-                let client = hyper::Client::builder().build::<_, hyper::Body>(https);
-
-                let res = client
-                    .request(request.map(hyper::Body::from))
-                    .await
-                    .map_err(OAuthError::RequestToken)?;
-                // Convert response body to `Vec<u8>` for parsing.
-                let (parts, body) = res.into_parts();
-                let bytes = hyper::body::to_bytes(body).await?;
-                let response = http::Response::from_parts(parts, bytes.to_vec());
-                match self.access.parse_token_response(scope_hash, response) {
-                    Ok(token) => Ok(token),
-
-                    Err(err) => match err {
-                        tame_oauth::Error::AuthError(_) | tame_oauth::Error::HttpStatus(_) => {
-                            Err(OAuthError::RetrieveCredentials(err).into())
-                        }
-                        tame_oauth::Error::Json(e) => Err(OAuthError::ParseToken(e).into()),
-                        err => Err(OAuthError::Unknown(err.to_string()).into()),
-                    },
-                }
-            }
-
-            // ServiceAccountAccess was just created, so it's impossible to have cached token.
-            Ok(TokenOrRequest::Token(token)) => Ok(token),
-
-            Err(err) => match err {
-                // Request builder failed.
-                tame_oauth::Error::Http(e) => Err(Error::HttpError(e)),
-                tame_oauth::Error::InvalidRsaKey => Err(OAuthError::InvalidRsaKey(err).into()),
-                tame_oauth::Error::InvalidKeyFormat => Err(OAuthError::InvalidKeyFormat(err).into()),
-                e => Err(OAuthError::Unknown(e.to_string()).into()),
-            },
-        }
-    }
-}
-
-#[cfg(feature = "oauth")]
-const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
-
-#[cfg(feature = "oauth")]
-fn gcloud_account_info() -> Result<ServiceAccountInfo, ConfigError> {
-    let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
-        .map(PathBuf::from)
-        .ok_or(OAuthError::MissingGoogleCredentials)?;
-    let data = std::fs::read_to_string(path).map_err(OAuthError::LoadCredentials)?;
-    ServiceAccountInfo::deserialize(data).map_err(|err| match err {
-        tame_oauth::Error::Json(e) => OAuthError::ParseCredentials(e).into(),
-        _ => OAuthError::Unknown(err.to_string()).into(),
-    })
 }
 
 #[cfg(test)]
