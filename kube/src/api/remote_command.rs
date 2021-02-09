@@ -48,7 +48,10 @@ pub struct AttachedProcess {
 }
 
 impl AttachedProcess {
-    pub(crate) fn new(stream: WebSocketStream<hyper::upgrade::Upgraded>, ap: &AttachParams) -> Self {
+    pub(crate) fn new<S>(stream: WebSocketStream<S>, ap: &AttachParams) -> Self
+    where
+        S: AsyncRead + AsyncWrite + Unpin + Sized + Send + 'static,
+    {
         // To simplify the implementation, always create a pipe for stdin.
         // The caller does not have access to it unless they had requested.
         let (stdin_writer, stdin_reader) = tokio::io::duplex(ap.max_stdin_buf_size.unwrap_or(MAX_BUF_SIZE));
@@ -166,12 +169,15 @@ const STDERR_CHANNEL: u8 = 2;
 const STATUS_CHANNEL: u8 = 3;
 // const RESIZE_CHANNEL: u8 = 4;
 
-async fn start_message_loop(
-    stream: WebSocketStream<hyper::upgrade::Upgraded>,
+async fn start_message_loop<S>(
+    stream: WebSocketStream<S>,
     stdin: impl AsyncRead + Unpin,
     mut stdout: Option<impl AsyncWrite + Unpin>,
     mut stderr: Option<impl AsyncWrite + Unpin>,
-) -> Option<Status> {
+) -> Option<Status>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Sized + Send + 'static,
+{
     let mut stdin_stream = tokio_util::io::ReaderStream::new(stdin);
     let (mut server_send, raw_server_recv) = stream.split();
     // Work with filtered messages to reduce noise.
