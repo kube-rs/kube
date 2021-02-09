@@ -15,7 +15,7 @@ pub(crate) use auth::{Authentication, RefreshableToken};
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 
-use http::header::{self, HeaderMap};
+use http::header::HeaderMap;
 
 use std::time::Duration;
 
@@ -39,10 +39,8 @@ pub struct Config {
     /// Client certs and key in PEM format and a password for a client to create `Identity` with.
     /// Password is only used with `native_tls` to create a PKCS12 archive.
     pub(crate) identity: Option<(Vec<u8>, String)>,
-    /// The authentication header from the credentials available in the kubeconfig. This supports
-    /// exec plugins as well as specified in
-    /// <https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins>
-    pub(crate) auth_header: Authentication,
+    /// Stores information to tell the cluster who you are.
+    pub(crate) auth_info: AuthInfo,
 }
 
 impl Config {
@@ -60,7 +58,7 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             identity: None,
-            auth_header: Authentication::None,
+            auth_info: AuthInfo::default(),
         }
     }
 
@@ -118,7 +116,10 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             identity: None,
-            auth_header: Authentication::Token(format!("Bearer {}", token)),
+            auth_info: AuthInfo {
+                token: Some(format!("Bearer {}", token)),
+                ..Default::default()
+            },
         })
     }
 
@@ -181,18 +182,8 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
-            auth_header: Authentication::from_auth_info(&loader.user).await?,
+            auth_info: loader.user,
         })
-    }
-
-    /// Get a valid HTTP `Authorization` header that can authenticate to the cluster
-    ///
-    /// Will renew tokens if required (and configured to).
-    ///
-    /// NOTE: This is `None` if the `Config` isn't configured to use token-based authentication
-    /// (such as anonymous access, or certificate-based authentication).
-    pub async fn get_auth_header(&self) -> Result<Option<header::HeaderValue>> {
-        self.auth_header.to_header().await
     }
 }
 

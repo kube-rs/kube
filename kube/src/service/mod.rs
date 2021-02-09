@@ -74,23 +74,23 @@ impl TryFrom<Config> for Service {
         let timeout = config.timeout;
 
         // AuthLayer is not necessary unless `RefreshableToken`
-        let maybe_auth = match &config.auth_header {
+        let maybe_auth = match Authentication::try_from(&config.auth_info)? {
             Authentication::None => None,
             Authentication::Basic(s) => {
                 default_headers.insert(
                     http::header::AUTHORIZATION,
-                    HeaderValue::from_str(s).map_err(ConfigError::InvalidBasicAuth)?,
+                    HeaderValue::from_str(&s).map_err(ConfigError::InvalidBasicAuth)?,
                 );
                 None
             }
             Authentication::Token(s) => {
                 default_headers.insert(
                     http::header::AUTHORIZATION,
-                    HeaderValue::from_str(s).map_err(ConfigError::InvalidBearerToken)?,
+                    HeaderValue::from_str(&s).map_err(ConfigError::InvalidBearerToken)?,
                 );
                 None
             }
-            Authentication::RefreshableToken(r) => Some(AuthLayer::new(r.clone())),
+            Authentication::RefreshableToken(r) => Some(AuthLayer::new(r)),
         };
 
         let common = ServiceBuilder::new()

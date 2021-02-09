@@ -194,6 +194,6 @@ mod tests {
             token: Some(token.clone()),
             ..Default::default()
         };
-        RefreshableToken(Arc::new(Mutex::new((token, expiry, info))))
+        RefreshableToken::Exec(Arc::new(Mutex::new((token, expiry, info))))
     }
 }
