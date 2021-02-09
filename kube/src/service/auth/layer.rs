@@ -148,7 +148,7 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn valid_token() {
-        const TOKEN: &str = "Bearer test";
+        const TOKEN: &str = "test";
         let auth = test_token(TOKEN.into());
         let (mut service, handle) = mock::spawn_layer(AuthLayer::new(auth));
 
@@ -158,7 +158,7 @@ mod tests {
             let (request, send) = handle.next_request().await.expect("service not called");
             assert_eq!(
                 request.headers().get(AUTHORIZATION).unwrap(),
-                HeaderValue::from_static(TOKEN)
+                HeaderValue::from_str(&format!("Bearer {}", TOKEN)).unwrap()
             );
             send.send_response(Response::builder().body(Body::empty()).unwrap());
         });

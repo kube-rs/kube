@@ -116,7 +116,7 @@ impl Config {
             accept_invalid_certs: false,
             identity: None,
             auth_info: AuthInfo {
-                token: Some(format!("Bearer {}", token)),
+                token: Some(token),
                 ..Default::default()
             },
         })

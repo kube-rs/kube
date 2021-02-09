@@ -60,15 +60,20 @@ impl RefreshableToken {
                         Authentication::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
                     }
                 }
-                Ok(header::HeaderValue::from_str(&locked_data.0).map_err(ConfigError::InvalidBearerToken)?)
+                Ok(
+                    header::HeaderValue::from_str(&format!("Bearer {}", &locked_data.0))
+                        .map_err(ConfigError::InvalidBearerToken)?,
+                )
             }
 
             #[cfg(feature = "oauth")]
             RefreshableToken::GcpOauth(data) => {
                 let gcp_oauth = data.lock().await;
                 let token = (*gcp_oauth).token().await?;
-                Ok(header::HeaderValue::from_str(&token.access_token)
-                    .map_err(ConfigError::InvalidBearerToken)?)
+                Ok(
+                    header::HeaderValue::from_str(&format!("Bearer {}", &token.access_token))
+                        .map_err(ConfigError::InvalidBearerToken)?,
+                )
             }
         }
     }
@@ -90,12 +95,12 @@ impl TryFrom<&AuthInfo> for Authentication {
                     provider.config.insert("expiry".into(), expiry.to_rfc3339());
                     info.auth_provider = Some(provider);
                     return Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
-                        Mutex::new((format!("Bearer {}", token), expiry, info)),
+                        Mutex::new((token, expiry, info)),
                     ))));
                 }
 
                 ProviderToken::GcpCommand(token, None) => {
-                    return Ok(Self::Token(format!("Bearer {}", token)));
+                    return Ok(Self::Token(token));
                 }
 
                 #[cfg(feature = "oauth")]
@@ -132,18 +137,11 @@ impl TryFrom<&AuthInfo> for Authentication {
             (&auth_info.username, &auth_info.password),
             expiration,
         ) {
-            (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
+            (Ok(token), _, None) => Ok(Authentication::Token(token)),
             (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken::Exec(
-                Arc::new(Mutex::new((
-                    format!("Bearer {}", token),
-                    expire,
-                    auth_info.clone(),
-                ))),
+                Arc::new(Mutex::new((token, expire, auth_info.clone()))),
             ))),
-            (_, (Some(u), Some(p)), _) => {
-                let encoded = base64::encode(&format!("{}:{}", u, p));
-                Ok(Authentication::Basic(format!("Basic {}", encoded)))
-            }
+            (_, (Some(u), Some(p)), _) => Ok(Authentication::Basic(base64::encode(&format!("{}:{}", u, p)))),
             _ => Ok(Authentication::None),
         }
     }
@@ -358,7 +356,7 @@ mod test {
         match Authentication::try_from(auth_info).unwrap() {
             Authentication::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
-                assert_eq!(token, "Bearer my_token".to_owned());
+                assert_eq!(token, "my_token".to_owned());
                 let config = info.auth_provider.unwrap().config;
                 assert_eq!(config.get("access-token"), Some(&"my_token".to_owned()));
             }

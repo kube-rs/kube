@@ -80,14 +80,15 @@ impl TryFrom<Config> for Service {
             Authentication::Basic(s) => {
                 default_headers.insert(
                     http::header::AUTHORIZATION,
-                    HeaderValue::from_str(&s).map_err(ConfigError::InvalidBasicAuth)?,
+                    HeaderValue::from_str(&format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?,
                 );
                 None
             }
             Authentication::Token(s) => {
                 default_headers.insert(
                     http::header::AUTHORIZATION,
-                    HeaderValue::from_str(&s).map_err(ConfigError::InvalidBearerToken)?,
+                    HeaderValue::from_str(&format!("Bearer {}", &s))
+                        .map_err(ConfigError::InvalidBearerToken)?,
                 );
                 None
             }
