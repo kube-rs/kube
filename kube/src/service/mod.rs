@@ -22,7 +22,8 @@ use hyper::{Body, Client as HyperClient};
 use hyper_timeout::TimeoutConnector;
 use tower::{buffer::Buffer, util::BoxService, BoxError, ServiceBuilder};
 
-use crate::{config::Authentication, error::ConfigError, Config, Error, Result};
+use crate::{error::ConfigError, Config, Error, Result};
+use auth::Authentication;
 
 // - `Buffer` for cheap clone
 // - `BoxService` to avoid type parameters in `Client`

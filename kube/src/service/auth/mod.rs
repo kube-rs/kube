@@ -17,12 +17,15 @@ use tame_oauth::{
     Token,
 };
 
-use super::{utils, AuthInfo, AuthProviderConfig, ExecConfig};
 #[cfg(feature = "oauth")] use crate::error::OAuthError;
 use crate::{
+    config::{data_or_file, AuthInfo, AuthProviderConfig, ExecConfig},
     error::{ConfigError, Error},
     Result,
 };
+
+mod layer;
+pub(crate) use layer::AuthLayer;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -151,7 +154,7 @@ impl TryFrom<&AuthInfo> for Authentication {
         };
 
         match (
-            utils::data_or_file(&raw_token, &auth_info.token_file),
+            data_or_file(&raw_token, &auth_info.token_file),
             (&auth_info.username, &auth_info.password),
             expiration,
         ) {

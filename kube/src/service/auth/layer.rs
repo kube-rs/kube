@@ -10,7 +10,8 @@ use hyper::Body;
 use pin_project::pin_project;
 use tower::{layer::Layer, BoxError, Service};
 
-use crate::{config::RefreshableToken, Result};
+use super::RefreshableToken;
+use crate::Result;
 
 /// `Layer` to decorate the request with `Authorization` header.
 pub struct AuthLayer {
