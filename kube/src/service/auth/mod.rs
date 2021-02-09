@@ -1,7 +1,7 @@
 use std::{convert::TryFrom, process::Command, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
-use http::header;
+use http::HeaderValue;
 use jsonpath_lib::select as jsonpath_select;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -34,7 +34,7 @@ pub(crate) enum RefreshableToken {
 }
 
 impl RefreshableToken {
-    pub(crate) async fn to_header(&self) -> Result<header::HeaderValue> {
+    pub(crate) async fn to_header(&self) -> Result<HeaderValue> {
         match self {
             RefreshableToken::Exec(data) => {
                 let mut locked_data = data.lock().await;
@@ -60,20 +60,21 @@ impl RefreshableToken {
                         Authentication::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
                     }
                 }
-                Ok(
-                    header::HeaderValue::from_str(&format!("Bearer {}", &locked_data.0))
-                        .map_err(ConfigError::InvalidBearerToken)?,
-                )
+
+                let mut value = HeaderValue::from_str(&format!("Bearer {}", &locked_data.0))
+                    .map_err(ConfigError::InvalidBearerToken)?;
+                value.set_sensitive(true);
+                Ok(value)
             }
 
             #[cfg(feature = "oauth")]
             RefreshableToken::GcpOauth(data) => {
                 let gcp_oauth = data.lock().await;
                 let token = (*gcp_oauth).token().await?;
-                Ok(
-                    header::HeaderValue::from_str(&format!("Bearer {}", &token.access_token))
-                        .map_err(ConfigError::InvalidBearerToken)?,
-                )
+                let mut value = HeaderValue::from_str(&format!("Bearer {}", &token.access_token))
+                    .map_err(ConfigError::InvalidBearerToken)?;
+                value.set_sensitive(true);
+                Ok(value)
             }
         }
     }

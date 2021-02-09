@@ -78,18 +78,17 @@ impl TryFrom<Config> for Service {
         let maybe_auth = match Authentication::try_from(&config.auth_info)? {
             Authentication::None => None,
             Authentication::Basic(s) => {
-                default_headers.insert(
-                    http::header::AUTHORIZATION,
-                    HeaderValue::from_str(&format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?,
-                );
+                let mut value =
+                    HeaderValue::from_str(&format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?;
+                value.set_sensitive(true);
+                default_headers.insert(http::header::AUTHORIZATION, value);
                 None
             }
             Authentication::Token(s) => {
-                default_headers.insert(
-                    http::header::AUTHORIZATION,
-                    HeaderValue::from_str(&format!("Bearer {}", &s))
-                        .map_err(ConfigError::InvalidBearerToken)?,
-                );
+                let mut value = HeaderValue::from_str(&format!("Bearer {}", &s))
+                    .map_err(ConfigError::InvalidBearerToken)?;
+                value.set_sensitive(true);
+                default_headers.insert(http::header::AUTHORIZATION, value);
                 None
             }
             Authentication::RefreshableToken(r) => Some(AuthLayer::new(r)),
