@@ -35,14 +35,6 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Op
     }
 }
 
-pub fn data_or_file<P: AsRef<Path>>(data: &Option<String>, file: &Option<P>) -> Result<String> {
-    match (data, file) {
-        (Some(d), _) => Ok(d.to_string()),
-        (_, Some(f)) => read_file_to_string(f),
-        _ => Err(ConfigError::NoFileOrData.into()),
-    }
-}
-
 pub fn read_file<P: AsRef<Path>>(file: P) -> Result<Vec<u8>> {
     let f = file.as_ref();
     let abs_file = if f.is_absolute() {
@@ -91,30 +83,11 @@ pub fn certs(data: &[u8]) -> Vec<Vec<u8>> {
 mod tests {
     extern crate tempfile;
     use super::*;
-    use crate::config::utils;
-    use std::io::Write;
 
     #[test]
     fn test_kubeconfig_path() {
         let expect_str = "/fake/.kube/config";
         env::set_var(KUBECONFIG, expect_str);
         assert_eq!(PathBuf::from(expect_str), kubeconfig_path().unwrap());
-    }
-
-    #[test]
-    fn test_data_or_file() {
-        let data = "fake_data";
-        let file = "fake_file";
-        let mut tmpfile = tempfile::NamedTempFile::new().unwrap();
-        write!(tmpfile, "{}", file).unwrap();
-
-        let actual = utils::data_or_file(&Some(data.to_string()), &Some(tmpfile.path()));
-        assert_eq!(actual.ok().unwrap(), data.to_string());
-
-        let actual = utils::data_or_file(&None, &Some(tmpfile.path()));
-        assert_eq!(actual.ok().unwrap(), file.to_string());
-
-        let actual = utils::data_or_file(&None, &None::<String>);
-        assert!(actual.is_err());
     }
 }
