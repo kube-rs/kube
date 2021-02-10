@@ -30,26 +30,7 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Op
         (Some(d), _) => base64::decode(&d)
             .map_err(ConfigError::Base64Decode)
             .map_err(Error::Kubeconfig),
-        (_, Some(f)) => {
-            let f = (*f).as_ref();
-            let abs_file = if f.is_absolute() {
-                f.to_path_buf()
-            } else {
-                find_kubeconfig().and_then(|cfg| {
-                    cfg.parent()
-                        .map(|kubedir| kubedir.join(f))
-                        .ok_or_else(|| ConfigError::NoAbsolutePath { path: f.into() }.into())
-                })?
-            };
-            // dbg!(&abs_file);
-            fs::read(&abs_file).map_err(|source| {
-                ConfigError::ReadFile {
-                    path: abs_file,
-                    source,
-                }
-                .into()
-            })
-        }
+        (_, Some(f)) => read_file(f),
         _ => Err(ConfigError::NoBase64FileOrData.into()),
     }
 }
@@ -57,15 +38,40 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Op
 pub fn data_or_file<P: AsRef<Path>>(data: &Option<String>, file: &Option<P>) -> Result<String> {
     match (data, file) {
         (Some(d), _) => Ok(d.to_string()),
-        (_, Some(f)) => fs::read_to_string(f).map_err(|source| {
-            ConfigError::ReadFile {
-                path: f.as_ref().into(),
-                source,
-            }
-            .into()
-        }),
+        (_, Some(f)) => read_file_to_string(f),
         _ => Err(ConfigError::NoFileOrData.into()),
     }
+}
+
+pub fn read_file<P: AsRef<Path>>(file: P) -> Result<Vec<u8>> {
+    let f = file.as_ref();
+    let abs_file = if f.is_absolute() {
+        f.to_path_buf()
+    } else {
+        find_kubeconfig().and_then(|cfg| {
+            cfg.parent()
+                .map(|kubedir| kubedir.join(f))
+                .ok_or_else(|| ConfigError::NoAbsolutePath { path: f.into() }.into())
+        })?
+    };
+    // dbg!(&abs_file);
+    fs::read(&abs_file).map_err(|source| {
+        ConfigError::ReadFile {
+            path: abs_file,
+            source,
+        }
+        .into()
+    })
+}
+
+pub fn read_file_to_string<P: AsRef<Path>>(file: P) -> Result<String> {
+    fs::read_to_string(&file).map_err(|source| {
+        ConfigError::ReadFile {
+            path: file.as_ref().into(),
+            source,
+        }
+        .into()
+    })
 }
 
 pub fn certs(data: &[u8]) -> Vec<Vec<u8>> {
