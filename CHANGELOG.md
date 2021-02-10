@@ -1,12 +1,15 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.49.0...master
- * feat: added support for stacked kubeconfigs - #132 via #411
- * refactor: authentication logic moved out of `kube::config` and into into `kube::service` - #409
+ * see https://github.com/clux/kube-rs/compare/0.50.0...master
+
+0.50.0 / 2021-02-10
+===================
+ * feat: added support for stacked kubeconfigs - [#132](https://github.com/clux/kube-rs/issues/132) via [#411](https://github.com/clux/kube-rs/issues/411)
+ * refactor: authentication logic moved out of `kube::config` and into into `kube::service` - [#409](https://github.com/clux/kube-rs/issues/409)
   - BREAKING: `Config::get_auth_header` removed
- * refactor: remove `hyper` dependency from `kube::api` - #410
- * refactor: `kube::Service` simpler auth and gzip handling - #405 + #408
+ * refactor: remove `hyper` dependency from `kube::api` - [#410](https://github.com/clux/kube-rs/issues/410)
+ * refactor: `kube::Service` simpler auth and gzip handling - [#405](https://github.com/clux/kube-rs/issues/405) + [#408](https://github.com/clux/kube-rs/issues/408)
 
 0.49.0 / 2021-02-08
 ===================
