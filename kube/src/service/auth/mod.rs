@@ -61,7 +61,7 @@ impl RefreshableToken {
                     }
                 }
 
-                let mut value = HeaderValue::from_str(&format!("Bearer {}", &locked_data.0))
+                let mut value = HeaderValue::try_from(format!("Bearer {}", &locked_data.0))
                     .map_err(ConfigError::InvalidBearerToken)?;
                 value.set_sensitive(true);
                 Ok(value)
@@ -71,7 +71,7 @@ impl RefreshableToken {
             RefreshableToken::GcpOauth(data) => {
                 let gcp_oauth = data.lock().await;
                 let token = (*gcp_oauth).token().await?;
-                let mut value = HeaderValue::from_str(&format!("Bearer {}", &token.access_token))
+                let mut value = HeaderValue::try_from(format!("Bearer {}", &token.access_token))
                     .map_err(ConfigError::InvalidBearerToken)?;
                 value.set_sensitive(true);
                 Ok(value)

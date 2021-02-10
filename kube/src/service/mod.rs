@@ -79,13 +79,13 @@ impl TryFrom<Config> for Service {
             Authentication::None => None,
             Authentication::Basic(s) => {
                 let mut value =
-                    HeaderValue::from_str(&format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?;
+                    HeaderValue::try_from(format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?;
                 value.set_sensitive(true);
                 default_headers.insert(http::header::AUTHORIZATION, value);
                 None
             }
             Authentication::Token(s) => {
-                let mut value = HeaderValue::from_str(&format!("Bearer {}", &s))
+                let mut value = HeaderValue::try_from(format!("Bearer {}", &s))
                     .map_err(ConfigError::InvalidBearerToken)?;
                 value.set_sensitive(true);
                 default_headers.insert(http::header::AUTHORIZATION, value);

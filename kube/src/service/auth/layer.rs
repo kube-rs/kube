@@ -134,7 +134,7 @@ where
 mod tests {
     use super::*;
 
-    use std::{matches, sync::Arc};
+    use std::{convert::TryFrom, matches, sync::Arc};
 
     use chrono::{Duration, Utc};
     use futures::pin_mut;
@@ -158,7 +158,7 @@ mod tests {
             let (request, send) = handle.next_request().await.expect("service not called");
             assert_eq!(
                 request.headers().get(AUTHORIZATION).unwrap(),
-                HeaderValue::from_str(&format!("Bearer {}", TOKEN)).unwrap()
+                HeaderValue::try_from(format!("Bearer {}", TOKEN)).unwrap()
             );
             send.send_response(Response::builder().body(Body::empty()).unwrap());
         });
