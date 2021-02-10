@@ -27,11 +27,7 @@ pub struct ConfigLoader {
 impl ConfigLoader {
     /// Returns a config loader based on the cluster information from the kubeconfig file.
     pub async fn new_from_options(options: &KubeConfigOptions) -> Result<Self> {
-        let kubeconfig_path = utils::find_kubeconfig()
-            .map_err(Box::new)
-            .map_err(ConfigError::LoadConfigFile)?;
-
-        let config = Kubeconfig::read_from(kubeconfig_path)?;
+        let config = Kubeconfig::read()?;
         let loader = Self::load(
             config,
             options.context.as_ref(),
@@ -61,7 +57,13 @@ impl ConfigLoader {
         cluster: Option<&String>,
         user: Option<&String>,
     ) -> Result<Self> {
-        let context_name = context.unwrap_or(&config.current_context);
+        let context_name = if let Some(name) = context {
+            name
+        } else if let Some(name) = &config.current_context {
+            name
+        } else {
+            return Err(ConfigError::CurrentContextNotSet.into());
+        };
         let current_context = config
             .contexts
             .iter()

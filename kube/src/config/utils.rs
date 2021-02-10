@@ -1,24 +1,10 @@
 use std::{
-    env, fs,
+    fs,
     path::{Path, PathBuf},
 };
 
 use crate::{error::ConfigError, Error, Result};
 use dirs::home_dir;
-
-const KUBECONFIG: &str = "KUBECONFIG";
-
-/// Search the kubeconfig file
-pub fn find_kubeconfig() -> Result<PathBuf> {
-    kubeconfig_path()
-        .or_else(default_kube_path)
-        .ok_or_else(|| ConfigError::NoKubeconfigPath.into())
-}
-
-/// Returns kubeconfig path from specified environment variable.
-pub fn kubeconfig_path() -> Option<PathBuf> {
-    env::var_os(KUBECONFIG).map(PathBuf::from)
-}
 
 /// Returns kubeconfig path from `$HOME/.kube/config`.
 pub fn default_kube_path() -> Option<PathBuf> {
@@ -36,20 +22,9 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Op
 }
 
 pub fn read_file<P: AsRef<Path>>(file: P) -> Result<Vec<u8>> {
-    let f = file.as_ref();
-    let abs_file = if f.is_absolute() {
-        f.to_path_buf()
-    } else {
-        find_kubeconfig().and_then(|cfg| {
-            cfg.parent()
-                .map(|kubedir| kubedir.join(f))
-                .ok_or_else(|| ConfigError::NoAbsolutePath { path: f.into() }.into())
-        })?
-    };
-    // dbg!(&abs_file);
-    fs::read(&abs_file).map_err(|source| {
+    fs::read(&file).map_err(|source| {
         ConfigError::ReadFile {
-            path: abs_file,
+            path: file.as_ref().into(),
             source,
         }
         .into()
@@ -77,17 +52,4 @@ pub fn certs(data: &[u8]) -> Vec<Vec<u8>> {
             }
         })
         .collect::<Vec<_>>()
-}
-
-#[cfg(test)]
-mod tests {
-    extern crate tempfile;
-    use super::*;
-
-    #[test]
-    fn test_kubeconfig_path() {
-        let expect_str = "/fake/.kube/config";
-        env::set_var(KUBECONFIG, expect_str);
-        assert_eq!(PathBuf::from(expect_str), kubeconfig_path().unwrap());
-    }
 }

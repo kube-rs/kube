@@ -120,6 +120,14 @@ pub enum ConfigError {
         kubeconfig: Box<Error>,
     },
 
+    #[error("Failed to determine current context")]
+    CurrentContextNotSet,
+
+    #[error("Merging kubeconfig with mismatching kind")]
+    KindMismatch,
+    #[error("Merging kubeconfig with mismatching apiVersion")]
+    ApiVersionMismatch,
+
     #[error("Unable to load in cluster config, {hostenv} and {portenv} must be defined")]
     /// One or more required in-cluster config options are missing
     MissingInClusterVariables {
