@@ -25,18 +25,17 @@ fn kube_port() -> Option<String> {
 
 /// Returns token from specified path in cluster.
 pub fn load_token() -> Result<String> {
-    utils::data_or_file(&None, &Some(SERVICE_TOKENFILE))
+    utils::read_file_to_string(SERVICE_TOKENFILE)
 }
 
 /// Returns certification from specified path in cluster.
 pub fn load_cert() -> Result<Vec<Vec<u8>>> {
-    let ca = utils::data_or_file_with_base64(&None, &Some(SERVICE_CERTFILE))?;
-    Ok(utils::certs(&ca))
+    Ok(utils::certs(&utils::read_file(SERVICE_CERTFILE)?))
 }
 
 /// Returns the default namespace from specified path in cluster.
 pub fn load_default_ns() -> Result<String> {
-    utils::data_or_file(&None, &Some(SERVICE_DEFAULT_NS))
+    utils::read_file_to_string(SERVICE_DEFAULT_NS)
 }
 
 #[test]

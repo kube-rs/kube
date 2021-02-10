@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
 use crate::{
-    config::{data_or_file, AuthInfo, AuthProviderConfig, ExecConfig},
+    config::{read_file_to_string, AuthInfo, AuthProviderConfig, ExecConfig},
     error::{ConfigError, Error},
     Result,
 };
@@ -119,6 +119,10 @@ impl TryFrom<&AuthInfo> for Authentication {
             }
         }
 
+        if let (Some(u), Some(p)) = (&auth_info.username, &auth_info.password) {
+            return Ok(Authentication::Basic(base64::encode(&format!("{}:{}", u, p))));
+        }
+
         let (raw_token, expiration) = match &auth_info.token {
             Some(token) => (Some(token.clone()), None),
             None => {
@@ -133,22 +137,19 @@ impl TryFrom<&AuthInfo> for Authentication {
                         None => None,
                     };
                     (status.token, expiration)
+                } else if let Some(file) = &auth_info.token_file {
+                    (Some(read_file_to_string(file)?), None)
                 } else {
                     (None, None)
                 }
             }
         };
 
-        match (
-            data_or_file(&raw_token, &auth_info.token_file),
-            (&auth_info.username, &auth_info.password),
-            expiration,
-        ) {
-            (Ok(token), _, None) => Ok(Authentication::Token(token)),
-            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken::Exec(
+        match (raw_token, expiration) {
+            (Some(token), None) => Ok(Authentication::Token(token)),
+            (Some(token), Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken::Exec(
                 Arc::new(Mutex::new((token, expire, auth_info.clone()))),
             ))),
-            (_, (Some(u), Some(p)), _) => Ok(Authentication::Basic(base64::encode(&format!("{}:{}", u, p)))),
             _ => Ok(Authentication::None),
         }
     }

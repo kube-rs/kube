@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// This type (and its children) are exposed for convenience only.
 /// Please load a [`Config`][crate::Config] object for use with a [`Client`][crate::Client]
 /// which will read and parse the kubeconfig file
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Kubeconfig {
     pub kind: Option<String>,
     #[serde(rename = "apiVersion")]
@@ -23,7 +23,7 @@ pub struct Kubeconfig {
     pub auth_infos: Vec<NamedAuthInfo>,
     pub contexts: Vec<NamedContext>,
     #[serde(rename = "current-context")]
-    pub current_context: String,
+    pub current_context: Option<String>,
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
@@ -132,6 +132,8 @@ pub struct Context {
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
+const KUBECONFIG: &str = "KUBECONFIG";
+
 /// Some helpers on the raw Config object are exposed for people needing to parse it
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
@@ -140,14 +142,126 @@ impl Kubeconfig {
             path: path.as_ref().into(),
             source,
         })?;
-        let config = serde_yaml::from_reader(f).map_err(ConfigError::ParseYaml)?;
+        let mut config: Kubeconfig = serde_yaml::from_reader(f).map_err(ConfigError::ParseYaml)?;
+
+        // Remap all files we read to absolute paths.
+        if let Some(dir) = path.as_ref().parent() {
+            for named in config.clusters.iter_mut() {
+                if let Some(path) = &named.cluster.certificate_authority {
+                    if let Some(abs_path) = to_absolute(dir, path) {
+                        named.cluster.certificate_authority = Some(abs_path);
+                    }
+                }
+            }
+            for named in config.auth_infos.iter_mut() {
+                if let Some(path) = &named.auth_info.client_certificate {
+                    if let Some(abs_path) = to_absolute(dir, path) {
+                        named.auth_info.client_certificate = Some(abs_path);
+                    }
+                }
+                if let Some(path) = &named.auth_info.client_key {
+                    if let Some(abs_path) = to_absolute(dir, path) {
+                        named.auth_info.client_key = Some(abs_path);
+                    }
+                }
+                if let Some(path) = &named.auth_info.token_file {
+                    if let Some(abs_path) = to_absolute(dir, path) {
+                        named.auth_info.token_file = Some(abs_path);
+                    }
+                }
+            }
+        }
         Ok(config)
     }
 
-    /// Read a Config from the default location
+    /// Read a Config from `KUBECONFIG` or the the default location.
     pub fn read() -> Result<Kubeconfig> {
-        let path = utils::find_kubeconfig()?;
-        Self::read_from(path)
+        match Self::from_env()? {
+            Some(config) => Ok(config),
+            None => {
+                let path = utils::default_kube_path().ok_or(ConfigError::NoKubeconfigPath)?;
+                Self::read_from(path)
+            }
+        }
+    }
+
+    /// Create `Kubeconfig` from `KUBECONFIG` environment variable.
+    /// Supports list of files to be merged.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `KUBECONFIG` value contains the NUL character.
+    pub fn from_env() -> Result<Option<Self>> {
+        match std::env::var_os(KUBECONFIG) {
+            Some(value) => {
+                let paths = std::env::split_paths(&value)
+                    .filter(|p| !p.as_os_str().is_empty())
+                    .collect::<Vec<_>>();
+                if paths.is_empty() {
+                    return Ok(None);
+                }
+
+                let merged = paths.iter().try_fold(Kubeconfig::default(), |m, p| {
+                    Kubeconfig::read_from(p).and_then(|c| m.merge(c))
+                })?;
+                Ok(Some(merged))
+            }
+
+            None => Ok(None),
+        }
+    }
+
+    /// Merge kubeconfig file according to the rules described in
+    /// <https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#merging-kubeconfig-files>
+    ///
+    /// > Merge the files listed in the `KUBECONFIG` environment variable according to these rules:
+    /// >
+    /// > - Ignore empty filenames.
+    /// > - Produce errors for files with content that cannot be deserialized.
+    /// > - The first file to set a particular value or map key wins.
+    /// > - Never change the value or map key.
+    /// >   Example: Preserve the context of the first file to set `current-context`.
+    /// >   Example: If two files specify a `red-user`, use only values from the first file's `red-user`.
+    /// >            Even if the second file has non-conflicting entries under `red-user`, discard them.
+    fn merge(mut self, next: Kubeconfig) -> Result<Self> {
+        if self.kind.is_some() && next.kind.is_some() && self.kind != next.kind {
+            return Err(ConfigError::KindMismatch.into());
+        }
+        if self.api_version.is_some() && next.api_version.is_some() && self.api_version != next.api_version {
+            return Err(ConfigError::ApiVersionMismatch.into());
+        }
+
+        self.kind = self.kind.or(next.kind);
+        self.api_version = self.api_version.or(next.api_version);
+        self.preferences = self.preferences.or(next.preferences);
+        append_new_named(&mut self.clusters, next.clusters, |x| &x.name);
+        append_new_named(&mut self.auth_infos, next.auth_infos, |x| &x.name);
+        append_new_named(&mut self.contexts, next.contexts, |x| &x.name);
+        self.current_context = self.current_context.or(next.current_context);
+        self.extensions = self.extensions.or(next.extensions);
+        Ok(self)
+    }
+}
+
+fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
+where
+    F: Fn(&T) -> &String,
+{
+    use std::collections::HashSet;
+    base.extend({
+        let existing = base.iter().map(|x| f(x)).collect::<HashSet<_>>();
+        next.into_iter()
+            .filter(|x| !existing.contains(f(x)))
+            .collect::<Vec<_>>()
+    });
+}
+
+fn to_absolute(dir: &Path, file: &str) -> Option<String> {
+    let path = Path::new(&file);
+    if path.is_relative() {
+        dir.join(path).to_str().map(str::to_owned)
+    } else {
+        None
     }
 }
 
@@ -169,5 +283,57 @@ impl AuthInfo {
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>> {
         utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kubeconfig_merge() {
+        let kubeconfig1 = Kubeconfig {
+            current_context: Some("default".into()),
+            auth_infos: vec![NamedAuthInfo {
+                name: "red-user".into(),
+                auth_info: AuthInfo {
+                    token: Some("first-token".into()),
+                    ..Default::default()
+                },
+            }],
+            ..Default::default()
+        };
+        let kubeconfig2 = Kubeconfig {
+            current_context: Some("dev".into()),
+            auth_infos: vec![
+                NamedAuthInfo {
+                    name: "red-user".into(),
+                    auth_info: AuthInfo {
+                        token: Some("second-token".into()),
+                        username: Some("red-user".into()),
+                        ..Default::default()
+                    },
+                },
+                NamedAuthInfo {
+                    name: "green-user".into(),
+                    auth_info: AuthInfo {
+                        token: Some("new-token".into()),
+                        ..Default::default()
+                    },
+                },
+            ],
+            ..Default::default()
+        };
+
+        let merged = kubeconfig1.merge(kubeconfig2).unwrap();
+        // Preserves first `current_context`
+        assert_eq!(merged.current_context, Some("default".into()));
+        // Auth info with the same name does not overwrite
+        assert_eq!(merged.auth_infos[0].name, "red-user".to_owned());
+        assert_eq!(merged.auth_infos[0].auth_info.token, Some("first-token".into()));
+        // Even if it's not conflicting
+        assert_eq!(merged.auth_infos[0].auth_info.username, None);
+        // New named auth info is appended
+        assert_eq!(merged.auth_infos[1].name, "green-user".to_owned());
     }
 }
