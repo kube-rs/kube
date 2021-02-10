@@ -22,7 +22,8 @@ use hyper::{Body, Client as HyperClient};
 use hyper_timeout::TimeoutConnector;
 use tower::{buffer::Buffer, util::BoxService, BoxError, ServiceBuilder};
 
-use crate::{config::Authentication, error::ConfigError, Config, Error, Result};
+use crate::{error::ConfigError, Config, Error, Result};
+use auth::Authentication;
 
 // - `Buffer` for cheap clone
 // - `BoxService` to avoid type parameters in `Client`
@@ -74,23 +75,23 @@ impl TryFrom<Config> for Service {
         let timeout = config.timeout;
 
         // AuthLayer is not necessary unless `RefreshableToken`
-        let maybe_auth = match &config.auth_header {
+        let maybe_auth = match Authentication::try_from(&config.auth_info)? {
             Authentication::None => None,
             Authentication::Basic(s) => {
-                default_headers.insert(
-                    http::header::AUTHORIZATION,
-                    HeaderValue::from_str(s).map_err(ConfigError::InvalidBasicAuth)?,
-                );
+                let mut value =
+                    HeaderValue::try_from(format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?;
+                value.set_sensitive(true);
+                default_headers.insert(http::header::AUTHORIZATION, value);
                 None
             }
             Authentication::Token(s) => {
-                default_headers.insert(
-                    http::header::AUTHORIZATION,
-                    HeaderValue::from_str(s).map_err(ConfigError::InvalidBearerToken)?,
-                );
+                let mut value = HeaderValue::try_from(format!("Bearer {}", &s))
+                    .map_err(ConfigError::InvalidBearerToken)?;
+                value.set_sensitive(true);
+                default_headers.insert(http::header::AUTHORIZATION, value);
                 None
             }
-            Authentication::RefreshableToken(r) => Some(AuthLayer::new(r.clone())),
+            Authentication::RefreshableToken(r) => Some(AuthLayer::new(r)),
         };
 
         let common = ServiceBuilder::new()

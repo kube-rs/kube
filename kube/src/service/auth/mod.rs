@@ -1,28 +1,21 @@
-#[cfg(feature = "oauth")] use std::{env, path::PathBuf};
-use std::{process::Command, sync::Arc};
+use std::{convert::TryFrom, process::Command, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
-use http::header;
+use http::HeaderValue;
 use jsonpath_lib::select as jsonpath_select;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-#[cfg(all(feature = "oauth", feature = "rustls-tls"))]
-use hyper_rustls::HttpsConnector;
-#[cfg(all(feature = "oauth", feature = "native-tls"))]
-use hyper_tls::HttpsConnector;
-#[cfg(feature = "oauth")]
-use tame_oauth::{
-    gcp::{ServiceAccountAccess, ServiceAccountInfo, TokenOrRequest},
-    Token,
-};
-
-use super::{utils, AuthInfo, AuthProviderConfig, ExecConfig};
-#[cfg(feature = "oauth")] use crate::error::OAuthError;
 use crate::{
+    config::{data_or_file, AuthInfo, AuthProviderConfig, ExecConfig},
     error::{ConfigError, Error},
     Result,
 };
+
+#[cfg(feature = "oauth")] mod oauth;
+
+mod layer;
+pub(crate) use layer::AuthLayer;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -33,68 +26,95 @@ pub(crate) enum Authentication {
     RefreshableToken(RefreshableToken),
 }
 
+// See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth
+// for the list of auth-plugins supported by client-go.
+// We currently support the following:
+// - exec
+// - gcp: command based token source (exec)
+// - gcp: application credential based token source (requires `oauth` feature)
 #[derive(Debug, Clone)]
-pub(crate) struct RefreshableToken(pub(crate) Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>);
+pub(crate) enum RefreshableToken {
+    Exec(Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>),
+    #[cfg(feature = "oauth")]
+    GcpOauth(Arc<Mutex<oauth::Gcp>>),
+}
 
 impl RefreshableToken {
-    pub(crate) async fn to_header(&self) -> Result<header::HeaderValue> {
-        let data = &self.0;
-        let mut locked_data = data.lock().await;
-        // Add some wiggle room onto the current timestamp so we don't get any race
-        // conditions where the token expires while we are refreshing
-        if Utc::now() + Duration::seconds(60) >= locked_data.1 {
-            if let Authentication::RefreshableToken(d) =
-                Authentication::from_auth_info(&locked_data.2).await?
-            {
-                let (new_token, new_expire, new_info) = Arc::try_unwrap(d.0)
-                    .expect("Unable to unwrap Arc, this is likely a programming error")
-                    .into_inner();
-                locked_data.0 = new_token;
-                locked_data.1 = new_expire;
-                locked_data.2 = new_info;
-            } else {
-                return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
+    pub(crate) async fn to_header(&self) -> Result<HeaderValue> {
+        match self {
+            RefreshableToken::Exec(data) => {
+                let mut locked_data = data.lock().await;
+                // Add some wiggle room onto the current timestamp so we don't get any race
+                // conditions where the token expires while we are refreshing
+                if Utc::now() + Duration::seconds(60) >= locked_data.1 {
+                    match Authentication::try_from(&locked_data.2)? {
+                        Authentication::None | Authentication::Basic(_) | Authentication::Token(_) => {
+                            return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
+                        }
+
+                        Authentication::RefreshableToken(RefreshableToken::Exec(d)) => {
+                            let (new_token, new_expire, new_info) = Arc::try_unwrap(d)
+                                .expect("Unable to unwrap Arc, this is likely a programming error")
+                                .into_inner();
+                            locked_data.0 = new_token;
+                            locked_data.1 = new_expire;
+                            locked_data.2 = new_info;
+                        }
+
+                        // Unreachable because the token source does not change
+                        #[cfg(feature = "oauth")]
+                        Authentication::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
+                    }
+                }
+
+                let mut value = HeaderValue::try_from(format!("Bearer {}", &locked_data.0))
+                    .map_err(ConfigError::InvalidBearerToken)?;
+                value.set_sensitive(true);
+                Ok(value)
+            }
+
+            #[cfg(feature = "oauth")]
+            RefreshableToken::GcpOauth(data) => {
+                let gcp_oauth = data.lock().await;
+                let token = (*gcp_oauth).token().await?;
+                let mut value = HeaderValue::try_from(format!("Bearer {}", &token.access_token))
+                    .map_err(ConfigError::InvalidBearerToken)?;
+                value.set_sensitive(true);
+                Ok(value)
             }
         }
-        Ok(header::HeaderValue::from_str(&locked_data.0).map_err(ConfigError::InvalidBearerToken)?)
     }
 }
 
-impl Authentication {
-    pub(crate) async fn to_header(&self) -> Result<Option<header::HeaderValue>> {
-        match self {
-            Self::None => Ok(None),
-            Self::Basic(value) => Ok(Some(
-                header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBasicAuth)?,
-            )),
-            Self::Token(value) => Ok(Some(
-                header::HeaderValue::from_str(value).map_err(ConfigError::InvalidBearerToken)?,
-            )),
-            Self::RefreshableToken(refreshable) => Ok(Some(refreshable.to_header().await?)),
-        }
-    }
+impl TryFrom<&AuthInfo> for Authentication {
+    type Error = Error;
 
     /// Loads the authentication header from the credentials available in the kubeconfig. This supports
     /// exec plugins as well as specified in
     /// https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
-    pub(crate) async fn from_auth_info(auth_info: &AuthInfo) -> Result<Self> {
+    fn try_from(auth_info: &AuthInfo) -> Result<Self, Self::Error> {
         if let Some(provider) = &auth_info.auth_provider {
-            match token_from_provider(provider).await? {
-                ProviderToken::GCP(token, Some(expiry)) => {
+            match token_from_provider(provider)? {
+                ProviderToken::GcpCommand(token, Some(expiry)) => {
                     let mut info = auth_info.clone();
                     let mut provider = provider.clone();
                     provider.config.insert("access-token".into(), token.clone());
                     provider.config.insert("expiry".into(), expiry.to_rfc3339());
                     info.auth_provider = Some(provider);
-                    return Ok(Self::RefreshableToken(RefreshableToken(Arc::new(Mutex::new((
-                        format!("Bearer {}", token),
-                        expiry,
-                        info,
-                    ))))));
+                    return Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
+                        Mutex::new((token, expiry, info)),
+                    ))));
                 }
 
-                ProviderToken::GCP(token, None) => {
-                    return Ok(Self::Token(format!("Bearer {}", token)));
+                ProviderToken::GcpCommand(token, None) => {
+                    return Ok(Self::Token(token));
+                }
+
+                #[cfg(feature = "oauth")]
+                ProviderToken::GcpOauth(gcp) => {
+                    return Ok(Self::RefreshableToken(RefreshableToken::GcpOauth(Arc::new(
+                        Mutex::new(gcp),
+                    ))));
                 }
             }
         }
@@ -120,18 +140,15 @@ impl Authentication {
         };
 
         match (
-            utils::data_or_file(&raw_token, &auth_info.token_file),
+            data_or_file(&raw_token, &auth_info.token_file),
             (&auth_info.username, &auth_info.password),
             expiration,
         ) {
-            (Ok(token), _, None) => Ok(Authentication::Token(format!("Bearer {}", token))),
-            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken(Arc::new(
-                Mutex::new((format!("Bearer {}", token), expire, auth_info.clone())),
-            )))),
-            (_, (Some(u), Some(p)), _) => {
-                let encoded = base64::encode(&format!("{}:{}", u, p));
-                Ok(Authentication::Basic(format!("Basic {}", encoded)))
-            }
+            (Ok(token), _, None) => Ok(Authentication::Token(token)),
+            (Ok(token), _, Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken::Exec(
+                Arc::new(Mutex::new((token, expire, auth_info.clone()))),
+            ))),
+            (_, (Some(u), Some(p)), _) => Ok(Authentication::Basic(base64::encode(&format!("{}:{}", u, p)))),
             _ => Ok(Authentication::None),
         }
     }
@@ -140,14 +157,16 @@ impl Authentication {
 // We need to differentiate providers because the keys/formats to store token expiration differs.
 enum ProviderToken {
     // "access-token", "expiry" (RFC3339)
-    GCP(String, Option<DateTime<Utc>>),
+    GcpCommand(String, Option<DateTime<Utc>>),
+    #[cfg(feature = "oauth")]
+    GcpOauth(oauth::Gcp),
     // "access-token", "expires-on" (timestamp)
     // Azure(String, Option<DateTime<Utc>>),
 }
 
-async fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
+fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
     if provider.name == "gcp" {
-        token_from_gcp_provider(provider).await
+        token_from_gcp_provider(provider)
     } else {
         Err(ConfigError::AuthExec(format!(
             "Authentication with provider {:} not supported",
@@ -157,9 +176,9 @@ async fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderTo
     }
 }
 
-async fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
+fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
     if let Some(id_token) = provider.config.get("id-token") {
-        return Ok(ProviderToken::GCP(id_token.clone(), None));
+        return Ok(ProviderToken::GcpCommand(id_token.clone(), None));
     }
 
     // Return cached access token if it's still valid
@@ -169,7 +188,7 @@ async fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<Provid
                 .parse::<DateTime<Utc>>()
                 .map_err(ConfigError::MalformedTokenExpirationDate)?;
             if Utc::now() + Duration::seconds(60) < expiry_date {
-                return Ok(ProviderToken::GCP(access_token.clone(), Some(expiry_date)));
+                return Ok(ProviderToken::GcpCommand(access_token.clone(), Some(expiry_date)));
             }
         }
     }
@@ -201,32 +220,24 @@ async fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<Provid
                 let expiry = expiry
                     .parse::<DateTime<Utc>>()
                     .map_err(ConfigError::MalformedTokenExpirationDate)?;
-                return Ok(ProviderToken::GCP(token, Some(expiry)));
+                return Ok(ProviderToken::GcpCommand(token, Some(expiry)));
             } else {
-                return Ok(ProviderToken::GCP(token, None));
+                return Ok(ProviderToken::GcpCommand(token, None));
             }
         } else {
             let token = std::str::from_utf8(&output.stdout)
                 .map_err(|e| ConfigError::AuthExec(format!("Result is not a string {:?} ", e)))?
                 .to_owned();
-            return Ok(ProviderToken::GCP(token, None));
+            return Ok(ProviderToken::GcpCommand(token, None));
         }
     }
 
     // Google Application Credentials-based token source
     #[cfg(feature = "oauth")]
     {
-        let token_res = if let Some(scopes) = provider.config.get("scopes") {
-            request_gcp_token(&scopes.split(',').collect::<Vec<_>>()).await?
-        } else {
-            request_gcp_token(&[
-                "https://www.googleapis.com/auth/cloud-platform",
-                "https://www.googleapis.com/auth/userinfo.email",
-            ])
-            .await?
-        };
-        let expiry_date = token_res.expiry_date();
-        Ok(ProviderToken::GCP(token_res.access_token, Some(expiry_date)))
+        Ok(ProviderToken::GcpOauth(oauth::Gcp::from_env_and_scopes(
+            provider.config.get("scopes"),
+        )?))
     }
     #[cfg(not(feature = "oauth"))]
     {
@@ -309,73 +320,6 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, ConfigError> {
     Ok(creds)
 }
 
-#[cfg(feature = "oauth")]
-pub async fn request_gcp_token<'a, S, I>(scopes: I) -> Result<Token>
-where
-    S: AsRef<str> + 'a,
-    I: IntoIterator<Item = &'a S>,
-{
-    let info = gcloud_account_info()?;
-    let access = ServiceAccountAccess::new(info).map_err(OAuthError::InvalidKeyFormat)?;
-    match access.get_token(scopes) {
-        Ok(TokenOrRequest::Request {
-            request, scope_hash, ..
-        }) => {
-            #[cfg(feature = "native-tls")]
-            let https = HttpsConnector::new();
-            #[cfg(feature = "rustls-tls")]
-            let https = HttpsConnector::with_native_roots();
-            let client = hyper::Client::builder().build::<_, hyper::Body>(https);
-
-            let res = client
-                .request(request.map(hyper::Body::from))
-                .await
-                .map_err(OAuthError::RequestToken)?;
-            // Convert response body to `Vec<u8>` for parsing.
-            let (parts, body) = res.into_parts();
-            let bytes = hyper::body::to_bytes(body).await?;
-            let response = http::Response::from_parts(parts, bytes.to_vec());
-            match access.parse_token_response(scope_hash, response) {
-                Ok(token) => Ok(token),
-
-                Err(err) => match err {
-                    tame_oauth::Error::AuthError(_) | tame_oauth::Error::HttpStatus(_) => {
-                        Err(OAuthError::RetrieveCredentials(err).into())
-                    }
-                    tame_oauth::Error::Json(e) => Err(OAuthError::ParseToken(e).into()),
-                    err => Err(OAuthError::Unknown(err.to_string()).into()),
-                },
-            }
-        }
-
-        // ServiceAccountAccess was just created, so it's impossible to have cached token.
-        Ok(TokenOrRequest::Token(_)) => unreachable!(),
-
-        Err(err) => match err {
-            // Request builder failed.
-            tame_oauth::Error::Http(e) => Err(Error::HttpError(e)),
-            tame_oauth::Error::InvalidRsaKey => Err(OAuthError::InvalidRsaKey(err).into()),
-            tame_oauth::Error::InvalidKeyFormat => Err(OAuthError::InvalidKeyFormat(err).into()),
-            e => Err(OAuthError::Unknown(e.to_string()).into()),
-        },
-    }
-}
-
-#[cfg(feature = "oauth")]
-const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
-
-#[cfg(feature = "oauth")]
-fn gcloud_account_info() -> Result<ServiceAccountInfo, ConfigError> {
-    let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
-        .map(PathBuf::from)
-        .ok_or(OAuthError::MissingGoogleCredentials)?;
-    let data = std::fs::read_to_string(path).map_err(OAuthError::LoadCredentials)?;
-    ServiceAccountInfo::deserialize(data).map_err(|err| match err {
-        tame_oauth::Error::Json(e) => OAuthError::ParseCredentials(e).into(),
-        _ => OAuthError::Unknown(err.to_string()).into(),
-    })
-}
-
 #[cfg(test)]
 mod test {
     use crate::config::Kubeconfig;
@@ -414,12 +358,12 @@ mod test {
             expiry = expiry
         );
 
-        let mut config: Kubeconfig = serde_yaml::from_str(&test_file).map_err(ConfigError::ParseYaml)?;
-        let auth_info = &mut config.auth_infos[0].auth_info;
-        match Authentication::from_auth_info(&auth_info).await {
-            Ok(Authentication::RefreshableToken(refreshable)) => {
-                let (token, _expire, info) = Arc::try_unwrap(refreshable.0).unwrap().into_inner();
-                assert_eq!(token, "Bearer my_token".to_owned());
+        let config: Kubeconfig = serde_yaml::from_str(&test_file).map_err(ConfigError::ParseYaml)?;
+        let auth_info = &config.auth_infos[0].auth_info;
+        match Authentication::try_from(auth_info).unwrap() {
+            Authentication::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
+                let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
+                assert_eq!(token, "my_token".to_owned());
                 let config = info.auth_provider.unwrap().config;
                 assert_eq!(config.get("access-token"), Some(&"my_token".to_owned()));
             }
