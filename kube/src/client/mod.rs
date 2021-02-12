@@ -46,6 +46,8 @@ pub struct Client {
 
 impl Client {
     /// Create and initialize a [`Client`] using the given `Service`.
+    ///
+    /// Use [`Client::try_from`](Self::try_from) to create with a [`Config`].
     pub fn new(service: Service) -> Self {
         Self { inner: service }
     }
@@ -59,7 +61,7 @@ impl Client {
     /// Will fail if neither configuration could be loaded.
     ///
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
-    /// instead
+    /// instead.
     pub async fn try_default() -> Result<Self> {
         let client_config = Config::infer().await?;
         Self::try_from(client_config)
