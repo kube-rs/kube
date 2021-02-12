@@ -80,29 +80,22 @@ pub struct FooSpec {
 
     // Listable field with specified 'set' merge strategy
     #[serde(default)]
-    set_listable: SetListable,
+    #[schemars(schema_with = "set_listable_schema")]
+    set_listable: Vec<u32>,
 }
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone)]
-struct SetListable(Vec<u32>);
-// https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
-use schemars::{gen::SchemaGenerator, schema::Schema};
-impl JsonSchema for SetListable {
-    fn schema_name() -> String {
-        "SetListable".into()
-    }
 
-    fn json_schema(_: &mut SchemaGenerator) -> Schema {
-        serde_json::from_value(serde_json::json!({
-            "type": "array",
-            "items": {
-                "format": "u32",
-                "minium": 0,
-                "type": "integer"
-            },
-            "x-kubernetes-list-type": "set"
-        }))
-        .unwrap()
-    }
+// https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
+fn set_listable_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    serde_json::from_value(serde_json::json!({
+        "type": "array",
+        "items": {
+            "format": "u32",
+            "minium": 0,
+            "type": "integer"
+        },
+        "x-kubernetes-list-type": "set"
+    }))
+    .unwrap()
 }
 
 fn default_value() -> String {
@@ -181,7 +174,7 @@ async fn main() -> Result<()> {
 
             // listable values to patch later to verify merge strategies
             "default_listable": vec![2],
-            "set_listable": SetListable(vec![2]),
+            "set_listable": vec![2],
         }
     }))?;
     let val = client
@@ -228,12 +221,12 @@ async fn main() -> Result<()> {
         "kind": "Foo",
         "spec": {
             "default_listable": vec![3],
-            "set_listable": SetListable(vec![3])
+            "set_listable": vec![3]
         }
     });
     let pres = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
     assert_eq!(pres.spec.default_listable, vec![3]);
-    assert_eq!(pres.spec.set_listable, SetListable(vec![2, 3]));
+    assert_eq!(pres.spec.set_listable, vec![2, 3]);
     println!("{:?}", serde_json::to_value(pres.spec));
 
     delete_crd(client.clone()).await?;
