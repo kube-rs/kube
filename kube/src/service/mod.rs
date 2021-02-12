@@ -1,7 +1,6 @@
 //! Abstracts the connection to Kubernetes API server.
 
 mod auth;
-mod builder_ext;
 #[cfg(feature = "gzip")] mod compression;
 mod headers;
 mod log;
@@ -10,7 +9,6 @@ mod url;
 
 use self::{log::LogRequest, url::set_cluster_url};
 use auth::AuthLayer;
-use builder_ext::ServiceBuilderExt;
 #[cfg(feature = "gzip")] use compression::{accept_compressed, maybe_decompress};
 use headers::set_default_headers;
 use tls::HttpsConnector;
@@ -120,7 +118,7 @@ impl TryFrom<Config> for Service {
 
         let inner = ServiceBuilder::new()
             .layer(common)
-            .optional_layer(maybe_auth)
+            .option_layer(maybe_auth)
             .layer(tower::layer::layer_fn(LogRequest::new))
             .service(client);
         Ok(Self::new(inner))
