@@ -20,7 +20,7 @@ UNRELEASED
    - refactor: `oauth2` module for GCP OAuth replaced with optional `tame-oauth` dependency
    - BREAKING: GCP OAuth is now opt-in (`oauth` feature). Note that GCP provider with command based token source is supported by default.
    - BREAKING: Gzip decompression is now opt-in (`gzip` feature) because Kubernetes does not have compression enabled by default yet and this feature requires extra dependencies. [#399](https://github.com/clux/kube-rs/pull/399)
-   - BREAKING: `Client::new` now takes a `Service` instead of `Config` [#400](https://github.com/clux/kube-rs/pull/400). Allows custom service for features not supported out of the box and testing.
+   - BREAKING: `Client::new` now takes a `Service` instead of `Config` [#400](https://github.com/clux/kube-rs/pull/400). Allows custom service for features not supported out of the box and testing. To create a `Client` from `Config`, use `Client::try_from` instead.
    - BREAKING: Removed `Config::proxy`. Proxy is no longer supported out of the box, but it should be possible by using a custom Service.
    - fix: Refreshable token from auth provider not refreshing
    - fix: Panic when loading config with non-GCP provider [#238](https://github.com/clux/kube-rs/issues/238)
