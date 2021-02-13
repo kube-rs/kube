@@ -1,11 +1,18 @@
 use http::Request;
 use hyper::Body;
 
-/// Set cluster URL.
-pub fn set_cluster_url(req: Request<Body>, url: &url::Url) -> Request<Body> {
+/// Set cluster URL
+///
+/// This also propagates `Config::default_ns` if requested via `Api::default_namespaced`
+/// `"DEFAULT_NS"` is the placeholder from `Api::default_namespaced` which it's kept up to date with
+/// This cannot clash with a legal namespace as it contains an underscore
+pub fn set_cluster_url(req: Request<Body>, url: &url::Url, default_ns: &str) -> Request<Body> {
     let (mut parts, body) = req.into_parts();
     let pandq = parts.uri.path_and_query().expect("valid path+query from kube");
-    parts.uri = finalize_url(url, &pandq).parse().expect("valid URL");
+    parts.uri = finalize_url(url, &pandq)
+        .replace("DEFAULT_NS", default_ns)
+        .parse()
+        .expect("valid URL");
     Request::from_parts(parts, body)
 }
 

@@ -53,6 +53,20 @@ where
         }
     }
 
+    /// Namespaced resource in the default namespace
+    ///
+    /// The default namespace is either "default" out of cluster,
+    /// or the service account's namespace in cluster.
+    pub fn default_namespaced(client: Client) -> Self {
+        // DEFAULT_NS marker is an illegal namespace, and is replaced by service::set_cluster_url
+        let resource = Resource::namespaced::<K>("DEFAULT_NS");
+        Self {
+            resource,
+            client,
+            phantom: iter::empty(),
+        }
+    }
+
     /// Consume self and return the [`Client`]
     pub fn into_client(self) -> Client {
         self.into()

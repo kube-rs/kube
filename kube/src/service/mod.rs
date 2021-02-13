@@ -71,6 +71,7 @@ impl TryFrom<Config> for Service {
         let cluster_url = config.cluster_url.clone();
         let mut default_headers = config.headers.clone();
         let timeout = config.timeout;
+        let default_ns = config.default_ns.clone();
 
         // AuthLayer is not necessary unless `RefreshableToken`
         let maybe_auth = match Authentication::try_from(&config.auth_info)? {
@@ -93,7 +94,7 @@ impl TryFrom<Config> for Service {
         };
 
         let common = ServiceBuilder::new()
-            .map_request(move |r| set_cluster_url(r, &cluster_url))
+            .map_request(move |r| set_cluster_url(r, &cluster_url, &default_ns))
             .map_request(move |r| set_default_headers(r, default_headers.clone()))
             .into_inner();
 
