@@ -95,6 +95,10 @@ impl TryFrom<&AuthInfo> for Authentication {
     fn try_from(auth_info: &AuthInfo) -> Result<Self, Self::Error> {
         if let Some(provider) = &auth_info.auth_provider {
             match token_from_provider(provider)? {
+                ProviderToken::Oidc(token) => {
+                    return Ok(Self::Token(token));
+                }
+
                 ProviderToken::GcpCommand(token, Some(expiry)) => {
                     let mut info = auth_info.clone();
                     let mut provider = provider.clone();
@@ -157,6 +161,7 @@ impl TryFrom<&AuthInfo> for Authentication {
 
 // We need to differentiate providers because the keys/formats to store token expiration differs.
 enum ProviderToken {
+    Oidc(String),
     // "access-token", "expiry" (RFC3339)
     GcpCommand(String, Option<DateTime<Utc>>),
     #[cfg(feature = "oauth")]
@@ -166,14 +171,21 @@ enum ProviderToken {
 }
 
 fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
-    if provider.name == "gcp" {
-        token_from_gcp_provider(provider)
-    } else {
-        Err(ConfigError::AuthExec(format!(
+    match provider.name.as_ref() {
+        "oidc" => token_from_oidc_provider(provider),
+        "gcp" => token_from_gcp_provider(provider),
+        _ => Err(ConfigError::AuthExec(format!(
             "Authentication with provider {:} not supported",
             provider.name
         ))
-        .into())
+        .into()),
+    }
+}
+
+fn token_from_oidc_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
+    match provider.config.get("id-token") {
+        Some(id_token) => Ok(ProviderToken::Oidc(id_token.clone())),
+        None => Err(ConfigError::AuthExec("No id-token for oidc Authentication provider".into()).into()),
     }
 }
 
