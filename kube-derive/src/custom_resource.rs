@@ -41,10 +41,12 @@ impl CustomDerive for CustomResource {
         };
 
         // Outputs
-        let mut ka = KubeAttrs::default();
+        let mut ka = KubeAttrs {
+            apiextensions: "v1".to_owned(), // implicit stable crd version expected
+            ..Default::default()
+        };
         let (mut group, mut version, mut kind) = (None, None, None); // mandatory GVK
         let mut kind_struct = None;
-        ka.apiextensions = "v1".to_string(); // implicit stable crd version expected
 
         // Arg parsing
         for attr in &input.attrs {
