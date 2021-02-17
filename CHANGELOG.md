@@ -1,8 +1,11 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.50.0...master
- * bug: fix oidc auth provider - #424 via #419
+ * see https://github.com/clux/kube-rs/compare/0.50.1...master
+
+0.50.1 / 2021-02-17
+===================
+ * bug: fix oidc auth provider - [#424](https://github.com/clux/kube-rs/issues/424) via [#419](https://github.com/clux/kube-rs/issues/419)
 
 0.50.0 / 2021-02-10
 ===================
