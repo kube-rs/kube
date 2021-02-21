@@ -52,16 +52,12 @@ pub struct NamedCluster {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Cluster {
     pub server: String,
-    #[serde(rename = "tls-server-name")]
-    pub tls_server_name: Option<String>,
     #[serde(rename = "insecure-skip-tls-verify")]
     pub insecure_skip_tls_verify: Option<bool>,
     #[serde(rename = "certificate-authority")]
     pub certificate_authority: Option<String>,
     #[serde(rename = "certificate-authority-data")]
     pub certificate_authority_data: Option<String>,
-    #[serde(rename = "proxy-url")]
-    pub proxy_url: Option<String>,
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
