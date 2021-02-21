@@ -38,7 +38,7 @@ pub struct Preferences {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedExtension {
     pub name: String,
-    pub extension: serde_yaml::Mapping,
+    pub extension: serde_json::Value,
 }
 
 /// NamedCluster associates name with cluster.
@@ -294,7 +294,7 @@ impl AuthInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_yaml::Value;
+    use serde_json::Value;
 
     #[test]
     fn kubeconfig_merge() {
@@ -409,7 +409,7 @@ users:
         assert_eq!(
             config.clusters[1].cluster.extensions.as_ref().unwrap()[0]
                 .extension
-                .get(&Value::String("provider".to_owned())),
+                .get("provider"),
             Some(&Value::String("minikube.sigs.k8s.io".to_owned()))
         );
     }
