@@ -1,4 +1,4 @@
-use k8s_openapi::Resource;
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Condition, Resource};
 use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -29,6 +29,9 @@ pub struct MyFoo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct FooStatus {
     is_bad: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(schema_with = "conditions")]
+    pub conditions: Vec<Condition>,
 }
 
 fn main() {
@@ -37,10 +40,40 @@ fn main() {
         name: "hi".into(),
         info: None,
     });
-    foo.status = Some(FooStatus { is_bad: true });
+    foo.status = Some(FooStatus {
+        is_bad: true,
+        conditions: vec![],
+    });
     println!("Spec: {:?}", foo.spec);
     let crd = serde_json::to_string_pretty(&FooCrd::crd()).unwrap();
     println!("Foo CRD: \n{}", crd);
+}
+
+fn conditions(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    serde_json::from_value(serde_json::json!({
+        "type": "array",
+        "x-kubernetes-list-type": "map",
+        "x-kubernetes-list-map-keys": ["type"],
+        "items": {
+            "type": "object",
+            "properties": {
+                "lastTransitionTime": { "format": "date-time", "type": "string" },
+                "message": { "type": "string" },
+                "observedGeneration": { "type": "integer", "format": "int64", "default": 0 },
+                "reason": { "type": "string" },
+                "status": { "type": "string" },
+                "type": { "type": "string" }
+            },
+            "required": [
+                "lastTransitionTime",
+                "message",
+                "reason",
+                "status",
+                "type"
+            ],
+        },
+    }))
+    .unwrap()
 }
 
 // some tests
@@ -100,6 +133,29 @@ fn verify_crd() {
                     "properties": {
                       "is_bad": {
                         "type": "boolean"
+                      },
+                      "conditions": {
+                        "type": "array",
+                        "x-kubernetes-list-type": "map",
+                        "x-kubernetes-list-map-keys": ["type"],
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "lastTransitionTime": { "format": "date-time", "type": "string" },
+                            "message": { "type": "string" },
+                            "observedGeneration": { "type": "integer", "format": "int64", "default": 0 },
+                            "reason": { "type": "string" },
+                            "status": { "type": "string" },
+                            "type": { "type": "string" }
+                          },
+                          "required": [
+                            "lastTransitionTime",
+                            "message",
+                            "reason",
+                            "status",
+                            "type"
+                          ],
+                        },
                       }
                     },
                     "required": [
