@@ -187,7 +187,6 @@ where
             Ok(action) => action.clone(),                       // do what user told us
             Err(err) => error_policy(err, err_context.clone()), // reconciler fn call failed
         };
-        // we should always requeue at some point in case of network errors ^
         let mut scheduler_tx = scheduler_tx.clone();
         async move {
             // Transmit the requeue request to the scheduler (picked up again at top)
@@ -200,7 +199,6 @@ where
                     .await
                     .expect("Message could not be sent to scheduler_rx");
             }
-            // NB: no else clause ^ because we don't allow not requeuing atm.
             reconciler_result
                 .map(|action| (obj_ref, action))
                 .context(ReconcilerFailed)
