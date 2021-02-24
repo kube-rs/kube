@@ -78,10 +78,8 @@ jobs:
           watch-timeout: 3m
       - run: kubectl get all -n apps
       - run: kubectl describe deploy dapp -n apps
-      - run: timeout 60 kubectl logs -f deploy/dapp -n apps || kubectl logs -f deploy/dapp -p -n apps
+      - run: kubectl wait --for=condition=Completed deploy/dapp -n apps --timeout=60s || kubectl logs -f deploy/dapp -p -n apps
       - run: kubectl get all -n apps
-      - run: kubectl get all -n apps | grep pod/dapp | grep Completed
-      - run: kubectl get all -n apps | grep empty-job | grep Completed
 
   cargo_test:
     docker:
