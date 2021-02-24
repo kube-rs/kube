@@ -1,12 +1,12 @@
 use darling::FromDeriveInput;
 use inflector::string::pluralize::to_plural;
 use proc_macro2::{Ident, Span};
-use syn::{DeriveInput, Path, Result};
+use syn::{Data, DeriveInput, Path};
 
 /// Values we can parse from #[kube(attrs)]
 #[derive(Debug, Default, FromDeriveInput)]
 #[darling(attributes(kube))]
-pub(crate) struct KubeAttrs {
+struct KubeAttrs {
     group: String,
     version: String,
     kind: String,
@@ -35,7 +35,27 @@ fn default_apiext() -> String {
     "v1".to_owned()
 }
 
-pub(crate) fn derive(input: DeriveInput, kube_attrs: KubeAttrs) -> Result<proc_macro2::TokenStream> {
+pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    let derive_input: DeriveInput = match syn::parse2(input) {
+        Err(err) => return err.to_compile_error(),
+        Ok(di) => di,
+    };
+    // Limit derive to structs
+    match derive_input.data {
+        Data::Struct(_) => {}
+        _ => {
+            return syn::Error::new_spanned(
+                &derive_input.ident,
+                r#"Enums or Unions can not #[derive(CustomResource)"#,
+            )
+            .to_compile_error()
+        }
+    }
+    let kube_attrs = match KubeAttrs::from_derive_input(&derive_input) {
+        Err(err) => return err.write_errors(),
+        Ok(attrs) => attrs,
+    };
+
     let KubeAttrs {
         group,
         kind,
@@ -52,14 +72,15 @@ pub(crate) fn derive(input: DeriveInput, kube_attrs: KubeAttrs) -> Result<proc_m
     } = kube_attrs;
 
     let struct_name = kind_struct.unwrap_or_else(|| kind.clone());
-    if input.ident == struct_name {
-        return Err(syn::Error::new_spanned(
-            input.ident,
+    if derive_input.ident == struct_name {
+        return syn::Error::new_spanned(
+            derive_input.ident,
             r#"#[derive(CustomResource)] `kind = "..."` must not equal the struct name (this is generated)"#,
-        ));
+        )
+        .to_compile_error();
     }
-    let visibility = input.vis;
-    let ident = input.ident;
+    let visibility = derive_input.vis;
+    let ident = derive_input.ident;
 
     // 1. Create root object Foo and truncate name from FooSpec
 
@@ -88,13 +109,19 @@ pub(crate) fn derive(input: DeriveInput, kube_attrs: KubeAttrs) -> Result<proc_m
 
     let mut derive_paths: Vec<Path> = vec![];
     for d in ["::serde::Serialize", "::serde::Deserialize", "Clone", "Debug"].iter() {
-        derive_paths.push(syn::parse_str(*d)?);
+        match syn::parse_str(*d) {
+            Err(err) => return err.to_compile_error(),
+            Ok(d) => derive_paths.push(d),
+        }
     }
     for d in &derives {
         if d == "Default" {
             has_default = true; // overridden manually to avoid confusion
         } else {
-            derive_paths.push(syn::parse_str(d)?);
+            match syn::parse_str(d) {
+                Err(err) => return err.to_compile_error(),
+                Ok(d) => derive_paths.push(d),
+            }
         }
     }
 
@@ -110,7 +137,10 @@ pub(crate) fn derive(input: DeriveInput, kube_attrs: KubeAttrs) -> Result<proc_m
         quote! {}
     };
     if schema_gen_enabled {
-        derive_paths.push(syn::parse_str("::schemars::JsonSchema")?);
+        match syn::parse_str("::schemars::JsonSchema") {
+            Err(err) => return err.to_compile_error(),
+            Ok(path) => derive_paths.push(path),
+        }
     }
 
     let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
@@ -314,11 +344,11 @@ pub(crate) fn derive(input: DeriveInput, kube_attrs: KubeAttrs) -> Result<proc_m
     };
 
     // Concat output
-    Ok(quote! {
+    quote! {
         #root_obj
         #impl_resource
         #impl_metadata
         #impl_default
         #impl_crd
-    })
+    }
 }

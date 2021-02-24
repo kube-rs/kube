@@ -5,11 +5,7 @@
 extern crate proc_macro;
 #[macro_use] extern crate quote;
 
-use darling::FromDeriveInput;
-
 mod custom_resource;
-use custom_resource::KubeAttrs;
-use syn::{Data, DeriveInput};
 
 /// A custom derive for kubernetes custom resource definitions.
 ///
@@ -180,40 +176,5 @@ use syn::{Data, DeriveInput};
 /// [`k8s_openapi::Resource`]: https://docs.rs/k8s-openapi/*/k8s_openapi/trait.Resource.html
 #[proc_macro_derive(CustomResource, attributes(kube))]
 pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = proc_macro2::TokenStream::from(input);
-    let tokens = input.clone();
-
-    let derive_input: DeriveInput = match syn::parse2(input) {
-        Err(err) => return err.to_compile_error().into(),
-        Ok(di) => di,
-    };
-    // Limit derive to structs
-    match derive_input.data {
-        Data::Struct(_) => {}
-        _ => {
-            return syn::Error::new_spanned(
-                &derive_input.ident,
-                r#"Enums or Unions can not #[derive(CustomResource)"#,
-            )
-            .to_compile_error()
-            .into()
-        }
-    }
-
-    let kube_attrs = match KubeAttrs::from_derive_input(&derive_input) {
-        Err(err) => return err.write_errors().into(),
-        Ok(attrs) => attrs,
-    };
-
-    let output = match custom_resource::derive(derive_input, kube_attrs) {
-        Ok(out) => match syn::parse2(out) {
-            Ok(res) => res,
-            Err(err) => {
-                syn::Error::new_spanned(&tokens, format!("#[derive(CustomResource)] failed: {:?}", err))
-                    .to_compile_error()
-            }
-        },
-        Err(err) => err.to_compile_error(),
-    };
-    output.into()
+    custom_resource::derive(proc_macro2::TokenStream::from(input)).into()
 }
