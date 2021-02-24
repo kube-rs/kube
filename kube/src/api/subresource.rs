@@ -48,7 +48,7 @@ where
 /// Methods for [status subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource).
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned,
+    K: DeserializeOwned,
 {
     /// Get the named resource with a status subresource
     ///
@@ -207,7 +207,7 @@ impl Loggable for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Loggable,
+    K: DeserializeOwned + Loggable,
 {
     /// Fetch logs as a string
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
@@ -274,7 +274,7 @@ impl Evictable for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Evictable,
+    K: DeserializeOwned + Evictable,
 {
     /// Create an eviction
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
