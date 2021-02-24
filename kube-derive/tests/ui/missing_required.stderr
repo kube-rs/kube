@@ -1,0 +1,23 @@
+error: Missing field `group`
+ --> $DIR/missing_required.rs:5:10
+  |
+5 | #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+  |          ^^^^^^^^^^^^^^
+  |
+  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: Missing field `version`
+ --> $DIR/missing_required.rs:5:10
+  |
+5 | #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+  |          ^^^^^^^^^^^^^^
+  |
+  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: Missing field `kind`
+ --> $DIR/missing_required.rs:5:10
+  |
+5 | #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+  |          ^^^^^^^^^^^^^^
+  |
+  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)

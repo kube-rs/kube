@@ -46,7 +46,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         _ => {
             return syn::Error::new_spanned(
                 &derive_input.ident,
-                r#"Enums or Unions can not #[derive(CustomResource)"#,
+                r#"Enums or Unions can not #[derive(CustomResource)]"#,
             )
             .to_compile_error()
         }
