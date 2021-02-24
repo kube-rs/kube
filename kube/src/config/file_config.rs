@@ -38,7 +38,7 @@ pub struct Preferences {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedExtension {
     pub name: String,
-    pub extension: String,
+    pub extension: serde_json::Value,
 }
 
 /// NamedCluster associates name with cluster.
@@ -58,6 +58,7 @@ pub struct Cluster {
     pub certificate_authority: Option<String>,
     #[serde(rename = "certificate-authority-data")]
     pub certificate_authority_data: Option<String>,
+    pub extensions: Option<Vec<NamedExtension>>,
 }
 
 /// NamedAuthInfo associates name with authentication.
@@ -289,6 +290,7 @@ impl AuthInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     #[test]
     fn kubeconfig_merge() {
@@ -335,5 +337,76 @@ mod tests {
         assert_eq!(merged.auth_infos[0].auth_info.username, None);
         // New named auth info is appended
         assert_eq!(merged.auth_infos[1].name, "green-user".to_owned());
+    }
+
+    #[test]
+    fn kubeconfig_deserialize() {
+        let config_yaml = "apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0t<SNIP>LS0tLQo=
+    server: https://ABCDEF0123456789.gr7.us-west-2.eks.amazonaws.com
+  name: eks
+- cluster:
+    certificate-authority: /home/kevin/.minikube/ca.crt
+    extensions:
+    - extension:
+        last-update: Thu, 18 Feb 2021 16:59:26 PST
+        provider: minikube.sigs.k8s.io
+        version: v1.17.1
+      name: cluster_info
+    server: https://192.168.49.2:8443
+  name: minikube
+contexts:
+- context:
+    cluster: minikube
+    extensions:
+    - extension:
+        last-update: Thu, 18 Feb 2021 16:59:26 PST
+        provider: minikube.sigs.k8s.io
+        version: v1.17.1
+      name: context_info
+    namespace: default
+    user: minikube
+  name: minikube
+- context:
+    cluster: arn:aws:eks:us-west-2:012345678912:cluster/eks
+    user: arn:aws:eks:us-west-2:012345678912:cluster/eks
+  name: eks
+current-context: minikube
+kind: Config
+preferences: {}
+users:
+- name: arn:aws:eks:us-west-2:012345678912:cluster/eks
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1alpha1
+      args:
+      - --region
+      - us-west-2
+      - eks
+      - get-token
+      - --cluster-name
+      - eks
+      command: aws
+      env: null
+      provideClusterInfo: false
+- name: minikube
+  user:
+    client-certificate: /home/kevin/.minikube/profiles/minikube/client.crt
+    client-key: /home/kevin/.minikube/profiles/minikube/client.key";
+
+        let config: Kubeconfig = serde_yaml::from_str(config_yaml)
+            .map_err(ConfigError::ParseYaml)
+            .unwrap();
+
+        assert_eq!(config.clusters[0].name, "eks");
+        assert_eq!(config.clusters[1].name, "minikube");
+        assert_eq!(
+            config.clusters[1].cluster.extensions.as_ref().unwrap()[0]
+                .extension
+                .get("provider"),
+            Some(&Value::String("minikube.sigs.k8s.io".to_owned()))
+        );
     }
 }
