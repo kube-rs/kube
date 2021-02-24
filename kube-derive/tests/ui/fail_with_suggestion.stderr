@@ -1,0 +1,5 @@
+error: Unknown field: `shortnames`. Did you mean `shortname`?
+ --> $DIR/fail_with_suggestion.rs:6:58
+  |
+6 | #[kube(group = "clux.dev", version = "v1", kind = "Foo", shortnames = "foo")]
+  |                                                          ^^^^^^^^^^
