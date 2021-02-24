@@ -352,3 +352,21 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #impl_crd
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // TODO Unit test `derive`
+
+    #[test]
+    fn test_apiextensions_default() {
+        let input = quote! {
+            #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+            #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+            struct FooSpec { foo: String }
+        };
+        let input = syn::parse2(input).unwrap();
+        let kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
+        assert_eq!(kube_attrs.apiextensions, "v1");
+    }
+}
