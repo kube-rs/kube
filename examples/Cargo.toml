@@ -15,6 +15,9 @@ kubederive = ["kube/derive"] # by default import kube-derive with its default fe
 schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
 native-tls = ["kube/native-tls", "kube-runtime/native-tls"]
 rustls-tls = ["kube/rustls-tls", "kube-runtime/rustls-tls"]
+proxy = [] # To not compile proxy example without required feature set.
+proxy-native-tls = ["proxy", "kube/proxy-native-tls"] # Enable this when trying proxy example
+proxy-rustls-tls = ["proxy", "kube/proxy-rustls-tls"] # Enable this when trying proxy example
 ws = ["kube/ws"]
 
 [dev-dependencies]
@@ -129,6 +132,14 @@ path = "pod_reflector.rs"
 [[example]]
 name = "pod_watcher"
 path = "pod_watcher.rs"
+
+# Use one of the following when trying proxy example:
+# - `--no-default-features --features=proxy-native-tls`
+# - `--no-default-features --features=proxy-rustls-tls`
+[[example]]
+name = "proxy"
+path = "proxy.rs"
+required-features = ["proxy"]
 
 [[example]]
 name = "node_reflector"

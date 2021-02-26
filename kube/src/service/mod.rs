@@ -2,23 +2,22 @@
 
 mod auth;
 #[cfg(feature = "gzip")] mod compression;
+mod connector;
 mod headers;
 mod log;
-mod tls;
 mod url;
 
 use self::{log::LogRequest, url::set_cluster_url};
 use auth::AuthLayer;
 #[cfg(feature = "gzip")] use compression::{accept_compressed, maybe_decompress};
 use headers::set_default_headers;
-use tls::HttpsConnector;
 
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use http::{HeaderValue, Request, Response};
 use hyper::{Body, Client as HyperClient};
 use hyper_timeout::TimeoutConnector;
-use tower::{buffer::Buffer, util::BoxService, BoxError, ServiceBuilder};
+use tower::{buffer::Buffer, layer, util::BoxService, BoxError, ServiceBuilder};
 
 use crate::{error::ConfigError, Config, Error, Result};
 use auth::Authentication;
@@ -104,22 +103,40 @@ impl TryFrom<Config> for Service {
             .map_response(maybe_decompress)
             .into_inner();
 
-        let https: HttpsConnector<_> = config.try_into()?;
-        let mut connector = TimeoutConnector::new(https);
-        if let Some(timeout) = timeout {
-            // reqwest's timeout is applied from when the request stars connecting until
-            // the response body has finished.
-            // Setting both connect and read timeout should be close enough.
-            connector.set_connect_timeout(Some(timeout));
-            // Timeout for reading the response.
-            connector.set_read_timeout(Some(timeout));
-        }
-        let client: HyperClient<_, Body> = HyperClient::builder().build(connector);
+        let with_timeout = layer::layer_fn(|c| {
+            let mut connector = TimeoutConnector::new(c);
+            if let Some(timeout) = timeout {
+                // reqwest's timeout is applied from when the request stars connecting until
+                // the response body has finished.
+                // Setting both connect and read timeout should be close enough.
+                connector.set_connect_timeout(Some(timeout));
+                // Timeout for reading the response.
+                connector.set_read_timeout(Some(timeout));
+            }
+            connector
+        });
+
+        #[cfg(feature = "native-tls")]
+        let tls = connector::tls_connector(config.identity, config.root_cert, config.accept_invalid_certs)?;
+        #[cfg(feature = "rustls-tls")]
+        let tls = std::sync::Arc::new(connector::tls_config(
+            config.identity,
+            config.root_cert,
+            config.accept_invalid_certs,
+        )?);
+
+        #[cfg(not(any(feature = "proxy-native-tls", feature = "proxy-rustls-tls")))]
+        let conn = connector::https_connector(tls);
+        #[cfg(any(feature = "proxy-native-tls", feature = "proxy-rustls-tls"))]
+        let conn = connector::proxy_connector(tls, config.proxy_url.map(|s| s.parse()).transpose()?);
+
+        let conn = ServiceBuilder::new().layer(with_timeout).service(conn);
+        let client: HyperClient<_, Body> = HyperClient::builder().build(conn);
 
         let inner = ServiceBuilder::new()
             .layer(common)
             .option_layer(maybe_auth)
-            .layer(tower::layer::layer_fn(LogRequest::new))
+            .layer(layer::layer_fn(LogRequest::new))
             .service(client);
         Ok(Self::new(inner))
     }

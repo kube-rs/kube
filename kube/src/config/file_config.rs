@@ -59,6 +59,8 @@ pub struct Cluster {
     #[serde(rename = "certificate-authority-data")]
     pub certificate_authority_data: Option<String>,
     pub extensions: Option<Vec<NamedExtension>>,
+    #[serde(rename = "proxy-url")]
+    pub proxy_url: Option<String>,
 }
 
 /// NamedAuthInfo associates name with authentication.

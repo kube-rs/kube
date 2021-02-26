@@ -40,6 +40,8 @@ pub struct Config {
     pub(crate) identity: Option<(Vec<u8>, String)>,
     /// Stores information to tell the cluster who you are.
     pub(crate) auth_info: AuthInfo,
+    /// Proxy URL. Not used unless `proxy-native-tls` or `proxy-rustls-tls` feature is enabled.
+    pub proxy_url: Option<String>,
 }
 
 impl Config {
@@ -58,6 +60,7 @@ impl Config {
             accept_invalid_certs: false,
             identity: None,
             auth_info: AuthInfo::default(),
+            proxy_url: None,
         }
     }
 
@@ -119,6 +122,7 @@ impl Config {
                 token: Some(token),
                 ..Default::default()
             },
+            proxy_url: None,
         })
     }
 
@@ -182,6 +186,7 @@ impl Config {
             accept_invalid_certs,
             identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
             auth_info: loader.user,
+            proxy_url: loader.cluster.proxy_url,
         })
     }
 }

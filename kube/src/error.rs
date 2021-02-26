@@ -50,6 +50,10 @@ pub enum Error {
     #[error("InternalUrlError: {0}")]
     InternalUrlError(#[from] url::ParseError),
 
+    /// Invalid Url
+    #[error("InvalidUrlError: {0}")]
+    InvalidUrlError(#[from] http::uri::InvalidUri),
+
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
     SerdeError(#[from] serde_json::Error),
