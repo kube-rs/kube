@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use std::{collections::HashMap, fs::File, path::Path};
+use std::{collections::HashMap, fs, path::Path};
 
 use crate::{config::utils, error::ConfigError, Result};
 
@@ -139,40 +139,54 @@ const KUBECONFIG: &str = "KUBECONFIG";
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
     pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig> {
-        let f = File::open(&path).map_err(|source| ConfigError::ReadFile {
+        let data = fs::read_to_string(&path).map_err(|source| ConfigError::ReadFile {
             path: path.as_ref().into(),
             source,
         })?;
-        let mut config: Kubeconfig = serde_yaml::from_reader(f).map_err(ConfigError::ParseYaml)?;
+        // support multiple documents
+        let mut documents: Vec<Kubeconfig> = vec![];
+        for doc in serde_yaml::Deserializer::from_str(&data) {
+            let value = serde_yaml::Value::deserialize(doc).map_err(ConfigError::ParseYaml)?;
+            let kconf = serde_yaml::from_value(value).map_err(ConfigError::ParseYaml)?;
+            documents.push(kconf)
+        }
 
         // Remap all files we read to absolute paths.
-        if let Some(dir) = path.as_ref().parent() {
-            for named in config.clusters.iter_mut() {
-                if let Some(path) = &named.cluster.certificate_authority {
-                    if let Some(abs_path) = to_absolute(dir, path) {
-                        named.cluster.certificate_authority = Some(abs_path);
+        let mut merged_docs = None;
+        for mut config in documents {
+            if let Some(dir) = path.as_ref().parent() {
+                for named in config.clusters.iter_mut() {
+                    if let Some(path) = &named.cluster.certificate_authority {
+                        if let Some(abs_path) = to_absolute(dir, path) {
+                            named.cluster.certificate_authority = Some(abs_path);
+                        }
+                    }
+                }
+                for named in config.auth_infos.iter_mut() {
+                    if let Some(path) = &named.auth_info.client_certificate {
+                        if let Some(abs_path) = to_absolute(dir, path) {
+                            named.auth_info.client_certificate = Some(abs_path);
+                        }
+                    }
+                    if let Some(path) = &named.auth_info.client_key {
+                        if let Some(abs_path) = to_absolute(dir, path) {
+                            named.auth_info.client_key = Some(abs_path);
+                        }
+                    }
+                    if let Some(path) = &named.auth_info.token_file {
+                        if let Some(abs_path) = to_absolute(dir, path) {
+                            named.auth_info.token_file = Some(abs_path);
+                        }
                     }
                 }
             }
-            for named in config.auth_infos.iter_mut() {
-                if let Some(path) = &named.auth_info.client_certificate {
-                    if let Some(abs_path) = to_absolute(dir, path) {
-                        named.auth_info.client_certificate = Some(abs_path);
-                    }
-                }
-                if let Some(path) = &named.auth_info.client_key {
-                    if let Some(abs_path) = to_absolute(dir, path) {
-                        named.auth_info.client_key = Some(abs_path);
-                    }
-                }
-                if let Some(path) = &named.auth_info.token_file {
-                    if let Some(abs_path) = to_absolute(dir, path) {
-                        named.auth_info.token_file = Some(abs_path);
-                    }
-                }
+            if let Some(c) = merged_docs {
+                merged_docs = Some(Kubeconfig::merge(c, config)?);
+            } else {
+                merged_docs = Some(config);
             }
         }
-        Ok(config)
+        Ok(merged_docs.expect("Need at least one yaml document in KUBECONFIG file"))
     }
 
     /// Read a Config from `KUBECONFIG` or the the default location.
