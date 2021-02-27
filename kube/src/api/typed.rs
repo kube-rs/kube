@@ -193,14 +193,9 @@ where
         self.client.request_status::<ObjectList<K>>(req).await
     }
 
-    /// Patch a resource a subset of its properties
+    /// Patch a subset of a resource's properties
     ///
-    /// Note that actual `patch` value depends on what `PatchStrategy` is used.
-    /// It is configured in `PatchParams` and defauls to strategic merge
-    /// patch.
-    ///
-    /// See [kubernetes json patch types](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
-    /// for more information about their distinction.
+    /// Takes a [`Patch`] along with [`PatchParams`] for the call.
     ///
     /// ```no_run
     /// use kube::{api::{Api, PatchParams, Patch, Meta}, Client};
@@ -225,10 +220,8 @@ where
     ///     Ok(())
     /// }
     /// ```
-    /// [`Merge`]: super::PatchStrategy::Merge
-    /// [`JSON`]: super::PatchStrategy::JSON
-    /// [`Strategic`]: super::PatchStrategy::Strategic
-    /// [`Apply`]: super::PatchStrategy::Apply
+    /// [`Patch`]: super::Patch
+    /// [`PatchParams`]: super::PatchParams
     pub async fn patch<P: Serialize>(&self, name: &str, pp: &PatchParams, patch: &Patch<P>) -> Result<K> {
         let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await

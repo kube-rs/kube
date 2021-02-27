@@ -12,7 +12,7 @@ fmt:
 	cargo +nightly fmt
 
 doc:
-	cargo +nightly doc --lib
+	cargo +nightly doc --lib --features=derive,ws,oauth,jsonpatch
 	xdg-open target/doc/kube/index.html
 
 test:
