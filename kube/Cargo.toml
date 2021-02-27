@@ -59,7 +59,7 @@ hyper = { version = "0.14.2", features = ["client", "http1", "stream", "tcp"] }
 hyper-tls = { version = "0.5.0", optional = true }
 hyper-rustls = { version = "0.22.1", optional = true }
 tokio-tungstenite = { version = "0.13.0", optional = true }
-tower = { version = "0.4.5", features = ["buffer", "util"] }
+tower = { version = "0.4.6", features = ["buffer", "util"] }
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"], optional = true }
 hyper-timeout = "0.4.1"
 tame-oauth = { version = "0.4.7", features = ["gcp"], optional = true }

@@ -70,7 +70,7 @@ impl Client {
     async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
         let mut svc = self.inner.clone();
         let res = svc
-            .ready_and()
+            .ready()
             .await
             .map_err(Error::Service)?
             .call(request)
