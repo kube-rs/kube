@@ -150,8 +150,8 @@ impl PostParams {
 ///
 /// See [kubernetes patch docs](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment) for the older patch types.
 ///
-/// Note that patches have different effects on different fields depending on their [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy).
-/// These strategies are configurable when deriving your [`CustomResource`](kube_derive::CustomResource).
+/// Note that patches have different effects on different fields depending on their merge strategies.
+/// These strategies are configurable when deriving your [`CustomResource`](kube_derive::CustomResource#customizing-schemas).
 ///
 /// # Creating a patch via serde_json
 /// ```
