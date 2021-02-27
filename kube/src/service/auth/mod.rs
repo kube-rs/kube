@@ -133,13 +133,11 @@ impl TryFrom<&AuthInfo> for Authentication {
                 if let Some(exec) = &auth_info.exec {
                     let creds = auth_exec(exec)?;
                     let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
-                    let expiration = match status.expiration_timestamp {
-                        Some(ts) => Some(
-                            ts.parse::<DateTime<Utc>>()
-                                .map_err(ConfigError::MalformedTokenExpirationDate)?,
-                        ),
-                        None => None,
-                    };
+                    let expiration = status
+                        .expiration_timestamp
+                        .map(|ts| ts.parse())
+                        .transpose()
+                        .map_err(ConfigError::MalformedTokenExpirationDate)?;
                     (status.token, expiration)
                 } else if let Some(file) = &auth_info.token_file {
                     (Some(read_file_to_string(file)?), None)
