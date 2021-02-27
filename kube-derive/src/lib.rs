@@ -70,7 +70,7 @@ mod custom_resource;
 ///
 /// ### `#[kube(apiextensions = "v1beta1")]`
 /// The version for `CustomResourceDefinition` desired in the `apiextensions.k8s.io` group.
-/// Default is `v1` (for clusters >= 1.17). If using kubernetes <= 1.16 pluase use `v1beta1`.
+/// Default is `v1` (for clusters >= 1.17). If using kubernetes <= 1.16 please use `v1beta1`.
 ///
 /// **NOTE**: Support for `v1` requires deriving the openapi v3 `JsonSchema` via the `schemars` dependency.
 ///
@@ -149,6 +149,19 @@ mod custom_resource;
 ///     pub fn crd() -> k8s_openapi::...::CustomResourceDefinition { ... }
 /// }
 /// ```
+///
+/// ## Customizing Schemas
+/// Should you need to customize the schemas, you can use:
+/// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
+/// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/clux/kube-rs/blob/master/examples/crd_derive.rs))
+/// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/clux/kube-rs/issues/129#issuecomment-750852916)
+///
+/// In general, you will need to override parts of the schemas (for fields in question) when you are:
+/// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
+/// - **customizing [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy)** (e.g. like in the [`crd_derive_schema` example](https://github.com/clux/kube-rs/blob/master/examples/crd_derive_schema.rs))
+/// - **customizing [certain kubebuilder like validation rules](https://github.com/clux/kube-rs/issues/129#issuecomment-749463718)** (tail the issue for state of affairs)
+///
+/// If you have to override a lot, [you can opt-out of schema-generation entirely](https://github.com/clux/kube-rs/issues/355#issuecomment-751253657)
 ///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.

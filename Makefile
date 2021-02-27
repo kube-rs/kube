@@ -12,7 +12,8 @@ fmt:
 	cargo +nightly fmt
 
 doc:
-	cargo +nightly doc --lib
+	# TODO: replace with RUSTDOCFLAGS="--cfg docsrs" once it works
+	cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch
 	xdg-open target/doc/kube/index.html
 
 test:

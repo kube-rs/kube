@@ -144,9 +144,41 @@ impl PostParams {
 
 /// Describes changes that should be applied to a resource
 ///
-/// For all strategies except `Json`, patch can be represented with arbitrary
-/// serializable value, such as `serde_json::Value`. You may also want to use
-/// a `k8s-openapi` definition for the resource for the better type safety.
+/// Takes arbitrary serializable data for all strategies except `Json`.
+///
+/// We recommend using ([server-side](https://kubernetes.io/blog/2020/04/01/kubernetes-1.18-feature-server-side-apply-beta-2)) `Apply` patches on new kubernetes releases.
+///
+/// See [kubernetes patch docs](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment) for the older patch types.
+///
+/// Note that patches have different effects on different fields depending on their merge strategies.
+/// These strategies are configurable when deriving your [`CustomResource`](kube_derive::CustomResource#customizing-schemas).
+///
+/// # Creating a patch via serde_json
+/// ```
+/// use kube::api::Patch;
+/// let patch = serde_json::json!({
+///     "apiVersion": "v1",
+///     "kind": "Pod",
+///     "metadata": {
+///         "name": "blog"
+///     },
+///     "spec": {
+///         "activeDeadlineSeconds": 5
+///     }
+/// });
+/// let patch = Patch::Apply(&patch);
+/// ```
+/// # Creating a patch from a type
+/// ```
+/// use kube::api::Patch;
+/// use k8s_openapi::api::rbac::v1::Role;
+/// use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+/// let r = Role {
+///     metadata: ObjectMeta { name: Some("user".into()), ..ObjectMeta::default() },
+///     rules: Some(vec![])
+/// };
+/// let patch = Patch::Apply(&r);
+/// ```
 #[non_exhaustive]
 pub enum Patch<T: Serialize> {
     /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
