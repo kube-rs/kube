@@ -154,9 +154,10 @@ mod custom_resource;
 /// Should you need to customize the schemas, you can use:
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
 /// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/clux/kube-rs/blob/master/examples/crd_derive.rs))
+/// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/clux/kube-rs/issues/129#issuecomment-750852916)
 ///
 /// In general, you will need to override parts of the schemas (for fields in question) when you are:
-/// - **using enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
+/// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
 /// - **customizing [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy)** (e.g. like in the [`crd_derive_schema` example](https://github.com/clux/kube-rs/blob/master/examples/crd_derive_schema.rs))
 /// - **customizing [certain kubebuilder like validation rules](https://github.com/clux/kube-rs/issues/129#issuecomment-749463718)** (tail the issue for state of affairs)
 ///
