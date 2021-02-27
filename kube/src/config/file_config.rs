@@ -186,7 +186,8 @@ impl Kubeconfig {
                 merged_docs = Some(config);
             }
         }
-        Ok(merged_docs.expect("Need at least one yaml document in KUBECONFIG file"))
+        let config = merged_docs.ok_or_else(|| ConfigError::EmptyKubeconfig(path.as_ref().to_path_buf()))?;
+        Ok(config)
     }
 
     /// Read a Config from `KUBECONFIG` or the the default location.

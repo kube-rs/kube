@@ -185,6 +185,9 @@ pub enum ConfigError {
     #[error("Failed to parse Kubeconfig YAML: {0}")]
     ParseYaml(#[source] serde_yaml::Error),
 
+    #[error("Failed to find a single YAML document in Kubeconfig: {0}")]
+    EmptyKubeconfig(PathBuf),
+
     #[error("Unable to run auth exec: {0}")]
     AuthExecStart(#[source] std::io::Error),
     #[error("Auth exec command '{cmd}' failed with status {status}: {out:?}")]
