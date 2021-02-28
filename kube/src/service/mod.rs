@@ -126,7 +126,12 @@ impl TryFrom<Config> for Service {
         )?);
 
         #[cfg(not(any(feature = "proxy-native-tls", feature = "proxy-rustls-tls")))]
-        let conn = connector::https_connector(tls);
+        let conn = {
+            if config.proxy_url.is_some() {
+                return Err(Error::ProxyNotSupported);
+            }
+            connector::https_connector(tls)
+        };
         #[cfg(any(feature = "proxy-native-tls", feature = "proxy-rustls-tls"))]
         let conn = connector::proxy_connector(tls, config.proxy_url.map(|s| s.parse()).transpose()?);
 

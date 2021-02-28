@@ -21,6 +21,10 @@ pub enum Error {
     #[error("ConnectionError: {0}")]
     Connection(std::io::Error),
 
+    /// Returned when trying to connect to a proxy using `kube` without proxy support.
+    #[error("Proxy is not supported")]
+    ProxyNotSupported,
+
     /// Hyper error
     #[error("HyperError: {0}")]
     HyperError(#[from] hyper::Error),
