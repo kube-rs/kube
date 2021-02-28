@@ -8,8 +8,12 @@ use std::{
     task::{Context, Poll},
 };
 
-/// Pulls messages from a [`Scheduler`], and runs an action for each message in parallel,
-/// while making sure to not run the same message multiple times at once.
+/// Pulls items from a [`Scheduler`], and runs an action for each item in parallel,
+/// while making sure to not process [equal](`Eq`) items multiple times at once.
+///
+/// If an item is to be emitted from the [`Scheduler`] while an equal item is
+/// already being processed then it will be held pending until the current item
+/// is finished.
 #[pin_project]
 pub struct Runner<T, R, F, MkF> {
     #[pin]

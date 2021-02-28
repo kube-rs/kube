@@ -1,11 +1,12 @@
-//! Crate with kubernetes runtime components
+//! Common components for building Kubernetes operators
 //!
 //! This crate contains the core building blocks to allow users to build
 //! controllers/operators/watchers that need to synchronize/reconcile kubernetes
 //! state.
 //!
-//! Newcomers should generally get started with the [`Controller`] builder, which manages
-//! all state internals for you.
+//! Newcomers are recommended to start with the [`Controller`] builder, which gives an
+//! opinionated starting point that should be appropriate for simple operators, but all
+//! components are designed to be usable á la carte if your operator doesn't quite fit that mold.
 
 #![deny(unsafe_code)]
 #![deny(clippy::all)]

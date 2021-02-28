@@ -1,3 +1,5 @@
+//! Runs a user-supplied reconciler function on objects when they (or related objects) are updated
+
 use self::runner::Runner;
 use crate::{
     reflector::{
@@ -127,14 +129,15 @@ impl<T> Context<T> {
 
 /// Apply a reconciler to an input stream, with a given retry policy
 ///
-/// Takes a `store` parameter for the main object which should be updated by a `reflector`.
+/// Takes a `store` parameter for the core objects, which should usually be updated by a [`reflector`].
 ///
-/// The `queue` is a source of external events that trigger the reconciler,
-/// usually taken from a `reflector` and then passed through a trigger function such as
-/// [`trigger_self`].
+/// The `queue` indicates which objects should be reconciled. For the core objects this will usually be
+/// the [`reflector`] (piped through [`trigger_self`]). If your core objects own any subobjects then you
+/// can also make them trigger reconciliations by [merging](`futures::stream::select`) the [`reflector`]
+/// with a [`watcher`](watcher()) or [`reflector`](reflector()) for the subobject.
 ///
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
-/// (such as triggering from arbitrary `Stream`s), at the cost of some more verbosity.
+/// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
 pub fn applier<K, QueueStream, ReconcilerFut, T>(
     mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
     mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,

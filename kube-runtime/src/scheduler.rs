@@ -1,3 +1,5 @@
+//! Delays and deduplicates [`Stream`] items
+
 use futures::{
     stream::{Fuse, FusedStream},
     Stream, StreamExt,
@@ -183,7 +185,7 @@ where
     /// no messages will be lost, even if it is reconstructed on each call to [`poll_next`](Self::poll_next).
     /// In fact, this is often desirable, to avoid long-lived borrows in `can_take_message`'s closure.
     ///
-    /// NOTE: `can_take_message` should be considered fairly performance-sensitive, since
+    /// NOTE: `can_take_message` should be considered to be fairly performance-sensitive, since
     /// it will generally be executed for each pending message, for each [`poll_next`](Self::poll_next).
     pub fn hold_unless<C: Fn(&T) -> bool>(self: Pin<&mut Self>, can_take_message: C) -> HoldUnless<T, R, C> {
         HoldUnless {
@@ -211,11 +213,14 @@ where
     }
 }
 
-/// Stream transformer that takes a message and `Instant` (in the form of a `ScheduleRequest`), and emits
-/// the message at the specified `Instant`.
+/// Stream transformer that delays and deduplicates [`Stream`] items.
 ///
-/// Objects are de-duplicated: if a message is submitted twice before being emitted then it will only be
-/// emitted at the earlier of the two `Instant`s.
+/// Items are deduplicated: if an item is submitted multiple times before being emitted then it will only be
+/// emitted at the earliest `Instant`.
+///
+/// Items can be "held pending" if the item doesn't match some predicate. Items trying to schedule an item
+/// that is already pending will be discarded (since it is already going to be emitted as soon as the consumer
+/// is ready for it).
 pub fn scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(requests: S) -> Scheduler<T, S> {
     Scheduler::new(requests)
 }

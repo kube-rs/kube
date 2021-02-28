@@ -1,3 +1,5 @@
+//! Watches a Kubernetes Resource for changes, with error recovery
+
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube::{
@@ -35,11 +37,11 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, Clone)]
-/// Watch events returned from the `Watcher`
+/// Watch events returned from the [`watcher`]
 pub enum Event<K> {
-    /// A resource was added or modified
+    /// An object was added or modified
     Applied(K),
-    /// A resource was deleted
+    /// An object was deleted
     ///
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use Finalizers instead.
@@ -47,6 +49,9 @@ pub enum Event<K> {
     /// The watch stream was restarted, so `Deleted` events may have been missed
     ///
     /// Should be used as a signal to replace the store contents atomically.
+    ///
+    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in this event
+    /// should be assumed to have been [`Deleted`](Event::Deleted).
     Restarted(Vec<K>),
 }
 
@@ -80,9 +85,9 @@ impl<K> Event<K> {
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-/// The internal finite state machine driving the [`Watcher`](struct.Watcher.html)
+/// The internal finite state machine driving the [`watcher`]
 enum State<K: Meta + Clone> {
-    /// The Watcher is empty, and the next poll() will start the initial LIST to get all existing objects
+    /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
     Empty,
     /// The initial LIST was successful, so we should move on to starting the actual watch.
     InitListed { resource_version: String },
@@ -183,11 +188,13 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 
 /// Watches a Kubernetes Resource for changes continuously
 ///
-/// Creates an indefinite read stream through continual [`Api::watch`] calls, and keeping track
-/// of [returned resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes).
-/// It tries to recover (by reconnecting and resyncing as required) if polled again after an error.
-/// However, keep in mind that most terminal `TryStream` combinators (such as `TryFutureExt::try_for_each`
-/// and `TryFutureExt::try_concat` will terminate eagerly if an `Error` reaches them.
+/// Compared to [`Api::watch`], this automatically tries to recover the stream upon errors.
+///
+/// Errors from the underlying watch are propagated, after which the stream will go into recovery mode on the next poll.
+/// You can apply your own backoff by not polling the stream for a duration after errors.
+/// Keep in mind that some [`TryStream`](futures::TryStream) combinators (such as
+/// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
+/// will terminate eagerly as soon as they receive an [`Err`].
 ///
 /// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`],
 /// direct users may want to flatten composite events with [`try_flatten_applied`]:
@@ -217,9 +224,20 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 ///
 /// # Migration from `kube::runtime`
 ///
-/// This is similar to the legacy `kube::runtime::Informer`, or the watching half of client-go's `Reflector`.
+/// This is similar to the legacy [`kube::runtime::Informer`], or the watching half of client-go's `Reflector`.
 /// Renamed to avoid confusion with client-go's `Informer` (which watches a `Reflector` for updates, rather
 /// the Kubernetes API).
+///
+/// # Recovery
+///
+/// (The details of recovery are considered an implementation detail and should not be relied on to be stable, but are
+/// documented here for posterity.)
+///
+/// If the watch connection is interrupted then we attempt to restart the watch using the last
+/// [resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
+/// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
+/// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
+/// an [`Event::Restarted`].
 pub fn watcher<K: Meta + Clone + DeserializeOwned + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,

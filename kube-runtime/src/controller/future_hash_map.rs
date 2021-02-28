@@ -6,8 +6,9 @@ use std::{
     task::{Context, Poll},
 };
 
-/// Variant of [`tokio::stream::StreamMap`] that only runs [`Future`]s, and uses a [`HashMap`] as
-/// the backing store, giving O(1) insertion and membership checks.
+/// Variant of [`tokio_stream::StreamMap`](https://docs.rs/tokio-stream/0.1.3/tokio_stream/struct.StreamMap.html)
+/// that only runs [`Future`]s, and uses a [`HashMap`] as the backing store, giving (amortized) O(1) insertion
+/// and membership checks.
 ///
 /// Just like for `StreamMap`'s `S`, `F` must be [`Unpin`], since [`HashMap`] is free to move
 /// entries as it pleases (for example: resizing the backing array).
