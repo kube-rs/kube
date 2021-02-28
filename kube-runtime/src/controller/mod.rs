@@ -290,6 +290,7 @@ where
     ///
     /// Configure `ListParams` and `Api` so you only get reconcile events
     /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
+    #[must_use]
     pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
         let writer = Writer::<K>::default();
         let reader = writer.as_reader();

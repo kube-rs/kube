@@ -113,9 +113,8 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
                 );
                     if can_take_message(&msg) {
                         break Poll::Ready(Some(Ok(msg)));
-                    } else {
-                        self.pending.insert(msg);
                     }
+                    self.pending.insert(msg);
                 }
                 Poll::Ready(Some(Err(err))) => break Poll::Ready(Some(Err(err))),
                 Poll::Ready(None) => {
