@@ -3,7 +3,9 @@ UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.50.1...master
  * `kube` `Config` now allows arbirary extension objects - #425
+ * `kube` `Config` now allows multiple yaml documents per kubeconfig - #440 via #441
  * `kube-derive` now more robust and is using `darling` - #435
+ * docs improvements to patch + runtime
 
 0.50.1 / 2021-02-17
 ===================

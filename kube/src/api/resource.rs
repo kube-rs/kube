@@ -362,10 +362,8 @@ mod test {
     // these are sanity tests for macros that create the Resource::v1Ctors
     #[test]
     fn api_url_secret() {
-        use k8s_openapi::Resource as ResourceTrait;
         let r = Resource::namespaced::<corev1::Secret>("ns");
         let req = r.create(&PostParams::default(), vec![]).unwrap();
-        println!("trait is: {:?}", corev1::Secret::GROUP);
         assert_eq!(req.uri(), "/api/v1/namespaces/ns/secrets?");
     }
 

@@ -352,12 +352,12 @@ mod test {
     fn delete_param_serialize() {
         let mut dp = DeleteParams::default();
         let emptyser = serde_json::to_string(&dp).unwrap();
-        println!("emptyser is: {}", emptyser);
+        //println!("emptyser is: {}", emptyser);
         assert_eq!(emptyser, "{}");
 
         dp.dry_run = true;
         let ser = serde_json::to_string(&dp).unwrap();
-        println!("ser is: {}", ser);
+        //println!("ser is: {}", ser);
         assert_eq!(ser, "{\"dryRun\":[\"All\"]}");
     }
 }

@@ -1,30 +1,38 @@
 #![allow(missing_docs)]
-
-use std::{collections::HashMap, fs::File, path::Path};
-
 use crate::{config::utils, error::ConfigError, Result};
-
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fs, path::Path};
 
 /// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
-/// that is normally stored in `~/.kube/config`
 ///
-/// This type (and its children) are exposed for convenience only.
-/// Please load a [`Config`][crate::Config] object for use with a [`Client`][crate::Client]
-/// which will read and parse the kubeconfig file
+/// Stored in `~/.kube/config` by default, but can be distributed across multiple paths in passed through `KUBECONFIG`.
+/// An analogue of the [config type from client-go](https://github.com/kubernetes/kubernetes/blob/cea1d4e20b4a7886d8ff65f34c6d4f95efcb4742/staging/src/k8s.io/client-go/tools/clientcmd/api/types.go#L28-L55).
+///
+/// This type (and its children) are exposed primarily for convenience.
+///
+/// [`Config`][crate::Config] is the __intended__ developer interface to help create a [`Client`][crate::Client],
+/// and this will handle the difference between in-cluster deployment and local development.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Kubeconfig {
+    /// General information to be use for cli interactions
+    pub preferences: Option<Preferences>,
+    /// Referencable names to cluster configs
+    pub clusters: Vec<NamedCluster>,
+    /// Referencable names to user configs
+    #[serde(rename = "users")]
+    pub auth_infos: Vec<NamedAuthInfo>,
+    /// Referencable names to context configs
+    pub contexts: Vec<NamedContext>,
+    /// The name of the context that you would like to use by default
+    #[serde(rename = "current-context")]
+    pub current_context: Option<String>,
+    /// Additional information for extenders so that reads and writes don't clobber unknown fields.
+    pub extensions: Option<Vec<NamedExtension>>,
+
+    // legacy fields TODO: remove
     pub kind: Option<String>,
     #[serde(rename = "apiVersion")]
     pub api_version: Option<String>,
-    pub preferences: Option<Preferences>,
-    pub clusters: Vec<NamedCluster>,
-    #[serde(rename = "users")]
-    pub auth_infos: Vec<NamedAuthInfo>,
-    pub contexts: Vec<NamedContext>,
-    #[serde(rename = "current-context")]
-    pub current_context: Option<String>,
-    pub extensions: Option<Vec<NamedExtension>>,
 }
 
 /// Preferences stores extensions for cli.
@@ -51,13 +59,17 @@ pub struct NamedCluster {
 /// Cluster stores information to connect Kubernetes cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Cluster {
+    /// The address of the kubernetes cluster (https://hostname:port).
     pub server: String,
     #[serde(rename = "insecure-skip-tls-verify")]
     pub insecure_skip_tls_verify: Option<bool>,
+    /// The path to a cert file for the certificate authority.
     #[serde(rename = "certificate-authority")]
     pub certificate_authority: Option<String>,
+    /// PEM-encoded certificate authority certificates. Overrides `certificate_authority`
     #[serde(rename = "certificate-authority-data")]
     pub certificate_authority_data: Option<String>,
+    /// Additional information for extenders so that reads and writes don't clobber unknown fields
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
@@ -72,31 +84,43 @@ pub struct NamedAuthInfo {
 /// AuthInfo stores information to tell cluster who you are.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct AuthInfo {
+    /// The username for basic authentication to the kubernetes cluster.
     pub username: Option<String>,
+    /// The password for basic authentication to the kubernetes cluster.
     pub password: Option<String>,
 
+    /// The bearer token for authentication to the kubernetes cluster.
     pub token: Option<String>,
+    /// Pointer to a file that contains a bearer token (as described above). If both `token` and token_file` are present, `token` takes precedence.
     #[serde(rename = "tokenFile")]
     pub token_file: Option<String>,
 
+    /// Path to a client cert file for TLS.
     #[serde(rename = "client-certificate")]
     pub client_certificate: Option<String>,
+    /// PEM-encoded data from a client cert file for TLS. Overrides `client_certificate`
     #[serde(rename = "client-certificate-data")]
     pub client_certificate_data: Option<String>,
 
+    /// Path to a client key file for TLS.
     #[serde(rename = "client-key")]
     pub client_key: Option<String>,
+    /// PEM-encoded data from a client key file for TLS. Overrides `client_key`
     #[serde(rename = "client-key-data")]
     pub client_key_data: Option<String>,
 
+    /// The username to act-as.
     #[serde(rename = "as")]
     pub impersonate: Option<String>,
+    /// The groups to imperonate.
     #[serde(rename = "as-groups")]
     pub impersonate_groups: Option<Vec<String>>,
 
+    /// Specifies a custom authentication plugin for the kubernetes cluster.
     #[serde(rename = "auth-provider")]
     pub auth_provider: Option<AuthProviderConfig>,
 
+    /// Specifies a custom exec-based authentication plugin for the kubernetes cluster.
     pub exec: Option<ExecConfig>,
 }
 
@@ -110,10 +134,18 @@ pub struct AuthProviderConfig {
 /// ExecConfig stores credential-plugin configuration.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecConfig {
+    /// Preferred input version of the ExecInfo.
+    ///
+    /// The returned ExecCredentials MUST use the same encoding version as the input.
     #[serde(rename = "apiVersion")]
     pub api_version: Option<String>,
-    pub args: Option<Vec<String>>,
+    /// Command to execute.
     pub command: String,
+    /// Arguments to pass to the command when executing it.
+    pub args: Option<Vec<String>>,
+    /// Env defines additional environment variables to expose to the process.
+    ///
+    /// TODO: These are unioned with the host's environment, as well as variables client-go uses to pass argument to the plugin.
     pub env: Option<Vec<HashMap<String, String>>>,
 }
 
@@ -127,9 +159,13 @@ pub struct NamedContext {
 /// Context stores tuple of cluster and user information.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Context {
+    /// Name of the cluster for this context
     pub cluster: String,
+    /// Name of the `AuthInfo` for this context
     pub user: String,
+    /// The default namespace to use on unspecified requests
     pub namespace: Option<String>,
+    /// Additional information for extenders so that reads and writes don't clobber unknown fields
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
@@ -139,39 +175,54 @@ const KUBECONFIG: &str = "KUBECONFIG";
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
     pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig> {
-        let f = File::open(&path).map_err(|source| ConfigError::ReadFile {
+        let data = fs::read_to_string(&path).map_err(|source| ConfigError::ReadFile {
             path: path.as_ref().into(),
             source,
         })?;
-        let mut config: Kubeconfig = serde_yaml::from_reader(f).map_err(ConfigError::ParseYaml)?;
+        // support multiple documents
+        let mut documents: Vec<Kubeconfig> = vec![];
+        for doc in serde_yaml::Deserializer::from_str(&data) {
+            let value = serde_yaml::Value::deserialize(doc).map_err(ConfigError::ParseYaml)?;
+            let kconf = serde_yaml::from_value(value).map_err(ConfigError::ParseYaml)?;
+            documents.push(kconf)
+        }
 
         // Remap all files we read to absolute paths.
-        if let Some(dir) = path.as_ref().parent() {
-            for named in config.clusters.iter_mut() {
-                if let Some(path) = &named.cluster.certificate_authority {
-                    if let Some(abs_path) = to_absolute(dir, path) {
-                        named.cluster.certificate_authority = Some(abs_path);
+        let mut merged_docs = None;
+        for mut config in documents {
+            if let Some(dir) = path.as_ref().parent() {
+                for named in config.clusters.iter_mut() {
+                    if let Some(path) = &named.cluster.certificate_authority {
+                        if let Some(abs_path) = to_absolute(dir, path) {
+                            named.cluster.certificate_authority = Some(abs_path);
+                        }
+                    }
+                }
+                for named in config.auth_infos.iter_mut() {
+                    if let Some(path) = &named.auth_info.client_certificate {
+                        if let Some(abs_path) = to_absolute(dir, path) {
+                            named.auth_info.client_certificate = Some(abs_path);
+                        }
+                    }
+                    if let Some(path) = &named.auth_info.client_key {
+                        if let Some(abs_path) = to_absolute(dir, path) {
+                            named.auth_info.client_key = Some(abs_path);
+                        }
+                    }
+                    if let Some(path) = &named.auth_info.token_file {
+                        if let Some(abs_path) = to_absolute(dir, path) {
+                            named.auth_info.token_file = Some(abs_path);
+                        }
                     }
                 }
             }
-            for named in config.auth_infos.iter_mut() {
-                if let Some(path) = &named.auth_info.client_certificate {
-                    if let Some(abs_path) = to_absolute(dir, path) {
-                        named.auth_info.client_certificate = Some(abs_path);
-                    }
-                }
-                if let Some(path) = &named.auth_info.client_key {
-                    if let Some(abs_path) = to_absolute(dir, path) {
-                        named.auth_info.client_key = Some(abs_path);
-                    }
-                }
-                if let Some(path) = &named.auth_info.token_file {
-                    if let Some(abs_path) = to_absolute(dir, path) {
-                        named.auth_info.token_file = Some(abs_path);
-                    }
-                }
+            if let Some(c) = merged_docs {
+                merged_docs = Some(Kubeconfig::merge(c, config)?);
+            } else {
+                merged_docs = Some(config);
             }
         }
+        let config = merged_docs.ok_or_else(|| ConfigError::EmptyKubeconfig(path.as_ref().to_path_buf()))?;
         Ok(config)
     }
 
@@ -408,5 +459,59 @@ users:
                 .get("provider"),
             Some(&Value::String("minikube.sigs.k8s.io".to_owned()))
         );
+    }
+
+    #[test]
+    fn kubeconfig_multi_document_merge() -> Result<()> {
+        let config_yaml = r#"---
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: aGVsbG8K
+    server: https://0.0.0.0:6443
+  name: k3d-promstack
+contexts:
+- context:
+    cluster: k3d-promstack
+    user: admin@k3d-promstack
+  name: k3d-promstack
+current-context: k3d-promstack
+kind: Config
+preferences: {}
+users:
+- name: admin@k3d-promstack
+  user:
+    client-certificate-data: aGVsbG8K
+    client-key-data: aGVsbG8K
+---
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: aGVsbG8K
+    server: https://0.0.0.0:6443
+  name: k3d-k3s-default
+contexts:
+- context:
+    cluster: k3d-k3s-default
+    user: admin@k3d-k3s-default
+  name: k3d-k3s-default
+current-context: k3d-k3s-default
+kind: Config
+preferences: {}
+users:
+- name: admin@k3d-k3s-default
+  user:
+    client-certificate-data: aGVsbG8K
+    client-key-data: aGVsbG8K
+"#;
+        let file = tempfile::NamedTempFile::new().expect("create config tempfile");
+        fs::write(file.path(), config_yaml).unwrap();
+        let cfg = Kubeconfig::read_from(file.path())?;
+
+        // Ensure we have data from both documents:
+        assert_eq!(cfg.clusters[0].name, "k3d-promstack");
+        assert_eq!(cfg.clusters[1].name, "k3d-k3s-default");
+
+        Ok(())
     }
 }
