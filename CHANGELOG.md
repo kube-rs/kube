@@ -1,10 +1,13 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.50.1...master
- * `kube` `Config` now allows arbirary extension objects - #425
- * `kube` `Config` now allows multiple yaml documents per kubeconfig - #440 via #441
- * `kube-derive` now more robust and is using `darling` - #435
+ * see https://github.com/clux/kube-rs/compare/0.51.0...master
+
+0.51.0 / 2021-02-28
+===================
+ * `kube` `Config` now allows arbirary extension objects - [#425](https://github.com/clux/kube-rs/issues/425)
+ * `kube` `Config` now allows multiple yaml documents per kubeconfig - [#440](https://github.com/clux/kube-rs/issues/440) via [#441](https://github.com/clux/kube-rs/issues/441)
+ * `kube-derive` now more robust and is using `darling` - [#435](https://github.com/clux/kube-rs/issues/435)
  * docs improvements to patch + runtime
 
 0.50.1 / 2021-02-17
