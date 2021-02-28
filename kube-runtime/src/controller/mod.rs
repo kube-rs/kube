@@ -57,7 +57,7 @@ pub struct ReconcilerAction {
     pub requeue_after: Option<Duration>,
 }
 
-/// Helper for building custom trigger filters, see [`trigger_self`] and [`trigger_owners`] for some examples.
+/// Helper for building custom trigger filters, see the implementations of [`trigger_self`] and [`trigger_owners`] for some examples.
 pub fn trigger_with<T, K, I, S>(
     stream: S,
     mapper: impl Fn(T) -> I,
