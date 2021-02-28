@@ -1,3 +1,5 @@
+//! Caches objects in memory
+
 mod object_ref;
 pub mod store;
 
