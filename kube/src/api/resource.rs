@@ -140,7 +140,7 @@ impl Resource {
         if let Some(labels) = &lp.label_selector {
             qp.append_pair("labelSelector", &labels);
         }
-        if lp.allow_bookmarks {
+        if lp.bookmarks {
             qp.append_pair("allowWatchBookmarks", "true");
         }
 
@@ -474,7 +474,7 @@ mod test {
         let req = r.watch(&gp, "0").unwrap();
         assert_eq!(
             req.uri(),
-            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290"
+            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290&allowWatchBookmarks=true"
         );
     }
     #[test]

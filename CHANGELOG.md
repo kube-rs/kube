@@ -2,6 +2,10 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.51.0...master
+ * `kube`: BREAKING: ListParams bookmarks default enabled-  #226 via
+   - renames `ListParams::allow_bookmarks` to `ListParams::bookmarks`
+   - `ListParams::default()` sets `bookmark` to true to avoid bad bad defaults
+   - `ListParams::allow_bookmarks` replaced by `ListParams::disable_bookmarks`
 
 0.51.0 / 2021-02-28
 ===================

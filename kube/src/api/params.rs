@@ -3,7 +3,7 @@ use crate::{Error, Result};
 use serde::Serialize;
 
 /// Common query parameters used in watch/list/delete calls on collections
-#[derive(Default, Clone)]
+#[derive(Clone)]
 #[allow(missing_docs)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
@@ -32,7 +32,7 @@ pub struct ListParams {
     /// If this is not a watch, this field is ignored.
     /// If the feature gate WatchBookmarks is not enabled in apiserver,
     /// this field is ignored.
-    pub allow_bookmarks: bool,
+    pub bookmarks: bool,
 
     /// Limit the number of results.
     ///
@@ -45,6 +45,21 @@ pub struct ListParams {
     ///
     /// After listing results with a limit, a continue token can be used to fetch another page of results.
     pub continue_token: Option<String>,
+}
+
+impl Default for ListParams {
+    fn default() -> Self {
+        Self {
+            // bookmarks stable since 1.17, and backwards compatible
+            bookmarks: true,
+
+            label_selector: None,
+            field_selector: None,
+            timeout: None,
+            limit: None,
+            continue_token: None,
+        }
+    }
 }
 
 impl ListParams {
@@ -99,9 +114,12 @@ impl ListParams {
         self
     }
 
-    /// Enables watch bookmarks from the api server if supported
-    pub fn allow_bookmarks(mut self) -> Self {
-        self.allow_bookmarks = true;
+    /// Disables watch bookmarks to simplify watch handling
+    ///
+    /// This is not recommended to use with production watchers as it can cause desyncs.
+    /// See [#219](https://github.com/clux/kube-rs/issues/219) for details.
+    pub fn disable_bookmarks(mut self) -> Self {
+        self.bookmarks = false;
         self
     }
 
