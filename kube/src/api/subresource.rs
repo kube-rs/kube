@@ -194,8 +194,10 @@ fn log_path() {
     use crate::api::Resource;
     use k8s_openapi::api::core::v1 as corev1;
     let r = Resource::namespaced::<corev1::Pod>("ns");
-    let mut lp = LogParams::default();
-    lp.container = Some("blah".into());
+    let lp = LogParams {
+        container: Some("blah".into()),
+        ..LogParams::default()
+    };
     let req = r.logs("foo", &lp).unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/log?&container=blah");
 }
@@ -469,8 +471,10 @@ fn attach_path() {
     use crate::api::Resource;
     use k8s_openapi::api::core::v1 as corev1;
     let r = Resource::namespaced::<corev1::Pod>("ns");
-    let mut ap = AttachParams::default();
-    ap.container = Some("blah".into());
+    let ap = AttachParams {
+        container: Some("blah".into()),
+        ..AttachParams::default()
+    };
     let req = r.attach("foo", &ap).unwrap();
     assert_eq!(
         req.uri(),
@@ -534,8 +538,10 @@ fn exec_path() {
     use crate::api::Resource;
     use k8s_openapi::api::core::v1 as corev1;
     let r = Resource::namespaced::<corev1::Pod>("ns");
-    let mut ap = AttachParams::default();
-    ap.container = Some("blah".into());
+    let ap = AttachParams {
+        container: Some("blah".into()),
+        ..AttachParams::default()
+    };
     let req = r.exec("foo", vec!["echo", "foo", "bar"], &ap).unwrap();
     assert_eq!(
         req.uri(),
