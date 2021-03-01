@@ -33,6 +33,10 @@ use tower::{Service as _, ServiceExt};
 
 use std::convert::{TryFrom, TryInto};
 
+// Binary subprotocol v4. See `Client::connect`.
+#[cfg(feature = "ws")]
+const WS_PROTOCOL: &str = "v4.channel.k8s.io";
+
 /// Client for connecting with a Kubernetes cluster.
 ///
 /// The best way to instantiate the client is either by
@@ -109,8 +113,7 @@ impl Client {
             http::header::SEC_WEBSOCKET_VERSION,
             HeaderValue::from_static("13"),
         );
-        // TODO generate random key and verify like tungstenite
-        let key = "kube";
+        let key = sec_websocket_key();
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_KEY,
             key.parse().expect("valid header value"),
@@ -122,14 +125,11 @@ impl Client {
         // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_PROTOCOL,
-            HeaderValue::from_static("v4.channel.k8s.io"),
+            HeaderValue::from_static(WS_PROTOCOL),
         );
 
         let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
-        if res.status() != StatusCode::SWITCHING_PROTOCOLS {
-            return Err(Error::ProtocolSwitch(res.status()));
-        }
-
+        verify_upgrade_response(&res, &key)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => {
                 Ok(WebSocketStream::from_raw_socket(upgraded, ws::protocol::Role::Client, None).await)
@@ -423,4 +423,71 @@ mod test {
         let s2: Status = serde_json::from_str::<Status>(statusnoname).unwrap();
         assert_eq!(s2.details.unwrap().name, ""); // optional probably better..
     }
+}
+
+#[cfg(feature = "ws")]
+// Verify upgrade response according to RFC6455.
+// Based on `tungstenite` and added subprotocol verification.
+fn verify_upgrade_response(res: &Response<Body>, key: &str) -> Result<()> {
+    if res.status() != StatusCode::SWITCHING_PROTOCOLS {
+        return Err(Error::ProtocolSwitch(res.status()));
+    }
+
+    let headers = res.headers();
+    if !headers
+        .get(http::header::UPGRADE)
+        .and_then(|h| h.to_str().ok())
+        .map(|h| h.eq_ignore_ascii_case("websocket"))
+        .unwrap_or(false)
+    {
+        return Err(Error::MissingUpgradeWebSocketHeader);
+    }
+
+    if !headers
+        .get(http::header::CONNECTION)
+        .and_then(|h| h.to_str().ok())
+        .map(|h| h.eq_ignore_ascii_case("Upgrade"))
+        .unwrap_or(false)
+    {
+        return Err(Error::MissingConnectionUpgradeHeader);
+    }
+
+    let accept_key = derive_accept_key(key.as_ref());
+    if !headers
+        .get(http::header::SEC_WEBSOCKET_ACCEPT)
+        .map(|h| h == &accept_key)
+        .unwrap_or(false)
+    {
+        return Err(Error::SecWebSocketAcceptKeyMismatch);
+    }
+
+    // Make sure that the server returned the correct subprotocol.
+    if !headers
+        .get(http::header::SEC_WEBSOCKET_PROTOCOL)
+        .map(|h| h == WS_PROTOCOL)
+        .unwrap_or(false)
+    {
+        return Err(Error::SecWebSocketProtocolMismatch);
+    }
+
+    Ok(())
+}
+
+/// Generate a random key for the `Sec-WebSocket-Key` header.
+/// This must be nonce consisting of a randomly selected 16-byte value in base64.
+#[cfg(feature = "ws")]
+fn sec_websocket_key() -> String {
+    let r: [u8; 16] = rand::random();
+    base64::encode(&r)
+}
+
+// TODO Replace this with tungstenite's `derive_accept_key` when 0.13.0 is released.
+#[cfg(feature = "ws")]
+fn derive_accept_key(request_key: &[u8]) -> String {
+    use sha1::{Digest, Sha1};
+    const WS_GUID: &[u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    let mut sha1 = Sha1::default();
+    sha1.update(request_key);
+    sha1.update(WS_GUID);
+    base64::encode(&sha1.finalize())
 }

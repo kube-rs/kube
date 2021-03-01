@@ -95,6 +95,30 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
     #[error("Failed to switch protocol. Status code: {0}")]
     ProtocolSwitch(http::status::StatusCode),
+
+    /// `Upgrade` header was not set to `websocket` (case insensitive)
+    #[cfg(feature = "ws")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+    #[error("Upgrade header was not set to websocket")]
+    MissingUpgradeWebSocketHeader,
+
+    /// `Connection` header was not set to `Upgrade` (case insensitive)
+    #[cfg(feature = "ws")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+    #[error("Connection header was not set to Upgrade")]
+    MissingConnectionUpgradeHeader,
+
+    /// `Sec-WebSocket-Accept` key mismatched.
+    #[cfg(feature = "ws")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+    #[error("Sec-WebSocket-Accept key mismatched")]
+    SecWebSocketAcceptKeyMismatch,
+
+    /// `Sec-WebSocket-Protocol` mismatched.
+    #[cfg(feature = "ws")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+    #[error("Sec-WebSocket-Protocol mismatched")]
+    SecWebSocketProtocolMismatch,
 }
 
 #[derive(Error, Debug)]
