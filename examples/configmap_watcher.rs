@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
     let cms: Api<ConfigMap> = Api::namespaced(client, &namespace);
-    let lp = ListParams::default().allow_bookmarks();
+    let lp = ListParams::default();
 
     let mut w = watcher(cms, lp).boxed();
     while let Some(event) = w.try_next().await? {
