@@ -44,7 +44,7 @@ fn object_to_owner_reference<K: Meta>(meta: ObjectMeta) -> Result<OwnerReference
             name: ".metadata.name",
         })?,
         uid: meta.uid.context(MissingObjectKey {
-            name: ".metadata.backtrace",
+            name: ".metadata.uid",
         })?,
         ..OwnerReference::default()
     })
