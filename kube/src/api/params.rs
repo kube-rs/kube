@@ -342,6 +342,163 @@ pub struct DeleteParams {
     pub preconditions: Option<Preconditions>,
 }
 
+/// Parameters for attaching to a container in a Pod.
+///
+/// - One of `stdin`, `stdout`, or `stderr` must be `true`.
+/// - `stderr` and `tty` cannot both be `true` because multiplexing is not supported with TTY.
+pub struct AttachParams {
+    /// The name of the container to attach.
+    /// Defaults to the only container if there is only one container in the pod.
+    pub container: Option<String>,
+    /// Attach to the container's standard input. Defaults to `false`.
+    ///
+    /// Call [`AttachedProcess::stdin`] to obtain a writer.
+    pub stdin: bool,
+    /// Attach to the container's standard output. Defaults to `true`.
+    ///
+    /// Call [`AttachedProcess::stdout`] to obtain a reader.
+    pub stdout: bool,
+    /// Attach to the container's standard error. Defaults to `true`.
+    ///
+    /// Call [`AttachedProcess::stderr`] to obtain a reader.
+    pub stderr: bool,
+    /// Allocate TTY. Defaults to `false`.
+    ///
+    /// NOTE: Terminal resizing is not implemented yet.
+    pub tty: bool,
+
+    /// The maximum amount of bytes that can be written to the internal `stdin`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stdin_buf_size: Option<usize>,
+    /// The maximum amount of bytes that can be written to the internal `stdout`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stdout_buf_size: Option<usize>,
+    /// The maximum amount of bytes that can be written to the internal `stderr`
+    /// pipe before the write returns `Poll::Pending`.
+    /// Defaults to 1024.
+    ///
+    /// This is not sent to the server.
+    pub max_stderr_buf_size: Option<usize>,
+}
+
+impl Default for AttachParams {
+    // Default matching the server's defaults.
+    fn default() -> Self {
+        Self {
+            container: None,
+            stdin: false,
+            stdout: true,
+            stderr: true,
+            tty: false,
+            max_stdin_buf_size: None,
+            max_stdout_buf_size: None,
+            max_stderr_buf_size: None,
+        }
+    }
+}
+
+impl AttachParams {
+    /// Default parameters for an tty exec with stdin and stdout
+    pub fn interactive_tty() -> Self {
+        Self {
+            stdin: true,
+            stdout: true,
+            stderr: false,
+            tty: true,
+            ..Default::default()
+        }
+    }
+
+    /// Specify the container to execute in.
+    pub fn container<T: Into<String>>(mut self, container: T) -> Self {
+        self.container = Some(container.into());
+        self
+    }
+
+    /// Set `stdin` field.
+    pub fn stdin(mut self, enable: bool) -> Self {
+        self.stdin = enable;
+        self
+    }
+
+    /// Set `stdout` field.
+    pub fn stdout(mut self, enable: bool) -> Self {
+        self.stdout = enable;
+        self
+    }
+
+    /// Set `stderr` field.
+    pub fn stderr(mut self, enable: bool) -> Self {
+        self.stderr = enable;
+        self
+    }
+
+    /// Set `tty` field.
+    pub fn tty(mut self, enable: bool) -> Self {
+        self.tty = enable;
+        self
+    }
+
+    /// Set `max_stdin_buf_size` field.
+    pub fn max_stdin_buf_size(mut self, size: usize) -> Self {
+        self.max_stdin_buf_size = Some(size);
+        self
+    }
+
+    /// Set `max_stdout_buf_size` field.
+    pub fn max_stdout_buf_size(mut self, size: usize) -> Self {
+        self.max_stdout_buf_size = Some(size);
+        self
+    }
+
+    /// Set `max_stderr_buf_size` field.
+    pub fn max_stderr_buf_size(mut self, size: usize) -> Self {
+        self.max_stderr_buf_size = Some(size);
+        self
+    }
+
+    pub(crate) fn validate(&self) -> Result<()> {
+        if !self.stdin && !self.stdout && !self.stderr {
+            return Err(Error::RequestValidation(
+                "AttachParams: one of stdin, stdout, or stderr must be true".into(),
+            ));
+        }
+
+        if self.stderr && self.tty {
+            // Multiplexing is not supported with TTY
+            return Err(Error::RequestValidation(
+                "AttachParams: tty and stderr cannot both be true".into(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn append_to_url_serializer(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
+        if self.stdin {
+            qp.append_pair("stdin", "true");
+        }
+        if self.stdout {
+            qp.append_pair("stdout", "true");
+        }
+        if self.stderr {
+            qp.append_pair("stderr", "true");
+        }
+        if self.tty {
+            qp.append_pair("tty", "true");
+        }
+        if let Some(container) = &self.container {
+            qp.append_pair("container", &container);
+        }
+    }
+}
+
 // dryRun serialization differ when used as body parameters and query strings:
 // query strings are either true/false
 // body params allow only: missing field, or ["All"]

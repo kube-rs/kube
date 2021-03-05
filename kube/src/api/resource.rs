@@ -1,4 +1,4 @@
-use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
+use super::params::{AttachParams, DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use crate::{api::DynamicResource, Error, Result};
 use inflector::string::pluralize::to_plural;
 
@@ -332,6 +332,42 @@ impl Resource {
     }
 }
 
+impl Resource {
+    /// Attach to a pod
+    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<Vec<u8>>> {
+        ap.validate()?;
+
+        let base_url = self.make_url() + "/" + name + "/" + "attach?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        ap.append_to_url_serializer(&mut qp);
+
+        let req = http::Request::get(qp.finish());
+        req.body(vec![]).map_err(Error::HttpError)
+    }
+}
+
+impl Resource {
+    /// Execute command in a pod
+    pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<Vec<u8>>>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        ap.validate()?;
+
+        let base_url = self.make_url() + "/" + name + "/" + "exec?";
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        ap.append_to_url_serializer(&mut qp);
+
+        for c in command.into_iter() {
+            qp.append_pair("command", &c.into());
+        }
+
+        let req = http::Request::get(qp.finish());
+        req.body(vec![]).map_err(Error::HttpError)
+    }
+}
+
 /// Extensive tests for Resource::<k8s_openapi::Resource impls>
 ///
 /// Cheap sanity check to ensure type maps work as expected
@@ -457,7 +493,7 @@ mod test {
 
     /// -----------------------------------------------------------------
     /// Tests that the misc mappings are also sensible
-    use crate::api::{DeleteParams, ListParams, Patch, PatchParams};
+    use crate::api::{AttachParams, DeleteParams, ListParams, Patch, PatchParams};
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiextsv1beta1;
 
     #[test]
@@ -589,6 +625,38 @@ mod test {
         let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
         assert_eq!(req.method(), "PUT");
+    }
+
+    #[test]
+    fn attach_path() {
+        use crate::api::Resource;
+        use k8s_openapi::api::core::v1 as corev1;
+        let r = Resource::namespaced::<corev1::Pod>("ns");
+        let ap = AttachParams {
+            container: Some("blah".into()),
+            ..AttachParams::default()
+        };
+        let req = r.attach("foo", &ap).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods/foo/attach?&stdout=true&stderr=true&container=blah"
+        );
+    }
+
+    #[test]
+    fn exec_path() {
+        use crate::api::Resource;
+        use k8s_openapi::api::core::v1 as corev1;
+        let r = Resource::namespaced::<corev1::Pod>("ns");
+        let ap = AttachParams {
+            container: Some("blah".into()),
+            ..AttachParams::default()
+        };
+        let req = r.exec("foo", vec!["echo", "foo", "bar"], &ap).unwrap();
+        assert_eq!(
+        req.uri(),
+        "/api/v1/namespaces/ns/pods/foo/exec?&stdout=true&stderr=true&container=blah&command=echo&command=foo&command=bar"
+    );
     }
 
     #[test]

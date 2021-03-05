@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct NotUsed {}
 
 pub(crate) mod params;
-pub use params::{DeleteParams, ListParams, Patch, PatchParams, PostParams, PropagationPolicy};
+pub use params::{AttachParams, DeleteParams, ListParams, Patch, PatchParams, PostParams, PropagationPolicy};
 mod resource;
 pub use resource::Resource;
 
@@ -24,8 +24,7 @@ pub use dynamic::DynamicResource;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
 
 mod subresource;
-#[cfg(feature = "ws")]
-pub use subresource::{AttachParams, Attachable, Executable};
+#[cfg(feature = "ws")] pub use subresource::{Attachable, Executable};
 pub use subresource::{EvictParams, Evictable, LogParams, Loggable, ScaleSpec, ScaleStatus};
 
 pub(crate) mod object;
