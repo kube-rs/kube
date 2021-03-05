@@ -1,7 +1,7 @@
 //! Error handling in [`kube`][crate]
 
 use http::header::InvalidHeaderValue;
-use serde::{Deserialize, Serialize};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -14,8 +14,8 @@ pub enum Error {
     /// It's also used in `WatchEvent` from watch calls.
     ///
     /// It's quite common to get a `410 Gone` when the `resourceVersion` is too old.
-    #[error("ApiError: {0} ({0:?})")]
-    Api(#[source] ErrorResponse),
+    #[error("ApiError: {0:?}")]
+    Api(Status),
 
     /// ConnectionError for when TcpStream fails to connect.
     #[error("ConnectionError: {0}")]
@@ -260,20 +260,4 @@ impl From<OAuthError> for Error {
     fn from(e: OAuthError) -> Self {
         ConfigError::OAuth(e).into()
     }
-}
-
-/// An error response from the API.
-#[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
-#[error("{message}: {reason}")]
-pub struct ErrorResponse {
-    /// The status
-    pub status: String,
-    /// A message about the error
-    #[serde(default)]
-    pub message: String,
-    /// The reason for the error
-    #[serde(default)]
-    pub reason: String,
-    /// The error code
-    pub code: u16,
 }

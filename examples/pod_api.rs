@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
@@ -41,8 +42,8 @@ async fn main() -> anyhow::Result<()> {
             // wait for it..
             std::thread::sleep(std::time::Duration::from_millis(5_000));
         }
-        Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-        Err(e) => return Err(e.into()),                        // any other case is probably bad
+        Err(kube::Error::Api(ae)) => assert_eq!(ae.code, Some(409)), // if you skipped delete, for instance
+        Err(e) => return Err(e.into()),                              // any other case is probably bad
     }
 
     // Watch it phase for a few seconds
@@ -59,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
                 info!("Modified: {} with phase: {}", Meta::name(&o), phase);
             }
             WatchEvent::Deleted(o) => info!("Deleted {}", Meta::name(&o)),
-            WatchEvent::Error(e) => error!("Error {}", e),
+            WatchEvent::Error(e) => error!("Error {:?}", e),
             _ => {}
         }
     }

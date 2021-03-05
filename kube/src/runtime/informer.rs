@@ -142,7 +142,7 @@ where
                     }
                     Ok(WatchEvent::Error(e)) => {
                         // 410 Gone => we need to restart from latest next call
-                        if e.code == 410 {
+                        if e.code == Some(410) {
                             warn!("Stream desynced: {:?}", e);
                             *needs_resync.lock().await = true;
                         }

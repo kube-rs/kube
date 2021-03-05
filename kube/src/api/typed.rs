@@ -1,11 +1,12 @@
 use either::Either;
 use futures::Stream;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use serde::{de::DeserializeOwned, Serialize};
 use std::iter;
 
 use crate::{
     api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Resource, WatchEvent},
-    client::{Client, Status},
+    client::Client,
     Result,
 };
 

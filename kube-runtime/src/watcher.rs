@@ -2,6 +2,7 @@
 
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use kube::{
     api::{ListParams, Meta, WatchEvent},
     Api,
@@ -23,11 +24,8 @@ pub enum Error {
         source: kube::Error,
         backtrace: Backtrace,
     },
-    #[snafu(display("error returned by apiserver during watch: {}", source))]
-    WatchError {
-        source: kube::error::ErrorResponse,
-        backtrace: Backtrace,
-    },
+    #[snafu(display("error returned by apiserver during watch: {:?}", status))]
+    WatchError { status: Status, backtrace: Backtrace },
     #[snafu(display("watch stream failed: {}", source))]
     WatchFailed {
         source: kube::Error,
@@ -115,19 +113,26 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
         State::Empty => match api.list(&list_params).await {
-            Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                resource_version: list.metadata.resource_version.unwrap(),
-            }),
+            Ok(list) => (
+                Some(Ok(Event::Restarted(list.items))),
+                State::InitListed {
+                    resource_version: list.metadata.resource_version.unwrap(),
+                },
+            ),
             Err(err) => (Some(Err(err).context(InitialListFailed)), State::Empty),
         },
         State::InitListed { resource_version } => match api.watch(&list_params, &resource_version).await {
-            Ok(stream) => (None, State::Watching {
-                resource_version,
-                stream: stream.boxed(),
-            }),
-            Err(err) => (Some(Err(err).context(WatchStartFailed)), State::InitListed {
-                resource_version,
-            }),
+            Ok(stream) => (
+                None,
+                State::Watching {
+                    resource_version,
+                    stream: stream.boxed(),
+                },
+            ),
+            Err(err) => (
+                Some(Err(err).context(WatchStartFailed)),
+                State::InitListed { resource_version },
+            ),
         },
         State::Watching {
             resource_version,
@@ -135,25 +140,34 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
         } => match stream.next().await {
             Some(Ok(WatchEvent::Added(obj))) | Some(Ok(WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_ver().unwrap();
-                (Some(Ok(Event::Applied(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Ok(Event::Applied(obj))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
                 let resource_version = obj.resource_ver().unwrap();
-                (Some(Ok(Event::Deleted(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Ok(Event::Deleted(obj))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
-            Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
-                resource_version: bm.metadata.resource_version,
-                stream,
-            }),
+            Some(Ok(WatchEvent::Bookmark(bm))) => (
+                None,
+                State::Watching {
+                    resource_version: bm.metadata.resource_version,
+                    stream,
+                },
+            ),
             Some(Ok(WatchEvent::Error(err))) => {
                 // HTTP GONE, means we have desynced and need to start over and re-list :(
-                let new_state = if err.code == 410 {
+                let new_state = if err.code == Some(410) {
                     State::Empty
                 } else {
                     State::Watching {
@@ -161,12 +175,15 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
                         stream,
                     }
                 };
-                (Some(Err(err).context(WatchError)), new_state)
+                (Some(WatchError { status: err }.fail()), new_state)
             }
-            Some(Err(err)) => (Some(Err(err).context(WatchFailed)), State::Watching {
-                resource_version,
-                stream,
-            }),
+            Some(Err(err)) => (
+                Some(Err(err).context(WatchFailed)),
+                State::Watching {
+                    resource_version,
+                    stream,
+                },
+            ),
             None => (None, State::InitListed { resource_version }),
         },
     }

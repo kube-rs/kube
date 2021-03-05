@@ -125,24 +125,27 @@ async fn main() -> Result<()> {
     // Nullables defaults to `None` and only sent if it's not configured to skip.
     let bar = Foo::new("bar", FooSpec { ..FooSpec::default() });
     let bar = foos.create(&PostParams::default(), &bar).await?;
-    assert_eq!(bar.spec, FooSpec {
-        // Nonnullable without default is required.
-        non_nullable: String::default(),
-        // Defaulting didn't happen because an empty string was sent.
-        non_nullable_with_default: String::default(),
-        // `nullable_skipped` field does not exist in the object (see below).
-        nullable_skipped: None,
-        // `nullable` field exists in the object (see below).
-        nullable: None,
-        // Defaulting happened because serialization was skipped.
-        nullable_skipped_with_default: default_nullable(),
-        // Defaulting did not happen because `null` was sent.
-        // Deserialization does not apply the default either.
-        nullable_with_default: None,
-        // Empty listables to be patched in later
-        default_listable: Default::default(),
-        set_listable: Default::default(),
-    });
+    assert_eq!(
+        bar.spec,
+        FooSpec {
+            // Nonnullable without default is required.
+            non_nullable: String::default(),
+            // Defaulting didn't happen because an empty string was sent.
+            non_nullable_with_default: String::default(),
+            // `nullable_skipped` field does not exist in the object (see below).
+            nullable_skipped: None,
+            // `nullable` field exists in the object (see below).
+            nullable: None,
+            // Defaulting happened because serialization was skipped.
+            nullable_skipped_with_default: default_nullable(),
+            // Defaulting did not happen because `null` was sent.
+            // Deserialization does not apply the default either.
+            nullable_with_default: None,
+            // Empty listables to be patched in later
+            default_listable: Default::default(),
+            set_listable: Default::default(),
+        }
+    );
 
     // Set up dynamic resource to test using raw values.
     let resource = Resource::dynamic("Foo")
@@ -203,12 +206,12 @@ async fn main() -> Result<()> {
     assert!(res.is_err());
     match res.err() {
         Some(kube::Error::Api(err)) => {
-            assert_eq!(err.code, 422);
-            assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert_eq!(err.code, Some(422));
+            assert_eq!(err.reason.as_deref(), Some("Invalid"));
+            assert_eq!(err.status.as_deref(), Some("Failure"));
             assert_eq!(
-                err.message,
-                "Foo.clux.dev \"qux\" is invalid: spec.non_nullable: Required value"
+                err.message.as_deref(),
+                Some("Foo.clux.dev \"qux\" is invalid: spec.non_nullable: Required value")
             );
         }
         _ => assert!(false),
