@@ -310,7 +310,7 @@ where
     ///             WatchEvent::Modified(s) => println!("Modified: {}", Meta::name(&s)),
     ///             WatchEvent::Deleted(s) => println!("Deleted {}", Meta::name(&s)),
     ///             WatchEvent::Bookmark(s) => {},
-    ///             WatchEvent::Error(s) => println!("{}", s),
+    ///             WatchEvent::Error(s) => println!("{:?}", s),
     ///         }
     ///     }
     ///     Ok(())

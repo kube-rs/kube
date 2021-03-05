@@ -61,7 +61,7 @@
 //!                 println!("Modified: {} with phase: {}", Meta::name(&o), phase);
 //!             }
 //!             WatchEvent::Deleted(o) => println!("Deleted {}", Meta::name(&o)),
-//!             WatchEvent::Error(e) => println!("Error {}", e),
+//!             WatchEvent::Error(e) => println!("Error {:?}", e),
 //!             _ => {}
 //!         }
 //!     }
