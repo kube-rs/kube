@@ -1,6 +1,4 @@
-use crate::{
-    api::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta},
-};
+use crate::api::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

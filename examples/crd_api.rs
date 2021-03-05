@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
             debug!("Created CRD: {:?}", o.spec);
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, Some(409)), // if you skipped delete, for instance
-        Err(e) => return Err(e.into()),                        // any other case is probably bad
+        Err(e) => return Err(e.into()),                              // any other case is probably bad
     }
     // Wait for the api to catch up
     sleep(Duration::from_secs(1)).await;
