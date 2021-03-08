@@ -20,7 +20,7 @@ use futures::{
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration, fmt::Debug};
 use stream::BoxStream;
 use tokio::{runtime::Handle, time::Instant};
 
@@ -277,7 +277,7 @@ where
 /// ```
 pub struct Controller<K>
 where
-    K: Clone + Meta + 'static,
+    K: Clone + Meta + Debug + 'static,
 {
     // NB: Need to Unpin for stream::select_all
     // TODO: get an arbitrary std::error::Error in here?
@@ -287,7 +287,7 @@ where
 
 impl<K> Controller<K>
 where
-    K: Clone + Meta + DeserializeOwned + Send + Sync + 'static,
+    K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
 {
     /// Create a Controller on a type `K`
     ///
@@ -317,7 +317,7 @@ where
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
     ///
     /// [`OwnerReference`]: https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.OwnerReference.html
-    pub fn owns<Child: Clone + Meta + DeserializeOwned + Send + 'static>(
+    pub fn owns<Child: Clone + Meta + DeserializeOwned + Debug + Send + 'static>(
         mut self,
         api: Api<Child>,
         lp: ListParams,
@@ -331,7 +331,7 @@ where
     ///
     /// This mapper should return something like `Option<ObjectRef<K>>`
     pub fn watches<
-        Other: Clone + Meta + DeserializeOwned + Send + 'static,
+        Other: Clone + Meta + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
     >(
         mut self,
