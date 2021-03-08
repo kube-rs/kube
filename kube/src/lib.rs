@@ -88,10 +88,6 @@ assert_cfg!(
 pub mod api;
 pub mod client;
 pub mod config;
-#[deprecated(note = "Replaced by the kube-runtime crate", since = "0.38.0")]
-// Rust doesn't allow items within a deprecated module to interact with each other..
-#[allow(deprecated)]
-pub mod runtime;
 pub mod service;
 
 pub mod error;
