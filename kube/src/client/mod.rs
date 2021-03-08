@@ -452,7 +452,7 @@ fn verify_upgrade_response(res: &Response<Body>, key: &str) -> Result<()> {
         return Err(Error::MissingConnectionUpgradeHeader);
     }
 
-    let accept_key = derive_accept_key(key.as_ref());
+    let accept_key = ws::handshake::derive_accept_key(key.as_ref());
     if !headers
         .get(http::header::SEC_WEBSOCKET_ACCEPT)
         .map(|h| h == &accept_key)
@@ -479,15 +479,4 @@ fn verify_upgrade_response(res: &Response<Body>, key: &str) -> Result<()> {
 fn sec_websocket_key() -> String {
     let r: [u8; 16] = rand::random();
     base64::encode(&r)
-}
-
-// TODO Replace this with tungstenite's `derive_accept_key` when 0.13.0 is released.
-#[cfg(feature = "ws")]
-fn derive_accept_key(request_key: &[u8]) -> String {
-    use sha1::{Digest, Sha1};
-    const WS_GUID: &[u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    let mut sha1 = Sha1::default();
-    sha1.update(request_key);
-    sha1.update(WS_GUID);
-    base64::encode(&sha1.finalize())
 }

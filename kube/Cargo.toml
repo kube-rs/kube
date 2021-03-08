@@ -21,7 +21,7 @@ native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
 rustls-tls = ["hyper-rustls", "tokio-rustls"]
 derive = ["kube-derive"]
 jsonpatch = ["json-patch"]
-ws = ["tokio-tungstenite", "rand", "sha-1"]
+ws = ["tokio-tungstenite", "rand"]
 oauth = ["tame-oauth"]
 gzip = ["async-compression"]
 
@@ -58,16 +58,13 @@ json-patch = { version = "0.2.6", optional = true }
 hyper = { version = "0.14.2", features = ["client", "http1", "stream", "tcp"] }
 hyper-tls = { version = "0.5.0", optional = true }
 hyper-rustls = { version = "0.22.1", optional = true }
-tokio-tungstenite = { version = "0.13.0", optional = true }
+tokio-tungstenite = { version = "0.14.0", optional = true }
 tower = { version = "0.4.6", features = ["buffer", "util"] }
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"], optional = true }
 hyper-timeout = "0.4.1"
 tame-oauth = { version = "0.4.7", features = ["gcp"], optional = true }
 pin-project = "1.0.4"
 rand = { version = "0.8.3", optional = true }
-# TODO Remove this and use `tungstenite`'s `derive_accept_key` when 0.13.0 is released.
-# https://github.com/snapview/tungstenite-rs/pull/174
-sha-1 = { version = "0.9", optional = true }
 
 [dependencies.k8s-openapi]
 version = "0.11.0"
