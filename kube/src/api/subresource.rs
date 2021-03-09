@@ -1,6 +1,8 @@
 use bytes::Bytes;
 use futures::Stream;
+use tracing::instrument;
 use serde::de::DeserializeOwned;
+use std::fmt::Debug;
 
 use crate::{
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, Resource},
@@ -53,6 +55,7 @@ where
     /// Get the named resource with a status subresource
     ///
     /// This actually returns the whole K, with metadata, and spec.
+    #[instrument(skip(self))]
     pub async fn get_status(&self, name: &str) -> Result<K> {
         let req = self.resource.get_status(name)?;
         self.client.request::<K>(req).await
@@ -81,7 +84,8 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn patch_status<P: serde::Serialize>(
+    #[instrument(skip(self))]
+    pub async fn patch_status<P: serde::Serialize + Debug>(
         &self,
         name: &str,
         pp: &PatchParams,
@@ -110,6 +114,7 @@ where
     ///     Ok(())
     /// }
     /// ```
+    #[instrument(skip(self))]
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.resource.replace_status(name, &pp, data)?;
         self.client.request::<K>(req).await
