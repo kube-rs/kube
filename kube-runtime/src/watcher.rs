@@ -9,8 +9,7 @@ use kube::{
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
 use snafu::{Backtrace, ResultExt, Snafu};
-use std::clone::Clone;
-use std::fmt::Debug;
+use std::{clone::Clone, fmt::Debug};
 
 #[derive(Snafu, Debug)]
 pub enum Error {

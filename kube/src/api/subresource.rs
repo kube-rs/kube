@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use futures::Stream;
-use tracing::instrument;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
+use tracing::instrument;
 
 use crate::{
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, Resource},

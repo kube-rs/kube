@@ -1,9 +1,8 @@
 use either::Either;
 use futures::Stream;
-use tracing::instrument;
 use serde::{de::DeserializeOwned, Serialize};
-use std::iter;
-use std::fmt::Debug;
+use std::{fmt::Debug, iter};
+use tracing::instrument;
 
 use crate::{
     api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Resource, WatchEvent},
@@ -230,7 +229,12 @@ where
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
     #[instrument(skip(self))]
-    pub async fn patch<P: Serialize + Debug>(&self, name: &str, pp: &PatchParams, patch: &Patch<P>) -> Result<K> {
+    pub async fn patch<P: Serialize + Debug>(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<K> {
         let req = self.resource.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }

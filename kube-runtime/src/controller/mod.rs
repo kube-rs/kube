@@ -20,7 +20,7 @@ use futures::{
 use kube::api::{Api, ListParams, Meta};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
-use std::{sync::Arc, time::Duration, fmt::Debug};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 use stream::BoxStream;
 use tokio::{runtime::Handle, time::Instant};
 
