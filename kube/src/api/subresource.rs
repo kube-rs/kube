@@ -84,7 +84,7 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), fields(name = "patch_status"))]
+    #[instrument(skip(self))]
     pub async fn patch_status<P: serde::Serialize + Debug>(
         &self,
         name: &str,
