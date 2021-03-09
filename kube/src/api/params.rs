@@ -206,8 +206,7 @@ pub enum Patch<T: Serialize> {
 
     /// [JSON patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
     ///
-    /// Note: Using this variant might require you to explicitly provide a type for `T`.
-    ///       This is a quirk in the API.
+    /// Using this variant will require you to explicitly provide a type for `T` at the moment.
     ///
     /// # Example
     ///
@@ -215,14 +214,6 @@ pub enum Patch<T: Serialize> {
     /// use kube::api::Patch;
     /// let json_patch = json_patch::Patch(vec![]);
     /// let patch = Patch::Json::<()>(json_patch);
-    /// ```
-    ///
-    /// This will fail to compile:
-    ///
-    /// ```compile_fail
-    /// use kube::api::Patch;
-    /// let json_patch = json_patch::Patch(vec![]);
-    /// let patch = Patch::Json(json_patch);
     /// ```
     #[cfg(feature = "jsonpatch")]
     #[cfg_attr(docsrs, doc(cfg(feature = "jsonpatch")))]
