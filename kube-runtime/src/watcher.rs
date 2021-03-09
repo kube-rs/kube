@@ -2,6 +2,7 @@
 
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use kube::{
     api::{ListParams, Meta, WatchEvent},
     Api,
@@ -23,11 +24,8 @@ pub enum Error {
         source: kube::Error,
         backtrace: Backtrace,
     },
-    #[snafu(display("error returned by apiserver during watch: {}", source))]
-    WatchError {
-        source: kube::error::ErrorResponse,
-        backtrace: Backtrace,
-    },
+    #[snafu(display("error returned by apiserver during watch: {:?}", status))]
+    WatchError { status: Status, backtrace: Backtrace },
     #[snafu(display("watch stream failed: {}", source))]
     WatchFailed {
         source: kube::Error,
@@ -153,7 +151,7 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
             }),
             Some(Ok(WatchEvent::Error(err))) => {
                 // HTTP GONE, means we have desynced and need to start over and re-list :(
-                let new_state = if err.code == 410 {
+                let new_state = if err.code == Some(410) {
                     State::Empty
                 } else {
                     State::Watching {
@@ -161,7 +159,7 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
                         stream,
                     }
                 };
-                (Some(Err(err).context(WatchError)), new_state)
+                (Some(WatchError { status: err }.fail()), new_state)
             }
             Some(Err(err)) => (Some(Err(err).context(WatchFailed)), State::Watching {
                 resource_version,

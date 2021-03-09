@@ -1,10 +1,10 @@
 use bytes::Bytes;
 use futures::Stream;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use serde::de::DeserializeOwned;
 
 use crate::{
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, Resource},
-    client::Status,
     Error, Result,
 };
 

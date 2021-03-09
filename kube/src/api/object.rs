@@ -1,7 +1,5 @@
-use crate::{
-    api::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta},
-    error::ErrorResponse,
-};
+use crate::api::metadata::{ListMeta, Meta, ObjectMeta, TypeMeta};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -27,7 +25,7 @@ where
     /// NB: This became Beta first in Kubernetes 1.16.
     Bookmark(Bookmark),
     /// There was some kind of error
-    Error(ErrorResponse),
+    Error(Status),
 }
 
 impl<K> Debug for WatchEvent<K>

@@ -203,12 +203,12 @@ async fn main() -> Result<()> {
     assert!(res.is_err());
     match res.err() {
         Some(kube::Error::Api(err)) => {
-            assert_eq!(err.code, 422);
-            assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert_eq!(err.code, Some(422));
+            assert_eq!(err.reason.as_deref(), Some("Invalid"));
+            assert_eq!(err.status.as_deref(), Some("Failure"));
             assert_eq!(
-                err.message,
-                "Foo.clux.dev \"qux\" is invalid: spec.non_nullable: Required value"
+                err.message.as_deref(),
+                Some("Foo.clux.dev \"qux\" is invalid: spec.non_nullable: Required value")
             );
         }
         _ => assert!(false),

@@ -9,7 +9,6 @@
 use crate::{
     api::{Meta, WatchEvent},
     config::Config,
-    error::ErrorResponse,
     service::Service,
     Error, Result,
 };
@@ -22,8 +21,8 @@ use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
 use hyper::Body;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
-use serde::{de::DeserializeOwned, Deserialize};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{self as k8s_meta_v1, Status};
+use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
@@ -239,7 +238,7 @@ impl Client {
                         }
 
                         // Got general error response
-                        if let Ok(e_resp) = serde_json::from_str::<ErrorResponse>(&line) {
+                        if let Ok(e_resp) = serde_json::from_str::<Status>(&line) {
                             return Some(Err(Error::Api(e_resp)));
                         }
                         // Parsing error
@@ -328,17 +327,19 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
     if s.is_client_error() || s.is_server_error() {
         // Print better debug when things do fail
         // trace!("Parsing error: {}", text);
-        if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(text) {
+        if let Ok(errdata) = serde_json::from_str::<Status>(text) {
             debug!("Unsuccessful: {:?}", errdata);
             Err(Error::Api(errdata))
         } else {
             warn!("Unsuccessful data error parse: {}", text);
             // Propagate errors properly via reqwest
-            let ae = ErrorResponse {
-                status: s.to_string(),
-                code: s.as_u16(),
-                message: format!("{:?}", text),
-                reason: "Failed to parse error data".into(),
+            let ae = Status {
+                metadata: Default::default(),
+                status: Some(s.to_string()),
+                code: Some(s.as_u16().into()),
+                message: Some(format!("{:?}", text)),
+                reason: Some("Failed to parse error data".into()),
+                details: None,
             };
             debug!("Unsuccessful: {:?} (reconstruct)", ae);
             Err(Error::Api(ae))
@@ -354,74 +355,6 @@ impl TryFrom<Config> for Client {
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
         Ok(Self::new(config.try_into()?))
-    }
-}
-
-// TODO: replace with Status in k8s openapi?
-
-/// A Kubernetes status object
-#[allow(missing_docs)]
-#[derive(Deserialize, Debug)]
-pub struct Status {
-    // TODO: typemeta
-    // TODO: metadata that can be completely empty (listmeta...)
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub status: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub message: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub reason: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub details: Option<StatusDetails>,
-    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
-    pub code: u16,
-}
-
-/// Status details object on the [`Status`] object
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-#[allow(missing_docs)]
-pub struct StatusDetails {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub name: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub group: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub kind: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub uid: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub causes: Vec<StatusCause>,
-    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
-    pub retry_after_seconds: u32,
-}
-
-/// Status cause object on the [`StatusDetails`] object
-#[derive(Deserialize, Debug)]
-#[allow(missing_docs)]
-pub struct StatusCause {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub reason: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub message: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub field: String,
-}
-
-#[cfg(test)]
-mod test {
-    use super::Status;
-
-    // ensure our status schema is sensible
-    #[test]
-    fn delete_deserialize_test() {
-        let statusresp = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"name":"some-app","group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
-        let s: Status = serde_json::from_str::<Status>(statusresp).unwrap();
-        assert_eq!(s.details.unwrap().name, "some-app");
-
-        let statusnoname = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
-        let s2: Status = serde_json::from_str::<Status>(statusnoname).unwrap();
-        assert_eq!(s2.details.unwrap().name, ""); // optional probably better..
     }
 }
 

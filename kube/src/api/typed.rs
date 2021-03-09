@@ -1,11 +1,12 @@
 use either::Either;
 use futures::Stream;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use serde::{de::DeserializeOwned, Serialize};
 use std::iter;
 
 use crate::{
     api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Resource, WatchEvent},
-    client::{Client, Status},
+    client::Client,
     Result,
 };
 
@@ -309,7 +310,7 @@ where
     ///             WatchEvent::Modified(s) => println!("Modified: {}", Meta::name(&s)),
     ///             WatchEvent::Deleted(s) => println!("Deleted {}", Meta::name(&s)),
     ///             WatchEvent::Bookmark(s) => {},
-    ///             WatchEvent::Error(s) => println!("{}", s),
+    ///             WatchEvent::Error(s) => println!("{:?}", s),
     ///         }
     ///     }
     ///     Ok(())
