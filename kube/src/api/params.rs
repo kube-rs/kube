@@ -203,7 +203,18 @@ pub enum Patch<T: Serialize> {
     ///
     /// Requires kubernetes >= 1.16
     Apply(T),
+
     /// [JSON patch](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment)
+    ///
+    /// Using this variant will require you to explicitly provide a type for `T` at the moment.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use kube::api::Patch;
+    /// let json_patch = json_patch::Patch(vec![]);
+    /// let patch = Patch::Json::<()>(json_patch);
+    /// ```
     #[cfg(feature = "jsonpatch")]
     #[cfg_attr(docsrs, doc(cfg(feature = "jsonpatch")))]
     Json(json_patch::Patch),
