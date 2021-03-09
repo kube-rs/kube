@@ -39,7 +39,7 @@ where
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        trace!("{} {} {:?}", req.method(), req.uri(), req.body());
+        tracing::trace!("{} {} {:?}", req.method(), req.uri(), req.body());
         self.service.call(req)
     }
 }
