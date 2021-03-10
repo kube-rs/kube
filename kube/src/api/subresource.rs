@@ -304,6 +304,7 @@ where
 /// - `stderr` and `tty` cannot both be `true` because multiplexing is not supported with TTY.
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+#[derive(Debug)]
 pub struct AttachParams {
     /// The name of the container to attach.
     /// Defaults to the only container if there is only one container in the pod.
@@ -577,7 +578,12 @@ where
 {
     /// Execute a command in a pod
     #[instrument(skip(self))]
-    pub async fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
+    pub async fn exec<I: Debug, T>(
+        &self,
+        name: &str,
+        command: I,
+        ap: &AttachParams,
+    ) -> Result<AttachedProcess>
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,
