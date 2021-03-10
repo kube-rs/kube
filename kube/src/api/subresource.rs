@@ -20,13 +20,15 @@ where
     K: Clone + DeserializeOwned,
 {
     /// Fetch the scale subresource
+    #[instrument(skip(self))]
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
         let req = self.resource.get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
 
     /// Update the scale subresource
-    pub async fn patch_scale<P: serde::Serialize>(
+    #[instrument(skip(self))]
+    pub async fn patch_scale<P: serde::Serialize + Debug>(
         &self,
         name: &str,
         pp: &PatchParams,
@@ -37,6 +39,7 @@ where
     }
 
     /// Replace the scale subresource
+    #[instrument(skip(self))]
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
         let req = self.resource.replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await
@@ -217,12 +220,14 @@ where
     K: DeserializeOwned + Loggable,
 {
     /// Fetch logs as a string
+    #[instrument(skip(self))]
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
 
     /// Fetch logs as a stream of bytes
+    #[instrument(skip(self))]
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
         let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
@@ -503,6 +508,7 @@ where
     K: Clone + DeserializeOwned + Attachable,
 {
     /// Attach to pod
+    #[instrument(skip(self))]
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
         let req = self.resource.attach(name, ap)?;
         let stream = self.client.connect(req).await?;
@@ -570,6 +576,7 @@ where
     K: Clone + DeserializeOwned + Executable,
 {
     /// Execute a command in a pod
+    #[instrument(skip(self))]
     pub async fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
     where
         I: IntoIterator<Item = T>,
