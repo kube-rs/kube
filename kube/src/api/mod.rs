@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 pub struct NotUsed {}
 
 pub(crate) mod params;
-pub use params::{DeleteParams, ListParams, Patch, PatchParams, PostParams, PropagationPolicy};
+pub use params::{
+    DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
+};
 mod resource;
 pub use resource::Resource;
 
@@ -20,8 +22,10 @@ pub use typed::Api;
 mod dynamic;
 pub use dynamic::DynamicResource;
 
-#[cfg(feature = "ws")] mod remote_command;
-#[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
+#[cfg(feature = "ws")]
+mod remote_command;
+#[cfg(feature = "ws")]
+pub use remote_command::AttachedProcess;
 
 mod subresource;
 #[cfg(feature = "ws")]
