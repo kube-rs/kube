@@ -148,7 +148,7 @@ impl Client {
         let text = self.request_text(request).await?;
 
         serde_json::from_str(&text).map_err(|e| {
-            warn!("{}, {:?}", text, e);
+            tracing::warn!("{}, {:?}", text, e);
             Error::SerdeError(e)
         })
     }
@@ -189,12 +189,12 @@ impl Client {
         if v["kind"] == "Status" {
             trace!("Status from {}", text);
             Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
-                warn!("{}, {:?}", text, e);
+                tracing::warn!("{}, {:?}", text, e);
                 Error::SerdeError(e)
             })?))
         } else {
             Ok(Left(serde_json::from_str::<T>(&text).map_err(|e| {
-                warn!("{}, {:?}", text, e);
+                tracing::warn!("{}, {:?}", text, e);
                 Error::SerdeError(e)
             })?))
         }
@@ -250,13 +250,13 @@ impl Client {
                 Err(LinesCodecError::Io(e)) => match e.kind() {
                     // Client timeout
                     std::io::ErrorKind::TimedOut => {
-                        warn!("timeout in poll: {}", e); // our client timeout
+                        tracing::warn!("timeout in poll: {}", e); // our client timeout
                         None
                     }
                     // Unexpected EOF from chunked decoder.
                     // Tends to happen after 300+s of watching.
                     std::io::ErrorKind::UnexpectedEof => {
-                        warn!("eof in poll: {}", e);
+                        tracing::warn!("eof in poll: {}", e);
                         None
                     }
                     _ => Some(Err(Error::ReadEvents(e))),
@@ -329,10 +329,10 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
         // Print better debug when things do fail
         // trace!("Parsing error: {}", text);
         if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(text) {
-            debug!("Unsuccessful: {:?}", errdata);
+            tracing::debug!("Unsuccessful: {:?}", errdata);
             Err(Error::Api(errdata))
         } else {
-            warn!("Unsuccessful data error parse: {}", text);
+            tracing::warn!("Unsuccessful data error parse: {}", text);
             // Propagate errors properly via reqwest
             let ae = ErrorResponse {
                 status: s.to_string(),
@@ -340,7 +340,7 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
                 message: format!("{:?}", text),
                 reason: "Failed to parse error data".into(),
             };
-            debug!("Unsuccessful: {:?} (reconstruct)", ae);
+            tracing::debug!("Unsuccessful: {:?} (reconstruct)", ae);
             Err(Error::Api(ae))
         }
     } else {

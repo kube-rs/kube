@@ -1,6 +1,8 @@
 use bytes::Bytes;
 use futures::Stream;
 use serde::de::DeserializeOwned;
+use std::fmt::Debug;
+use tracing::instrument;
 
 use crate::{
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, Resource},
@@ -18,13 +20,15 @@ where
     K: Clone + DeserializeOwned,
 {
     /// Fetch the scale subresource
+    #[instrument(skip(self))]
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
         let req = self.resource.get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
 
     /// Update the scale subresource
-    pub async fn patch_scale<P: serde::Serialize>(
+    #[instrument(skip(self))]
+    pub async fn patch_scale<P: serde::Serialize + Debug>(
         &self,
         name: &str,
         pp: &PatchParams,
@@ -35,6 +39,7 @@ where
     }
 
     /// Replace the scale subresource
+    #[instrument(skip(self))]
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
         let req = self.resource.replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await
@@ -53,6 +58,7 @@ where
     /// Get the named resource with a status subresource
     ///
     /// This actually returns the whole K, with metadata, and spec.
+    #[instrument(skip(self))]
     pub async fn get_status(&self, name: &str) -> Result<K> {
         let req = self.resource.get_status(name)?;
         self.client.request::<K>(req).await
@@ -81,7 +87,8 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn patch_status<P: serde::Serialize>(
+    #[instrument(skip(self))]
+    pub async fn patch_status<P: serde::Serialize + Debug>(
         &self,
         name: &str,
         pp: &PatchParams,
@@ -110,6 +117,7 @@ where
     ///     Ok(())
     /// }
     /// ```
+    #[instrument(skip(self))]
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
         let req = self.resource.replace_status(name, &pp, data)?;
         self.client.request::<K>(req).await
@@ -212,12 +220,14 @@ where
     K: DeserializeOwned + Loggable,
 {
     /// Fetch logs as a string
+    #[instrument(skip(self))]
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
 
     /// Fetch logs as a stream of bytes
+    #[instrument(skip(self))]
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
         let req = self.resource.logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
@@ -294,6 +304,7 @@ where
 /// - `stderr` and `tty` cannot both be `true` because multiplexing is not supported with TTY.
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+#[derive(Debug)]
 pub struct AttachParams {
     /// The name of the container to attach.
     /// Defaults to the only container if there is only one container in the pod.
@@ -498,6 +509,7 @@ where
     K: Clone + DeserializeOwned + Attachable,
 {
     /// Attach to pod
+    #[instrument(skip(self))]
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
         let req = self.resource.attach(name, ap)?;
         let stream = self.client.connect(req).await?;
@@ -565,7 +577,13 @@ where
     K: Clone + DeserializeOwned + Executable,
 {
     /// Execute a command in a pod
-    pub async fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
+    #[instrument(skip(self))]
+    pub async fn exec<I: Debug, T>(
+        &self,
+        name: &str,
+        command: I,
+        ap: &AttachParams,
+    ) -> Result<AttachedProcess>
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,

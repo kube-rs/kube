@@ -3,7 +3,7 @@ use crate::{Error, Result};
 use serde::Serialize;
 
 /// Common query parameters used in watch/list/delete calls on collections
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[allow(missing_docs)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
@@ -137,7 +137,7 @@ impl ListParams {
 }
 
 /// Common query parameters for put/post calls
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct PostParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
@@ -198,6 +198,7 @@ impl PostParams {
 /// let patch = Patch::Apply(&r);
 /// ```
 #[non_exhaustive]
+#[derive(Debug)]
 pub enum Patch<T: Serialize> {
     /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
     ///
@@ -257,7 +258,7 @@ impl<T: Serialize> Patch<T> {
 }
 
 /// Common query parameters for patch calls
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct PatchParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
@@ -321,7 +322,7 @@ impl PatchParams {
 }
 
 /// Common query parameters for delete calls
-#[derive(Default, Clone, Serialize)]
+#[derive(Default, Clone, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteParams {
     /// When present, indicates that modifications should not be persisted.
@@ -392,7 +393,7 @@ mod test {
 }
 
 /// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
-#[derive(Default, Clone, Serialize)]
+#[derive(Default, Clone, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Preconditions {
     /// Specifies the target ResourceVersion

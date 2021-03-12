@@ -9,7 +9,7 @@ use kube::{
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
 use snafu::{Backtrace, ResultExt, Snafu};
-use std::clone::Clone;
+use std::{clone::Clone, fmt::Debug};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -108,7 +108,7 @@ enum State<K: Meta + Clone> {
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
-async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
+async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     state: State<K>,
@@ -173,7 +173,7 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 }
 
 /// Trampoline helper for `step_trampolined`
-async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
+async fn step<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     mut state: State<K>,
@@ -238,7 +238,7 @@ async fn step<K: Meta + Clone + DeserializeOwned + Send + 'static>(
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
 /// an [`Event::Restarted`].
-pub fn watcher<K: Meta + Clone + DeserializeOwned + Send + 'static>(
+pub fn watcher<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
