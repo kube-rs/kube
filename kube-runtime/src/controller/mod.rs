@@ -322,7 +322,7 @@ where
 
 impl<K> Controller<K>
 where
-    K: Clone + Meta + DeserializeOwned + Send + Sync + 'static,
+    K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
     <K as Meta>::Family: Debug + Eq + Hash + Clone,
 {
     /// Create a Controller on a type `K`

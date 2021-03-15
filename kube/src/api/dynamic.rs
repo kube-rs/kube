@@ -252,7 +252,7 @@ impl GroupVersionKind {
 }
 
 /// The most generic representation of a single Kubernetes resource.
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct DynamicObject {
     /// standard metadata
     pub metadata: ObjectMeta,
