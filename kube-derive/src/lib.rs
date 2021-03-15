@@ -74,6 +74,12 @@ mod custom_resource;
 ///
 /// **NOTE**: Support for `v1` requires deriving the openapi v3 `JsonSchema` via the `schemars` dependency.
 ///
+/// ### `#[kube(singular = "nonstandard-singular")]`
+/// To specify the singular name. Defaults to lowercased `kind`.
+///
+/// ### `#[kube(plural = "nonstandard-plural")]`
+/// To specify the plural name. Defaults to inferring from singular.
+///
 /// ### `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
 ///

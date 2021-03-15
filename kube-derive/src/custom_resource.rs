@@ -15,6 +15,9 @@ struct KubeAttrs {
     /// lowercase plural of kind (inferred if omitted)
     #[darling(default)]
     plural: Option<String>,
+    /// singular defaults to lowercased kind
+    #[darling(default)]
+    singular: Option<String>,
     #[darling(default)]
     namespaced: bool,
     #[darling(default = "default_apiext")]
@@ -65,6 +68,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         derives,
         status,
         plural,
+        singular,
         shortnames,
         printcolums,
         apiextensions,
@@ -217,7 +221,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     };
 
     // 5. Implement CustomResource
-    let name = kind.to_ascii_lowercase();
+    let name = singular.unwrap_or_else(|| kind.to_ascii_lowercase());
     let plural = plural.unwrap_or_else(|| to_plural(&name));
     let scope = if namespaced { "Namespaced" } else { "Cluster" };
 
