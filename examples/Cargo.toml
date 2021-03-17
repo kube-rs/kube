@@ -139,6 +139,10 @@ name = "node_watcher"
 path = "node_watcher.rs"
 
 [[example]]
+name = "dynamic_watcher"
+path = "dynamic_watcher.rs"
+
+[[example]]
 name = "secret_reflector"
 path = "secret_reflector.rs"
 

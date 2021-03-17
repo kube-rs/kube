@@ -3,10 +3,11 @@
 mod object_ref;
 pub mod store;
 
-pub use self::object_ref::{ErasedResource, ObjectRef, RuntimeResource};
+pub use self::object_ref::ObjectRef;
 use crate::watcher;
 use futures::{Stream, TryStreamExt};
 use kube::api::Meta;
+use std::{fmt::Debug, hash::Hash};
 pub use store::Store;
 
 /// Caches objects from `watcher::Event`s to a local `Store`
@@ -22,6 +23,7 @@ pub use store::Store;
 pub fn reflector<K, W>(mut store: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Meta + Clone,
+    <K as Meta>::Family: Debug + Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
     stream.inspect_ok(move |event| store.apply_watcher_event(event))

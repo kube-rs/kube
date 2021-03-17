@@ -6,13 +6,7 @@
 //! the [`Api`][crate::api::Api] type for more structured
 //! interaction with the kuberneres API.
 
-use crate::{
-    api::{Meta, WatchEvent},
-    config::Config,
-    error::ErrorResponse,
-    service::Service,
-    Error, Result,
-};
+use crate::{api::WatchEvent, config::Config, error::ErrorResponse, service::Service, Error, Result};
 
 #[cfg(feature = "ws")]
 use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
@@ -201,12 +195,12 @@ impl Client {
     }
 
     /// Perform a raw request and get back a stream of [`WatchEvent`] objects
-    pub async fn request_events<T: Clone + Meta>(
+    pub async fn request_events<T>(
         &self,
         request: Request<Vec<u8>>,
     ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>>>
     where
-        T: DeserializeOwned,
+        T: Clone + DeserializeOwned,
     {
         let res = self.send(request.map(Body::from)).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());

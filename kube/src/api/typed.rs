@@ -32,11 +32,30 @@ pub struct Api<K> {
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K> Api<K>
 where
-    K: k8s_openapi::Resource,
+    K: Meta,
+    <K as Meta>::Family: Default,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
-        let resource = Resource::all::<K>();
+        Self::all_with(client, &Default::default())
+    }
+
+    /// Namespaced resource within a given namespace
+    pub fn namespaced(client: Client, ns: &str) -> Self {
+        Self::namespaced_with(client, ns, &Default::default())
+    }
+}
+
+/// Expose same interface as Api for controlling scope/group/versions/ns
+impl<K> Api<K>
+where
+    K: Meta,
+{
+    /// Cluster level resources, or resources viewed across all namespaces
+    ///
+    /// This function accepts `K::Family` so it can be used with dynamic resources.
+    pub fn all_with(client: Client, family: &K::Family) -> Self {
+        let resource = Resource::all_with::<K>(family);
         Self {
             resource,
             client,
@@ -45,13 +64,22 @@ where
     }
 
     /// Namespaced resource within a given namespace
-    pub fn namespaced(client: Client, ns: &str) -> Self {
-        let resource = Resource::namespaced::<K>(ns);
+    ///
+    /// This function accepts `K::Family` so it can be used with dynamic resources.
+    pub fn namespaced_with(client: Client, ns: &str, family: &K::Family) -> Self {
+        let resource = Resource::namespaced_with::<K>(ns, family);
         Self {
             resource,
             client,
             phantom: iter::empty(),
         }
+    }
+
+    /// Returns reference to the underlying `Resource` object.
+    /// It can be used to make low-level requests or as a `Family`
+    /// for a `DynamicObject`.
+    pub fn resource(&self) -> &Resource {
+        &self.resource
     }
 
     /// Consume self and return the [`Client`]
