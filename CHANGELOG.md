@@ -2,10 +2,29 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.51.0...master
- * `kube`: BREAKING: `ListParams` bookmarks default enabled-  #226 via #445
+ * `kube-derive`: allow overriding `#[kube(plural)]` and `#[kube(singular)]` - #458 via #463
+ * `kube`: added tracing instrumentation for io operations in `kube::Api` - #455
+ * `kube`: `DeleteParams`'s `Preconditions` is now public - #459 via #460
+ * `kube`: remove dependency on duplicate `derive_accept_key` for `ws` - #452
+ * `kube`: Properly verify websocket keys in `ws` handshake - #447
+ * `kube`: BREAKING: removed optional, and deprecated `runtime` module - #454
+ * `kube`: BREAKING: `ListParams` bookmarks default enabled - #226 via #445
    - renames member `::allow_bookmarks` to `::bookmarks`
    - `::default()` sets `bookmark` to `true` to avoid bad bad defaults #219
    - method `::allow_bookmarks()` replaced by `::disable_bookmarks()`
+ * `kube`: BREAKING: Uncouple `Meta` trait from `k8s_openapi` - #385
+   - New dynamic helper object `GroupVersionKind` introduced
+   - `DynamicObject` added to represent a dynamic kubernetes object
+   - `Meta` trait now takes a mostly hidden type `Family`
+   - `Meta` blanked impl'd for `k8s_openapi::Metadata` of non-list types (`Family = ()`)
+   - `Meta` blanked impl'd for `DynamicObject` (`Family = GroupVersionKind`)
+   - `Api::all_with` + `Api::namespaced_with` added for querying with dynamic families
+   - see `dynamic_watcher` example
+ * `kube-runtime`: BREAKING: lower level interface changes as a result of `kube::api::Meta` trait:
+  - `ObjectRef` now generic over `K: Meta` rather than `RuntimeResource`
+  - `reflector::{Writer, Store}` takes a `K: Meta` rather than a `K: k8s_openapi::Resource`
+  - Possible to use `watcher` or `Controller`'s on `GroupVersionKind` types now.
+
 
 0.51.0 / 2021-02-28
 ===================

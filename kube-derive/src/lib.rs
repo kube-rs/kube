@@ -119,6 +119,8 @@ mod custom_resource;
 ///     namespaced,
 ///     status = "FooStatus",
 ///     derive = "PartialEq",
+///     singular = "foot",
+///     plural = "feetz",
 ///     shortname = "f",
 ///     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
 ///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#

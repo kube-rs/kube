@@ -222,12 +222,6 @@ async fn step<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [`reflector`]: super::reflector::reflector
 /// [`Api::watch`]: https://docs.rs/kube/*/kube/struct.Api.html#method.watch
 ///
-/// # Migration from `kube::runtime`
-///
-/// This is similar to the legacy [`kube::runtime::Informer`], or the watching half of client-go's `Reflector`.
-/// Renamed to avoid confusion with client-go's `Informer` (which watches a `Reflector` for updates, rather
-/// the Kubernetes API).
-///
 /// # Recovery
 ///
 /// (The details of recovery are considered an implementation detail and should not be relied on to be stable, but are

@@ -54,6 +54,8 @@ cargo run --example event_watcher
 NAMESPACE=dev cargo run --example multi_watcher
 # watch broken nodes and cross reference with events api
 cargo run --example node_watcher
+# watch arbitrary, untyped objects across all namespaces
+cargo run --example dynamic_watcher
 ```
 
 ### controllers
