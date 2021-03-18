@@ -17,7 +17,7 @@ use std::iter;
 /// ### Direct usage
 /// ```
 /// use kube::api::Resource;
-/// let foos = Resource::dynamic("Foo") // <.spec.kind>
+/// let foos = Resource::dynamic("Foo", "foos") // <.spec.kind>
 ///    .group("clux.dev") // <.spec.group>
 ///    .version("v1")
 ///    .into_resource();
