@@ -13,7 +13,7 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 #[derivative(Default(bound = "K::Family: Default"))]
 pub struct Writer<K: 'static + Meta>
 where
-    K::Family: Debug + Eq + Hash + Clone,
+    K::Family: Eq + Hash,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
     family: K::Family,
@@ -21,7 +21,7 @@ where
 
 impl<K: 'static + Meta + Clone> Writer<K>
 where
-    K::Family: Debug + Eq + Hash + Clone,
+    K::Family: Eq + Hash,
 {
     /// Creates a new Writer with the specified family.
     ///
@@ -46,7 +46,10 @@ where
     }
 
     /// Applies a single watcher event to the store
-    pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
+    pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>)
+    where
+        K::Family: Clone,
+    {
         match event {
             watcher::Event::Applied(obj) => {
                 self.store
@@ -77,18 +80,18 @@ where
 ///
 /// Cannot be constructed directly since one writer handle is required,
 /// use `Writer::as_reader()` instead.
-#[derive(Debug, Derivative)]
-#[derivative(Clone)]
+#[derive(Derivative)]
+#[derivative(Debug(bound = "K: Debug, K::Family: Debug"), Clone)]
 pub struct Store<K: 'static + Meta>
 where
-    K::Family: Debug + Eq + Hash + Clone,
+    K::Family: Hash + Eq,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
 impl<K: 'static + Clone + Meta> Store<K>
 where
-    K::Family: Debug + Eq + Hash + Clone,
+    K::Family: Eq + Hash + Clone,
 {
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
     ///
