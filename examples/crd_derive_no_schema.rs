@@ -2,8 +2,10 @@
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
     CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps,
 };
-#[cfg(not(feature = "schema"))] use kube_derive::CustomResource;
-#[cfg(not(feature = "schema"))] use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "schema"))]
+use kube_derive::{api::Meta, CustomResource};
+#[cfg(not(feature = "schema"))]
+use serde::{Deserialize, Serialize};
 
 /// CustomResource with manually implemented schema
 ///
@@ -64,10 +66,10 @@ fn verify_bar_is_a_custom_resource() {
     use schemars::JsonSchema; // only for ensuring it's not implemented
     use static_assertions::{assert_impl_all, assert_not_impl_any};
 
-    println!("Kind {}", Bar::KIND);
+    println!("Kind {}", Bar::kind(&()));
     let bar = Bar::new("five", MyBar { bars: 5 });
     println!("Spec: {:?}", bar.spec);
-    assert_impl_all!(Bar: k8s_openapi::Resource, k8s_openapi::Metadata);
+    assert_impl_all!(Bar: kube::api::Meta);
     assert_not_impl_any!(MyBar: JsonSchema); // but no schemars schema implemented
 
     let crd = Bar::crd_with_manual_schema();
