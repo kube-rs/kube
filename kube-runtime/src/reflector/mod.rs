@@ -19,7 +19,7 @@ pub use store::Store;
 pub fn reflector<K, W>(mut store: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Meta + Clone,
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+    K::Family: Debug + Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
     stream.inspect_ok(move |event| store.apply_watcher_event(event))

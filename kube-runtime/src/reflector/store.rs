@@ -10,10 +10,10 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
-#[derivative(Default(bound = "<K as Meta>::Family: Default"))]
+#[derivative(Default(bound = "K::Family: Default"))]
 pub struct Writer<K: 'static + Meta>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+    K::Family: Debug + Eq + Hash + Clone,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
     family: K::Family,
@@ -21,7 +21,7 @@ where
 
 impl<K: 'static + Meta + Clone> Writer<K>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+    K::Family: Debug + Eq + Hash + Clone,
 {
     /// Creates a new Writer with the specified family.
     ///
@@ -81,14 +81,14 @@ where
 #[derivative(Clone)]
 pub struct Store<K: 'static + Meta>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+    K::Family: Debug + Eq + Hash + Clone,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
 impl<K: 'static + Clone + Meta> Store<K>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+    K::Family: Debug + Eq + Hash + Clone,
 {
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
     ///

@@ -24,7 +24,7 @@ use std::{
 /// ```
 pub struct ObjectRef<K: Meta>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+    K::Family: Debug + Eq + Hash + Clone,
 {
     family: K::Family,
     /// The name of the object
@@ -45,7 +45,7 @@ where
 
 impl<K: Meta> ObjectRef<K>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone + Default,
+    K::Family: Debug + Eq + Hash + Clone + Default,
 {
     #[must_use]
     pub fn new(name: &str) -> Self {
@@ -63,7 +63,7 @@ where
 
 impl<K: Meta> ObjectRef<K>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+    K::Family: Debug + Eq + Hash + Clone,
 {
     #[must_use]
     pub fn new_with(name: &str, family: K::Family) -> Self {
@@ -143,7 +143,7 @@ where
 
 impl<K: Meta> Display for ObjectRef<K>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
+    K::Family: Debug + Eq + Hash + Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
