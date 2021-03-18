@@ -12,15 +12,15 @@ UNRELEASED
    - renames member `::allow_bookmarks` to `::bookmarks`
    - `::default()` sets `bookmark` to `true` to avoid bad bad defaults #219
    - method `::allow_bookmarks()` replaced by `::disable_bookmarks()`
- * `kube`: BREAKING: Uncouple `Meta` trait from `k8s_openapi` - #385
+ * `kube`: BREAKING: Mostly internal changes to the `Meta` trait to support dynamic types #385
+   - BREAKING: `Meta` trait now takes an optional associated type for runtime type info: `Family`
+     * THIS SHOULD NOT AFFECT YOU UNLESS YOU ARE IMPLEMENTING / CUSTOMISING THE TRAIT DIRECTLY
    - New dynamic helper object `GroupVersionKind` introduced
    - `DynamicObject` added to represent a dynamic kubernetes object
-   - `Meta` trait now takes a mostly hidden type `Family`
-   - `Meta` blanked impl'd for `k8s_openapi::Metadata` of non-list types (`Family = ()`)
-   - `Meta` blanked impl'd for `DynamicObject` (`Family = GroupVersionKind`)
    - `Api::all_with` + `Api::namespaced_with` added for querying with dynamic families
    - see `dynamic_watcher` example
  * `kube-runtime`: BREAKING: lower level interface changes as a result of `kube::api::Meta` trait:
+  - THESE SHOULD NOT AFFECT YOU UNLESS YOU ARE IMPLEMENTING / CUSTOMISING LOW LEVEL TYPES DIRECTLY
   - `ObjectRef` now generic over `K: Meta` rather than `RuntimeResource`
   - `reflector::{Writer, Store}` takes a `K: Meta` rather than a `K: k8s_openapi::Resource`
   - Possible to use `watcher` or `Controller`'s on `GroupVersionKind` types now.
