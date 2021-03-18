@@ -10,7 +10,7 @@ mod custom_resource;
 /// A custom derive for kubernetes custom resource definitions.
 ///
 /// This will generate a **root object** containing your spec and metadata.
-/// This root object will implement the [`k8s_openapi::Metadata`] + [`k8s_openapi::Resource`]
+/// This root object will implement the [`kube::api::Meta`]
 /// traits so it can be used with [`kube::Api`].
 ///
 /// The generated type will also implement a `::crd` method to generate the crd
@@ -20,7 +20,7 @@ mod custom_resource;
 ///
 /// ```rust
 /// use serde::{Serialize, Deserialize};
-/// use k8s_openapi::Resource;
+/// use kube::api::Meta;
 /// use kube_derive::CustomResource;
 /// use schemars::JsonSchema;
 ///
@@ -30,7 +30,7 @@ mod custom_resource;
 ///     info: String,
 /// }
 ///
-/// println!("kind = {}", Foo::KIND); // impl k8s_openapi::Resource
+/// println!("kind = {}", Foo::kind(&())); // impl kube::api::Meta
 /// let f = Foo::new("foo-1", FooSpec {
 ///     info: "informative info".into(),
 /// });
@@ -196,8 +196,7 @@ mod custom_resource;
 ///
 /// [`kube`]: https://docs.rs/kube
 /// [`kube::Api`]: https://docs.rs/kube/*/kube/struct.Api.html
-/// [`k8s_openapi::Metadata`]: https://docs.rs/k8s-openapi/*/k8s_openapi/trait.Metadata.html
-/// [`k8s_openapi::Resource`]: https://docs.rs/k8s-openapi/*/k8s_openapi/trait.Resource.html
+/// [`kube::api::Metadata`]: https://docs.rs/kube/*/kube/api/trait.Meta.html
 #[proc_macro_derive(CustomResource, attributes(kube))]
 pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     custom_resource::derive(proc_macro2::TokenStream::from(input)).into()
