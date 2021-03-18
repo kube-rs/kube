@@ -90,8 +90,8 @@ impl Resource {
     /// This is the only entrypoint to `Resource` that bypasses [`k8s_openapi`] entirely.
     /// If you need a `CustomResource` consider using `kube-derive` for its
     /// `#[derive(CustomResource)]` proc-macro.
-    pub fn dynamic(kind: &str) -> DynamicResource {
-        DynamicResource::new(kind)
+    pub fn dynamic(kind: &str, plural: &str) -> DynamicResource {
+        DynamicResource::new(kind, plural)
     }
 }
 

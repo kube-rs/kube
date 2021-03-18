@@ -87,9 +87,10 @@ impl DynamicResource {
     ///
     /// [`group`]: Self::group
     /// [`version`]: Self::version
-    pub fn new(kind: &str) -> Self {
+    pub fn new(kind: &str, plural: &str) -> Self {
         Self {
             kind: kind.into(),
+            plural: plural.into(),
             ..Default::default()
         }
     }
@@ -318,7 +319,7 @@ mod test {
     };
     #[test]
     fn raw_custom_resource() {
-        let r = Resource::dynamic("Foo")
+        let r = Resource::dynamic("Foo", "foos")
             .group("clux.dev")
             .version("v1")
             .within("myns")
@@ -335,7 +336,7 @@ mod test {
 
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
-        let r = Resource::dynamic("Service")
+        let r = Resource::dynamic("Service", "services")
             .group("")
             .version("v1")
             .try_into_resource()?;
@@ -360,7 +361,7 @@ mod test {
         let client = Client::try_default().await.unwrap();
         let a1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
-        let a2: Api<Foo> = Resource::dynamic("Foo")
+        let a2: Api<Foo> = Resource::dynamic("Foo", "foos")
             .group("clux.dev")
             .version("v1")
             .within("myns")

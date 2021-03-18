@@ -145,7 +145,7 @@ async fn main() -> Result<()> {
     });
 
     // Set up dynamic resource to test using raw values.
-    let resource = Resource::dynamic("Foo")
+    let resource = Resource::dynamic("Foo", "foos")
         .group("clux.dev")
         .version("v1")
         .within(&namespace)
