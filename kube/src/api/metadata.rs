@@ -22,6 +22,8 @@ pub trait Meta {
     type Family: Send + Sync + 'static;
     /// Returns kind of this object
     fn kind<'a>(f: &'a Self::Family) -> Cow<'a, str>;
+    /// Returns plural name of this object
+    fn plural<'a>(f: &'a Self::Family) -> Cow<'a, str>;
     /// Returns group of this object
     fn group<'a>(f: &'a Self::Family) -> Cow<'a, str>;
     /// Returns version of this object
@@ -56,6 +58,10 @@ where
 
     fn kind<'a>(_: &'a ()) -> Cow<'a, str> {
         K::KIND.into()
+    }
+
+    fn plural<'a>(_: &'a Self::Family) -> Cow<'a, str> {
+        inflector::string::pluralize::to_plural(&K::KIND.to_ascii_lowercase()).into()
     }
 
     fn group<'a>(_: &'a ()) -> Cow<'a, str> {

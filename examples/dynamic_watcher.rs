@@ -15,9 +15,10 @@ async fn main() -> anyhow::Result<()> {
     let group = "clux.dev";
     let version = "v1";
     let kind = "Foo";
+    let plural = "foos";
 
     // Turn them into a GVK
-    let gvk = GroupVersionKind::from_dynamic_gvk(group, version, kind);
+    let gvk = GroupVersionKind::from_dynamic_gvk(group, version, kind, plural);
     // Use them in an Api with the dynamic family
     let api = Api::<DynamicObject>::all_with(client, &gvk);
 

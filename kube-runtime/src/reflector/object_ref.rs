@@ -134,6 +134,7 @@ where
                 K::group(&self.family).as_ref(),
                 K::version(&self.family).as_ref(),
                 K::kind(&self.family).as_ref(),
+                K::plural(&self.family).as_ref()
             ),
             name: self.name,
             namespace: self.namespace,

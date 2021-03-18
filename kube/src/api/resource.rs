@@ -3,7 +3,6 @@ use crate::{
     api::{DynamicResource, Meta},
     Error, Result,
 };
-use inflector::string::pluralize::to_plural;
 
 /// A Kubernetes resource that can be accessed through the API
 #[derive(Clone, Debug)]
@@ -26,6 +25,11 @@ pub struct Resource {
     /// This is the string used in the kind field of the resource's serialized form.
     pub kind: String,
 
+    /// The plural name of the resource
+    ///
+    /// This is used as a part of the URLs
+    pub plural: String,
+
     /// The version of the resource.
     pub version: String,
 
@@ -39,6 +43,7 @@ impl Resource {
         Self {
             api_version: K::api_version(f).into_owned(),
             kind: K::kind(f).into_owned(),
+            plural: K::plural(f).into_owned(),
             group: K::group(f).into_owned(),
             version: K::version(f).into_owned(),
             namespace: None,
@@ -57,6 +62,7 @@ impl Resource {
         Self {
             api_version: K::api_version(f).into_owned(),
             kind: kind.into_owned(),
+            plural: K::plural(f).into_owned(),
             group: K::group(f).into_owned(),
             version: K::version(f).into_owned(),
             namespace: Some(ns.to_string()),
@@ -103,7 +109,7 @@ impl Resource {
             group = if self.group.is_empty() { "api" } else { "apis" },
             api_version = self.api_version,
             namespaces = n,
-            resource = to_plural(&self.kind.to_ascii_lowercase()),
+            resource = self.plural,
         )
     }
 }

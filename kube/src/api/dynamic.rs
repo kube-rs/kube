@@ -33,6 +33,7 @@ use std::iter;
 #[derive(Default)]
 pub struct DynamicResource {
     pub(crate) kind: String,
+    pub(crate) plural: String,
     pub(crate) version: Option<String>,
     pub(crate) group: Option<String>,
     pub(crate) namespace: Option<String>,
@@ -71,6 +72,7 @@ impl DynamicResource {
         let group = ar.group.clone().unwrap_or_else(|| default_group.into());
         DynamicResource {
             kind: ar.kind.to_string(),
+            plural: ar.name.clone(),
             version: Some(version),
             group: Some(group),
             namespace: None,
@@ -181,6 +183,7 @@ impl TryFrom<DynamicResource> for Resource {
                 format!("{}/{}", group, version)
             },
             kind: rb.kind,
+            plural: rb.plural,
             version,
             group,
             namespace: rb.namespace,
@@ -218,6 +221,8 @@ pub struct GroupVersionKind {
     version: StringRef,
     /// Kind
     kind: StringRef,
+    /// Plural name
+    plural: StringRef,
     /// Concatenation of group and version
     api_version: StringRef,
 }
@@ -226,7 +231,7 @@ impl GroupVersionKind {
     /// Creates `GroupVersionKind` from group, version and kind.
     /// For `core` resources, group should be empty.
     /// `api_version` will be created based on group and version
-    pub fn from_dynamic_gvk(group: &str, version: &str, kind: &str) -> Self {
+    pub fn from_dynamic_gvk(group: &str, version: &str, kind: &str, plural: &str) -> Self {
         let api_version = if group.is_empty() {
             version.to_string()
         } else {
@@ -236,6 +241,7 @@ impl GroupVersionKind {
             group: StringRef::Dynamic(group.into()),
             version: StringRef::Dynamic(version.into()),
             kind: StringRef::Dynamic(kind.into()),
+            plural: StringRef::Dynamic(plural.into()),
             api_version: StringRef::Dynamic(api_version.into()),
         }
     }
@@ -246,6 +252,9 @@ impl GroupVersionKind {
             group: StringRef::Static(K::GROUP),
             version: StringRef::Static(K::VERSION),
             kind: StringRef::Static(K::KIND),
+            plural: StringRef::Dynamic(
+                inflector::string::pluralize::to_plural(&K::KIND.to_ascii_lowercase()).into(),
+            ),
             api_version: StringRef::Static(K::API_VERSION),
         }
     }
@@ -274,6 +283,10 @@ impl Meta for DynamicObject {
 
     fn kind<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
         f.kind.as_str().into()
+    }
+
+    fn plural<'a>(f: &'a Self::Family) -> Cow<'a, str> {
+        f.plural.as_str().into()
     }
 
     fn api_version<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
