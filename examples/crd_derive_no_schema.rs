@@ -3,7 +3,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
     CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps,
 };
 #[cfg(not(feature = "schema"))]
-use kube_derive::{api::Meta, CustomResource};
+use kube::CustomResource;
 #[cfg(not(feature = "schema"))]
 use serde::{Deserialize, Serialize};
 
@@ -62,7 +62,7 @@ fn main() {
 #[cfg(not(feature = "schema"))]
 #[test]
 fn verify_bar_is_a_custom_resource() {
-    use k8s_openapi::Resource;
+    use kube::api::Meta;
     use schemars::JsonSchema; // only for ensuring it's not implemented
     use static_assertions::{assert_impl_all, assert_not_impl_any};
 
