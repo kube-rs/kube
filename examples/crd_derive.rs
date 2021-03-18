@@ -1,5 +1,5 @@
-use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Condition, Resource};
-use kube::CustomResource;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
+use kube::{api::Meta, CustomResource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -35,11 +35,14 @@ pub struct FooStatus {
 }
 
 fn main() {
-    println!("Kind {}", FooCrd::KIND);
-    let mut foo = FooCrd::new("hi", MyFoo {
-        name: "hi".into(),
-        info: None,
-    });
+    println!("Kind {}", FooCrd::kind(&()));
+    let mut foo = FooCrd::new(
+        "hi",
+        MyFoo {
+            name: "hi".into(),
+            info: None,
+        },
+    );
     foo.status = Some(FooStatus {
         is_bad: true,
         conditions: vec![],

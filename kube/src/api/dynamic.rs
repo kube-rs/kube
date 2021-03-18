@@ -313,6 +313,9 @@ impl Meta for DynamicObject {
 
 #[cfg(test)]
 mod test {
+    mod kube {
+        pub use crate::*;
+    }
     use crate::{
         api::{Patch, PatchParams, PostParams, Resource},
         Result,

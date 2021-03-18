@@ -165,8 +165,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
-                    api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
-                    kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
+                    api_version: <#rootident as kube::api::Meta>::api_version(&()).to_string(),
+                    kind: <#rootident as kube::api::Meta>::kind(&()).to_string(),
                     metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         name: Some(name.to_string()),
                         ..Default::default()
@@ -178,37 +178,59 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    // 2. Implement Resource trait for k8s_openapi
-    let api_ver = format!("{}/{}", group, version);
-    let impl_resource = quote! {
-        impl k8s_openapi::Resource for #rootident {
-            const API_VERSION: &'static str = #api_ver;
-            const GROUP: &'static str = #group;
-            const KIND: &'static str = #kind;
-            const VERSION: &'static str = #version;
-        }
-    };
+    let api_version = format!("{}/{}", group, version);
+    let name = singular.unwrap_or_else(|| kind.to_ascii_lowercase());
+    let plural = plural.unwrap_or_else(|| to_plural(&name));
 
-    // 3. Implement Metadata trait for k8s_openapi
-    let impl_metadata = quote! {
-        impl k8s_openapi::Metadata for #rootident {
-            type Ty = k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-            fn metadata(&self) -> &Self::Ty {
+    // 2. Implement kube::Meta trait
+    let impl_meta = quote! {
+        impl kube::api::Meta for #rootident {
+            type Family = ();
+
+            fn kind<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+                #kind.into()
+            }
+
+            fn plural<'a>(_: &'a Self::Family) -> std::borrow::Cow<'a, str> {
+                #plural.into()
+            }
+
+            fn group<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+               #group.into()
+            }
+
+            fn version<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+                #version.into()
+            }
+
+            fn api_version<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+                #api_version.into()
+            }
+
+            fn meta(&self) -> &kube::api::ObjectMeta {
                 &self.metadata
             }
-            fn metadata_mut(&mut self) -> &mut Self::Ty {
-                &mut self.metadata
+            fn name(&self) -> String {
+                self.meta().name.clone().expect("kind has metadata.name")
+            }
+
+            fn resource_ver(&self) -> Option<String> {
+                self.meta().resource_version.clone()
+            }
+
+            fn namespace(&self) -> Option<String> {
+                self.meta().namespace.clone()
             }
         }
     };
-    // 4. Implement Default if requested
+    // 3. Implement Default if requested
     let impl_default = if has_default {
         quote! {
             impl Default for #rootident {
                 fn default() -> Self {
                     Self {
-                        api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
-                        kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
+                        api_version: #api_version.to_string(),
+                        kind: #kind.to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
                         #statusdef
@@ -220,9 +242,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         quote! {}
     };
 
-    // 5. Implement CustomResource
-    let name = singular.unwrap_or_else(|| kind.to_ascii_lowercase());
-    let plural = plural.unwrap_or_else(|| to_plural(&name));
+    // 4. Implement CustomResource
     let scope = if namespaced { "Namespaced" } else { "Cluster" };
 
     // Compute a bunch of crd props
@@ -350,8 +370,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // Concat output
     quote! {
         #root_obj
-        #impl_resource
-        #impl_metadata
+        #impl_meta
         #impl_default
         #impl_crd
     }
