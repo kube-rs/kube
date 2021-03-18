@@ -3,7 +3,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
     CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps,
 };
 #[cfg(not(feature = "schema"))]
-use kube::CustomResource;
+use kube_derive::CustomResource;
 #[cfg(not(feature = "schema"))]
 use serde::{Deserialize, Serialize};
 
