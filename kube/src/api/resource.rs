@@ -355,6 +355,10 @@ impl Resource {
 fn to_plural(word: &str) -> String {
     if word == "endpoints" {
         return word.to_owned();
+    } else if word == "nodemetrics" {
+        return "nodes".to_owned();
+    } else if word == "podmetrics" {
+        return "pods".to_owned();
     }
 
     // Words ending in s, x, z, ch, sh will be pluralized with -es (eg. foxes).

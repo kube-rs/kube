@@ -106,7 +106,7 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn get(&self, name: &str) -> Result<K> {
         let req = self.resource.get(name)?;
         self.client.request::<K>(req).await
@@ -130,7 +130,7 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
         let req = self.resource.list(&lp)?;
         self.client.request::<ObjectList<K>>(req).await
@@ -152,7 +152,7 @@ where
     ///     - Tradeoff between the two
     ///     - Easy partially filling of native [`k8s_openapi`] types (most fields optional)
     ///     - Partial safety against runtime errors (at least you must write valid JSON)
-    #[instrument(skip(self))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
@@ -184,7 +184,7 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
         let req = self.resource.delete(name, &dp)?;
         self.client.request_status::<K>(req).await
@@ -217,7 +217,7 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn delete_collection(
         &self,
         dp: &DeleteParams,
@@ -256,7 +256,7 @@ where
     /// ```
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
-    #[instrument(skip(self))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn patch<P: Serialize + Debug>(
         &self,
         name: &str,
@@ -311,7 +311,7 @@ where
     /// ```
     ///
     /// Consider mutating the result of `api.get` rather than recreating it.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn replace(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
@@ -358,7 +358,7 @@ where
     /// ```
     /// [`ListParams::timeout`]: super::ListParams::timeout
     /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
-    #[instrument(skip(self))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn watch(
         &self,
         lp: &ListParams,
