@@ -15,6 +15,7 @@
 #![allow(clippy::pub_enum_variant_names)]
 // Triggered by many derive macros (kube-derive, derivative)
 #![allow(clippy::default_trait_access)]
+#![allow(clippy::type_repetition_in_bounds)]
 
 pub mod controller;
 pub mod reflector;

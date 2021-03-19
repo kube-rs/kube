@@ -7,7 +7,13 @@ use std::{
 };
 
 #[derive(Derivative)]
-#[derivative(Debug, PartialEq, Eq, Hash, Clone)]
+#[derivative(
+    Debug(bound = "K::Family: Debug"),
+    PartialEq(bound = "K::Family: PartialEq"),
+    Eq(bound = "K::Family: Eq"),
+    Hash(bound = "K::Family: Hash"),
+    Clone(bound = "K::Family: Clone")
+)]
 /// A typed and namedspaced (if relevant) reference to a Kubernetes object
 ///
 /// `K` may be either the object type or `DynamicObject`, in which case the
@@ -22,10 +28,7 @@ use std::{
 ///     ObjectRef::<Secret>::new("a").erase(),
 /// );
 /// ```
-pub struct ObjectRef<K: Meta>
-where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
-{
+pub struct ObjectRef<K: Meta> {
     family: K::Family,
     /// The name of the object
     pub name: String,
@@ -45,7 +48,7 @@ where
 
 impl<K: Meta> ObjectRef<K>
 where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone + Default,
+    K::Family: Default,
 {
     #[must_use]
     pub fn new(name: &str) -> Self {
@@ -61,10 +64,7 @@ where
     }
 }
 
-impl<K: Meta> ObjectRef<K>
-where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
-{
+impl<K: Meta> ObjectRef<K> {
     #[must_use]
     pub fn new_with(name: &str, family: K::Family) -> Self {
         Self {
@@ -117,10 +117,7 @@ where
     /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
     /// has a corresponding `Endpoints`, but it wouldn't make sense to convert a `Pod` into a `Deployment`.
     #[must_use]
-    pub fn into_kind_unchecked<K2: Meta>(self, f2: K2::Family) -> ObjectRef<K2>
-    where
-        <K2 as Meta>::Family: Debug + Eq + Hash + Clone,
-    {
+    pub fn into_kind_unchecked<K2: Meta>(self, f2: K2::Family) -> ObjectRef<K2> {
         ObjectRef {
             family: f2,
             name: self.name,
@@ -141,10 +138,7 @@ where
     }
 }
 
-impl<K: Meta> Display for ObjectRef<K>
-where
-    <K as Meta>::Family: Debug + Eq + Hash + Clone,
-{
+impl<K: Meta> Display for ObjectRef<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
