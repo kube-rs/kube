@@ -1,5 +1,4 @@
 use darling::FromDeriveInput;
-use inflector::string::pluralize::to_plural;
 use proc_macro2::{Ident, Span};
 use syn::{Data, DeriveInput, Path};
 
@@ -355,6 +354,37 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #impl_default
         #impl_crd
     }
+}
+
+// Simple pluralizer.
+// Duplicating the code from kube (without special casing) because it's simple enough.
+// Irregular plurals must be explicitly specified.
+fn to_plural(word: &str) -> String {
+    // Words ending in s, x, z, ch, sh will be pluralized with -es (eg. foxes).
+    if word.ends_with('s')
+        || word.ends_with('x')
+        || word.ends_with('z')
+        || word.ends_with("ch")
+        || word.ends_with("sh")
+    {
+        return format!("{}es", word);
+    }
+
+    // Words ending in y that are preceded by a consonant will be pluralized by
+    // replacing y with -ies (eg. puppies).
+    if word.ends_with('y') {
+        if let Some(c) = word.chars().nth(word.len() - 2) {
+            if !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u') {
+                // Remove 'y' and add `ies`
+                let mut chars = word.chars();
+                chars.next_back();
+                return format!("{}ies", chars.as_str());
+            }
+        }
+    }
+
+    // All other words will have "s" added to the end (eg. days).
+    format!("{}s", word)
 }
 
 #[cfg(test)]

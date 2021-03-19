@@ -5,8 +5,6 @@ use crate::{
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
 use std::{borrow::Cow, convert::TryFrom, sync::Arc};
 
-use inflector::{cases::pascalcase::is_pascal_case, string::pluralize::to_plural};
-
 use std::iter;
 
 /// A dynamic builder for Resource
@@ -168,12 +166,6 @@ impl TryFrom<DynamicResource> for Resource {
         let version = rb.version.unwrap();
         let group = rb.group.unwrap();
 
-        // pedantic conventions we enforce internally in kube-derive
-        // but are broken by a few native / common custom resources such as istio, or
-        // kinds matching: CRI*, *Options, *Metrics, CSI*, ENI*, API*
-        if to_plural(&rb.kind) == rb.kind || !is_pascal_case(&rb.kind) {
-            debug!("DynamicResource '{}' should be singular + PascalCase", rb.kind);
-        }
         Ok(Self {
             api_version: if group.is_empty() {
                 version.clone()
