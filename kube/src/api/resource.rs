@@ -353,7 +353,7 @@ impl Resource {
 
 // Simple pluralizer. Handles the special cases.
 fn to_plural(word: &str) -> String {
-    if word == "endpoints" {
+    if word == "endpoints" || word == "endpointslices" {
         return word.to_owned();
     } else if word == "nodemetrics" {
         return "nodes".to_owned();
