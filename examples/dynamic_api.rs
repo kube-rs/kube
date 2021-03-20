@@ -37,12 +37,9 @@ async fn main() -> anyhow::Result<()> {
     }
     // core/v1 has a legacy endpoint
     let coreapis = client.list_core_api_versions().await?;
-
     assert_eq!(coreapis.versions.len(), 1);
     let corev1 = client.list_core_api_resources(&coreapis.versions[0]).await?;
-    print_group(&client, &coreapis.versions[0], corev1, ns_filter.as_deref()).await?;
-
-    Ok(())
+    print_group(&client, &coreapis.versions[0], corev1, ns_filter.as_deref()).await
 }
 
 async fn print_group(
@@ -55,7 +52,6 @@ async fn print_group(
         if !ar.verbs.contains(&"list".to_string()) {
             continue;
         }
-        info!("{} : {}", group_version, ar.kind);
         let mut resource = DynamicResource::from_api_resource(&ar, &apis.group_version);
         if ar.namespaced {
             if let Some(ns) = ns_filter {
@@ -64,6 +60,7 @@ async fn print_group(
         }
         let api = resource.into_api::<DynamicObject>(client.clone());
         let list = api.list(&Default::default()).await?;
+        info!("{} : {}", group_version, ar.kind);
         for item in list.items {
             let name = item.name();
             let ns = item.namespace().map(|s| s + "/").unwrap_or_default();
