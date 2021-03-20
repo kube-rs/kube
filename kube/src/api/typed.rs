@@ -33,7 +33,7 @@ pub struct Api<K> {
 impl<K> Api<K>
 where
     K: Meta,
-    <K as Meta>::Family: Default,
+    <K as Meta>::DynamicType: Default,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
@@ -53,9 +53,9 @@ where
 {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
-    /// This function accepts `K::Family` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, family: &K::Family) -> Self {
-        let resource = Resource::all_with::<K>(family);
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    pub fn all_with(client: Client, rtt: &K::DynamicType) -> Self {
+        let resource = Resource::all_with::<K>(rtt);
         Self {
             resource,
             client,
@@ -65,9 +65,9 @@ where
 
     /// Namespaced resource within a given namespace
     ///
-    /// This function accepts `K::Family` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, family: &K::Family) -> Self {
-        let resource = Resource::namespaced_with::<K>(ns, family);
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    pub fn namespaced_with(client: Client, ns: &str, rtt: &K::DynamicType) -> Self {
+        let resource = Resource::namespaced_with::<K>(ns, rtt);
         Self {
             resource,
             client,
@@ -76,7 +76,7 @@ where
     }
 
     /// Returns reference to the underlying `Resource` object.
-    /// It can be used to make low-level requests or as a `Family`
+    /// It can be used to make low-level requests or as a `DynamicType`
     /// for a `DynamicObject`.
     pub fn resource(&self) -> &Resource {
         &self.resource

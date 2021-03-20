@@ -16,18 +16,23 @@ use std::borrow::Cow;
 ///
 /// This avoids a bunch of the unnecessary unwrap mechanics for apps.
 pub trait Meta {
-    /// Types that know their metadata at compile time should select `Family = ()`.
-    /// Types that require some information at runtime should select `Family`
+    /// Type information for types that do not know their resource information at compile time.
+    ///
+    /// Types that know their metadata at compile time should select `DynamicType = ()`.
+    /// Types that require some information at runtime should select `DynamicType`
     /// as type of this information.
-    type Family: Send + Sync + 'static;
+    ///
+    /// See [`DynamicObject`] for a valid implementation of non-k8s-openapi resources.
+    type DynamicType: Send + Sync + 'static;
+
     /// Returns kind of this object
-    fn kind<'a>(f: &'a Self::Family) -> Cow<'a, str>;
+    fn kind(f: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns group of this object
-    fn group<'a>(f: &'a Self::Family) -> Cow<'a, str>;
+    fn group(f: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns version of this object
-    fn version<'a>(f: &'a Self::Family) -> Cow<'a, str>;
+    fn version(f: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns apiVersion of this object
-    fn api_version<'a>(f: &'a Self::Family) -> Cow<'a, str> {
+    fn api_version<'a>(f: &'a Self::DynamicType) -> Cow<'_, str> {
         let group = Self::group(f);
         if group.is_empty() {
             return Self::version(f);
@@ -52,21 +57,21 @@ impl<K> Meta for K
 where
     K: Metadata<Ty = ObjectMeta>,
 {
-    type Family = ();
+    type DynamicType = ();
 
-    fn kind<'a>(_: &'a ()) -> Cow<'a, str> {
+    fn kind<'a>(_: &()) -> Cow<'_, str> {
         K::KIND.into()
     }
 
-    fn group<'a>(_: &'a ()) -> Cow<'a, str> {
+    fn group<'a>(_: &()) -> Cow<'_, str> {
         K::GROUP.into()
     }
 
-    fn version<'a>(_: &'a ()) -> Cow<'a, str> {
+    fn version<'a>(_: &()) -> Cow<'_, str> {
         K::VERSION.into()
     }
 
-    fn api_version<'a>(_: &'a ()) -> Cow<'a, str> {
+    fn api_version<'a>(_: &'a ()) -> Cow<'_, str> {
         K::API_VERSION.into()
     }
 
