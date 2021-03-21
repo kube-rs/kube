@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use tracing::instrument;
 
 use crate::{
-    api::{Api, DeleteParams, Patch, PatchParams, PostParams, Resource},
+    api::{Api, DeleteParams, Patch, PatchParams, PostParams, RequestBuilder},
     client::Status,
     Error, Result,
 };
@@ -153,7 +153,7 @@ pub struct LogParams {
     pub timestamps: bool,
 }
 
-impl Resource {
+impl RequestBuilder {
     /// Get a pod logs
     pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "log?";
@@ -199,9 +199,9 @@ impl Resource {
 
 #[test]
 fn log_path() {
-    use crate::api::Resource;
+    use crate::api::RequestBuilder;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let r = RequestBuilder::namespaced::<corev1::Pod>("ns");
     let lp = LogParams {
         container: Some("blah".into()),
         ..LogParams::default()
@@ -247,7 +247,7 @@ pub struct EvictParams {
     pub post_options: PostParams,
 }
 
-impl Resource {
+impl RequestBuilder {
     /// Create an eviction
     pub fn evict(&self, name: &str, ep: &EvictParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/" + "eviction?";
@@ -271,9 +271,9 @@ impl Resource {
 
 #[test]
 fn evict_path() {
-    use crate::api::Resource;
+    use crate::api::RequestBuilder;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let r = RequestBuilder::namespaced::<corev1::Pod>("ns");
     let ep = EvictParams::default();
     let req = r.evict("foo", &ep).unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/eviction?");
@@ -462,7 +462,7 @@ impl AttachParams {
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl Resource {
+impl RequestBuilder {
     /// Attach to a pod
     pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<Vec<u8>>> {
         ap.validate()?;
@@ -479,9 +479,9 @@ impl Resource {
 #[cfg(feature = "ws")]
 #[test]
 fn attach_path() {
-    use crate::api::Resource;
+    use crate::api::RequestBuilder;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let r = RequestBuilder::namespaced::<corev1::Pod>("ns");
     let ap = AttachParams {
         container: Some("blah".into()),
         ..AttachParams::default()
@@ -522,7 +522,7 @@ where
 // ----------------------------------------------------------------------------
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl Resource {
+impl RequestBuilder {
     /// Execute command in a pod
     pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<Vec<u8>>>
     where
@@ -547,9 +547,9 @@ impl Resource {
 #[cfg(feature = "ws")]
 #[test]
 fn exec_path() {
-    use crate::api::Resource;
+    use crate::api::RequestBuilder;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = Resource::namespaced::<corev1::Pod>("ns");
+    let r = RequestBuilder::namespaced::<corev1::Pod>("ns");
     let ap = AttachParams {
         container: Some("blah".into()),
         ..AttachParams::default()

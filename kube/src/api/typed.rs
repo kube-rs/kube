@@ -5,20 +5,24 @@ use std::{fmt::Debug, iter};
 use tracing::instrument;
 
 use crate::{
-    api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Resource, WatchEvent},
+    api::{
+        DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, RequestBuilder,
+        WatchEvent,
+    },
     client::{Client, Status},
     Result,
 };
 
-/// A generic Api abstraction
+/// The generic Api abstraction
 ///
-/// This abstracts over a [`Resource`] and a type `K` so that
-/// we get automatic serialization/deserialization on the api calls
-/// implemented by the dynamic [`Resource`].
+/// This abstracts over a request builder and a resource of type `K` to provide
+/// automatic serialization/deserialization to and from `K` in api calls.
+///
+/// This abstraction takes a [`Client`] (cheap to clone) and awaits the result internally.
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request creator object
-    pub(crate) resource: Resource,
+    pub(crate) resource: RequestBuilder,
     /// The client to use (from this library)
     pub(crate) client: Client,
     /// Underlying Object unstored
@@ -55,7 +59,7 @@ where
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
     pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
-        let resource = Resource::all_with::<K>(dyntype);
+        let resource = RequestBuilder::all_with::<K>(dyntype);
         Self {
             resource,
             client,
@@ -67,7 +71,7 @@ where
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
     pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
-        let resource = Resource::namespaced_with::<K>(ns, dyntype);
+        let resource = RequestBuilder::namespaced_with::<K>(ns, dyntype);
         Self {
             resource,
             client,
@@ -78,7 +82,7 @@ where
     /// Returns reference to the underlying `Resource` object.
     /// It can be used to make low-level requests or as a `DynamicType`
     /// for a `DynamicObject`.
-    pub fn resource(&self) -> &Resource {
+    pub fn resource(&self) -> &RequestBuilder {
         &self.resource
     }
 

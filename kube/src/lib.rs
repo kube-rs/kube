@@ -96,7 +96,7 @@ pub mod error;
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-pub use api::{Api, DynamicResource, Resource};
+pub use api::{Api, DynamicResource, RequestBuilder};
 #[doc(inline)] pub use client::Client;
 #[doc(inline)] pub use config::Config;
 #[doc(inline)] pub use error::Error;

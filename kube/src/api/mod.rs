@@ -13,8 +13,9 @@ pub(crate) mod params;
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
 };
+// TODO: rename files to requests.rs
 mod resource;
-pub use resource::Resource;
+pub use resource::RequestBuilder;
 
 pub(crate) mod typed;
 pub use typed::Api;

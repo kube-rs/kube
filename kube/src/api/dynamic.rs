@@ -1,5 +1,5 @@
 use crate::{
-    api::{typed::Api, Meta, Resource},
+    api::{typed::Api, Meta, RequestBuilder},
     Client, Error, Result,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
@@ -14,8 +14,8 @@ use std::iter;
 ///
 /// ### Direct usage
 /// ```
-/// use kube::api::Resource;
-/// let foos = Resource::dynamic("Foo") // <.spec.kind>
+/// use kube::api::RequestBuilder;
+/// let foos = RequestBuilder::dynamic("Foo") // <.spec.kind>
 ///    .group("clux.dev") // <.spec.group>
 ///    .version("v1")
 ///    .into_resource();
@@ -112,8 +112,8 @@ impl DynamicResource {
     ///
     /// Note this crashes on invalid group/version/kinds.
     /// Use [`try_into_resource`](Self::try_into_resource) to handle the errors.
-    pub fn into_resource(self) -> Resource {
-        Resource::try_from(self).unwrap()
+    pub fn into_resource(self) -> RequestBuilder {
+        RequestBuilder::try_from(self).unwrap()
     }
 
     /// Consume the `DynamicResource` and convert to an `Api` object.
@@ -121,7 +121,7 @@ impl DynamicResource {
     /// Note this crashes on invalid group/version/kinds.
     /// Use [`try_into_api`](Self::try_into_api) to handle the errors.
     pub fn into_api<K: Meta>(self, client: Client) -> Api<K> {
-        let resource = Resource::try_from(self).unwrap();
+        let resource = RequestBuilder::try_from(self).unwrap();
         Api {
             client,
             resource,
@@ -132,13 +132,13 @@ impl DynamicResource {
     /// Consume the `DynamicResource` and attempt to build a `Resource`.
     ///
     /// Equivalent to importing TryFrom trait into scope.
-    pub fn try_into_resource(self) -> Result<Resource> {
-        Resource::try_from(self)
+    pub fn try_into_resource(self) -> Result<RequestBuilder> {
+        RequestBuilder::try_from(self)
     }
 
     /// Consume the `DynamicResource` and and attempt to convert to an `Api` object.
     pub fn try_into_api<K: Meta>(self, client: Client) -> Result<Api<K>> {
-        let resource = Resource::try_from(self)?;
+        let resource = RequestBuilder::try_from(self)?;
         Ok(Api {
             client,
             resource,
@@ -147,7 +147,7 @@ impl DynamicResource {
     }
 }
 
-impl TryFrom<DynamicResource> for Resource {
+impl TryFrom<DynamicResource> for RequestBuilder {
     type Error = crate::Error;
 
     fn try_from(rb: DynamicResource) -> Result<Self> {
@@ -292,12 +292,12 @@ impl Meta for DynamicObject {
 #[cfg(test)]
 mod test {
     use crate::{
-        api::{Patch, PatchParams, PostParams, Resource},
+        api::{Patch, PatchParams, PostParams, RequestBuilder},
         Result,
     };
     #[test]
     fn raw_custom_resource() {
-        let r = Resource::dynamic("Foo")
+        let r = RequestBuilder::dynamic("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
@@ -314,7 +314,7 @@ mod test {
 
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
-        let r = Resource::dynamic("Service")
+        let r = RequestBuilder::dynamic("Service")
             .group("")
             .version("v1")
             .try_into_resource()?;
@@ -339,7 +339,7 @@ mod test {
         let client = Client::try_default().await.unwrap();
         let a1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
-        let a2: Api<Foo> = Resource::dynamic("Foo")
+        let a2: Api<Foo> = RequestBuilder::dynamic("Foo")
             .group("clux.dev")
             .version("v1")
             .within("myns")
