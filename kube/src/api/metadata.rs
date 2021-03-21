@@ -32,7 +32,7 @@ pub trait Meta {
     /// Returns version of this object
     fn version(f: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns apiVersion of this object
-    fn api_version<'a>(f: &'a Self::DynamicType) -> Cow<'_, str> {
+    fn api_version(f: &Self::DynamicType) -> Cow<'_, str> {
         let group = Self::group(f);
         if group.is_empty() {
             return Self::version(f);
@@ -71,7 +71,7 @@ where
         K::VERSION.into()
     }
 
-    fn api_version<'a>(_: &'a ()) -> Cow<'_, str> {
+    fn api_version(_: &()) -> Cow<'_, str> {
         K::API_VERSION.into()
     }
 
