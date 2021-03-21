@@ -54,8 +54,8 @@ where
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, rtt: &K::DynamicType) -> Self {
-        let resource = Resource::all_with::<K>(rtt);
+    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
+        let resource = Resource::all_with::<K>(dyntype);
         Self {
             resource,
             client,
@@ -66,8 +66,8 @@ where
     /// Namespaced resource within a given namespace
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, rtt: &K::DynamicType) -> Self {
-        let resource = Resource::namespaced_with::<K>(ns, rtt);
+    pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
+        let resource = Resource::namespaced_with::<K>(ns, dyntype);
         Self {
             resource,
             client,

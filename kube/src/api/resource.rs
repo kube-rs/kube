@@ -36,12 +36,12 @@ impl Resource {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with<K: Meta>(rtt: &K::DynamicType) -> Self {
+    pub fn all_with<K: Meta>(dyntype: &K::DynamicType) -> Self {
         Self {
-            api_version: K::api_version(rtt).into_owned(),
-            kind: K::kind(rtt).into_owned(),
-            group: K::group(rtt).into_owned(),
-            version: K::version(rtt).into_owned(),
+            api_version: K::api_version(dyntype).into_owned(),
+            kind: K::kind(dyntype).into_owned(),
+            group: K::group(dyntype).into_owned(),
+            version: K::version(dyntype).into_owned(),
             namespace: None,
         }
     }
@@ -49,8 +49,8 @@ impl Resource {
     /// Namespaced resource within a given namespace
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn namespaced_with<K: Meta>(ns: &str, rtt: &K::DynamicType) -> Self {
-        let kind = K::kind(rtt);
+    pub fn namespaced_with<K: Meta>(ns: &str, dyntype: &K::DynamicType) -> Self {
+        let kind = K::kind(dyntype);
         match kind.as_ref() {
             "Node" | "Namespace" | "ClusterRole" | "CustomResourceDefinition" => {
                 panic!("{} is not a namespace scoped resource", kind)
@@ -58,10 +58,10 @@ impl Resource {
             _ => {}
         }
         Self {
-            api_version: K::api_version(rtt).into_owned(),
+            api_version: K::api_version(dyntype).into_owned(),
             kind: kind.into_owned(),
-            group: K::group(rtt).into_owned(),
-            version: K::version(rtt).into_owned(),
+            group: K::group(dyntype).into_owned(),
+            version: K::version(dyntype).into_owned(),
             namespace: Some(ns.to_string()),
         }
     }

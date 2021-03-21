@@ -16,7 +16,7 @@ where
     K::DynamicType: Eq + Hash,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
-    family: K::DynamicType,
+    dyntype: K::DynamicType,
 }
 
 impl<K: 'static + Meta + Clone> Writer<K>
@@ -27,10 +27,10 @@ where
     ///
     /// If the dynamic type is default-able (for example when writer is used with
     /// `k8s_openapi` types) you can use `Default` instead.
-    pub fn new(family: K::DynamicType) -> Self {
+    pub fn new(dyntype: K::DynamicType) -> Self {
         Writer {
             store: Default::default(),
-            family,
+            dyntype,
         }
     }
 
@@ -53,16 +53,16 @@ where
         match event {
             watcher::Event::Applied(obj) => {
                 self.store
-                    .insert(ObjectRef::from_obj_with(&obj, self.family.clone()), obj.clone());
+                    .insert(ObjectRef::from_obj_with(&obj, self.dyntype.clone()), obj.clone());
             }
             watcher::Event::Deleted(obj) => {
                 self.store
-                    .remove(&ObjectRef::from_obj_with(&obj, self.family.clone()));
+                    .remove(&ObjectRef::from_obj_with(&obj, self.dyntype.clone()));
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| (ObjectRef::from_obj_with(obj, self.family.clone()), obj))
+                    .map(|obj| (ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj))
                     .collect::<HashMap<_, _>>();
                 // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
                 self.store.retain(|key, _old_value| new_objs.contains_key(key));
