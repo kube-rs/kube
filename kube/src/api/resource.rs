@@ -34,6 +34,8 @@ pub struct Resource {
 
 impl Resource {
     /// Cluster level resources, or resources viewed across all namespaces
+    ///
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
     pub fn all_with<K: Meta>(rtt: &K::DynamicType) -> Self {
         Self {
             api_version: K::api_version(rtt).into_owned(),
@@ -45,6 +47,8 @@ impl Resource {
     }
 
     /// Namespaced resource within a given namespace
+    ///
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
     pub fn namespaced_with<K: Meta>(ns: &str, rtt: &K::DynamicType) -> Self {
         let kind = K::kind(rtt);
         match kind.as_ref() {

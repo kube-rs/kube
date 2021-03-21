@@ -23,9 +23,9 @@ impl<K: 'static + Meta + Clone> Writer<K>
 where
     K::DynamicType: Eq + Hash,
 {
-    /// Creates a new Writer with the specified family.
+    /// Creates a new Writer with the specified dynamic type.
     ///
-    /// If family is default-able (for example when writer is used with
+    /// If the dynamic type is default-able (for example when writer is used with
     /// `k8s_openapi` types) you can use `Default` instead.
     pub fn new(family: K::DynamicType) -> Self {
         Writer {
