@@ -10,27 +10,27 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
-#[derivative(Default(bound = "K::Family: Default"))]
+#[derivative(Default(bound = "K::DynamicType: Default"))]
 pub struct Writer<K: 'static + Meta>
 where
-    K::Family: Eq + Hash,
+    K::DynamicType: Eq + Hash,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
-    family: K::Family,
+    dyntype: K::DynamicType,
 }
 
 impl<K: 'static + Meta + Clone> Writer<K>
 where
-    K::Family: Eq + Hash,
+    K::DynamicType: Eq + Hash,
 {
-    /// Creates a new Writer with the specified family.
+    /// Creates a new Writer with the specified dynamic type.
     ///
-    /// If family is default-able (for example when writer is used with
+    /// If the dynamic type is default-able (for example when writer is used with
     /// `k8s_openapi` types) you can use `Default` instead.
-    pub fn new(family: K::Family) -> Self {
+    pub fn new(dyntype: K::DynamicType) -> Self {
         Writer {
             store: Default::default(),
-            family,
+            dyntype,
         }
     }
 
@@ -48,21 +48,21 @@ where
     /// Applies a single watcher event to the store
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>)
     where
-        K::Family: Clone,
+        K::DynamicType: Clone,
     {
         match event {
             watcher::Event::Applied(obj) => {
                 self.store
-                    .insert(ObjectRef::from_obj_with(&obj, self.family.clone()), obj.clone());
+                    .insert(ObjectRef::from_obj_with(&obj, self.dyntype.clone()), obj.clone());
             }
             watcher::Event::Deleted(obj) => {
                 self.store
-                    .remove(&ObjectRef::from_obj_with(&obj, self.family.clone()));
+                    .remove(&ObjectRef::from_obj_with(&obj, self.dyntype.clone()));
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| (ObjectRef::from_obj_with(obj, self.family.clone()), obj))
+                    .map(|obj| (ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj))
                     .collect::<HashMap<_, _>>();
                 // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
                 self.store.retain(|key, _old_value| new_objs.contains_key(key));
@@ -81,17 +81,17 @@ where
 /// Cannot be constructed directly since one writer handle is required,
 /// use `Writer::as_reader()` instead.
 #[derive(Derivative)]
-#[derivative(Debug(bound = "K: Debug, K::Family: Debug"), Clone)]
+#[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
 pub struct Store<K: 'static + Meta>
 where
-    K::Family: Hash + Eq,
+    K::DynamicType: Hash + Eq,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
 impl<K: 'static + Clone + Meta> Store<K>
 where
-    K::Family: Eq + Hash + Clone,
+    K::DynamicType: Eq + Hash + Clone,
 {
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
     ///

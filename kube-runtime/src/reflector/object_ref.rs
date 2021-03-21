@@ -8,11 +8,11 @@ use std::{
 
 #[derive(Derivative)]
 #[derivative(
-    Debug(bound = "K::Family: Debug"),
-    PartialEq(bound = "K::Family: PartialEq"),
-    Eq(bound = "K::Family: Eq"),
-    Hash(bound = "K::Family: Hash"),
-    Clone(bound = "K::Family: Clone")
+    Debug(bound = "K::DynamicType: Debug"),
+    PartialEq(bound = "K::DynamicType: PartialEq"),
+    Eq(bound = "K::DynamicType: Eq"),
+    Hash(bound = "K::DynamicType: Hash"),
+    Clone(bound = "K::DynamicType: Clone")
 )]
 /// A typed and namedspaced (if relevant) reference to a Kubernetes object
 ///
@@ -29,7 +29,7 @@ use std::{
 /// );
 /// ```
 pub struct ObjectRef<K: Meta> {
-    family: K::Family,
+    dyntype: K::DynamicType,
     /// The name of the object
     pub name: String,
     /// The namespace of the object
@@ -48,7 +48,7 @@ pub struct ObjectRef<K: Meta> {
 
 impl<K: Meta> ObjectRef<K>
 where
-    K::Family: Default,
+    K::DynamicType: Default,
 {
     #[must_use]
     pub fn new(name: &str) -> Self {
@@ -66,9 +66,9 @@ where
 
 impl<K: Meta> ObjectRef<K> {
     #[must_use]
-    pub fn new_with(name: &str, family: K::Family) -> Self {
+    pub fn new_with(name: &str, dyntype: K::DynamicType) -> Self {
         Self {
-            family,
+            dyntype,
             name: name.into(),
             namespace: None,
         }
@@ -81,12 +81,12 @@ impl<K: Meta> ObjectRef<K> {
     }
 
     #[must_use]
-    pub fn from_obj_with(obj: &K, f: K::Family) -> Self
+    pub fn from_obj_with(obj: &K, dyntype: K::DynamicType) -> Self
     where
         K: Meta,
     {
         Self {
-            family: f,
+            dyntype,
             name: obj.name(),
             namespace: obj.namespace(),
         }
@@ -99,11 +99,11 @@ impl<K: Meta> ObjectRef<K> {
     pub fn from_owner_ref(
         namespace: Option<&str>,
         owner: &OwnerReference,
-        family: K::Family,
+        dyntype: K::DynamicType,
     ) -> Option<Self> {
-        if owner.api_version == K::api_version(&family) && owner.kind == K::kind(&family) {
+        if owner.api_version == K::api_version(&dyntype) && owner.kind == K::kind(&dyntype) {
             Some(Self {
-                family,
+                dyntype,
                 name: owner.name.clone(),
                 namespace: namespace.map(String::from),
             })
@@ -117,9 +117,9 @@ impl<K: Meta> ObjectRef<K> {
     /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
     /// has a corresponding `Endpoints`, but it wouldn't make sense to convert a `Pod` into a `Deployment`.
     #[must_use]
-    pub fn into_kind_unchecked<K2: Meta>(self, f2: K2::Family) -> ObjectRef<K2> {
+    pub fn into_kind_unchecked<K2: Meta>(self, dt2: K2::DynamicType) -> ObjectRef<K2> {
         ObjectRef {
-            family: f2,
+            dyntype: dt2,
             name: self.name,
             namespace: self.namespace,
         }
@@ -127,10 +127,10 @@ impl<K: Meta> ObjectRef<K> {
 
     pub fn erase(self) -> ObjectRef<DynamicObject> {
         ObjectRef {
-            family: kube::api::GroupVersionKind::from_dynamic_gvk(
-                K::group(&self.family).as_ref(),
-                K::version(&self.family).as_ref(),
-                K::kind(&self.family).as_ref(),
+            dyntype: kube::api::GroupVersionKind::from_dynamic_gvk(
+                K::group(&self.dyntype).as_ref(),
+                K::version(&self.dyntype).as_ref(),
+                K::kind(&self.dyntype).as_ref(),
             ),
             name: self.name,
             namespace: self.namespace,
@@ -143,9 +143,9 @@ impl<K: Meta> Display for ObjectRef<K> {
         write!(
             f,
             "{}.{}.{}/{}",
-            K::kind(&self.family),
-            K::version(&self.family),
-            K::group(&self.family),
+            K::kind(&self.dyntype),
+            K::version(&self.dyntype),
+            K::group(&self.dyntype),
             self.name
         )?;
         if let Some(namespace) = &self.namespace {

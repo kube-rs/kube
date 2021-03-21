@@ -34,19 +34,23 @@ pub struct Resource {
 
 impl Resource {
     /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all_with<K: Meta>(f: &K::Family) -> Self {
+    ///
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    pub fn all_with<K: Meta>(dyntype: &K::DynamicType) -> Self {
         Self {
-            api_version: K::api_version(f).into_owned(),
-            kind: K::kind(f).into_owned(),
-            group: K::group(f).into_owned(),
-            version: K::version(f).into_owned(),
+            api_version: K::api_version(dyntype).into_owned(),
+            kind: K::kind(dyntype).into_owned(),
+            group: K::group(dyntype).into_owned(),
+            version: K::version(dyntype).into_owned(),
             namespace: None,
         }
     }
 
     /// Namespaced resource within a given namespace
-    pub fn namespaced_with<K: Meta>(ns: &str, f: &K::Family) -> Self {
-        let kind = K::kind(f);
+    ///
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    pub fn namespaced_with<K: Meta>(ns: &str, dyntype: &K::DynamicType) -> Self {
+        let kind = K::kind(dyntype);
         match kind.as_ref() {
             "Node" | "Namespace" | "ClusterRole" | "CustomResourceDefinition" => {
                 panic!("{} is not a namespace scoped resource", kind)
@@ -54,10 +58,10 @@ impl Resource {
             _ => {}
         }
         Self {
-            api_version: K::api_version(f).into_owned(),
+            api_version: K::api_version(dyntype).into_owned(),
             kind: kind.into_owned(),
-            group: K::group(f).into_owned(),
-            version: K::version(f).into_owned(),
+            group: K::group(dyntype).into_owned(),
+            version: K::version(dyntype).into_owned(),
             namespace: Some(ns.to_string()),
         }
     }
@@ -65,7 +69,7 @@ impl Resource {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all<K: Meta>() -> Self
     where
-        <K as Meta>::Family: Default,
+        <K as Meta>::DynamicType: Default,
     {
         Self::all_with::<K>(&Default::default())
     }
@@ -73,7 +77,7 @@ impl Resource {
     /// Namespaced resource within a given namespace
     pub fn namespaced<K: Meta>(ns: &str) -> Self
     where
-        <K as Meta>::Family: Default,
+        <K as Meta>::DynamicType: Default,
     {
         Self::namespaced_with::<K>(ns, &Default::default())
     }

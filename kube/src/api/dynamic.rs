@@ -254,21 +254,21 @@ pub struct DynamicObject {
 }
 
 impl Meta for DynamicObject {
-    type Family = GroupVersionKind;
+    type DynamicType = GroupVersionKind;
 
-    fn group<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
+    fn group(f: &GroupVersionKind) -> Cow<'_, str> {
         f.group.as_str().into()
     }
 
-    fn version<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
+    fn version(f: &GroupVersionKind) -> Cow<'_, str> {
         f.version.as_str().into()
     }
 
-    fn kind<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
+    fn kind(f: &GroupVersionKind) -> Cow<'_, str> {
         f.kind.as_str().into()
     }
 
-    fn api_version<'a>(f: &'a GroupVersionKind) -> Cow<'a, str> {
+    fn api_version(f: &GroupVersionKind) -> Cow<'_, str> {
         f.api_version.as_str().into()
     }
 

@@ -4,6 +4,7 @@ use kube::{
     Api, Client,
 };
 use kube_runtime::{utils::try_flatten_applied, watcher};
+use std::env;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -12,13 +13,13 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     // Take dynamic resource identifiers:
-    let group = "clux.dev";
-    let version = "v1";
-    let kind = "Foo";
+    let group = env::var("GROUP").unwrap_or_else(|_| "clux.dev".into());
+    let version = env::var("VERSION").unwrap_or_else(|_| "v1".into());
+    let kind = env::var("KIND").unwrap_or_else(|_| "Foo".into());
 
     // Turn them into a GVK
-    let gvk = GroupVersionKind::from_dynamic_gvk(group, version, kind);
-    // Use them in an Api with the dynamic family
+    let gvk = GroupVersionKind::from_dynamic_gvk(&group, &version, &kind);
+    // Use them in an Api with the GVK as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &gvk);
 
     // Fully compatible with kube-runtime

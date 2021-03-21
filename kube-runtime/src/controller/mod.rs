@@ -73,36 +73,39 @@ where
 }
 
 /// Enqueues the object itself for reconciliation
-pub fn trigger_self<K, S>(stream: S, family: K::Family) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
+pub fn trigger_self<K, S>(
+    stream: S,
+    dyntype: K::DynamicType,
+) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
 where
     S: TryStream<Ok = K>,
     K: Meta,
-    K::Family: Clone,
+    K::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
-        Some(ObjectRef::from_obj_with(&obj, family.clone()))
+        Some(ObjectRef::from_obj_with(&obj, dyntype.clone()))
     })
 }
 
 /// Enqueues any owners of type `KOwner` for reconciliation
 pub fn trigger_owners<KOwner, S>(
     stream: S,
-    owner_family: KOwner::Family,
+    owner_type: KOwner::DynamicType,
 ) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
 where
     S: TryStream,
     S::Ok: Meta,
     KOwner: Meta,
-    KOwner::Family: Clone,
+    KOwner::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
         let meta = obj.meta().clone();
         let ns = meta.namespace;
-        let owner_family = owner_family.clone();
+        let dt = owner_type.clone();
         meta.owner_references
             .into_iter()
             .flatten()
-            .flat_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_family.clone()))
+            .flat_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, dt.clone()))
     })
 }
 
@@ -155,7 +158,7 @@ pub fn applier<K, QueueStream, ReconcilerFut, T>(
 ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
     K: Clone + Meta + 'static,
-    K::Family: Debug + Eq + Hash + Clone + Unpin,
+    K::DynamicType: Debug + Eq + Hash + Clone + Unpin,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
     QueueStream: TryStream<Ok = ObjectRef<K>>,
@@ -293,19 +296,19 @@ where
 pub struct Controller<K>
 where
     K: Clone + Meta + Debug + 'static,
-    K::Family: Eq + Hash,
+    K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
     // TODO: get an arbitrary std::error::Error in here?
     selector: SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
-    family: K::Family,
+    dyntype: K::DynamicType,
     reader: Store<K>,
 }
 
 impl<K> Controller<K>
 where
     K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
-    K::Family: Eq + Hash + Clone + Default,
+    K::DynamicType: Eq + Hash + Clone + Default,
 {
     /// Create a Controller on a type `K`
     ///
@@ -320,29 +323,29 @@ where
 impl<K> Controller<K>
 where
     K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
-    K::Family: Eq + Hash + Clone,
+    K::DynamicType: Eq + Hash + Clone,
 {
     /// Create a Controller on a type `K`
     ///
     /// Configure `ListParams` and `Api` so you only get reconcile events
     /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
     ///
-    /// Unlike `new`, this function accepts `K::Family` so it can be used with dynamic
+    /// Unlike `new`, this function accepts `K::DynamicType` so it can be used with dynamic
     /// resources.
-    pub fn new_with(owned_api: Api<K>, lp: ListParams, family: K::Family) -> Self {
-        let writer = Writer::<K>::new(family.clone());
+    pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
+        let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
         let mut selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
             try_flatten_applied(reflector(writer, watcher(owned_api, lp))),
-            family.clone(),
+            dyntype.clone(),
         )
         .boxed();
         selector.push(self_watcher);
         Self {
             selector,
             reader,
-            family,
+            dyntype,
         }
     }
 
@@ -365,9 +368,9 @@ where
         lp: ListParams,
     ) -> Self
     where
-        Child::Family: Debug + Eq + Hash + Clone,
+        Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)), self.family.clone());
+        let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)), self.dyntype.clone());
         self.selector.push(child_watcher.boxed());
         self
     }
@@ -404,7 +407,7 @@ where
         context: Context<T>,
     ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, watcher::Error>>>
     where
-        K::Family: Debug + Unpin,
+        K::DynamicType: Debug + Unpin,
         ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Send + 'static,
         ReconcilerFut::Error: std::error::Error + Send + 'static,
     {
