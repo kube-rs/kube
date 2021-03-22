@@ -1,18 +1,9 @@
 use crate::{
-    api::{Meta, Request},
+    api::{Meta},
     Error, Result,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
-use std::{borrow::Cow, convert::TryFrom};
-
-impl<K: Meta<Info = GroupVersionKind>> TryFrom<GroupVersionKind> for Request<K> {
-    type Error = crate::Error;
-
-    fn try_from(gvk: GroupVersionKind) -> Result<Self> {
-        let req = Request::new_with(gvk);
-        Ok(req)
-    }
-}
+use std::{borrow::Cow};
 
 /// Represents a type-erased object kind
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -155,7 +146,7 @@ mod test {
     #[test]
     fn raw_custom_resource() {
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
-        let r: Request<DynamicObject> = Request::namespaced_with("myns", gvk);
+        let r: Request<DynamicObject> = Request::new_with(gvk).namespace(Some("myns"));
 
         let pp = PostParams::default();
         let req = r.create(&pp, vec![]).unwrap();
@@ -169,7 +160,7 @@ mod test {
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
         let gvk = GroupVersionKind::gvk("", "v1", "Service").unwrap();
-        let r: Request<DynamicObject> = Request::all_with(gvk);
+        let r: Request<DynamicObject> = Request::new_with(gvk);
         let pp = PostParams::default();
         let req = r.create(&pp, vec![])?;
         assert_eq!(req.uri(), "/api/v1/services?");

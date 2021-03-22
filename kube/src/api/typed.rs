@@ -20,8 +20,8 @@ pub struct Api<K: Meta>
 where
     <K as Meta>::Info: Clone,
 {
-    /// The request creator object
-    pub(crate) resource: Request<K>,
+    info: K::Info,
+    namespace: Option<String>,
     /// The client to use (from this library)
     pub(crate) client: Client,
 }
@@ -33,12 +33,12 @@ where
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
-        Self::all_with(client, Default::default())
+        Self { client, info: Default::default(), namespace: None }
     }
 
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self {
-        Self::namespaced_with(client, ns, Default::default())
+        Self { client, info: Default::default(), namespace: Some(ns.to_string()) }
     }
 }
 
@@ -51,16 +51,14 @@ where
     ///
     /// This function accepts `K::Info` so it can be used with dynamic resources.
     pub fn all_with(client: Client, info: K::Info) -> Self {
-        let resource = Request::new_with(info);
-        Self { resource, client }
+        Self { client, info, namespace: None }
     }
 
     /// Namespaced resource within a given namespace
     ///
     /// This function accepts `K::Info` so it can be used with dynamic resources.
     pub fn namespaced_with(client: Client, ns: &str, info: K::Info) -> Self {
-        let resource = Request::new_with(info).namespace(ns);
-        Self { resource, client }
+        Self { client, info, namespace: Some(ns.to_string()) }
     }
 
     /// Consume self and return the [`Client`]
@@ -90,8 +88,9 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn get(&self, name: &str) -> Result<K> {
-        let req = self.resource.get(name)?;
-        self.client.request::<K>(req).await
+        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let http_req = req.get(name)?;
+        self.client.request::<K>(http_req).await
     }
 
     /// Get a list of resources
@@ -114,8 +113,9 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let req = self.resource.list(&lp)?;
-        self.client.request::<ObjectList<K>>(req).await
+        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let http_req = req.list(&lp)?;
+        self.client.request::<ObjectList<K>>(http_req).await
     }
 
     /// Create a resource
@@ -140,8 +140,9 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = self.resource.create(&pp, bytes)?;
-        self.client.request::<K>(req).await
+        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let http_req = req.create(&pp, bytes)?;
+        self.client.request::<K>(http_req).await
     }
 
     /// Delete a named resource
@@ -168,8 +169,9 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let req = self.resource.delete(name, &dp)?;
-        self.client.request_status::<K>(req).await
+        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let http_req = req.delete(name, &dp)?;
+        self.client.request_status::<K>(http_req).await
     }
 
     /// Delete a collection of resources
@@ -205,8 +207,9 @@ where
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let req = self.resource.delete_collection(&dp, &lp)?;
-        self.client.request_status::<ObjectList<K>>(req).await
+        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let http_req = req.delete_collection(&dp, &lp)?;
+        self.client.request_status::<ObjectList<K>>(http_req).await
     }
 
     /// Patch a subset of a resource's properties
@@ -245,8 +248,9 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req = self.resource.patch(name, &pp, patch)?;
-        self.client.request::<K>(req).await
+        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let http_req = req.patch(name, &pp, patch)?;
+        self.client.request::<K>(http_req).await
     }
 
     /// Replace a resource entirely with a new one
@@ -299,8 +303,9 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = self.resource.replace(name, &pp, bytes)?;
-        self.client.request::<K>(req).await
+        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let http_req = req.replace(name, &pp, bytes)?;
+        self.client.request::<K>(http_req).await
     }
 
     /// Watch a list of resources
@@ -346,8 +351,9 @@ where
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let req = self.resource.watch(&lp, &version)?;
-        self.client.request_events::<K>(req).await
+        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let http_req = req.watch(&lp, &version)?;
+        self.client.request_events::<K>(http_req).await
     }
 }
 

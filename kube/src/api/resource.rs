@@ -2,45 +2,34 @@ use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use crate::{api::Meta, Error, Result};
 
 /// A Kubernetes request builder
-#[derive(Clone, Debug)]
-pub struct Request<K: Meta> {
-    info: K::Info,
-    namespace: Option<String>,
+#[derive(Debug)]
+pub struct Request<'a, K: Meta> {
+    info: &'a K::Info,
+    namespace: Option<&'a str>,
 }
 
-impl<K: Meta> Request<K> {
-    /// New request with the default type information
-    ///
-    /// Intended for `k8s_openapi` types.
-    /// Setup for querying cluster level resources, or resources viewed across all namespaces.
-    pub fn new() -> Self
-    where
-        <K as Meta>::Info: Default,
-    {
-        Self::new_with(Default::default())
-    }
-
+impl<'a, K: Meta> Request<'a, K> {
     /// New request with the custom type information
     ///
     /// Setup for querying cluster level resources, or resources viewed across all namespaces.
     /// This function accepts `K::Info` so it can be used with dynamic resources.
-    pub fn new_with(info: K::Info) -> Self {
+    pub fn new_with(info: &'a K::Info) -> Self {
         Self {
             info,
-            namespace: None,
+            namespace: None
         }
     }
 
     /// Sets the namespace for namespaced requests
-    pub fn namespace(mut self, ns: &str) -> Self {
-        self.namespace = Some(ns.to_string());
+    pub fn namespace(mut self, ns: Option<&'a str>) -> Self {
+        self.namespace = ns;
         self
     }
 }
 
 // -------------------------------------------------------
 
-impl<K: Meta> Request<K> {
+impl<'a, K: Meta> Request<'a, K> {
     pub(crate) fn make_url(&self) -> String {
         let n = if let Some(ns) = &self.namespace {
             format!("namespaces/{}/", ns)
@@ -61,7 +50,7 @@ impl<K: Meta> Request<K> {
 }
 
 /// Convenience methods found from API conventions
-impl<K: Meta> Request<K> {
+impl<'a, K: Meta> Request<'a, K> {
     /// List a collection of a resource
     pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "?";
@@ -207,7 +196,7 @@ impl<K: Meta> Request<K> {
 }
 
 /// Scale subresource
-impl<K: Meta> Request<K> {
+impl<'a, K: Meta> Request<'a, K> {
     /// Get an instance of the scale subresource
     pub fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/scale";
@@ -256,7 +245,7 @@ impl<K: Meta> Request<K> {
 }
 
 /// Status subresource
-impl<K: Meta> Request<K> {
+impl<'a, K: Meta> Request<'a, K> {
     /// Get an instance of the status subresource
     pub fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let base_url = self.make_url() + "/" + name + "/status";
