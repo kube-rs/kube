@@ -51,7 +51,7 @@ where
     ///
     /// This function accepts `K::Info` so it can be used with dynamic resources.
     pub fn all_with(client: Client, info: K::Info) -> Self {
-        let resource = Request::all_with(info);
+        let resource = Request::new_with(info);
         Self { resource, client }
     }
 
@@ -59,15 +59,8 @@ where
     ///
     /// This function accepts `K::Info` so it can be used with dynamic resources.
     pub fn namespaced_with(client: Client, ns: &str, info: K::Info) -> Self {
-        let resource = Request::namespaced_with(ns, info);
+        let resource = Request::new_with(info).namespace(ns);
         Self { resource, client }
-    }
-
-    /// Returns reference to the underlying `Resource` object.
-    /// It can be used to make low-level requests or as a `Info`
-    /// for a `DynamicObject`.
-    pub fn resource(&self) -> &Request<K> {
-        &self.resource
     }
 
     /// Consume self and return the [`Client`]

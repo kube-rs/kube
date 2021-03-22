@@ -9,49 +9,33 @@ pub struct Request<K: Meta> {
 }
 
 impl<K: Meta> Request<K> {
-    /// Cluster level resources, or resources viewed across all namespaces
+    /// New request with the default type information
     ///
+    /// Intended for `k8s_openapi` types.
+    /// Setup for querying cluster level resources, or resources viewed across all namespaces.
+    pub fn new() -> Self
+    where
+        <K as Meta>::Info: Default,
+    {
+        Self::new_with(Default::default())
+    }
+
+    /// New request with the custom type information
+    ///
+    /// Setup for querying cluster level resources, or resources viewed across all namespaces.
     /// This function accepts `K::Info` so it can be used with dynamic resources.
-    /// TODO: rename to new_with
-    pub fn all_with(info: K::Info) -> Self {
+    pub fn new_with(info: K::Info) -> Self {
         Self {
             info,
             namespace: None,
         }
     }
 
-    /// Namespaced resource within a given namespace
-    ///
-    /// This function accepts `K::Info` so it can be used with dynamic resources.
-    pub fn namespaced_with(ns: &str, info: K::Info) -> Self {
-        Self {
-            info,
-            namespace: Some(ns.to_string()),
-        }
+    /// Sets the namespace for namespaced requests
+    pub fn namespace(mut self, ns: &str) -> Self {
+        self.namespace = Some(ns.to_string());
+        self
     }
-
-    // TODO: provide namespace setter taking mut self
-
-    /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all() -> Self
-    where
-        <K as Meta>::Info: Default,
-    {
-        Self::all_with(Default::default())
-    }
-
-    /// Namespaced resource within a given namespace
-    pub fn namespaced(ns: &str) -> Self
-    where
-        <K as Meta>::Info: Default,
-    {
-        Self::namespaced_with(ns, Default::default())
-    }
-
-    // Build a custom Request type from a `GroupVersionKind`
-    //pub fn dynamic(kind: &str) -> RequestBuilder {
-    //    RequestBuilder::new(kind)
-    //}
 }
 
 // -------------------------------------------------------

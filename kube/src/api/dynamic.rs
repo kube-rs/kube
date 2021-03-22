@@ -9,12 +9,7 @@ impl<K: Meta<Info = GroupVersionKind>> TryFrom<GroupVersionKind> for Request<K> 
     type Error = crate::Error;
 
     fn try_from(gvk: GroupVersionKind) -> Result<Self> {
-        //let req: Request<K> = if let Some(ns) = rb.namespace {
-        //    Request::namespaced_with(&ns, gvk)
-        // TODO: put a namespace modifier to make this easier
-        //} else {
-        let req = Request::all_with(gvk);
-        //};
+        let req = Request::new_with(gvk);
         Ok(req)
     }
 }
@@ -154,7 +149,7 @@ impl Meta for DynamicObject {
 #[cfg(test)]
 mod test {
     use crate::{
-        api::{Patch, PatchParams, PostParams, Request, GroupVersionKind, DynamicObject},
+        api::{DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams, Request},
         Result,
     };
     #[test]
@@ -174,7 +169,7 @@ mod test {
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
         let gvk = GroupVersionKind::gvk("", "v1", "Service").unwrap();
-        let r: Request<DynamicObject> = Request::all_with( gvk);
+        let r: Request<DynamicObject> = Request::all_with(gvk);
         let pp = PostParams::default();
         let req = r.create(&pp, vec![])?;
         assert_eq!(req.uri(), "/api/v1/services?");
