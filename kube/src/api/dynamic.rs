@@ -1,9 +1,6 @@
-use crate::{
-    api::{Meta},
-    Error, Result,
-};
+use crate::{api::Meta, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
-use std::{borrow::Cow};
+use std::borrow::Cow;
 
 /// Represents a type-erased object kind
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

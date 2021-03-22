@@ -33,12 +33,20 @@ where
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
-        Self { client, info: Default::default(), namespace: None }
+        Self {
+            client,
+            info: Default::default(),
+            namespace: None,
+        }
     }
 
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self {
-        Self { client, info: Default::default(), namespace: Some(ns.to_string()) }
+        Self {
+            client,
+            info: Default::default(),
+            namespace: Some(ns.to_string()),
+        }
     }
 }
 
@@ -51,14 +59,22 @@ where
     ///
     /// This function accepts `K::Info` so it can be used with dynamic resources.
     pub fn all_with(client: Client, info: K::Info) -> Self {
-        Self { client, info, namespace: None }
+        Self {
+            client,
+            info,
+            namespace: None,
+        }
     }
 
     /// Namespaced resource within a given namespace
     ///
     /// This function accepts `K::Info` so it can be used with dynamic resources.
     pub fn namespaced_with(client: Client, ns: &str, info: K::Info) -> Self {
-        Self { client, info, namespace: Some(ns.to_string()) }
+        Self {
+            client,
+            info,
+            namespace: Some(ns.to_string()),
+        }
     }
 
     /// Consume self and return the [`Client`]
@@ -88,7 +104,7 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn get(&self, name: &str) -> Result<K> {
-        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
         let http_req = req.get(name)?;
         self.client.request::<K>(http_req).await
     }
@@ -113,7 +129,7 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
         let http_req = req.list(&lp)?;
         self.client.request::<ObjectList<K>>(http_req).await
     }
@@ -140,7 +156,7 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
         let http_req = req.create(&pp, bytes)?;
         self.client.request::<K>(http_req).await
     }
@@ -169,7 +185,7 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
         let http_req = req.delete(name, &dp)?;
         self.client.request_status::<K>(http_req).await
     }
@@ -207,7 +223,7 @@ where
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
         let http_req = req.delete_collection(&dp, &lp)?;
         self.client.request_status::<ObjectList<K>>(http_req).await
     }
@@ -248,7 +264,7 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
         let http_req = req.patch(name, &pp, patch)?;
         self.client.request::<K>(http_req).await
     }
@@ -303,7 +319,7 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
         let http_req = req.replace(name, &pp, bytes)?;
         self.client.request::<K>(http_req).await
     }
@@ -351,7 +367,7 @@ where
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let req: Request<K> = Request::new_with(&self.info).namespace(self.namespace.as_deref());
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
         let http_req = req.watch(&lp, &version)?;
         self.client.request_events::<K>(http_req).await
     }

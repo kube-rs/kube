@@ -9,21 +9,9 @@ pub struct Request<'a, K: Meta> {
 }
 
 impl<'a, K: Meta> Request<'a, K> {
-    /// New request with the custom type information
-    ///
-    /// Setup for querying cluster level resources, or resources viewed across all namespaces.
-    /// This function accepts `K::Info` so it can be used with dynamic resources.
-    pub fn new_with(info: &'a K::Info) -> Self {
-        Self {
-            info,
-            namespace: None
-        }
-    }
-
-    /// Sets the namespace for namespaced requests
-    pub fn namespace(mut self, ns: Option<&'a str>) -> Self {
-        self.namespace = ns;
-        self
+    /// New request base with type infomation and optional namespace
+    pub fn new(info: &'a K::Info, namespace: Option<&'a str>) -> Self {
+        Self { info, namespace }
     }
 }
 
