@@ -104,9 +104,8 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn get(&self, name: &str) -> Result<K> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
-        let http_req = req.get(name)?;
-        self.client.request::<K>(http_req).await
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).get(name)?;
+        self.client.request::<K>(req).await
     }
 
     /// Get a list of resources
@@ -129,9 +128,8 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
-        let http_req = req.list(&lp)?;
-        self.client.request::<ObjectList<K>>(http_req).await
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).list(&lp)?;
+        self.client.request::<ObjectList<K>>(req).await
     }
 
     /// Create a resource
@@ -156,9 +154,8 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
-        let http_req = req.create(&pp, bytes)?;
-        self.client.request::<K>(http_req).await
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).create(&pp, bytes)?;
+        self.client.request::<K>(req).await
     }
 
     /// Delete a named resource
@@ -185,9 +182,8 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
-        let http_req = req.delete(name, &dp)?;
-        self.client.request_status::<K>(http_req).await
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).delete(name, &dp)?;
+        self.client.request_status::<K>(req).await
     }
 
     /// Delete a collection of resources
@@ -223,9 +219,8 @@ where
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
-        let http_req = req.delete_collection(&dp, &lp)?;
-        self.client.request_status::<ObjectList<K>>(http_req).await
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).delete_collection(&dp, &lp)?;
+        self.client.request_status::<ObjectList<K>>(req).await
     }
 
     /// Patch a subset of a resource's properties
@@ -264,9 +259,8 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
-        let http_req = req.patch(name, &pp, patch)?;
-        self.client.request::<K>(http_req).await
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).patch(name, &pp, patch)?;
+        self.client.request::<K>(req).await
     }
 
     /// Replace a resource entirely with a new one
@@ -319,9 +313,8 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
-        let http_req = req.replace(name, &pp, bytes)?;
-        self.client.request::<K>(http_req).await
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).replace(name, &pp, bytes)?;
+        self.client.request::<K>(req).await
     }
 
     /// Watch a list of resources
@@ -367,9 +360,8 @@ where
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref());
-        let http_req = req.watch(&lp, &version)?;
-        self.client.request_events::<K>(http_req).await
+        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).watch(&lp, &version)?;
+        self.client.request_events::<K>(req).await
     }
 }
 
