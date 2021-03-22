@@ -407,20 +407,20 @@ mod test {
     // TODO: fixturize these tests
     #[test]
     fn api_url_secret() {
-        let r: Request<corev1::Secret> = Request::namespaced("ns");
+        let r = Request::<corev1::Secret>::new(&(), Some("ns"));
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces/ns/secrets?");
     }
 
     #[test]
     fn api_url_rs() {
-        let r: Request<appsv1::ReplicaSet> = Request::namespaced("ns");
+        let r = Request::<appsv1::ReplicaSet>::new(&(), Some("ns"));
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets?");
     }
     #[test]
     fn api_url_role() {
-        let r: Request<rbacv1::Role> = Request::namespaced("ns");
+        let r = Request::<rbacv1::Role>::new(&(), Some("ns"));
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(
             req.uri(),
@@ -430,13 +430,13 @@ mod test {
 
     #[test]
     fn api_url_cj() {
-        let r: Request<batchv1beta1::CronJob> = Request::namespaced("ns");
+        let r = Request::<batchv1beta1::CronJob>::new(&(), Some("ns"));
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/batch/v1beta1/namespaces/ns/cronjobs?");
     }
     #[test]
     fn api_url_hpa() {
-        let r: Request<autoscalingv1::HorizontalPodAutoscaler> = Request::namespaced("ns");
+        let r = Request::<autoscalingv1::HorizontalPodAutoscaler>::new(&(), Some("ns"));
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(
             req.uri(),
@@ -446,7 +446,7 @@ mod test {
 
     #[test]
     fn api_url_np() {
-        let r: Request<networkingv1::NetworkPolicy> = Request::namespaced("ns");
+        let r = Request::<networkingv1::NetworkPolicy>::new(&(), Some("ns"));
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(
             req.uri(),
@@ -455,21 +455,21 @@ mod test {
     }
     #[test]
     fn api_url_ingress() {
-        let r: Request<extsv1beta1::Ingress> = Request::namespaced("ns");
+        let r = Request::<extsv1beta1::Ingress>::new(&(), Some("ns"));
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/extensions/v1beta1/namespaces/ns/ingresses?");
     }
 
     #[test]
     fn api_url_vattach() {
-        let r: Request<storagev1::VolumeAttachment> = Request::all();
+        let r = Request::<storagev1::VolumeAttachment>::new(&(), None);
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/storage.k8s.io/v1/volumeattachments?");
     }
 
     #[test]
     fn api_url_admission() {
-        let r: Request<adregv1beta1::ValidatingWebhookConfiguration> = Request::all();
+        let r: Request<adregv1beta1::ValidatingWebhookConfiguration> = Request::new(&(), None);
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(
             req.uri(),
@@ -479,7 +479,7 @@ mod test {
 
     #[test]
     fn api_auth_selfreview() {
-        let r: Request<authv1::SelfSubjectRulesReview> = Request::all();
+        let r: Request<authv1::SelfSubjectRulesReview> = Request::new(&(), None);
         //assert_eq!(r.group, "authorization.k8s.io");
         //assert_eq!(r.kind, "SelfSubjectRulesReview");
 
@@ -492,7 +492,7 @@ mod test {
 
     #[test]
     fn api_apiextsv1_crd() {
-        let r: Request<apiextsv1::CustomResourceDefinition> = Request::all();
+        let r = Request::<apiextsv1::CustomResourceDefinition>::new(&(), None);
         let req = r.create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(
             req.uri(),
@@ -507,14 +507,14 @@ mod test {
 
     #[test]
     fn list_path() {
-        let r: Request<appsv1::Deployment> = Request::namespaced("ns");
+        let r = Request::<appsv1::Deployment>::new(&(), Some("ns"));
         let gp = ListParams::default();
         let req = r.list(&gp).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
     }
     #[test]
     fn watch_path() {
-        let r: Request<corev1::Pod> = Request::namespaced("ns");
+        let r = Request::<corev1::Pod>::new(&(), Some("ns"));
         let gp = ListParams::default();
         let req = r.watch(&gp, "0").unwrap();
         assert_eq!(
@@ -524,7 +524,7 @@ mod test {
     }
     #[test]
     fn replace_path() {
-        let r: Request<appsv1::DaemonSet> = Request::all();
+        let r = Request::<appsv1::DaemonSet>::new(&(), None);
         let pp = PostParams {
             dry_run: true,
             ..Default::default()
@@ -535,7 +535,7 @@ mod test {
 
     #[test]
     fn delete_path() {
-        let r: Request<appsv1::ReplicaSet> = Request::namespaced("ns");
+        let r = Request::<appsv1::ReplicaSet>::new(&(), Some("ns"));
         let dp = DeleteParams::default();
         let req = r.delete("myrs", &dp).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets/myrs");
@@ -544,7 +544,7 @@ mod test {
 
     #[test]
     fn delete_collection_path() {
-        let r: Request<appsv1::ReplicaSet> = Request::namespaced("ns");
+        let r = Request::<appsv1::ReplicaSet>::new(&(), Some("ns"));
         let lp = ListParams::default();
         let dp = DeleteParams::default();
         let req = r.delete_collection(&dp, &lp).unwrap();
@@ -554,7 +554,7 @@ mod test {
 
     #[test]
     fn namespace_path() {
-        let r: Request<corev1::Namespace> = Request::all();
+        let r = Request::<corev1::Namespace>::new(&(), None);
         let gp = ListParams::default();
         let req = r.list(&gp).unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces")
@@ -563,7 +563,7 @@ mod test {
     // subresources with weird version accuracy
     #[test]
     fn patch_status_path() {
-        let r: Request<corev1::Node> = Request::all();
+        let r = Request::<corev1::Node>::new(&(), None);
         let pp = PatchParams::default();
         let req = r.patch_status("mynode", &pp, &Patch::Merge(())).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
@@ -575,7 +575,7 @@ mod test {
     }
     #[test]
     fn replace_status_path() {
-        let r: Request<corev1::Node> = Request::all();
+        let r = Request::<corev1::Node>::new(&(), None);
         let pp = PostParams::default();
         let req = r.replace_status("mynode", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
@@ -585,7 +585,7 @@ mod test {
     #[test]
     fn create_ingress() {
         // NB: Ingress exists in extensions AND networking
-        let r: Request<networkingv1beta1::Ingress> = Request::namespaced("ns");
+        let r = Request::<networkingv1beta1::Ingress>::new(&(), Some("ns"));
         let pp = PostParams::default();
         let req = r.create(&pp, vec![]).unwrap();
 
@@ -604,7 +604,7 @@ mod test {
 
     #[test]
     fn replace_status() {
-        let r: Request<apiextsv1beta1::CustomResourceDefinition> = Request::all();
+        let r = Request::<apiextsv1beta1::CustomResourceDefinition>::new(&(), None);
         let pp = PostParams::default();
         let req = r.replace_status("mycrd.domain.io", &pp, vec![]).unwrap();
         assert_eq!(
@@ -614,14 +614,14 @@ mod test {
     }
     #[test]
     fn get_scale_path() {
-        let r: Request<corev1::Node> = Request::all();
+        let r = Request::<corev1::Node>::new(&(), None);
         let req = r.get_scale("mynode").unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale");
         assert_eq!(req.method(), "GET");
     }
     #[test]
     fn patch_scale_path() {
-        let r: Request<corev1::Node> = Request::all();
+        let r = Request::<corev1::Node>::new(&(), None);
         let pp = PatchParams::default();
         let req = r.patch_scale("mynode", &pp, &Patch::Merge(())).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
@@ -629,7 +629,7 @@ mod test {
     }
     #[test]
     fn replace_scale_path() {
-        let r: Request<corev1::Node> = Request::all();
+        let r = Request::<corev1::Node>::new(&(), None);
         let pp = PostParams::default();
         let req = r.replace_scale("mynode", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
@@ -640,6 +640,6 @@ mod test {
     //#[test]
     //#[should_panic]
     //fn all_resources_not_namespaceable() {
-    //    let _r: Request<corev1::Node> = Request::namespaced("ns");
+    //    let _r = Request::<corev1::Node>::new(&(), Some("ns"));
     //}
 }

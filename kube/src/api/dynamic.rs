@@ -143,7 +143,7 @@ mod test {
     #[test]
     fn raw_custom_resource() {
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
-        let r: Request<DynamicObject> = Request::new_with(gvk).namespace(Some("myns"));
+        let r: Request<DynamicObject> = Request::new(&gvk, Some("myns"));
 
         let pp = PostParams::default();
         let req = r.create(&pp, vec![]).unwrap();
@@ -157,7 +157,7 @@ mod test {
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
         let gvk = GroupVersionKind::gvk("", "v1", "Service").unwrap();
-        let r: Request<DynamicObject> = Request::new_with(gvk);
+        let r: Request<DynamicObject> = Request::new(&gvk, None);
         let pp = PostParams::default();
         let req = r.create(&pp, vec![])?;
         assert_eq!(req.uri(), "/api/v1/services?");
