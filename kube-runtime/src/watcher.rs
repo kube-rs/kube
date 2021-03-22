@@ -112,7 +112,10 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Debug + Send + 's
     api: &Api<K>,
     list_params: &ListParams,
     state: State<K>,
-) -> (Option<Result<Event<K>>>, State<K>) {
+) -> (Option<Result<Event<K>>>, State<K>)
+where
+    <K as Meta>::Info: Clone,
+{
     match state {
         State::Empty => match api.list(&list_params).await {
             Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
@@ -177,7 +180,10 @@ async fn step<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     mut state: State<K>,
-) -> (Result<Event<K>>, State<K>) {
+) -> (Result<Event<K>>, State<K>)
+where
+    <K as Meta>::Info: Clone,
+{
     loop {
         match step_trampolined(&api, &list_params, state).await {
             (Some(result), new_state) => return (result, new_state),
@@ -235,7 +241,10 @@ async fn step<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
 pub fn watcher<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
-) -> impl Stream<Item = Result<Event<K>>> + Send {
+) -> impl Stream<Item = Result<Event<K>>> + Send
+where
+    <K as Meta>::Info: Clone,
+{
     futures::stream::unfold(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {

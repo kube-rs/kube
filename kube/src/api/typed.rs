@@ -1,11 +1,11 @@
 use either::Either;
 use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, iter};
+use std::fmt::Debug;
 use tracing::instrument;
 
 use crate::{
-    api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Resource, WatchEvent},
+    api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Request, WatchEvent},
     client::{Client, Status},
     Result,
 };
@@ -16,69 +16,57 @@ use crate::{
 /// we get automatic serialization/deserialization on the api calls
 /// implemented by the dynamic [`Resource`].
 #[derive(Clone)]
-pub struct Api<K> {
+pub struct Api<K: Meta>
+where
+    <K as Meta>::Info: Clone,
+{
     /// The request creator object
-    pub(crate) resource: Resource,
+    pub(crate) resource: Request<K>,
     /// The client to use (from this library)
     pub(crate) client: Client,
-    /// Underlying Object unstored
-    ///
-    /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
-    /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
-    /// is `Send`, even if `K` may not be).
-    pub(crate) phantom: iter::Empty<K>,
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K> Api<K>
+impl<K: Meta> Api<K>
 where
-    K: Meta,
-    <K as Meta>::DynamicType: Default,
+    <K as Meta>::Info: Default + Clone,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
-        Self::all_with(client, &Default::default())
+        Self::all_with(client, Default::default())
     }
 
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self {
-        Self::namespaced_with(client, ns, &Default::default())
+        Self::namespaced_with(client, ns, Default::default())
     }
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K> Api<K>
+impl<K: Meta> Api<K>
 where
-    K: Meta,
+    <K as Meta>::Info: Clone,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
-    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
-        let resource = Resource::all_with::<K>(dyntype);
-        Self {
-            resource,
-            client,
-            phantom: iter::empty(),
-        }
+    /// This function accepts `K::Info` so it can be used with dynamic resources.
+    pub fn all_with(client: Client, info: K::Info) -> Self {
+        let resource = Request::all_with(info);
+        Self { resource, client }
     }
 
     /// Namespaced resource within a given namespace
     ///
-    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
-        let resource = Resource::namespaced_with::<K>(ns, dyntype);
-        Self {
-            resource,
-            client,
-            phantom: iter::empty(),
-        }
+    /// This function accepts `K::Info` so it can be used with dynamic resources.
+    pub fn namespaced_with(client: Client, ns: &str, info: K::Info) -> Self {
+        let resource = Request::namespaced_with(ns, info);
+        Self { resource, client }
     }
 
     /// Returns reference to the underlying `Resource` object.
-    /// It can be used to make low-level requests or as a `DynamicType`
+    /// It can be used to make low-level requests or as a `Info`
     /// for a `DynamicObject`.
-    pub fn resource(&self) -> &Resource {
+    pub fn resource(&self) -> &Request<K> {
         &self.resource
     }
 
@@ -92,6 +80,7 @@ where
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + Meta + Debug,
+    <K as Meta>::Info: Clone,
 {
     /// Get a named resource
     ///
@@ -369,7 +358,10 @@ where
     }
 }
 
-impl<K> From<Api<K>> for Client {
+impl<K: Meta> From<Api<K>> for Client
+where
+    <K as Meta>::Info: Clone,
+{
     fn from(api: Api<K>) -> Self {
         api.client
     }

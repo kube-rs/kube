@@ -18,9 +18,9 @@ async fn main() -> anyhow::Result<()> {
     let kind = env::var("KIND").unwrap_or_else(|_| "Foo".into());
 
     // Turn them into a GVK
-    let gvk = GroupVersionKind::from_dynamic_gvk(&group, &version, &kind);
+    let gvk = GroupVersionKind::gvk(&group, &version, &kind)?;
     // Use them in an Api with the GVK as its DynamicType
-    let api = Api::<DynamicObject>::all_with(client, &gvk);
+    let api = Api::<DynamicObject>::all_with(client, gvk);
 
     // Fully compatible with kube-runtime
     let watcher = watcher(api, ListParams::default());

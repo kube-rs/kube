@@ -18,21 +18,21 @@ use std::borrow::Cow;
 pub trait Meta {
     /// Type information for types that do not know their resource information at compile time.
     ///
-    /// Types that know their metadata at compile time should select `DynamicType = ()`.
-    /// Types that require some information at runtime should select `DynamicType`
+    /// Types that know their metadata at compile time should select `Info = ()`.
+    /// Types that require some information at runtime should select `Info`
     /// as type of this information.
     ///
     /// See [`DynamicObject`] for a valid implementation of non-k8s-openapi resources.
-    type DynamicType: Send + Sync + 'static;
+    type Info: Send + Sync + 'static;
 
     /// Returns kind of this object
-    fn kind(f: &Self::DynamicType) -> Cow<'_, str>;
+    fn kind(f: &Self::Info) -> Cow<'_, str>;
     /// Returns group of this object
-    fn group(f: &Self::DynamicType) -> Cow<'_, str>;
+    fn group(f: &Self::Info) -> Cow<'_, str>;
     /// Returns version of this object
-    fn version(f: &Self::DynamicType) -> Cow<'_, str>;
+    fn version(f: &Self::Info) -> Cow<'_, str>;
     /// Returns apiVersion of this object
-    fn api_version(f: &Self::DynamicType) -> Cow<'_, str> {
+    fn api_version(f: &Self::Info) -> Cow<'_, str> {
         let group = Self::group(f);
         if group.is_empty() {
             return Self::version(f);
@@ -57,7 +57,7 @@ impl<K> Meta for K
 where
     K: Metadata<Ty = ObjectMeta>,
 {
-    type DynamicType = ();
+    type Info = ();
 
     fn kind<'a>(_: &()) -> Cow<'_, str> {
         K::KIND.into()
