@@ -22,13 +22,13 @@ pub use typed::Api;
 mod dynamic;
 pub use dynamic::{DynamicObject, GroupVersionKind};
 
-//#[cfg(feature = "ws")] mod remote_command;
-//#[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
+#[cfg(feature = "ws")] mod remote_command;
+#[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
 
-//mod subresource;
-//#[cfg(feature = "ws")]
-//pub use subresource::{AttachParams, Attachable, Executable};
-//pub use subresource::{EvictParams, Evictable, LogParams, Loggable, ScaleSpec, ScaleStatus};
+mod subresource;
+#[cfg(feature = "ws")]
+pub use subresource::{AttachParams, Attachable, Executable};
+pub use subresource::{EvictParams, Evictable, LogParams, Loggable, ScaleSpec, ScaleStatus};
 
 pub(crate) mod object;
 pub use self::object::{Object, ObjectList, WatchEvent};

@@ -2,6 +2,8 @@ use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use crate::{api::Meta, Error, Result};
 
 /// A Kubernetes request builder
+///
+/// Contains references to the type information necessary to construct a url.
 #[derive(Debug)]
 pub struct Request<'a, K: Meta> {
     info: &'a K::Info,

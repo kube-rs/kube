@@ -20,8 +20,8 @@ pub struct Api<K: Meta>
 where
     <K as Meta>::Info: Clone,
 {
-    info: K::Info,
-    namespace: Option<String>,
+    pub(crate) info: K::Info,
+    pub(crate) namespace: Option<String>,
     /// The client to use (from this library)
     pub(crate) client: Client,
 }
