@@ -125,10 +125,6 @@ pub struct TypeMeta {
     pub kind: String,
 }
 
-// TODO: MetadataExt trait on k8s_openapi::ObjectMeta
-// TODO: ObjectExt trait for Object, DynamicObject, and Resource implementors
-
-
 // Simple pluralizer. Handles the special cases.
 fn to_plural(word: &str) -> String {
     if word == "endpoints" || word == "endpointslices" {
