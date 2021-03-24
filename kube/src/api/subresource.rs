@@ -18,12 +18,12 @@ pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 impl<K: Meta> Api<K>
 where
     K: Clone + DeserializeOwned,
-    <K as Meta>::Info: Clone,
+    <K as Meta>::DynType: Clone,
 {
     /// Fetch the scale subresource
     #[instrument(skip(self), level = "trace")]
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
@@ -36,7 +36,7 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<Scale> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
@@ -44,7 +44,7 @@ where
     /// Replace the scale subresource
     #[instrument(skip(self), level = "trace")]
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await
     }
@@ -58,14 +58,14 @@ where
 impl<K: Meta> Api<K>
 where
     K: DeserializeOwned,
-    <K as Meta>::Info: Clone,
+    <K as Meta>::DynType: Clone,
 {
     /// Get the named resource with a status subresource
     ///
     /// This actually returns the whole K, with metadata, and spec.
     #[instrument(skip(self), level = "trace")]
     pub async fn get_status(&self, name: &str) -> Result<K> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).get_status(name)?;
         self.client.request::<K>(req).await
     }
@@ -100,7 +100,7 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).patch_status(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
@@ -126,7 +126,7 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).replace_status(name, &pp, data)?;
         self.client.request::<K>(req).await
     }
@@ -226,12 +226,12 @@ impl Loggable for k8s_openapi::api::core::v1::Pod {}
 impl<K: Meta> Api<K>
 where
     K: DeserializeOwned + Loggable,
-    <K as Meta>::Info: Clone,
+    <K as Meta>::DynType: Clone,
 {
     /// Fetch logs as a string
     #[instrument(skip(self), level = "trace")]
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
@@ -239,7 +239,7 @@ where
     /// Fetch logs as a stream of bytes
     #[instrument(skip(self), level = "trace")]
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
     }
@@ -298,11 +298,11 @@ impl Evictable for k8s_openapi::api::core::v1::Pod {}
 impl<K: Meta> Api<K>
 where
     K: DeserializeOwned + Evictable,
-    <K as Meta>::Info: Clone,
+    <K as Meta>::DynType: Clone,
 {
     /// Create an eviction
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).evict(name, ep)?;
         self.client.request::<Status>(req).await
     }
@@ -520,12 +520,12 @@ impl Attachable for k8s_openapi::api::core::v1::Pod {}
 impl<K: Meta> Api<K>
 where
     K: Clone + DeserializeOwned + Attachable,
-    <K as Meta>::Info: Clone,
+    <K as Meta>::DynType: Clone,
 {
     /// Attach to pod
     #[instrument(skip(self), level = "trace")]
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).attach(name, ap)?;
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
@@ -592,7 +592,7 @@ impl Executable for k8s_openapi::api::core::v1::Pod {}
 impl<K: Meta> Api<K>
 where
     K: Clone + DeserializeOwned + Executable,
-    <K as Meta>::Info: Clone,
+    <K as Meta>::DynType: Clone,
 {
     /// Execute a command in a pod
     #[instrument(skip(self), level = "trace")]
@@ -606,7 +606,7 @@ where
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
-        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
         let req = Request::new(url).exec(name, command, ap)?;
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))

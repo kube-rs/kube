@@ -137,7 +137,7 @@ impl DynamicObject {
 }
 
 impl Meta for DynamicObject {
-    type Info = GroupVersionKind;
+    type DynType = GroupVersionKind;
 
     fn group(f: &GroupVersionKind) -> Cow<'_, str> {
         f.group.as_str().into()
@@ -225,13 +225,13 @@ mod test {
         // Test method to dump information
         impl<K: Meta> Api<K>
         where
-            <K as Meta>::Info: Clone,
+            <K as Meta>::DynType: Clone,
         {
             fn dump_gvk(&self) -> String {
-                let group = K::group(&self.info);
-                let api_version = K::api_version(&self.info);
-                let kind = K::kind(&self.info);
-                let version = K::version(&self.info);
+                let group = K::group(&self.dyntype);
+                let api_version = K::api_version(&self.dyntype);
+                let kind = K::kind(&self.dyntype);
+                let version = K::version(&self.dyntype);
                 format!("{}/{} ({}) {}", group, version, api_version, kind)
             }
         }

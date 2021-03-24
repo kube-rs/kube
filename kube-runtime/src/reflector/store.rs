@@ -10,24 +10,24 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
-#[derivative(Default(bound = "K::Info: Default"))]
+#[derivative(Default(bound = "K::DynType: Default"))]
 pub struct Writer<K: 'static + Meta>
 where
-    K::Info: Eq + Hash,
+    K::DynType: Eq + Hash,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
-    dyntype: K::Info,
+    dyntype: K::DynType,
 }
 
 impl<K: 'static + Meta + Clone> Writer<K>
 where
-    K::Info: Eq + Hash,
+    K::DynType: Eq + Hash,
 {
     /// Creates a new Writer with the specified dynamic type.
     ///
     /// If the dynamic type is default-able (for example when writer is used with
     /// `k8s_openapi` types) you can use `Default` instead.
-    pub fn new(dyntype: K::Info) -> Self {
+    pub fn new(dyntype: K::DynType) -> Self {
         Writer {
             store: Default::default(),
             dyntype,
@@ -48,7 +48,7 @@ where
     /// Applies a single watcher event to the store
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>)
     where
-        K::Info: Clone,
+        K::DynType: Clone,
     {
         match event {
             watcher::Event::Applied(obj) => {
@@ -81,17 +81,17 @@ where
 /// Cannot be constructed directly since one writer handle is required,
 /// use `Writer::as_reader()` instead.
 #[derive(Derivative)]
-#[derivative(Debug(bound = "K: Debug, K::Info: Debug"), Clone)]
+#[derivative(Debug(bound = "K: Debug, K::DynType: Debug"), Clone)]
 pub struct Store<K: 'static + Meta>
 where
-    K::Info: Hash + Eq,
+    K::DynType: Hash + Eq,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
 impl<K: 'static + Clone + Meta> Store<K>
 where
-    K::Info: Eq + Hash + Clone,
+    K::DynType: Eq + Hash + Clone,
 {
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
     ///

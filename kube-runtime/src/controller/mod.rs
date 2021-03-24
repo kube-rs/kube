@@ -73,11 +73,14 @@ where
 }
 
 /// Enqueues the object itself for reconciliation
-pub fn trigger_self<K, S>(stream: S, dyntype: K::Info) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
+pub fn trigger_self<K, S>(
+    stream: S,
+    dyntype: K::DynType,
+) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
 where
     S: TryStream<Ok = K>,
     K: Meta,
-    K::Info: Clone,
+    K::DynType: Clone,
 {
     trigger_with(stream, move |obj| {
         Some(ObjectRef::from_obj_with(&obj, dyntype.clone()))
@@ -87,13 +90,13 @@ where
 /// Enqueues any owners of type `KOwner` for reconciliation
 pub fn trigger_owners<KOwner, S>(
     stream: S,
-    owner_type: KOwner::Info,
+    owner_type: KOwner::DynType,
 ) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
 where
     S: TryStream,
     S::Ok: Meta,
     KOwner: Meta,
-    KOwner::Info: Clone,
+    KOwner::DynType: Clone,
 {
     trigger_with(stream, move |obj| {
         let meta = obj.meta().clone();
@@ -155,7 +158,7 @@ pub fn applier<K, QueueStream, ReconcilerFut, T>(
 ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
     K: Clone + Meta + 'static,
-    K::Info: Debug + Eq + Hash + Clone + Unpin,
+    K::DynType: Debug + Eq + Hash + Clone + Unpin,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
     QueueStream: TryStream<Ok = ObjectRef<K>>,
@@ -293,19 +296,19 @@ where
 pub struct Controller<K>
 where
     K: Clone + Meta + Debug + 'static,
-    K::Info: Eq + Hash,
+    K::DynType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
     // TODO: get an arbitrary std::error::Error in here?
     selector: SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
-    dyntype: K::Info,
+    dyntype: K::DynType,
     reader: Store<K>,
 }
 
 impl<K> Controller<K>
 where
     K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
-    K::Info: Eq + Hash + Clone + Default,
+    K::DynType: Eq + Hash + Clone + Default,
 {
     /// Create a Controller on a type `K`
     ///
@@ -320,16 +323,16 @@ where
 impl<K> Controller<K>
 where
     K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
-    K::Info: Eq + Hash + Clone,
+    K::DynType: Eq + Hash + Clone,
 {
     /// Create a Controller on a type `K`
     ///
     /// Configure `ListParams` and `Api` so you only get reconcile events
     /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
     ///
-    /// Unlike `new`, this function accepts `K::Info` so it can be used with dynamic
+    /// Unlike `new`, this function accepts `K::DynType` so it can be used with dynamic
     /// resources.
-    pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::Info) -> Self {
+    pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
         let mut selector = stream::SelectAll::new();
@@ -365,7 +368,7 @@ where
         lp: ListParams,
     ) -> Self
     where
-        Child::Info: Debug + Eq + Hash + Clone,
+        Child::DynType: Debug + Eq + Hash + Clone,
     {
         let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)), self.dyntype.clone());
         self.selector.push(child_watcher.boxed());
@@ -386,7 +389,7 @@ where
     ) -> Self
     where
         I::IntoIter: Send,
-        <Other as Meta>::Info: Clone,
+        <Other as Meta>::DynType: Clone,
     {
         let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), mapper);
         self.selector.push(other_watcher.boxed());
@@ -405,7 +408,7 @@ where
         context: Context<T>,
     ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, watcher::Error>>>
     where
-        K::Info: Debug + Unpin,
+        K::DynType: Debug + Unpin,
         ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Send + 'static,
         ReconcilerFut::Error: std::error::Error + Send + 'static,
     {

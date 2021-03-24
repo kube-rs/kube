@@ -8,11 +8,11 @@ use std::{
 
 #[derive(Derivative)]
 #[derivative(
-    Debug(bound = "K::Info: Debug"),
-    PartialEq(bound = "K::Info: PartialEq"),
-    Eq(bound = "K::Info: Eq"),
-    Hash(bound = "K::Info: Hash"),
-    Clone(bound = "K::Info: Clone")
+    Debug(bound = "K::DynType: Debug"),
+    PartialEq(bound = "K::DynType: PartialEq"),
+    Eq(bound = "K::DynType: Eq"),
+    Hash(bound = "K::DynType: Hash"),
+    Clone(bound = "K::DynType: Clone")
 )]
 /// A typed and namedspaced (if relevant) reference to a Kubernetes object
 ///
@@ -29,7 +29,7 @@ use std::{
 /// );
 /// ```
 pub struct ObjectRef<K: Meta> {
-    dyntype: K::Info,
+    dyntype: K::DynType,
     /// The name of the object
     pub name: String,
     /// The namespace of the object
@@ -48,7 +48,7 @@ pub struct ObjectRef<K: Meta> {
 
 impl<K: Meta> ObjectRef<K>
 where
-    K::Info: Default,
+    K::DynType: Default,
 {
     #[must_use]
     pub fn new(name: &str) -> Self {
@@ -66,7 +66,7 @@ where
 
 impl<K: Meta> ObjectRef<K> {
     #[must_use]
-    pub fn new_with(name: &str, dyntype: K::Info) -> Self {
+    pub fn new_with(name: &str, dyntype: K::DynType) -> Self {
         Self {
             dyntype,
             name: name.into(),
@@ -81,7 +81,7 @@ impl<K: Meta> ObjectRef<K> {
     }
 
     #[must_use]
-    pub fn from_obj_with(obj: &K, dyntype: K::Info) -> Self
+    pub fn from_obj_with(obj: &K, dyntype: K::DynType) -> Self
     where
         K: Meta,
     {
@@ -96,7 +96,11 @@ impl<K: Meta> ObjectRef<K> {
     /// Create an `ObjectRef` from an `OwnerReference`
     ///
     /// Returns `None` if the types do not match.
-    pub fn from_owner_ref(namespace: Option<&str>, owner: &OwnerReference, dyntype: K::Info) -> Option<Self> {
+    pub fn from_owner_ref(
+        namespace: Option<&str>,
+        owner: &OwnerReference,
+        dyntype: K::DynType,
+    ) -> Option<Self> {
         if owner.api_version == K::api_version(&dyntype) && owner.kind == K::kind(&dyntype) {
             Some(Self {
                 dyntype,
@@ -113,7 +117,7 @@ impl<K: Meta> ObjectRef<K> {
     /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
     /// has a corresponding `Endpoints`, but it wouldn't make sense to convert a `Pod` into a `Deployment`.
     #[must_use]
-    pub fn into_kind_unchecked<K2: Meta>(self, dt2: K2::Info) -> ObjectRef<K2> {
+    pub fn into_kind_unchecked<K2: Meta>(self, dt2: K2::DynType) -> ObjectRef<K2> {
         ObjectRef {
             dyntype: dt2,
             name: self.name,
