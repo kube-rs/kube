@@ -104,7 +104,8 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn get(&self, name: &str) -> Result<K> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).get(name)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).get(name)?;
         self.client.request::<K>(req).await
     }
 
@@ -128,7 +129,8 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).list(&lp)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).list(&lp)?;
         self.client.request::<ObjectList<K>>(req).await
     }
 
@@ -154,7 +156,8 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).create(&pp, bytes)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).create(&pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
@@ -182,7 +185,8 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).delete(name, &dp)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).delete(name, &dp)?;
         self.client.request_status::<K>(req).await
     }
 
@@ -219,7 +223,8 @@ where
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).delete_collection(&dp, &lp)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).delete_collection(&dp, &lp)?;
         self.client.request_status::<ObjectList<K>>(req).await
     }
 
@@ -259,7 +264,8 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).patch(name, &pp, patch)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
 
@@ -313,7 +319,8 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).replace(name, &pp, bytes)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).replace(name, &pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
@@ -360,7 +367,8 @@ where
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).watch(&lp, &version)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).watch(&lp, &version)?;
         self.client.request_events::<K>(req).await
     }
 }

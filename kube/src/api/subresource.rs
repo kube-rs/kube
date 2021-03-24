@@ -23,7 +23,8 @@ where
     /// Fetch the scale subresource
     #[instrument(skip(self), level = "trace")]
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).get_scale(name)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).get_scale(name)?;
         self.client.request::<Scale>(req).await
     }
 
@@ -35,14 +36,16 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<Scale> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).patch_scale(name, &pp, patch)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).patch_scale(name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
 
     /// Replace the scale subresource
     #[instrument(skip(self), level = "trace")]
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).replace_scale(name, &pp, data)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).replace_scale(name, &pp, data)?;
         self.client.request::<Scale>(req).await
     }
 }
@@ -62,7 +65,8 @@ where
     /// This actually returns the whole K, with metadata, and spec.
     #[instrument(skip(self), level = "trace")]
     pub async fn get_status(&self, name: &str) -> Result<K> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).get_status(name)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).get_status(name)?;
         self.client.request::<K>(req).await
     }
 
@@ -96,7 +100,8 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).patch_status(name, &pp, patch)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).patch_status(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
 
@@ -121,7 +126,8 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).replace_status(name, &pp, data)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).replace_status(name, &pp, data)?;
         self.client.request::<K>(req).await
     }
 }
@@ -155,11 +161,11 @@ pub struct LogParams {
     pub timestamps: bool,
 }
 
-impl<'a, K: Meta> Request<'a, K> {
+impl Request {
     /// Get a pod logs
     pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url() + "/" + name + "/" + "log?";
-        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        let target = format!("{}/{}/log?", self.url_path, name);
+        let mut qp = url::form_urlencoded::Serializer::new(target);
 
         if let Some(container) = &lp.container {
             qp.append_pair("container", &container);
@@ -203,12 +209,12 @@ impl<'a, K: Meta> Request<'a, K> {
 fn log_path() {
     use crate::api::Request;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = Request::<corev1::Pod>::new(&(), Some("ns"));
     let lp = LogParams {
         container: Some("blah".into()),
         ..LogParams::default()
     };
-    let req = r.logs("foo", &lp).unwrap();
+    let url = corev1::Pod::url_path(&(), Some("ns"));
+    let req = Request::new(url).logs("foo", &lp).unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/log?&container=blah");
 }
 
@@ -225,14 +231,16 @@ where
     /// Fetch logs as a string
     #[instrument(skip(self), level = "trace")]
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).logs(name, lp)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).logs(name, lp)?;
         Ok(self.client.request_text(req).await?)
     }
 
     /// Fetch logs as a stream of bytes
     #[instrument(skip(self), level = "trace")]
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).logs(name, lp)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).logs(name, lp)?;
         Ok(self.client.request_text_stream(req).await?)
     }
 }
@@ -250,14 +258,14 @@ pub struct EvictParams {
     pub post_options: PostParams,
 }
 
-impl<'a, K: Meta> Request<'a, K> {
+impl Request {
     /// Create an eviction
     pub fn evict(&self, name: &str, ep: &EvictParams) -> Result<http::Request<Vec<u8>>> {
-        let base_url = self.make_url() + "/" + name + "/" + "eviction?";
-        // This is technically identical to Resource::create, but different url
+        let target = format!("{}/{}/eviction?", self.url_path, name);
+        // This is technically identical to Request::create, but different url
         let pp = &ep.post_options;
         pp.validate()?;
-        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        let mut qp = url::form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }
@@ -276,9 +284,9 @@ impl<'a, K: Meta> Request<'a, K> {
 fn evict_path() {
     use crate::api::Request;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = Request::<corev1::Pod>::new(&(), Some("ns"));
     let ep = EvictParams::default();
-    let req = r.evict("foo", &ep).unwrap();
+    let url = corev1::Pod::url_path(&(), Some("ns"));
+    let req = Request::new(url).evict("foo", &ep).unwrap();
     assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/eviction?");
 }
 
@@ -294,7 +302,8 @@ where
 {
     /// Create an eviction
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).evict(name, ep)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).evict(name, ep)?;
         self.client.request::<Status>(req).await
     }
 }
@@ -466,13 +475,13 @@ impl AttachParams {
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl<'a, K: Meta> Request<'a, K> {
+impl Request {
     /// Attach to a pod
     pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<Vec<u8>>> {
         ap.validate()?;
 
-        let base_url = self.make_url() + "/" + name + "/" + "attach?";
-        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        let target = format!("{}/{}/attach?", self.url_path, name);
+        let mut qp = url::form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer(&mut qp);
 
         let req = http::Request::get(qp.finish());
@@ -483,14 +492,14 @@ impl<'a, K: Meta> Request<'a, K> {
 #[cfg(feature = "ws")]
 #[test]
 fn attach_path() {
-    use crate::api::Resource;
+    use crate::api::Request;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = Resource::namespaced::<corev1::Pod>("ns");
     let ap = AttachParams {
         container: Some("blah".into()),
         ..AttachParams::default()
     };
-    let req = r.attach("foo", &ap).unwrap();
+    let url = corev1::Pod::url_path(&(), Some("ns"));
+    let req = Request::new(url).attach("foo", &ap).unwrap();
     assert_eq!(
         req.uri(),
         "/api/v1/namespaces/ns/pods/foo/attach?&stdout=true&stderr=true&container=blah"
@@ -508,14 +517,16 @@ impl Attachable for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl<K> Api<K>
+impl<K: Meta> Api<K>
 where
     K: Clone + DeserializeOwned + Attachable,
+    <K as Meta>::Info: Clone,
 {
     /// Attach to pod
     #[instrument(skip(self), level = "trace")]
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).attach(name, ap)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).attach(name, ap)?;
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
     }
@@ -526,7 +537,7 @@ where
 // ----------------------------------------------------------------------------
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl<'a, K: Meta> Request<'a, K> {
+impl Request {
     /// Execute command in a pod
     pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<Vec<u8>>>
     where
@@ -535,8 +546,8 @@ impl<'a, K: Meta> Request<'a, K> {
     {
         ap.validate()?;
 
-        let base_url = self.make_url() + "/" + name + "/" + "exec?";
-        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        let target = format!("{}/{}/exec?", self.url_path, name);
+        let mut qp = url::form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer(&mut qp);
 
         for c in command.into_iter() {
@@ -551,14 +562,16 @@ impl<'a, K: Meta> Request<'a, K> {
 #[cfg(feature = "ws")]
 #[test]
 fn exec_path() {
-    use crate::api::Resource;
+    use crate::api::Request;
     use k8s_openapi::api::core::v1 as corev1;
-    let r = Resource::namespaced::<corev1::Pod>("ns");
     let ap = AttachParams {
         container: Some("blah".into()),
         ..AttachParams::default()
     };
-    let req = r.exec("foo", vec!["echo", "foo", "bar"], &ap).unwrap();
+    let url = corev1::Pod::url_path(&(), Some("ns"));
+    let req = Request::new(url)
+        .exec("foo", vec!["echo", "foo", "bar"], &ap)
+        .unwrap();
     assert_eq!(
         req.uri(),
         "/api/v1/namespaces/ns/pods/foo/exec?&stdout=true&stderr=true&container=blah&command=echo&command=foo&command=bar"
@@ -576,9 +589,10 @@ impl Executable for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl<K> Api<K>
+impl<K: Meta> Api<K>
 where
     K: Clone + DeserializeOwned + Executable,
+    <K as Meta>::Info: Clone,
 {
     /// Execute a command in a pod
     #[instrument(skip(self), level = "trace")]
@@ -592,7 +606,8 @@ where
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
-        let req = Request::<K>::new(&self.info, self.namespace.as_deref()).exec(name, command, ap)?;
+        let url = K::url_path(&self.info, self.namespace.as_deref());
+        let req = Request::new(url).exec(name, command, ap)?;
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
     }

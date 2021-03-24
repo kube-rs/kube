@@ -52,7 +52,6 @@ async fn print_group(
         if !ar.verbs.contains(&"list".to_string()) {
             continue;
         }
-
         let gvk = GroupVersionKind::from_api_resource(&ar, &apis.group_version);
         let api: Api<DynamicObject> = if ar.namespaced {
             if let Some(ns) = ns_filter {
@@ -68,7 +67,7 @@ async fn print_group(
         info!("{} : {}", group_version, ar.kind);
         for item in list.items {
             let name = item.name();
-            let ns = item.namespace().map(|s| s + "/").unwrap_or_default();
+            let ns = item.metadata.namespace.map(|s| s + "/").unwrap_or_default();
             info!("\t\t{}{}", ns, name);
         }
     }

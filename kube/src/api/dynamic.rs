@@ -1,4 +1,7 @@
-use crate::{api::Meta, Error, Result};
+use crate::{
+    api::{metadata::TypeMeta, Meta},
+    Error, Result,
+};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
 use std::borrow::Cow;
 
@@ -88,14 +91,49 @@ impl GroupVersionKind {
     }
 }
 
-/// The most generic representation of a single Kubernetes resource.
+/// A dynamic representation of a kubernetes resource
+///
+/// This will work with any non-list type object.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct DynamicObject {
-    /// standard metadata
+    /// The type fields, not always present
+    #[serde(flatten, default)]
+    pub types: Option<TypeMeta>,
+    /// Object metadata
     pub metadata: ObjectMeta,
-    /// All other data. Meaning of this field depends on specific object.
+
+    /// All other keys
     #[serde(flatten)]
     pub data: serde_json::Value,
+}
+
+impl DynamicObject {
+    /// Create a DynamicObject with minimal values set from GVK.
+    pub fn new(name: &str, gvk: &GroupVersionKind) -> Self {
+        Self {
+            types: Some(TypeMeta {
+                api_version: gvk.api_version.to_string(),
+                kind: gvk.kind.to_string(),
+            }),
+            metadata: ObjectMeta {
+                name: Some(name.to_string()),
+                ..Default::default()
+            },
+            data: Default::default(),
+        }
+    }
+
+    /// Attach dynamic data to a DynamicObject
+    pub fn data(mut self, data: serde_json::Value) -> Self {
+        self.data = data;
+        self
+    }
+
+    /// Attach a namespace to a DynamicObject
+    pub fn namespace(mut self, ns: &str) -> Self {
+        self.metadata.namespace = Some(ns.into());
+        self
+    }
 }
 
 impl Meta for DynamicObject {
@@ -137,19 +175,21 @@ impl Meta for DynamicObject {
 #[cfg(test)]
 mod test {
     use crate::{
-        api::{DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams, Request},
+        api::{DynamicObject, GroupVersionKind, Meta, Patch, PatchParams, PostParams, Request},
         Result,
     };
     #[test]
     fn raw_custom_resource() {
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
-        let r: Request<DynamicObject> = Request::new(&gvk, Some("myns"));
+        let url = DynamicObject::url_path(&gvk, Some("myns"));
 
         let pp = PostParams::default();
-        let req = r.create(&pp, vec![]).unwrap();
+        let req = Request::new(url.clone()).create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");
         let patch_params = PatchParams::default();
-        let req = r.patch("baz", &patch_params, &Patch::Merge(())).unwrap();
+        let req = Request::new(url)
+            .patch("baz", &patch_params, &Patch::Merge(()))
+            .unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos/baz?");
         assert_eq!(req.method(), "PATCH");
     }
@@ -157,9 +197,9 @@ mod test {
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
         let gvk = GroupVersionKind::gvk("", "v1", "Service").unwrap();
-        let r: Request<DynamicObject> = Request::new(&gvk, None);
+        let url = DynamicObject::url_path(&gvk, None);
         let pp = PostParams::default();
-        let req = r.create(&pp, vec![])?;
+        let req = Request::new(url).create(&pp, vec![])?;
         assert_eq!(req.uri(), "/api/v1/services?");
         Ok(())
     }
@@ -168,7 +208,7 @@ mod test {
     #[tokio::test]
     #[ignore] // circle has no kubeconfig
     async fn convenient_custom_resource() {
-        use crate::{Api, Client, CustomResource};
+        use crate::{api::Meta, Api, Client, CustomResource};
         use schemars::JsonSchema;
         use serde::{Deserialize, Serialize};
         #[derive(Clone, Debug, CustomResource, Deserialize, Serialize, JsonSchema)]
@@ -177,14 +217,25 @@ mod test {
             foo: String,
         };
         let client = Client::try_default().await.unwrap();
-        let a1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
-        let a2: Api<Foo> = Request::dynamic("Foo")
-            .group("clux.dev")
-            .version("v1")
-            .within("myns")
-            .into_api(client);
-        assert_eq!(a1.resource.api_version, a2.resource.api_version);
+        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
+        let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", gvk);
+        let a2: Api<Foo> = Api::namespaced(client.clone(), "myns");
+
+        // Test method to dump information
+        impl<K: Meta> Api<K>
+        where
+            <K as Meta>::Info: Clone,
+        {
+            fn dump_gvk(&self) -> String {
+                let group = K::group(&self.info);
+                let api_version = K::api_version(&self.info);
+                let kind = K::kind(&self.info);
+                let version = K::version(&self.info);
+                format!("{}/{} ({}) {}", group, version, api_version, kind)
+            }
+        }
+        assert_eq!(a1.dump_gvk(), a2.dump_gvk());
         // ^ ensures that traits are implemented
     }
 }
