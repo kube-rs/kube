@@ -13,8 +13,10 @@ pub struct Request {
 
 impl Request {
     /// New request with a resource's url path
-    pub fn new(url_path: String) -> Self {
-        Self { url_path }
+    pub fn new<S: Into<String>>(url_path: S) -> Self {
+        Self {
+            url_path: url_path.into(),
+        }
     }
 }
 
@@ -469,7 +471,7 @@ mod test {
         // NB: Ingress exists in extensions AND networking
         let url = networkingv1beta1::Ingress::url_path(&(), Some("ns"));
         let pp = PostParams::default();
-        let req = Request::new(url.clone()).create(&pp, vec![]).unwrap();
+        let req = Request::new(&url).create(&pp, vec![]).unwrap();
 
         assert_eq!(
             req.uri(),

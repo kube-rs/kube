@@ -184,7 +184,7 @@ mod test {
         let url = DynamicObject::url_path(&gvk, Some("myns"));
 
         let pp = PostParams::default();
-        let req = Request::new(url.clone()).create(&pp, vec![]).unwrap();
+        let req = Request::new(&url).create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");
         let patch_params = PatchParams::default();
         let req = Request::new(url)
