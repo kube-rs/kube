@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3.8"
-kube = { path = "../kube", version = "^0.51.0", default-features = false }
+kube = { path = "../kube", version = "^0.51.0", default-features = false, features = ["jsonpatch"] }
 derivative = "2.1.1"
 serde = "1.0.118"
 smallvec = "1.6.0"
@@ -23,6 +23,8 @@ tokio = { version = "1.0.1", features = ["time"] }
 snafu = { version = "0.6.10", features = ["futures"] }
 dashmap = "4.0.1"
 tokio-util = { version = "0.6.0", features = ["time"] }
+json-patch = "0.2.6"
+serde_json = "1.0.64"
 
 [dependencies.k8s-openapi]
 version = "0.11.0"
