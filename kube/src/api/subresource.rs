@@ -18,7 +18,7 @@ pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 impl<K: Meta> Api<K>
 where
     K: Clone + DeserializeOwned,
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     /// Fetch the scale subresource
     #[instrument(skip(self), level = "trace")]
@@ -58,7 +58,7 @@ where
 impl<K: Meta> Api<K>
 where
     K: DeserializeOwned,
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     /// Get the named resource with a status subresource
     ///
@@ -226,7 +226,7 @@ impl Loggable for k8s_openapi::api::core::v1::Pod {}
 impl<K: Meta> Api<K>
 where
     K: DeserializeOwned + Loggable,
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     /// Fetch logs as a string
     #[instrument(skip(self), level = "trace")]
@@ -298,7 +298,7 @@ impl Evictable for k8s_openapi::api::core::v1::Pod {}
 impl<K: Meta> Api<K>
 where
     K: DeserializeOwned + Evictable,
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     /// Create an eviction
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
@@ -520,7 +520,7 @@ impl Attachable for k8s_openapi::api::core::v1::Pod {}
 impl<K: Meta> Api<K>
 where
     K: Clone + DeserializeOwned + Attachable,
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     /// Attach to pod
     #[instrument(skip(self), level = "trace")]
@@ -592,7 +592,7 @@ impl Executable for k8s_openapi::api::core::v1::Pod {}
 impl<K: Meta> Api<K>
 where
     K: Clone + DeserializeOwned + Executable,
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     /// Execute a command in a pod
     #[instrument(skip(self), level = "trace")]

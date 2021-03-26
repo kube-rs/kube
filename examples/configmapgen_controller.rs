@@ -36,7 +36,7 @@ struct ConfigMapGeneratorSpec {
     content: String,
 }
 
-fn object_to_owner_reference<K: Meta<DynType = ()>>(meta: ObjectMeta) -> Result<OwnerReference, Error> {
+fn object_to_owner_reference<K: Meta<DynamicType = ()>>(meta: ObjectMeta) -> Result<OwnerReference, Error> {
     Ok(OwnerReference {
         api_version: K::api_version(&()).to_string(),
         kind: K::kind(&()).to_string(),

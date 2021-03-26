@@ -18,9 +18,9 @@ use crate::{
 #[derive(Clone)]
 pub struct Api<K: Meta>
 where
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
-    pub(crate) dyntype: K::DynType,
+    pub(crate) dyntype: K::DynamicType,
     pub(crate) namespace: Option<String>,
     /// The client to use (from this library)
     pub(crate) client: Client,
@@ -29,7 +29,7 @@ where
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K: Meta> Api<K>
 where
-    <K as Meta>::DynType: Default + Clone,
+    <K as Meta>::DynamicType: Default + Clone,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
@@ -53,12 +53,12 @@ where
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K: Meta> Api<K>
 where
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
-    /// This function accepts `K::DynType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, dyntype: K::DynType) -> Self {
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    pub fn all_with(client: Client, dyntype: K::DynamicType) -> Self {
         Self {
             client,
             dyntype,
@@ -68,8 +68,8 @@ where
 
     /// Namespaced resource within a given namespace
     ///
-    /// This function accepts `K::DynType` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, dyntype: K::DynType) -> Self {
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    pub fn namespaced_with(client: Client, ns: &str, dyntype: K::DynamicType) -> Self {
         Self {
             client,
             dyntype,
@@ -87,7 +87,7 @@ where
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + Meta + Debug,
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     /// Get a named resource
     ///
@@ -375,7 +375,7 @@ where
 
 impl<K: Meta> From<Api<K>> for Client
 where
-    <K as Meta>::DynType: Clone,
+    <K as Meta>::DynamicType: Clone,
 {
     fn from(api: Api<K>) -> Self {
         api.client

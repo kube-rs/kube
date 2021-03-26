@@ -18,21 +18,21 @@ pub trait Meta {
     // TODO: rename to Resource
     /// Type information for types that do not know their resource information at compile time.
     ///
-    /// Types that know their metadata at compile time should select `DynType = ()`.
-    /// Types that require some information at runtime should select `DynType`
+    /// Types that know their metadata at compile time should select `DynamicType = ()`.
+    /// Types that require some information at runtime should select `DynamicType`
     /// as type of this information.
     ///
     /// See [`DynamicObject`] for a valid implementation of non-k8s-openapi resources.
-    type DynType: Send + Sync + 'static;
+    type DynamicType: Send + Sync + 'static;
 
     /// Returns kind of this object
-    fn kind(f: &Self::DynType) -> Cow<'_, str>;
+    fn kind(f: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns group of this object
-    fn group(f: &Self::DynType) -> Cow<'_, str>;
+    fn group(f: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns version of this object
-    fn version(f: &Self::DynType) -> Cow<'_, str>;
+    fn version(f: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns apiVersion of this object
-    fn api_version(f: &Self::DynType) -> Cow<'_, str> {
+    fn api_version(f: &Self::DynamicType) -> Cow<'_, str> {
         let group = Self::group(f);
         if group.is_empty() {
             return Self::version(f);
@@ -44,7 +44,7 @@ pub trait Meta {
     }
 
     /// Creates a url path for http requests for this resource
-    fn url_path(t: &Self::DynType, namespace: Option<&str>) -> String {
+    fn url_path(t: &Self::DynamicType, namespace: Option<&str>) -> String {
         let n = if let Some(ns) = namespace {
             format!("namespaces/{}/", ns)
         } else {
@@ -77,7 +77,7 @@ impl<K> Meta for K
 where
     K: k8s_openapi::Metadata<Ty = ObjectMeta>,
 {
-    type DynType = ();
+    type DynamicType = ();
 
     fn kind<'a>(_: &()) -> Cow<'_, str> {
         K::KIND.into()
