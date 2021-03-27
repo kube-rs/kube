@@ -215,7 +215,7 @@ mod test {
         #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
         struct FooSpec {
             foo: String,
-        };
+        }
         let client = Client::try_default().await.unwrap();
 
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
@@ -228,10 +228,10 @@ mod test {
             <K as Meta>::DynamicType: Clone,
         {
             fn dump_gvk(&self) -> String {
-                let group = K::group(&self.dynamictype);
-                let api_version = K::api_version(&self.dynamictype);
-                let kind = K::kind(&self.dynamictype);
-                let version = K::version(&self.dynamictype);
+                let group = K::group(&self.dyntype);
+                let api_version = K::api_version(&self.dyntype);
+                let kind = K::kind(&self.dyntype);
+                let version = K::version(&self.dyntype);
                 format!("{}/{} ({}) {}", group, version, api_version, kind)
             }
         }

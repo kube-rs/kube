@@ -6,7 +6,7 @@ use kube::{
     api::{Api, DynamicObject, GroupVersionKind, Meta},
     Client,
 };
-use log::info;
+use log::{info, warn};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,6 +27,7 @@ async fn main() -> anyhow::Result<()> {
     // loop over all api groups (except core v1)
     let apigroups = client.list_api_groups().await?;
     for g in apigroups.groups {
+        warn!("api group: {}", g.name);
         let ver = g
             .preferred_version
             .as_ref()
@@ -35,7 +36,8 @@ async fn main() -> anyhow::Result<()> {
         let apis = client.list_api_group_resources(&ver.group_version).await?;
         print_group(&client, &ver.group_version, apis, ns_filter.as_deref()).await?;
     }
-    // core/v1 has a legacy endpoint
+
+    warn!("core/v1 legacy group");
     let coreapis = client.list_core_api_versions().await?;
     assert_eq!(coreapis.versions.len(), 1);
     let corev1 = client.list_core_api_resources(&coreapis.versions[0]).await?;
