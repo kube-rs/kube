@@ -13,8 +13,8 @@ pub(crate) mod params;
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
 };
-mod resource;
-pub use resource::Request;
+mod request;
+pub use request::Request;
 
 pub(crate) mod typed;
 pub use typed::Api;
