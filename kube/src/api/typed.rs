@@ -5,7 +5,9 @@ use std::{fmt::Debug, iter};
 use tracing::instrument;
 
 use crate::{
-    api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Request, WatchEvent},
+    api::{
+        DeleteParams, ListParams, ObjectList, Patch, PatchParams, PostParams, Request, Resource, WatchEvent,
+    },
     client::{Client, Status},
     Result,
 };
@@ -28,7 +30,7 @@ pub struct Api<K> {
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K: Meta> Api<K>
+impl<K: Resource> Api<K>
 where
     <K as Meta>::DynamicType: Default,
 {
@@ -114,7 +116,7 @@ where
     /// You get use this to get everything, or a subset matching fields/labels, say:
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, Meta}, Client};
+    /// use kube::{api::{Api, ListParams, Resource}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -122,7 +124,7 @@ where
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
     ///     for p in pods.list(&lp).await? {
-    ///         println!("Found Pod: {}", Meta::name(&p));
+    ///         println!("Found Pod: {}", Resource::name(&p));
     ///     }
     ///     Ok(())
     /// }
@@ -196,7 +198,7 @@ where
     /// 4XX and 5XX status types are returned as an [`Err(kube::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
-    /// use kube::{api::{Api, DeleteParams, ListParams, Meta}, Client};
+    /// use kube::{api::{Api, DeleteParams, ListParams, Resource}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -204,7 +206,7 @@ where
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
     ///         either::Left(list) => {
-    ///             let names: Vec<_> = list.iter().map(Meta::name).collect();
+    ///             let names: Vec<_> = list.iter().map(Resource::name).collect();
     ///             println!("Deleting collection of pods: {:?}", names);
     ///         },
     ///         either::Right(status) => {
@@ -229,7 +231,7 @@ where
     /// Takes a [`Patch`] along with [`PatchParams`] for the call.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PatchParams, Patch, Meta}, Client};
+    /// use kube::{api::{Api, PatchParams, Patch, Resource}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -273,7 +275,7 @@ where
     /// Thus, to use this function, you need to do a `get` then a `replace` with its result.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PostParams, Meta}, Client};
+    /// use kube::{api::{Api, PostParams, Resource}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -285,7 +287,7 @@ where
     ///         "kind": "Job",
     ///         "metadata": {
     ///             "name": "baz",
-    ///             "resourceVersion": Meta::resource_ver(&j),
+    ///             "resourceVersion": Resource::resource_ver(&j),
     ///         },
     ///         "spec": {
     ///             "template": {
@@ -330,7 +332,7 @@ where
     /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, Meta, WatchEvent}, Client};
+    /// use kube::{api::{Api, ListParams, Resource, WatchEvent}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
     /// #[tokio::main]
@@ -343,9 +345,9 @@ where
     ///     let mut stream = jobs.watch(&lp, "0").await?.boxed();
     ///     while let Some(status) = stream.try_next().await? {
     ///         match status {
-    ///             WatchEvent::Added(s) => println!("Added {}", Meta::name(&s)),
-    ///             WatchEvent::Modified(s) => println!("Modified: {}", Meta::name(&s)),
-    ///             WatchEvent::Deleted(s) => println!("Deleted {}", Meta::name(&s)),
+    ///             WatchEvent::Added(s) => println!("Added {}", Resource::name(&s)),
+    ///             WatchEvent::Modified(s) => println!("Modified: {}", Resource::name(&s)),
+    ///             WatchEvent::Deleted(s) => println!("Deleted {}", Resource::name(&s)),
     ///             WatchEvent::Bookmark(s) => {},
     ///             WatchEvent::Error(s) => println!("{}", s),
     ///         }

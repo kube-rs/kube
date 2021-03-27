@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
-    api::{Api, ListParams, Meta},
+    api::{Api, ListParams, Resource},
     Client,
 };
 use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
             // Periodically read our state
-            let deploys: Vec<_> = reader.state().iter().map(Meta::name).collect();
+            let deploys: Vec<_> = reader.state().iter().map(Resource::name).collect();
             info!("Current deploys: {:?}", deploys);
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;
         }
@@ -38,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
     // We can look at the events we want and use it as a watcher
     let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", Meta::name(&event));
+        info!("Applied {}", Resource::name(&event));
     }
 
     Ok(())

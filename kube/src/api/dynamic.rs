@@ -1,5 +1,5 @@
 use crate::{
-    api::{metadata::TypeMeta, Meta},
+    api::{metadata::TypeMeta, Resource},
     Error, Result,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
@@ -136,7 +136,7 @@ impl DynamicObject {
     }
 }
 
-impl Meta for DynamicObject {
+impl Resource for DynamicObject {
     type DynamicType = GroupVersionKind;
 
     fn group(f: &GroupVersionKind) -> Cow<'_, str> {
@@ -175,7 +175,7 @@ impl Meta for DynamicObject {
 #[cfg(test)]
 mod test {
     use crate::{
-        api::{DynamicObject, GroupVersionKind, Meta, Patch, PatchParams, PostParams, Request},
+        api::{DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams, Request, Resource},
         Result,
     };
     #[test]

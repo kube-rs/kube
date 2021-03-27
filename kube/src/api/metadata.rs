@@ -2,7 +2,7 @@ pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-/// An accessor trait for Metadata.
+/// An accessor trait for a kubernetes Resource.
 ///
 /// This is for a subset of Kubernetes type that do not end in `List`.
 /// These types, using [`ObjectMeta`], SHOULD all have required properties:
@@ -14,8 +14,7 @@ use std::borrow::Cow;
 /// - `.metadata.resource_version`
 ///
 /// This avoids a bunch of the unnecessary unwrap mechanics for apps.
-pub trait Meta {
-    // TODO: rename to Resource
+pub trait Resource {
     /// Type information for types that do not know their resource information at compile time.
     ///
     /// Types that know their metadata at compile time should select `DynamicType = ()`.
@@ -73,7 +72,7 @@ pub trait Meta {
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
-impl<K> Meta for K
+impl<K> Resource for K
 where
     K: k8s_openapi::Metadata<Ty = ObjectMeta>,
 {
