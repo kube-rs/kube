@@ -29,10 +29,12 @@ pub struct Api<K> {
     pub(crate) phantom: iter::Empty<K>,
 }
 
-/// Expose same interface as Api for controlling scope/group/versions/ns
+/// Api constructors for Resource implementors with Default DynamicTypes
+///
+/// This generally means structs implementing `k8s_openapi::Resource`.
 impl<K: Resource> Api<K>
 where
-    <K as Meta>::DynamicType: Default,
+    <K as Resource>::DynamicType: Default,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
@@ -55,8 +57,10 @@ where
     }
 }
 
-/// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K: Meta> Api<K> {
+/// Api constructors for Resource implementors with custom DynamicTypes
+///
+/// This generally means resources created via [`DynamicObject`](crate::api::DynamicObject).
+impl<K: Resource> Api<K> {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.

@@ -199,7 +199,7 @@ impl Request {
 
 #[test]
 fn log_path() {
-    use crate::api::{Meta, Request};
+    use crate::api::{Request, Resource};
     use k8s_openapi::api::core::v1 as corev1;
     let lp = LogParams {
         container: Some("blah".into()),
@@ -271,7 +271,7 @@ impl Request {
 
 #[test]
 fn evict_path() {
-    use crate::api::{Meta, Request};
+    use crate::api::{Request, Resource};
     use k8s_openapi::api::core::v1 as corev1;
     let ep = EvictParams::default();
     let url = corev1::Pod::url_path(&(), Some("ns"));
@@ -479,7 +479,7 @@ impl Request {
 #[cfg(feature = "ws")]
 #[test]
 fn attach_path() {
-    use crate::api::{Meta, Request};
+    use crate::api::{Request, Resource};
     use k8s_openapi::api::core::v1 as corev1;
     let ap = AttachParams {
         container: Some("blah".into()),
@@ -547,7 +547,7 @@ impl Request {
 #[cfg(feature = "ws")]
 #[test]
 fn exec_path() {
-    use crate::api::{Meta, Request};
+    use crate::api::{Request, Resource};
     use k8s_openapi::api::core::v1 as corev1;
     let ap = AttachParams {
         container: Some("blah".into()),
