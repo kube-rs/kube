@@ -25,8 +25,8 @@ impl Request {
 /// Convenience methods found from API conventions
 impl Request {
     /// List a collection of a resource
-    pub fn list(self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "?";
+    pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}?", self.url_path);
         let mut qp = url::form_urlencoded::Serializer::new(target);
 
         if let Some(fields) = &lp.field_selector {
@@ -48,8 +48,8 @@ impl Request {
     }
 
     /// Watch a resource at a given version
-    pub fn watch(self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "?";
+    pub fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}?", self.url_path);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         lp.validate()?;
         if lp.limit.is_some() {
@@ -84,8 +84,8 @@ impl Request {
     }
 
     /// Get a single instance
-    pub fn get(self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "/" + name;
+    pub fn get(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}/{}", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
@@ -93,9 +93,9 @@ impl Request {
     }
 
     /// Create an instance of a resource
-    pub fn create(self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         pp.validate()?;
-        let target = self.url_path + "?";
+        let target = format!("{}?", self.url_path);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -106,8 +106,8 @@ impl Request {
     }
 
     /// Delete an instance of a resource
-    pub fn delete(self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "/" + name + "?";
+    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}/{}?", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let body = serde_json::to_vec(&dp)?;
@@ -116,8 +116,8 @@ impl Request {
     }
 
     /// Delete a collection of a resource
-    pub fn delete_collection(self, dp: &DeleteParams, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "?";
+    pub fn delete_collection(&self, dp: &DeleteParams, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}?", self.url_path);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", &fields);
@@ -156,8 +156,8 @@ impl Request {
     /// Replace an instance of a resource
     ///
     /// Requires `metadata.resourceVersion` set in data
-    pub fn replace(self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "/" + name + "?";
+    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}/{}?", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -171,8 +171,8 @@ impl Request {
 /// Scale subresource
 impl Request {
     /// Get an instance of the scale subresource
-    pub fn get_scale(self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "/" + name + "/scale";
+    pub fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}/{}/scale", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
@@ -181,13 +181,13 @@ impl Request {
 
     /// Patch an instance of the scale subresource
     pub fn patch_scale<P: serde::Serialize>(
-        self,
+        &self,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>> {
         pp.validate(patch)?;
-        let target = self.url_path + "/" + name + "/scale?";
+        let target = format!("{}/{}/scale?", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -200,8 +200,13 @@ impl Request {
     }
 
     /// Replace an instance of the scale subresource
-    pub fn replace_scale(self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "/" + name + "/scale?";
+    pub fn replace_scale(
+        &self,
+        name: &str,
+        pp: &PostParams,
+        data: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}/{}/scale?", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -215,8 +220,8 @@ impl Request {
 /// Status subresource
 impl Request {
     /// Get an instance of the status subresource
-    pub fn get_status(self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "/" + name + "/status";
+    pub fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}/{}/status", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
@@ -225,13 +230,13 @@ impl Request {
 
     /// Patch an instance of the status subresource
     pub fn patch_status<P: serde::Serialize>(
-        self,
+        &self,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>> {
         pp.validate(patch)?;
-        let target = self.url_path + "/" + name + "/status?";
+        let target = format!("{}/{}/status?", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -245,12 +250,12 @@ impl Request {
 
     /// Replace an instance of the status subresource
     pub fn replace_status(
-        self,
+        &self,
         name: &str,
         pp: &PostParams,
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>> {
-        let target = self.url_path + "/" + name + "/status?";
+        let target = format!("{}/{}/status?", self.url_path, name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -427,10 +432,13 @@ mod test {
     #[test]
     fn delete_collection_path() {
         let url = appsv1::ReplicaSet::url_path(&(), Some("ns"));
-        let lp = ListParams::default();
+        let lp = ListParams::default().labels("app=myapp");
         let dp = DeleteParams::default();
         let req = Request::new(url).delete_collection(&dp, &lp).unwrap();
-        assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets");
+        assert_eq!(
+            req.uri(),
+            "/apis/apps/v1/namespaces/ns/replicasets?&labelSelector=app%3Dmyapp"
+        );
         assert_eq!(req.method(), "DELETE")
     }
 
