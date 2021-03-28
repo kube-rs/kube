@@ -164,8 +164,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
-                    api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
-                    kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
+                    api_version: <#rootident as kube::Resource>::api_version(&()).to_string(),
+                    kind: <#rootident as kube::Resource>::kind(&()).to_string(),
                     metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         name: Some(name.to_string()),
                         ..Default::default()
@@ -177,37 +177,58 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    // 2. Implement Resource trait for k8s_openapi
+    // 2. Implement Resource trait
     let api_ver = format!("{}/{}", group, version);
     let impl_resource = quote! {
-        impl k8s_openapi::Resource for #rootident {
-            const API_VERSION: &'static str = #api_ver;
-            const GROUP: &'static str = #group;
-            const KIND: &'static str = #kind;
-            const VERSION: &'static str = #version;
+        impl kube::Resource for #rootident {
+            type DynamicType = ();
+
+            fn kind<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+                #kind.into()
+            }
+
+            fn plural<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+                #plural.into()
+            }
+
+            fn group<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+               #group.into()
+            }
+
+            fn version<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+                #version.into()
+            }
+
+            fn api_version<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+                #api_ver.into()
+            }
+
+            fn meta(&self) -> &kube::api::ObjectMeta {
+                &self.metadata
+            }
+
+            fn name(&self) -> String {
+                self.meta().name.clone().expect("kind has metadata.name")
+            }
+
+            fn resource_ver(&self) -> Option<String> {
+                self.meta().resource_version.clone()
+            }
+
+            fn namespace(&self) -> Option<String> {
+                self.meta().namespace.clone()
+            }
         }
     };
 
-    // 3. Implement Metadata trait for k8s_openapi
-    let impl_metadata = quote! {
-        impl k8s_openapi::Metadata for #rootident {
-            type Ty = k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-            fn metadata(&self) -> &Self::Ty {
-                &self.metadata
-            }
-            fn metadata_mut(&mut self) -> &mut Self::Ty {
-                &mut self.metadata
-            }
-        }
-    };
-    // 4. Implement Default if requested
+    // 3. Implement Default if requested
     let impl_default = if has_default {
         quote! {
             impl Default for #rootident {
                 fn default() -> Self {
                     Self {
-                        api_version: <#rootident as k8s_openapi::Resource>::API_VERSION.to_string(),
-                        kind: <#rootident as k8s_openapi::Resource>::KIND.to_string(),
+                        api_version: <#rootident as kube::Resource>::api_version(&()).to_string(),
+                        kind: <#rootident as kube::Resource>::kind(&()).to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
                         #statusdef
@@ -219,7 +240,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         quote! {}
     };
 
-    // 5. Implement CustomResource
+    // 4. Implement CustomResource
     let name = singular.unwrap_or_else(|| kind.to_ascii_lowercase());
     let plural = plural.unwrap_or_else(|| to_plural(&name));
     let scope = if namespaced { "Namespaced" } else { "Cluster" };
@@ -315,7 +336,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    // TODO: should ::crd be from a trait?
+    // Implement the ::crd method (fine to not have in a trait as its a generated type)
     let impl_crd = quote! {
         impl #rootident {
             pub fn crd() -> #apiext::CustomResourceDefinition {
@@ -350,7 +371,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     quote! {
         #root_obj
         #impl_resource
-        #impl_metadata
         #impl_default
         #impl_crd
     }

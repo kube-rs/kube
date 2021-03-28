@@ -16,6 +16,8 @@ pub struct GroupVersionKind {
     kind: String,
     /// Concatenation of group and version
     api_version: String,
+    /// Optional plural/resource
+    plural: Option<String>,
 }
 
 impl GroupVersionKind {
@@ -57,6 +59,7 @@ impl GroupVersionKind {
             version,
             kind,
             api_version,
+            plural: None,
         }
     }
 
@@ -87,7 +90,14 @@ impl GroupVersionKind {
             version,
             kind,
             api_version,
+            plural: None,
         })
+    }
+
+    /// Set an explicit plural/resource value to avoid relying on inferred pluralisation.
+    pub fn plural(mut self, plural: &str) -> Self {
+        self.plural = Some(plural.to_string());
+        self
     }
 }
 
