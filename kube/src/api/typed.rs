@@ -16,7 +16,7 @@ use crate::{
 /// we get automatic serialization/deserialization on the api calls
 /// implemented by the dynamic [`Resource`].
 #[derive(Clone)]
-pub struct Api<K: Meta> {
+pub struct Api<K> {
     /// The request builder object with its resource dependent url
     pub(crate) request: Request,
     /// The client to use (from this library)
@@ -88,7 +88,7 @@ impl<K: Meta> Api<K> {
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Meta + Debug,
+    K: Clone + DeserializeOwned + Debug,
 {
     /// Get a named resource
     ///
@@ -366,7 +366,7 @@ where
     }
 }
 
-impl<K: Meta> From<Api<K>> for Client {
+impl<K> From<Api<K>> for Client {
     fn from(api: Api<K>) -> Self {
         api.client
     }

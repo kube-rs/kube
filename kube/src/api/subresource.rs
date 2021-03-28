@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use tracing::instrument;
 
 use crate::{
-    api::{Api, DeleteParams, Meta, Patch, PatchParams, PostParams, Request},
+    api::{Api, DeleteParams, Patch, PatchParams, PostParams, Request},
     client::Status,
     Error, Result,
 };
@@ -15,7 +15,7 @@ pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 #[cfg(feature = "ws")] use crate::api::remote_command::AttachedProcess;
 
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
-impl<K: Meta> Api<K>
+impl<K> Api<K>
 where
     K: Clone + DeserializeOwned,
 {
@@ -51,7 +51,7 @@ where
 // TODO: Replace examples with owned custom resources. Bad practice to write to owned objects
 // These examples work, but the job controller will totally overwrite what we do.
 /// Methods for [status subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource).
-impl<K: Meta> Api<K>
+impl<K> Api<K>
 where
     K: DeserializeOwned,
 {
@@ -199,7 +199,7 @@ impl Request {
 
 #[test]
 fn log_path() {
-    use crate::api::Request;
+    use crate::api::{Meta, Request};
     use k8s_openapi::api::core::v1 as corev1;
     let lp = LogParams {
         container: Some("blah".into()),
@@ -215,7 +215,7 @@ pub trait Loggable {}
 
 impl Loggable for k8s_openapi::api::core::v1::Pod {}
 
-impl<K: Meta> Api<K>
+impl<K> Api<K>
 where
     K: DeserializeOwned + Loggable,
 {
@@ -271,7 +271,7 @@ impl Request {
 
 #[test]
 fn evict_path() {
-    use crate::api::Request;
+    use crate::api::{Meta, Request};
     use k8s_openapi::api::core::v1 as corev1;
     let ep = EvictParams::default();
     let url = corev1::Pod::url_path(&(), Some("ns"));
@@ -284,7 +284,7 @@ pub trait Evictable {}
 
 impl Evictable for k8s_openapi::api::core::v1::Pod {}
 
-impl<K: Meta> Api<K>
+impl<K> Api<K>
 where
     K: DeserializeOwned + Evictable,
 {
@@ -479,7 +479,7 @@ impl Request {
 #[cfg(feature = "ws")]
 #[test]
 fn attach_path() {
-    use crate::api::Request;
+    use crate::api::{Meta, Request};
     use k8s_openapi::api::core::v1 as corev1;
     let ap = AttachParams {
         container: Some("blah".into()),
@@ -504,7 +504,7 @@ impl Attachable for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl<K: Meta> Api<K>
+impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + Attachable,
 {
@@ -547,7 +547,7 @@ impl Request {
 #[cfg(feature = "ws")]
 #[test]
 fn exec_path() {
-    use crate::api::Request;
+    use crate::api::{Meta, Request};
     use k8s_openapi::api::core::v1 as corev1;
     let ap = AttachParams {
         container: Some("blah".into()),
@@ -574,7 +574,7 @@ impl Executable for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl<K: Meta> Api<K>
+impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + Executable,
 {
