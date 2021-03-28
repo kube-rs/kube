@@ -5,7 +5,7 @@ use crate::{Error, Result};
 ///
 /// Takes a base_path and supplies constructors for common operations
 /// The extra operations all return `http::Request` objects.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Request {
     /// The path component of a url
     pub url_path: String,

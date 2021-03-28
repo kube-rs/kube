@@ -32,7 +32,7 @@ impl GroupVersionKind {
     /// for ar in &apps.resources {
     ///     let gvk = GroupVersionKind::from_api_resource(ar, &apps.group_version);
     ///     dbg!(&gvk);
-    ///     let api: Api<DynamicObject> = Api::namespaced_with(client.clone(), "default", gvk);
+    ///     let api: Api<DynamicObject> = Api::namespaced_with(client.clone(), "default", &gvk);
     /// }
     /// # Ok(())
     /// # }
@@ -208,7 +208,7 @@ mod test {
     #[tokio::test]
     #[ignore] // circle has no kubeconfig
     async fn convenient_custom_resource() {
-        use crate::{api::Meta, Api, Client, CustomResource};
+        use crate::{Api, Client, CustomResource};
         use schemars::JsonSchema;
         use serde::{Deserialize, Serialize};
         #[derive(Clone, Debug, CustomResource, Deserialize, Serialize, JsonSchema)]
@@ -219,23 +219,10 @@ mod test {
         let client = Client::try_default().await.unwrap();
 
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
-        let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", gvk);
+        let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", &gvk);
         let a2: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
-        // Test method to dump information
-        impl<K: Meta> Api<K>
-        where
-            <K as Meta>::DynamicType: Clone,
-        {
-            fn dump_gvk(&self) -> String {
-                let group = K::group(&self.dyntype);
-                let api_version = K::api_version(&self.dyntype);
-                let kind = K::kind(&self.dyntype);
-                let version = K::version(&self.dyntype);
-                format!("{}/{} ({}) {}", group, version, api_version, kind)
-            }
-        }
-        assert_eq!(a1.dump_gvk(), a2.dump_gvk());
-        // ^ ensures that traits are implemented
+        // make sure they return the same url_path through their impls
+        assert_eq!(a1.request.url_path, a2.request.url_path);
     }
 }

@@ -149,7 +149,7 @@ async fn main() -> Result<()> {
 
     // Set up dynamic resource to test using raw values.
     let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo")?;
-    let dynapi: Api<DynamicObject> = Api::namespaced_with(client.clone(), &namespace, gvk.clone());
+    let dynapi: Api<DynamicObject> = Api::namespaced_with(client.clone(), &namespace, &gvk);
 
     // Test that skipped nullable field without default is not defined.
     let val = dynapi.get("bar").await?.data;

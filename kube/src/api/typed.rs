@@ -1,7 +1,7 @@
 use either::Either;
 use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, iter};
 use tracing::instrument;
 
 use crate::{
@@ -16,64 +16,66 @@ use crate::{
 /// we get automatic serialization/deserialization on the api calls
 /// implemented by the dynamic [`Resource`].
 #[derive(Clone)]
-pub struct Api<K: Meta>
-where
-    <K as Meta>::DynamicType: Clone,
-{
-    pub(crate) dyntype: K::DynamicType,
-    pub(crate) namespace: Option<String>,
+pub struct Api<K: Meta> {
+    /// The request builder object with its resource dependent url
+    pub(crate) request: Request,
     /// The client to use (from this library)
     pub(crate) client: Client,
+    /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
+    /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
+    /// is `Send`, even if `K` may not be).
+    pub(crate) phantom: iter::Empty<K>,
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K: Meta> Api<K>
 where
-    <K as Meta>::DynamicType: Default + Clone,
+    <K as Meta>::DynamicType: Default,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
+        let url = K::url_path(&Default::default(), None);
         Self {
             client,
-            dyntype: Default::default(),
-            namespace: None,
+            request: Request::new(url),
+            phantom: iter::empty(),
         }
     }
 
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self {
+        let url = K::url_path(&Default::default(), Some(ns));
         Self {
             client,
-            dyntype: Default::default(),
-            namespace: Some(ns.to_string()),
+            request: Request::new(url),
+            phantom: iter::empty(),
         }
     }
 }
 
 /// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K: Meta> Api<K>
-where
-    <K as Meta>::DynamicType: Clone,
-{
+impl<K: Meta> Api<K> {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, dyntype: K::DynamicType) -> Self {
+    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
+        let url = K::url_path(dyntype, None);
         Self {
             client,
-            dyntype,
-            namespace: None,
+            request: Request::new(url),
+            phantom: iter::empty(),
         }
     }
 
     /// Namespaced resource within a given namespace
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, dyntype: K::DynamicType) -> Self {
+    pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
+        let url = K::url_path(dyntype, Some(ns));
         Self {
             client,
-            dyntype,
-            namespace: Some(ns.to_string()),
+            request: Request::new(url),
+            phantom: iter::empty(),
         }
     }
 
@@ -87,7 +89,6 @@ where
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + Meta + Debug,
-    <K as Meta>::DynamicType: Clone,
 {
     /// Get a named resource
     ///
@@ -104,8 +105,7 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn get(&self, name: &str) -> Result<K> {
-        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
-        let req = Request::new(url).get(name)?;
+        let req = self.request.get(name)?;
         self.client.request::<K>(req).await
     }
 
@@ -129,8 +129,7 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
-        let req = Request::new(url).list(&lp)?;
+        let req = self.request.list(&lp)?;
         self.client.request::<ObjectList<K>>(req).await
     }
 
@@ -156,8 +155,7 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
-        let req = Request::new(url).create(&pp, bytes)?;
+        let req = self.request.create(&pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
@@ -185,8 +183,7 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
-        let req = Request::new(url).delete(name, &dp)?;
+        let req = self.request.delete(name, &dp)?;
         self.client.request_status::<K>(req).await
     }
 
@@ -223,8 +220,7 @@ where
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
-        let req = Request::new(url).delete_collection(&dp, &lp)?;
+        let req = self.request.delete_collection(&dp, &lp)?;
         self.client.request_status::<ObjectList<K>>(req).await
     }
 
@@ -264,8 +260,7 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
-        let req = Request::new(url).patch(name, &pp, patch)?;
+        let req = self.request.patch(name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
 
@@ -319,8 +314,7 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
-        let req = Request::new(url).replace(name, &pp, bytes)?;
+        let req = self.request.replace(name, &pp, bytes)?;
         self.client.request::<K>(req).await
     }
 
@@ -367,16 +361,12 @@ where
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let url = K::url_path(&self.dyntype, self.namespace.as_deref());
-        let req = Request::new(url).watch(&lp, &version)?;
+        let req = self.request.watch(&lp, &version)?;
         self.client.request_events::<K>(req).await
     }
 }
 
-impl<K: Meta> From<Api<K>> for Client
-where
-    <K as Meta>::DynamicType: Clone,
-{
+impl<K: Meta> From<Api<K>> for Client {
     fn from(api: Api<K>) -> Self {
         api.client
     }

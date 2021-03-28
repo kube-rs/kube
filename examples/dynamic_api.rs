@@ -57,12 +57,12 @@ async fn print_group(
         let gvk = GroupVersionKind::from_api_resource(&ar, &apis.group_version);
         let api: Api<DynamicObject> = if ar.namespaced {
             if let Some(ns) = ns_filter {
-                Api::namespaced_with(client.clone(), ns, gvk)
+                Api::namespaced_with(client.clone(), ns, &gvk)
             } else {
-                Api::all_with(client.clone(), gvk)
+                Api::all_with(client.clone(), &gvk)
             }
         } else {
-            Api::all_with(client.clone(), gvk)
+            Api::all_with(client.clone(), &gvk)
         };
 
         let list = api.list(&Default::default()).await?;
