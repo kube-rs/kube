@@ -21,7 +21,7 @@ where
 
 impl<K: 'static + Meta + Clone> Writer<K>
 where
-    K::DynamicType: Eq + Hash,
+    K::DynamicType: Eq + Hash + Clone,
 {
     /// Creates a new Writer with the specified dynamic type.
     ///
@@ -46,10 +46,7 @@ where
     }
 
     /// Applies a single watcher event to the store
-    pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>)
-    where
-        K::DynamicType: Clone,
-    {
+    pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
                 self.store

@@ -1,5 +1,4 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
-use k8s_openapi::Metadata;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
@@ -16,6 +15,7 @@ use std::borrow::Cow;
 ///
 /// This avoids a bunch of the unnecessary unwrap mechanics for apps.
 pub trait Meta {
+    // TODO: rename to Resource
     /// Type information for types that do not know their resource information at compile time.
     ///
     /// Types that know their metadata at compile time should select `DynamicType = ()`.
@@ -42,6 +42,26 @@ pub trait Meta {
         group.push_str(&Self::version(f));
         group.into()
     }
+
+    /// Creates a url path for http requests for this resource
+    fn url_path(t: &Self::DynamicType, namespace: Option<&str>) -> String {
+        let n = if let Some(ns) = namespace {
+            format!("namespaces/{}/", ns)
+        } else {
+            "".into()
+        };
+        let group = Self::group(t);
+        let api_version = Self::api_version(t);
+        let plural = to_plural(&Self::kind(t).to_ascii_lowercase());
+        format!(
+            "/{group}/{api_version}/{namespaces}{plural}",
+            group = if group.is_empty() { "api" } else { "apis" },
+            api_version = api_version,
+            namespaces = n,
+            plural = plural
+        )
+    }
+
     /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
     /// The name of the resource
@@ -55,7 +75,7 @@ pub trait Meta {
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
 impl<K> Meta for K
 where
-    K: Metadata<Ty = ObjectMeta>,
+    K: k8s_openapi::Metadata<Ty = ObjectMeta>,
 {
     type DynamicType = ();
 
@@ -103,4 +123,101 @@ pub struct TypeMeta {
 
     /// The name of the API
     pub kind: String,
+}
+
+// Simple pluralizer. Handles the special cases.
+fn to_plural(word: &str) -> String {
+    if word == "endpoints" || word == "endpointslices" {
+        return word.to_owned();
+    } else if word == "nodemetrics" {
+        return "nodes".to_owned();
+    } else if word == "podmetrics" {
+        return "pods".to_owned();
+    }
+
+    // Words ending in s, x, z, ch, sh will be pluralized with -es (eg. foxes).
+    if word.ends_with('s')
+        || word.ends_with('x')
+        || word.ends_with('z')
+        || word.ends_with("ch")
+        || word.ends_with("sh")
+    {
+        return format!("{}es", word);
+    }
+
+    // Words ending in y that are preceded by a consonant will be pluralized by
+    // replacing y with -ies (eg. puppies).
+    if word.ends_with('y') {
+        if let Some(c) = word.chars().nth(word.len() - 2) {
+            if !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u') {
+                // Remove 'y' and add `ies`
+                let mut chars = word.chars();
+                chars.next_back();
+                return format!("{}ies", chars.as_str());
+            }
+        }
+    }
+
+    // All other words will have "s" added to the end (eg. days).
+    format!("{}s", word)
+}
+
+#[test]
+fn test_to_plural_native() {
+    // Extracted from `swagger.json`
+    #[rustfmt::skip]
+    let native_kinds = vec![
+        ("APIService", "apiservices"),
+        ("Binding", "bindings"),
+        ("CertificateSigningRequest", "certificatesigningrequests"),
+        ("ClusterRole", "clusterroles"), ("ClusterRoleBinding", "clusterrolebindings"),
+        ("ComponentStatus", "componentstatuses"),
+        ("ConfigMap", "configmaps"),
+        ("ControllerRevision", "controllerrevisions"),
+        ("CronJob", "cronjobs"),
+        ("CSIDriver", "csidrivers"), ("CSINode", "csinodes"), ("CSIStorageCapacity", "csistoragecapacities"),
+        ("CustomResourceDefinition", "customresourcedefinitions"),
+        ("DaemonSet", "daemonsets"),
+        ("Deployment", "deployments"),
+        ("Endpoints", "endpoints"), ("EndpointSlice", "endpointslices"),
+        ("Event", "events"),
+        ("FlowSchema", "flowschemas"),
+        ("HorizontalPodAutoscaler", "horizontalpodautoscalers"),
+        ("Ingress", "ingresses"), ("IngressClass", "ingressclasses"),
+        ("Job", "jobs"),
+        ("Lease", "leases"),
+        ("LimitRange", "limitranges"),
+        ("LocalSubjectAccessReview", "localsubjectaccessreviews"),
+        ("MutatingWebhookConfiguration", "mutatingwebhookconfigurations"),
+        ("Namespace", "namespaces"),
+        ("NetworkPolicy", "networkpolicies"),
+        ("Node", "nodes"),
+        ("PersistentVolumeClaim", "persistentvolumeclaims"),
+        ("PersistentVolume", "persistentvolumes"),
+        ("PodDisruptionBudget", "poddisruptionbudgets"),
+        ("Pod", "pods"),
+        ("PodSecurityPolicy", "podsecuritypolicies"),
+        ("PodTemplate", "podtemplates"),
+        ("PriorityClass", "priorityclasses"),
+        ("PriorityLevelConfiguration", "prioritylevelconfigurations"),
+        ("ReplicaSet", "replicasets"),
+        ("ReplicationController", "replicationcontrollers"),
+        ("ResourceQuota", "resourcequotas"),
+        ("Role", "roles"), ("RoleBinding", "rolebindings"),
+        ("RuntimeClass", "runtimeclasses"),
+        ("Secret", "secrets"),
+        ("SelfSubjectAccessReview", "selfsubjectaccessreviews"),
+        ("SelfSubjectRulesReview", "selfsubjectrulesreviews"),
+        ("ServiceAccount", "serviceaccounts"),
+        ("Service", "services"),
+        ("StatefulSet", "statefulsets"),
+        ("StorageClass", "storageclasses"), ("StorageVersion", "storageversions"),
+        ("SubjectAccessReview", "subjectaccessreviews"),
+        ("TokenReview", "tokenreviews"),
+        ("ValidatingWebhookConfiguration", "validatingwebhookconfigurations"),
+        ("VolumeAttachment", "volumeattachments"),
+    ];
+    for (kind, plural) in native_kinds {
+        assert_eq!(to_plural(&kind.to_ascii_lowercase()), plural);
+    }
 }

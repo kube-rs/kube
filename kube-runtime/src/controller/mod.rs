@@ -368,7 +368,7 @@ where
         lp: ListParams,
     ) -> Self
     where
-        Child::DynamicType: Debug + Eq + Hash + Clone,
+        Child::DynamicType: Debug + Eq + Hash,
     {
         let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)), self.dyntype.clone());
         self.selector.push(child_watcher.boxed());

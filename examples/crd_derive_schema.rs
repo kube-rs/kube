@@ -2,7 +2,10 @@ use anyhow::{anyhow, Result};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
-    api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, Resource, WatchEvent},
+    api::{
+        Api, DeleteParams, DynamicObject, GroupVersionKind, ListParams, Patch, PatchParams, PostParams,
+        WatchEvent,
+    },
     Client, CustomResource,
 };
 use schemars::JsonSchema;
@@ -145,16 +148,11 @@ async fn main() -> Result<()> {
     });
 
     // Set up dynamic resource to test using raw values.
-    let resource = Resource::dynamic("Foo")
-        .group("clux.dev")
-        .version("v1")
-        .within(&namespace)
-        .into_resource();
+    let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo")?;
+    let dynapi: Api<DynamicObject> = Api::namespaced_with(client.clone(), &namespace, &gvk);
 
     // Test that skipped nullable field without default is not defined.
-    let val = client
-        .request::<serde_json::Value>(resource.get("bar").unwrap())
-        .await?;
+    let val = dynapi.get("bar").await?.data;
     println!("{:?}", val["spec"]);
     // `nullable_skipped` field does not exist, but `nullable` does.
     let spec = val["spec"].as_object().unwrap();
@@ -162,12 +160,7 @@ async fn main() -> Result<()> {
     assert!(spec.contains_key("nullable"));
 
     // Test defaulting of `non_nullable_with_default` field
-    let data = serde_json::to_vec(&serde_json::json!({
-        "apiVersion": "clux.dev/v1",
-        "kind": "Foo",
-        "metadata": {
-            "name": "baz"
-        },
+    let data = DynamicObject::new("baz", &gvk).data(serde_json::json!({
         "spec": {
             "non_nullable": "a required field",
             // `non_nullable_with_default` field is missing
@@ -176,10 +169,8 @@ async fn main() -> Result<()> {
             "default_listable": vec![2],
             "set_listable": vec![2],
         }
-    }))?;
-    let val = client
-        .request::<serde_json::Value>(resource.create(&PostParams::default(), data).unwrap())
-        .await?;
+    }));
+    let val = dynapi.create(&PostParams::default(), &data).await?.data;
     println!("{:?}", val["spec"]);
     // Defaulting happened for non-nullable field
     assert_eq!(val["spec"]["non_nullable_with_default"], default_value());
@@ -189,17 +180,10 @@ async fn main() -> Result<()> {
     assert_eq!(serde_json::to_string(&val["spec"]["set_listable"])?, "[2]");
 
     // Missing required field (non-nullable without default) is an error
-    let data = serde_json::to_vec(&serde_json::json!({
-        "apiVersion": "clux.dev/v1",
-        "kind": "Foo",
-        "metadata": {
-            "name": "qux"
-        },
+    let data = DynamicObject::new("qux", &gvk).data(serde_json::json!({
         "spec": {}
-    }))?;
-    let res = client
-        .request::<serde_json::Value>(resource.create(&PostParams::default(), data).unwrap())
-        .await;
+    }));
+    let res = dynapi.create(&PostParams::default(), &data).await;
     assert!(res.is_err());
     match res.err() {
         Some(kube::Error::Api(err)) => {

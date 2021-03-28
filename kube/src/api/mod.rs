@@ -14,13 +14,13 @@ pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
 };
 mod resource;
-pub use resource::Resource;
+pub use resource::Request;
 
 pub(crate) mod typed;
 pub use typed::Api;
 
 mod dynamic;
-pub use dynamic::{DynamicObject, DynamicResource, GroupVersionKind};
+pub use dynamic::{DynamicObject, GroupVersionKind};
 
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;

@@ -1,63 +1,42 @@
 use crate::{
-    api::{typed::Api, Meta, Resource},
-    Client, Error, Result,
+    api::{metadata::TypeMeta, Meta},
+    Error, Result,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
-use std::{borrow::Cow, convert::TryFrom, sync::Arc};
+use std::borrow::Cow;
 
-use std::iter;
-
-/// A dynamic builder for Resource
-///
-/// Can be used to interact with a dynamic api resources.
-/// Can be constructed either from [`DynamicResource::from_api_resource`], or directly.
-///
-/// ### Direct usage
-/// ```
-/// use kube::api::Resource;
-/// let foos = Resource::dynamic("Foo") // <.spec.kind>
-///    .group("clux.dev") // <.spec.group>
-///    .version("v1")
-///    .into_resource();
-/// ```
-///
-/// It is recommended to use [`kube::CustomResource`] (from kube's `derive` feature)
-/// for CRD cases where you own a struct rather than this.
-///
-/// **Note:** You will need to implement [`k8s_openapi`] traits yourself to use the typed [`Api`]
-/// with a [`Resource`] built from a [`DynamicResource`] (and this is not always feasible).
-///
-/// [`kube::CustomResource`]: crate::CustomResource
-#[derive(Default)]
-pub struct DynamicResource {
-    pub(crate) kind: String,
-    pub(crate) version: Option<String>,
-    pub(crate) group: Option<String>,
-    pub(crate) namespace: Option<String>,
+/// Represents a type-erased object kind
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GroupVersionKind {
+    /// API group
+    group: String,
+    /// Version
+    version: String,
+    /// Kind
+    kind: String,
+    /// Concatenation of group and version
+    api_version: String,
 }
 
-impl DynamicResource {
-    /// Creates `DynamicResource` from an [`APIResource`].
+impl GroupVersionKind {
+    /// Creates `GroupVersionKind` from an [`APIResource`].
     ///
     /// `APIResource` objects can be extracted from [`Client::list_api_group_resources`].
-    /// If it does not specify version and/or group, they will be taken
-    /// from `group_version`.
+    /// If it does not specify version and/or group, they will be taken from `group_version`.
     ///
     /// ### Example usage:
     /// ```
-    /// use kube::api::DynamicResource;
+    /// use kube::api::{GroupVersionKind, Api, DynamicObject};
     /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// let apps = client.list_api_group_resources("apps/v1").await?;
     /// for ar in &apps.resources {
-    ///     let dr = DynamicResource::from_api_resource(ar, &apps.group_version);
-    ///     let r = dr.within("kube-system").into_resource();
-    ///     dbg!(r);
+    ///     let gvk = GroupVersionKind::from_api_resource(ar, &apps.group_version);
+    ///     dbg!(&gvk);
+    ///     let api: Api<DynamicObject> = Api::namespaced_with(client.clone(), "default", &gvk);
     /// }
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// [`API Resource`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource
     pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
         let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
         let (default_group, default_version) = match *gvsplit.as_slice() {
@@ -65,192 +44,96 @@ impl DynamicResource {
             [v] => ("", v),   // core v1 case
             _ => unreachable!(),
         };
-        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
         let group = ar.group.clone().unwrap_or_else(|| default_group.into());
-        DynamicResource {
-            kind: ar.kind.to_string(),
-            version: Some(version),
-            group: Some(group),
-            namespace: None,
-        }
-    }
-
-    /// Create a `DynamicResource` specifying the kind.
-    ///
-    /// The kind must not be plural and it must be in PascalCase
-    /// **Note:** You **must** call [`group`] and [`version`] to successfully convert
-    /// this object into something useful.
-    ///
-    /// [`group`]: Self::group
-    /// [`version`]: Self::version
-    pub fn new(kind: &str) -> Self {
+        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
+        let kind = ar.kind.to_string();
+        let api_version = if group.is_empty() {
+            version.clone()
+        } else {
+            format!("{}/{}", group, version)
+        };
         Self {
-            kind: kind.into(),
-            ..Default::default()
-        }
-    }
-
-    /// Set the api group of a custom resource
-    pub fn group(mut self, group: &str) -> Self {
-        self.group = Some(group.to_string());
-        self
-    }
-
-    /// Set the api version of a custom resource
-    pub fn version(mut self, version: &str) -> Self {
-        self.version = Some(version.to_string());
-        self
-    }
-
-    /// Set the namespace of a custom resource
-    pub fn within(mut self, ns: &str) -> Self {
-        self.namespace = Some(ns.into());
-        self
-    }
-
-    /// Consume the `DynamicResource` and build a `Resource`.
-    ///
-    /// Note this crashes on invalid group/version/kinds.
-    /// Use [`try_into_resource`](Self::try_into_resource) to handle the errors.
-    pub fn into_resource(self) -> Resource {
-        Resource::try_from(self).unwrap()
-    }
-
-    /// Consume the `DynamicResource` and convert to an `Api` object.
-    ///
-    /// Note this crashes on invalid group/version/kinds.
-    /// Use [`try_into_api`](Self::try_into_api) to handle the errors.
-    pub fn into_api<K: Meta>(self, client: Client) -> Api<K> {
-        let resource = Resource::try_from(self).unwrap();
-        Api {
-            client,
-            resource,
-            phantom: iter::empty(),
-        }
-    }
-
-    /// Consume the `DynamicResource` and attempt to build a `Resource`.
-    ///
-    /// Equivalent to importing TryFrom trait into scope.
-    pub fn try_into_resource(self) -> Result<Resource> {
-        Resource::try_from(self)
-    }
-
-    /// Consume the `DynamicResource` and and attempt to convert to an `Api` object.
-    pub fn try_into_api<K: Meta>(self, client: Client) -> Result<Api<K>> {
-        let resource = Resource::try_from(self)?;
-        Ok(Api {
-            client,
-            resource,
-            phantom: iter::empty(),
-        })
-    }
-}
-
-impl TryFrom<DynamicResource> for Resource {
-    type Error = crate::Error;
-
-    fn try_from(rb: DynamicResource) -> Result<Self> {
-        if rb.version.is_none() {
-            return Err(Error::DynamicResource(format!(
-                "DynamicResource '{}' must have a version",
-                rb.kind
-            )));
-        }
-        if rb.group.is_none() {
-            return Err(Error::DynamicResource(format!(
-                "DynamicResource '{}' must have a group (can be empty string)",
-                rb.kind
-            )));
-        }
-        let version = rb.version.unwrap();
-        let group = rb.group.unwrap();
-
-        Ok(Self {
-            api_version: if group.is_empty() {
-                version.clone()
-            } else {
-                format!("{}/{}", group, version)
-            },
-            kind: rb.kind,
-            version,
             group,
-            namespace: rb.namespace,
-        })
-    }
-}
-
-/// Cheaply `Clone`-able string.
-// `String`: cloning requires additional allocation.
-// `StringRef::Dynamic`: cloning is one atomic operation.
-// `StringRef::Static`: cloning is essentially free.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum StringRef {
-    /// Should be used when string is known during compilation.
-    Static(&'static str),
-    /// Should be used when string is only known at runtime
-    Dynamic(Arc<str>),
-}
-
-impl StringRef {
-    fn as_str(&self) -> &str {
-        match self {
-            StringRef::Static(s) => *s,
-            StringRef::Dynamic(s) => &*s,
+            version,
+            kind,
+            api_version,
         }
     }
-}
 
-/// Represents a type-erased object kind
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GroupVersionKind {
-    /// API group
-    group: StringRef,
-    /// Version
-    version: StringRef,
-    /// Kind
-    kind: StringRef,
-    /// Concatenation of group and version
-    api_version: StringRef,
-}
-
-impl GroupVersionKind {
-    /// Creates `GroupVersionKind` from group, version and kind.
-    /// For `core` resources, group should be empty.
-    /// `api_version` will be created based on group and version
-    pub fn from_dynamic_gvk(group: &str, version: &str, kind: &str) -> Self {
+    /// Set the api group, version, and kind for a resource
+    pub fn gvk(group_: &str, version_: &str, kind_: &str) -> Result<Self> {
+        let version = version_.to_string();
+        let group = group_.to_string();
+        let kind = kind_.to_string();
         let api_version = if group.is_empty() {
             version.to_string()
         } else {
             format!("{}/{}", group, version)
         };
-        GroupVersionKind {
-            group: StringRef::Dynamic(group.into()),
-            version: StringRef::Dynamic(version.into()),
-            kind: StringRef::Dynamic(kind.into()),
-            api_version: StringRef::Dynamic(api_version.into()),
+        if version.is_empty() {
+            return Err(Error::DynamicType(format!(
+                "GroupVersionKind '{}' must have a version",
+                kind
+            )));
         }
-    }
-
-    /// Create `GroupVersionKind` for statically known resource.
-    pub fn for_resource<K: k8s_openapi::Resource>() -> Self {
-        GroupVersionKind {
-            group: StringRef::Static(K::GROUP),
-            version: StringRef::Static(K::VERSION),
-            kind: StringRef::Static(K::KIND),
-            api_version: StringRef::Static(K::API_VERSION),
+        if kind.is_empty() {
+            return Err(Error::DynamicType(format!(
+                "GroupVersionKind '{}' must have a kind",
+                kind
+            )));
         }
+        Ok(Self {
+            group,
+            version,
+            kind,
+            api_version,
+        })
     }
 }
 
-/// The most generic representation of a single Kubernetes resource.
+/// A dynamic representation of a kubernetes resource
+///
+/// This will work with any non-list type object.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct DynamicObject {
-    /// standard metadata
+    /// The type fields, not always present
+    #[serde(flatten, default)]
+    pub types: Option<TypeMeta>,
+    /// Object metadata
     pub metadata: ObjectMeta,
-    /// All other data. Meaning of this field depends on specific object.
+
+    /// All other keys
     #[serde(flatten)]
     pub data: serde_json::Value,
+}
+
+impl DynamicObject {
+    /// Create a DynamicObject with minimal values set from GVK.
+    pub fn new(name: &str, gvk: &GroupVersionKind) -> Self {
+        Self {
+            types: Some(TypeMeta {
+                api_version: gvk.api_version.to_string(),
+                kind: gvk.kind.to_string(),
+            }),
+            metadata: ObjectMeta {
+                name: Some(name.to_string()),
+                ..Default::default()
+            },
+            data: Default::default(),
+        }
+    }
+
+    /// Attach dynamic data to a DynamicObject
+    pub fn data(mut self, data: serde_json::Value) -> Self {
+        self.data = data;
+        self
+    }
+
+    /// Attach a namespace to a DynamicObject
+    pub fn namespace(mut self, ns: &str) -> Self {
+        self.metadata.namespace = Some(ns.into());
+        self
+    }
 }
 
 impl Meta for DynamicObject {
@@ -292,34 +175,31 @@ impl Meta for DynamicObject {
 #[cfg(test)]
 mod test {
     use crate::{
-        api::{Patch, PatchParams, PostParams, Resource},
+        api::{DynamicObject, GroupVersionKind, Meta, Patch, PatchParams, PostParams, Request},
         Result,
     };
     #[test]
     fn raw_custom_resource() {
-        let r = Resource::dynamic("Foo")
-            .group("clux.dev")
-            .version("v1")
-            .within("myns")
-            .into_resource();
+        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
+        let url = DynamicObject::url_path(&gvk, Some("myns"));
 
         let pp = PostParams::default();
-        let req = r.create(&pp, vec![]).unwrap();
+        let req = Request::new(&url).create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos?");
         let patch_params = PatchParams::default();
-        let req = r.patch("baz", &patch_params, &Patch::Merge(())).unwrap();
+        let req = Request::new(url)
+            .patch("baz", &patch_params, &Patch::Merge(()))
+            .unwrap();
         assert_eq!(req.uri(), "/apis/clux.dev/v1/namespaces/myns/foos/baz?");
         assert_eq!(req.method(), "PATCH");
     }
 
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
-        let r = Resource::dynamic("Service")
-            .group("")
-            .version("v1")
-            .try_into_resource()?;
+        let gvk = GroupVersionKind::gvk("", "v1", "Service").unwrap();
+        let url = DynamicObject::url_path(&gvk, None);
         let pp = PostParams::default();
-        let req = r.create(&pp, vec![])?;
+        let req = Request::new(url).create(&pp, vec![])?;
         assert_eq!(req.uri(), "/api/v1/services?");
         Ok(())
     }
@@ -335,16 +215,14 @@ mod test {
         #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
         struct FooSpec {
             foo: String,
-        };
+        }
         let client = Client::try_default().await.unwrap();
-        let a1: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
-        let a2: Api<Foo> = Resource::dynamic("Foo")
-            .group("clux.dev")
-            .version("v1")
-            .within("myns")
-            .into_api(client);
-        assert_eq!(a1.resource.api_version, a2.resource.api_version);
-        // ^ ensures that traits are implemented
+        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
+        let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", &gvk);
+        let a2: Api<Foo> = Api::namespaced(client.clone(), "myns");
+
+        // make sure they return the same url_path through their impls
+        assert_eq!(a1.request.url_path, a2.request.url_path);
     }
 }
