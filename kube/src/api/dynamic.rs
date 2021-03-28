@@ -228,6 +228,7 @@ mod test {
     #[tokio::test]
     #[ignore] // circle has no kubeconfig
     async fn convenient_custom_resource() {
+        use crate as kube; // derive macro needs kube in scope
         use crate::{Api, Client, CustomResource};
         use schemars::JsonSchema;
         use serde::{Deserialize, Serialize};

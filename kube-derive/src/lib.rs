@@ -20,7 +20,7 @@ mod custom_resource;
 ///
 /// ```rust
 /// use serde::{Serialize, Deserialize};
-/// use k8s_openapi::Resource;
+/// use kube::Resource;
 /// use kube_derive::CustomResource;
 /// use schemars::JsonSchema;
 ///
@@ -30,7 +30,7 @@ mod custom_resource;
 ///     info: String,
 /// }
 ///
-/// println!("kind = {}", Foo::KIND); // impl k8s_openapi::Resource
+/// println!("kind = {}", Foo::kind(&())); // impl kube::Resource
 /// let f = Foo::new("foo-1", FooSpec {
 ///     info: "informative info".into(),
 /// });
