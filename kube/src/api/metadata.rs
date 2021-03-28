@@ -137,7 +137,7 @@ pub struct TypeMeta {
 }
 
 // Simple pluralizer. Handles the special cases.
-fn to_plural(word: &str) -> String {
+pub(crate) fn to_plural(word: &str) -> String {
     if word == "endpoints" || word == "endpointslices" {
         return word.to_owned();
     } else if word == "nodemetrics" {

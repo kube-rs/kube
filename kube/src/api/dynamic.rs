@@ -54,12 +54,13 @@ impl GroupVersionKind {
         } else {
             format!("{}/{}", group, version)
         };
+        let plural = Some(ar.name.clone());
         Self {
             group,
             version,
             kind,
             api_version,
-            plural: None,
+            plural,
         }
     }
 
@@ -149,20 +150,29 @@ impl DynamicObject {
 impl Resource for DynamicObject {
     type DynamicType = GroupVersionKind;
 
-    fn group(f: &GroupVersionKind) -> Cow<'_, str> {
-        f.group.as_str().into()
+    fn group(dt: &GroupVersionKind) -> Cow<'_, str> {
+        dt.group.as_str().into()
     }
 
-    fn version(f: &GroupVersionKind) -> Cow<'_, str> {
-        f.version.as_str().into()
+    fn version(dt: &GroupVersionKind) -> Cow<'_, str> {
+        dt.version.as_str().into()
     }
 
-    fn kind(f: &GroupVersionKind) -> Cow<'_, str> {
-        f.kind.as_str().into()
+    fn kind(dt: &GroupVersionKind) -> Cow<'_, str> {
+        dt.kind.as_str().into()
     }
 
-    fn api_version(f: &GroupVersionKind) -> Cow<'_, str> {
-        f.api_version.as_str().into()
+    fn api_version(dt: &GroupVersionKind) -> Cow<'_, str> {
+        dt.api_version.as_str().into()
+    }
+
+    fn plural<'a>(dt: &'a Self::DynamicType) -> Cow<'a, str> {
+        if let Some(plural) = &dt.plural {
+            plural.into()
+        } else {
+            // fallback to inference
+            crate::api::metadata::to_plural(&Self::kind(dt).to_ascii_lowercase()).into()
+        }
     }
 
     fn meta(&self) -> &ObjectMeta {
