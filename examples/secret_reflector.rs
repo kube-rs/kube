@@ -2,7 +2,7 @@
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    api::{Api, ListParams, Meta},
+    api::{Api, ListParams, Resource},
     Client,
 };
 use kube_runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher};
@@ -39,7 +39,7 @@ fn spawn_periodic_reader(reader: Store<Secret>) {
             let cms: Vec<_> = reader
                 .state()
                 .iter()
-                .map(|s| format!("{}: {:?}", Meta::name(s), decode(s).keys()))
+                .map(|s| format!("{}: {:?}", Resource::name(s), decode(s).keys()))
                 .collect();
             info!("Current secrets: {:?}", cms);
             tokio::time::sleep(std::time::Duration::from_secs(15)).await;
@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
 
     try_flatten_applied(rf)
         .try_for_each(|s| async move {
-            log::info!("Applied: {}", Meta::name(&s));
+            log::info!("Applied: {}", Resource::name(&s));
             Ok(())
         })
         .await?;

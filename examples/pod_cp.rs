@@ -4,7 +4,7 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
-    api::{Api, AttachParams, DeleteParams, ListParams, Meta, PostParams, WatchEvent},
+    api::{Api, AttachParams, DeleteParams, ListParams, PostParams, Resource, WatchEvent},
     Client,
 };
 use tokio::io::AsyncWriteExt;
@@ -42,12 +42,12 @@ async fn main() -> anyhow::Result<()> {
     while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(o) => {
-                info!("Added {}", Meta::name(&o));
+                info!("Added {}", Resource::name(&o));
             }
             WatchEvent::Modified(o) => {
                 let s = o.status.as_ref().expect("status exists on pod");
                 if s.phase.clone().unwrap_or_default() == "Running" {
-                    info!("Ready to attach to {}", Meta::name(&o));
+                    info!("Ready to attach to {}", Resource::name(&o));
                     break;
                 }
             }
@@ -93,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {
-            assert_eq!(Meta::name(&pdel), "example");
+            assert_eq!(Resource::name(&pdel), "example");
         });
 
     Ok(())

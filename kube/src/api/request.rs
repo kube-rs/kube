@@ -272,7 +272,7 @@ impl Request {
 /// Cheap sanity check to ensure type maps work as expected
 #[cfg(test)]
 mod test {
-    use crate::api::{Meta, PostParams, Request};
+    use crate::api::{PostParams, Request, Resource};
 
     use k8s::{
         admissionregistration::v1beta1 as adregv1beta1,

@@ -10,7 +10,7 @@
 //!
 //! ```rust,no_run
 //! use futures::{StreamExt, TryStreamExt};
-//! use kube::api::{Api, Meta, ListParams, PostParams, WatchEvent};
+//! use kube::api::{Api, Resource, ListParams, PostParams, WatchEvent};
 //! use kube::Client;
 //! use k8s_openapi::api::core::v1::Pod;
 //!
@@ -54,13 +54,13 @@
 //!     // Observe the pods phase for 10 seconds
 //!     while let Some(status) = stream.try_next().await? {
 //!         match status {
-//!             WatchEvent::Added(o) => println!("Added {}", Meta::name(&o)),
+//!             WatchEvent::Added(o) => println!("Added {}", Resource::name(&o)),
 //!             WatchEvent::Modified(o) => {
 //!                 let s = o.status.as_ref().expect("status exists on pod");
 //!                 let phase = s.phase.clone().unwrap_or_default();
-//!                 println!("Modified: {} with phase: {}", Meta::name(&o), phase);
+//!                 println!("Modified: {} with phase: {}", Resource::name(&o), phase);
 //!             }
-//!             WatchEvent::Deleted(o) => println!("Deleted {}", Meta::name(&o)),
+//!             WatchEvent::Deleted(o) => println!("Deleted {}", Resource::name(&o)),
 //!             WatchEvent::Error(e) => println!("Error {}", e),
 //!             _ => {}
 //!         }
@@ -96,7 +96,7 @@ pub mod error;
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-pub use api::Api;
+pub use api::{Api, Resource};
 #[doc(inline)] pub use client::Client;
 #[doc(inline)] pub use config::Config;
 #[doc(inline)] pub use error::Error;

@@ -2,7 +2,7 @@ use super::ObjectRef;
 use crate::watcher;
 use dashmap::DashMap;
 use derivative::Derivative;
-use kube::api::Meta;
+use kube::Resource;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 
 /// A writable Store handle
@@ -11,7 +11,7 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = "K::DynamicType: Default"))]
-pub struct Writer<K: 'static + Meta>
+pub struct Writer<K: 'static + Resource>
 where
     K::DynamicType: Eq + Hash,
 {
@@ -19,7 +19,7 @@ where
     dyntype: K::DynamicType,
 }
 
-impl<K: 'static + Meta + Clone> Writer<K>
+impl<K: 'static + Resource + Clone> Writer<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -79,14 +79,14 @@ where
 /// use `Writer::as_reader()` instead.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
-pub struct Store<K: 'static + Meta>
+pub struct Store<K: 'static + Resource>
 where
     K::DynamicType: Hash + Eq,
 {
     store: Arc<DashMap<ObjectRef<K>, K>>,
 }
 
-impl<K: 'static + Clone + Meta> Store<K>
+impl<K: 'static + Clone + Resource> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {

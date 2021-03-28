@@ -6,7 +6,7 @@ pub mod store;
 pub use self::object_ref::ObjectRef;
 use crate::watcher;
 use futures::{Stream, TryStreamExt};
-use kube::api::Meta;
+use kube::Resource;
 use std::hash::Hash;
 pub use store::Store;
 
@@ -18,7 +18,7 @@ pub use store::Store;
 /// the whole `Store` will be cleared whenever any of them emits a `Restarted` event.
 pub fn reflector<K, W>(mut store: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
-    K: Meta + Clone,
+    K: Resource + Clone,
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {

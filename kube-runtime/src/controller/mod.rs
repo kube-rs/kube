@@ -17,7 +17,7 @@ use futures::{
     stream::{self, SelectAll},
     FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube::api::{Api, DynamicObject, ListParams, Meta};
+use kube::api::{Api, DynamicObject, ListParams, Resource};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
 use std::{fmt::Debug, hash::Hash, sync::Arc, time::Duration};
@@ -65,7 +65,7 @@ pub fn trigger_with<T, K, I, S>(
 where
     S: TryStream<Ok = T>,
     I: IntoIterator<Item = ObjectRef<K>>,
-    K: Meta,
+    K: Resource,
 {
     stream
         .map_ok(move |obj| stream::iter(mapper(obj).into_iter().map(Ok)))
@@ -79,7 +79,7 @@ pub fn trigger_self<K, S>(
 ) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
 where
     S: TryStream<Ok = K>,
-    K: Meta,
+    K: Resource,
     K::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
@@ -94,8 +94,8 @@ pub fn trigger_owners<KOwner, S>(
 ) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
 where
     S: TryStream,
-    S::Ok: Meta,
-    KOwner: Meta,
+    S::Ok: Resource,
+    KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
@@ -157,7 +157,7 @@ pub fn applier<K, QueueStream, ReconcilerFut, T>(
     queue: QueueStream,
 ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
-    K: Clone + Meta + 'static,
+    K: Clone + Resource + 'static,
     K::DynamicType: Debug + Eq + Hash + Clone + Unpin,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
@@ -295,7 +295,7 @@ where
 /// ```
 pub struct Controller<K>
 where
-    K: Clone + Meta + Debug + 'static,
+    K: Clone + Resource + Debug + 'static,
     K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
@@ -307,7 +307,7 @@ where
 
 impl<K> Controller<K>
 where
-    K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
+    K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
     K::DynamicType: Eq + Hash + Clone + Default,
 {
     /// Create a Controller on a type `K`
@@ -322,7 +322,7 @@ where
 
 impl<K> Controller<K>
 where
-    K: Clone + Meta + DeserializeOwned + Debug + Send + Sync + 'static,
+    K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
     K::DynamicType: Eq + Hash + Clone,
 {
     /// Create a Controller on a type `K`
@@ -362,7 +362,7 @@ where
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
     ///
     /// [`OwnerReference`]: https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.OwnerReference.html
-    pub fn owns<Child: Clone + Meta + DeserializeOwned + Debug + Send + 'static>(
+    pub fn owns<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
         mut self,
         api: Api<Child>,
         lp: ListParams,
@@ -379,7 +379,7 @@ where
     ///
     /// This mapper should return something like `Option<ObjectRef<K>>`
     pub fn watches<
-        Other: Clone + Meta + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
     >(
         mut self,
