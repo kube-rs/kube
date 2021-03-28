@@ -166,7 +166,7 @@ impl Resource for DynamicObject {
         dt.api_version.as_str().into()
     }
 
-    fn plural<'a>(dt: &'a Self::DynamicType) -> Cow<'a, str> {
+    fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
         if let Some(plural) = &dt.plural {
             plural.into()
         } else {

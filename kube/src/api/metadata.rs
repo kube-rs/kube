@@ -50,7 +50,7 @@ pub trait Resource {
     /// `k8s_openapi` types, where we maintain a list of special pluralisations for compatibility.
     ///
     /// Thus when used with `DynamicObject` or `kube-derive`, we override this with correct values.
-    fn plural<'a>(dt: &'a Self::DynamicType) -> Cow<'a, str> {
+    fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
         to_plural(&Self::kind(dt).to_ascii_lowercase()).into()
     }
 
