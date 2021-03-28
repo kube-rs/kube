@@ -178,29 +178,33 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     };
 
     // 2. Implement Resource trait
+    let name = singular.unwrap_or_else(|| kind.to_ascii_lowercase());
+    let plural = plural.unwrap_or_else(|| to_plural(&name));
+    let scope = if namespaced { "Namespaced" } else { "Cluster" };
+
     let api_ver = format!("{}/{}", group, version);
     let impl_resource = quote! {
         impl kube::Resource for #rootident {
             type DynamicType = ();
 
-            fn kind<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
-                #kind.into()
-            }
-
-            fn plural<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
-                #plural.into()
-            }
-
-            fn group<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+            fn group(_: &()) -> std::borrow::Cow<'_, str> {
                #group.into()
             }
 
-            fn version<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+            fn kind(_: &()) -> std::borrow::Cow<'_, str> {
+                #kind.into()
+            }
+
+            fn version(_: &()) -> std::borrow::Cow<'_, str> {
                 #version.into()
             }
 
-            fn api_version<'a>(_: &'a ()) -> std::borrow::Cow<'a, str> {
+            fn api_version(_: &()) -> std::borrow::Cow<'_, str> {
                 #api_ver.into()
+            }
+
+            fn plural(_: &()) -> std::borrow::Cow<'_, str> {
+                #plural.into()
             }
 
             fn meta(&self) -> &kube::api::ObjectMeta {
@@ -241,9 +245,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     };
 
     // 4. Implement CustomResource
-    let name = singular.unwrap_or_else(|| kind.to_ascii_lowercase());
-    let plural = plural.unwrap_or_else(|| to_plural(&name));
-    let scope = if namespaced { "Namespaced" } else { "Cluster" };
 
     // Compute a bunch of crd props
     let mut printers = format!("[ {} ]", printcolums.join(",")); // hacksss

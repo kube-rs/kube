@@ -90,15 +90,15 @@ where
 {
     type DynamicType = ();
 
-    fn kind<'a>(_: &()) -> Cow<'_, str> {
+    fn kind(_: &()) -> Cow<'_, str> {
         K::KIND.into()
     }
 
-    fn group<'a>(_: &()) -> Cow<'_, str> {
+    fn group(_: &()) -> Cow<'_, str> {
         K::GROUP.into()
     }
 
-    fn version<'a>(_: &()) -> Cow<'_, str> {
+    fn version(_: &()) -> Cow<'_, str> {
         K::VERSION.into()
     }
 
