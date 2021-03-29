@@ -12,19 +12,42 @@ UNRELEASED
    - renames member `::allow_bookmarks` to `::bookmarks`
    - `::default()` sets `bookmark` to `true` to avoid bad bad defaults #219
    - method `::allow_bookmarks()` replaced by `::disable_bookmarks()`
- * `kube`: BREAKING: Mostly internal changes to the `Meta` trait to support dynamic types #385
-   - BREAKING: `Meta` trait now takes an optional associated type for runtime type info: `Family`
-     * THIS SHOULD NOT AFFECT YOU UNLESS YOU ARE IMPLEMENTING / CUSTOMISING THE TRAIT DIRECTLY
-   - New dynamic helper object `GroupVersionKind` introduced
-   - `DynamicObject` added to represent a dynamic kubernetes object
+ * `kube`: `DynamicObject` and `GroupVersionKind` introduced for full dynamic object support
+ * `kube-runtime`: watchers/reflectors/controllers can be used with dynamic objects from api discovery
+ * `kube`: Pluralisation now only happens for `k8s_openapi` objects by default #481
+   - inflector dependency removed #471
+   - added internal pluralisation helper for `k8s_openapi` objects
+ * `kube`: BREAKING: Restructuring of low level `Resource` request builder #474
+   - `Resource` renamed to `Request` and requires only a `path_url` to construct
+ * `kube`: BREAKING: Mostly internal `Meta` trait revamped to support dynamic types
+   - `Meta` renamed to `kube::Resource` to mimic `k8s_openapi::Resource` #478
+   - The trait now takes an optional associated type for runtime type info: `DynamicType` #385
    - `Api::all_with` + `Api::namespaced_with` added for querying with dynamic families
-   - see `dynamic_watcher` example
+   - see `dynamic_watcher` + `dynamic_api` for example usage
  * `kube-runtime`: BREAKING: lower level interface changes as a result of `kube::api::Meta` trait:
   - THESE SHOULD NOT AFFECT YOU UNLESS YOU ARE IMPLEMENTING / CUSTOMISING LOW LEVEL TYPES DIRECTLY
-  - `ObjectRef` now generic over `K: Meta` rather than `RuntimeResource`
-  - `reflector::{Writer, Store}` takes a `K: Meta` rather than a `K: k8s_openapi::Resource`
-  - Possible to use `watcher` or `Controller`'s on `GroupVersionKind` types now.
+  - `ObjectRef` now generic over `kube::Resource` rather than `RuntimeResource`
+  - `reflector::{Writer, Store}` takes a `kube::Resource` rather than a `k8s_openapi::Resource`
+ * `kube-derive`: BREAKING: Generated type no longer generates `k8s-openapi` traits
+  - This allows correct pluralisation via `#[kube(plural = "mycustomplurals")]` #467 via #481
 
+### 0.52.0 Migration Guide
+While we had a few breaking changes. Most are to low level internal interfaces and should not change much, but some changes you might need to make:
+
+#### kube
+- if using the old, low-level `kube::api::Resource`, please consider the easier `kube::Api`, or look at tests in `request.rs` or `typed.rs` if you need the low level interface
+- search replace `kube::api::Meta` with `kube::Resource` if used - trait was renamed
+- if implementing the trait, add `type DynamicType = ();` to the impl
+- remove calls to `ListParams::allow_bookmarks` (allow default)
+- handle `WatchEvent::Bookmark` or set `ListParams::disable_bookmarks()`
+- look at examples if replacing the long deprecated legacy runtime
+
+#### kube-derive
+The following constants from `k8s_openapi::Resource` no longer exist. Please `use kube::Resource` and:
+- replace `Foo::KIND` with `Foo::kind(&())`
+- replace `Foo::GROUP` with `Foo::group(&())`
+- replace `Foo::VERSION` with `Foo::version(&())`
+- replace `Foo::API_VERSION` with `Foo::api_version(&())`
 
 0.51.0 / 2021-02-28
 ===================
