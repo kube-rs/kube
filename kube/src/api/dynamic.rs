@@ -16,6 +16,8 @@ pub struct GroupVersionKind {
     kind: String,
     /// Concatenation of group and version
     api_version: String,
+    /// Optional plural/resource
+    plural: Option<String>,
 }
 
 impl GroupVersionKind {
@@ -52,11 +54,13 @@ impl GroupVersionKind {
         } else {
             format!("{}/{}", group, version)
         };
+        let plural = Some(ar.name.clone());
         Self {
             group,
             version,
             kind,
             api_version,
+            plural,
         }
     }
 
@@ -87,7 +91,14 @@ impl GroupVersionKind {
             version,
             kind,
             api_version,
+            plural: None,
         })
+    }
+
+    /// Set an explicit plural/resource value to avoid relying on inferred pluralisation.
+    pub fn plural(mut self, plural: &str) -> Self {
+        self.plural = Some(plural.to_string());
+        self
     }
 }
 
@@ -139,20 +150,29 @@ impl DynamicObject {
 impl Resource for DynamicObject {
     type DynamicType = GroupVersionKind;
 
-    fn group(f: &GroupVersionKind) -> Cow<'_, str> {
-        f.group.as_str().into()
+    fn group(dt: &GroupVersionKind) -> Cow<'_, str> {
+        dt.group.as_str().into()
     }
 
-    fn version(f: &GroupVersionKind) -> Cow<'_, str> {
-        f.version.as_str().into()
+    fn version(dt: &GroupVersionKind) -> Cow<'_, str> {
+        dt.version.as_str().into()
     }
 
-    fn kind(f: &GroupVersionKind) -> Cow<'_, str> {
-        f.kind.as_str().into()
+    fn kind(dt: &GroupVersionKind) -> Cow<'_, str> {
+        dt.kind.as_str().into()
     }
 
-    fn api_version(f: &GroupVersionKind) -> Cow<'_, str> {
-        f.api_version.as_str().into()
+    fn api_version(dt: &GroupVersionKind) -> Cow<'_, str> {
+        dt.api_version.as_str().into()
+    }
+
+    fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
+        if let Some(plural) = &dt.plural {
+            plural.into()
+        } else {
+            // fallback to inference
+            crate::api::metadata::to_plural(&Self::kind(dt).to_ascii_lowercase()).into()
+        }
     }
 
     fn meta(&self) -> &ObjectMeta {
@@ -208,6 +228,7 @@ mod test {
     #[tokio::test]
     #[ignore] // circle has no kubeconfig
     async fn convenient_custom_resource() {
+        use crate as kube; // derive macro needs kube in scope
         use crate::{Api, Client, CustomResource};
         use schemars::JsonSchema;
         use serde::{Deserialize, Serialize};

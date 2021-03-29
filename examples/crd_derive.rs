@@ -1,5 +1,5 @@
-use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Condition, Resource};
-use kube::CustomResource;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
+use kube::{CustomResource, Resource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
     group = "clux.dev",
     version = "v1",
     kind = "Foo",
+    plural = "fooz",
     struct = "FooCrd",
     namespaced,
     status = "FooStatus",
@@ -35,7 +36,7 @@ pub struct FooStatus {
 }
 
 fn main() {
-    println!("Kind {}", FooCrd::KIND);
+    println!("Kind {}", FooCrd::kind(&()));
     let mut foo = FooCrd::new("hi", MyFoo {
         name: "hi".into(),
         info: None,
@@ -84,13 +85,13 @@ fn verify_crd() {
       "apiVersion": "apiextensions.k8s.io/v1",
       "kind": "CustomResourceDefinition",
       "metadata": {
-        "name": "foos.clux.dev"
+        "name": "fooz.clux.dev"
       },
       "spec": {
         "group": "clux.dev",
         "names": {
           "kind": "Foo",
-          "plural": "foos",
+          "plural": "fooz",
           "shortNames": ["f"],
           "singular": "foo"
         },
@@ -183,18 +184,27 @@ fn verify_crd() {
       }
     });
     let crd = serde_json::to_value(FooCrd::crd()).unwrap();
+    println!("got crd: {}", serde_yaml::to_string(&FooCrd::crd()).unwrap());
     assert_eq!(crd, output);
 }
 
 #[test]
 fn verify_resource() {
     use static_assertions::{assert_impl_all, assert_impl_one};
-    assert_eq!(FooCrd::KIND, "Foo");
-    assert_eq!(FooCrd::GROUP, "clux.dev");
-    assert_eq!(FooCrd::VERSION, "v1");
-    assert_eq!(FooCrd::API_VERSION, "clux.dev/v1");
-    assert_impl_all!(FooCrd: k8s_openapi::Resource, k8s_openapi::Metadata, Default);
+    assert_eq!(FooCrd::kind(&()), "Foo");
+    assert_eq!(FooCrd::group(&()), "clux.dev");
+    assert_eq!(FooCrd::version(&()), "v1");
+    assert_eq!(FooCrd::api_version(&()), "clux.dev/v1");
+    assert_impl_all!(FooCrd: Resource, Default);
     assert_impl_one!(MyFoo: JsonSchema);
+}
+
+#[tokio::test]
+async fn verify_api_gen() {
+    use kube::{Api, Client};
+    let client = Client::try_default().await.unwrap();
+    let api: Api<FooCrd> = Api::namespaced(client, "myns");
+    assert_eq!(api.resource_url(), "/apis/clux.dev/v1/namespaces/myns/fooz");
 }
 
 #[test]
@@ -206,6 +216,7 @@ apiVersion: clux.dev/v1
 kind: Foo
 metadata: {}
 spec:
-  name: """#;
+  name: ""
+"#;
     assert_eq!(exp, ser);
 }

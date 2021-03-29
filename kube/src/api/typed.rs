@@ -89,6 +89,11 @@ impl<K: Resource> Api<K> {
     pub fn into_client(self) -> Client {
         self.into()
     }
+
+    /// Return a reference to the current resource url path
+    pub fn resource_url(&self) -> &str {
+        &self.request.url_path
+    }
 }
 
 /// PUSH/PUT/POST/GET abstractions

@@ -25,33 +25,45 @@ pub trait Resource {
     type DynamicType: Send + Sync + 'static;
 
     /// Returns kind of this object
-    fn kind(f: &Self::DynamicType) -> Cow<'_, str>;
+    fn kind(dt: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns group of this object
-    fn group(f: &Self::DynamicType) -> Cow<'_, str>;
+    fn group(dt: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns version of this object
-    fn version(f: &Self::DynamicType) -> Cow<'_, str>;
+    fn version(dt: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns apiVersion of this object
-    fn api_version(f: &Self::DynamicType) -> Cow<'_, str> {
-        let group = Self::group(f);
+    fn api_version(dt: &Self::DynamicType) -> Cow<'_, str> {
+        let group = Self::group(dt);
         if group.is_empty() {
-            return Self::version(f);
+            return Self::version(dt);
         }
         let mut group = group.into_owned();
         group.push('/');
-        group.push_str(&Self::version(f));
+        group.push_str(&Self::version(dt));
         group.into()
+    }
+    /// Returns the plural name of the kind
+    ///
+    /// This is known as the resource in apimachinery, we rename it for disambiguation.
+    /// By default, we infer this name through pluralization.
+    ///
+    /// The pluralization process is not recommended to be relied upon, and is only used for
+    /// `k8s_openapi` types, where we maintain a list of special pluralisations for compatibility.
+    ///
+    /// Thus when used with `DynamicObject` or `kube-derive`, we override this with correct values.
+    fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
+        to_plural(&Self::kind(dt).to_ascii_lowercase()).into()
     }
 
     /// Creates a url path for http requests for this resource
-    fn url_path(t: &Self::DynamicType, namespace: Option<&str>) -> String {
+    fn url_path(dt: &Self::DynamicType, namespace: Option<&str>) -> String {
         let n = if let Some(ns) = namespace {
             format!("namespaces/{}/", ns)
         } else {
             "".into()
         };
-        let group = Self::group(t);
-        let api_version = Self::api_version(t);
-        let plural = to_plural(&Self::kind(t).to_ascii_lowercase());
+        let group = Self::group(dt);
+        let api_version = Self::api_version(dt);
+        let plural = Self::plural(dt);
         format!(
             "/{group}/{api_version}/{namespaces}{plural}",
             group = if group.is_empty() { "api" } else { "apis" },
@@ -78,15 +90,15 @@ where
 {
     type DynamicType = ();
 
-    fn kind<'a>(_: &()) -> Cow<'_, str> {
+    fn kind(_: &()) -> Cow<'_, str> {
         K::KIND.into()
     }
 
-    fn group<'a>(_: &()) -> Cow<'_, str> {
+    fn group(_: &()) -> Cow<'_, str> {
         K::GROUP.into()
     }
 
-    fn version<'a>(_: &()) -> Cow<'_, str> {
+    fn version(_: &()) -> Cow<'_, str> {
         K::VERSION.into()
     }
 
@@ -125,7 +137,7 @@ pub struct TypeMeta {
 }
 
 // Simple pluralizer. Handles the special cases.
-fn to_plural(word: &str) -> String {
+pub(crate) fn to_plural(word: &str) -> String {
     if word == "endpoints" || word == "endpointslices" {
         return word.to_owned();
     } else if word == "nodemetrics" {
