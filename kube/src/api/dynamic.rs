@@ -23,7 +23,7 @@ pub struct GroupVersionKind {
 impl GroupVersionKind {
     /// Creates `GroupVersionKind` from an [`APIResource`].
     ///
-    /// `APIResource` objects can be extracted from [`Client::list_api_group_resources`].
+    /// `APIResource` objects can be extracted from [`Client::list_api_group_resources`](crate::Client::list_api_group_resources).
     /// If it does not specify version and/or group, they will be taken from `group_version`.
     ///
     /// ### Example usage:

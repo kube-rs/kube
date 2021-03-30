@@ -21,7 +21,7 @@ pub trait Resource {
     /// Types that require some information at runtime should select `DynamicType`
     /// as type of this information.
     ///
-    /// See [`DynamicObject`] for a valid implementation of non-k8s-openapi resources.
+    /// See [`DynamicObject`](crate::api::DynamicObject) for a valid implementation of non-k8s-openapi resources.
     type DynamicType: Send + Sync + 'static;
 
     /// Returns kind of this object
