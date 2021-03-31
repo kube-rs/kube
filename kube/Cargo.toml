@@ -24,6 +24,7 @@ jsonpatch = ["json-patch"]
 ws = ["tokio-tungstenite", "rand"]
 oauth = ["tame-oauth"]
 gzip = ["async-compression"]
+admission = ["json-patch"]
 
 [package.metadata.docs.rs]
 features = ["derive", "ws", "oauth", "jsonpatch"]
