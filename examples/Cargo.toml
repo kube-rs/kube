@@ -21,7 +21,7 @@ ws = ["kube/ws"]
 anyhow = "1.0.37"
 env_logger = "0.8.2"
 futures = "0.3.8"
-kube = { path = "../kube", version = "^0.52.0", default-features = false }
+kube = { path = "../kube", version = "^0.52.0", default-features = false, features = ["admission"] }
 kube-derive = { path = "../kube-derive", version = "^0.52.0", default-features = false } # only needed to opt out of schema
 kube-runtime = { path = "../kube-runtime", version = "^0.52.0", default-features = false }
 k8s-openapi = { version = "0.11.0", features = ["v1_20"], default-features = false }
@@ -37,6 +37,11 @@ either = "1.6.1"
 schemars = "0.8.0"
 static_assertions = "1.1.0"
 tar = "0.4.32"
+tracing = "0.1"
+tracing-subscriber = "0.2"
+warp = { version = "0.3", features = ["tls"] }
+http = "0.2.3"
+json-patch = "0.2.6"
 
 [[example]]
 name = "configmapgen_controller"
@@ -145,6 +150,10 @@ path = "dynamic_watcher.rs"
 [[example]]
 name = "secret_reflector"
 path = "secret_reflector.rs"
+
+[[example]]
+name = "admission_controller"
+path = "admission_controller.rs"
 
 [dependencies]
 tokio-util = "0.6.0"

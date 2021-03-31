@@ -3,10 +3,11 @@ use crate::{
     Error, Result,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
 /// Represents a type-erased object kind
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GroupVersionKind {
     /// API group
     group: String,
@@ -15,6 +16,7 @@ pub struct GroupVersionKind {
     /// Kind
     kind: String,
     /// Concatenation of group and version
+    #[serde(default)]
     api_version: String,
     /// Optional plural/resource
     plural: Option<String>,
@@ -99,6 +101,76 @@ impl GroupVersionKind {
     pub fn plural(mut self, plural: &str) -> Self {
         self.plural = Some(plural.to_string());
         self
+    }
+}
+
+/// Represents a type-erased object resource.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GroupVersionResource {
+    /// API group
+    group: String,
+    /// Version
+    version: String,
+    /// Resource
+    resource: String,
+    /// Concatenation of group and version
+    #[serde(default)]
+    api_version: String,
+}
+
+impl GroupVersionResource {
+    /// Creates `GroupVersionResource` from an [`APIResource`].
+    pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
+        let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
+        let (default_group, default_version) = match *gvsplit.as_slice() {
+            [g, v] => (g, v), // standard case
+            [v] => ("", v),   // core v1 case
+            _ => unreachable!(),
+        };
+        let group = ar.group.clone().unwrap_or_else(|| default_group.into());
+        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
+        let resource = ar.name.to_string();
+        let api_version = if group.is_empty() {
+            version.clone()
+        } else {
+            format!("{}/{}", group, version)
+        };
+        Self {
+            group,
+            version,
+            resource,
+            api_version,
+        }
+    }
+
+    /// Set the api group, version, and the plural resource name.
+    pub fn gvr(group_: &str, version_: &str, resource_: &str) -> Result<Self> {
+        let version = version_.to_string();
+        let group = group_.to_string();
+        let resource = resource_.to_string();
+        let api_version = if group.is_empty() {
+            version.to_string()
+        } else {
+            format!("{}/{}", group, version)
+        };
+        if version.is_empty() {
+            return Err(Error::DynamicType(format!(
+                "GroupVersionResource '{}' must have a version",
+                resource
+            )));
+        }
+        if resource.is_empty() {
+            return Err(Error::DynamicType(format!(
+                "GroupVersionResource '{}' must have a resource",
+                resource
+            )));
+        }
+        Ok(Self {
+            group,
+            version,
+            resource,
+            api_version,
+        })
     }
 }
 

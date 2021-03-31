@@ -20,7 +20,7 @@ pub(crate) mod typed;
 pub use typed::Api;
 
 mod dynamic;
-pub use dynamic::{DynamicObject, GroupVersionKind};
+pub use dynamic::{DynamicObject, GroupVersionKind, GroupVersionResource};
 
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
@@ -35,3 +35,5 @@ pub use self::object::{Object, ObjectList, WatchEvent};
 
 mod metadata;
 pub use self::metadata::{ListMeta, ObjectMeta, Resource, TypeMeta};
+
+#[cfg(feature = "admission")] pub mod admission;
