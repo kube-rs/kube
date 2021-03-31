@@ -1,6 +1,6 @@
 [package]
 name = "kube-runtime"
-version = "0.51.0"
+version = "0.52.0"
 description = "Kubernetes futures controller runtime"
 authors = [
   "Teo Klestrup Röijezon <teo@nullable.se>",
@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3.8"
-kube = { path = "../kube", version = "^0.51.0", default-features = false }
+kube = { path = "../kube", version = "^0.52.0", default-features = false }
 derivative = "2.1.1"
 serde = "1.0.118"
 smallvec = "1.6.0"
@@ -34,7 +34,7 @@ native-tls = ["kube/native-tls"]
 rustls-tls = ["kube/rustls-tls"]
 
 [dev-dependencies]
-kube-derive = { path = "../kube-derive", version = "^0.51.0"}
+kube-derive = { path = "../kube-derive", version = "^0.52.0"}
 serde_json = "1.0.61"
 tokio = { version = "1.0.1", features = ["full", "test-util"] }
 rand = "0.8.0"

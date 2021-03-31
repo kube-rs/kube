@@ -1,27 +1,30 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.51.0...master
- * `kube-derive`: allow overriding `#[kube(plural)]` and `#[kube(singular)]` - #458 via #463
- * `kube`: added tracing instrumentation for io operations in `kube::Api` - #455
- * `kube`: `DeleteParams`'s `Preconditions` is now public - #459 via #460
- * `kube`: remove dependency on duplicate `derive_accept_key` for `ws` - #452
- * `kube`: Properly verify websocket keys in `ws` handshake - #447
- * `kube`: BREAKING: removed optional, and deprecated `runtime` module - #454
- * `kube`: BREAKING: `ListParams` bookmarks default enabled - #226 via #445
+ * see https://github.com/clux/kube-rs/compare/0.52.0...master
+
+0.52.0 / 2021-03-31
+===================
+ * `kube-derive`: allow overriding `#[kube(plural)]` and `#[kube(singular)]` - [#458](https://github.com/clux/kube-rs/issues/458) via [#463](https://github.com/clux/kube-rs/issues/463)
+ * `kube`: added tracing instrumentation for io operations in `kube::Api` - [#455](https://github.com/clux/kube-rs/issues/455)
+ * `kube`: `DeleteParams`'s `Preconditions` is now public - [#459](https://github.com/clux/kube-rs/issues/459) via [#460](https://github.com/clux/kube-rs/issues/460)
+ * `kube`: remove dependency on duplicate `derive_accept_key` for `ws` - [#452](https://github.com/clux/kube-rs/issues/452)
+ * `kube`: Properly verify websocket keys in `ws` handshake - [#447](https://github.com/clux/kube-rs/issues/447)
+ * `kube`: BREAKING: removed optional, and deprecated `runtime` module - [#454](https://github.com/clux/kube-rs/issues/454)
+ * `kube`: BREAKING: `ListParams` bookmarks default enabled - [#226](https://github.com/clux/kube-rs/issues/226) via [#445](https://github.com/clux/kube-rs/issues/445)
    - renames member `::allow_bookmarks` to `::bookmarks`
-   - `::default()` sets `bookmark` to `true` to avoid bad bad defaults #219
+   - `::default()` sets `bookmark` to `true` to avoid bad bad defaults [#219](https://github.com/clux/kube-rs/issues/219)
    - method `::allow_bookmarks()` replaced by `::disable_bookmarks()`
  * `kube`: `DynamicObject` and `GroupVersionKind` introduced for full dynamic object support
  * `kube-runtime`: watchers/reflectors/controllers can be used with dynamic objects from api discovery
- * `kube`: Pluralisation now only happens for `k8s_openapi` objects by default #481
-   - inflector dependency removed #471
+ * `kube`: Pluralisation now only happens for `k8s_openapi` objects by default [#481](https://github.com/clux/kube-rs/issues/481)
+   - inflector dependency removed [#471](https://github.com/clux/kube-rs/issues/471)
    - added internal pluralisation helper for `k8s_openapi` objects
- * `kube`: BREAKING: Restructuring of low level `Resource` request builder #474
+ * `kube`: BREAKING: Restructuring of low level `Resource` request builder [#474](https://github.com/clux/kube-rs/issues/474)
    - `Resource` renamed to `Request` and requires only a `path_url` to construct
  * `kube`: BREAKING: Mostly internal `Meta` trait revamped to support dynamic types
-   - `Meta` renamed to `kube::Resource` to mimic `k8s_openapi::Resource` #478
-   - The trait now takes an optional associated type for runtime type info: `DynamicType` #385
+   - `Meta` renamed to `kube::Resource` to mimic `k8s_openapi::Resource` [#478](https://github.com/clux/kube-rs/issues/478)
+   - The trait now takes an optional associated type for runtime type info: `DynamicType` [#385](https://github.com/clux/kube-rs/issues/385)
    - `Api::all_with` + `Api::namespaced_with` added for querying with dynamic families
    - see `dynamic_watcher` + `dynamic_api` for example usage
  * `kube-runtime`: BREAKING: lower level interface changes as a result of `kube::api::Meta` trait:
@@ -29,7 +32,7 @@ UNRELEASED
   - `ObjectRef` now generic over `kube::Resource` rather than `RuntimeResource`
   - `reflector::{Writer, Store}` takes a `kube::Resource` rather than a `k8s_openapi::Resource`
  * `kube-derive`: BREAKING: Generated type no longer generates `k8s-openapi` traits
-  - This allows correct pluralisation via `#[kube(plural = "mycustomplurals")]` #467 via #481
+  - This allows correct pluralisation via `#[kube(plural = "mycustomplurals")]` [#467](https://github.com/clux/kube-rs/issues/467) via [#481](https://github.com/clux/kube-rs/issues/481)
 
 ### 0.52.0 Migration Guide
 While we had a few breaking changes. Most are to low level internal interfaces and should not change much, but some changes you might need to make:
