@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-    api::{Api, ListParams, Resource},
+    api::{Api, ListParams, ResourceExt},
     Client,
 };
 use kube_runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher};
@@ -15,7 +15,7 @@ fn spawn_periodic_reader(reader: Store<ConfigMap>) {
             let cms: Vec<_> = reader
                 .state()
                 .iter()
-                .map(|obj| Resource::name(obj).clone())
+                .map(|obj| ResourceExt::expect_name(obj).clone())
                 .collect();
             info!("Current configmaps: {:?}", cms);
         }
@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut applied_events = try_flatten_applied(rf).boxed_local();
     while let Some(event) = applied_events.try_next().await? {
-        info!("Applied {}", Resource::name(&event))
+        info!("Applied {}", ResourceExt::expect_name(&event))
     }
     Ok(())
 }

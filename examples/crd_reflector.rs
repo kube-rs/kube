@@ -1,7 +1,7 @@
 #[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use kube::{
-    api::{Api, ListParams, Resource},
+    api::{Api, ListParams, ResourceExt},
     Client, CustomResource,
 };
 use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
@@ -33,13 +33,17 @@ async fn main() -> anyhow::Result<()> {
         loop {
             // Periodically read our state
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let crds = reader.state().iter().map(Resource::name).collect::<Vec<_>>();
+            let crds = reader
+                .state()
+                .iter()
+                .map(ResourceExt::expect_name)
+                .collect::<Vec<_>>();
             info!("Current crds: {:?}", crds);
         }
     });
     let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", Resource::name(&event));
+        info!("Applied {}", ResourceExt::expect_name(&event));
     }
     Ok(())
 }

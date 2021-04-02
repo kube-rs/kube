@@ -3,7 +3,7 @@
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube::{
-    api::{ListParams, Resource, WatchEvent},
+    api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
 };
 use serde::de::DeserializeOwned;

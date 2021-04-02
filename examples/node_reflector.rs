@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Node;
 use kube::{
-    api::{Api, ListParams, Resource},
+    api::{Api, ListParams, ResourceExt},
     Client,
 };
 use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
@@ -25,7 +25,11 @@ async fn main() -> anyhow::Result<()> {
     // Periodically read our state in the background
     tokio::spawn(async move {
         loop {
-            let nodes = reader.state().iter().map(Resource::name).collect::<Vec<_>>();
+            let nodes = reader
+                .state()
+                .iter()
+                .map(ResourceExt::expect_name)
+                .collect::<Vec<_>>();
             info!("Current {} nodes: {:?}", nodes.len(), nodes);
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
@@ -34,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
     // Drain and log applied events from the reflector
     let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", Resource::name(&event));
+        info!("Applied {}", ResourceExt::expect_name(&event));
     }
 
     Ok(())

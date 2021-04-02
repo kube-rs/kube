@@ -75,12 +75,42 @@ pub trait Resource {
 
     /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
+    /// Metadata that all persisted resources must have
+    fn meta_mut(&mut self) -> &mut ObjectMeta;
+}
+
+/// Helper methods for resources.
+pub trait ResourceExt: Resource {
     /// The name of the resource
-    fn name(&self) -> String;
+    fn name(&self) -> Option<String>;
+    /// Returns the name of the resource, panicking if it is
+    /// missing. Use this function if you know that name is set, for example
+    /// when resource was received from the apiserver.
+    /// Because of `.metadata.generateName` field, in other contexts name
+    /// may be missing.
+    fn expect_name(&self) -> String;
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
     /// The resource version
     fn resource_ver(&self) -> Option<String>;
+}
+
+impl<K: Resource> ResourceExt for K {
+    fn name(&self) -> Option<String> {
+        self.meta().name.clone()
+    }
+
+    fn expect_name(&self) -> String {
+        self.meta().name.clone().expect("kind has metadata.name")
+    }
+
+    fn namespace(&self) -> Option<String> {
+        self.meta().namespace.clone()
+    }
+
+    fn resource_ver(&self) -> Option<String> {
+        self.meta().resource_version.clone()
+    }
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
@@ -110,16 +140,8 @@ where
         self.metadata()
     }
 
-    fn name(&self) -> String {
-        self.meta().name.clone().expect("kind has metadata.name")
-    }
-
-    fn resource_ver(&self) -> Option<String> {
-        self.meta().resource_version.clone()
-    }
-
-    fn namespace(&self) -> Option<String> {
-        self.meta().namespace.clone()
+    fn meta_mut(&mut self) -> &mut ObjectMeta {
+        self.metadata_mut()
     }
 }
 

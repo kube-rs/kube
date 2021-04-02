@@ -7,7 +7,7 @@ use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
 
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, Resource, WatchEvent},
+    api::{Api, ListParams, Patch, PatchParams, ResourceExt, WatchEvent},
     Client, CustomResource,
 };
 
@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
     let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
     // NB: kubernetes < 1.20 will fail to admit scale subresources - see #387
-    info!("Applied 1 {}: {:?}", Resource::name(&o), o.spec);
+    info!("Applied 1 {}: {:?}", ResourceExt::expect_name(&o), o.spec);
 
     // 2. Apply from partial json!
     let patch = serde_json::json!({
@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Applying 2: \n{}", serde_yaml::to_string(&patch)?);
     let o2 = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
-    info!("Applied 2 {}: {:?}", Resource::name(&o2), o2.spec);
+    info!("Applied 2 {}: {:?}", ResourceExt::expect_name(&o2), o2.spec);
 
     Ok(())
 }
@@ -90,7 +90,7 @@ async fn wait_for_crd_ready(crds: &Api<CustomResourceDefinition>) -> anyhow::Res
 
     while let Some(status) = stream.try_next().await? {
         if let WatchEvent::Modified(s) = status {
-            info!("Modify event for {}", Resource::name(&s));
+            info!("Modify event for {}", ResourceExt::expect_name(&s));
             if let Some(s) = s.status {
                 if let Some(conds) = s.conditions {
                     if let Some(pcond) = conds.iter().find(|c| c.type_ == "NamesAccepted") {

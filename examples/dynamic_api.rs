@@ -3,7 +3,7 @@
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResourceList;
 use kube::{
-    api::{Api, DynamicObject, GroupVersionKind, Resource},
+    api::{Api, DynamicObject, GroupVersionKind, ResourceExt},
     Client,
 };
 use log::{info, warn};
@@ -68,7 +68,7 @@ async fn print_group(
         let list = api.list(&Default::default()).await?;
         info!("{} : {}", group_version, ar.kind);
         for item in list.items {
-            let name = item.name();
+            let name = item.expect_name();
             let ns = item.metadata.namespace.map(|s| s + "/").unwrap_or_default();
             info!("\t\t{}{}", ns, name);
         }
