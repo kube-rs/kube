@@ -296,7 +296,7 @@ where
     ///         "kind": "Job",
     ///         "metadata": {
     ///             "name": "baz",
-    ///             "resourceVersion": j.resource_ver(),
+    ///             "resourceVersion": j.resource_version(),
     ///         },
     ///         "spec": {
     ///             "template": {

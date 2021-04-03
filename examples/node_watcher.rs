@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{

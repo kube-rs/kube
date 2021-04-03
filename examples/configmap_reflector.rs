@@ -12,11 +12,7 @@ fn spawn_periodic_reader(reader: Store<ConfigMap>) {
         loop {
             // Periodically read our state
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let cms: Vec<_> = reader
-                .state()
-                .iter()
-                .map(|obj| obj.name_unchecked())
-                .collect();
+            let cms: Vec<_> = reader.state().iter().map(|obj| obj.name_unchecked()).collect();
             info!("Current configmaps: {:?}", cms);
         }
     });
