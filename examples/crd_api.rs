@@ -109,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
         "metadata": {
             "name": "baz",
             // Updates need to provide our last observed version:
-            "resourceVersion": ResourceExt::resource_ver(&f1cpy),
+            "resourceVersion": f1cpy.resource_version(),
         },
         "spec": { "name": "baz", "info": "new baz", "replicas": 1 },
     }))?;
@@ -146,7 +146,7 @@ async fn main() -> anyhow::Result<()> {
         "metadata": {
             "name": "qux",
             // Updates need to provide our last observed version:
-            "resourceVersion": ResourceExt::resource_ver(&o),
+            "resourceVersion": o.resource_version(),
         },
         "status": FooStatus { is_bad: true, replicas: 0 }
     });

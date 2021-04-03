@@ -92,7 +92,10 @@ pub trait ResourceExt: Resource {
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
     /// The resource version
-    fn resource_ver(&self) -> Option<String>;
+    fn resource_version(&self) -> Option<String>;
+    /// Unique ID (if you delete resource and then create a new
+    /// resource with the same name, it will have different ID)
+    fn uid(&self) -> Option<String>;
 }
 
 impl<K: Resource> ResourceExt for K {
@@ -108,8 +111,12 @@ impl<K: Resource> ResourceExt for K {
         self.meta().namespace.clone()
     }
 
-    fn resource_ver(&self) -> Option<String> {
+    fn resource_version(&self) -> Option<String> {
         self.meta().resource_version.clone()
+    }
+
+    fn uid(&self) -> Option<String> {
+        self.meta().uid.clone()
     }
 }
 

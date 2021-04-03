@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Patch Pod blog");
     let patch = json!({
         "metadata": {
-            "resourceVersion": ResourceExt::resource_ver(&p1cpy),
+            "resourceVersion": p1cpy.resource_version(),
         },
         "spec": {
             "activeDeadlineSeconds": 5
