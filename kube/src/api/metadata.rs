@@ -88,7 +88,7 @@ pub trait ResourceExt: Resource {
     /// when resource was received from the apiserver.
     /// Because of `.metadata.generateName` field, in other contexts name
     /// may be missing.
-    fn expect_name(&self) -> String;
+    fn name_unchecked(&self) -> String;
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
     /// The resource version
@@ -100,7 +100,7 @@ impl<K: Resource> ResourceExt for K {
         self.meta().name.clone()
     }
 
-    fn expect_name(&self) -> String {
+    fn name_unchecked(&self) -> String {
         self.meta().name.clone().expect("kind has metadata.name")
     }
 

@@ -39,12 +39,12 @@ async fn main() -> anyhow::Result<()> {
     while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(o) => {
-                info!("Added {}", o.expect_name());
+                info!("Added {}", o.name_unchecked());
             }
             WatchEvent::Modified(o) => {
                 let s = o.status.as_ref().expect("status exists on pod");
                 if s.phase.clone().unwrap_or_default() == "Running" {
-                    info!("Ready to attach to {}", o.expect_name());
+                    info!("Ready to attach to {}", o.name_unchecked());
                     break;
                 }
             }
@@ -81,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {
-            assert_eq!(pdel.expect_name(), "example");
+            assert_eq!(pdel.name_unchecked(), "example");
         });
 
     Ok(())

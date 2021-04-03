@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
@@ -26,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
 
 // A simple node problem detector
 async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result<()> {
-    let name = ResourceExt::expect_name(&o);
+    let name = o.name_unchecked();
     // Nodes often modify a lot - only print broken nodes
     if let Some(true) = o.spec.unwrap().unschedulable {
         let failed = o

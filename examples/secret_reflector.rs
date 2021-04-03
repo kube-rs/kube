@@ -39,7 +39,7 @@ fn spawn_periodic_reader(reader: Store<Secret>) {
             let cms: Vec<_> = reader
                 .state()
                 .iter()
-                .map(|s| format!("{}: {:?}", s.expect_name(), decode(s).keys()))
+                .map(|s| format!("{}: {:?}", s.name_unchecked(), decode(s).keys()))
                 .collect();
             info!("Current secrets: {:?}", cms);
             tokio::time::sleep(std::time::Duration::from_secs(15)).await;
@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
 
     try_flatten_applied(rf)
         .try_for_each(|s| async move {
-            log::info!("Applied: {}", s.expect_name());
+            log::info!("Applied: {}", s.name_unchecked());
             Ok(())
         })
         .await?;

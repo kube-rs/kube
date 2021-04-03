@@ -133,7 +133,7 @@ where
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
     ///     for p in pods.list(&lp).await? {
-    ///         println!("Found Pod: {}", p.expect_name());
+    ///         println!("Found Pod: {}", p.name_unchecked());
     ///     }
     ///     Ok(())
     /// }
@@ -215,7 +215,7 @@ where
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
     ///         either::Left(list) => {
-    ///             let names: Vec<_> = list.iter().map(ResourceExt::expect_name).collect();
+    ///             let names: Vec<_> = list.iter().map(ResourceExt::name_unchecked).collect();
     ///             println!("Deleting collection of pods: {:?}", names);
     ///         },
     ///         either::Right(status) => {
@@ -354,9 +354,9 @@ where
     ///     let mut stream = jobs.watch(&lp, "0").await?.boxed();
     ///     while let Some(status) = stream.try_next().await? {
     ///         match status {
-    ///             WatchEvent::Added(s) => println!("Added {}", s.expect_name()),
-    ///             WatchEvent::Modified(s) => println!("Modified: {}", s.expect_name()),
-    ///             WatchEvent::Deleted(s) => println!("Deleted {}", s.expect_name()),
+    ///             WatchEvent::Added(s) => println!("Added {}", s.name_unchecked()),
+    ///             WatchEvent::Modified(s) => println!("Modified: {}", s.name_unchecked()),
+    ///             WatchEvent::Deleted(s) => println!("Deleted {}", s.name_unchecked()),
     ///             WatchEvent::Bookmark(s) => {},
     ///             WatchEvent::Error(s) => println!("{}", s),
     ///         }

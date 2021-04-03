@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
             // Periodically read our state
-            let deploys: Vec<_> = reader.state().iter().map(ResourceExt::expect_name).collect();
+            let deploys: Vec<_> = reader.state().iter().map(ResourceExt::name_unchecked).collect();
             info!("Current deploys: {:?}", deploys);
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;
         }
@@ -38,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
     // We can look at the events we want and use it as a watcher
     let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", ResourceExt::expect_name(&event));
+        info!("Applied {}", event.name_unchecked());
     }
 
     Ok(())

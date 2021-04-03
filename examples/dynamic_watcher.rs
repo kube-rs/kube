@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
     let watcher = watcher(api, ListParams::default());
     try_flatten_applied(watcher)
         .try_for_each(|p| async move {
-            log::info!("Applied: {}", ResourceExt::expect_name(&p));
+            log::info!("Applied: {}", p.name_unchecked());
             Ok(())
         })
         .await?;

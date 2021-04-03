@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use futures::{stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::{
     apps::v1::Deployment,
@@ -38,9 +39,9 @@ async fn main() -> anyhow::Result<()> {
     }
     while let Some(o) = combo_stream.try_next().await? {
         match o {
-            Watched::Config(cm) => info!("Got configmap: {}", ResourceExt::expect_name(&cm)),
-            Watched::Deploy(d) => info!("Got deployment: {}", ResourceExt::expect_name(&d)),
-            Watched::Secret(s) => info!("Got secret: {}", ResourceExt::expect_name(&s)),
+            Watched::Config(cm) => info!("Got configmap: {}", cm.name_unchecked()),
+            Watched::Deploy(d) => info!("Got deployment: {}", d.name_unchecked()),
+            Watched::Secret(s) => info!("Got secret: {}", s.name_unchecked()),
         }
     }
     Ok(())

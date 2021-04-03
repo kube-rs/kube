@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
             let nodes = reader
                 .state()
                 .iter()
-                .map(ResourceExt::expect_name)
+                .map(ResourceExt::name_unchecked)
                 .collect::<Vec<_>>();
             info!("Current {} nodes: {:?}", nodes.len(), nodes);
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
@@ -38,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
     // Drain and log applied events from the reflector
     let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", ResourceExt::expect_name(&event));
+        info!("Applied {}", event.name_unchecked());
     }
 
     Ok(())

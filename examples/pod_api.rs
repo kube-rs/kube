@@ -35,8 +35,8 @@ async fn main() -> anyhow::Result<()> {
     let pp = PostParams::default();
     match pods.create(&pp, &p).await {
         Ok(o) => {
-            let name = ResourceExt::expect_name(&o);
-            assert_eq!(ResourceExt::expect_name(&p), name);
+            let name = o.name_unchecked();
+            assert_eq!(p.name_unchecked(), name);
             info!("Created {}", name);
             // wait for it..
             std::thread::sleep(std::time::Duration::from_millis(5_000));
@@ -52,13 +52,13 @@ async fn main() -> anyhow::Result<()> {
     let mut stream = pods.watch(&lp, "0").await?.boxed();
     while let Some(status) = stream.try_next().await? {
         match status {
-            WatchEvent::Added(o) => info!("Added {}", ResourceExt::expect_name(&o)),
+            WatchEvent::Added(o) => info!("Added {}", o.name_unchecked()),
             WatchEvent::Modified(o) => {
                 let s = o.status.as_ref().expect("status exists on pod");
                 let phase = s.phase.clone().unwrap_or_default();
-                info!("Modified: {} with phase: {}", ResourceExt::expect_name(&o), phase);
+                info!("Modified: {} with phase: {}", o.name_unchecked(), phase);
             }
-            WatchEvent::Deleted(o) => info!("Deleted {}", ResourceExt::expect_name(&o)),
+            WatchEvent::Deleted(o) => info!("Deleted {}", o.name_unchecked()),
             WatchEvent::Error(e) => error!("Error {}", e),
             _ => {}
         }
@@ -88,13 +88,13 @@ async fn main() -> anyhow::Result<()> {
 
     let lp = ListParams::default().fields(&format!("metadata.name={}", "blog")); // only want results for our pod
     for p in pods.list(&lp).await? {
-        info!("Found Pod: {}", ResourceExt::expect_name(&p));
+        info!("Found Pod: {}", p.name_unchecked());
     }
 
     // Delete it
     let dp = DeleteParams::default();
     pods.delete("blog", &dp).await?.map_left(|pdel| {
-        assert_eq!(ResourceExt::expect_name(&pdel), "blog");
+        assert_eq!(pdel.name_unchecked(), "blog");
         info!("Deleting blog pod started: {:?}", pdel);
     });
 

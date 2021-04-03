@@ -36,14 +36,14 @@ async fn main() -> anyhow::Result<()> {
             let crds = reader
                 .state()
                 .iter()
-                .map(ResourceExt::expect_name)
+                .map(ResourceExt::name_unchecked)
                 .collect::<Vec<_>>();
             info!("Current crds: {:?}", crds);
         }
     });
     let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", ResourceExt::expect_name(&event));
+        info!("Applied {}", event.name_unchecked());
     }
     Ok(())
 }

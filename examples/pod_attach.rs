@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
 use std::io::Write;
 
@@ -43,12 +44,12 @@ async fn main() -> anyhow::Result<()> {
     while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(o) => {
-                info!("Added {}", ResourceExt::expect_name(&o));
+                info!("Added {}", o.name_unchecked());
             }
             WatchEvent::Modified(o) => {
                 let s = o.status.as_ref().expect("status exists on pod");
                 if s.phase.clone().unwrap_or_default() == "Running" {
-                    info!("Ready to attach to {}", ResourceExt::expect_name(&o));
+                    info!("Ready to attach to {}", o.name_unchecked());
                     break;
                 }
             }
@@ -68,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {
-            assert_eq!(ResourceExt::expect_name(&pdel), "example");
+            assert_eq!(pdel.name_unchecked(), "example");
         });
 
     Ok(())
