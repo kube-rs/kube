@@ -54,13 +54,13 @@
 //!     // Observe the pods phase for 10 seconds
 //!     while let Some(status) = stream.try_next().await? {
 //!         match status {
-//!             WatchEvent::Added(o) => println!("Added {}", o.name_unchecked()),
+//!             WatchEvent::Added(o) => println!("Added {}", o.name()),
 //!             WatchEvent::Modified(o) => {
 //!                 let s = o.status.as_ref().expect("status exists on pod");
 //!                 let phase = s.phase.clone().unwrap_or_default();
-//!                 println!("Modified: {} with phase: {}", o.name_unchecked(), phase);
+//!                 println!("Modified: {} with phase: {}", o.name(), phase);
 //!             }
-//!             WatchEvent::Deleted(o) => println!("Deleted {}", o.name_unchecked()),
+//!             WatchEvent::Deleted(o) => println!("Deleted {}", o.name()),
 //!             WatchEvent::Error(e) => println!("Error {}", e),
 //!             _ => {}
 //!         }

@@ -25,11 +25,7 @@ async fn main() -> anyhow::Result<()> {
     // Periodically read our state in the background
     tokio::spawn(async move {
         loop {
-            let nodes = reader
-                .state()
-                .iter()
-                .map(ResourceExt::name_unchecked)
-                .collect::<Vec<_>>();
+            let nodes = reader.state().iter().map(ResourceExt::name).collect::<Vec<_>>();
             info!("Current {} nodes: {:?}", nodes.len(), nodes);
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
@@ -38,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
     // Drain and log applied events from the reflector
     let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", event.name_unchecked());
+        info!("Applied {}", event.name());
     }
 
     Ok(())

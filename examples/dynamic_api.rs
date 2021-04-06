@@ -68,7 +68,7 @@ async fn print_group(
         let list = api.list(&Default::default()).await?;
         info!("{} : {}", group_version, ar.kind);
         for item in list.items {
-            let name = item.name_unchecked();
+            let name = item.name();
             let ns = item.metadata.namespace.map(|s| s + "/").unwrap_or_default();
             info!("\t\t{}{}", ns, name);
         }

@@ -83,14 +83,15 @@ pub trait Resource {
 
 /// Helper methods for resources.
 pub trait ResourceExt: Resource {
-    /// The name of the resource
-    fn name(&self) -> Option<String>;
     /// Returns the name of the resource, panicking if it is
     /// missing. Use this function if you know that name is set, for example
     /// when resource was received from the apiserver.
     /// Because of `.metadata.generateName` field, in other contexts name
     /// may be missing.
-    fn name_unchecked(&self) -> String;
+    ///
+    /// For non-panicking alternative, you can directly read `name` field
+    /// on the `self.meta()`.
+    fn name(&self) -> String;
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
     /// The resource version
@@ -121,12 +122,8 @@ pub trait ResourceExt: Resource {
 static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| BTreeMap::new());
 
 impl<K: Resource> ResourceExt for K {
-    fn name(&self) -> Option<String> {
-        self.meta().name.clone()
-    }
-
-    fn name_unchecked(&self) -> String {
-        self.meta().name.clone().expect("kind has metadata.name")
+    fn name(&self) -> String {
+        self.meta().name.clone().expect(".metadata.name missing")
     }
 
     fn namespace(&self) -> Option<String> {

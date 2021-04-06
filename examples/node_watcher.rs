@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
 
 // A simple node problem detector
 async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result<()> {
-    let name = o.name_unchecked();
+    let name = o.name();
     // Nodes often modify a lot - only print broken nodes
     if let Some(true) = o.spec.unwrap().unschedulable {
         let failed = o

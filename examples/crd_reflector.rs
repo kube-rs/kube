@@ -33,17 +33,13 @@ async fn main() -> anyhow::Result<()> {
         loop {
             // Periodically read our state
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let crds = reader
-                .state()
-                .iter()
-                .map(ResourceExt::name_unchecked)
-                .collect::<Vec<_>>();
+            let crds = reader.state().iter().map(ResourceExt::name).collect::<Vec<_>>();
             info!("Current crds: {:?}", crds);
         }
     });
     let mut rfa = try_flatten_applied(rf).boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", event.name_unchecked());
+        info!("Applied {}", event.name());
     }
     Ok(())
 }

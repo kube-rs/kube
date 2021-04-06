@@ -211,7 +211,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///     let watcher = watcher(pods, ListParams::default());
 ///     try_flatten_applied(watcher)
 ///         .try_for_each(|p| async move {
-///          println!("Applied: {}", p.name_unchecked());
+///          println!("Applied: {}", p.name());
 ///             Ok(())
 ///         })
 ///         .await?;

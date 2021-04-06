@@ -90,7 +90,7 @@ impl<K: Resource> ObjectRef<K> {
     {
         Self {
             dyntype,
-            name: obj.name_unchecked(),
+            name: obj.name(),
             namespace: obj.namespace(),
         }
     }

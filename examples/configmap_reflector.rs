@@ -12,7 +12,7 @@ fn spawn_periodic_reader(reader: Store<ConfigMap>) {
         loop {
             // Periodically read our state
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let cms: Vec<_> = reader.state().iter().map(|obj| obj.name_unchecked()).collect();
+            let cms: Vec<_> = reader.state().iter().map(|obj| obj.name()).collect();
             info!("Current configmaps: {:?}", cms);
         }
     });
@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut applied_events = try_flatten_applied(rf).boxed_local();
     while let Some(event) = applied_events.try_next().await? {
-        info!("Applied {}", event.name_unchecked())
+        info!("Applied {}", event.name())
     }
     Ok(())
 }

@@ -44,12 +44,12 @@ async fn main() -> anyhow::Result<()> {
     while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(o) => {
-                info!("Added {}", o.name_unchecked());
+                info!("Added {}", o.name());
             }
             WatchEvent::Modified(o) => {
                 let s = o.status.as_ref().expect("status exists on pod");
                 if s.phase.clone().unwrap_or_default() == "Running" {
-                    info!("Ready to evict to {}", o.name_unchecked());
+                    info!("Ready to evict to {}", o.name());
                     break;
                 }
             }

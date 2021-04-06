@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
     let watcher = watcher(api, ListParams::default());
     try_flatten_applied(watcher)
         .try_for_each(|p| async move {
-            log::debug!("Applied: {}", p.name_unchecked());
+            log::debug!("Applied: {}", p.name());
             if let Some(unready_reason) = pod_unready(&p) {
                 log::warn!("{}", unready_reason);
             }
@@ -40,7 +40,7 @@ fn pod_unready(p: &Pod) -> Option<String> {
             if p.metadata.labels.as_ref().unwrap().contains_key("job-name") {
                 return None; // ignore job based pods, they are meant to exit 0
             }
-            return Some(format!("Unready pod {}: {}", p.name_unchecked(), failed));
+            return Some(format!("Unready pod {}: {}", p.name(), failed));
         }
     }
     None

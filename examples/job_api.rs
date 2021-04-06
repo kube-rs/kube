@@ -52,18 +52,18 @@ async fn main() -> anyhow::Result<()> {
 
     while let Some(status) = stream.try_next().await? {
         match status {
-            WatchEvent::Added(s) => info!("Added {}", s.name_unchecked()),
+            WatchEvent::Added(s) => info!("Added {}", s.name()),
             WatchEvent::Modified(s) => {
                 let current_status = s.status.clone().expect("Status is missing");
                 match current_status.completion_time {
                     Some(_) => {
-                        info!("Modified: {} is complete", s.name_unchecked());
+                        info!("Modified: {} is complete", s.name());
                         break;
                     }
-                    _ => info!("Modified: {} is running", s.name_unchecked()),
+                    _ => info!("Modified: {} is running", s.name()),
                 }
             }
-            WatchEvent::Deleted(s) => info!("Deleted {}", s.name_unchecked()),
+            WatchEvent::Deleted(s) => info!("Deleted {}", s.name()),
             WatchEvent::Error(s) => error!("{}", s),
             _ => {}
         }
