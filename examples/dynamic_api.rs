@@ -3,7 +3,7 @@
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResourceList;
 use kube::{
-    api::{Api, DynamicObject, GroupVersionKind, Resource},
+    api::{Api, DynamicObject, GroupVersionKind, ResourceExt},
     Client,
 };
 use log::{info, warn};

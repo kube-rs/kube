@@ -1,6 +1,6 @@
 use futures::prelude::*;
 use kube::{
-    api::{DynamicObject, GroupVersionKind, ListParams, Resource},
+    api::{DynamicObject, GroupVersionKind, ListParams, ResourceExt},
     Api, Client,
 };
 use kube_runtime::{utils::try_flatten_applied, watcher};
@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
     let watcher = watcher(api, ListParams::default());
     try_flatten_applied(watcher)
         .try_for_each(|p| async move {
-            log::info!("Applied: {}", Resource::name(&p));
+            log::info!("Applied: {}", p.name());
             Ok(())
         })
         .await?;

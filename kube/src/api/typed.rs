@@ -125,7 +125,7 @@ where
     /// You get use this to get everything, or a subset matching fields/labels, say:
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, Resource}, Client};
+    /// use kube::{api::{Api, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -133,7 +133,7 @@ where
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
     ///     for p in pods.list(&lp).await? {
-    ///         println!("Found Pod: {}", Resource::name(&p));
+    ///         println!("Found Pod: {}", p.name());
     ///     }
     ///     Ok(())
     /// }
@@ -207,7 +207,7 @@ where
     /// 4XX and 5XX status types are returned as an [`Err(kube::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
-    /// use kube::{api::{Api, DeleteParams, ListParams, Resource}, Client};
+    /// use kube::{api::{Api, DeleteParams, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -215,7 +215,7 @@ where
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
     ///         either::Left(list) => {
-    ///             let names: Vec<_> = list.iter().map(Resource::name).collect();
+    ///             let names: Vec<_> = list.iter().map(ResourceExt::name).collect();
     ///             println!("Deleting collection of pods: {:?}", names);
     ///         },
     ///         either::Right(status) => {
@@ -284,7 +284,7 @@ where
     /// Thus, to use this function, you need to do a `get` then a `replace` with its result.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PostParams, Resource}, Client};
+    /// use kube::{api::{Api, PostParams, ResourceExt}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -296,7 +296,7 @@ where
     ///         "kind": "Job",
     ///         "metadata": {
     ///             "name": "baz",
-    ///             "resourceVersion": Resource::resource_ver(&j),
+    ///             "resourceVersion": j.resource_version(),
     ///         },
     ///         "spec": {
     ///             "template": {
@@ -341,7 +341,7 @@ where
     /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, Resource, WatchEvent}, Client};
+    /// use kube::{api::{Api, ListParams, ResourceExt, WatchEvent}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
     /// #[tokio::main]
@@ -354,9 +354,9 @@ where
     ///     let mut stream = jobs.watch(&lp, "0").await?.boxed();
     ///     while let Some(status) = stream.try_next().await? {
     ///         match status {
-    ///             WatchEvent::Added(s) => println!("Added {}", Resource::name(&s)),
-    ///             WatchEvent::Modified(s) => println!("Modified: {}", Resource::name(&s)),
-    ///             WatchEvent::Deleted(s) => println!("Deleted {}", Resource::name(&s)),
+    ///             WatchEvent::Added(s) => println!("Added {}", s.name()),
+    ///             WatchEvent::Modified(s) => println!("Modified: {}", s.name()),
+    ///             WatchEvent::Deleted(s) => println!("Deleted {}", s.name()),
     ///             WatchEvent::Bookmark(s) => {},
     ///             WatchEvent::Error(s) => println!("{}", s),
     ///         }

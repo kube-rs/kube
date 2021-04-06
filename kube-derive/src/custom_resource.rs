@@ -211,16 +211,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 &self.metadata
             }
 
-            fn name(&self) -> String {
-                self.meta().name.clone().expect("kind has metadata.name")
-            }
-
-            fn resource_ver(&self) -> Option<String> {
-                self.meta().resource_version.clone()
-            }
-
-            fn namespace(&self) -> Option<String> {
-                self.meta().namespace.clone()
+            fn meta_mut(&mut self) -> &mut kube::api::ObjectMeta {
+                &mut self.metadata
             }
         }
     };

@@ -5,7 +5,7 @@ use k8s_openapi::api::{
     core::v1::{ConfigMap, Secret},
 };
 use kube::{
-    api::{Api, ListParams, Resource},
+    api::{Api, ListParams, ResourceExt},
     Client,
 };
 use kube_runtime::{utils::try_flatten_applied, watcher};
@@ -38,9 +38,9 @@ async fn main() -> anyhow::Result<()> {
     }
     while let Some(o) = combo_stream.try_next().await? {
         match o {
-            Watched::Config(cm) => info!("Got configmap: {}", Resource::name(&cm)),
-            Watched::Deploy(d) => info!("Got deployment: {}", Resource::name(&d)),
-            Watched::Secret(s) => info!("Got secret: {}", Resource::name(&s)),
+            Watched::Config(cm) => info!("Got configmap: {}", cm.name()),
+            Watched::Deploy(d) => info!("Got deployment: {}", d.name()),
+            Watched::Secret(s) => info!("Got secret: {}", s.name()),
         }
     }
     Ok(())

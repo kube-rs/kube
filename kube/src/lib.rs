@@ -10,7 +10,7 @@
 //!
 //! ```rust,no_run
 //! use futures::{StreamExt, TryStreamExt};
-//! use kube::api::{Api, Resource, ListParams, PostParams, WatchEvent};
+//! use kube::api::{Api, ResourceExt, ListParams, PostParams, WatchEvent};
 //! use kube::Client;
 //! use k8s_openapi::api::core::v1::Pod;
 //!
@@ -54,13 +54,13 @@
 //!     // Observe the pods phase for 10 seconds
 //!     while let Some(status) = stream.try_next().await? {
 //!         match status {
-//!             WatchEvent::Added(o) => println!("Added {}", Resource::name(&o)),
+//!             WatchEvent::Added(o) => println!("Added {}", o.name()),
 //!             WatchEvent::Modified(o) => {
 //!                 let s = o.status.as_ref().expect("status exists on pod");
 //!                 let phase = s.phase.clone().unwrap_or_default();
-//!                 println!("Modified: {} with phase: {}", Resource::name(&o), phase);
+//!                 println!("Modified: {} with phase: {}", o.name(), phase);
 //!             }
-//!             WatchEvent::Deleted(o) => println!("Deleted {}", Resource::name(&o)),
+//!             WatchEvent::Deleted(o) => println!("Deleted {}", o.name()),
 //!             WatchEvent::Error(e) => println!("Error {}", e),
 //!             _ => {}
 //!         }

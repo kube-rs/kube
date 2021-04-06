@@ -251,16 +251,8 @@ impl Resource for DynamicObject {
         &self.metadata
     }
 
-    fn name(&self) -> String {
-        self.metadata.name.clone().expect("missing name")
-    }
-
-    fn namespace(&self) -> Option<String> {
-        self.metadata.namespace.clone()
-    }
-
-    fn resource_ver(&self) -> Option<String> {
-        self.metadata.resource_version.clone()
+    fn meta_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
     }
 }
 

@@ -4,7 +4,7 @@ use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, Resource, WatchEvent},
+    api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt, WatchEvent},
     Client,
 };
 
@@ -35,8 +35,8 @@ async fn main() -> anyhow::Result<()> {
     let pp = PostParams::default();
     match pods.create(&pp, &p).await {
         Ok(o) => {
-            let name = Resource::name(&o);
-            assert_eq!(Resource::name(&p), name);
+            let name = o.name();
+            assert_eq!(p.name(), name);
             info!("Created {}", name);
             // wait for it..
             std::thread::sleep(std::time::Duration::from_millis(5_000));
@@ -52,13 +52,13 @@ async fn main() -> anyhow::Result<()> {
     let mut stream = pods.watch(&lp, "0").await?.boxed();
     while let Some(status) = stream.try_next().await? {
         match status {
-            WatchEvent::Added(o) => info!("Added {}", Resource::name(&o)),
+            WatchEvent::Added(o) => info!("Added {}", o.name()),
             WatchEvent::Modified(o) => {
                 let s = o.status.as_ref().expect("status exists on pod");
                 let phase = s.phase.clone().unwrap_or_default();
-                info!("Modified: {} with phase: {}", Resource::name(&o), phase);
+                info!("Modified: {} with phase: {}", o.name(), phase);
             }
-            WatchEvent::Deleted(o) => info!("Deleted {}", Resource::name(&o)),
+            WatchEvent::Deleted(o) => info!("Deleted {}", o.name()),
             WatchEvent::Error(e) => error!("Error {}", e),
             _ => {}
         }
@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Patch Pod blog");
     let patch = json!({
         "metadata": {
-            "resourceVersion": Resource::resource_ver(&p1cpy),
+            "resourceVersion": p1cpy.resource_version(),
         },
         "spec": {
             "activeDeadlineSeconds": 5
@@ -88,13 +88,13 @@ async fn main() -> anyhow::Result<()> {
 
     let lp = ListParams::default().fields(&format!("metadata.name={}", "blog")); // only want results for our pod
     for p in pods.list(&lp).await? {
-        info!("Found Pod: {}", Resource::name(&p));
+        info!("Found Pod: {}", p.name());
     }
 
     // Delete it
     let dp = DeleteParams::default();
     pods.delete("blog", &dp).await?.map_left(|pdel| {
-        assert_eq!(Resource::name(&pdel), "blog");
+        assert_eq!(pdel.name(), "blog");
         info!("Deleting blog pod started: {:?}", pdel);
     });
 

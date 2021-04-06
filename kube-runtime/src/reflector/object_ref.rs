@@ -1,6 +1,6 @@
 use derivative::Derivative;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
-use kube::api::{DynamicObject, Resource};
+use kube::api::{DynamicObject, Resource, ResourceExt};
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
@@ -80,6 +80,9 @@ impl<K: Resource> ObjectRef<K> {
         self
     }
 
+    /// Creates ObjectRef from the resource and dynamic type.
+    /// Panics if name is missing (name always exists if the object
+    /// was returned from the apiserver)
     #[must_use]
     pub fn from_obj_with(obj: &K, dyntype: K::DynamicType) -> Self
     where

@@ -2,7 +2,7 @@ use color_eyre::Result;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{ListParams, Resource},
+    api::{ListParams, ResourceExt},
     Api, Client,
 };
 use kube_runtime::{utils::try_flatten_applied, watcher};
@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
     let watcher = watcher(api, ListParams::default());
     try_flatten_applied(watcher)
         .try_for_each(|p| async move {
-            log::debug!("Applied: {}", Resource::name(&p));
+            log::debug!("Applied: {}", p.name());
             if let Some(unready_reason) = pod_unready(&p) {
                 log::warn!("{}", unready_reason);
             }
@@ -40,7 +40,7 @@ fn pod_unready(p: &Pod) -> Option<String> {
             if p.metadata.labels.as_ref().unwrap().contains_key("job-name") {
                 return None; // ignore job based pods, they are meant to exit 0
             }
-            return Some(format!("Unready pod {}: {}", Resource::name(p), failed));
+            return Some(format!("Unready pod {}: {}", p.name(), failed));
         }
     }
     None
