@@ -207,6 +207,14 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 #plural.into()
             }
 
+            fn scope(_: &()) -> kube::api::Scope {
+                if #namespaced {
+                    kube::api::Scope::Namespaced
+                } else {
+                    kube::api::Scope::Cluster
+                }
+            }
+
             fn meta(&self) -> &kube::api::ObjectMeta {
                 &self.metadata
             }

@@ -1,5 +1,5 @@
 use crate::{
-    api::{metadata::TypeMeta, Resource},
+    api::{metadata::TypeMeta, Resource, Scope},
     Error, Result,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
@@ -20,6 +20,8 @@ pub struct GroupVersionKind {
     api_version: String,
     /// Optional plural/resource
     plural: Option<String>,
+    /// Scope (Unknown by default)
+    scope: Scope,
 }
 
 impl GroupVersionKind {
@@ -57,12 +59,18 @@ impl GroupVersionKind {
             format!("{}/{}", group, version)
         };
         let plural = Some(ar.name.clone());
+        let scope = if ar.namespaced {
+            Scope::Namespaced
+        } else {
+            Scope::Cluster
+        };
         Self {
             group,
             version,
             kind,
             api_version,
             plural,
+            scope
         }
     }
 
@@ -94,6 +102,7 @@ impl GroupVersionKind {
             kind,
             api_version,
             plural: None,
+            scope: Scope::Unknown,
         })
     }
 
@@ -101,6 +110,12 @@ impl GroupVersionKind {
     pub fn plural(mut self, plural: &str) -> Self {
         self.plural = Some(plural.to_string());
         self
+    }
+
+    /// Set explicit scope (instead of default Unknown)
+    pub fn scope(mut self, scope: Scope) -> Self {
+       self.scope = scope;
+       self
     }
 }
 
@@ -245,6 +260,10 @@ impl Resource for DynamicObject {
             // fallback to inference
             crate::api::metadata::to_plural(&Self::kind(dt).to_ascii_lowercase()).into()
         }
+    }
+
+    fn scope(_dt: &GroupVersionKind) -> Scope {
+        Scope::Unknown
     }
 
     fn meta(&self) -> &ObjectMeta {

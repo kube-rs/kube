@@ -9,3 +9,7 @@ members = [
   "tests",
   "examples",
 ]
+
+[patch.crates-io.k8s-openapi]
+git = "https://github.com/mikailbag/k8s-openapi"
+branch = "expose-resource-name"

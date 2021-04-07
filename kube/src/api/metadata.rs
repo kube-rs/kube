@@ -4,6 +4,20 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, collections::BTreeMap};
 
+/// Scope of the resource
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+pub enum Scope {
+    /// Resource is cluster-scoped, i.e. not bound
+    /// to any particular namespace
+    Cluster,
+    /// Resource is namespaced: it is owned by the namespace
+    /// specified in the `.metadata.namespace` field.
+    Namespaced,
+    /// Unknown scope
+    // Future work: delete this variant
+    Unknown,
+}
+
 /// An accessor trait for a kubernetes Resource.
 ///
 /// This is for a subset of Kubernetes type that do not end in `List`.
@@ -32,6 +46,8 @@ pub trait Resource {
     fn group(dt: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns version of this object
     fn version(dt: &Self::DynamicType) -> Cow<'_, str>;
+    /// Returns resource scope
+    fn scope(dt: &Self::DynamicType) -> Scope;
     /// Returns apiVersion of this object
     fn api_version(dt: &Self::DynamicType) -> Cow<'_, str> {
         let group = Self::group(dt);
@@ -192,6 +208,18 @@ where
 
     fn api_version(_: &()) -> Cow<'_, str> {
         K::API_VERSION.into()
+    }
+
+    fn plural(_: &()) -> Cow<'_, str> {
+        K::PLURAL_NAME.into()
+    }
+
+    fn scope(_: &()) -> Scope {
+        if K::NAMESPACED {
+            Scope::Namespaced
+        } else {
+            Scope::Cluster
+        }
     }
 
     fn meta(&self) -> &ObjectMeta {

@@ -6,7 +6,7 @@ use tracing::instrument;
 
 use crate::{
     api::{
-        DeleteParams, ListParams, ObjectList, Patch, PatchParams, PostParams, Request, Resource, WatchEvent,
+        DeleteParams, ListParams, ObjectList, Patch, PatchParams, PostParams, Request, Resource, WatchEvent, Scope
     },
     client::{Client, Status},
     Result,
@@ -38,22 +38,15 @@ where
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
-        let url = K::url_path(&Default::default(), None);
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: iter::empty(),
-        }
+        Self::all_with(client, &Default::default())
     }
 
     /// Namespaced resource within a given namespace
+    /// 
+    /// # Panics
+    /// This function panics if the resource is clister-scoped.
     pub fn namespaced(client: Client, ns: &str) -> Self {
-        let url = K::url_path(&Default::default(), Some(ns));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: iter::empty(),
-        }
+        Self::namespaced_with(client, ns, &Default::default())
     }
 }
 
@@ -76,7 +69,13 @@ impl<K: Resource> Api<K> {
     /// Namespaced resource within a given namespace
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    /// 
+    /// # Panics
+    /// This function panics if the resource is cluster-scoped.
     pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
+        if let Scope::Cluster = K::scope(dyntype) {
+            panic!("Namespaced Api created for the cluster-scoped resource");
+        }
         let url = K::url_path(dyntype, Some(ns));
         Self {
             client,
@@ -382,3 +381,4 @@ impl<K> From<Api<K>> for Client {
         api.client
     }
 }
+

@@ -34,6 +34,6 @@ pub(crate) mod object;
 pub use self::object::{Object, ObjectList, WatchEvent};
 
 mod metadata;
-pub use self::metadata::{ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta};
+pub use self::metadata::{ListMeta, ObjectMeta, Resource, ResourceExt, Scope, TypeMeta};
 
 #[cfg(feature = "admission")] pub mod admission;
