@@ -41,7 +41,7 @@ async fn main() {
 }
 
 async fn mutate_handler(body: AdmissionReview<DynamicObject>) -> Result<impl Reply, Infallible> {
-    let req: AdmissionRequest<DynamicObject> = match body.try_into() {
+    let req: AdmissionRequest<_> = match body.try_into() {
         Ok(req) => req,
         Err(err) => {
             error!("invalid request: {}", err.to_string());

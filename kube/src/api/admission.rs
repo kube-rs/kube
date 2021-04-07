@@ -17,6 +17,13 @@ use k8s_openapi::{
 };
 use serde::{Deserialize, Serialize};
 
+/// The `kind` field in [`TypeMeta`].
+pub const META_KIND: &'static str = "AdmissionReview";
+/// The `api_version` field in [`TypeMeta`] on the v1 version.
+pub const META_API_VERSION_V1: &'static str = "admission.k8s.io/v1";
+/// The `api_version` field in [`TypeMeta`] on the v1beta1 version.
+pub const META_API_VERSION_V1BETA1: &'static str = "admission.k8s.io/v1beta1";
+
 /// The top level struct used for Serializing and Deserializing AdmissionReview
 /// requests and responses.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -48,9 +55,21 @@ impl<T: Resource> TryInto<AdmissionRequest<T>> for AdmissionReview<T> {
 }
 
 /// An incoming [`AdmissionReview`] request.
+/// ```ignore
+/// use kube::api::{admission::{AdmissionRequest, AdmissionReview}, DynamicObject};
+/// use std::convert::TryInto;
+///
+/// // The incoming AdmissionReview received by the controller.
+/// let body: AdmissionReview<DynamicObject>;
+/// let req: AdmissionRequest<_> = body.try_into().unwrap();
+/// ```
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AdmissionRequest<T: Resource> {
+    /// Copied from the containing [`AdmissionReview`] and used to specify a
+    /// response type and version when constructing an [`AdmissionResponse`].
+    #[serde(skip)]
+    types: TypeMeta,
     /// An identifier for the individual request/response. It allows us to
     /// distinguish instances of requests which are otherwise identical (parallel
     /// requests, requests when earlier requests did not modify, etc). The UID is
@@ -155,11 +174,46 @@ pub enum Operation {
     CONNECT,
 }
 
-/// An outgoing [`AdmissionReview`] response.
+/// An outgoing [`AdmissionReview`] response. Constructed from the corresponding
+/// [`AdmissionRequest`].
+/// ```ignore
+/// use kube::api::{
+///         admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
+///         DynamicObject,
+/// };
+/// use std::convert::TryInto;
+///
+/// // The incoming AdmissionReview received by the controller.
+/// let body: AdmissionReview<DynamicObject>;
+/// let req: AdmissionRequest<_> = body.try_into().unwrap();
+///
+/// // A normal response with no side effects.
+/// let _: AdmissionReview<_> = AdmissionResponse::from(&req).into_review();
+///
+/// // A response rejecting the admission webhook with a provided reason.
+/// let _: AdmissionReview<_> = AdmissionResponse::from(&req)
+///     .deny("Some rejection reason.")
+///     .into_review();
+///
+/// use json_patch::{AddOperation, Patch, PatchOperation};
+///
+/// // A response adding a label to the resource.
+/// let _: AdmissionReview<_> = AdmissionResponse::from(&req)
+///     .with_patch(Patch(vec![PatchOperation::Add(AddOperation {
+///         path: "/metadata/labels/my-label".to_owned(),
+///         value: serde_json::Value::String("my-value".to_owned()),
+///     })]))
+///     .unwrap()
+///     .into_review();
+///
+/// ```
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AdmissionResponse {
+    /// Copied from the corresponding consructing [`AdmissionRequest`].
+    #[serde(skip)]
+    types: TypeMeta,
     /// Identifier for the individual request/response. This must be copied over
     /// from the corresponding AdmissionRequest.
     pub uid: String,
@@ -196,6 +250,7 @@ pub struct AdmissionResponse {
 impl<T: Resource> From<&AdmissionRequest<T>> for AdmissionResponse {
     fn from(req: &AdmissionRequest<T>) -> Self {
         Self {
+            types: req.types.clone(),
             uid: req.uid.clone(),
             allowed: true,
             result: Default::default(),
@@ -213,6 +268,13 @@ impl AdmissionResponse {
     /// original request cannot be read.
     pub fn invalid<T: ToString>(reason: T) -> Self {
         Self {
+            // Since we don't have a request to use for construction, just
+            // default to "admission.k8s.io/v1beta1", since it is the most
+            // supported and we won't be using any of the new fields.
+            types: TypeMeta {
+                kind: META_KIND.to_owned(),
+                api_version: META_API_VERSION_V1BETA1.to_owned(),
+            },
             uid: Default::default(),
             allowed: false,
             result: Status {
@@ -247,10 +309,7 @@ impl AdmissionResponse {
     /// can be used as a webhook response.
     pub fn into_review(self) -> AdmissionReview<DynamicObject> {
         AdmissionReview {
-            types: TypeMeta {
-                kind: "AdmissionReview".to_owned(),
-                api_version: "admission.k8s.io/v1".to_owned(),
-            },
+            types: self.types.clone(),
             request: None,
             response: Some(self),
         }
