@@ -14,7 +14,7 @@ pub struct GroupVersionKind {
     /// Version
     version: String,
     /// Kind
-    kind: String,
+    pub(crate) kind: String,
     /// Concatenation of group and version
     #[serde(default)]
     api_version: String,
