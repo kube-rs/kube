@@ -22,7 +22,7 @@ where
     /// Fetch the scale subresource
     #[instrument(skip(self), level = "trace")]
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
-        let req = self.request.get_scale(name)?;
+        let req = self.request.get_subresource("scale", name)?;
         self.client.request::<Scale>(req).await
     }
 
@@ -34,14 +34,14 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<Scale> {
-        let req = self.request.patch_scale(name, &pp, patch)?;
+        let req = self.request.patch_subresource("scale", name, &pp, patch)?;
         self.client.request::<Scale>(req).await
     }
 
     /// Replace the scale subresource
     #[instrument(skip(self), level = "trace")]
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
-        let req = self.request.replace_scale(name, &pp, data)?;
+        let req = self.request.replace_subresource("scale", name, &pp, data)?;
         self.client.request::<Scale>(req).await
     }
 }
@@ -60,7 +60,7 @@ where
     /// This actually returns the whole K, with metadata, and spec.
     #[instrument(skip(self), level = "trace")]
     pub async fn get_status(&self, name: &str) -> Result<K> {
-        let req = self.request.get_status(name)?;
+        let req = self.request.get_subresource("status", name)?;
         self.client.request::<K>(req).await
     }
 
@@ -94,7 +94,7 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req = self.request.patch_status(name, &pp, patch)?;
+        let req = self.request.patch_subresource("status", name, &pp, patch)?;
         self.client.request::<K>(req).await
     }
 
@@ -119,7 +119,7 @@ where
     /// ```
     #[instrument(skip(self), level = "trace")]
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = self.request.replace_status(name, &pp, data)?;
+        let req = self.request.replace_subresource("status", name, &pp, data)?;
         self.client.request::<K>(req).await
     }
 }

@@ -168,26 +168,27 @@ impl Request {
     }
 }
 
-/// Scale subresource
+/// Subresources
 impl Request {
-    /// Get an instance of the scale subresource
-    pub fn get_scale(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let target = format!("{}/{}/scale", self.url_path, name);
+    /// Get an instance of the subresource
+    pub fn get_subresource(&self, subresource_name: &str, name: &str) -> Result<http::Request<Vec<u8>>> {
+        let target = format!("{}/{}/{}", self.url_path, name, subresource_name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
     }
 
-    /// Patch an instance of the scale subresource
-    pub fn patch_scale<P: serde::Serialize>(
+    /// Patch an instance of the subresource
+    pub fn patch_subresource<P: serde::Serialize>(
         &self,
+        subresource_name: &str,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>> {
         pp.validate(patch)?;
-        let target = format!("{}/{}/scale?", self.url_path, name);
+        let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -199,14 +200,15 @@ impl Request {
             .map_err(Error::HttpError)
     }
 
-    /// Replace an instance of the scale subresource
-    pub fn replace_scale(
+    /// Replace an instance of the subresource
+    pub fn replace_subresource(
         &self,
+        subresource_name: &str,
         name: &str,
         pp: &PostParams,
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>> {
-        let target = format!("{}/{}/scale?", self.url_path, name);
+        let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = url::form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
@@ -216,56 +218,6 @@ impl Request {
         req.body(data).map_err(Error::HttpError)
     }
 }
-
-/// Status subresource
-impl Request {
-    /// Get an instance of the status subresource
-    pub fn get_status(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
-        let target = format!("{}/{}/status", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
-        let urlstr = qp.finish();
-        let req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
-    }
-
-    /// Patch an instance of the status subresource
-    pub fn patch_status<P: serde::Serialize>(
-        &self,
-        name: &str,
-        pp: &PatchParams,
-        patch: &Patch<P>,
-    ) -> Result<http::Request<Vec<u8>>> {
-        pp.validate(patch)?;
-        let target = format!("{}/{}/status?", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
-        pp.populate_qp(&mut qp);
-        let urlstr = qp.finish();
-
-        http::Request::patch(urlstr)
-            .header("Accept", "application/json")
-            .header("Content-Type", patch.content_type())
-            .body(patch.serialize()?)
-            .map_err(Error::HttpError)
-    }
-
-    /// Replace an instance of the status subresource
-    pub fn replace_status(
-        &self,
-        name: &str,
-        pp: &PostParams,
-        data: Vec<u8>,
-    ) -> Result<http::Request<Vec<u8>>> {
-        let target = format!("{}/{}/status?", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
-        let urlstr = qp.finish();
-        let req = http::Request::put(urlstr);
-        req.body(data).map_err(Error::HttpError)
-    }
-}
-
 
 /// Extensive tests for Request of k8s_openapi::Resource structs
 ///
@@ -456,7 +408,7 @@ mod test {
         let url = corev1::Node::url_path(&(), None);
         let pp = PatchParams::default();
         let req = Request::new(url)
-            .patch_status("mynode", &pp, &Patch::Merge(()))
+            .patch_subresource("status", "mynode", &pp, &Patch::Merge(()))
             .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
         assert_eq!(
@@ -469,7 +421,9 @@ mod test {
     fn replace_status_path() {
         let url = corev1::Node::url_path(&(), None);
         let pp = PostParams::default();
-        let req = Request::new(url).replace_status("mynode", &pp, vec![]).unwrap();
+        let req = Request::new(url)
+            .replace_subresource("status", "mynode", &pp, vec![])
+            .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
         assert_eq!(req.method(), "PUT");
     }
@@ -501,7 +455,7 @@ mod test {
         let url = apiextsv1beta1::CustomResourceDefinition::url_path(&(), None);
         let pp = PostParams::default();
         let req = Request::new(url)
-            .replace_status("mycrd.domain.io", &pp, vec![])
+            .replace_subresource("status", "mycrd.domain.io", &pp, vec![])
             .unwrap();
         assert_eq!(
             req.uri(),
@@ -511,7 +465,7 @@ mod test {
     #[test]
     fn get_scale_path() {
         let url = corev1::Node::url_path(&(), None);
-        let req = Request::new(url).get_scale("mynode").unwrap();
+        let req = Request::new(url).get_subresource("scale", "mynode").unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale");
         assert_eq!(req.method(), "GET");
     }
@@ -520,7 +474,7 @@ mod test {
         let url = corev1::Node::url_path(&(), None);
         let pp = PatchParams::default();
         let req = Request::new(url)
-            .patch_scale("mynode", &pp, &Patch::Merge(()))
+            .patch_subresource("scale", "mynode", &pp, &Patch::Merge(()))
             .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
         assert_eq!(req.method(), "PATCH");
@@ -529,7 +483,9 @@ mod test {
     fn replace_scale_path() {
         let url = corev1::Node::url_path(&(), None);
         let pp = PostParams::default();
-        let req = Request::new(url).replace_scale("mynode", &pp, vec![]).unwrap();
+        let req = Request::new(url)
+            .replace_subresource("scale", "mynode", &pp, vec![])
+            .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
         assert_eq!(req.method(), "PUT");
     }
