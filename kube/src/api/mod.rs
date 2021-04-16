@@ -19,8 +19,11 @@ pub use request::Request;
 pub(crate) mod typed;
 pub use typed::Api;
 
+mod gvk;
+pub use gvk::{GroupVersionKind, GroupVersionResource};
+
 mod dynamic;
-pub use dynamic::{DynamicObject, GroupVersionKind, GroupVersionResource};
+pub use dynamic::{ApiResource, DynamicObject};
 
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;

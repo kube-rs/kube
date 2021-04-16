@@ -1,32 +1,87 @@
-use crate::{
-    api::{metadata::TypeMeta, Resource},
-    Error, Result,
-};
+use crate::api::{metadata::TypeMeta, GroupVersionKind, Resource};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-/// Represents a type-erased object kind
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GroupVersionKind {
-    /// API group
-    group: String,
-    /// Version
-    version: String,
-    /// Kind
-    pub(crate) kind: String,
-    /// Concatenation of group and version
-    #[serde(default)]
-    api_version: String,
-    /// Optional plural/resource
-    plural: Option<String>,
+/// Resource scope
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum Scope {
+    /// Objects are global
+    Cluster,
+    /// Each object lives in namespace.
+    Namespaced,
 }
 
-impl GroupVersionKind {
-    /// Creates `GroupVersionKind` from an [`APIResource`].
+/// Operations that are supported on the resource
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct Operations {
+    /// Object can be created
+    pub create: bool,
+    /// Single object can be queried
+    pub get: bool,
+    /// Multiple objects can be queried
+    pub list: bool,
+    /// A watch can be started
+    pub watch: bool,
+    /// A single object can be deleted
+    pub delete: bool,
+    /// Multiple objects can be deleted
+    pub delete_collection: bool,
+    /// Object can be updated
+    pub update: bool,
+    /// Object can be patched
+    pub patch: bool,
+    /// All other verbs
+    pub other: Vec<String>,
+}
+
+impl Operations {
+    /// Returns empty `Operations`
+    pub fn empty() -> Self {
+        Operations {
+            create: false,
+            get: false,
+            list: false,
+            watch: false,
+            delete: false,
+            delete_collection: false,
+            update: false,
+            patch: false,
+            other: Vec::new(),
+        }
+    }
+}
+
+/// Contains information about Kubernetes API resources
+/// which is either required or helpful for working with it.
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct ApiResource {
+    /// Resource group, empty for core group.
+    pub group: String,
+    /// group version
+    pub version: String,
+    /// apiVersion of the resource (v1 for core group,
+    /// groupName/groupVersions for other).
+    pub api_version: String,
+    /// Singular PascalCase name of the resource
+    pub kind: String,
+    /// Plural name of the resource
+    pub plural_name: String,
+    /// Scope of the resource
+    pub scope: Scope,
+    /// Names of the available subresources
+    pub subresources: Vec<String>,
+    /// Supported operations on this resource
+    pub operations: Operations,
+}
+
+impl ApiResource {
+    /// Creates ApiResource from `meta::v1::APIResource` instance.
+    /// This is recommended way to create `ApiResource`s.
+    /// This function correctly sets all fields except `subresources`.
     ///
     /// `APIResource` objects can be extracted from [`Client::list_api_group_resources`](crate::Client::list_api_group_resources).
-    /// If it does not specify version and/or group, they will be taken from `group_version`.
+    /// If it does not specify version and/or group, they will be taken from `group_version`
+    /// (otherwise the second parameter is ignored).
     ///
     /// ### Example usage:
     /// ```
@@ -41,7 +96,7 @@ impl GroupVersionKind {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
+    pub fn from_apiresource(ar: &APIResource, group_version: &str) -> Self {
         let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
         let (default_group, default_version) = match *gvsplit.as_slice() {
             [g, v] => (g, v), // standard case
@@ -56,125 +111,78 @@ impl GroupVersionKind {
         } else {
             format!("{}/{}", group, version)
         };
-        let plural = Some(ar.name.clone());
-        Self {
+        let plural_name = ar.name.clone();
+        let scope = if ar.namespaced {
+            Scope::Namespaced
+        } else {
+            Scope::Cluster
+        };
+        let mut operations = Operations::empty();
+        for verb in &ar.verbs {
+            match verb.as_str() {
+                "create" => operations.create = true,
+                "get" => operations.get = true,
+                "list" => operations.list = true,
+                "watch" => operations.watch = true,
+                "delete" => operations.delete = true,
+                "deletecollection" => operations.delete_collection = true,
+                "update" => operations.update = true,
+                "patch" => operations.patch = true,
+                _ => operations.other.push(verb.clone()),
+            }
+        }
+        ApiResource {
             group,
             version,
             kind,
             api_version,
-            plural,
+            plural_name,
+            scope,
+            subresources: Vec::new(),
+            operations,
         }
     }
 
-    /// Set the api group, version, and kind for a resource
-    pub fn gvk(group_: &str, version_: &str, kind_: &str) -> Result<Self> {
-        let version = version_.to_string();
-        let group = group_.to_string();
-        let kind = kind_.to_string();
-        let api_version = if group.is_empty() {
-            version.to_string()
-        } else {
-            format!("{}/{}", group, version)
+    /// Creates ApiResource from group, version and kind.
+    /// # Warning
+    /// This function has to **guess** some information.
+    /// While it makes it best to guess correctly, sometimes it can
+    /// be wrong, and using returned ApiResource will lead to incorrect
+    /// api requests.
+    /// In more details:
+    ///  - `scope` is assumed to be `Namespaced`
+    ///  - `plural_name` is derived from `kind` (can lead to incorrect request)
+    ///  - `operations` and `subresources` are filled with values which
+    ///     are expected for most resources
+    pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
+        let api_version = match gvk.group.as_str() {
+            "" => gvk.version.clone(),
+            _ => format!("{}/{}", gvk.group, gvk.version),
         };
-        if version.is_empty() {
-            return Err(Error::DynamicType(format!(
-                "GroupVersionKind '{}' must have a version",
-                kind
-            )));
-        }
-        if kind.is_empty() {
-            return Err(Error::DynamicType(format!(
-                "GroupVersionKind '{}' must have a kind",
-                kind
-            )));
-        }
-        Ok(Self {
-            group,
-            version,
-            kind,
+        ApiResource {
+            group: gvk.group.clone(),
+            version: gvk.version.clone(),
             api_version,
-            plural: None,
-        })
-    }
-
-    /// Set an explicit plural/resource value to avoid relying on inferred pluralisation.
-    pub fn plural(mut self, plural: &str) -> Self {
-        self.plural = Some(plural.to_string());
-        self
+            kind: gvk.kind.clone(),
+            plural_name: crate::api::metadata::to_plural(&gvk.kind.to_ascii_lowercase()),
+            scope: Scope::Namespaced,
+            subresources: vec!["status".to_string()],
+            operations: Operations {
+                create: true,
+                get: true,
+                list: true,
+                watch: true,
+                delete: true,
+                delete_collection: true,
+                update: true,
+                patch: true,
+                other: Vec::new(),
+            },
+        }
     }
 }
 
-/// Represents a type-erased object resource.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GroupVersionResource {
-    /// API group
-    group: String,
-    /// Version
-    version: String,
-    /// Resource
-    resource: String,
-    /// Concatenation of group and version
-    #[serde(default)]
-    api_version: String,
-}
-
-impl GroupVersionResource {
-    /// Creates `GroupVersionResource` from an [`APIResource`].
-    pub fn from_api_resource(ar: &APIResource, group_version: &str) -> Self {
-        let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
-        let (default_group, default_version) = match *gvsplit.as_slice() {
-            [g, v] => (g, v), // standard case
-            [v] => ("", v),   // core v1 case
-            _ => unreachable!(),
-        };
-        let group = ar.group.clone().unwrap_or_else(|| default_group.into());
-        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
-        let resource = ar.name.to_string();
-        let api_version = if group.is_empty() {
-            version.clone()
-        } else {
-            format!("{}/{}", group, version)
-        };
-        Self {
-            group,
-            version,
-            resource,
-            api_version,
-        }
-    }
-
-    /// Set the api group, version, and the plural resource name.
-    pub fn gvr(group_: &str, version_: &str, resource_: &str) -> Result<Self> {
-        let version = version_.to_string();
-        let group = group_.to_string();
-        let resource = resource_.to_string();
-        let api_version = if group.is_empty() {
-            version.to_string()
-        } else {
-            format!("{}/{}", group, version)
-        };
-        if version.is_empty() {
-            return Err(Error::DynamicType(format!(
-                "GroupVersionResource '{}' must have a version",
-                resource
-            )));
-        }
-        if resource.is_empty() {
-            return Err(Error::DynamicType(format!(
-                "GroupVersionResource '{}' must have a resource",
-                resource
-            )));
-        }
-        Ok(Self {
-            group,
-            version,
-            resource,
-            api_version,
-        })
-    }
-}
-
-/// A dynamic representation of a kubernetes resource
+/// A dynamic representation of a kubernetes object
 ///
 /// This will work with any non-list type object.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -191,12 +199,12 @@ pub struct DynamicObject {
 }
 
 impl DynamicObject {
-    /// Create a DynamicObject with minimal values set from GVK.
-    pub fn new(name: &str, gvk: &GroupVersionKind) -> Self {
+    /// Create a DynamicObject with minimal values set from ApiResource.
+    pub fn new(name: &str, resource: &ApiResource) -> Self {
         Self {
             types: Some(TypeMeta {
-                api_version: gvk.api_version.to_string(),
-                kind: gvk.kind.to_string(),
+                api_version: resource.api_version.to_string(),
+                kind: resource.kind.to_string(),
             }),
             metadata: ObjectMeta {
                 name: Some(name.to_string()),
@@ -220,31 +228,26 @@ impl DynamicObject {
 }
 
 impl Resource for DynamicObject {
-    type DynamicType = GroupVersionKind;
+    type DynamicType = ApiResource;
 
-    fn group(dt: &GroupVersionKind) -> Cow<'_, str> {
+    fn group(dt: &ApiResource) -> Cow<'_, str> {
         dt.group.as_str().into()
     }
 
-    fn version(dt: &GroupVersionKind) -> Cow<'_, str> {
+    fn version(dt: &ApiResource) -> Cow<'_, str> {
         dt.version.as_str().into()
     }
 
-    fn kind(dt: &GroupVersionKind) -> Cow<'_, str> {
+    fn kind(dt: &ApiResource) -> Cow<'_, str> {
         dt.kind.as_str().into()
     }
 
-    fn api_version(dt: &GroupVersionKind) -> Cow<'_, str> {
+    fn api_version(dt: &ApiResource) -> Cow<'_, str> {
         dt.api_version.as_str().into()
     }
 
-    fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
-        if let Some(plural) = &dt.plural {
-            plural.into()
-        } else {
-            // fallback to inference
-            crate::api::metadata::to_plural(&Self::kind(dt).to_ascii_lowercase()).into()
-        }
+    fn plural(dt: &ApiResource) -> Cow<'_, str> {
+        dt.plural_name.as_str().into()
     }
 
     fn meta(&self) -> &ObjectMeta {
@@ -259,13 +262,16 @@ impl Resource for DynamicObject {
 #[cfg(test)]
 mod test {
     use crate::{
-        api::{DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams, Request, Resource},
+        api::{
+            ApiResource, DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams, Request, Resource,
+        },
         Result,
     };
     #[test]
     fn raw_custom_resource() {
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
-        let url = DynamicObject::url_path(&gvk, Some("myns"));
+        let res = ApiResource::from_gvk(&gvk);
+        let url = DynamicObject::url_path(&res, Some("myns"));
 
         let pp = PostParams::default();
         let req = Request::new(&url).create(&pp, vec![]).unwrap();
@@ -281,7 +287,8 @@ mod test {
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
         let gvk = GroupVersionKind::gvk("", "v1", "Service").unwrap();
-        let url = DynamicObject::url_path(&gvk, None);
+        let api_resource = ApiResource::from_gvk(&gvk);
+        let url = DynamicObject::url_path(&api_resource, None);
         let pp = PostParams::default();
         let req = Request::new(url).create(&pp, vec![])?;
         assert_eq!(req.uri(), "/api/v1/services?");
@@ -304,7 +311,8 @@ mod test {
         let client = Client::try_default().await.unwrap();
 
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
-        let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", &gvk);
+        let api_resource = ApiResource::from_gvk(&gvk);
+        let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", &api_resource);
         let a2: Api<Foo> = Api::namespaced(client.clone(), "myns");
 
         // make sure they return the same url_path through their impls

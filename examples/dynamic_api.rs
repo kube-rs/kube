@@ -2,9 +2,8 @@
 //! to `kubectl get all --all-namespaces`.
 
 use kube::{
-    api::{Api, DynamicObject, Resource, ResourceExt},
-    client::Discovery,
-    Client,
+    api::{Api, ApiResource, DynamicObject, Resource, ResourceExt},
+    client::{Client, Discovery},
 };
 use log::{info, warn};
 
