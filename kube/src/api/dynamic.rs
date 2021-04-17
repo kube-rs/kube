@@ -1,58 +1,9 @@
 use crate::api::{metadata::TypeMeta, GroupVersionKind, Resource};
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, ObjectMeta};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList, ObjectMeta};
 use std::borrow::Cow;
 
-/// Resource scope
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum Scope {
-    /// Objects are global
-    Cluster,
-    /// Each object lives in namespace.
-    Namespaced,
-}
-
-/// Operations that are supported on the resource
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct Operations {
-    /// Object can be created
-    pub create: bool,
-    /// Single object can be queried
-    pub get: bool,
-    /// Multiple objects can be queried
-    pub list: bool,
-    /// A watch can be started
-    pub watch: bool,
-    /// A single object can be deleted
-    pub delete: bool,
-    /// Multiple objects can be deleted
-    pub delete_collection: bool,
-    /// Object can be updated
-    pub update: bool,
-    /// Object can be patched
-    pub patch: bool,
-    /// All other verbs
-    pub other: Vec<String>,
-}
-
-impl Operations {
-    /// Returns empty `Operations`
-    pub fn empty() -> Self {
-        Operations {
-            create: false,
-            get: false,
-            list: false,
-            watch: false,
-            delete: false,
-            delete_collection: false,
-            update: false,
-            patch: false,
-            other: Vec::new(),
-        }
-    }
-}
-
 /// Contains information about Kubernetes API resources
-/// which is either required or helpful for working with it.
+/// which is enough for working with it.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ApiResource {
     /// Resource group, empty for core group.
@@ -66,12 +17,6 @@ pub struct ApiResource {
     pub kind: String,
     /// Plural name of the resource
     pub plural_name: String,
-    /// Scope of the resource
-    pub scope: Scope,
-    /// Names of the available subresources
-    pub subresources: Vec<String>,
-    /// Supported operations on this resource
-    pub operations: Operations,
 }
 
 impl ApiResource {
@@ -112,48 +57,21 @@ impl ApiResource {
             format!("{}/{}", group, version)
         };
         let plural_name = ar.name.clone();
-        let scope = if ar.namespaced {
-            Scope::Namespaced
-        } else {
-            Scope::Cluster
-        };
-        let mut operations = Operations::empty();
-        for verb in &ar.verbs {
-            match verb.as_str() {
-                "create" => operations.create = true,
-                "get" => operations.get = true,
-                "list" => operations.list = true,
-                "watch" => operations.watch = true,
-                "delete" => operations.delete = true,
-                "deletecollection" => operations.delete_collection = true,
-                "update" => operations.update = true,
-                "patch" => operations.patch = true,
-                _ => operations.other.push(verb.clone()),
-            }
-        }
         ApiResource {
             group,
             version,
             kind,
             api_version,
             plural_name,
-            scope,
-            subresources: Vec::new(),
-            operations,
         }
     }
 
     /// Creates ApiResource from group, version and kind.
     /// # Warning
-    /// This function has to **guess** some information.
+    /// This function has to **guess** resource plural name.
     /// While it makes it best to guess correctly, sometimes it can
     /// be wrong, and using returned ApiResource will lead to incorrect
     /// api requests.
-    /// In more details:
-    ///  - `scope` is assumed to be `Namespaced`
-    ///  - `plural_name` is derived from `kind` (can lead to incorrect request)
-    ///  - `operations` and `subresources` are filled with values which
-    ///     are expected for most resources
     pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
         let api_version = match gvk.group.as_str() {
             "" => gvk.version.clone(),
@@ -165,19 +83,6 @@ impl ApiResource {
             api_version,
             kind: gvk.kind.clone(),
             plural_name: crate::api::metadata::to_plural(&gvk.kind.to_ascii_lowercase()),
-            scope: Scope::Namespaced,
-            subresources: vec!["status".to_string()],
-            operations: Operations {
-                create: true,
-                get: true,
-                list: true,
-                watch: true,
-                delete: true,
-                delete_collection: true,
-                update: true,
-                patch: true,
-                other: Vec::new(),
-            },
         }
     }
 }
@@ -256,6 +161,116 @@ impl Resource for DynamicObject {
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
+    }
+}
+
+/// Resource scope
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum Scope {
+    /// Objects are global
+    Cluster,
+    /// Each object lives in namespace.
+    Namespaced,
+}
+
+/// Operations that are supported on the resource
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct Operations {
+    /// Object can be created
+    pub create: bool,
+    /// Single object can be queried
+    pub get: bool,
+    /// Multiple objects can be queried
+    pub list: bool,
+    /// A watch can be started
+    pub watch: bool,
+    /// A single object can be deleted
+    pub delete: bool,
+    /// Multiple objects can be deleted
+    pub delete_collection: bool,
+    /// Object can be updated
+    pub update: bool,
+    /// Object can be patched
+    pub patch: bool,
+    /// All other verbs
+    pub other: Vec<String>,
+}
+
+impl Operations {
+    /// Returns empty `Operations`
+    pub fn empty() -> Self {
+        Operations {
+            create: false,
+            get: false,
+            list: false,
+            watch: false,
+            delete: false,
+            delete_collection: false,
+            update: false,
+            patch: false,
+            other: Vec::new(),
+        }
+    }
+}
+/// Contains additional, detailed information abount API resource
+pub struct ApiResourceExtras {
+    /// Scope of the resource
+    pub scope: Scope,
+    /// Available subresources. Please note that returned ApiResources are not
+    /// standalone resources. Their name will be of form `subresource_name`,
+    /// not `resource_name/subresource_name`.
+    /// To work with subresources, use `Request` methods.
+    pub subresources: Vec<(ApiResource, ApiResourceExtras)>,
+    /// Supported operations on this resource
+    pub operations: Operations,
+}
+
+impl ApiResourceExtras {
+    /// Creates ApiResourceExtras from `meta::v1::APIResourceList` instance.
+    /// This function correctly sets all fields except `subresources`.
+    /// # Panics
+    /// Panics if list does not contain resource named `name`.
+    pub fn from_apiresourcelist(list: &APIResourceList, name: &str) -> Self {
+        let ar = list
+            .resources
+            .iter()
+            .find(|r| r.name == name)
+            .expect("resource not found in APIResourceList");
+        let scope = if ar.namespaced {
+            Scope::Namespaced
+        } else {
+            Scope::Cluster
+        };
+        let mut operations = Operations::empty();
+        for verb in &ar.verbs {
+            match verb.as_str() {
+                "create" => operations.create = true,
+                "get" => operations.get = true,
+                "list" => operations.list = true,
+                "watch" => operations.watch = true,
+                "delete" => operations.delete = true,
+                "deletecollection" => operations.delete_collection = true,
+                "update" => operations.update = true,
+                "patch" => operations.patch = true,
+                _ => operations.other.push(verb.clone()),
+            }
+        }
+        let mut subresources = Vec::new();
+        let subresource_name_prefix = format!("{}/", name);
+        for res in &list.resources {
+            if let Some(subresource_name) = res.name.strip_prefix(&subresource_name_prefix) {
+                let mut api_resource = ApiResource::from_apiresource(res, &list.group_version);
+                api_resource.plural_name = subresource_name.to_string();
+                let extra = ApiResourceExtras::from_apiresourcelist(list, &res.name);
+                subresources.push((api_resource, extra));
+            }
+        }
+
+        ApiResourceExtras {
+            scope,
+            subresources,
+            operations,
+        }
     }
 }
 

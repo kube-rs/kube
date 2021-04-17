@@ -23,7 +23,7 @@ mod gvk;
 pub use gvk::{GroupVersionKind, GroupVersionResource};
 
 mod dynamic;
-pub use dynamic::{ApiResource, DynamicObject};
+pub use dynamic::{ApiResource, ApiResourceExtras, DynamicObject, Operations, Scope};
 
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
