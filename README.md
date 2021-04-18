@@ -7,7 +7,7 @@
 
 Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go), a runtime abstraction inspired by [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime), and a derive macro for [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/) inspired by [kubebuilder](https://book.kubebuilder.io/reference/generating-crd.html).
 
-These crates makes certain assumptions about the kubernetes [apimachinery](https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go) + [api concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/) to enable generic abstractions. These abstractions allow rust reinterpretations of reflectors, informers, controllers, and custom resource interfaces, so that you can write applications easily.
+These crates make certain assumptions about the kubernetes [apimachinery](https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go) + [api concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/) to enable generic abstractions. These abstractions allow rust reinterpretations of reflectors, informers, controllers, and custom resource interfaces, so that you can write applications easily.
 
 ## Installation
 Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) types corresponding for your cluster version:
@@ -53,7 +53,7 @@ println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
 }});
-let patched = pods.patch("blog", &pp, serde_json::to_vec(&patch)?).await?;
+let patched = pods.patch("blog", &pp, &Patch::Merge(patch)).await?;
 assert_eq!(patched.spec.active_deadline_seconds, Some(5));
 
 pods.delete("blog", &DeleteParams::default()).await?;
@@ -67,7 +67,7 @@ Working with custom resources uses automatic code-generation via [proc_macros in
 You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec struct:
 
 ```rust
-#[derive(CustomResource, Serialize, Deserialize, Default, Clone)]
+#[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 pub struct FooSpec {
     name: String,
@@ -80,9 +80,9 @@ Then you can use the generated wrapper struct `Foo`:
 ```rust
 assert_eq!("Foo", Foo::KIND); // impl k8s_openapi::Resource for Foo
 let foos: Api<Foo> = Api::namespaced(client, "default");
-let f = Foo::new("my-foo");
-println!("foo: {:?}", f)
-println!("crd: {}", serde_yaml::to_string(Foo::crd());
+let f = Foo::new("my-foo", FooSpec::default());
+println!("foo: {:?}", f);
+println!("crd: {:?}", serde_yaml::to_string(&Foo::crd()));
 ```
 
 There are a ton of kubebuilder like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](./examples) for more.
@@ -104,9 +104,9 @@ let watcher = watcher(api, ListParams::default());
 This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
 
 ```rust
-let apply_events = try_flatten_applied(watcher).boxed_local()
-while let Some(event) = watcher.try_next().await? {
-    println!("Applied: {}", Meta::name(&event));
+let mut apply_events = try_flatten_applied(watcher).boxed_local();
+while let Some(event) = apply_events.try_next().await? {
+    println!("Applied: {}", event.name());
 }
 ```
 
