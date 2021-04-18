@@ -136,9 +136,9 @@ impl<K: Resource> ObjectRef<K> {
         )
         .expect("valid gvk");
         let mut res = kube::api::ApiResource::from_gvk(&gvk);
-        res.plural_name = K::plural(&self.dyntype).to_string();
+        res.plural = K::plural(&self.dyntype).to_string();
         ObjectRef {
-            dyntype: res,
+            dyntype: kube::api::ApiResource::erase::<K>(&self.dyntype),
             name: self.name,
             namespace: self.namespace,
         }

@@ -16,7 +16,7 @@ pub struct ApiResource {
     /// Singular PascalCase name of the resource
     pub kind: String,
     /// Plural name of the resource
-    pub plural_name: String,
+    pub plural: String,
 }
 
 impl ApiResource {
@@ -56,13 +56,24 @@ impl ApiResource {
         } else {
             format!("{}/{}", group, version)
         };
-        let plural_name = ar.name.clone();
+        let plural = ar.name.clone();
         ApiResource {
             group,
             version,
             kind,
             api_version,
-            plural_name,
+            plural,
+        }
+    }
+
+    /// Creates ApiResource by type-erasing another Resource
+    pub fn erase<K: Resource>(dt: &K::DynamicType) -> Self {
+        ApiResource {
+            group: K::group(dt).to_string(),
+            version: K::version(dt).to_string(),
+            api_version: K::api_version(dt).to_string(),
+            kind: K::kind(dt).to_string(),
+            plural: K::plural(dt).to_string(),
         }
     }
 
@@ -82,7 +93,7 @@ impl ApiResource {
             version: gvk.version.clone(),
             api_version,
             kind: gvk.kind.clone(),
-            plural_name: crate::api::metadata::to_plural(&gvk.kind.to_ascii_lowercase()),
+            plural: crate::api::metadata::to_plural(&gvk.kind.to_ascii_lowercase()),
         }
     }
 }
@@ -152,7 +163,7 @@ impl Resource for DynamicObject {
     }
 
     fn plural(dt: &ApiResource) -> Cow<'_, str> {
-        dt.plural_name.as_str().into()
+        dt.plural.as_str().into()
     }
 
     fn meta(&self) -> &ObjectMeta {
@@ -260,7 +271,7 @@ impl ApiResourceExtras {
         for res in &list.resources {
             if let Some(subresource_name) = res.name.strip_prefix(&subresource_name_prefix) {
                 let mut api_resource = ApiResource::from_apiresource(res, &list.group_version);
-                api_resource.plural_name = subresource_name.to_string();
+                api_resource.plural = subresource_name.to_string();
                 let extra = ApiResourceExtras::from_apiresourcelist(list, &res.name);
                 subresources.push((api_resource, extra));
             }

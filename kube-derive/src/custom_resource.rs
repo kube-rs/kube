@@ -329,7 +329,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    // Implement the ::crd method (fine to not have in a trait as its a generated type)
+    // Implement the ::crd and ::api_resource methods (fine to not have in a trait as its a generated type)
     let impl_crd = quote! {
         impl #rootident {
             pub fn crd() -> #apiext::CustomResourceDefinition {
@@ -356,6 +356,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 #jsondata
                 serde_json::from_value(jsondata)
                     .expect("valid custom resource from #[kube(attrs..)]")
+            }
+
+            pub fn api_resource() -> kube::api::ApiResource {
+                kube::api::ApiResource::erase::<Self>(&())
             }
         }
     };
