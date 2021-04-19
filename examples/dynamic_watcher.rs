@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let kind = env::var("KIND").unwrap_or_else(|_| "Foo".into());
 
     // Turn them into a GVK
-    let gvk = GroupVersionKind::gvk(&group, &version, &kind)?;
+    let gvk = GroupVersionKind::gvk(&group, &version, &kind);
     let api_resource = ApiResource::from_gvk(&gvk);
     // Use them in an Api with the GVK as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &api_resource);

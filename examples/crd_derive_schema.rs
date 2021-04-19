@@ -148,7 +148,7 @@ async fn main() -> Result<()> {
     });
 
     // Set up dynamic resource to test using raw values.
-    let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo")?;
+    let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
     let api_resource = ApiResource::from_gvk(&gvk);
     let dynapi: Api<DynamicObject> = Api::namespaced_with(client.clone(), &namespace, &api_resource);
 

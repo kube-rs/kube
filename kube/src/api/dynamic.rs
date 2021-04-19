@@ -301,7 +301,7 @@ mod test {
     };
     #[test]
     fn raw_custom_resource() {
-        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
+        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
         let res = ApiResource::from_gvk(&gvk);
         let url = DynamicObject::url_path(&res, Some("myns"));
 
@@ -318,7 +318,7 @@ mod test {
 
     #[test]
     fn raw_resource_in_default_group() -> Result<()> {
-        let gvk = GroupVersionKind::gvk("", "v1", "Service").unwrap();
+        let gvk = GroupVersionKind::gvk("", "v1", "Service");
         let api_resource = ApiResource::from_gvk(&gvk);
         let url = DynamicObject::url_path(&api_resource, None);
         let pp = PostParams::default();
@@ -342,7 +342,7 @@ mod test {
         }
         let client = Client::try_default().await.unwrap();
 
-        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo").unwrap();
+        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
         let api_resource = ApiResource::from_gvk(&gvk);
         let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", &api_resource);
         let a2: Api<Foo> = Api::namespaced(client.clone(), "myns");
