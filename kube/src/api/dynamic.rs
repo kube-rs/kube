@@ -21,8 +21,6 @@ pub struct ApiResource {
 
 impl ApiResource {
     /// Creates ApiResource from `meta::v1::APIResource` instance.
-    /// This is recommended way to create `ApiResource`s.
-    /// This function correctly sets all fields except `subresources`.
     ///
     /// `APIResource` objects can be extracted from [`Client::list_api_group_resources`](crate::Client::list_api_group_resources).
     /// If it does not specify version and/or group, they will be taken from `group_version`
@@ -30,13 +28,13 @@ impl ApiResource {
     ///
     /// ### Example usage:
     /// ```
-    /// use kube::api::{GroupVersionKind, Api, DynamicObject};
+    /// use kube::api::{ApiResource, Api, DynamicObject};
     /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// let apps = client.list_api_group_resources("apps/v1").await?;
     /// for ar in &apps.resources {
-    ///     let gvk = GroupVersionKind::from_api_resource(ar, &apps.group_version);
-    ///     dbg!(&gvk);
-    ///     let api: Api<DynamicObject> = Api::namespaced_with(client.clone(), "default", &gvk);
+    ///     let resource = ApiResource::from_apiresource(ar, &apps.group_version);
+    ///     dbg!(&resource);
+    ///     let api: Api<DynamicObject> = Api::namespaced_with(client.clone(), "default", &resource);
     /// }
     /// # Ok(())
     /// # }
@@ -84,6 +82,14 @@ impl ApiResource {
     /// be wrong, and using returned ApiResource will lead to incorrect
     /// api requests.
     pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
+        ApiResource::from_gvk_with_plural(
+            gvk,
+            &crate::api::metadata::to_plural(&gvk.kind.to_ascii_lowercase()),
+        )
+    }
+
+    /// Creates ApiResource from group, version, kind and plural name.
+    pub fn from_gvk_with_plural(gvk: &GroupVersionKind, plural: &str) -> Self {
         let api_version = match gvk.group.as_str() {
             "" => gvk.version.clone(),
             _ => format!("{}/{}", gvk.group, gvk.version),
@@ -93,7 +99,7 @@ impl ApiResource {
             version: gvk.version.clone(),
             api_version,
             kind: gvk.kind.clone(),
-            plural: crate::api::metadata::to_plural(&gvk.kind.to_ascii_lowercase()),
+            plural: plural.to_string(),
         }
     }
 }
