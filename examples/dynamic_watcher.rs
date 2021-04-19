@@ -19,7 +19,17 @@ async fn main() -> anyhow::Result<()> {
 
     // Turn them into a GVK
     let gvk = GroupVersionKind::gvk(&group, &version, &kind);
-    let api_resource = ApiResource::from_gvk(&gvk);
+    let mut api_resource = ApiResource::from_gvk(&gvk);
+
+    if let Some(resource) = env::var("RESOURCE").ok() {
+        api_resource.plural = resource;
+    } else {
+        println!(
+            "Using inferred plural name (use RESOURCE to override): {}",
+            api_resource.plural
+        );
+    }
+
     // Use them in an Api with the GVK as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &api_resource);
 

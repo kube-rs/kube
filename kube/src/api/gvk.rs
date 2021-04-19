@@ -47,7 +47,7 @@ impl GroupVersionResource {
         } else {
             format!("{}/{}", group, version)
         };
-        
+
         Self {
             group,
             version,
