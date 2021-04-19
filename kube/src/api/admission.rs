@@ -221,6 +221,7 @@ pub struct AdmissionResponse {
     pub allowed: bool,
     /// Extra details into why an admission request was denied. This field IS NOT
     /// consulted in any way if "Allowed" is "true".
+    #[serde(rename = "status")]
     pub result: Status,
     /// The patch body. Currently we only support "JSONPatch" which implements
     /// RFC 6902.
