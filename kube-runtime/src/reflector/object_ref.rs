@@ -160,18 +160,18 @@ mod tests {
     fn display_should_follow_expected_format() {
         assert_eq!(
             format!("{}", ObjectRef::<Pod>::new("my-pod").within("my-namespace")),
-            "Pod.v1./my-pod.my-namespace"
+            "my-pod.my-namespace"
         );
         assert_eq!(
             format!(
                 "{}",
                 ObjectRef::<Deployment>::new("my-deploy").within("my-namespace")
             ),
-            "Deployment.v1.apps/my-deploy.my-namespace"
+            "my-deploy.my-namespace"
         );
         assert_eq!(
             format!("{}", ObjectRef::<Node>::new("my-node")),
-            "Node.v1./my-node"
+            "my-node"
         );
     }
 
