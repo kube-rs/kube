@@ -169,10 +169,7 @@ mod tests {
             ),
             "my-deploy.my-namespace"
         );
-        assert_eq!(
-            format!("{}", ObjectRef::<Node>::new("my-node")),
-            "my-node"
-        );
+        assert_eq!(format!("{}", ObjectRef::<Node>::new("my-node")), "my-node");
     }
 
     #[test]
