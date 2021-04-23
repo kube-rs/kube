@@ -15,20 +15,7 @@ use std::{
     Hash(bound = "K::DynamicType: Hash"),
     Clone(bound = "K::DynamicType: Clone")
 )]
-/// A typed and namedspaced (if relevant) reference to a Kubernetes object
-///
-/// `K` may be either the object type or `DynamicObject`, in which case the
-/// type is stored at runtime. Erased `ObjectRef`s pointing to different types
-/// are still considered different.
-///
-/// ```
-/// use kube_runtime::reflector::ObjectRef;
-/// use k8s_openapi::api::core::v1::{ConfigMap, Secret};
-/// assert_ne!(
-///     ObjectRef::<ConfigMap>::new("a").erase(),
-///     ObjectRef::<Secret>::new("a").erase(),
-/// );
-/// ```
+/// A namedspaced (if relevant) reference to a Kubernetes object
 pub struct ObjectRef<K: Resource> {
     dyntype: PhantomData<K::DynamicType>,
     /// The name of the object
