@@ -1,19 +1,142 @@
-use crate::{api::GroupVersionKind, Client};
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList};
+use crate::{api::ApiResource, Client};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResourceList;
 use std::{cmp::Reverse, collections::HashMap};
+
+/// Resource scope
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum Scope {
+    /// Objects are global
+    Cluster,
+    /// Each object lives in namespace.
+    Namespaced,
+}
+
+/// Operations that are supported on the resource
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct Operations {
+    /// Object can be created
+    pub create: bool,
+    /// Single object can be queried
+    pub get: bool,
+    /// Multiple objects can be queried
+    pub list: bool,
+    /// A watch can be started
+    pub watch: bool,
+    /// A single object can be deleted
+    pub delete: bool,
+    /// Multiple objects can be deleted
+    pub delete_collection: bool,
+    /// Object can be updated
+    pub update: bool,
+    /// Object can be patched
+    pub patch: bool,
+    /// All other verbs
+    pub other: Vec<String>,
+}
+
+impl Operations {
+    /// Returns empty `Operations`
+    pub fn empty() -> Self {
+        Operations {
+            create: false,
+            get: false,
+            list: false,
+            watch: false,
+            delete: false,
+            delete_collection: false,
+            update: false,
+            patch: false,
+            other: Vec::new(),
+        }
+    }
+}
+/// Contains additional, detailed information abount API resource
+#[derive(Debug, Clone)]
+pub struct ApiResourceExtras {
+    /// Scope of the resource
+    pub scope: Scope,
+    /// Available subresources. Please note that returned ApiResources are not
+    /// standalone resources. Their name will be of form `subresource_name`,
+    /// not `resource_name/subresource_name`.
+    /// To work with subresources, use `Request` methods.
+    pub subresources: Vec<(ApiResource, ApiResourceExtras)>,
+    /// Supported operations on this resource
+    pub operations: Operations,
+}
+
+impl ApiResourceExtras {
+    /// Creates ApiResourceExtras from `meta::v1::APIResourceList` instance.
+    /// This function correctly sets all fields except `subresources`.
+    /// # Panics
+    /// Panics if list does not contain resource named `name`.
+    pub fn from_apiresourcelist(list: &APIResourceList, name: &str) -> Self {
+        let ar = list
+            .resources
+            .iter()
+            .find(|r| r.name == name)
+            .expect("resource not found in APIResourceList");
+        let scope = if ar.namespaced {
+            Scope::Namespaced
+        } else {
+            Scope::Cluster
+        };
+        let mut operations = Operations::empty();
+        for verb in &ar.verbs {
+            match verb.as_str() {
+                "create" => operations.create = true,
+                "get" => operations.get = true,
+                "list" => operations.list = true,
+                "watch" => operations.watch = true,
+                "delete" => operations.delete = true,
+                "deletecollection" => operations.delete_collection = true,
+                "update" => operations.update = true,
+                "patch" => operations.patch = true,
+                _ => operations.other.push(verb.clone()),
+            }
+        }
+        let mut subresources = Vec::new();
+        let subresource_name_prefix = format!("{}/", name);
+        for res in &list.resources {
+            if let Some(subresource_name) = res.name.strip_prefix(&subresource_name_prefix) {
+                let mut api_resource = ApiResource::from_apiresource(res, &list.group_version);
+                api_resource.plural = subresource_name.to_string();
+                let extra = ApiResourceExtras::from_apiresourcelist(list, &res.name);
+                subresources.push((api_resource, extra));
+            }
+        }
+
+        ApiResourceExtras {
+            scope,
+            subresources,
+            operations,
+        }
+    }
+}
 
 struct GroupVersionData {
     version: String,
-    list: APIResourceList,
-    resources: Vec<APIResource>,
+    // list: APIResourceList,
+    resources: Vec<(ApiResource, ApiResourceExtras)>,
 }
 
 impl GroupVersionData {
     fn new(version: String, list: APIResourceList) -> Self {
+        // TODO: could be better than O(N^2).
+        let mut resources = Vec::new();
+        for res in &list.resources {
+            // skip subresources
+            if res.name.contains('/') {
+                continue;
+            }
+            let api_res = ApiResource::from_apiresource(res, &list.group_version);
+            let extra = ApiResourceExtras::from_apiresourcelist(&list, &res.name);
+            resources.push((api_res, extra));
+        }
         GroupVersionData {
             version,
-            list: list.clone(),
-            resources: filter_api_resource_list(list),
+            resources,
+            //list: list.clone(),
+            // resources: filter_api_resource_list(list),
         }
     }
 }
@@ -30,15 +153,15 @@ pub struct Group {
 /// On creation `Discovery` queries Kubernetes API,
 /// making list of all API resources, and provides a simple
 /// interface on the top of that information.
+///
+/// # Resource representation
+/// Each resource is represented as a pair
+/// `(ApiResource, ApiResourceExtras)`. Former can be used
+/// to make API requests (together with the `DynamicObject`
+/// or `Object`). Latter provides additional information such
+/// as scope or supported verbs.
 pub struct Discovery {
     groups: HashMap<String, Group>,
-}
-
-fn filter_api_resource_list(resource_list: APIResourceList) -> Vec<APIResource> {
-    let mut resource_list = resource_list.resources;
-    // skip subresources
-    resource_list.retain(|ar| !ar.name.contains('/'));
-    resource_list
 }
 
 // TODO: this is pretty unoptimized
@@ -118,29 +241,20 @@ impl Discovery {
 
     /// Returns resource with given group, version and kind.
     ///
-    /// This function returns `GroupVersionKind` which can be used together
-    /// with `DynamicObject` and raw `APIResource` value with additional information.
+    /// This function returns `ApiResource` which can be used together
+    /// with `DynamicObject` and raw `ApiResourceExtras` value with additional information.
     pub fn resolve_group_version_kind(
         &self,
         group: &str,
         version: &str,
         kind: &str,
-    ) -> Option<(GroupVersionKind, APIResource)> {
+    ) -> Option<(ApiResource, ApiResourceExtras)> {
         // TODO: could be better than O(N)
         let group = self.group(group)?;
         group
             .resources_by_version(version)
             .into_iter()
-            .find(|gvk| gvk.kind == kind)
-            .map(|gvk| {
-                let data = group
-                    .versions_and_resources
-                    .iter()
-                    .find(|data| data.version == version)
-                    .unwrap();
-                let raw = data.list.resources.iter().find(|r| r.kind == kind).unwrap();
-                (gvk, raw.clone())
-            })
+            .find(|res| res.0.kind == kind)
     }
 }
 
@@ -176,13 +290,13 @@ impl Group {
 
     /// Returns preferred version for working with given group.
     pub fn preferred_version(&self) -> Option<&str> {
-       self.preferred_version.as_deref()
+        self.preferred_version.as_deref()
     }
 
     /// Returns preferred version for working with given group.
     /// If server does not recommend one, this function picks
     /// "the most stable and the most recent" version.
-    
+
     pub fn preferred_version_or_guess(&self) -> &str {
         match &self.preferred_version {
             Some(v) => v,
@@ -193,28 +307,14 @@ impl Group {
     /// Returns resources available in version `ver` of this group.
     /// If the group does not support this version,
     /// returns empty vector.
-    pub fn resources_by_version(&self, ver: &str) -> Vec<GroupVersionKind> {
+    pub fn resources_by_version(&self, ver: &str) -> Vec<(ApiResource, ApiResourceExtras)> {
         let resources = self
             .versions_and_resources
             .iter()
             .find(|ver_data| ver_data.version == ver)
             .map(|ver_data| ver_data.resources.as_slice())
             .unwrap_or(&[]);
-        resources
-            .iter()
-            .cloned()
-            .map(|mut api_resource| {
-                api_resource.group = Some(if self.name == "core" {
-                    String::new()
-                } else {
-                    self.name.clone()
-                });
-                api_resource.version = Some(ver.to_string());
-                // second argument will be ignored because we have just filled necessary
-                // `api_resource` fields.
-                GroupVersionKind::from_api_resource(&api_resource, "unused/v0")
-            })
-            .collect()
+        resources.iter().cloned().collect()
     }
 }
 

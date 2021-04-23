@@ -7,7 +7,7 @@
 //! interaction with the kuberneres API.
 mod discovery;
 
-pub use discovery::{Discovery, Group};
+pub use discovery::{ApiResourceExtras, Discovery, Group, Operations, Scope};
 
 use crate::{api::WatchEvent, config::Config, error::ErrorResponse, service::Service, Error, Result};
 
