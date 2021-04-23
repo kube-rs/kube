@@ -4,6 +4,7 @@ use kube::api::{DynamicObject, Resource, ResourceExt};
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
+    marker::PhantomData,
 };
 
 #[derive(Derivative)]
@@ -29,7 +30,7 @@ use std::{
 /// );
 /// ```
 pub struct ObjectRef<K: Resource> {
-    dyntype: K::DynamicType,
+    dyntype: PhantomData<K::DynamicType>,
     /// The name of the object
     pub name: String,
     /// The namespace of the object
@@ -68,7 +69,7 @@ impl<K: Resource> ObjectRef<K> {
     #[must_use]
     pub fn new_with(name: &str, dyntype: K::DynamicType) -> Self {
         Self {
-            dyntype,
+            dyntype: PhantomData,
             name: name.into(),
             namespace: None,
         }
@@ -89,7 +90,7 @@ impl<K: Resource> ObjectRef<K> {
         K: Resource,
     {
         Self {
-            dyntype,
+            dyntype: PhantomData,
             name: obj.name(),
             namespace: obj.namespace(),
         }
@@ -106,7 +107,7 @@ impl<K: Resource> ObjectRef<K> {
     ) -> Option<Self> {
         if owner.api_version == K::api_version(&dyntype) && owner.kind == K::kind(&dyntype) {
             Some(Self {
-                dyntype,
+                dyntype: PhantomData,
                 name: owner.name.clone(),
                 namespace: namespace.map(String::from),
             })
@@ -122,7 +123,7 @@ impl<K: Resource> ObjectRef<K> {
     #[must_use]
     pub fn into_kind_unchecked<K2: Resource>(self, dt2: K2::DynamicType) -> ObjectRef<K2> {
         ObjectRef {
-            dyntype: dt2,
+            dyntype: PhantomData,
             name: self.name,
             namespace: self.namespace,
         }
@@ -130,12 +131,7 @@ impl<K: Resource> ObjectRef<K> {
 
     pub fn erase(self) -> ObjectRef<DynamicObject> {
         ObjectRef {
-            dyntype: kube::api::GroupVersionKind::gvk(
-                K::group(&self.dyntype).as_ref(),
-                K::version(&self.dyntype).as_ref(),
-                K::kind(&self.dyntype).as_ref(),
-            )
-            .expect("valid gvk"),
+            dyntype: PhantomData,
             name: self.name,
             namespace: self.namespace,
         }
@@ -144,14 +140,7 @@ impl<K: Resource> ObjectRef<K> {
 
 impl<K: Resource> Display for ObjectRef<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}.{}.{}/{}",
-            K::kind(&self.dyntype),
-            K::version(&self.dyntype),
-            K::group(&self.dyntype),
-            self.name
-        )?;
+        write!(f, "{}", self.name)?;
         if let Some(namespace) = &self.namespace {
             write!(f, ".{}", namespace)?;
         }
