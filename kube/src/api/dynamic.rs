@@ -213,7 +213,7 @@ impl DynamicObject {
     }
 
     /// Attach a namespace to a DynamicObject
-    pub fn namespace(mut self, ns: &str) -> Self {
+    pub fn within(mut self, ns: &str) -> Self {
         self.metadata.namespace = Some(ns.into());
         self
     }
