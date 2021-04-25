@@ -1,3 +1,5 @@
+//! High-level utilities for runtime API discovery.
+
 use crate::{api::ApiResource, Client};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResourceList;
 use std::{cmp::Reverse, collections::HashMap};
@@ -11,45 +13,26 @@ pub enum Scope {
     Namespaced,
 }
 
-/// Operations that are supported on the resource
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct Operations {
-    /// Object can be created
-    pub create: bool,
-    /// Single object can be queried
-    pub get: bool,
-    /// Multiple objects can be queried
-    pub list: bool,
-    /// A watch can be started
-    pub watch: bool,
-    /// A single object can be deleted
-    pub delete: bool,
-    /// Multiple objects can be deleted
-    pub delete_collection: bool,
-    /// Object can be updated
-    pub update: bool,
-    /// Object can be patched
-    pub patch: bool,
-    /// All other verbs
-    pub other: Vec<String>,
+/// Defines standard verbs
+pub mod verbs {
+    /// Create a resource
+    pub const CREATE: &'static str = "create";
+    /// Get single resource
+    pub const GET: &'static str = "get";
+    /// List objects
+    pub const LIST: &'static str = "list";
+    /// Watch for objects changes
+    pub const WATCH: &'static str = "watch";
+    /// Delete single object
+    pub const DELETE: &'static str = "delete";
+    /// Delete multiple objects at once
+    pub const DELETE_COLLECTION: &'static str = "deletecollection";
+    /// Update an object
+    pub const UPDATE: &'static str = "update";
+    /// Patch an object
+    pub const PATCH: &'static str = "patch";
 }
 
-impl Operations {
-    /// Returns empty `Operations`
-    pub fn empty() -> Self {
-        Operations {
-            create: false,
-            get: false,
-            list: false,
-            watch: false,
-            delete: false,
-            delete_collection: false,
-            update: false,
-            patch: false,
-            other: Vec::new(),
-        }
-    }
-}
 /// Contains additional, detailed information abount API resource
 #[derive(Debug, Clone)]
 pub struct ApiResourceExtras {
@@ -61,7 +44,7 @@ pub struct ApiResourceExtras {
     /// To work with subresources, use `Request` methods.
     pub subresources: Vec<(ApiResource, ApiResourceExtras)>,
     /// Supported operations on this resource
-    pub operations: Operations,
+    pub operations: Vec<String>,
 }
 
 impl ApiResourceExtras {
@@ -80,20 +63,6 @@ impl ApiResourceExtras {
         } else {
             Scope::Cluster
         };
-        let mut operations = Operations::empty();
-        for verb in &ar.verbs {
-            match verb.as_str() {
-                "create" => operations.create = true,
-                "get" => operations.get = true,
-                "list" => operations.list = true,
-                "watch" => operations.watch = true,
-                "delete" => operations.delete = true,
-                "deletecollection" => operations.delete_collection = true,
-                "update" => operations.update = true,
-                "patch" => operations.patch = true,
-                _ => operations.other.push(verb.clone()),
-            }
-        }
         let mut subresources = Vec::new();
         let subresource_name_prefix = format!("{}/", name);
         for res in &list.resources {
@@ -108,8 +77,13 @@ impl ApiResourceExtras {
         ApiResourceExtras {
             scope,
             subresources,
-            operations,
+            operations: ar.verbs.clone(),
         }
+    }
+
+    /// Checks that given verb is supported on this resource.
+    pub fn supports_operation(&self, operation: &str) -> bool {
+        self.operations.iter().any(|op| op == operation)
     }
 }
 
@@ -148,7 +122,7 @@ pub struct Group {
     preferred_version: Option<String>,
 }
 
-/// High-level utility for runtime API discovery.
+/// Cached APIs information.
 ///
 /// On creation `Discovery` queries Kubernetes API,
 /// making list of all API resources, and provides a simple

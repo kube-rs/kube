@@ -5,9 +5,7 @@
 //! This client can be used on its own or in conjuction with
 //! the [`Api`][crate::api::Api] type for more structured
 //! interaction with the kuberneres API.
-mod discovery;
-
-pub use discovery::{ApiResourceExtras, Discovery, Group, Operations, Scope};
+pub mod discovery;
 
 use crate::{api::WatchEvent, config::Config, error::ErrorResponse, service::Service, Error, Result};
 

@@ -3,7 +3,10 @@
 
 use kube::{
     api::{Api, DynamicObject, ResourceExt},
-    client::{Client, Discovery, Scope},
+    client::{
+        discovery::{verbs, Discovery, Scope},
+        Client,
+    },
 };
 use log::info;
 
@@ -23,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
     for group in discovery.groups() {
         let ver = group.preferred_version_or_guess();
         for (api_res, extras) in group.resources_by_version(ver) {
-            if !extras.operations.list {
+            if !extras.supports_operation(verbs::LIST) {
                 continue;
             }
             let api: Api<DynamicObject> = if extras.scope == Scope::Namespaced {
