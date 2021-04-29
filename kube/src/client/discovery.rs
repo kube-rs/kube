@@ -62,11 +62,14 @@ impl Discovery {
 
                 v.push(GroupVersionData::new(vers.version, resource_list));
             }
-            groups.insert(g.name.clone(), Group {
-                name: g.name,
-                versions_and_resources: v,
-                preferred_version: g.preferred_version.map(|v| v.version),
-            });
+            groups.insert(
+                g.name.clone(),
+                Group {
+                    name: g.name,
+                    versions_and_resources: v,
+                    preferred_version: g.preferred_version.map(|v| v.version),
+                },
+            );
         }
 
         let coreapis = client.list_core_api_versions().await?;
@@ -75,11 +78,14 @@ impl Discovery {
             let resource_list = client.list_core_api_resources(&core_ver).await?;
             core_v.push(GroupVersionData::new(core_ver, resource_list));
         }
-        groups.insert(Group::CORE_GROUP.to_string(), Group {
-            name: Group::CORE_GROUP.to_string(),
-            versions_and_resources: core_v,
-            preferred_version: Some("v1".to_string()),
-        });
+        groups.insert(
+            Group::CORE_GROUP.to_string(),
+            Group {
+                name: Group::CORE_GROUP.to_string(),
+                versions_and_resources: core_v,
+                preferred_version: Some("v1".to_string()),
+            },
+        );
 
         groups.values_mut().for_each(|group| group.sort_versions());
 
@@ -170,13 +176,13 @@ impl Group {
 
     /// Returns preferred version for working with given group.
     pub fn preferred_version(&self) -> Option<&str> {
-        self.preferred_version.as_deref()
+       self.preferred_version.as_deref()
     }
 
     /// Returns preferred version for working with given group.
     /// If server does not recommend one, this function picks
     /// "the most stable and the most recent" version.
-
+    
     pub fn preferred_version_or_guess(&self) -> &str {
         match &self.preferred_version {
             Some(v) => v,
