@@ -3,7 +3,6 @@ use std::{
     task::{Context, Poll},
 };
 
-
 use futures::{ready, Future};
 use http::{header::AUTHORIZATION, Request};
 use hyper::Body;

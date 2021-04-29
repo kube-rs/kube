@@ -11,13 +11,12 @@ use self::{log::LogRequest, url::set_cluster_url};
 use auth::AuthLayer;
 #[cfg(feature = "gzip")] use compression::{accept_compressed, maybe_decompress};
 use headers::set_default_headers;
-use tls::HttpsConnector;
-
-use std::convert::{TryFrom, TryInto};
-
 use http::{HeaderValue, Request, Response};
 use hyper::{Body, Client as HyperClient};
 use hyper_timeout::TimeoutConnector;
+use std::convert::{TryFrom, TryInto};
+use tls::HttpsConnector;
+
 use tower::{buffer::Buffer, util::BoxService, BoxError, ServiceBuilder};
 
 use crate::{error::ConfigError, Config, Error, Result};
