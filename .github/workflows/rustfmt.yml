@@ -1,9 +1,6 @@
-# When pushed to `master`, run `cargo +nightly fmt --all` and commit any changes.
+# When pushed, run `cargo +nightly fmt --all` and commit any changes.
 name: rustfmt
-on:
-  push:
-    branches:
-      - master
+on: [push]
 jobs:
   rustfmt_nightly:
     runs-on: ubuntu-latest
