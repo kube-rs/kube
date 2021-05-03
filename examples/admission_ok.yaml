@@ -1,0 +1,7 @@
+apiVersion: clux.dev/v1
+kind: Foo
+metadata:
+  name: ok
+spec:
+  name: ok
+  info: this is accepted, and a label is added

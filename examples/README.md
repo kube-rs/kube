@@ -23,6 +23,17 @@ cargo run --example dynamic_api
 NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
+## kube admission controller example
+Admission controllers are a bit of a special beast. They don't need `kube_runtime` because they simply get changes sent to them over `https`, but you do instead need a webserver, certificates, and either your controller deployed behind a `Service`, or as we do here: running locally with a private ip that your `k3d` cluster can reach.
+
+```sh
+export ADMISSION_PRIVATE_IP=192.168.1.163
+./admission_setup.sh
+cargo run --example admission_controller &
+kubectl apply -f admission_ok.yaml # should succeed and add a label
+kubectl apply -f admission_reject.yaml # should fail
+```
+
 ## kube-derive focused examples
 How deriving `CustomResource` works in practice, and how it interacts with the [schemars](https://github.com/GREsau/schemars/) dependency.
 
