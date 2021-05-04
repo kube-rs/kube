@@ -3,6 +3,7 @@
 //! For more information on admission controllers, see:
 //! https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/
 //! https://kubernetes.io/blog/2019/03/21/a-guide-to-kubernetes-admission-controllers/
+//! https://github.com/kubernetes/api/blob/master/admission/v1/types.go
 
 use crate::{
     api::{DynamicObject, GroupVersionKind, GroupVersionResource, Resource, TypeMeta},

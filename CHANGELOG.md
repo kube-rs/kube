@@ -2,6 +2,7 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.52.0...master
+ * `kube`: added support for admission controllers under `admission` feat - #477 via #484
 
 0.52.0 / 2021-03-31
 ===================
