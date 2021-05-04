@@ -25,6 +25,7 @@ We recommend turning off `default-features` for `k8s-openapi` to speed up your c
 
 ## Upgrading
 Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
+All crates herein are versioned and [released](./release.toml) together to guarantee [compatibility before 1.0](https://github.com/clux/kube-rs/issues/508).
 
 ## Usage
 See the [examples directory](./examples) for how to use any of these crates.
