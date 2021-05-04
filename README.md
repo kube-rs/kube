@@ -32,13 +32,19 @@ See the [examples directory](./examples) for how to use any of these crates.
 - **[kube API Docs](https://docs.rs/kube/)**
 - **[kube-runtime API Docs](https://docs.rs/kube-runtime/)**
 
-Some real world examples:
+Official examples:
 
 - [version-rs](https://github.com/clux/version-rs): super lightweight reflector deployment with actix 2 and prometheus metrics
 
 - [controller-rs](https://github.com/clux/controller-rs): `Controller` owned by a `Manager` inside actix
 
+Real world users:
+
 - [krustlet](https://github.com/deislabs/krustlet): a complete `WASM` running `kubelet`
+- [stackabletech operators](https://github.com/stackabletech) - ([kafka](https://github.com/stackabletech/kafka-operator), [zookeeper](https://github.com/stackabletech/zookeeper-operator), and more)
+- [kdash tui](https://github.com/kdash-rs/kdash) - terminal dashboard for kubernetes
+- [logdna agent](https://github.com/logdna/logdna-agent-v2)
+- [kubeapps pinniped](https://github.com/kubeapps/kubeapps/tree/master/cmd/pinniped-proxy)
 
 ## Api
 The direct `Api` type takes a client, and is constructed with either the `::global` or `::namespaced` functions:
