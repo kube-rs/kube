@@ -119,7 +119,7 @@ pub trait ResourceExt: Resource {
 
 // TODO: replace with ordinary static when BTreeMap::new() is no longer
 // const-unstable.
-static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| BTreeMap::new());
+static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(BTreeMap::new);
 
 impl<K: Resource> ResourceExt for K {
     fn name(&self) -> String {
