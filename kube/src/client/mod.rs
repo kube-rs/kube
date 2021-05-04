@@ -330,7 +330,6 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
             Err(Error::Api(errdata))
         } else {
             tracing::warn!("Unsuccessful data error parse: {}", text);
-            // Propagate errors properly via reqwest
             let ae = ErrorResponse {
                 status: s.to_string(),
                 code: s.as_u16(),

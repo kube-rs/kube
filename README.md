@@ -47,7 +47,7 @@ Real world users:
 - [kubeapps pinniped](https://github.com/kubeapps/kubeapps/tree/master/cmd/pinniped-proxy)
 
 ## Api
-The direct `Api` type takes a client, and is constructed with either the `::global` or `::namespaced` functions:
+The direct `Api` type takes a client, and is constructed with either the `::all` or `::namespaced` functions:
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
@@ -59,7 +59,8 @@ println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
 }});
-let patched = pods.patch("blog", &pp, &Patch::Merge(patch)).await?;
+let pp = PatchParams::apply("my_manager");
+let patched = pods.patch("blog", &pp, &Patch::Apply(patch)).await?;
 assert_eq!(patched.spec.active_deadline_seconds, Some(5));
 
 pods.delete("blog", &DeleteParams::default()).await?;
@@ -81,17 +82,16 @@ pub struct FooSpec {
 }
 ```
 
-Then you can use the generated wrapper struct `Foo`:
+Then you can use the generated wrapper struct `Foo` as a [`kube::Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
 
 ```rust
-assert_eq!("Foo", Foo::KIND); // impl k8s_openapi::Resource for Foo
 let foos: Api<Foo> = Api::namespaced(client, "default");
 let f = Foo::new("my-foo", FooSpec::default());
 println!("foo: {:?}", f);
 println!("crd: {:?}", serde_yaml::to_string(&Foo::crd()));
 ```
 
-There are a ton of kubebuilder like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](./examples) for more.
+There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](./examples) for more.
 
 **NB:** `#[derive(CustomResource)]` requires the `derive` feature enabled on `kube`.
 
@@ -160,7 +160,7 @@ kube-runtime = { version = "0.52.0", default-features = false, features = ["rust
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_20"] }
 ```
 
-This will pull in the variant of `reqwest` that also uses its `rustls-tls` feature.
+This will pull in `hyper-rustls` and `tokio-rustls`.
 
 ## musl-libc
 Kube will work with [distroless](https://github.com/clux/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/clux/kube-rs/issues/331#issuecomment-715962188)).
