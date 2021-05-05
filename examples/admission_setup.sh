@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Require: a private ip reachable from your cluster. If running k3d, then not 0.0.0.0, but 192.168.X.X
+# This script is loosely adapting the TLS setup described in
+# https://kubernetes.io/blog/2019/03/21/a-guide-to-kubernetes-admission-controllers/#tls-certificates
+# for local development
+
+# Require: a private ip reachable from your cluster.
+# If using k3d to test locally, then probably 10.x.x.x or 192.168.X.X
+# When running behind a Service in-cluster; 0.0.0.0
 test -n "${ADMISSION_PRIVATE_IP}"
 
 # Cleanup: Remove old MutatingWebhookConfiguration if exists (immutable)

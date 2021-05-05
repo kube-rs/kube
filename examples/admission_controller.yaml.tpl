@@ -24,5 +24,5 @@ webhooks:
         resources: ["foos"]
     failurePolicy: Fail
     admissionReviewVersions: ["v1", "v1beta1"]
-    sideEffects: NoneOnDryRun
+    sideEffects: None
     timeoutSeconds: 5

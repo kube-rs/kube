@@ -142,11 +142,9 @@ pub struct AdmissionRequest<T: Resource> {
     /// The operation being performed. This may be different than the operation
     /// requested. e.g. a patch can result in either a CREATE or UPDATE
     /// Operation.
-    #[serde(default)]
-    pub operation: Option<Operation>,
+    pub operation: Operation,
     /// Information about the requesting user.
-    #[serde(default)]
-    pub user_info: Option<UserInfo>,
+    pub user_info: UserInfo,
     /// The object from the incoming request.
     pub object: Option<T>,
     ///  The existing object. Only populated for DELETE and UPDATE requests.
