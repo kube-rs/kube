@@ -288,7 +288,7 @@ impl PatchParams {
 
     pub(crate) fn populate_qp(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
         if self.dry_run {
-            qp.append_pair("dryRun", "true");
+            qp.append_pair("dryRun", "All");
         }
         if self.force {
             qp.append_pair("force", "true");
