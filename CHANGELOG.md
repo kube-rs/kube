@@ -2,7 +2,12 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.52.0...master
- * `kube`: added support for admission controllers under `admission` feat - #477 via #484
+ * `kube`: `admission` controller module added under feature - #477 via #484 + fixes in #488 #498 #499 + #507 + #509
+ * `kube`: `config` parsing of pem blobs now resilient against missing newlines - #504 via #505
+ * `kube`: `discovery` module added to simplify dynamic api usage - #491
+ * `kube`: `api` BREAKING: `DynamicObject::namespace` renamed to `::within` - #502
+ * `kube`: `api` BREAKING: added `ResourceExt` trait moving the getters from `Resource` trait - #486
+ * `kube`: `api` added a generic interface for subresources via `Request` - #487
 
 0.52.0 / 2021-03-31
 ===================
