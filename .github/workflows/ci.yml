@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# NOTE `actions-rs/cargo` can't run commands in subdirectory at the moment.
+# https://github.com/actions-rs/cargo/issues/86
+# Workaround with `--manifest-path`.
+jobs:
+  cargo_test:
+    strategy:
+      # Prevent GitHub from canceling all in-progress jobs when a matrix job fails.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          toolchain: stable
+          profile: minimal
+      # Smart caching for Rust projects.
+      # Includes workaround for macos cache corruption.
+      # - https://github.com/rust-lang/cargo/issues/8603
+      # - https://github.com/actions/cache/issues/403
+      - uses: Swatinem/rust-cache@v1
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -p kube-runtime
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -p kube
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -p kube-derive
+      # REVIEW This runs tests again
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --lib --all -j4
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --doc --all -j4
+
+      # kube features
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path kube/Cargo.toml --lib --no-default-features --features=native-tls,ws,oauth
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path kube/Cargo.toml --lib --no-default-features --features=rustls-tls,ws,oauth
+
+      # examples
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -p examples -j4
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --manifest-path examples/Cargo.toml
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path examples/Cargo.toml --example crd_derive_no_schema --no-default-features --features=native-tls
+
+  integration:
+    # TODO Compile static binary once
+    # TODO Test macos and win
+    runs-on: ubuntu-latest
+    - uses: actions/checkout@v2
+
+    # NOTE caching is probably not as effective because clux/muslrust uses nightly.
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git
+          target
+        key: musl-cargo-${{ hashFiles('**/Cargo.toml') }}
+
+    - uses: nolar/setup-k3d-k3s@v1
+      with:
+        version: v1.20
+        # k3d-kube
+        k3d-name: kube
+        # Used to avoid rate limits when fetching the releases from k3s repo.
+        # Anonymous access is limited to 60 requests / hour / worker
+        # github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Compile dapp
+      run: |
+        docker run --rm -t \
+            --mount type=bind,source=${{ github.workspace }},target=/volume \
+            --mount type=bind,source=~/.cargo/registry,target=/root/.cargo/registry \
+            --mount type=bind,source=~/.cargo/git,target=/root/.cargo/git \
+            clux/muslrust:latest \
+            cargo build -p tests --release
+
+        cp target/x86_64-unknown-linux-musl/release/dapp tests/
+
+    - name: Build image
+      run: 'docker build -t clux/kube-dapp:${{ github.sha }} tests/'
+    - name: Import image
+      run: 'k3d image import clux/kube-dapp:${{ github.sha }} --cluster k3d-kube'
+    - run: sed -i 's/latest/${{ github.sha }}/g' tests/deployment.yaml
+
+    - name: Create resource
+      run: kubectl apply -f tests/deployment.yaml -n apps
+    - name: Show rollout status
+      run: kubectl rollout status deployment/dapp -n apps --watch=true --timeout=3m
+    - name: Describe resource 
+      run: kubectl describe deployment/dapp -n apps
+
+    - run: kubectl get all -n apps
+    - run: kubectl describe deploy dapp -n apps
+    - run: kubectl wait --for=condition=Completed deploy/dapp -n apps --timeout=60s || kubectl logs -f deploy/dapp -p -n apps
+    - run: kubectl get all -n apps
