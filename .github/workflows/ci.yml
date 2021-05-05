@@ -28,6 +28,13 @@ jobs:
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v1
 
+      - run: echo "VCPKGRS_DYNAMIC=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+        if: runner.os == 'Windows'
+      - run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+        if: runner.os == 'Windows'
+      - run: vcpkg install openssl:x64-windows
+        if: runner.os == 'Windows'
+
       - name: Build
         uses: actions-rs/cargo@v1
         with:
