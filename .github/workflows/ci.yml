@@ -125,23 +125,21 @@ jobs:
         run: |
           docker run --rm -t \
               --mount type=bind,source=${{ github.workspace }},target=/volume \
-              --mount type=bind,source=~/.cargo/registry,target=/root/.cargo/registry \
-              --mount type=bind,source=~/.cargo/git,target=/root/.cargo/git \
+              --mount type=bind,source=$HOME/.cargo,target=/root/.cargo \
               clux/muslrust:latest \
               cargo build -p tests --release
-
-          cp target/x86_64-unknown-linux-musl/release/dapp tests/
+          cp target/release/dapp tests/
 
       - name: Build image
         run: "docker build -t clux/kube-dapp:${{ github.sha }} tests/"
       - name: Import image
-        run: "k3d image import clux/kube-dapp:${{ github.sha }} --cluster k3d-kube"
+        run: "k3d image import clux/kube-dapp:${{ github.sha }} --cluster kube"
       - run: sed -i 's/latest/${{ github.sha }}/g' tests/deployment.yaml
 
       - name: Create resource
         run: kubectl apply -f tests/deployment.yaml -n apps
       - name: Show rollout status
-        run: kubectl rollout status deployment/dapp -n apps --watch=true --timeout=3m
+        run: kubectl rollout status deployment/dapp -n apps --watch=true --timeout=5m
       - name: Describe resource
         run: kubectl describe deployment/dapp -n apps
 
