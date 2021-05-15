@@ -21,9 +21,9 @@ ws = ["kube/ws"]
 anyhow = "1.0.37"
 env_logger = "0.8.2"
 futures = "0.3.8"
-kube = { path = "../kube", version = "^0.52.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.52.0", default-features = false } # only needed to opt out of schema
-kube-runtime = { path = "../kube-runtime", version = "^0.52.0", default-features = false }
+kube = { path = "../kube", version = "^0.53.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.53.0", default-features = false } # only needed to opt out of schema
+kube-runtime = { path = "../kube-runtime", version = "^0.53.0", default-features = false }
 k8s-openapi = { version = "0.11.0", features = ["v1_20"], default-features = false }
 log = "0.4.11"
 serde = { version = "1.0.118", features = ["derive"] }

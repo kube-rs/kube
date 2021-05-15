@@ -1,14 +1,17 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.52.0...master
- * `kube`: `admission` controller module added under feature - #477 via #484 + fixes in #488 #498 #499 + #507 + #509
- * `kube`: `config` parsing of pem blobs now resilient against missing newlines - #504 via #505
- * `kube`: `discovery` module added to simplify dynamic api usage - #491
- * `kube`: `api` BREAKING: `DynamicObject::namespace` renamed to `::within` - #502
- * `kube`: `api` BREAKING: added `ResourceExt` trait moving the getters from `Resource` trait - #486
- * `kube`: `api` added a generic interface for subresources via `Request` - #487
- * `kube`: `api` fix bug in `PatchParams::dry_run` not being serialized correctly - #511
+ * see https://github.com/clux/kube-rs/compare/0.53.0...master
+
+0.53.0 / 2021-05-15
+===================
+ * `kube`: `admission` controller module added under feature - [#477](https://github.com/clux/kube-rs/issues/477) via [#484](https://github.com/clux/kube-rs/issues/484) + fixes in [#488](https://github.com/clux/kube-rs/issues/488) [#498](https://github.com/clux/kube-rs/issues/498) [#499](https://github.com/clux/kube-rs/issues/499) + [#507](https://github.com/clux/kube-rs/issues/507) + [#509](https://github.com/clux/kube-rs/issues/509)
+ * `kube`: `config` parsing of pem blobs now resilient against missing newlines - [#504](https://github.com/clux/kube-rs/issues/504) via [#505](https://github.com/clux/kube-rs/issues/505)
+ * `kube`: `discovery` module added to simplify dynamic api usage - [#491](https://github.com/clux/kube-rs/issues/491)
+ * `kube`: `api` BREAKING: `DynamicObject::namespace` renamed to `::within` - [#502](https://github.com/clux/kube-rs/issues/502)
+ * `kube`: `api` BREAKING: added `ResourceExt` trait moving the getters from `Resource` trait - [#486](https://github.com/clux/kube-rs/issues/486)
+ * `kube`: `api` added a generic interface for subresources via `Request` - [#487](https://github.com/clux/kube-rs/issues/487)
+ * `kube`: `api` fix bug in `PatchParams::dry_run` not being serialized correctly - [#511](https://github.com/clux/kube-rs/issues/511)
 
 0.52.0 / 2021-03-31
 ===================
