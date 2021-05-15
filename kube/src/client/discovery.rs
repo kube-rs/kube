@@ -19,6 +19,7 @@ impl GroupVersionData {
 }
 
 /// Describes one API group.
+/// TODO: Rename to ApiGroup
 pub struct Group {
     name: String,
     versions_and_resources: Vec<GroupVersionData>,

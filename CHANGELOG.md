@@ -13,6 +13,17 @@ UNRELEASED
  * `kube`: `api` added a generic interface for subresources via `Request` - [#487](https://github.com/clux/kube-rs/issues/487)
  * `kube`: `api` fix bug in `PatchParams::dry_run` not being serialized correctly - [#511](https://github.com/clux/kube-rs/issues/511)
 
+### 0.53.0 Migration Guide
+The most likely issue you'll run into is from `kube` when using `Resource` trait which has been split:
+
+```diff
++use kube::api::ResouceExt;
+-    let name = Resource::name(&foo);
+-    let ns = Resource::namespace(&foo).expect("foo is namespaced");
++    let name = ResourceExt::name(&foo);
++    let ns = ResourceExt::namespace(&foo).expect("foo is namespaced");
+```
+
 0.52.0 / 2021-03-31
 ===================
  * `kube-derive`: allow overriding `#[kube(plural)]` and `#[kube(singular)]` - [#458](https://github.com/clux/kube-rs/issues/458) via [#463](https://github.com/clux/kube-rs/issues/463)
