@@ -199,10 +199,10 @@ pub enum ConfigError {
     #[error("Failed to decode base64")]
     Base64Decode(#[source] base64::DecodeError),
 
-    #[error("Failed to compute the absolute path of '{path:?}'")]
+    #[error("Failed to compute the absolute path of {path:?}")]
     NoAbsolutePath { path: PathBuf },
 
-    #[error("Failed to read '{path:?}'")]
+    #[error("Failed to read {path:?}")]
     ReadFile {
         path: PathBuf,
         #[source]
