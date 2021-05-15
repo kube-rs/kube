@@ -145,7 +145,7 @@ pub struct AdmissionRequest<T: Resource> {
     pub operation: Operation,
     /// Information about the requesting user.
     pub user_info: UserInfo,
-    /// The object from the incoming request.
+    /// The object from the incoming request. It's None for DELETE operations.
     pub object: Option<T>,
     ///  The existing object. Only populated for DELETE and UPDATE requests.
     pub old_object: Option<T>,

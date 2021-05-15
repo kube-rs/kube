@@ -8,6 +8,7 @@ UNRELEASED
  * `kube`: `api` BREAKING: `DynamicObject::namespace` renamed to `::within` - #502
  * `kube`: `api` BREAKING: added `ResourceExt` trait moving the getters from `Resource` trait - #486
  * `kube`: `api` added a generic interface for subresources via `Request` - #487
+ * `kube`: `api` fix bug in `PatchParams::dry_run` not being serialized correctly - #511
 
 0.52.0 / 2021-03-31
 ===================
