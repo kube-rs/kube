@@ -130,12 +130,7 @@ impl<K: Resource> ObjectRef<K> {
 
     pub fn erase(self) -> ObjectRef<DynamicObject> {
         ObjectRef {
-            dyntype: kube::api::GroupVersionKind::gvk(
-                K::group(&self.dyntype).as_ref(),
-                K::version(&self.dyntype).as_ref(),
-                K::kind(&self.dyntype).as_ref(),
-            )
-            .expect("valid gvk"),
+            dyntype: kube::api::ApiResource::erase::<K>(&self.dyntype),
             name: self.name,
             namespace: self.namespace,
         }

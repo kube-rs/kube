@@ -70,10 +70,6 @@ pub enum Error {
     #[error("Request validation failed with {0}")]
     RequestValidation(String),
 
-    /// A dynamic type conversion failure
-    #[error("Dynamic type conversion failed {0}")]
-    DynamicType(String),
-
     /// Configuration error
     #[error("Error loading kubeconfig: {0}")]
     Kubeconfig(#[from] ConfigError),

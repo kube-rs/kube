@@ -1,6 +1,6 @@
 use futures::prelude::*;
 use kube::{
-    api::{DynamicObject, GroupVersionKind, ListParams, ResourceExt},
+    api::{ApiResource, DynamicObject, GroupVersionKind, ListParams, ResourceExt},
     Api, Client,
 };
 use kube_runtime::{utils::try_flatten_applied, watcher};
@@ -18,9 +18,20 @@ async fn main() -> anyhow::Result<()> {
     let kind = env::var("KIND").unwrap_or_else(|_| "Foo".into());
 
     // Turn them into a GVK
-    let gvk = GroupVersionKind::gvk(&group, &version, &kind)?;
+    let gvk = GroupVersionKind::gvk(&group, &version, &kind);
+    let mut api_resource = ApiResource::from_gvk(&gvk);
+
+    if let Some(resource) = env::var("RESOURCE").ok() {
+        api_resource.plural = resource;
+    } else {
+        println!(
+            "Using inferred plural name (use RESOURCE to override): {}",
+            api_resource.plural
+        );
+    }
+
     // Use them in an Api with the GVK as its DynamicType
-    let api = Api::<DynamicObject>::all_with(client, &gvk);
+    let api = Api::<DynamicObject>::all_with(client, &api_resource);
 
     // Fully compatible with kube-runtime
     let watcher = watcher(api, ListParams::default());
