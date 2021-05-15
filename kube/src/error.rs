@@ -14,22 +14,23 @@ pub enum Error {
     /// It's also used in `WatchEvent` from watch calls.
     ///
     /// It's quite common to get a `410 Gone` when the `resourceVersion` is too old.
-    #[error("ApiError: {0} ({0:?})")]
+    #[error("ApiError")]
     Api(#[source] ErrorResponse),
 
     /// ConnectionError for when TcpStream fails to connect.
-    #[error("ConnectionError: {0}")]
-    Connection(std::io::Error),
+    #[error("ConnectionError")]
+    Connection(#[source] std::io::Error),
 
     /// Hyper error
-    #[error("HyperError: {0}")]
+    #[error("HyperError")]
     HyperError(#[from] hyper::Error),
+
     /// Service error
-    #[error("ServiceError: {0}")]
-    Service(tower::BoxError),
+    #[error("ServiceError")]
+    Service(#[source] tower::BoxError),
 
     /// UTF-8 Error
-    #[error("UTF-8 Error: {0}")]
+    #[error("UTF-8 Error")]
     FromUtf8(#[from] std::string::FromUtf8Error),
 
     /// Returned when failed to find a newline character within max length.
@@ -39,15 +40,15 @@ pub enum Error {
     LinesCodecMaxLineLengthExceeded,
 
     /// Returned on `std::io::Error` when reading event stream.
-    #[error("Error reading events stream: {0}")]
-    ReadEvents(std::io::Error),
+    #[error("Error reading events stream")]
+    ReadEvents(#[source] std::io::Error),
 
     /// Http based error
-    #[error("HttpError: {0}")]
+    #[error("HttpError")]
     HttpError(#[from] http::Error),
 
     /// Url conversion error
-    #[error("InternalUrlError: {0}")]
+    #[error("InternalUrlError")]
     InternalUrlError(#[from] url::ParseError),
 
     /// Common error case when requesting parsing into own structs
@@ -75,7 +76,7 @@ pub enum Error {
     DynamicType(String),
 
     /// Configuration error
-    #[error("Error loading kubeconfig: {0}")]
+    #[error("Error loading kubeconfig")]
     Kubeconfig(#[from] ConfigError),
 
     /// An error with configuring SSL occured
@@ -84,7 +85,7 @@ pub enum Error {
 
     /// An error from openssl when handling configuration
     #[cfg(feature = "native-tls")]
-    #[error("OpensslError: {0}")]
+    #[error("OpensslError")]
     OpensslError(#[from] openssl::error::ErrorStack),
 
     /// The server did not respond with [`SWITCHING_PROTOCOLS`] status when upgrading the
@@ -126,10 +127,10 @@ pub enum Error {
 #[allow(missing_docs)]
 /// Possible errors when loading config
 pub enum ConfigError {
-    #[error("Invalid basic auth: {0}")]
+    #[error("Invalid basic auth")]
     InvalidBasicAuth(#[source] InvalidHeaderValue),
 
-    #[error("Invalid bearer token: {0}")]
+    #[error("Invalid bearer token")]
     InvalidBearerToken(#[source] InvalidHeaderValue),
 
     #[error("Tried to refresh a token and got a non-refreshable token response")]
@@ -149,6 +150,7 @@ pub enum ConfigError {
 
     #[error("Merging kubeconfig with mismatching kind")]
     KindMismatch,
+
     #[error("Merging kubeconfig with mismatching apiVersion")]
     ApiVersionMismatch,
 
@@ -159,69 +161,79 @@ pub enum ConfigError {
         portenv: &'static str,
     },
 
-    #[error("Unable to load incluster default namespace: {0}")]
+    #[error("Unable to load incluster default namespace")]
     InvalidInClusterNamespace(#[source] Box<Error>),
 
-    #[error("Unable to load in cluster token: {0}")]
+    #[error("Unable to load in cluster token")]
     InvalidInClusterToken(#[source] Box<Error>),
 
-    #[error("Malformed url: {0}")]
+    #[error("Malformed url")]
     MalformedUrl(#[from] url::ParseError),
 
     #[error("exec-plugin response did not contain a status")]
     ExecPluginFailed,
 
-    #[error("Malformed token expiration date: {0}")]
+    #[error("Malformed token expiration date")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
     #[cfg(feature = "oauth")]
     #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
-    #[error("OAuth Error: {0}")]
+    #[error("OAuth Error")]
     OAuth(#[from] OAuthError),
 
-    #[error("Unable to load config file: {0}")]
+    #[error("Unable to load config file")]
     LoadConfigFile(#[source] Box<Error>),
+
     #[error("Unable to load current context: {context_name}")]
     LoadContext { context_name: String },
+
     #[error("Unable to load cluster of context: {cluster_name}")]
     LoadClusterOfContext { cluster_name: String },
+
     #[error("Unable to find named user: {user_name}")]
     FindUser { user_name: String },
 
     #[error("Unable to find path of kubeconfig")]
     NoKubeconfigPath,
 
-    #[error("Failed to decode base64: {0}")]
+    #[error("Failed to decode base64")]
     Base64Decode(#[source] base64::DecodeError),
+
     #[error("Failed to compute the absolute path of '{path:?}'")]
     NoAbsolutePath { path: PathBuf },
-    #[error("Failed to read '{path:?}': {source}")]
+
+    #[error("Failed to read '{path:?}'")]
     ReadFile {
         path: PathBuf,
         #[source]
         source: std::io::Error,
     },
+
     #[error("Failed to get data/file with base64 format")]
     NoBase64FileOrData,
+
     #[error("Failed to get data/file")]
     NoFileOrData,
 
-    #[error("Failed to parse Kubeconfig YAML: {0}")]
+    #[error("Failed to parse Kubeconfig YAML")]
     ParseYaml(#[source] serde_yaml::Error),
 
     #[error("Failed to find a single YAML document in Kubeconfig: {0}")]
     EmptyKubeconfig(PathBuf),
 
-    #[error("Unable to run auth exec: {0}")]
+    #[error("Unable to run auth exec")]
     AuthExecStart(#[source] std::io::Error),
+
     #[error("Auth exec command '{cmd}' failed with status {status}: {out:?}")]
     AuthExecRun {
         cmd: String,
         status: std::process::ExitStatus,
         out: std::process::Output,
     },
-    #[error("Failed to parse auth exec output: {0}")]
+
+    #[error("Failed to parse auth exec output")]
     AuthExecParse(#[source] serde_json::Error),
+
     #[error("Failed exec auth: {0}")]
     AuthExec(String),
 }
@@ -233,23 +245,31 @@ pub enum ConfigError {
 #[allow(missing_docs)]
 /// Possible errors when requesting token with OAuth
 pub enum OAuthError {
-    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
     /// Missing GOOGLE_APPLICATION_CREDENTIALS env
+    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
     MissingGoogleCredentials,
-    #[error("Unable to load OAuth credentials file: {0}")]
+
+    #[error("Unable to load OAuth credentials file")]
     LoadCredentials(#[source] std::io::Error),
-    #[error("Unable to parse OAuth credentials file: {0}")]
+
+    #[error("Unable to parse OAuth credentials file")]
     ParseCredentials(#[source] serde_json::Error),
-    #[error("Credentials file had invalid key format: {0}")]
+
+    #[error("Credentials file had invalid key format")]
     InvalidKeyFormat(#[source] tame_oauth::Error),
-    #[error("Credentials file had invalid RSA key: {0}")]
+
+    #[error("Credentials file had invalid RSA key")]
     InvalidRsaKey(#[source] tame_oauth::Error),
-    #[error("Unable to request token: {0}")]
+
+    #[error("Unable to request token")]
     RequestToken(#[source] hyper::Error),
+
     #[error("Fail to retrieve new credential {0:?}")]
     RetrieveCredentials(#[source] tame_oauth::Error),
-    #[error("Unable to parse token: {0}")]
+
+    #[error("Unable to parse token")]
     ParseToken(#[source] serde_json::Error),
+
     #[error("Unknown OAuth error: {0}")]
     Unknown(String),
 }
