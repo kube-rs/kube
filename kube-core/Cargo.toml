@@ -1,0 +1,20 @@
+[package]
+name = "kube-core"
+description = "Type definitions used amongst workspace crates"
+version = "0.53.0"
+authors = [
+  "clux <sszynrae@gmail.com>",
+  "kazk <kazk.dev@gmail.com>",
+]
+edition = "2018"
+license = "Apache-2.0"
+repository = "https://github.com/clux/kube-rs"
+readme = "../README.md"
+
+[dependencies]
+serde = { version = "1.0.118", features = ["derive"] }
+
+[dependencies.k8s-openapi]
+version = "0.11.0"
+default-features = false
+features = []
