@@ -16,21 +16,21 @@ pub enum Scope {
 /// Defines standard verbs
 pub mod verbs {
     /// Create a resource
-    pub const CREATE: &'static str = "create";
+    pub const CREATE: &str = "create";
     /// Get single resource
-    pub const GET: &'static str = "get";
+    pub const GET: &str = "get";
     /// List objects
-    pub const LIST: &'static str = "list";
+    pub const LIST: &str = "list";
     /// Watch for objects changes
-    pub const WATCH: &'static str = "watch";
+    pub const WATCH: &str = "watch";
     /// Delete single object
-    pub const DELETE: &'static str = "delete";
+    pub const DELETE: &str = "delete";
     /// Delete multiple objects at once
-    pub const DELETE_COLLECTION: &'static str = "deletecollection";
+    pub const DELETE_COLLECTION: &str = "deletecollection";
     /// Update an object
-    pub const UPDATE: &'static str = "update";
+    pub const UPDATE: &str = "update";
     /// Patch an object
-    pub const PATCH: &'static str = "patch";
+    pub const PATCH: &str = "patch";
 }
 
 /// Contains additional, detailed information abount API resource
@@ -283,7 +283,7 @@ impl Group {
             .find(|ver_data| ver_data.version == ver)
             .map(|ver_data| ver_data.resources.as_slice())
             .unwrap_or(&[]);
-        resources.iter().cloned().collect()
+        resources.to_vec()
     }
 }
 

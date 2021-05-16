@@ -58,8 +58,8 @@ impl ApiResource {
         ApiResource {
             group,
             version,
-            kind,
             api_version,
+            kind,
             plural,
         }
     }

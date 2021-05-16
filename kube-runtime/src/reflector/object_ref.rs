@@ -80,7 +80,7 @@ impl<K: Resource> ObjectRef<K> {
         self
     }
 
-    /// Creates ObjectRef from the resource and dynamic type.
+    /// Creates `ObjectRef` from the resource and dynamic type.
     /// Panics if name is missing (name always exists if the object
     /// was returned from the apiserver)
     #[must_use]
