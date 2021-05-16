@@ -9,11 +9,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Deserialize, Serialize, Default, Debug)]
 pub struct NotUsed {}
 
-pub(crate) mod params;
+pub(crate) use kube_core::params;
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
 };
-mod request;
+use kube_core::request;
 pub use request::Request;
 
 pub(crate) mod typed;

@@ -224,8 +224,9 @@ impl Request {
 /// Cheap sanity check to ensure type maps work as expected
 #[cfg(test)]
 mod test {
-    use crate::api::{PostParams, Request, Resource};
-
+    use crate::params::PostParams;
+    use crate::request::Request;
+    use crate::resource::Resource;
     use k8s::{
         admissionregistration::v1beta1 as adregv1beta1,
         apps::v1 as appsv1,
@@ -341,7 +342,7 @@ mod test {
 
     /// -----------------------------------------------------------------
     /// Tests that the misc mappings are also sensible
-    use crate::api::{DeleteParams, ListParams, Patch, PatchParams};
+    use crate::params::{DeleteParams, ListParams, Patch, PatchParams};
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiextsv1beta1;
 
     #[test]

@@ -273,3 +273,13 @@ pub struct ErrorResponse {
     /// The error code
     pub code: u16,
 }
+
+impl From<kube_core::Error> for Error {
+    fn from(error: kube_core::Error) -> Self {
+        match error {
+            kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
+            kube_core::Error::SerdeError(e) => Error::SerdeError(e),
+            kube_core::Error::HttpError(e) => Error::HttpError(e)
+        }
+    }
+}
