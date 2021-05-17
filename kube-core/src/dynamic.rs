@@ -1,8 +1,7 @@
-use crate::api::{metadata::TypeMeta, Resource};
+pub use crate::api_resource::ApiResource;
+use crate::{metadata::TypeMeta, resource::Resource};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use std::borrow::Cow;
-
-pub use kube_core::api_resource::ApiResource;
 
 /// A dynamic representation of a kubernetes object
 ///
@@ -84,9 +83,12 @@ impl Resource for DynamicObject {
 #[cfg(test)]
 mod test {
     use crate::{
-        api::{
-            ApiResource, DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams, Request, Resource,
-        },
+        api_resource::ApiResource,
+        dynamic::DynamicObject,
+        gvk::GroupVersionKind,
+        params::{Patch, PatchParams, PostParams},
+        request::Request,
+        resource::Resource,
         Result,
     };
     #[test]

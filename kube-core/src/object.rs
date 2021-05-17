@@ -1,6 +1,6 @@
 use crate::{
-    api::metadata::{ListMeta, ObjectMeta, TypeMeta},
-    error::ErrorResponse,
+    metadata::{ListMeta, ObjectMeta, TypeMeta},
+    ErrorResponse,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
