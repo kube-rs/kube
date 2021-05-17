@@ -2,6 +2,7 @@ use thiserror::Error;
 
 pub mod api_resource;
 pub mod gvk;
+pub mod dynamic;
 pub mod params;
 pub mod request;
 pub mod resource;
