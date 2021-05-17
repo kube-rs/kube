@@ -36,7 +36,7 @@ pub use subresource::{EvictParams, Evictable, LogParams, Loggable, ScaleSpec, Sc
 pub(crate) mod object;
 pub use self::object::{Object, ObjectList, WatchEvent};
 
-mod metadata;
+use kube_core::metadata;
 pub use self::metadata::{ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta};
 
 #[cfg(feature = "admission")] pub mod admission;

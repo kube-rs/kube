@@ -5,6 +5,7 @@ pub mod gvk;
 pub mod params;
 pub mod request;
 pub mod resource;
+pub mod metadata;
 pub mod subresource;
 
 #[macro_use] extern crate log;
