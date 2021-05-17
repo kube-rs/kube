@@ -116,8 +116,7 @@ impl GroupVersionData {
 }
 
 /// Describes one API group.
-/// TODO: Rename to ApiGroup
-pub struct Group {
+pub struct ApiGroup {
     name: String,
     versions_and_resources: Vec<GroupVersionData>,
     preferred_version: Option<String>,
@@ -136,7 +135,7 @@ pub struct Group {
 /// or `Object`). Latter provides additional information such
 /// as scope or supported verbs.
 pub struct Discovery {
-    groups: HashMap<String, Group>,
+    groups: HashMap<String, ApiGroup>,
 }
 
 // TODO: this is pretty unoptimized
@@ -160,7 +159,7 @@ impl Discovery {
 
                 v.push(GroupVersionData::new(vers.version, resource_list));
             }
-            groups.insert(g.name.clone(), Group {
+            groups.insert(g.name.clone(), ApiGroup {
                 name: g.name,
                 versions_and_resources: v,
                 preferred_version: g.preferred_version.map(|v| v.version),
@@ -173,8 +172,8 @@ impl Discovery {
             let resource_list = client.list_core_api_resources(&core_ver).await?;
             core_v.push(GroupVersionData::new(core_ver, resource_list));
         }
-        groups.insert(Group::CORE_GROUP.to_string(), Group {
-            name: Group::CORE_GROUP.to_string(),
+        groups.insert(ApiGroup::CORE_GROUP.to_string(), ApiGroup {
+            name: ApiGroup::CORE_GROUP.to_string(),
             versions_and_resources: core_v,
             preferred_version: Some("v1".to_string()),
         });
@@ -189,17 +188,17 @@ impl Discovery {
     pub fn parse_api_version(api_version: &str) -> Option<(&str, &str)> {
         let mut iter = api_version.rsplitn(2, '/');
         let version = iter.next()?;
-        let group = iter.next().unwrap_or(Group::CORE_GROUP);
+        let group = iter.next().unwrap_or(ApiGroup::CORE_GROUP);
         Some((group, version))
     }
 
     /// Returns iterator over all served groups
-    pub fn groups(&self) -> impl Iterator<Item = &Group> {
+    pub fn groups(&self) -> impl Iterator<Item = &ApiGroup> {
         self.groups.iter().map(|(_, group)| group)
     }
 
     /// Returns information about the group `g`, if it is served.
-    pub fn group(&self, g: &str) -> Option<&Group> {
+    pub fn group(&self, g: &str) -> Option<&ApiGroup> {
         self.groups.get(g)
     }
 
@@ -227,7 +226,7 @@ impl Discovery {
     }
 }
 
-impl Group {
+impl ApiGroup {
     /// Core group name
     pub const CORE_GROUP: &'static str = "core";
 
@@ -265,7 +264,6 @@ impl Group {
     /// Returns preferred version for working with given group.
     /// If server does not recommend one, this function picks
     /// "the most stable and the most recent" version.
-
     pub fn preferred_version_or_guess(&self) -> &str {
         match &self.preferred_version {
             Some(v) => v,
