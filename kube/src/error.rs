@@ -279,7 +279,7 @@ impl From<kube_core::Error> for Error {
         match error {
             kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
             kube_core::Error::SerdeError(e) => Error::SerdeError(e),
-            kube_core::Error::HttpError(e) => Error::HttpError(e)
+            kube_core::Error::HttpError(e) => Error::HttpError(e),
         }
     }
 }

@@ -12,8 +12,7 @@ use crate::{
 
 pub use kube_core::subresource::{EvictParams, LogParams};
 
-#[cfg(feature = "ws")]
-pub use kube_core::subresource::AttachParams;
+#[cfg(feature = "ws")] pub use kube_core::subresource::AttachParams;
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 

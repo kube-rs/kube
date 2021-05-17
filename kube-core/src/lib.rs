@@ -2,9 +2,9 @@ use thiserror::Error;
 
 pub mod api_resource;
 pub mod gvk;
-pub mod resource;
 pub mod params;
 pub mod request;
+pub mod resource;
 pub mod subresource;
 
 #[macro_use] extern crate log;

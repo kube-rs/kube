@@ -10,10 +10,10 @@ use serde::{Deserialize, Serialize};
 pub struct NotUsed {}
 
 pub(crate) use kube_core::params;
+use kube_core::request;
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
 };
-use kube_core::request;
 pub use request::Request;
 
 pub(crate) mod typed;

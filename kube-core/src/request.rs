@@ -224,9 +224,7 @@ impl Request {
 /// Cheap sanity check to ensure type maps work as expected
 #[cfg(test)]
 mod test {
-    use crate::params::PostParams;
-    use crate::request::Request;
-    use crate::resource::Resource;
+    use crate::{params::PostParams, request::Request, resource::Resource};
     use k8s::{
         admissionregistration::v1beta1 as adregv1beta1,
         apps::v1 as appsv1,

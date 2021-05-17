@@ -167,16 +167,16 @@ pub struct AdmissionRequest<T: Resource> {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Operation {
     /// An operation that creates a resource.
-    #[serde(rename="CREATE")]
+    #[serde(rename = "CREATE")]
     Create,
     /// An operation that updates a resource.
-    #[serde(rename="UPDATE")]
+    #[serde(rename = "UPDATE")]
     Update,
     /// An operation that deletes a resource.
-    #[serde(rename="DELETE")]
+    #[serde(rename = "DELETE")]
     Delete,
     /// An operation that connects to a resource.
-    #[serde(rename="CONNECT")]
+    #[serde(rename = "CONNECT")]
     Connect,
 }
 
