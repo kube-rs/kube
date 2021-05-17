@@ -344,8 +344,8 @@ where
         selector.push(self_watcher);
         Self {
             selector,
-            reader,
             dyntype,
+            reader,
         }
     }
 

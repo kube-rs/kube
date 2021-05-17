@@ -19,11 +19,11 @@ use k8s_openapi::{
 use serde::{Deserialize, Serialize};
 
 /// The `kind` field in [`TypeMeta`].
-pub const META_KIND: &'static str = "AdmissionReview";
+pub const META_KIND: &str = "AdmissionReview";
 /// The `api_version` field in [`TypeMeta`] on the v1 version.
-pub const META_API_VERSION_V1: &'static str = "admission.k8s.io/v1";
+pub const META_API_VERSION_V1: &str = "admission.k8s.io/v1";
 /// The `api_version` field in [`TypeMeta`] on the v1beta1 version.
-pub const META_API_VERSION_V1BETA1: &'static str = "admission.k8s.io/v1beta1";
+pub const META_API_VERSION_V1BETA1: &str = "admission.k8s.io/v1beta1";
 
 /// The top level struct used for Serializing and Deserializing AdmissionReview
 /// requests and responses.
@@ -167,13 +167,17 @@ pub struct AdmissionRequest<T: Resource> {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Operation {
     /// An operation that creates a resource.
-    CREATE,
+    #[serde(rename="CREATE")]
+    Create,
     /// An operation that updates a resource.
-    UPDATE,
+    #[serde(rename="UPDATE")]
+    Update,
     /// An operation that deletes a resource.
-    DELETE,
+    #[serde(rename="DELETE")]
+    Delete,
     /// An operation that connects to a resource.
-    CONNECT,
+    #[serde(rename="CONNECT")]
+    Connect,
 }
 
 /// An outgoing [`AdmissionReview`] response. Constructed from the corresponding
