@@ -97,7 +97,7 @@ jobs:
       - run: cargo test -p kube-runtime
       - run: cargo test -p kube
       - run: cargo test -p kube-derive
-      - run: cargo test -p kube-core --features k8s-openapi/v1_20
+      - run: cargo test -p kube-core
       - run: cargo test --lib --all -j4
       - run: cargo test --doc --all -j4
       - run: cargo test -j4 -p examples
@@ -135,7 +135,7 @@ jobs:
       - run: cargo test -p kube-runtime
       - run: cargo test -p kube
       - run: cargo test -p kube-derive
-      - run: cargo test -p kube-core --features k8s-openapi/v1_20
+      - run: cargo test -p kube-core
       - run: cargo test --lib --all -j4
       - run: cargo test --doc --all -j4
       - run: cargo test -j4 -p examples
