@@ -14,6 +14,8 @@ readme = "../README.md"
 [features]
 ws = []
 admission = ["json-patch"]
+jsonpatch = ["json-patch"]
+derive = []
 
 [dependencies]
 serde = { version = "1.0.118", features = ["derive"] }
