@@ -6,7 +6,10 @@
 //! https://github.com/kubernetes/api/blob/master/admission/v1/types.go
 
 use crate::{
-    api::{DynamicObject, GroupVersionKind, GroupVersionResource, Resource, TypeMeta},
+    dynamic::DynamicObject,
+    gvk::{GroupVersionKind, GroupVersionResource},
+    metadata::TypeMeta,
+    resource::Resource,
     Error, Result,
 };
 
@@ -338,8 +341,8 @@ mod test {
     use std::convert::TryInto;
 
     use crate::{
-        api::admission::{AdmissionResponse, AdmissionReview, DynamicObject},
-        Result,
+        admission::{AdmissionResponse, AdmissionReview},
+        DynamicObject, Result,
     };
 
     #[test]

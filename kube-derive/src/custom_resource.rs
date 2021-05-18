@@ -164,8 +164,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
-                    api_version: <#rootident as kube_core::resource::Resource>::api_version(&()).to_string(),
-                    kind: <#rootident as kube_core::resource::Resource>::kind(&()).to_string(),
+                    api_version: <#rootident as kube_core::Resource>::api_version(&()).to_string(),
+                    kind: <#rootident as kube_core::Resource>::kind(&()).to_string(),
                     metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         name: Some(name.to_string()),
                         ..Default::default()
@@ -184,7 +184,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     let api_ver = format!("{}/{}", group, version);
     let impl_resource = quote! {
-        impl kube_core::resource::Resource for #rootident {
+        impl kube_core::Resource for #rootident {
             type DynamicType = ();
 
             fn group(_: &()) -> std::borrow::Cow<'_, str> {
@@ -223,8 +223,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             impl Default for #rootident {
                 fn default() -> Self {
                     Self {
-                        api_version: <#rootident as kube_core::resource::Resource>::api_version(&()).to_string(),
-                        kind: <#rootident as kube_core::resource::Resource>::kind(&()).to_string(),
+                        api_version: <#rootident as kube_core::Resource>::api_version(&()).to_string(),
+                        kind: <#rootident as kube_core::Resource>::kind(&()).to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
                         #statusdef
