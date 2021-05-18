@@ -1,11 +1,14 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.53.0...master
- * `kube`: `api` `discovery` module now uses a new `ApiResource` struct #495
+ * see https://github.com/clux/kube-rs/compare/0.54.0...master
+
+0.54.0 / 2021-05-18
+===================
+ * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/clux/kube-rs/issues/495)
  * `kube`: `api` BREAKING: `DynamicObject` now takes an `ApiResource` rather than a `GroupVersionKind`
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
- * `kube-core` crate factored out of `kube` to reduce dependencies - #516 via #517 + #519 + #522
+ * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/clux/kube-rs/issues/516) via [#517](https://github.com/clux/kube-rs/issues/517) + [#519](https://github.com/clux/kube-rs/issues/519) + [#522](https://github.com/clux/kube-rs/issues/522)
 
 0.53.0 / 2021-05-15
 ===================
