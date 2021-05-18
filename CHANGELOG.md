@@ -5,7 +5,7 @@ UNRELEASED
  * `kube`: `api` `discovery` module now uses a new `ApiResource` struct #495
  * `kube`: `api` BREAKING: `DynamicObject` now takes an `ApiResource` rather than a `GroupVersionKind`
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
- * `kube-core` crate factored out of `kube` to reduce dependencies - #516 via #517
+ * `kube-core` crate factored out of `kube` to reduce dependencies - #516 via #517 + #519 + #522
 
 0.53.0 / 2021-05-15
 ===================
