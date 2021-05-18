@@ -1,7 +1,8 @@
 //! High-level utilities for runtime API discovery.
 
-use crate::{api::ApiResource, Client};
+use crate::Client;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResourceList;
+use kube_core::ApiResource;
 use std::{cmp::Reverse, collections::HashMap};
 
 /// Resource scope

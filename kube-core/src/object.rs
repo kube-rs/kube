@@ -215,3 +215,12 @@ impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
         self.items.iter_mut()
     }
 }
+
+// -------------------------------------------------------
+
+/// Empty struct for when data should be discarded
+///
+/// Not using [`()`](https://doc.rust-lang.org/stable/std/primitive.unit.html), because serde's
+/// [`Deserialize`](serde::Deserialize) `impl` is too strict.
+#[derive(Clone, Deserialize, Serialize, Default, Debug)]
+pub struct NotUsed {}

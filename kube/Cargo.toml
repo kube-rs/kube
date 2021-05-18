@@ -24,7 +24,7 @@ jsonpatch = ["json-patch"]
 ws = ["tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["tame-oauth"]
 gzip = ["async-compression"]
-admission = ["json-patch"]
+admission = ["json-patch", "kube-core/admission"]
 
 [package.metadata.docs.rs]
 features = ["derive", "ws", "oauth", "jsonpatch"]

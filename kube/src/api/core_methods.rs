@@ -1,100 +1,11 @@
 use either::Either;
 use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, iter};
+use std::fmt::Debug;
 use tracing::instrument;
 
-use crate::{
-    api::{
-        DeleteParams, ListParams, ObjectList, Patch, PatchParams, PostParams, Request, Resource, WatchEvent,
-    },
-    client::{Client, Status},
-    Result,
-};
-
-/// A generic Api abstraction
-///
-/// This abstracts over a [`Resource`] and a type `K` so that
-/// we get automatic serialization/deserialization on the api calls
-/// implemented by the dynamic [`Resource`].
-#[derive(Clone)]
-pub struct Api<K> {
-    /// The request builder object with its resource dependent url
-    pub(crate) request: Request,
-    /// The client to use (from this library)
-    pub(crate) client: Client,
-    /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
-    /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
-    /// is `Send`, even if `K` may not be).
-    pub(crate) phantom: iter::Empty<K>,
-}
-
-/// Api constructors for Resource implementors with Default DynamicTypes
-///
-/// This generally means structs implementing `k8s_openapi::Resource`.
-impl<K: Resource> Api<K>
-where
-    <K as Resource>::DynamicType: Default,
-{
-    /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all(client: Client) -> Self {
-        let url = K::url_path(&Default::default(), None);
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: iter::empty(),
-        }
-    }
-
-    /// Namespaced resource within a given namespace
-    pub fn namespaced(client: Client, ns: &str) -> Self {
-        let url = K::url_path(&Default::default(), Some(ns));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: iter::empty(),
-        }
-    }
-}
-
-/// Api constructors for Resource implementors with custom DynamicTypes
-///
-/// This generally means resources created via [`DynamicObject`](crate::api::DynamicObject).
-impl<K: Resource> Api<K> {
-    /// Cluster level resources, or resources viewed across all namespaces
-    ///
-    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
-        let url = K::url_path(dyntype, None);
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: iter::empty(),
-        }
-    }
-
-    /// Namespaced resource within a given namespace
-    ///
-    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
-        let url = K::url_path(dyntype, Some(ns));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: iter::empty(),
-        }
-    }
-
-    /// Consume self and return the [`Client`]
-    pub fn into_client(self) -> Client {
-        self.into()
-    }
-
-    /// Return a reference to the current resource url path
-    pub fn resource_url(&self) -> &str {
-        &self.request.url_path
-    }
-}
+use crate::{api::Api, client::Status, Result};
+use kube_core::{object::ObjectList, params::*, WatchEvent};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
@@ -374,11 +285,5 @@ where
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
         let req = self.request.watch(&lp, &version)?;
         self.client.request_events::<K>(req).await
-    }
-}
-
-impl<K> From<Api<K>> for Client {
-    fn from(api: Api<K>) -> Self {
-        api.client
     }
 }
