@@ -1,7 +1,7 @@
 //! Error handling in [`kube`][crate]
 
 use http::header::InvalidHeaderValue;
-use serde::{Deserialize, Serialize};
+pub use kube_core::ErrorResponse;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -258,28 +258,12 @@ impl From<OAuthError> for Error {
     }
 }
 
-/// An error response from the API.
-#[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
-#[error("{message}: {reason}")]
-pub struct ErrorResponse {
-    /// The status
-    pub status: String,
-    /// A message about the error
-    #[serde(default)]
-    pub message: String,
-    /// The reason for the error
-    #[serde(default)]
-    pub reason: String,
-    /// The error code
-    pub code: u16,
-}
-
 impl From<kube_core::Error> for Error {
     fn from(error: kube_core::Error) -> Self {
         match error {
             kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
             kube_core::Error::SerdeError(e) => Error::SerdeError(e),
-            kube_core::Error::HttpError(e) => Error::HttpError(e)
+            kube_core::Error::HttpError(e) => Error::HttpError(e),
         }
     }
 }

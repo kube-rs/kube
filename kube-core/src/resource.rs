@@ -1,8 +1,7 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
-use std::collections::BTreeMap;
-use std::borrow::Cow;
 use once_cell::sync::Lazy;
+use std::{borrow::Cow, collections::BTreeMap};
 
 /// An accessor trait for a kubernetes Resource.
 ///

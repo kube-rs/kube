@@ -9,21 +9,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Deserialize, Serialize, Default, Debug)]
 pub struct NotUsed {}
 
-pub(crate) use kube_core::params;
-pub use params::{
-    DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
-};
-use kube_core::request;
-pub use request::Request;
-
 pub(crate) mod typed;
 pub use typed::Api;
-
-mod gvk;
-pub use gvk::{GroupVersionKind, GroupVersionResource};
-
-mod dynamic;
-pub use dynamic::{ApiResource, DynamicObject};
 
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
@@ -33,10 +20,17 @@ mod subresource;
 pub use subresource::{AttachParams, Attachable, Executable};
 pub use subresource::{EvictParams, Evictable, LogParams, Loggable, ScaleSpec, ScaleStatus};
 
-pub(crate) mod object;
-pub use self::object::{Object, ObjectList, WatchEvent};
-
-mod metadata;
-pub use self::metadata::{ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta};
+// Re-exports from kube-core
+pub(crate) use kube_core::params;
+pub use kube_core::{
+    dynamic::{ApiResource, DynamicObject},
+    gvk::{GroupVersionKind, GroupVersionResource},
+    metadata::{ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta},
+    object::{Object, ObjectList, WatchEvent},
+    request::Request,
+};
+pub use params::{
+    DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
+};
 
 #[cfg(feature = "admission")] pub mod admission;

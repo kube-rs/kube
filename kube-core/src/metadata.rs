@@ -1,11 +1,9 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
 
-pub use kube_core::resource::{Resource, ResourceExt};
+pub use crate::resource::{Resource, ResourceExt};
 
-/// A convenience struct for ad-hoc serialization.
-///
-/// Mostly useful for [`Object`](super::Object).
+/// Type information that is flattened into every kubernetes object
 #[derive(Deserialize, Serialize, Clone, Default, Debug, Eq, PartialEq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct TypeMeta {

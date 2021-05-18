@@ -1,5 +1,4 @@
-use crate::gvk::GroupVersionKind;
-use crate::resource::Resource;
+use crate::{gvk::GroupVersionKind, resource::Resource};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource;
 
 /// Contains information about Kubernetes API resources
