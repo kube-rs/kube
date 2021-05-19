@@ -1,6 +1,6 @@
 //! API helpers for structured interaction with the Kubernetes API
 
-
+mod dynamic;
 mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
