@@ -82,13 +82,22 @@ assert_cfg!(
     ),
     "Must use exactly one of native-tls or rustls-tls features"
 );
+assert_cfg!(
+    any(
+        not(feature = "client"),
+        all(feature = "config", feature = "client")
+    ),
+    "Must use client with config feature"
+);
 
-#[macro_use] extern crate log;
+#[allow(unused_imports)]
+#[macro_use]
+extern crate log;
 
-pub mod api;
-pub mod client;
-pub mod config;
-pub mod service;
+#[cfg(feature = "client")] pub mod api;
+#[cfg(feature = "client")] pub mod client;
+#[cfg(feature = "config")] pub mod config;
+#[cfg(feature = "client")] pub mod service;
 
 pub mod error;
 
@@ -96,11 +105,30 @@ pub mod error;
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-pub use api::{Api, Resource, ResourceExt};
-#[doc(inline)] pub use client::Client;
-#[doc(inline)] pub use config::Config;
+#[cfg(feature = "client")] pub use api::Api;
+#[cfg(feature = "client")]
+#[doc(inline)]
+pub use client::Client;
+#[cfg(feature = "config")]
+#[doc(inline)]
+pub use config::Config;
 #[doc(inline)] pub use error::Error;
-#[doc(inline)] pub use service::Service;
+#[cfg(feature = "client")]
+#[doc(inline)]
+pub use service::Service;
+
+/// Re-exports from kube_core crate.
+pub mod core {
+    pub use kube_core::{
+        dynamic::{ApiResource, DynamicObject},
+        gvk::{GroupVersionKind, GroupVersionResource},
+        metadata::{ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta},
+        object::{NotUsed, Object, ObjectList, WatchEvent},
+        request::Request,
+        response::Status,
+    };
+}
+pub use crate::core::{Resource, ResourceExt};
 
 /// Convient alias for `Result<T, Error>`
 pub type Result<T, E = Error> = std::result::Result<T, E>;

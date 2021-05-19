@@ -21,6 +21,8 @@ pub use request::Request;
 mod resource;
 pub use resource::{Resource, ResourceExt};
 
+pub mod response;
+
 pub mod subresource;
 
 #[macro_use] extern crate log;

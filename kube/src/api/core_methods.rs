@@ -4,8 +4,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 use tracing::instrument;
 
-use crate::{api::Api, client::Status, Result};
-use kube_core::{object::ObjectList, params::*, WatchEvent};
+use crate::{api::Api, Result};
+use kube_core::{object::ObjectList, params::*, response::Status, WatchEvent};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>

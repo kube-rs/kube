@@ -6,10 +6,10 @@ use tracing::instrument;
 
 use crate::{
     api::{Api, Patch, PatchParams, PostParams},
-    client::Status,
     Result,
 };
 
+use kube_core::response::Status;
 pub use kube_core::subresource::{EvictParams, LogParams};
 
 #[cfg(feature = "ws")] pub use kube_core::subresource::AttachParams;

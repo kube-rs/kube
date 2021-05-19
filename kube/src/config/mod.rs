@@ -12,7 +12,7 @@ mod utils;
 use crate::{error::ConfigError, Result};
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
-pub(crate) use utils::read_file_to_string;
+#[allow(unused_imports)] pub(crate) use utils::read_file_to_string;
 
 use http::header::HeaderMap;
 

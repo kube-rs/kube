@@ -1,5 +1,5 @@
 //! Error handling in [`kube`][crate]
-
+#![allow(unused_imports)]
 use http::header::InvalidHeaderValue;
 pub use kube_core::ErrorResponse;
 use std::path::PathBuf;
@@ -22,9 +22,11 @@ pub enum Error {
     Connection(std::io::Error),
 
     /// Hyper error
+    #[cfg(feature = "client")]
     #[error("HyperError: {0}")]
     HyperError(#[from] hyper::Error),
     /// Service error
+    #[cfg(feature = "client")]
     #[error("ServiceError: {0}")]
     Service(tower::BoxError),
 
@@ -71,6 +73,7 @@ pub enum Error {
     RequestValidation(String),
 
     /// Configuration error
+    #[cfg(feature = "config")]
     #[error("Error loading kubeconfig: {0}")]
     Kubeconfig(#[from] ConfigError),
 
@@ -117,6 +120,7 @@ pub enum Error {
     SecWebSocketProtocolMismatch,
 }
 
+#[cfg(feature = "config")]
 #[derive(Error, Debug)]
 // Redundant with the error messages and machine names
 #[allow(missing_docs)]
@@ -167,6 +171,7 @@ pub enum ConfigError {
     #[error("exec-plugin response did not contain a status")]
     ExecPluginFailed,
 
+    #[cfg(feature = "client")]
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 

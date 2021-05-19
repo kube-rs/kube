@@ -1,4 +1,4 @@
-use kube_core::{
+use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, ResourceExt,
 };
