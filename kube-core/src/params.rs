@@ -281,7 +281,9 @@ impl PatchParams {
             }
         }
         if self.force && !patch.is_apply() {
-            warn!("PatchParams::force only works with Patch::Apply");
+            return Err(Error::RequestValidation(
+                "PatchParams::force only works with Patch::Apply".into(),
+            ));
         }
         Ok(())
     }

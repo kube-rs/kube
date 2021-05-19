@@ -25,9 +25,6 @@ pub mod response;
 
 pub mod subresource;
 
-#[macro_use] extern crate log;
-
-
 mod error;
 pub use error::{Error, ErrorResponse};
 pub type Result<T, E = Error> = std::result::Result<T, E>;
