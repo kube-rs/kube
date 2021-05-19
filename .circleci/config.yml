@@ -102,9 +102,9 @@ jobs:
       - run: cargo test --doc --all -j4
       - run: cargo test -j4 -p examples
       - run: cd examples && cargo build --examples
-      - run: cd examples && cargo test --example crd_derive_no_schema --no-default-features --features=native-tls
-      - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls,ws,oauth
-      - run: cd kube && cargo test --lib --no-default-features --features=native-tls,ws,oauth
+      - run: cd examples && cargo test --example crd_derive_no_schema --no-default-features --features=native-tls,client
+      - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls,ws,oauth,client
+      - run: cd kube && cargo test --lib --no-default-features --features=native-tls,ws,oauth,client
       - save_cache:
           paths:
             - /usr/local/cargo/registry
@@ -139,7 +139,7 @@ jobs:
       - run: cargo test --lib --all -j4
       - run: cargo test --doc --all -j4
       - run: cargo test -j4 -p examples
-      - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls
+      - run: cd kube && cargo test --lib --no-default-features --features=rustls-tls,client
       - save_cache:
           paths:
             - "$HOME/.cargo/registry"
