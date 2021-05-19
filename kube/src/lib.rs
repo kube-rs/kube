@@ -101,7 +101,7 @@ assert_cfg!(
 #[cfg(feature = "client")] pub mod config;
 #[cfg(feature = "client")] pub mod service;
 
-#[cfg(feature = "client")] pub mod error;
+pub mod error;
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
