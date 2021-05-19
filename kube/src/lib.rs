@@ -101,7 +101,7 @@ assert_cfg!(
 #[cfg(feature = "client")] pub mod config;
 #[cfg(feature = "client")] pub mod service;
 
-pub mod error;
+#[cfg(feature = "client")] pub mod error;
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
@@ -114,7 +114,7 @@ pub use client::Client;
 #[cfg(feature = "client")]
 #[doc(inline)]
 pub use config::Config;
-#[doc(inline)] pub use error::Error;
+#[cfg(feature = "client")]#[doc(inline)] pub use error::Error;
 #[cfg(feature = "client")]
 #[doc(inline)]
 pub use service::Service;
@@ -134,4 +134,5 @@ pub mod core {
 pub use crate::core::{Resource, ResourceExt};
 
 /// Convient alias for `Result<T, Error>`
+#[cfg(feature = "client")]
 pub type Result<T, E = Error> = std::result::Result<T, E>;
