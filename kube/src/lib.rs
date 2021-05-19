@@ -83,11 +83,7 @@ assert_cfg!(
     any(
         all(feature = "native-tls", feature = "client"),
         all(feature = "rustls-tls", feature = "client"),
-        all(not(
-            feature = "rustls-tls",
-            feature = "native-tls",
-            feature = "client"
-        )),
+        all(not(feature = "rustls-tls"), not(feature = "native-tls"), not(feature = "client")),
     ),
     "When using a tls stack, you must use the client feature"
 );
