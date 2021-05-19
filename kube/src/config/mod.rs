@@ -70,8 +70,8 @@ impl Config {
     pub async fn infer() -> Result<Self> {
         match Self::from_cluster_env() {
             Err(cluster_env_err) => {
-                trace!("No in-cluster config found: {}", cluster_env_err);
-                trace!("Falling back to local kubeconfig");
+                tracing::trace!("No in-cluster config found: {}", cluster_env_err);
+                tracing::trace!("Falling back to local kubeconfig");
                 let config = Self::from_kubeconfig(&KubeConfigOptions::default())
                     .await
                     .map_err(|kubeconfig_err| ConfigError::ConfigInferenceExhausted {
@@ -165,7 +165,7 @@ impl Config {
         match loader.identity_pem() {
             Ok(id) => identity_pem = Some(id),
             Err(e) => {
-                debug!("failed to load client identity from kubeconfig: {}", e);
+                tracing::debug!("failed to load client identity from kubeconfig: {}", e);
                 // last resort only if configs ask for it, and no client certs
                 if let Some(true) = loader.cluster.insecure_skip_tls_verify {
                     accept_invalid_certs = true;

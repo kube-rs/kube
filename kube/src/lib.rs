@@ -96,10 +96,6 @@ assert_cfg!(
     "When using the ws feature, you must use the client feature"
 );
 
-#[allow(unused_imports)]
-#[macro_use]
-extern crate log;
-
 #[cfg(feature = "client")] pub mod api;
 #[cfg(feature = "client")] pub mod client;
 #[cfg(feature = "client")] pub mod config;

@@ -183,7 +183,7 @@ impl Client {
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text)?;
         if v["kind"] == "Status" {
-            trace!("Status from {}", text);
+            tracing::trace!("Status from {}", text);
             Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
                 tracing::warn!("{}, {:?}", text, e);
                 Error::SerdeError(e)
@@ -206,7 +206,7 @@ impl Client {
     {
         let res = self.send(request.map(Body::from)).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
-        trace!("headers: {:?}", res.headers());
+        tracing::trace!("headers: {:?}", res.headers());
 
         let frames = FramedRead::new(
             StreamReader::new(res.into_body().map_err(|e| {
