@@ -24,6 +24,7 @@ proc-macro = true
 [features]
 default = ["schema"]
 schema = []
+core = []
 
 [dev-dependencies]
 serde = { version = "1.0.118", features = ["derive"] }

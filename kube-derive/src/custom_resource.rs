@@ -146,6 +146,12 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     }
 
+    let resource = if cfg!(feature = "core") {
+        quote! { kube_core::Resource }
+    } else {
+        quote! { kube::api::Resource }
+    };
+
     let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
     let root_obj = quote! {
         #[doc = #docstr]
@@ -164,8 +170,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
-                    api_version: <#rootident as kube_core::Resource>::api_version(&()).to_string(),
-                    kind: <#rootident as kube_core::Resource>::kind(&()).to_string(),
+                    api_version: <#rootident as #resource>::api_version(&()).to_string(),
+                    kind: <#rootident as #resource>::kind(&()).to_string(),
                     metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         name: Some(name.to_string()),
                         ..Default::default()
@@ -184,7 +190,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     let api_ver = format!("{}/{}", group, version);
     let impl_resource = quote! {
-        impl kube_core::Resource for #rootident {
+        impl #resource for #rootident {
             type DynamicType = ();
 
             fn group(_: &()) -> std::borrow::Cow<'_, str> {
@@ -223,8 +229,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             impl Default for #rootident {
                 fn default() -> Self {
                     Self {
-                        api_version: <#rootident as kube_core::Resource>::api_version(&()).to_string(),
-                        kind: <#rootident as kube_core::Resource>::kind(&()).to_string(),
+                        api_version: <#rootident as #resource>::api_version(&()).to_string(),
+                        kind: <#rootident as #resource>::kind(&()).to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
                         #statusdef
@@ -329,6 +335,13 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
+    let api_resource = if cfg!(feature = "core") {
+        quote! { kube_core::api_resource::ApiResource }
+    } else {
+        quote! { kube::api::ApiResource }
+    };
+
+
     // Implement the ::crd and ::api_resource methods (fine to not have in a trait as its a generated type)
     let impl_crd = quote! {
         impl #rootident {
@@ -358,8 +371,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     .expect("valid custom resource from #[kube(attrs..)]")
             }
 
-            pub fn api_resource() -> kube_core::api_resource::ApiResource {
-                kube_core::api_resource::ApiResource::erase::<Self>(&())
+            pub fn api_resource() -> #api_resource {
+                #api_resource::erase::<Self>(&())
             }
         }
     };
