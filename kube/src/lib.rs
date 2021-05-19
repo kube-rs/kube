@@ -89,7 +89,7 @@ assert_cfg!(
             not(feature = "client")
         ),
     ),
-    "When using a tls stack, you must use the client feature"
+    "You must use a tls stack when using the client feature"
 );
 assert_cfg!(
     any(not(feature = "ws"), all(feature = "ws", feature = "client")),
@@ -105,7 +105,7 @@ extern crate log;
 #[cfg(feature = "client")] pub mod config;
 #[cfg(feature = "client")] pub mod service;
 
-pub mod error;
+#[cfg(feature = "client")] pub mod error;
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
