@@ -17,7 +17,7 @@ doc:
 test:
 	cargo test --all
 	cargo test --lib --all -- --ignored # also run tests that fail on circleci
-	cd kube && cargo test --lib --features=rustls-tls --no-default-features
+	cd kube && cargo test --lib --features=rustls-tls,client --no-default-features
 	cd kube && cargo test --lib --features=derive
 
 readme:

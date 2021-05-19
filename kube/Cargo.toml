@@ -16,20 +16,19 @@ categories = ["web-programming::http-client"]
 edition = "2018"
 
 [features]
-default = ["native-tls"]
+default = ["native-tls", "client"]
 native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
 rustls-tls = ["hyper-rustls", "tokio-rustls"]
 derive = ["kube-derive"]
-client = ["hyper", "tower", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib"]
-config = ["pem", "dirs"]
-jsonpatch = ["json-patch"]
+client = ["hyper", "tower", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "pem", "dirs", "tokio", "bytes", "futures", "tokio-util", "tracing"]
+jsonpatch = ["kube-core/jsonpatch"]
 ws = ["tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["tame-oauth"]
 gzip = ["async-compression"]
-admission = ["json-patch", "kube-core/admission"]
+admission = ["kube-core/admission"]
 
 [package.metadata.docs.rs]
-features = ["derive", "client", "config", "ws", "oauth", "jsonpatch"]
+features = ["derive", "client", "ws", "oauth", "jsonpatch", "admission"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -45,19 +44,18 @@ url = "2.2.0"
 log = "0.4.11"
 either = "1.6.1"
 thiserror = "1.0.23"
-futures = "0.3.8"
+futures = { version = "0.3.8", optional = true }
 pem = { version = "0.8.2", optional = true }
 openssl = { version = "0.10.32", optional = true }
 tokio-native-tls = { version = "0.3.0", optional = true }
 tokio-rustls = { version = "0.22.0", features = ["dangerous_configuration"], optional = true }
-bytes = "1.0.0"
-tokio = { version = "1.0.1", features = ["time", "signal", "sync"] }
+bytes = { version = "1.0.0", optional = true }
+tokio = { version = "1.0.1", features = ["time", "signal", "sync"], optional = true }
 static_assertions = "1.1.0"
 kube-derive = { path = "../kube-derive", version = "^0.54.0", optional = true }
 kube-core = { path = "../kube-core", version = "^0.54.0"}
 jsonpath_lib = { version = "0.2.6", optional = true }
-tokio-util = { version = "0.6.0", features = ["io", "codec"] }
-json-patch = { version = "0.2.6", optional = true }
+tokio-util = { version = "0.6.0", optional = true, features = ["io", "codec"] }
 hyper = { version = "0.14.2", optional = true, features = ["client", "http1", "stream", "tcp"] }
 hyper-tls = { version = "0.5.0", optional = true }
 hyper-rustls = { version = "0.22.1", optional = true }
@@ -68,7 +66,7 @@ hyper-timeout = {version = "0.4.1", optional = true }
 tame-oauth = { version = "0.4.7", features = ["gcp"], optional = true }
 pin-project = { version = "1.0.4", optional = true }
 rand = { version = "0.8.3", optional = true }
-tracing = "0.1.25"
+tracing = { version = "0.1.25", optional = true }
 
 [dependencies.k8s-openapi]
 version = "0.11.0"

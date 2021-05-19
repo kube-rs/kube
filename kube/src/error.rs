@@ -73,7 +73,7 @@ pub enum Error {
     RequestValidation(String),
 
     /// Configuration error
-    #[cfg(feature = "config")]
+    #[cfg(feature = "client")]
     #[error("Error loading kubeconfig: {0}")]
     Kubeconfig(#[from] ConfigError),
 
@@ -120,7 +120,7 @@ pub enum Error {
     SecWebSocketProtocolMismatch,
 }
 
-#[cfg(feature = "config")]
+#[cfg(feature = "client")]
 #[derive(Error, Debug)]
 // Redundant with the error messages and machine names
 #[allow(missing_docs)]

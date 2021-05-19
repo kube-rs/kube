@@ -2,8 +2,9 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.54.0...master
+ * `kube` BREAKING: when opting out of default-features, you need to specify `client` feature
 
-0.54.0 / 2021-05-18
+0.54.0 / 2021-05-18 YANKED
 ===================
  * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/clux/kube-rs/issues/495)
  * `kube`: `api` BREAKING: `DynamicObject` now takes an `ApiResource` rather than a `GroupVersionKind`

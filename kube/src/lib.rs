@@ -76,18 +76,24 @@
 
 #[macro_use] extern crate static_assertions;
 assert_cfg!(
-    all(
-        not(all(feature = "native-tls", feature = "rustls-tls")),
-        any(feature = "native-tls", feature = "rustls-tls")
-    ),
+    not(all(feature = "native-tls", feature = "rustls-tls")),
     "Must use exactly one of native-tls or rustls-tls features"
 );
 assert_cfg!(
     any(
-        not(feature = "client"),
-        all(feature = "config", feature = "client")
+        all(feature = "native-tls", feature = "client"),
+        all(feature = "rustls-tls", feature = "client"),
+        all(not(
+            feature = "rustls-tls",
+            feature = "native-tls",
+            feature = "client"
+        )),
     ),
-    "Must use client with config feature"
+    "When using a tls stack, you must use the client feature"
+);
+assert_cfg!(
+    any(not(feature = "ws"), all(feature = "ws", feature = "client")),
+    "When using the ws feature, you must use the client feature"
 );
 
 #[allow(unused_imports)]
@@ -96,7 +102,7 @@ extern crate log;
 
 #[cfg(feature = "client")] pub mod api;
 #[cfg(feature = "client")] pub mod client;
-#[cfg(feature = "config")] pub mod config;
+#[cfg(feature = "client")] pub mod config;
 #[cfg(feature = "client")] pub mod service;
 
 pub mod error;
@@ -109,7 +115,7 @@ pub use kube_derive::CustomResource;
 #[cfg(feature = "client")]
 #[doc(inline)]
 pub use client::Client;
-#[cfg(feature = "config")]
+#[cfg(feature = "client")]
 #[doc(inline)]
 pub use config::Config;
 #[doc(inline)] pub use error::Error;
@@ -119,13 +125,14 @@ pub use service::Service;
 
 /// Re-exports from kube_core crate.
 pub mod core {
+    #[cfg(feature = "admission")] pub use kube_core::admission;
     pub use kube_core::{
-        dynamic::{ApiResource, DynamicObject},
-        gvk::{GroupVersionKind, GroupVersionResource},
-        metadata::{ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta},
-        object::{NotUsed, Object, ObjectList, WatchEvent},
-        request::Request,
-        response::Status,
+        dynamic::{self, ApiResource, DynamicObject},
+        gvk::{self, GroupVersionKind, GroupVersionResource},
+        metadata::{self, ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta},
+        object::{self, NotUsed, Object, ObjectList, WatchEvent},
+        request::{self, Request},
+        response::{self, Status},
     };
 }
 pub use crate::core::{Resource, ResourceExt};
