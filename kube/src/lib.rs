@@ -79,45 +79,41 @@ assert_cfg!(
     not(all(feature = "native-tls", feature = "rustls-tls")),
     "Must use exactly one of native-tls or rustls-tls features"
 );
-assert_cfg!(
-    any(
-        all(feature = "native-tls", feature = "client"),
-        all(feature = "rustls-tls", feature = "client"),
-        all(
-            not(feature = "rustls-tls"),
-            not(feature = "native-tls"),
-            not(feature = "client")
-        ),
-    ),
-    "You must use a tls stack when using the client feature"
-);
-assert_cfg!(
-    any(not(feature = "ws"), all(feature = "ws", feature = "client")),
-    "When using the ws feature, you must use the client feature"
-);
 
-#[cfg(feature = "client")] pub mod api;
-#[cfg(feature = "client")] pub mod client;
-#[cfg(feature = "client")] pub mod config;
-#[cfg(feature = "client")] pub mod service;
+macro_rules! cfg_client {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "client")]
+            $item
+        )*
+    }
+}
 
-#[cfg(feature = "client")] pub mod error;
+cfg_client! {
+    pub mod api;
+    pub mod client;
+    pub mod config;
+    pub mod service;
 
-#[cfg(feature = "derive")]
-#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
-pub use kube_derive::CustomResource;
+    pub mod error;
 
-#[cfg(feature = "client")] pub use api::Api;
-#[cfg(feature = "client")]
-#[doc(inline)]
-pub use client::Client;
-#[cfg(feature = "client")]
-#[doc(inline)]
-pub use config::Config;
-#[cfg(feature = "client")]#[doc(inline)] pub use error::Error;
-#[cfg(feature = "client")]
-#[doc(inline)]
-pub use service::Service;
+    #[cfg(feature = "derive")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+    pub use kube_derive::CustomResource;
+
+    #[doc(inline)]
+    pub use api::Api;
+    #[doc(inline)]
+    pub use client::Client;
+    #[doc(inline)]
+    pub use config::Config;
+    #[doc(inline)] pub use error::Error;
+    #[doc(inline)]
+    pub use service::Service;
+
+    /// Convient alias for `Result<T, Error>`
+    pub type Result<T, E = Error> = std::result::Result<T, E>;
+}
 
 /// Re-exports from kube_core crate.
 pub mod core {
@@ -132,7 +128,3 @@ pub mod core {
     };
 }
 pub use crate::core::{Resource, ResourceExt};
-
-/// Convient alias for `Result<T, Error>`
-#[cfg(feature = "client")]
-pub type Result<T, E = Error> = std::result::Result<T, E>;
