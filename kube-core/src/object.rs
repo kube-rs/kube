@@ -118,9 +118,9 @@ where
     P: Clone,
     U: Clone,
 {
-    /// The types field of an `Object`
-    #[serde(flatten)]
-    pub types: TypeMeta,
+    /// The type fields, not always present
+    #[serde(flatten, default)]
+    pub types: Option<TypeMeta>,
 
     /// Resource metadata
     ///
@@ -149,10 +149,10 @@ where
     /// A constructor that takes Resource values from an `ApiResource`
     pub fn new(name: &str, ar: &ApiResource, spec: P) -> Self {
         Self {
-            types: TypeMeta {
+            types: Some(TypeMeta {
                 api_version: ar.api_version.clone(),
                 kind: ar.kind.clone(),
-            },
+            }),
             metadata: ObjectMeta {
                 name: Some(name.to_string()),
                 ..Default::default()
@@ -235,7 +235,7 @@ mod test {
         let mypod = PodSimple::new("blog", &ar, data).within("dev");
         assert_eq!(mypod.metadata.namespace.unwrap(), "dev");
         assert_eq!(mypod.metadata.name.unwrap(), "blog");
-        assert_eq!(mypod.types.kind, "Pod");
-        assert_eq!(mypod.types.api_version, "v1");
+        assert_eq!(mypod.types.as_ref().unwrap().kind, "Pod");
+        assert_eq!(mypod.types.as_ref().unwrap().api_version, "v1");
     }
 }

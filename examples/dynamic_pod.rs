@@ -1,9 +1,9 @@
 use kube::{
-    api::{Api, Object, ResourceExt, ApiResource, NotUsed},
-    Client
+    api::{Api, ApiResource, NotUsed, Object, ResourceExt},
+    Client,
 };
-use serde::Deserialize;
 use log::info;
+use serde::Deserialize;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
