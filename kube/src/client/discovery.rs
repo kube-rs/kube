@@ -2,7 +2,7 @@
 
 use crate::Client;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResourceList;
-use kube_core::ApiResource;
+use kube_core::dynamic::ApiResource;
 use std::{cmp::Reverse, collections::HashMap};
 
 /// Resource scope

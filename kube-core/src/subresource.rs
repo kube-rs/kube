@@ -1,3 +1,4 @@
+//! Request builder types and parameters for subresources
 use std::fmt::Debug;
 
 use crate::{
@@ -132,15 +133,15 @@ pub struct AttachParams {
     pub container: Option<String>,
     /// Attach to the container's standard input. Defaults to `false`.
     ///
-    /// Call [`AttachedProcess::stdin`] to obtain a writer.
+    /// Call [`AttachedProcess::stdin`](https://docs.rs/kube/*/kube/api/struct.AttachedProcess.html#method.stdin) to obtain a writer.
     pub stdin: bool,
     /// Attach to the container's standard output. Defaults to `true`.
     ///
-    /// Call [`AttachedProcess::stdout`] to obtain a reader.
+    /// Call [`AttachedProcess::stdout`](https://docs.rs/kube/*/kube/api/struct.AttachedProcess.html#method.stdout) to obtain a reader.
     pub stdout: bool,
     /// Attach to the container's standard error. Defaults to `true`.
     ///
-    /// Call [`AttachedProcess::stderr`] to obtain a reader.
+    /// Call [`AttachedProcess::stderr`](https://docs.rs/kube/*/kube/api/struct.AttachedProcess.html#method.stderr) to obtain a reader.
     pub stderr: bool,
     /// Allocate TTY. Defaults to `false`.
     ///

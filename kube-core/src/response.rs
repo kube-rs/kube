@@ -1,6 +1,6 @@
+//! Generic api response types
 use serde::Deserialize;
 // TODO: replace with Status in k8s openapi?
-
 /// A Kubernetes status object
 #[allow(missing_docs)]
 #[derive(Deserialize, Debug)]

@@ -1,8 +1,9 @@
 use crate::{gvk::GroupVersionKind, resource::Resource};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource;
 
-/// Contains information about Kubernetes API resources
-/// which is enough for working with it.
+/// Information about a Kubernetes API resource
+///
+/// Enough information to use it as a `Resource`
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ApiResource {
     /// Resource group, empty for core group.

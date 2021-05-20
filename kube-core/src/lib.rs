@@ -1,7 +1,16 @@
-#[cfg(feature = "admission")] pub mod admission;
+//! Crate with types and traits necessary for interacting with the Kubernetes API
+//!
+//! This crate is available as a minimal alternative to `kube` where a client is not available.
+//! The same information here is always re-exported from `kube` under `kube::core`.
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![deny(missing_docs)]
+#![deny(unsafe_code)]
 
-pub mod api_resource;
-pub use api_resource::ApiResource;
+#[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
+#[cfg(feature = "admission")]
+pub mod admission;
+
+mod api_resource;
 pub mod dynamic;
 pub use dynamic::DynamicObject;
 
@@ -11,7 +20,6 @@ pub use gvk::{GroupVersionKind, GroupVersionResource};
 pub mod metadata;
 
 pub mod object;
-pub use object::WatchEvent;
 
 pub mod params;
 
@@ -25,6 +33,11 @@ pub mod response;
 
 pub mod subresource;
 
+pub mod watch;
+pub use watch::WatchEvent;
+
 mod error;
 pub use error::{Error, ErrorResponse};
+
+/// Convient alias for `Result<T, Error>`
 pub type Result<T, E = Error> = std::result::Result<T, E>;

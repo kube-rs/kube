@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Core error types.
 #[derive(Error, Debug)]
 pub enum Error {
     /// A request validation failed

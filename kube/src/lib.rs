@@ -95,6 +95,7 @@ assert_cfg!(
 macro_rules! cfg_client {
     ($($item:item)*) => {
         $(
+            #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
             #[cfg(feature = "client")]
             $item
         )*
@@ -108,10 +109,6 @@ cfg_client! {
     pub mod service;
 
     pub mod error;
-
-    #[cfg(feature = "derive")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
-    pub use kube_derive::CustomResource;
 
     #[doc(inline)]
     pub use api::Api;
@@ -127,16 +124,22 @@ cfg_client! {
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
+#[cfg(feature = "derive")]
+#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+pub use kube_derive::CustomResource;
+
 /// Re-exports from kube_core crate.
 pub mod core {
     #[cfg(feature = "admission")] pub use kube_core::admission;
     pub use kube_core::{
         dynamic::{self, ApiResource, DynamicObject},
         gvk::{self, GroupVersionKind, GroupVersionResource},
-        metadata::{self, ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta},
-        object::{self, NotUsed, Object, ObjectList, WatchEvent},
+        metadata::{self, ListMeta, ObjectMeta, TypeMeta},
+        object::{self, NotUsed, Object, ObjectList},
         request::{self, Request},
         response::{self, Status},
+        watch::{self, WatchEvent},
+        Resource, ResourceExt,
     };
 }
 pub use crate::core::{Resource, ResourceExt};

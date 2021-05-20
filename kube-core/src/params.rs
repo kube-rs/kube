@@ -1,10 +1,9 @@
-///! A port of *Optionals from apimachinery/types.go
+//! A port of request parameter *Optionals from apimachinery/types.go
 use crate::{Error, Result};
 use serde::Serialize;
 
 /// Common query parameters used in watch/list/delete calls on collections
 #[derive(Clone, Debug)]
-#[allow(missing_docs)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///
@@ -169,7 +168,7 @@ impl PostParams {
 /// See [kubernetes patch docs](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment) for the older patch types.
 ///
 /// Note that patches have different effects on different fields depending on their merge strategies.
-/// These strategies are configurable when deriving your [`CustomResource`](kube_derive::CustomResource#customizing-schemas).
+/// These strategies are configurable when deriving your [`CustomResource`](https://docs.rs/kube-derive/*/kube_derive/derive.CustomResource.html#customizing-schemas).
 ///
 /// # Creating a patch via serde_json
 /// ```
