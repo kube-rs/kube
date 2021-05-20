@@ -3,6 +3,7 @@ UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.54.0...master
  * `kube`: `client` feature added (default-enabled) - #528
+ * `kube`: `PatchParams` force now only works with `Patch::Apply` #528
  * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/clux/kube-rs/issues/495)
  * `kube`: `api` BREAKING: `DynamicObject` now takes an `ApiResource` rather than a `GroupVersionKind`
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
