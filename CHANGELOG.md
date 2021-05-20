@@ -2,14 +2,11 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.54.0...master
- * `kube` BREAKING: when opting out of default-features, you need to specify `client` feature
-
-0.54.0 / 2021-05-18 YANKED
-===================
+ * `kube`: `client` feature added (default-enabled) - #528
  * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/clux/kube-rs/issues/495)
  * `kube`: `api` BREAKING: `DynamicObject` now takes an `ApiResource` rather than a `GroupVersionKind`
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
- * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/clux/kube-rs/issues/516) via [#517](https://github.com/clux/kube-rs/issues/517) + [#519](https://github.com/clux/kube-rs/issues/519) + [#522](https://github.com/clux/kube-rs/issues/522)
+ * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/clux/kube-rs/issues/516) via [#517](https://github.com/clux/kube-rs/issues/517) + [#519](https://github.com/clux/kube-rs/issues/519) + [#522](https://github.com/clux/kube-rs/issues/522) and #528
 
 0.53.0 / 2021-05-15
 ===================
