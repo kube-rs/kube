@@ -22,11 +22,9 @@ pub enum Error {
     Connection(std::io::Error),
 
     /// Hyper error
-    #[cfg(feature = "client")]
     #[error("HyperError: {0}")]
     HyperError(#[from] hyper::Error),
     /// Service error
-    #[cfg(feature = "client")]
     #[error("ServiceError: {0}")]
     Service(tower::BoxError),
 
@@ -73,7 +71,6 @@ pub enum Error {
     RequestValidation(String),
 
     /// Configuration error
-    #[cfg(feature = "client")]
     #[error("Error loading kubeconfig: {0}")]
     Kubeconfig(#[from] ConfigError),
 
@@ -120,7 +117,6 @@ pub enum Error {
     SecWebSocketProtocolMismatch,
 }
 
-#[cfg(feature = "client")]
 #[derive(Error, Debug)]
 // Redundant with the error messages and machine names
 #[allow(missing_docs)]
@@ -171,7 +167,6 @@ pub enum ConfigError {
     #[error("exec-plugin response did not contain a status")]
     ExecPluginFailed,
 
-    #[cfg(feature = "client")]
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
