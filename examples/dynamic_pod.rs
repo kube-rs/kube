@@ -22,7 +22,9 @@ async fn main() -> anyhow::Result<()> {
     }
     type PodSimple = Object<PodSpecSimple, NotUsed>;
 
+    // Here we simply steal the type info from k8s_openapi, but we could create this from scratch.
     let ar = ApiResource::erase::<k8s_openapi::api::core::v1::Pod>(&());
+
     let pods: Api<PodSimple> = Api::namespaced_with(client, "default", &ar);
     for p in pods.list(&Default::default()).await? {
         info!("Found pod {} running: {:?}", p.name(), p.spec.containers);
