@@ -1,5 +1,4 @@
 //! Error handling in [`kube`][crate]
-#![allow(unused_imports)]
 use http::header::InvalidHeaderValue;
 pub use kube_core::ErrorResponse;
 use std::path::PathBuf;
