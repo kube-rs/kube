@@ -1,7 +1,11 @@
 //! Generic object and objectlist wrappers.
-use crate::metadata::{ListMeta, ObjectMeta, TypeMeta};
+use crate::{
+    api_resource::ApiResource,
+    metadata::{ListMeta, ObjectMeta, TypeMeta},
+    resource::Resource,
+};
 use serde::{Deserialize, Serialize};
-
+use std::borrow::Cow;
 
 /// A generic Kubernetes object list
 ///
@@ -102,9 +106,12 @@ impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
 
 /// A standard Kubernetes object with `.spec` and `.status`.
 ///
-/// This is a convenience struct provided for serialization/deserialization
-/// It is not useful within the library anymore, because it can not easily implement
-/// the [`k8s_openapi`] traits.
+/// This is a convenience struct provided for serialization/deserialization.
+/// It is slightly stricter than ['DynamicObject`] in that it enforces the spec/status convention,
+/// and as such will not in general work with all api-discovered resources.
+///
+/// This can be used to tie existing resources to smaller, local struct variants to optimize for memory use.
+/// E.g. if you are only interested in a few fields, but you store tons of them in memory with reflectors.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Object<P, U>
 where
@@ -139,12 +146,12 @@ where
     P: Clone,
     U: Clone,
 {
-    /// A constructor like the one from kube-derive
-    pub fn new<K: k8s_openapi::Resource>(name: &str, spec: P) -> Self {
+    /// A constructor that takes Resource values from an `ApiResource`
+    pub fn new(name: &str, ar: &ApiResource, spec: P) -> Self {
         Self {
             types: TypeMeta {
-                api_version: <K as k8s_openapi::Resource>::API_VERSION.to_string(),
-                kind: <K as k8s_openapi::Resource>::KIND.to_string(),
+                api_version: ar.api_version.clone(),
+                kind: ar.kind.clone(),
             },
             metadata: ObjectMeta {
                 name: Some(name.to_string()),
@@ -154,6 +161,44 @@ where
             status: None,
         }
     }
+
+    /// Attach a namespace to an Object
+    pub fn within(mut self, ns: &str) -> Self {
+        self.metadata.namespace = Some(ns.into());
+        self
+    }
+}
+
+impl<P, U> Resource for Object<P, U>
+where
+    P: Clone,
+    U: Clone,
+{
+    type DynamicType = ApiResource;
+
+    fn group(dt: &ApiResource) -> Cow<'_, str> {
+        dt.group.as_str().into()
+    }
+
+    fn version(dt: &ApiResource) -> Cow<'_, str> {
+        dt.version.as_str().into()
+    }
+
+    fn kind(dt: &ApiResource) -> Cow<'_, str> {
+        dt.kind.as_str().into()
+    }
+
+    fn api_version(dt: &ApiResource) -> Cow<'_, str> {
+        dt.api_version.as_str().into()
+    }
+
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn meta_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
+    }
 }
 
 /// Empty struct for when data should be discarded
@@ -162,3 +207,35 @@ where
 /// [`Deserialize`](serde::Deserialize) `impl` is too strict.
 #[derive(Clone, Deserialize, Serialize, Default, Debug)]
 pub struct NotUsed {}
+
+
+#[cfg(test)]
+mod test {
+    use super::{ApiResource, NotUsed, Object};
+    #[test]
+    fn simplified_k8s_object() {
+        use k8s_openapi::api::core::v1::Pod;
+        // Replacing heavy type k8s_openapi::api::core::v1::PodSpec with:
+        #[derive(Clone)]
+        struct PodSpecSimple {
+            containers: Vec<ContainerSimple>,
+        }
+        #[derive(Clone)]
+        struct ContainerSimple {
+            image: String,
+        }
+        type PodSimple = Object<PodSpecSimple, NotUsed>;
+        // by grabbing the ApiResource info from the Resource trait
+        let ar = ApiResource::erase::<Pod>(&());
+        assert_eq!(ar.group, "");
+        assert_eq!(ar.kind, "Pod");
+        let data = PodSpecSimple {
+            containers: vec![ContainerSimple { image: "blog".into() }],
+        };
+        let mypod = PodSimple::new("blog", &ar, data).within("dev");
+        assert_eq!(mypod.metadata.namespace.unwrap(), "dev");
+        assert_eq!(mypod.metadata.name.unwrap(), "blog");
+        assert_eq!(mypod.types.kind, "Pod");
+        assert_eq!(mypod.types.api_version, "v1");
+    }
+}
