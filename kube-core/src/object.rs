@@ -112,7 +112,7 @@ impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
 ///
 /// This can be used to tie existing resources to smaller, local struct variants to optimize for memory use.
 /// E.g. if you are only interested in a few fields, but you store tons of them in memory with reflectors.
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Object<P, U>
 where
     P: Clone,
