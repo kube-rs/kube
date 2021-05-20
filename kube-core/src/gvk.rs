@@ -1,3 +1,4 @@
+//! Type information structs for dynamic resources.
 use serde::{Deserialize, Serialize};
 
 /// Contains enough information to identify API Resource.

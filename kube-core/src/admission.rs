@@ -1,9 +1,9 @@
 //! Contains types for implementing admission controllers.
 //!
 //! For more information on admission controllers, see:
-//! https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/
-//! https://kubernetes.io/blog/2019/03/21/a-guide-to-kubernetes-admission-controllers/
-//! https://github.com/kubernetes/api/blob/master/admission/v1/types.go
+//! <https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/>
+//! <https://kubernetes.io/blog/2019/03/21/a-guide-to-kubernetes-admission-controllers/>
+//! <https://github.com/kubernetes/api/blob/master/admission/v1/types.go>
 
 use crate::{
     dynamic::DynamicObject,
@@ -148,7 +148,7 @@ pub struct AdmissionRequest<T: Resource> {
     pub operation: Operation,
     /// Information about the requesting user.
     pub user_info: UserInfo,
-    /// The object from the incoming request. It's None for DELETE operations.
+    /// The object from the incoming request. It's `None` for [`DELETE`](Operation::Delete) operations.
     pub object: Option<T>,
     ///  The existing object. Only populated for DELETE and UPDATE requests.
     pub old_object: Option<T>,
@@ -159,7 +159,7 @@ pub struct AdmissionRequest<T: Resource> {
     /// The operation option structure of the operation being performed. e.g.
     /// `meta.k8s.io/v1.DeleteOptions` or `meta.k8s.io/v1.CreateOptions`. This
     /// may be different than the options the caller provided. e.g. for a patch
-    /// request the performed [`Operation`] might be a [`Operation::CREATE`], in
+    /// request the performed [`Operation`] might be a [`CREATE`](Operation::Create), in
     /// which case the Options will a `meta.k8s.io/v1.CreateOptions` even though
     /// the caller provided `meta.k8s.io/v1.PatchOptions`.
     #[serde(default)]
@@ -168,18 +168,15 @@ pub struct AdmissionRequest<T: Resource> {
 
 /// The operation specified in an [`AdmissionRequest`].
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Operation {
     /// An operation that creates a resource.
-    #[serde(rename = "CREATE")]
     Create,
     /// An operation that updates a resource.
-    #[serde(rename = "UPDATE")]
     Update,
     /// An operation that deletes a resource.
-    #[serde(rename = "DELETE")]
     Delete,
     /// An operation that connects to a resource.
-    #[serde(rename = "CONNECT")]
     Connect,
 }
 

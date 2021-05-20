@@ -16,9 +16,11 @@ pub(crate) use kube_core::params;
 pub use kube_core::{
     dynamic::{ApiResource, DynamicObject},
     gvk::{GroupVersionKind, GroupVersionResource},
-    metadata::{ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta},
-    object::{NotUsed, Object, ObjectList, WatchEvent},
+    metadata::{ListMeta, ObjectMeta, TypeMeta},
+    object::{NotUsed, Object, ObjectList},
     request::Request,
+    watch::WatchEvent,
+    Resource, ResourceExt,
 };
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,

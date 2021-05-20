@@ -1,6 +1,6 @@
+//! Request builder type for arbitrary api types
 use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use crate::{Error, Result};
-
 /// A Kubernetes request builder
 ///
 /// Takes a base_path and supplies constructors for common operations
