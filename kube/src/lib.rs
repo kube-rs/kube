@@ -76,31 +76,67 @@
 
 #[macro_use] extern crate static_assertions;
 assert_cfg!(
-    all(
-        not(all(feature = "native-tls", feature = "rustls-tls")),
-        any(feature = "native-tls", feature = "rustls-tls")
-    ),
+    not(all(feature = "native-tls", feature = "rustls-tls")),
     "Must use exactly one of native-tls or rustls-tls features"
 );
+assert_cfg!(
+    any(
+        all(feature = "native-tls", feature = "client"),
+        all(feature = "rustls-tls", feature = "client"),
+        all(
+            not(feature = "rustls-tls"),
+            not(feature = "native-tls"),
+            not(feature = "client")
+        ),
+    ),
+    "You must use a tls stack when using the client feature"
+);
 
-#[macro_use] extern crate log;
+macro_rules! cfg_client {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "client")]
+            $item
+        )*
+    }
+}
 
-pub mod api;
-pub mod client;
-pub mod config;
-pub mod service;
+cfg_client! {
+    pub mod api;
+    pub mod client;
+    pub mod config;
+    pub mod service;
 
-pub mod error;
+    pub mod error;
 
-#[cfg(feature = "derive")]
-#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
-pub use kube_derive::CustomResource;
+    #[cfg(feature = "derive")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+    pub use kube_derive::CustomResource;
 
-pub use api::{Api, Resource, ResourceExt};
-#[doc(inline)] pub use client::Client;
-#[doc(inline)] pub use config::Config;
-#[doc(inline)] pub use error::Error;
-#[doc(inline)] pub use service::Service;
+    #[doc(inline)]
+    pub use api::Api;
+    #[doc(inline)]
+    pub use client::Client;
+    #[doc(inline)]
+    pub use config::Config;
+    #[doc(inline)] pub use error::Error;
+    #[doc(inline)]
+    pub use service::Service;
 
-/// Convient alias for `Result<T, Error>`
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+    /// Convient alias for `Result<T, Error>`
+    pub type Result<T, E = Error> = std::result::Result<T, E>;
+}
+
+/// Re-exports from kube_core crate.
+pub mod core {
+    #[cfg(feature = "admission")] pub use kube_core::admission;
+    pub use kube_core::{
+        dynamic::{self, ApiResource, DynamicObject},
+        gvk::{self, GroupVersionKind, GroupVersionResource},
+        metadata::{self, ListMeta, ObjectMeta, Resource, ResourceExt, TypeMeta},
+        object::{self, NotUsed, Object, ObjectList, WatchEvent},
+        request::{self, Request},
+        response::{self, Status},
+    };
+}
+pub use crate::core::{Resource, ResourceExt};

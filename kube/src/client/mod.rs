@@ -18,7 +18,8 @@ use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
 use hyper::Body;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
-use serde::{de::DeserializeOwned, Deserialize};
+use kube_core::response::Status;
+use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
@@ -182,7 +183,7 @@ impl Client {
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text)?;
         if v["kind"] == "Status" {
-            trace!("Status from {}", text);
+            tracing::trace!("Status from {}", text);
             Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
                 tracing::warn!("{}, {:?}", text, e);
                 Error::SerdeError(e)
@@ -205,7 +206,7 @@ impl Client {
     {
         let res = self.send(request.map(Body::from)).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
-        trace!("headers: {:?}", res.headers());
+        tracing::trace!("headers: {:?}", res.headers());
 
         let frames = FramedRead::new(
             StreamReader::new(res.into_body().map_err(|e| {
@@ -348,74 +349,6 @@ impl TryFrom<Config> for Client {
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
         Ok(Self::new(config.try_into()?))
-    }
-}
-
-// TODO: replace with Status in k8s openapi?
-
-/// A Kubernetes status object
-#[allow(missing_docs)]
-#[derive(Deserialize, Debug)]
-pub struct Status {
-    // TODO: typemeta
-    // TODO: metadata that can be completely empty (listmeta...)
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub status: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub message: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub reason: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub details: Option<StatusDetails>,
-    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
-    pub code: u16,
-}
-
-/// Status details object on the [`Status`] object
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-#[allow(missing_docs)]
-pub struct StatusDetails {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub name: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub group: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub kind: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub uid: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub causes: Vec<StatusCause>,
-    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
-    pub retry_after_seconds: u32,
-}
-
-/// Status cause object on the [`StatusDetails`] object
-#[derive(Deserialize, Debug)]
-#[allow(missing_docs)]
-pub struct StatusCause {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub reason: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub message: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub field: String,
-}
-
-#[cfg(test)]
-mod test {
-    use super::Status;
-
-    // ensure our status schema is sensible
-    #[test]
-    fn delete_deserialize_test() {
-        let statusresp = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"name":"some-app","group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
-        let s: Status = serde_json::from_str::<Status>(statusresp).unwrap();
-        assert_eq!(s.details.unwrap().name, "some-app");
-
-        let statusnoname = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
-        let s2: Status = serde_json::from_str::<Status>(statusnoname).unwrap();
-        assert_eq!(s2.details.unwrap().name, ""); // optional probably better..
     }
 }
 

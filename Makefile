@@ -17,21 +17,12 @@ doc:
 test:
 	cargo test --all
 	cargo test --lib --all -- --ignored # also run tests that fail on circleci
-	cd kube && cargo test --lib --features=rustls-tls --no-default-features
+	cd kube && cargo test --lib --features=rustls-tls,client --no-default-features
+	cd kube && cargo test --lib --no-default-features
 	cd kube && cargo test --lib --features=derive
 
 readme:
 	rustdoc README.md --test --edition=2018
-
-minikube-create:
-	sudo rm -rf /tmp/juju-mk* /tmp/minikube*
-	minikube start --driver=docker \
-		--kubernetes-version v1.20.2 \
-		--extra-config kubeadm.ignore-preflight-errors=SystemVerification
-
-minikube:
-	kubectl config set-context --cluster=minikube --user=minikube --namespace=apps minikube
-	kubectl create namespace apps
 
 kind-create:
 	kind create cluster
