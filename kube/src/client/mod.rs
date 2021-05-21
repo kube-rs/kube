@@ -475,3 +475,48 @@ fn sec_websocket_key() -> String {
     let r: [u8; 16] = rand::random();
     base64::encode(&r)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{Api, Client};
+
+    use futures::pin_mut;
+    use http::{Request, Response};
+    use hyper::Body;
+    use k8s_openapi::api::core::v1::Pod;
+    use tower_test::mock;
+
+    #[tokio::test]
+    async fn test_mock() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            // Receive a request for pod and respond with some data
+            pin_mut!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert_eq!(request.method(), http::Method::GET);
+            assert_eq!(request.uri().to_string(), "/api/v1/namespaces/default/pods/test");
+            let pod: Pod = serde_json::from_value(serde_json::json!({
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {
+                    "name": "test",
+                    "annotations": { "kube-rs": "test" },
+                },
+                "spec": {
+                    "containers": [{ "name": "test", "image": "test-image" }],
+                }
+            }))
+            .unwrap();
+            send.send_response(
+                Response::builder()
+                    .body(Body::from(serde_json::to_vec(&pod).unwrap()))
+                    .unwrap(),
+            );
+        });
+
+        let pods: Api<Pod> = Api::namespaced(Client::new(mock_service), "default");
+        let pod = pods.get("test").await.unwrap();
+        assert_eq!(pod.metadata.annotations.unwrap().get("kube-rs").unwrap(), "test");
+        spawned.await.unwrap();
+    }
+}
