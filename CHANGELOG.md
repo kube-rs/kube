@@ -4,10 +4,11 @@ UNRELEASED
  * see https://github.com/clux/kube-rs/compare/0.54.0...master
  * `kube`: `client` feature added (default-enabled) - #528
  * `kube`: `PatchParams` force now only works with `Patch::Apply` #528
- * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/clux/kube-rs/issues/495)
- * `kube`: `api` BREAKING: `DynamicObject` now takes an `ApiResource` rather than a `GroupVersionKind`
+ * `kube`: `api` `discovery` module now uses a new `ApiResource` struct #495 + #482
+ * `kube`: `api` BREAKING: `DynamicObject` + `Object` now takes an `ApiResource` rather than a `GroupVersionKind`
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
- * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/clux/kube-rs/issues/516) via [#517](https://github.com/clux/kube-rs/issues/517) + [#519](https://github.com/clux/kube-rs/issues/519) + [#522](https://github.com/clux/kube-rs/issues/522) and #528
+ * `kube-core` crate factored out of `kube` to reduce dependencies - #516 via #517 + #519 + #522 + #528 + #530
+ * `kube`: `kube::Service` removed to allow `kube::Client` to take an abritrary `Service<http::Request<hyper::Body>>` - #532
 
 0.53.0 / 2021-05-15
 ===================
