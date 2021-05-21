@@ -29,7 +29,8 @@ async fn main() -> Result<()> {
 
 fn pod_unready(p: &Pod) -> Option<String> {
     let status = p.status.as_ref().unwrap();
-    let failed = status.conditions
+    let failed = status
+        .conditions
         .iter()
         .filter(|c| c.type_ == "Ready" && c.status == "False")
         .map(|c| c.message.clone().unwrap_or_default())
