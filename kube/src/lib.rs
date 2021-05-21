@@ -106,7 +106,7 @@ cfg_client! {
     pub mod api;
     pub mod client;
     pub mod config;
-    pub mod service;
+    pub(crate) mod service;
 
     pub mod error;
 
@@ -117,8 +117,6 @@ cfg_client! {
     #[doc(inline)]
     pub use config::Config;
     #[doc(inline)] pub use error::Error;
-    #[doc(inline)]
-    pub use service::Service;
 
     /// Convient alias for `Result<T, Error>`
     pub type Result<T, E = Error> = std::result::Result<T, E>;
