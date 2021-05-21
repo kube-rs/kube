@@ -516,7 +516,7 @@ mod tests {
 
         let pods: Api<Pod> = Api::namespaced(Client::new(mock_service), "default");
         let pod = pods.get("test").await.unwrap();
-        assert_eq!(pod.metadata.annotations.unwrap().get("kube-rs").unwrap(), "test");
+        assert_eq!(pod.metadata.annotations.get("kube-rs").unwrap(), "test");
         spawned.await.unwrap();
     }
 }
