@@ -26,9 +26,9 @@ client = ["config", "__non_core", "hyper", "tower", "hyper-timeout", "pin-projec
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 derive = ["kube-derive"]
+config = ["__non_core", "pem", "dirs"]
 
 # private feature sets; do not use
-config = ["__non_core", "pem", "dirs"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
