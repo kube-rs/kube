@@ -101,23 +101,46 @@ macro_rules! cfg_client {
         )*
     }
 }
+macro_rules! cfg_config {
+    ($($item:item)*) => {
+        $(
+            #[cfg_attr(docsrs, doc(cfg(feature = "config")))]
+            #[cfg(feature = "config")]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_error {
+    ($($item:item)*) => {
+        $(
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
+            #[cfg(any(feature = "config", feature = "client"))]
+            $item
+        )*
+    }
+}
 
 cfg_client! {
     pub mod api;
     pub mod client;
-    pub mod config;
     pub(crate) mod service;
-
-    pub mod error;
 
     #[doc(inline)]
     pub use api::Api;
     #[doc(inline)]
     pub use client::Client;
+}
+
+cfg_config! {
+    pub mod config;
     #[doc(inline)]
     pub use config::Config;
-    #[doc(inline)] pub use error::Error;
+}
 
+cfg_error! {
+    pub mod error;
+    #[doc(inline)] pub use error::Error;
     /// Convient alias for `Result<T, Error>`
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }

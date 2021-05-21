@@ -21,9 +21,11 @@ pub enum Error {
     Connection(std::io::Error),
 
     /// Hyper error
+    #[cfg(feature = "client")]
     #[error("HyperError: {0}")]
     HyperError(#[from] hyper::Error),
     /// Service error
+    #[cfg(feature = "client")]
     #[error("ServiceError: {0}")]
     Service(tower::BoxError),
 
@@ -166,6 +168,7 @@ pub enum ConfigError {
     #[error("exec-plugin response did not contain a status")]
     ExecPluginFailed,
 
+    #[cfg(feature = "client")]
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
