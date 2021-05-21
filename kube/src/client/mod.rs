@@ -52,6 +52,7 @@ pub struct Client {
     // - `Buffer` for cheap clone
     // - `BoxService` for dynamic response future type
     inner: Buffer<BoxService<Request<Body>, Response<Body>, BoxError>, Request<Body>>,
+    default_ns: String,
 }
 
 impl Client {
@@ -63,8 +64,18 @@ impl Client {
         S: Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
         S::Future: Send + 'static,
     {
+        Self::new_with_default_ns(service, "default")
+    }
+
+    /// Create and initialize a [`Client`] using the given `Service` and the default namespace.
+    pub fn new_with_default_ns<S, T: Into<String>>(service: S, default_ns: T) -> Self
+    where
+        S: Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
+        S::Future: Send + 'static,
+    {
         Self {
             inner: Buffer::new(BoxService::new(service), 1024),
+            default_ns: default_ns.into(),
         }
     }
 
@@ -80,6 +91,10 @@ impl Client {
     /// instead.
     pub async fn try_default() -> Result<Self> {
         Self::try_from(Config::infer().await?)
+    }
+
+    pub(crate) fn default_ns(&self) -> &str {
+        &self.default_ns
     }
 
     async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
@@ -366,6 +381,7 @@ impl TryFrom<Config> for Client {
         let cluster_url = config.cluster_url.clone();
         let mut default_headers = config.headers.clone();
         let timeout = config.timeout;
+        let default_ns = config.default_ns.clone();
 
         // AuthLayer is not necessary unless `RefreshableToken`
         let maybe_auth = match Authentication::try_from(&config.auth_info)? {
@@ -416,7 +432,7 @@ impl TryFrom<Config> for Client {
             .option_layer(maybe_auth)
             .layer(tower::layer::layer_fn(LogRequest::new))
             .service(client);
-        Ok(Self::new(inner))
+        Ok(Self::new_with_default_ns(inner, default_ns))
     }
 }
 
