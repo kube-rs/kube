@@ -7,27 +7,35 @@
 //! interaction with the kuberneres API.
 pub mod discovery;
 
-use crate::{api::WatchEvent, config::Config, error::ErrorResponse, service::Service, Error, Result};
-
-#[cfg(feature = "ws")]
-use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
+use std::convert::{TryFrom, TryInto};
 
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
-use http::{self, Request, Response, StatusCode};
+use http::{self, HeaderValue, Request, Response, StatusCode};
 use hyper::Body;
+use hyper_timeout::TimeoutConnector;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use kube_core::response::Status;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
+#[cfg(feature = "ws")]
+use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
-use tower::{Service as _, ServiceExt};
+use tower::{buffer::Buffer, util::BoxService, BoxError, Service, ServiceBuilder, ServiceExt};
 
-use std::convert::{TryFrom, TryInto};
+
+#[cfg(feature = "gzip")]
+use crate::service::{accept_compressed, maybe_decompress};
+use crate::{
+    api::WatchEvent,
+    error::{ConfigError, ErrorResponse},
+    service::{set_cluster_url, set_default_headers, AuthLayer, Authentication, HttpsConnector, LogRequest},
+    Config, Error, Result,
+};
 
 // Binary subprotocol v4. See `Client::connect`.
 #[cfg(feature = "ws")]
@@ -41,15 +49,23 @@ const WS_PROTOCOL: &str = "v4.channel.k8s.io";
 /// using [`Client::try_from`].
 #[derive(Clone)]
 pub struct Client {
-    inner: Service,
+    // - `Buffer` for cheap clone
+    // - `BoxService` for dynamic response future type
+    inner: Buffer<BoxService<Request<Body>, Response<Body>, BoxError>, Request<Body>>,
 }
 
 impl Client {
     /// Create and initialize a [`Client`] using the given `Service`.
     ///
     /// Use [`Client::try_from`](Self::try_from) to create with a [`Config`].
-    pub fn new(service: Service) -> Self {
-        Self { inner: service }
+    pub fn new<S>(service: S) -> Self
+    where
+        S: Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
+        S::Future: Send + 'static,
+    {
+        Self {
+            inner: Buffer::new(BoxService::new(service), 1024),
+        }
     }
 
     /// Create and initialize a [`Client`] using the inferred
@@ -63,8 +79,7 @@ impl Client {
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead.
     pub async fn try_default() -> Result<Self> {
-        let client_config = Config::infer().await?;
-        Self::try_from(client_config)
+        Self::try_from(Config::infer().await?)
     }
 
     async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
@@ -348,7 +363,60 @@ impl TryFrom<Config> for Client {
 
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
-        Ok(Self::new(config.try_into()?))
+        let cluster_url = config.cluster_url.clone();
+        let mut default_headers = config.headers.clone();
+        let timeout = config.timeout;
+
+        // AuthLayer is not necessary unless `RefreshableToken`
+        let maybe_auth = match Authentication::try_from(&config.auth_info)? {
+            Authentication::None => None,
+            Authentication::Basic(s) => {
+                let mut value =
+                    HeaderValue::try_from(format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?;
+                value.set_sensitive(true);
+                default_headers.insert(http::header::AUTHORIZATION, value);
+                None
+            }
+            Authentication::Token(s) => {
+                let mut value = HeaderValue::try_from(format!("Bearer {}", &s))
+                    .map_err(ConfigError::InvalidBearerToken)?;
+                value.set_sensitive(true);
+                default_headers.insert(http::header::AUTHORIZATION, value);
+                None
+            }
+            Authentication::RefreshableToken(r) => Some(AuthLayer::new(r)),
+        };
+
+        let common = ServiceBuilder::new()
+            .map_request(move |r| set_cluster_url(r, &cluster_url))
+            .map_request(move |r| set_default_headers(r, default_headers.clone()))
+            .into_inner();
+
+        #[cfg(feature = "gzip")]
+        let common = ServiceBuilder::new()
+            .layer(common)
+            .map_request(accept_compressed)
+            .map_response(maybe_decompress)
+            .into_inner();
+
+        let https: HttpsConnector<_> = config.try_into()?;
+        let mut connector = TimeoutConnector::new(https);
+        if let Some(timeout) = timeout {
+            // reqwest's timeout is applied from when the request stars connecting until
+            // the response body has finished.
+            // Setting both connect and read timeout should be close enough.
+            connector.set_connect_timeout(Some(timeout));
+            // Timeout for reading the response.
+            connector.set_read_timeout(Some(timeout));
+        }
+        let client: hyper::Client<_, Body> = hyper::Client::builder().build(connector);
+
+        let inner = ServiceBuilder::new()
+            .layer(common)
+            .option_layer(maybe_auth)
+            .layer(tower::layer::layer_fn(LogRequest::new))
+            .service(client);
+        Ok(Self::new(inner))
     }
 }
 
@@ -406,4 +474,49 @@ fn verify_upgrade_response(res: &Response<Body>, key: &str) -> Result<()> {
 fn sec_websocket_key() -> String {
     let r: [u8; 16] = rand::random();
     base64::encode(&r)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Api, Client};
+
+    use futures::pin_mut;
+    use http::{Request, Response};
+    use hyper::Body;
+    use k8s_openapi::api::core::v1::Pod;
+    use tower_test::mock;
+
+    #[tokio::test]
+    async fn test_mock() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            // Receive a request for pod and respond with some data
+            pin_mut!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert_eq!(request.method(), http::Method::GET);
+            assert_eq!(request.uri().to_string(), "/api/v1/namespaces/default/pods/test");
+            let pod: Pod = serde_json::from_value(serde_json::json!({
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {
+                    "name": "test",
+                    "annotations": { "kube-rs": "test" },
+                },
+                "spec": {
+                    "containers": [{ "name": "test", "image": "test-image" }],
+                }
+            }))
+            .unwrap();
+            send.send_response(
+                Response::builder()
+                    .body(Body::from(serde_json::to_vec(&pod).unwrap()))
+                    .unwrap(),
+            );
+        });
+
+        let pods: Api<Pod> = Api::namespaced(Client::new(mock_service), "default");
+        let pod = pods.get("test").await.unwrap();
+        assert_eq!(pod.metadata.annotations.unwrap().get("kube-rs").unwrap(), "test");
+        spawned.await.unwrap();
+    }
 }
