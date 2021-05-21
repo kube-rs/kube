@@ -10,3 +10,6 @@ members = [
   "tests",
   "examples",
 ]
+
+[patch.crates-io]
+k8s-openapi = { git = "https://github.com/Arnavion/k8s-openapi" }

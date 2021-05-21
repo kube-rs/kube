@@ -1,6 +1,5 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
-use once_cell::sync::Lazy;
 use std::{borrow::Cow, collections::BTreeMap};
 
 /// An accessor trait for a kubernetes Resource.
@@ -148,10 +147,6 @@ pub trait ResourceExt: Resource {
     fn finalizers_mut(&mut self) -> &mut Vec<String>;
 }
 
-// TODO: replace with ordinary static when BTreeMap::new() is no longer
-// const-unstable.
-static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(BTreeMap::new);
-
 impl<K: Resource> ResourceExt for K {
     fn name(&self) -> String {
         self.meta().name.clone().expect(".metadata.name missing")
@@ -170,35 +165,35 @@ impl<K: Resource> ResourceExt for K {
     }
 
     fn labels(&self) -> &BTreeMap<String, String> {
-        self.meta().labels.as_ref().unwrap_or_else(|| &*EMPTY_MAP)
+        &self.meta().labels
     }
 
     fn labels_mut(&mut self) -> &mut BTreeMap<String, String> {
-        self.meta_mut().labels.get_or_insert_with(BTreeMap::new)
+        &mut self.meta_mut().labels
     }
 
     fn annotations(&self) -> &BTreeMap<String, String> {
-        self.meta().annotations.as_ref().unwrap_or_else(|| &*EMPTY_MAP)
+        &self.meta().annotations
     }
 
     fn annotations_mut(&mut self) -> &mut BTreeMap<String, String> {
-        self.meta_mut().annotations.get_or_insert_with(BTreeMap::new)
+        &mut self.meta_mut().annotations
     }
 
     fn owner_references(&self) -> &[OwnerReference] {
-        self.meta().owner_references.as_deref().unwrap_or_default()
+        self.meta().owner_references.as_slice()
     }
 
     fn owner_references_mut(&mut self) -> &mut Vec<OwnerReference> {
-        self.meta_mut().owner_references.get_or_insert_with(Vec::new)
+        &mut self.meta_mut().owner_references
     }
 
     fn finalizers(&self) -> &[String] {
-        self.meta().finalizers.as_deref().unwrap_or_default()
+        self.meta().finalizers.as_slice()
     }
 
     fn finalizers_mut(&mut self) -> &mut Vec<String> {
-        self.meta_mut().finalizers.get_or_insert_with(Vec::new)
+        &mut self.meta_mut().finalizers
     }
 }
 

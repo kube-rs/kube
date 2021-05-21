@@ -235,9 +235,8 @@ async fn create_crd(client: Client) -> Result<CustomResourceDefinition> {
             let accepted = crd
                 .status
                 .as_ref()
-                .and_then(|s| s.conditions.as_ref())
-                .map(|cs| {
-                    cs.iter()
+                .map(|s| {
+                    s.conditions.iter()
                         .any(|c| c.type_ == "NamesAccepted" && c.status == "True")
                 })
                 .unwrap_or(false);

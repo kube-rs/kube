@@ -33,7 +33,6 @@ async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result
             .status
             .unwrap()
             .conditions
-            .unwrap()
             .into_iter()
             .filter(|c| {
                 // In a failed state either some of the extra conditions are not False

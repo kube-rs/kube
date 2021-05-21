@@ -104,7 +104,6 @@ where
         let dt = owner_type.clone();
         meta.owner_references
             .into_iter()
-            .flatten()
             .flat_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, dt.clone()))
     })
 }
