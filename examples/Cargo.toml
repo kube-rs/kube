@@ -89,6 +89,10 @@ name = "dynamic_api"
 path = "dynamic_api.rs"
 
 [[example]]
+name = "dynamic_pod"
+path = "dynamic_pod.rs"
+
+[[example]]
 name = "event_watcher"
 path = "event_watcher.rs"
 
