@@ -68,7 +68,7 @@ impl Client {
     }
 
     /// Create and initialize a [`Client`] using the given `Service` and the default namespace.
-    pub fn new_with_default_ns<S, T: Into<String>>(service: S, default_ns: T) -> Self
+    fn new_with_default_ns<S, T: Into<String>>(service: S, default_ns: T) -> Self
     where
         S: Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
         S::Future: Send + 'static,
