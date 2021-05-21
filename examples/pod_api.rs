@@ -17,10 +17,6 @@ async fn main() -> anyhow::Result<()> {
 
     // Manage pods
     let pods: Api<Pod> = Api::namespaced(client, &namespace);
-    for p in pods.list(&Default::default()).await? {
-        use kube::ResourceExt;
-        info!("found pod {}", p.name());
-    }
 
     // Create Pod blog
     info!("Creating Pod instance blog");
