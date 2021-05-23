@@ -325,7 +325,7 @@ impl ApiGroup {
     /// Returns the recommended (preferred or latest versioned) resources in the ApiGroup
     ///
     /// ```no_run
-    /// use kube::{Client, api::{Api, discovery::{Discovery, verbs}, DynamicObject}, ResourceExt};
+    /// use kube::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs}, ResourceExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
@@ -350,7 +350,7 @@ impl ApiGroup {
     /// Returns the recommended version of the Kind in the recommended resources (if found)
     ///
     /// ```no_run
-    /// use kube::{Client, api::{Api, Discovery, DynamicObject}, ResourceExt};
+    /// use kube::{Client, api::{Api, DynamicObject}, Discovery, ResourceExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;

@@ -3,10 +3,8 @@
 
 use kube::{
     api::{Api, DynamicObject, ResourceExt},
-    client::{
-        discovery::{verbs, Discovery, Scope},
-        Client,
-    },
+    discovery::{verbs, Discovery, Scope},
+    Client,
 };
 use log::info;
 
