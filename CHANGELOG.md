@@ -2,6 +2,8 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.55.0...master
+ * `kube`: added `Api::default_namespaced` - #209 via #534
+ * `kube`: added `config` feature - #533 via #535
 
 0.55.0 / 2021-05-21
 ===================

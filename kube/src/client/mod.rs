@@ -2,10 +2,11 @@
 //!
 //! The [`Client`] uses standard kube error handling.
 //!
-//! This client can be used on its own or in conjuction with
-//! the [`Api`][crate::api::Api] type for more structured
-//! interaction with the kuberneres API.
-pub mod discovery;
+//! This client can be used on its own or in conjuction with the [`Api`][crate::api::Api]
+//! type for more structured interaction with the kubernetes API.
+//!
+//! The [`Client`] can also be used with [`Discovery`](crate::api::Discovery) to dynamically
+//! retrieve the resources served by the kubernetes API.
 
 use std::convert::{TryFrom, TryInto};
 

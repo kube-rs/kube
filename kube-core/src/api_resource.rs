@@ -19,6 +19,7 @@ pub struct ApiResource {
     pub plural: String,
 }
 
+// TODO: probably make `from_apiresource` private to encourage `Discovery`
 impl ApiResource {
     /// Creates ApiResource from `meta::v1::APIResource` instance.
     ///

@@ -21,25 +21,23 @@ async fn main() -> anyhow::Result<()> {
 
     let ns_filter = std::env::var("NAMESPACE").ok();
 
-    let discovery = Discovery::new(&client).await?;
-
+    let discovery = Discovery::all(&client).await?;
     for group in discovery.groups() {
-        let ver = group.preferred_version_or_guess();
-        for (api_res, extras) in group.resources_by_version(ver) {
-            if !extras.supports_operation(verbs::LIST) {
+        for (ar, caps) in group.recommended_resources() {
+            if !caps.supports_operation(verbs::LIST) {
                 continue;
             }
-            let api: Api<DynamicObject> = if extras.scope == Scope::Namespaced {
+            let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
                 if let Some(ns) = &ns_filter {
-                    Api::namespaced_with(client.clone(), ns, &api_res)
+                    Api::namespaced_with(client.clone(), ns, &ar)
                 } else {
-                    Api::all_with(client.clone(), &api_res)
+                    Api::all_with(client.clone(), &ar)
                 }
             } else {
-                Api::all_with(client.clone(), &api_res)
+                Api::all_with(client.clone(), &ar)
             };
 
-            info!("{}/{} : {}", group.name(), ver, api_res.kind);
+            info!("{}/{} : {}", group.name(), ar.version, ar.kind);
 
             let list = api.list(&Default::default()).await?;
             for item in list.items {

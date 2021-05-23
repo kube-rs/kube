@@ -25,6 +25,8 @@ pub use kube_core::{
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
 };
+pub mod discovery;
+pub use discovery::Discovery;
 
 use crate::Client;
 /// The generic Api abstraction
