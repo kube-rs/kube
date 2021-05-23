@@ -238,7 +238,7 @@ impl ApiGroup {
         }
         let mut group = ApiGroup {
             name: g.name,
-            data: data,
+            data,
             preferred: g.preferred_version.map(|v| v.version),
         };
         group.sort_versions();
@@ -256,7 +256,7 @@ impl ApiGroup {
         }
         let mut group = ApiGroup {
             name: ApiGroup::CORE_GROUP.to_string(),
-            data: data,
+            data,
             preferred: Some("v1".to_string()),
         };
         group.sort_versions();

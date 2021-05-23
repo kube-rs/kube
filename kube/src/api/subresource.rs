@@ -158,14 +158,14 @@ where
     #[instrument(skip(self), level = "trace")]
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
         let req = self.request.logs(name, lp)?;
-        Ok(self.client.request_text(req).await?)
+        self.client.request_text(req).await
     }
 
     /// Fetch logs as a stream of bytes
     #[instrument(skip(self), level = "trace")]
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
         let req = self.request.logs(name, lp)?;
-        Ok(self.client.request_text_stream(req).await?)
+        self.client.request_text_stream(req).await
     }
 }
 
