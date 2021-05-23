@@ -76,16 +76,6 @@ impl ApiResource {
         }
     }
 
-    /// Creates ApiResource from group, version and kind.
-    /// # Warning
-    /// This function has to **guess** resource plural name.
-    /// While it makes it best to guess correctly, sometimes it can
-    /// be wrong, and using returned ApiResource will lead to incorrect
-    /// api requests.
-    pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
-        ApiResource::from_gvk_with_plural(gvk, &crate::resource::to_plural(&gvk.kind.to_ascii_lowercase()))
-    }
-
     /// Creates ApiResource from group, version, kind and plural name.
     pub fn from_gvk_with_plural(gvk: &GroupVersionKind, plural: &str) -> Self {
         let api_version = match gvk.group.as_str() {
@@ -99,5 +89,15 @@ impl ApiResource {
             kind: gvk.kind.clone(),
             plural: plural.to_string(),
         }
+    }
+
+    /// Creates ApiResource from group, version and kind.
+    ///
+    /// # Warning
+    /// This function will **guess** the resource plural name.
+    /// Usually, this is ok, but for CRDs with complex pluralisations it can fail.
+    /// Prefer [`ApiResource::from_gvk_with_plural`](super::ApiResource::from_gvk_with_plural)
+    pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
+        ApiResource::from_gvk_with_plural(gvk, &crate::resource::to_plural(&gvk.kind.to_ascii_lowercase()))
     }
 }

@@ -5,7 +5,7 @@
 //! This client can be used on its own or in conjuction with the [`Api`][crate::api::Api]
 //! type for more structured interaction with the kubernetes API.
 //!
-//! The [`Client`] can also be used with [`Discovery`](crate::api::Discovery) to dynamically
+//! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
 
 use std::convert::{TryFrom, TryInto};
@@ -297,7 +297,13 @@ impl Client {
             }
         }))
     }
+}
 
+/// Low level discovery methods using `k8s_openapi` types.
+///
+/// Consider using the [`discovery`](crate::discovery) module for
+/// easier-to-use variants of this functionality.
+impl Client {
     /// Returns apiserver version.
     pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
         self.request(Request::builder().uri("/version").body(vec![])?)

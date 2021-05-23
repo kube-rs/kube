@@ -2,7 +2,8 @@
 
 use crate::{Client, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIResourceList, APIVersions};
-use kube_core::{gvk::GroupVersionKind, dynamic::ApiResource};
+use kube_core::gvk::GroupVersionKind;
+pub use kube_core::dynamic::ApiResource;
 use std::collections::HashMap;
 
 /// Resource scope
@@ -127,12 +128,20 @@ impl GroupVersionData {
 ///
 /// Or you can use it to discover everything via `Discovery::all`.
 /// Internally, it will use a series of `Client` calls (one per group) to discover what was requested.
+///
+/// To make use of discovered apis, extract one or more [`ApiGroup`]s from it,
+/// or resolve a precise one using [`Discovery::resolve_gvk`](crate::discovery::Discovery::resolve_gvk).
+///
+/// [`ApiGroup`]: crate::discovery::ApiGroup
 pub struct Discovery {
     groups: HashMap<String, ApiGroup>,
 }
 
 impl Discovery {
     /// Discovers all APIs available in the cluster including CustomResourceDefinitions
+    ///
+    /// See example usage in [examples/dynamic.api](https://github.com/clux/kube-rs/blob/master/examples/dynamic_api.rs)
+    /// to create something akin to `kubectl get all --all-namespaces`.
     pub async fn all(client: &Client) -> Result<Self> {
         let api_groups = client.list_api_groups().await?;
         let mut groups = HashMap::new();
@@ -154,6 +163,21 @@ impl Discovery {
     /// Discovers all APIs available under a certain group and return the singular ApiGroup
     ///
     /// You can safely unwrap the Option if you know the apigroup passed exists on the apiserver.
+    ///
+    /// ```no_run
+    /// use kube::{Client, api::{Api, DynamicObject}, Discovery, ResourceExt};
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), kube::Error> {
+    ///     let client = Client::try_default().await?;
+    ///     let apigroup = Discovery::single(&client, "apiregistration.k8s.io").await?.unwrap();
+    ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
+    ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+    ///     for service in api.list(&Default::default()).await? {
+    ///         println!("Found APIService: {}", service.name());
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn single(client: &Client, apigroup: &str) -> Result<Option<ApiGroup>> {
         let api_groups = client.list_api_groups().await?;
         for g in api_groups.groups {
@@ -186,7 +210,7 @@ impl Discovery {
         self.groups.values()
     }
 
-    /// Returns the `ApiGroup` for a given group if served
+    /// Returns the [`ApiGroup`] for a given group if served
     pub fn get(&self, group: &str) -> Option<&ApiGroup> {
         self.groups.get(group)
     }
@@ -196,10 +220,10 @@ impl Discovery {
         self.groups.contains_key(group)
     }
 
-    /// Finds an ApiResource and its ApiCapabilities after discovery by matching a GVK
+    /// Finds an [`ApiResource`] and its [`ApiCapabilities`] after discovery by matching a GVK
     pub fn resolve_gvk(&self, gvk: &GroupVersionKind) -> Option<(ApiResource, ApiCapabilities)> {
         self.get(&gvk.group)?
-            .resources_by_version(&gvk.version)
+            .versioned_resources(&gvk.version)
             .into_iter()
             .find(|res| res.0.kind == gvk.kind)
     }
@@ -210,6 +234,58 @@ impl Discovery {
 // ----------------------------------------------------------------------------
 
 /// Describes one API groups collected resources and capabilities.
+///
+/// Each `ApiGroup` contains all data pinned to a each version.
+/// In particular, one data set within the `ApiGroup` for `"apiregistration.k8s.io"`
+/// is the subset pinned to `"v1"`; commonly referred to as `"apiregistration.k8s.io/v1"`.
+///
+/// If you know the version of the discovered group, you can fetch it directly:
+/// ```no_run
+/// use kube::{Client, api::{Api, DynamicObject}, Discovery, ResourceExt};
+/// #[tokio::main]
+/// async fn main() -> Result<(), kube::Error> {
+///     let client = Client::try_default().await?;
+///     let apigroup = Discovery::single(&client, "apiregistration.k8s.io").await?.unwrap();
+///      for (apiresource, caps) in apigroup.versioned_resources("v1") {
+///          println!("Found ApiResource {}", apiresource.kind);
+///      }
+///     Ok(())
+/// }
+/// ```
+///
+/// But if you do not know this information, you can use [`ApiGroup::preferred_version_or_latest`].
+///
+/// Whichever way you choose the end result is something describing a resource and its abilities:
+/// - `Vec<(ApiResource, `ApiCapabilities)>` :: for all resources in a versioned ApiGroup
+/// - `(ApiResource, ApiCapabilities)` :: for a single kind under a versioned ApiGroud
+///
+/// These two types: [`ApiResource`], and [`ApiCapabilities`]
+/// should contain the information needed to construct an [`Api`](crate::Api) and start querying the kubernetes API.
+/// You will likely need to use [`DynamicObject`] as the generic type for Api to do this,
+/// as well as the [`ApiResource`] for the `DynamicType` for the [`Resource`] trait.
+///
+/// ```no_run
+/// use kube::{Client, api::{Api, DynamicObject}, Discovery, ResourceExt};
+/// #[tokio::main]
+/// async fn main() -> Result<(), kube::Error> {
+///     let client = Client::try_default().await?;
+///     let apigroup = Discovery::single(&client, "apiregistration.k8s.io").await?.unwrap();
+///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
+///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+///     for service in api.list(&Default::default()).await? {
+///         println!("Found APIService: {}", service.name());
+///     }
+///     Ok(())
+/// }
+/// ```
+/// [`ApiResource`]: crate::discovery::ApiResource
+/// [`ApiCapabilities`]: crate::discovery::ApiCapabilities
+/// [`DynamicObject`]: crate::api::DynamicObject
+/// [`Resource`]: crate::Resource
+/// [`ApiGroup::preferred_version_or_latest`]: crate::discovery::ApiGroup::preferred_version_or_latest
+/// [`ApiGroup::versioned_resources`]: crate::discovery::ApiGroup::versioned_resources
+/// [`ApiGroup::recommended_resources`]: crate::discovery::ApiGroup::recommended_resources
+/// [`ApiGroup::recommended_kind`]: crate::discovery::ApiGroup::recommended_kind
 pub struct ApiGroup {
     /// Name of the group e.g. apiregistration.k8s.io
     name: String,
@@ -269,15 +345,14 @@ impl ApiGroup {
 
 /// Public ApiGroup interface
 impl ApiGroup {
-    /// Core group name
-    pub const CORE_GROUP: &'static str = "core";
-
     /// Returns the name of this group.
     ///
     /// For the core group (served at `/api`), it returns `ApiGroup::CORE`.
     pub fn name(&self) -> &str {
         &self.name
     }
+    /// Core group name
+    pub const CORE_GROUP: &'static str = "core";
 
     /// Returns served versions (e.g. `["v1", "v2beta1"]`) of this group.
     ///
@@ -306,13 +381,13 @@ impl ApiGroup {
         self.preferred.as_deref().unwrap_or_else(|| self.versions().next().unwrap())
     }
 
-    /// Returns resources available by a version
+    /// Returns the resources in the group at an arbitrary version string.
     ///
     /// If the group does not support this version, the returned vector is empty.
     ///
     /// If you are looking for the api recommended list of resources, or just on particular kind
-    /// consider `ApiGroup::recommended_resources` or `ApiGroup::recommended_kind` instead.
-    pub fn resources_by_version(&self, ver: &str) -> Vec<(ApiResource, ApiCapabilities)> {
+    /// consider [`ApiGroup::recommended_resources`] or [`ApiGroup::recommended_kind`] instead.
+    pub fn versioned_resources(&self, ver: &str) -> Vec<(ApiResource, ApiCapabilities)> {
         self
             .data
             .iter()
@@ -322,7 +397,7 @@ impl ApiGroup {
             .to_vec()
     }
 
-    /// Returns the recommended (preferred or latest versioned) resources in the ApiGroup
+    /// Returns the recommended (preferred or latest) versioned resources in the group
     ///
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs}, ResourceExt};
@@ -342,12 +417,14 @@ impl ApiGroup {
     ///     Ok(())
     /// }
     /// ```
-    pub fn recommended_resources(&self) -> Vec<(ApiResource, ApiCapabilities)> {
+    ///
+    /// This is equivalent to taking the [`ApiGroup::versioned_resources`] at the [`ApiGroup::preferred_version_or_latest`].
+        pub fn recommended_resources(&self) -> Vec<(ApiResource, ApiCapabilities)> {
         let ver = self.preferred_version_or_latest();
-        self.resources_by_version(ver)
+        self.versioned_resources(ver)
     }
 
-    /// Returns the recommended version of the Kind in the recommended resources (if found)
+    /// Returns the recommended version of the `kind` in the recommended resources (if found)
     ///
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, Discovery, ResourceExt};
@@ -363,9 +440,11 @@ impl ApiGroup {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// This is equivalent to filtering the [`ApiGroup::versioned_resources`] at [`ApiGroup::preferred_version_or_latest`] against a chosen `kind`.
     pub fn recommended_kind(&self, kind: &str) -> Option<(ApiResource, ApiCapabilities)> {
         let ver = self.preferred_version_or_latest();
-        for (ar, caps) in self.resources_by_version(ver) {
+        for (ar, caps) in self.versioned_resources(ver) {
             if ar.kind == kind {
                 return Some((ar, caps))
             }
