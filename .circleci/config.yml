@@ -98,6 +98,7 @@ jobs:
       - run: cargo test -p kube
       - run: cargo test -p kube-derive
       - run: cargo test -p kube-core
+      - run: cargo test -p kube --lib --no-default-features --features=config
       - run: cargo test --lib --all -j4
       - run: cargo test --doc --all -j4
       - run: cargo test -j4 -p examples

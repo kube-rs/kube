@@ -72,6 +72,21 @@ impl<K: Resource> Api<K> {
         }
     }
 
+    /// Namespaced resource within the default namespace
+    ///
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    ///
+    /// Unless configured explicitly, the default namespace is either "default"
+    /// out of cluster, or the service account's namespace in cluster.
+    pub fn default_namespaced_with(client: Client, dyntype: &K::DynamicType) -> Self {
+        let url = K::url_path(dyntype, Some(client.default_ns()));
+        Self {
+            client,
+            request: Request::new(url),
+            phantom: std::iter::empty(),
+        }
+    }
+
     /// Consume self and return the [`Client`]
     pub fn into_client(self) -> Client {
         self.into()
@@ -104,6 +119,19 @@ where
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self {
         let url = K::url_path(&Default::default(), Some(ns));
+        Self {
+            client,
+            request: Request::new(url),
+            phantom: std::iter::empty(),
+        }
+    }
+
+    /// Namespaced resource within the default namespace
+    ///
+    /// Unless configured explicitly, the default namespace is either "default"
+    /// out of cluster, or the service account's namespace in cluster.
+    pub fn default_namespaced(client: Client) -> Self {
+        let url = K::url_path(&Default::default(), Some(client.default_ns()));
         Self {
             client,
             request: Request::new(url),

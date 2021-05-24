@@ -12,6 +12,7 @@ mod utils;
 use crate::{error::ConfigError, Result};
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
+#[cfg(feature = "client")]
 pub(crate) use utils::read_file_to_string;
 
 use http::header::HeaderMap;
@@ -212,3 +213,39 @@ pub use file_config::{
     AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedAuthInfo, NamedCluster,
     NamedContext, NamedExtension, Preferences,
 };
+
+
+#[cfg(test)]
+mod tests {
+    #[cfg(not(feature = "client"))] // want to ensure this works without client features
+    #[tokio::test]
+    async fn config_loading_on_small_feature_set() {
+        use super::Config;
+        let cfgraw = r#"
+        apiVersion: v1
+        clusters:
+        - cluster:
+            certificate-authority-data: aGVsbG8K
+            server: https://0.0.0.0:6443
+          name: k3d-test
+        contexts:
+        - context:
+            cluster: k3d-test
+            user: admin@k3d-test
+          name: k3d-test
+        current-context: k3d-test
+        kind: Config
+        preferences: {}
+        users:
+        - name: admin@k3d-test
+          user:
+            client-certificate-data: aGVsbG8K
+            client-key-data: aGVsbG8K
+        "#;
+        let file = tempfile::NamedTempFile::new().expect("create config tempfile");
+        std::fs::write(file.path(), cfgraw).unwrap();
+        std::env::set_var("KUBECONFIG", file.path());
+        let kubeconfig = Config::infer().await.unwrap();
+        assert_eq!(kubeconfig.cluster_url.into_string(), "https://0.0.0.0:6443/");
+    }
+}

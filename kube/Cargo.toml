@@ -22,13 +22,13 @@ rustls-tls = ["client", "hyper-rustls", "tokio-rustls"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["client", "tame-oauth"]
 gzip = ["client", "async-compression"]
-client = ["__config", "__non_core", "hyper", "tower", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
+client = ["config", "__non_core", "hyper", "tower", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 derive = ["kube-derive"]
+config = ["__non_core", "pem", "dirs"]
 
 # private feature sets; do not use
-__config = ["pem", "dirs"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
