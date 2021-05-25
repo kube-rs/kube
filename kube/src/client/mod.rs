@@ -8,13 +8,13 @@
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
 
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
 use http::{self, HeaderValue, Request, Response, StatusCode};
-use hyper::Body;
+use hyper::{client::HttpConnector, Body};
 use hyper_timeout::TimeoutConnector;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
@@ -28,13 +28,12 @@ use tokio_util::{
 };
 use tower::{buffer::Buffer, util::BoxService, BoxError, Service, ServiceBuilder, ServiceExt};
 
-
 #[cfg(feature = "gzip")]
 use crate::service::{accept_compressed, maybe_decompress};
 use crate::{
     api::WatchEvent,
     error::{ConfigError, ErrorResponse},
-    service::{set_cluster_url, set_default_headers, AuthLayer, Authentication, HttpsConnector, LogRequest},
+    service::{set_cluster_url, set_default_headers, AuthLayer, Authentication, LogRequest},
     Config, Error, Result,
 };
 
@@ -423,8 +422,25 @@ impl TryFrom<Config> for Client {
             .map_response(maybe_decompress)
             .into_inner();
 
-        let https: HttpsConnector<_> = config.try_into()?;
-        let mut connector = TimeoutConnector::new(https);
+        let mut connector = HttpConnector::new();
+        connector.enforce_http(false);
+
+        // Note that if both `native_tls` and `rustls` is enabled, `native_tls` is used by default.
+        // To use `rustls`, disable `native_tls` or create custom client.
+        // If tls features are not enabled, http connector will be used.
+        #[cfg(feature = "native-tls")]
+        let connector = hyper_tls::HttpsConnector::from((
+            connector,
+            tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
+        ));
+
+        #[cfg(all(not(feature = "native-tls"), feature = "rustls-tls"))]
+        let connector = hyper_rustls::HttpsConnector::from((
+            connector,
+            std::sync::Arc::new(config.rustls_tls_client_config()?),
+        ));
+
+        let mut connector = TimeoutConnector::new(connector);
         if let Some(timeout) = timeout {
             // reqwest's timeout is applied from when the request stars connecting until
             // the response body has finished.

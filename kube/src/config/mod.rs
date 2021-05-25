@@ -7,6 +7,7 @@
 mod file_config;
 mod file_loader;
 mod incluster_config;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
 mod utils;
 
 use crate::{error::ConfigError, Result};
@@ -35,9 +36,9 @@ pub struct Config {
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
-    /// Client certs and key in PEM format and a password for a client to create `Identity` with.
-    /// Password is only used with `native_tls` to create a PKCS12 archive.
-    pub(crate) identity: Option<(Vec<u8>, String)>,
+    // TODO should keep client key and certificate separate. It's split later anyway.
+    /// Client certificate and private key in PEM.
+    identity_pem: Option<Vec<u8>>,
     /// Stores information to tell the cluster who you are.
     pub(crate) auth_info: AuthInfo,
 }
@@ -56,7 +57,7 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
-            identity: None,
+            identity_pem: None,
             auth_info: AuthInfo::default(),
         }
     }
@@ -114,7 +115,7 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
-            identity: None,
+            identity_pem: None,
             auth_info: AuthInfo {
                 token: Some(token),
                 ..Default::default()
@@ -180,7 +181,7 @@ impl Config {
             headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
-            identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
+            identity_pem,
             auth_info: loader.user,
         })
     }
@@ -189,7 +190,6 @@ impl Config {
 // https://github.com/clux/kube-rs/issues/146#issuecomment-590924397
 /// Default Timeout
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
-const IDENTITY_PASSWORD: &str = " ";
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]

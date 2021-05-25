@@ -74,24 +74,6 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-#[macro_use] extern crate static_assertions;
-assert_cfg!(
-    not(all(feature = "native-tls", feature = "rustls-tls")),
-    "Must use exactly one of native-tls or rustls-tls features"
-);
-assert_cfg!(
-    any(
-        all(feature = "native-tls", feature = "client"),
-        all(feature = "rustls-tls", feature = "client"),
-        all(
-            not(feature = "rustls-tls"),
-            not(feature = "native-tls"),
-            not(feature = "client")
-        ),
-    ),
-    "You must use a tls stack when using the client feature"
-);
-
 macro_rules! cfg_client {
     ($($item:item)*) => {
         $(

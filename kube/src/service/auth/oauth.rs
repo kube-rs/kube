@@ -1,7 +1,5 @@
 use std::{env, path::PathBuf};
 
-#[cfg(feature = "rustls-tls")] use hyper_rustls::HttpsConnector;
-#[cfg(feature = "native-tls")] use hyper_tls::HttpsConnector;
 use tame_oauth::{
     gcp::{ServiceAccountAccess, ServiceAccountInfo, TokenOrRequest},
     Token,
@@ -52,10 +50,16 @@ impl Gcp {
             Ok(TokenOrRequest::Request {
                 request, scope_hash, ..
             }) => {
-                #[cfg(feature = "native-tls")]
-                let https = HttpsConnector::new();
+                #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+                compile_error!(
+                    "At least one of native-tls or rustls-tls feature must be enabled to use oauth feature"
+                );
+                // If both are enabled, we use rustls unlike `Client` because there's no need to support ip v4/6 subject matching.
+                // TODO Allow users to choose when both are enabled.
                 #[cfg(feature = "rustls-tls")]
-                let https = HttpsConnector::with_native_roots();
+                let https = hyper_rustls::HttpsConnector::with_native_roots();
+                #[cfg(all(not(feature = "rustls-tls"), feature = "native-tls"))]
+                let https = hyper_tls::HttpsConnector::new();
                 let client = hyper::Client::builder().build::<_, hyper::Body>(https);
 
                 let res = client
