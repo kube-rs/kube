@@ -79,10 +79,8 @@ mod native_tls {
 mod rustls_tls {
     use std::sync::Arc;
 
-    use tokio_rustls::{
-        rustls::{self, Certificate, ClientConfig, ServerCertVerified, ServerCertVerifier},
-        webpki::DNSNameRef,
-    };
+    use rustls::{self, Certificate, ClientConfig, ServerCertVerified, ServerCertVerifier};
+    use webpki::DNSNameRef;
 
     use crate::{Error, Result};
 
