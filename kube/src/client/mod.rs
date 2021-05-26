@@ -59,22 +59,22 @@ impl Client {
     /// Create and initialize a [`Client`] using the given `Service`.
     ///
     /// Use [`Client::try_from`](Self::try_from) to create with a [`Config`].
-    pub fn new<S>(service: S) -> Self
+    pub fn new<S, E: Into<BoxError>>(service: S) -> Self
     where
-        S: Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
+        S: Service<Request<Body>, Response = Response<Body>, Error = E> + Send + 'static,
         S::Future: Send + 'static,
     {
         Self::new_with_default_ns(service, "default")
     }
 
     /// Create and initialize a [`Client`] using the given `Service` and the default namespace.
-    fn new_with_default_ns<S, T: Into<String>>(service: S, default_ns: T) -> Self
+    fn new_with_default_ns<S, E: Into<BoxError>, T: Into<String>>(service: S, default_ns: T) -> Self
     where
-        S: Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
+        S: Service<Request<Body>, Response = Response<Body>, Error = E> + Send + 'static,
         S::Future: Send + 'static,
     {
         Self {
-            inner: Buffer::new(BoxService::new(service), 1024),
+            inner: Buffer::new(BoxService::new(service.map_err(|e| e.into())), 1024),
             default_ns: default_ns.into(),
         }
     }

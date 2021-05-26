@@ -23,7 +23,6 @@ async fn main() -> anyhow::Result<()> {
     let cluster_url = config.cluster_url.clone();
     let common = ServiceBuilder::new()
         .map_request(move |r| kube::set_cluster_url(r, &cluster_url))
-        .map_err(|e: hyper::Error| e.into())
         .into_inner();
     let mut http = HttpConnector::new();
     http.enforce_http(false);
