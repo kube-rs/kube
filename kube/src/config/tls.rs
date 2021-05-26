@@ -90,7 +90,6 @@ mod rustls_tls {
         root_cert: Option<&Vec<Vec<u8>>>,
         accept_invalid: bool,
     ) -> Result<ClientConfig> {
-        use rustls::internal::pemfile;
         use std::io::Cursor;
 
         // Based on code from `reqwest`
@@ -98,21 +97,46 @@ mod rustls_tls {
         if let Some(buf) = identity_pem {
             let (key, certs) = {
                 let mut pem = Cursor::new(buf);
-                let certs = pemfile::certs(&mut pem)
+                let certs = rustls_pemfile::certs(&mut pem)
+                    .and_then(|certs| {
+                        if certs.is_empty() {
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::NotFound,
+                                "No X.509 Certificates Found",
+                            ))
+                        } else {
+                            Ok(certs.into_iter().map(rustls::Certificate).collect::<Vec<_>>())
+                        }
+                    })
                     .map_err(|_| Error::SslError("No valid certificate was found".into()))?;
                 pem.set_position(0);
 
-                let mut sk = pemfile::pkcs8_private_keys(&mut pem)
-                    .and_then(|pkcs8_keys| {
-                        if pkcs8_keys.is_empty() {
-                            Err(())
+                // TODO Support EC Private Key to support k3d. Need to convert to PKCS#8 or RSA (PKCS#1).
+                // `openssl pkcs8 -topk8 -nocrypt -in ec.pem -out pkcs8.pem`
+                // https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations#EC_Private_Key_File_Formats
+                let mut sk = rustls_pemfile::pkcs8_private_keys(&mut pem)
+                    .and_then(|keys| {
+                        if keys.is_empty() {
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::NotFound,
+                                "No PKCS8 Key Found",
+                            ))
                         } else {
-                            Ok(pkcs8_keys)
+                            Ok(keys.into_iter().map(rustls::PrivateKey).collect::<Vec<_>>())
                         }
                     })
                     .or_else(|_| {
                         pem.set_position(0);
-                        pemfile::rsa_private_keys(&mut pem)
+                        rustls_pemfile::rsa_private_keys(&mut pem).and_then(|keys| {
+                            if keys.is_empty() {
+                                Err(std::io::Error::new(
+                                    std::io::ErrorKind::NotFound,
+                                    "No RSA Key Found",
+                                ))
+                            } else {
+                                Ok(keys.into_iter().map(rustls::PrivateKey).collect::<Vec<_>>())
+                            }
+                        })
                     })
                     .map_err(|_| Error::SslError("No valid private key was found".into()))?;
 

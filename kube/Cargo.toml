@@ -18,7 +18,7 @@ edition = "2018"
 [features]
 default = ["native-tls"]
 native-tls = ["client", "openssl", "hyper-tls", "tokio-native-tls"]
-rustls-tls = ["client", "rustls", "hyper-rustls", "webpki"]
+rustls-tls = ["client", "rustls", "rustls-pemfile", "hyper-rustls", "webpki"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["client", "tame-oauth"]
 gzip = ["client", "async-compression"]
@@ -52,6 +52,7 @@ pem = { version = "0.8.2", optional = true }
 openssl = { version = "0.10.32", optional = true }
 tokio-native-tls = { version = "0.3.0", optional = true }
 rustls = { version = "0.19.1", features = ["dangerous_configuration"], optional = true }
+rustls-pemfile = { version = "0.2.1", optional = true }
 webpki = { version = "0.21.4", optional = true }
 bytes = { version = "1.0.0", optional = true }
 tokio = { version = "1.0.1", features = ["time", "signal", "sync"], optional = true }
