@@ -10,12 +10,18 @@ publish = false
 edition = "2018"
 
 [features]
-default = ["native-tls", "schema", "kubederive", "ws"]
+default = ["native-tls", "rustls-tls", "schema", "kubederive", "ws"]
 kubederive = ["kube/derive"] # by default import kube-derive with its default features
 schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
-native-tls = ["kube/native-tls"]
-rustls-tls = ["kube/rustls-tls"]
+native-tls = ["kube/native-tls", "hyper-tls", "tokio-native-tls"]
+rustls-tls = ["kube/rustls-tls", "hyper-rustls"]
 ws = ["kube/ws"]
+
+[dependencies]
+tokio-util = "0.6.0"
+hyper-tls = { version = "0.5.0", optional = true }
+tokio-native-tls = { version = "0.3.0", optional = true }
+hyper-rustls = { version = "0.22.1", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.37"
@@ -43,6 +49,8 @@ tracing-subscriber = "0.2"
 warp = { version = "0.3", features = ["tls"] }
 http = "0.2.3"
 json-patch = "0.2.6"
+tower = { version = "0.4.6" }
+hyper = { version = "0.14.2", features = ["client", "http1", "stream", "tcp"] }
 
 [[example]]
 name = "configmapgen_controller"
@@ -160,5 +168,6 @@ path = "secret_reflector.rs"
 name = "admission_controller"
 path = "admission_controller.rs"
 
-[dependencies]
-tokio-util = "0.6.0"
+[[example]]
+name = "custom_client"
+path = "custom_client.rs"

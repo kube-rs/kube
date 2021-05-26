@@ -8,9 +8,9 @@ mod url;
 
 #[cfg(feature = "gzip")]
 pub(crate) use self::compression::{accept_compressed, maybe_decompress};
+pub use self::url::set_cluster_url;
 pub(crate) use self::{
     auth::{AuthLayer, Authentication},
     headers::set_default_headers,
     log::LogRequest,
-    url::set_cluster_url,
 };
