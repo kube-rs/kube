@@ -16,9 +16,9 @@ categories = ["web-programming::http-client"]
 edition = "2018"
 
 [features]
-default = ["native-tls"]
-native-tls = ["client", "openssl", "hyper-tls", "tokio-native-tls"]
-rustls-tls = ["client", "rustls", "rustls-pemfile", "hyper-rustls", "webpki"]
+default = ["client", "native-tls"]
+native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
+rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls", "webpki"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["client", "tame-oauth"]
 gzip = ["client", "async-compression"]

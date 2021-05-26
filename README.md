@@ -157,7 +157,7 @@ Kube has basic support ([with caveats](https://github.com/clux/kube-rs/issues?q=
 
 ```toml
 [dependencies]
-kube = { version = "0.55.0", default-features = false, features = ["rustls-tls"] }
+kube = { version = "0.55.0", default-features = false, features = ["client", "rustls-tls"] }
 kube-runtime = { version = "0.55.0" }
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_20"] }
 ```

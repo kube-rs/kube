@@ -13,8 +13,8 @@ edition = "2018"
 default = ["native-tls", "rustls-tls", "schema", "kubederive", "ws"]
 kubederive = ["kube/derive"] # by default import kube-derive with its default features
 schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
-native-tls = ["kube/native-tls", "hyper-tls", "tokio-native-tls"]
-rustls-tls = ["kube/rustls-tls", "hyper-rustls"]
+native-tls = ["kube/client", "kube/native-tls", "hyper-tls", "tokio-native-tls"]
+rustls-tls = ["kube/client", "kube/rustls-tls", "hyper-rustls"]
 ws = ["kube/ws"]
 
 [dependencies]
