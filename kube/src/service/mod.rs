@@ -1,16 +1,16 @@
-//! Abstracts the connection to Kubernetes API server.
+//! Middleware for customizing client.
 
 mod auth;
+mod base_uri;
 #[cfg(feature = "gzip")] mod compression;
 mod headers;
 mod log;
-mod url;
 
 #[cfg(feature = "gzip")]
 pub(crate) use self::compression::{accept_compressed, maybe_decompress};
-pub use self::url::set_cluster_url;
 pub(crate) use self::{
     auth::{AuthLayer, Authentication},
     headers::set_default_headers,
     log::LogRequest,
 };
+pub use base_uri::{SetBaseUri, SetBaseUriLayer};

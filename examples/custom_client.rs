@@ -11,6 +11,7 @@ use tower::ServiceBuilder;
 
 use kube::{
     api::{Api, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
+    service::SetBaseUriLayer,
     Client, Config,
 };
 
@@ -22,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::infer().await?;
     let cluster_url = config.cluster_url.clone();
     let common = ServiceBuilder::new()
-        .map_request(move |r| kube::set_cluster_url(r, &cluster_url))
+        .layer(SetBaseUriLayer::new(cluster_url))
         .into_inner();
     let mut http = HttpConnector::new();
     http.enforce_http(false);

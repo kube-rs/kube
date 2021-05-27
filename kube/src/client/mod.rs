@@ -33,7 +33,7 @@ use crate::service::{accept_compressed, maybe_decompress};
 use crate::{
     api::WatchEvent,
     error::{ConfigError, ErrorResponse},
-    service::{set_cluster_url, set_default_headers, AuthLayer, Authentication, LogRequest},
+    service::{set_default_headers, AuthLayer, Authentication, LogRequest, SetBaseUriLayer},
     Config, Error, Result,
 };
 
@@ -411,7 +411,7 @@ impl TryFrom<Config> for Client {
         };
 
         let common = ServiceBuilder::new()
-            .map_request(move |r| set_cluster_url(r, &cluster_url))
+            .layer(SetBaseUriLayer::new(cluster_url))
             .map_request(move |r| set_default_headers(r, default_headers.clone()))
             .into_inner();
 

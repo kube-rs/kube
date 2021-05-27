@@ -107,10 +107,7 @@ cfg_client! {
     pub mod api;
     pub mod discovery;
     pub mod client;
-    pub(crate) mod service;
-    // Export this for examples for now.
-    #[doc(hidden)]
-    pub use service::set_cluster_url;
+    pub mod service;
 
     #[doc(inline)]
     pub use api::Api;
