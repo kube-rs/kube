@@ -47,9 +47,9 @@ pub enum Error {
     #[error("HttpError: {0}")]
     HttpError(#[from] http::Error),
 
-    /// Url conversion error
-    #[error("InternalUrlError: {0}")]
-    InternalUrlError(#[from] url::ParseError),
+    /// Failed to construct a URI.
+    #[error(transparent)]
+    InvalidUri(#[from] http::uri::InvalidUri),
 
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
@@ -165,9 +165,6 @@ pub enum ConfigError {
 
     #[error("Unable to load in cluster token: {0}")]
     InvalidInClusterToken(#[source] Box<Error>),
-
-    #[error("Malformed url: {0}")]
-    MalformedUrl(#[from] url::ParseError),
 
     #[error("exec-plugin response did not contain a status")]
     ExecPluginFailed,

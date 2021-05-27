@@ -27,7 +27,7 @@ impl Request {
     /// List a collection of a resource
     pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}?", self.url_path);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
 
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", &fields);
@@ -50,7 +50,7 @@ impl Request {
     /// Watch a resource at a given version
     pub fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}?", self.url_path);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         lp.validate()?;
         if lp.limit.is_some() {
             return Err(Error::RequestValidation(
@@ -86,7 +86,7 @@ impl Request {
     /// Get a single instance
     pub fn get(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}/{}", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
@@ -96,7 +96,7 @@ impl Request {
     pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         pp.validate()?;
         let target = format!("{}?", self.url_path);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }
@@ -108,7 +108,7 @@ impl Request {
     /// Delete an instance of a resource
     pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}/{}?", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let body = serde_json::to_vec(&dp)?;
         let req = http::Request::delete(urlstr);
@@ -118,7 +118,7 @@ impl Request {
     /// Delete a collection of a resource
     pub fn delete_collection(&self, dp: &DeleteParams, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}?", self.url_path);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", &fields);
         }
@@ -142,7 +142,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>> {
         pp.validate(patch)?;
         let target = format!("{}/{}?", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
 
@@ -158,7 +158,7 @@ impl Request {
     /// Requires `metadata.resourceVersion` set in data
     pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}/{}?", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }
@@ -173,7 +173,7 @@ impl Request {
     /// Get an instance of the subresource
     pub fn get_subresource(&self, subresource_name: &str, name: &str) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}/{}/{}", self.url_path, name, subresource_name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::HttpError)
@@ -189,7 +189,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>> {
         pp.validate(patch)?;
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
 
@@ -209,7 +209,7 @@ impl Request {
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }

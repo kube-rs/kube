@@ -23,7 +23,7 @@ use std::time::Duration;
 #[derive(Debug, Clone)]
 pub struct Config {
     /// The configured cluster url
-    pub cluster_url: url::Url,
+    pub cluster_url: http::Uri,
     /// The configured default namespace
     pub default_ns: String,
     /// The configured root certificate
@@ -49,7 +49,7 @@ impl Config {
     ///
     /// Most likely you want to use [`Config::infer`] to infer the config from
     /// the environment.
-    pub fn new(cluster_url: url::Url) -> Self {
+    pub fn new(cluster_url: http::Uri) -> Self {
         Self {
             cluster_url,
             default_ns: String::from("default"),
@@ -96,7 +96,7 @@ impl Config {
             hostenv: incluster_config::SERVICE_HOSTENV,
             portenv: incluster_config::SERVICE_PORTENV,
         })?;
-        let cluster_url = url::Url::parse(&cluster_url)?;
+        let cluster_url = cluster_url.parse::<http::Uri>()?;
 
         let default_ns = incluster_config::load_default_ns()
             .map_err(Box::new)
@@ -143,7 +143,7 @@ impl Config {
     }
 
     async fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
-        let cluster_url = url::Url::parse(&loader.cluster.server)?;
+        let cluster_url = loader.cluster.server.parse::<http::Uri>()?;
 
         let default_ns = loader
             .current_context
@@ -245,6 +245,6 @@ mod tests {
         std::fs::write(file.path(), cfgraw).unwrap();
         std::env::set_var("KUBECONFIG", file.path());
         let kubeconfig = Config::infer().await.unwrap();
-        assert_eq!(kubeconfig.cluster_url.into_string(), "https://0.0.0.0:6443/");
+        assert_eq!(kubeconfig.cluster_url, "https://0.0.0.0:6443/");
     }
 }
