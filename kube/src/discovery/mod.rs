@@ -179,6 +179,7 @@ impl Discovery {
     /// }
     /// ```
     pub async fn single(client: &Client, apigroup: &str) -> Result<Option<ApiGroup>> {
+        // NB: listing api groups is unnecessary if you know the version
         let api_groups = client.list_api_groups().await?;
         for g in api_groups.groups {
             if g.name != apigroup {
@@ -189,6 +190,58 @@ impl Discovery {
             }
         }
         Ok(None)
+    }
+
+    /// Discovers all APIs available under a certain group at a particular version and return the singular ApiGroup
+    ///
+    /// This is a cheaper variant of `Discovery::single` when you know what version you want.
+    ///
+    /// ```no_run
+    /// use kube::{Client, api::{Api, DynamicObject}, Discovery, ResourceExt};
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), kube::Error> {
+    ///     let client = Client::try_default().await?;
+    ///     let apigroup = Discovery::single_pinned(&client, "apiregistration.k8s.io/v1").await?.unwrap();
+    ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
+    ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+    ///     for service in api.list(&Default::default()).await? {
+    ///         println!("Found APIService: {}", service.name());
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// This example is contrieved. Ideally, you use this when you need more than one `kind`.
+    /// If you only need a single `kind`, `Discovery::gvk` is the best solution.
+    pub async fn single_pinned(client: &Client, apigroupversion: &str) -> Result<ApiGroup> {
+        ApiGroup::query_blind_gv(&client, apigroupversion).await
+    }
+
+    /// Single discovery for a single GVK
+    ///
+    /// This is an optimized function that avoids the unnecessary listing of api groups.
+    /// It merely requests the api group resources for the specified apigroup, and then resolves the kind.
+    ///
+    /// ```no_run
+    /// use kube::{Client, api::{Api, DynamicObject}, Discovery, ResourceExt};
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), kube::Error> {
+    ///     let client = Client::try_default().await?;
+    ///     let gvk = GroupVersionKind {
+    ///         group: "apiregistration.k8s.io".into(),
+    ///         version: "v1".into(),
+    ///         kind: "APIService".into(),
+    ///     };
+    ///     let (ar, caps) = Discovery::gvk(&client, &gvk).await?.unwrap();
+    ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+    ///     for service in api.list(&Default::default()).await? {
+    ///         println!("Found APIService: {}", service.name());
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn gvk(client: &Client, gvk: &GroupVersionKind) -> Result<Option<(ApiResource, ApiCapabilities)>> {
+        ApiGroup::query_blind_gvk(client, &gvk).await
     }
 
     // make something in between? vector of group inputs? could just call `Discovery::single` again..
@@ -340,6 +393,41 @@ impl ApiGroup {
     }
     fn sort_versions(&mut self) {
         self.data.sort_by_cached_key(|gvd| Version::parse(gvd.version.as_str()))
+    }
+    // shortcut method to give cheapest return for a single GVK
+    async fn query_blind_gvk(client: &Client, gvk: &GroupVersionKind) -> Result<Option<(ApiResource, ApiCapabilities)>> {
+        // TODO: handle core
+        let gv = format!("{}/{}", &gvk.group, &gvk.version);
+        let list = client.list_api_group_resources(&gv).await?;
+        for res in &list.resources {
+            if res.kind == gvk.kind && !res.name.contains('/') {
+                let ar = ApiResource::from_apiresource(res, &list.group_version);
+                let caps = ApiCapabilities::from_apiresourcelist(&list, &res.name);
+                return Ok(Some((ar, caps)));
+            }
+        }
+        Ok(None)
+    }
+    async fn query_blind_gv(client: &Client, groupversion: &str) -> Result<Self> {
+        // TODO: helper fn
+        let gvsplit = groupversion.splitn(2, '/').collect::<Vec<_>>();
+        let (group, version) = match *gvsplit.as_slice() {
+            [g, v] => (g, v), // standard case
+            [v] => ("", v),   // core v1 case
+            _ => unreachable!(),
+        };
+        let list = if group == "" {
+            client.list_core_api_resources(&groupversion).await?
+        } else {
+            client.list_api_group_resources(&groupversion).await?
+        };
+        let data = GroupVersionData::new(version.to_string(), list);
+        let group = ApiGroup {
+            name: group.to_string(),
+            data: vec![data],
+            preferred: Some(version.to_string()) // you preferred what you asked for
+        };
+        Ok(group)
     }
 }
 

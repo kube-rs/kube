@@ -40,6 +40,7 @@ impl ApiResource {
     /// # }
     /// ```
     pub fn from_apiresource(ar: &APIResource, group_version: &str) -> Self {
+        // TODO: these 5 lines as a helper
         let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
         let (default_group, default_version) = match *gvsplit.as_slice() {
             [g, v] => (g, v), // standard case
