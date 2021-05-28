@@ -392,9 +392,8 @@ impl ApiGroup {
             .data
             .iter()
             .find(|gvd| gvd.version == ver)
-            .map(|gvd| gvd.resources.as_slice())
-            .unwrap_or(&[])
-            .to_vec()
+            .map(|gvd| gvd.resources.clone())
+            .unwrap_or_default()
     }
 
     /// Returns the recommended (preferred or latest) versioned resources in the group

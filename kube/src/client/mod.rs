@@ -17,7 +17,7 @@ use http::{self, HeaderValue, Request, Response, StatusCode};
 use hyper::Body;
 use hyper_timeout::TimeoutConnector;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
-use kube_core::response::Status;
+pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 #[cfg(feature = "ws")]
