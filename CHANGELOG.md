@@ -10,6 +10,7 @@ UNRELEASED
  * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/clux/kube-rs/issues/495) + [#482](https://github.com/clux/kube-rs/issues/482)
  * `kube`: `api` BREAKING: `DynamicObject` + `Object` now takes an `ApiResource` rather than a `GroupVersionKind`
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
+ * `kube`: `client` BREAKING: `kube::client::Status` moved to `kube::core::Status`
  * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/clux/kube-rs/issues/516) via [#517](https://github.com/clux/kube-rs/issues/517) + [#519](https://github.com/clux/kube-rs/issues/519) + [#522](https://github.com/clux/kube-rs/issues/522) + [#528](https://github.com/clux/kube-rs/issues/528) + [#530](https://github.com/clux/kube-rs/issues/530)
  * `kube`: `kube::Service` removed to allow `kube::Client` to take an abritrary `Service<http::Request<hyper::Body>>` - [#532](https://github.com/clux/kube-rs/issues/532)
 
