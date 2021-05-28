@@ -201,7 +201,7 @@ impl Discovery {
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let apigroup = Discovery::single_pinned(&client, "apiregistration.k8s.io/v1").await?.unwrap();
+    ///     let apigroup = Discovery::single_pinned(&client, "apiregistration.k8s.io/v1").await?;
     ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
     ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///     for service in api.list(&Default::default()).await? {
@@ -223,7 +223,7 @@ impl Discovery {
     /// It merely requests the api group resources for the specified apigroup, and then resolves the kind.
     ///
     /// ```no_run
-    /// use kube::{Client, api::{Api, DynamicObject}, Discovery, ResourceExt};
+    /// use kube::{Client, api::{Api, DynamicObject, GroupVersionKind}, Discovery, ResourceExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
