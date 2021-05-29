@@ -60,8 +60,8 @@ impl FromStr for GroupVersion {
 impl GroupVersion {
     /// Generate the apiVersion string used in a kind's yaml
     pub fn api_version(&self) -> String {
-        if self.group == "" {
-            format!("{}", self.version)
+        if self.group.is_empty() {
+            self.version.clone()
         } else {
             format!("{}/{}", self.group, self.version)
         }
@@ -70,8 +70,8 @@ impl GroupVersion {
 impl GroupVersionKind {
     /// Generate the apiVersion string used in a kind's yaml
     pub fn api_version(&self) -> String {
-        if self.group == "" {
-            format!("{}", self.version)
+        if self.group.is_empty() {
+            self.version.clone()
         } else {
             format!("{}/{}", self.group, self.version)
         }

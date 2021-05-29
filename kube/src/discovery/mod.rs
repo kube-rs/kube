@@ -129,6 +129,7 @@ enum DiscoveryMode {
 }
 
 impl DiscoveryMode {
+    #[allow(clippy::ptr_arg)] // hashmap complains on &str here
     fn is_queryable(&self, group: &String) -> bool {
         match &self {
             Self::Allow(allowed) => allowed.contains(group),
@@ -175,7 +176,7 @@ impl Discovery {
 
     /// Configure the discovery client to only look for the listed apigroups
     pub fn filter(mut self, allow: &[&str]) -> Self {
-        self.mode = DiscoveryMode::Allow(allow.into_iter().map(ToString::to_string).collect());
+        self.mode = DiscoveryMode::Allow(allow.iter().map(ToString::to_string).collect());
         self
     }
 
@@ -492,7 +493,7 @@ impl ApiGroup {
     async fn query_gvk(client: &Client, gvk: &GroupVersionKind) -> Result<(ApiResource, ApiCapabilities)> {
         let apiver = gvk.api_version();
         #[allow(deprecated)] // will make these method not public later
-        let list = if gvk.group == "" {
+        let list = if gvk.group.is_empty() {
             client.list_core_api_resources(&apiver).await?
         } else {
             client.list_api_group_resources(&apiver).await?
@@ -512,7 +513,7 @@ impl ApiGroup {
     async fn query_gv(client: &Client, gv: &GroupVersion) -> Result<Self> {
         let apiver = gv.api_version();
         #[allow(deprecated)] // will make these methods not public later
-        let list = if gv.group == "" {
+        let list = if gv.group.is_empty() {
             client.list_core_api_resources(&apiver).await?
         } else {
             client.list_api_group_resources(&apiver).await?
