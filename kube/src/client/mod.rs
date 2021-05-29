@@ -311,6 +311,7 @@ impl Client {
     }
 
     /// Lists api groups that apiserver serves.
+    #[deprecated(since = "0.56.0", note = "Replaced by discovery module")]
     pub async fn list_api_groups(&self) -> Result<k8s_meta_v1::APIGroupList> {
         self.request(Request::builder().uri("/apis").body(vec![])?).await
     }
@@ -333,17 +334,20 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    #[deprecated(since = "0.56.0", note = "Replaced by discovery module")]
     pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/apis/{}", apiversion);
         self.request(Request::builder().uri(url).body(vec![])?).await
     }
 
     /// Lists versions of `core` a.k.a. `""` legacy API group.
+    #[deprecated(since = "0.56.0", note = "Replaced by discovery module")]
     pub async fn list_core_api_versions(&self) -> Result<k8s_meta_v1::APIVersions> {
         self.request(Request::builder().uri("/api").body(vec![])?).await
     }
 
     /// Lists resources served in particular `core` group version.
+    #[deprecated(since = "0.56.0", note = "Replaced by discovery module")]
     pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/api/{}", version);
         self.request(Request::builder().uri(url).body(vec![])?).await

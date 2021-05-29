@@ -33,6 +33,17 @@ pub enum Error {
     #[error("UTF-8 Error: {0}")]
     FromUtf8(#[from] std::string::FromUtf8Error),
 
+    /// Invalid GroupVersion
+    #[error("Invalid GroupVersion: {0}")]
+    GroupVersionError(String),
+
+    /// Missing GroupVersionKind
+    #[error("Missing GVK: {0}")]
+    MissingGVK(String),
+    /// Missing API Group
+    #[error("Empty Api Group: {0}")]
+    MissingApiGroup(String),
+
     /// Returned when failed to find a newline character within max length.
     /// Only returned by `Client::request_events` and this should never happen as
     /// the max is `usize::MAX`.
@@ -266,6 +277,7 @@ impl From<kube_core::Error> for Error {
             kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
             kube_core::Error::SerdeError(e) => Error::SerdeError(e),
             kube_core::Error::HttpError(e) => Error::HttpError(e),
+            kube_core::Error::GroupVersionError(s) => Error::GroupVersionError(s),
         }
     }
 }

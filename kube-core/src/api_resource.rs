@@ -1,4 +1,7 @@
-use crate::{gvk::GroupVersionKind, resource::Resource};
+use crate::{
+    gvk::{GroupVersion, GroupVersionKind},
+    resource::Resource,
+};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource;
 
 /// Information about a Kubernetes API resource
@@ -39,16 +42,11 @@ impl ApiResource {
     /// # Ok(())
     /// # }
     /// ```
+    #[deprecated(since = "0.56.0")]
     pub fn from_apiresource(ar: &APIResource, group_version: &str) -> Self {
-        // TODO: these 5 lines as a helper
-        let gvsplit = group_version.splitn(2, '/').collect::<Vec<_>>();
-        let (default_group, default_version) = match *gvsplit.as_slice() {
-            [g, v] => (g, v), // standard case
-            [v] => ("", v),   // core v1 case
-            _ => unreachable!(),
-        };
-        let group = ar.group.clone().unwrap_or_else(|| default_group.into());
-        let version = ar.version.clone().unwrap_or_else(|| default_version.into());
+        let gv: GroupVersion = group_version.parse().expect("valid group_version");
+        let group = ar.group.clone().unwrap_or(gv.group);
+        let version = ar.version.clone().unwrap_or(gv.version);
         let kind = ar.kind.to_string();
         let api_version = if group.is_empty() {
             version.clone()
@@ -96,7 +94,7 @@ impl ApiResource {
     /// # Warning
     /// This function will **guess** the resource plural name.
     /// Usually, this is ok, but for CRDs with complex pluralisations it can fail.
-    /// Prefer [`ApiResource::from_gvk_with_plural`](super::ApiResource::from_gvk_with_plural)
+    /// Prefer [`ApiResource::from_gvk_with_plural`](crate::api_resource::ApiResource::from_gvk_with_plural)
     pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
         ApiResource::from_gvk_with_plural(gvk, &crate::resource::to_plural(&gvk.kind.to_ascii_lowercase()))
     }

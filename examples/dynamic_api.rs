@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
 
     let ns_filter = std::env::var("NAMESPACE").ok();
 
-    let discovery = Discovery::all(&client).await?;
+    let discovery = Discovery::new(client.clone()).run().await?;
     for group in discovery.groups() {
         for (ar, caps) in group.recommended_resources() {
             if !caps.supports_operation(verbs::LIST) {
