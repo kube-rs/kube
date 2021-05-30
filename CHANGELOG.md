@@ -5,8 +5,9 @@ UNRELEASED
  * `kube`: added `Api::default_namespaced` - #209 via #534
  * `kube`: added `config` feature - #533 via #535
  * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module #523
-  - `discovery`: added helpers for recommended resources / kinds #523
-  - BREAKING: removed `ApiResource::from_apiresource`
+  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds #523
+  - `discovery`: moved `ApiResource` and `ApiCapabilities` (result of discovery) to `kube_core::discovery`
+  - BREAKING: removed internal `ApiResource::from_apiresource`
 
 0.55.0 / 2021-05-21
 ===================

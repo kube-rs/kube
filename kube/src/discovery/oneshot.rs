@@ -3,9 +3,9 @@
 //! These helpers provides a simpler discovery interface, but do not offer any built-in caching.
 //!
 //! This can provide specific information for 3 cases:
-//! - single group discovery: "apiregistration.k8s.io" via [`oneshot::group`]
-//! - single group at pinned version: "apiregistration.k8s.io/v1" via [`oneshot::gv`]
 //! - single kind in a particular group at a pinned version via [`oneshot::gvk`]
+//! - all kinds in a group at pinned version: "apiregistration.k8s.io/v1" via [`oneshot::gv`]
+//! - all kinds/version combinations in a group: "apiregistration.k8s.io" via [`oneshot::group`]
 //!
 //! [`oneshot::group`]: crate::discovery::oneshot::group
 //! [`oneshot::gv`]: crate::discovery::oneshot::gv
