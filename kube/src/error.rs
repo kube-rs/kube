@@ -264,8 +264,6 @@ impl From<OAuthError> for Error {
     }
 }
 
-#[cfg(feature = "client")]
-#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 #[derive(Error, Debug)]
 // Redundant with the error messages and machine names
 #[allow(missing_docs)]
