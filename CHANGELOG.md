@@ -4,8 +4,9 @@ UNRELEASED
  * see https://github.com/clux/kube-rs/compare/0.55.0...master
  * `kube`: added `Api::default_namespaced` - #209 via #534
  * `kube`: added `config` feature - #533 via #535
- * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and reworked module #523
- * `kube`: `discovery`: added helpers for recommended resources / kinds #523
+ * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module #523
+  - `discovery`: added helpers for recommended resources / kinds #523
+  - BREAKING: removed `ApiResource::from_apiresource`
 
 0.55.0 / 2021-05-21
 ===================

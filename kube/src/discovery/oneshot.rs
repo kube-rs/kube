@@ -12,7 +12,7 @@
 //! [`oneshot::gvk`]: crate::discovery::oneshot::gvk
 
 use super::ApiGroup;
-use crate::{Client, Error, Result};
+use crate::{error::DiscoveryError, Client, Result};
 use kube_core::{
     discovery::{ApiCapabilities, ApiResource},
     gvk::{GroupVersion, GroupVersionKind},
@@ -52,7 +52,7 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
             return ApiGroup::query_apis(&client, g).await;
         }
     }
-    Err(Error::MissingApiGroup(apigroup.to_string()))
+    Err(DiscoveryError::MissingApiGroup(apigroup.to_string()).into())
 }
 
 /// Discovers all APIs available under a certain group at a particular version and return the singular ApiGroup

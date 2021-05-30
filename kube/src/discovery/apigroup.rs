@@ -2,7 +2,7 @@ use super::{
     openapi::{self, GroupVersionData},
     version::Version,
 };
-use crate::{Client, Error, Result};
+use crate::{error::DiscoveryError, Client, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
 use kube_core::gvk::{GroupVersion, GroupVersionKind};
@@ -80,13 +80,13 @@ impl ApiGroup {
         tracing::debug!(name = g.name.as_str(), "Listing group versions");
         let key = g.name;
         if g.versions.is_empty() {
-            return Err(Error::EmptyApiGroup(key));
+            return Err(DiscoveryError::EmptyApiGroup(key).into());
         }
         let mut data = vec![];
         for vers in &g.versions {
             #[allow(deprecated)] // will make this method not public later
             let resources = client.list_api_group_resources(&vers.group_version).await?;
-            data.push(GroupVersionData::new(vers.version.clone(), resources));
+            data.push(GroupVersionData::new(vers.version.clone(), resources)?);
         }
         let mut group = ApiGroup {
             name: key,
@@ -101,12 +101,12 @@ impl ApiGroup {
         let mut data = vec![];
         let key = ApiGroup::CORE_GROUP.to_string();
         if coreapis.versions.is_empty() {
-            return Err(Error::EmptyApiGroup(key));
+            return Err(DiscoveryError::EmptyApiGroup(key).into());
         }
         for v in coreapis.versions {
             #[allow(deprecated)] // will make this method not public later
             let resources = client.list_core_api_resources(&v).await?;
-            data.push(GroupVersionData::new(v, resources));
+            data.push(GroupVersionData::new(v, resources)?);
         }
         let mut group = ApiGroup {
             name: ApiGroup::CORE_GROUP.to_string(),
@@ -136,12 +136,12 @@ impl ApiGroup {
         };
         for res in &list.resources {
             if res.kind == gvk.kind && !res.name.contains('/') {
-                let ar = openapi::parse_apiresource(res, &list.group_version);
-                let caps = openapi::parse_apicapabilities(&list, &res.name);
+                let ar = openapi::parse_apiresource(res, &list.group_version)?;
+                let caps = openapi::parse_apicapabilities(&list, &res.name)?;
                 return Ok((ar, caps));
             }
         }
-        Err(Error::MissingGVK(format!("{:?}", gvk)))
+        Err(DiscoveryError::MissingKind(format!("{:?}", gvk)).into())
     }
 
     // shortcut method to give cheapest return for a pinned group
@@ -153,7 +153,7 @@ impl ApiGroup {
         } else {
             client.list_api_group_resources(&apiver).await?
         };
-        let data = GroupVersionData::new(gv.version.clone(), list);
+        let data = GroupVersionData::new(gv.version.clone(), list)?;
         let group = ApiGroup {
             name: gv.group.clone(),
             data: vec![data],

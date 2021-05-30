@@ -51,7 +51,7 @@ impl FromStr for GroupVersion {
         let (group, version) = match *gvsplit.as_slice() {
             [g, v] => (g.to_string(), v.to_string()), // standard case
             [v] => ("".to_string(), v.to_string()),   // core v1 case
-            _ => return Err(Error::GroupVersionError(gv.into())),
+            _ => return Err(Error::InvalidGroupVersion(gv.into())),
         };
         Ok(Self { group, version })
     }

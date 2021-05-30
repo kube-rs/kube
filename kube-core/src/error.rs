@@ -18,7 +18,7 @@ pub enum Error {
 
     /// Invalid GroupVersion
     #[error("Invalid GroupVersion: {0}")]
-    GroupVersionError(String),
+    InvalidGroupVersion(String),
 }
 
 /// An error response from the API.

@@ -33,20 +33,6 @@ pub enum Error {
     #[error("UTF-8 Error: {0}")]
     FromUtf8(#[from] std::string::FromUtf8Error),
 
-    /// Invalid GroupVersion
-    #[error("Invalid GroupVersion: {0}")]
-    GroupVersionError(String),
-
-    /// Missing GroupVersionKind
-    #[error("Missing GVK: {0}")]
-    MissingGVK(String),
-    /// Missing API Group
-    #[error("Missing Api Group: {0}")]
-    MissingApiGroup(String),
-    /// Empty API Group
-    #[error("Empty Api Group: {0}")]
-    EmptyApiGroup(String),
-
     /// Returned when failed to find a newline character within max length.
     /// Only returned by `Client::request_events` and this should never happen as
     /// the max is `usize::MAX`.
@@ -88,6 +74,10 @@ pub enum Error {
     /// Configuration error
     #[error("Error loading kubeconfig: {0}")]
     Kubeconfig(#[from] ConfigError),
+
+    /// Discovery errors
+    #[error("Error from discovery: {0}")]
+    Discovery(#[from] DiscoveryError),
 
     /// An error with configuring SSL occured
     #[error("SslError: {0}")]
@@ -274,13 +264,34 @@ impl From<OAuthError> for Error {
     }
 }
 
+#[cfg(feature = "client")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+#[derive(Error, Debug)]
+// Redundant with the error messages and machine names
+#[allow(missing_docs)]
+/// Possible errors when using API discovery
+pub enum DiscoveryError {
+    #[error("Invalid GroupVersion: {0}")]
+    InvalidGroupVersion(String),
+    #[error("Missing Kind: {0}")]
+    MissingKind(String),
+    #[error("Missing Api Group: {0}")]
+    MissingApiGroup(String),
+    #[error("Missing MissingResource: {0}")]
+    MissingResource(String),
+    #[error("Empty Api Group: {0}")]
+    EmptyApiGroup(String),
+}
+
 impl From<kube_core::Error> for Error {
     fn from(error: kube_core::Error) -> Self {
         match error {
             kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
             kube_core::Error::SerdeError(e) => Error::SerdeError(e),
             kube_core::Error::HttpError(e) => Error::HttpError(e),
-            kube_core::Error::GroupVersionError(s) => Error::GroupVersionError(s),
+            kube_core::Error::InvalidGroupVersion(s) => {
+                Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
+            }
         }
     }
 }
