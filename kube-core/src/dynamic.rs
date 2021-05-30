@@ -87,8 +87,7 @@ impl Resource for DynamicObject {
 #[cfg(test)]
 mod test {
     use crate::{
-        api_resource::ApiResource,
-        dynamic::DynamicObject,
+        dynamic::{ApiResource, DynamicObject},
         gvk::GroupVersionKind,
         params::{Patch, PatchParams, PostParams},
         request::Request,
