@@ -1,5 +1,5 @@
 use super::{
-    openapi::{self, GroupVersionData},
+    parse::{self, GroupVersionData},
     version::Version,
 };
 use crate::{error::DiscoveryError, Client, Result};
@@ -136,8 +136,8 @@ impl ApiGroup {
         };
         for res in &list.resources {
             if res.kind == gvk.kind && !res.name.contains('/') {
-                let ar = openapi::parse_apiresource(res, &list.group_version)?;
-                let caps = openapi::parse_apicapabilities(&list, &res.name)?;
+                let ar = parse::parse_apiresource(res, &list.group_version)?;
+                let caps = parse::parse_apicapabilities(&list, &res.name)?;
                 return Ok((ar, caps));
             }
         }
@@ -169,8 +169,6 @@ impl ApiGroup {
     pub const CORE_GROUP: &'static str = "";
 
     /// Returns the name of this group.
-    ///
-    /// For the core group (served at `/api`), it returns `ApiGroup::CORE`.
     pub fn name(&self) -> &str {
         &self.name
     }

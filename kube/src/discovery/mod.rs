@@ -7,7 +7,7 @@ use std::collections::HashMap;
 mod apigroup;
 pub mod oneshot;
 pub use apigroup::ApiGroup;
-mod openapi;
+mod parse;
 // an implementation of mentioned kubernetes version priority
 mod version;
 
