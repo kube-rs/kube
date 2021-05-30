@@ -39,11 +39,9 @@ use kube_core::{
 /// ```
 pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
     if apigroup == ApiGroup::CORE_GROUP {
-        #[allow(deprecated)] // will make this method not public later
         let coreapis = client.list_core_api_versions().await?;
         return ApiGroup::query_core(&client, coreapis).await;
     } else {
-        #[allow(deprecated)] // will make this method not public later
         let api_groups = client.list_api_groups().await?;
         for g in api_groups.groups {
             if g.name != apigroup {

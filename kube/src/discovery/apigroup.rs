@@ -84,7 +84,6 @@ impl ApiGroup {
         }
         let mut data = vec![];
         for vers in &g.versions {
-            #[allow(deprecated)] // will make this method not public later
             let resources = client.list_api_group_resources(&vers.group_version).await?;
             data.push(GroupVersionData::new(vers.version.clone(), resources)?);
         }
@@ -104,7 +103,6 @@ impl ApiGroup {
             return Err(DiscoveryError::EmptyApiGroup(key).into());
         }
         for v in coreapis.versions {
-            #[allow(deprecated)] // will make this method not public later
             let resources = client.list_core_api_resources(&v).await?;
             data.push(GroupVersionData::new(v, resources)?);
         }
@@ -128,7 +126,6 @@ impl ApiGroup {
         gvk: &GroupVersionKind,
     ) -> Result<(ApiResource, ApiCapabilities)> {
         let apiver = gvk.api_version();
-        #[allow(deprecated)] // will make these method not public later
         let list = if gvk.group.is_empty() {
             client.list_core_api_resources(&apiver).await?
         } else {
@@ -147,7 +144,6 @@ impl ApiGroup {
     // shortcut method to give cheapest return for a pinned group
     pub(crate) async fn query_gv(client: &Client, gv: &GroupVersion) -> Result<Self> {
         let apiver = gv.api_version();
-        #[allow(deprecated)] // will make these methods not public later
         let list = if gv.group.is_empty() {
             client.list_core_api_resources(&apiver).await?
         } else {

@@ -100,7 +100,6 @@ impl Discovery {
     /// See a bigger example in [examples/dynamic.api](https://github.com/clux/kube-rs/blob/master/examples/dynamic_api.rs)
     pub async fn run(mut self) -> Result<Self> {
         self.groups.clear();
-        #[allow(deprecated)] // will make this method not public later
         let api_groups = self.client.list_api_groups().await?;
         // query regular groups + crds under /apis
         for g in api_groups.groups {
@@ -113,7 +112,6 @@ impl Discovery {
         // query core versions under /api
         let corekey = ApiGroup::CORE_GROUP.to_string();
         if self.mode.is_queryable(&corekey) {
-            #[allow(deprecated)] // will make this method not public later
             let coreapis = self.client.list_core_api_versions().await?;
             let apigroup = ApiGroup::query_core(&self.client, coreapis).await?;
             self.groups.insert(corekey, apigroup);
