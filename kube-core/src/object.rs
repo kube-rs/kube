@@ -1,6 +1,6 @@
 //! Generic object and objectlist wrappers.
 use crate::{
-    api_resource::ApiResource,
+    discovery::ApiResource,
     metadata::{ListMeta, ObjectMeta, TypeMeta},
     resource::Resource,
 };

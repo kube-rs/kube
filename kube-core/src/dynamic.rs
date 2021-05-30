@@ -2,7 +2,7 @@
 //!
 //! For concrete usage see [examples prefixed with dynamic_](https://github.com/clux/kube-rs/tree/master/examples).
 
-pub use crate::api_resource::ApiResource;
+pub use crate::discovery::ApiResource;
 use crate::{metadata::TypeMeta, resource::Resource};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use std::borrow::Cow;

@@ -41,8 +41,11 @@ pub enum Error {
     #[error("Missing GVK: {0}")]
     MissingGVK(String),
     /// Missing API Group
-    #[error("Empty Api Group: {0}")]
+    #[error("Missing Api Group: {0}")]
     MissingApiGroup(String),
+    /// Empty API Group
+    #[error("Empty Api Group: {0}")]
+    EmptyApiGroup(String),
 
     /// Returned when failed to find a newline character within max length.
     /// Only returned by `Client::request_events` and this should never happen as

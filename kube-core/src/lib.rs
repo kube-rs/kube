@@ -10,12 +10,13 @@
 #[cfg(feature = "admission")]
 pub mod admission;
 
-mod api_resource;
+pub mod discovery;
+
 pub mod dynamic;
 pub use dynamic::DynamicObject;
 
 pub mod gvk;
-pub use gvk::{GroupVersionKind, GroupVersionResource};
+pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 
 pub mod metadata;
 
