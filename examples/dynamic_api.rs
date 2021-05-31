@@ -13,10 +13,6 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
-
-    let v = client.apiserver_version().await?;
-    info!("api version: {:?}", v);
-
     let ns_filter = std::env::var("NAMESPACE").ok();
 
     let discovery = Discovery::new(client.clone()).run().await?;

@@ -11,6 +11,9 @@ mod parse;
 // an implementation of mentioned kubernetes version priority
 mod version;
 
+// re-export one-shots
+pub use oneshot::{group, pinned_group, pinned_kind};
+
 /// How the Discovery client decides what api groups to scan
 enum DiscoveryMode {
     /// Only allow explicitly listed apigroups
@@ -68,6 +71,12 @@ impl Discovery {
     /// Configure the discovery client to only look for the listed apigroups
     pub fn filter(mut self, allow: &[&str]) -> Self {
         self.mode = DiscoveryMode::Allow(allow.iter().map(ToString::to_string).collect());
+        self
+    }
+
+    /// Configure the discovery client to look for all apigroups except the listed ones
+    pub fn exclude(mut self, deny: &[&str]) -> Self {
+        self.mode = DiscoveryMode::Block(deny.iter().map(ToString::to_string).collect());
         self
     }
 
@@ -140,7 +149,7 @@ impl Discovery {
     /// Finds an [`ApiResource`] and its [`ApiCapabilities`] after discovery by matching a GVK
     ///
     /// This is for quick extraction after having done a complete discovery.
-    /// If you are only interested in a single kind, consider [`oneshot::gvk`](crate::discovery::oneshot::gvk).
+    /// If you are only interested in a single kind, consider [`oneshot::pinned_kind`](crate::discovery::pinned_kind).
     pub fn resolve_gvk(&self, gvk: &GroupVersionKind) -> Option<(ApiResource, ApiCapabilities)> {
         self.get(&gvk.group)?
             .versioned_resources(&gvk.version)

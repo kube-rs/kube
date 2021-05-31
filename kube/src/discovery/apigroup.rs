@@ -20,7 +20,7 @@ use kube_core::gvk::{GroupVersion, GroupVersionKind};
 /// #[tokio::main]
 /// async fn main() -> Result<(), kube::Error> {
 ///     let client = Client::try_default().await?;
-///     let apigroup = discovery::oneshot::group(&client, "apiregistration.k8s.io").await?;
+///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///      for (apiresource, caps) in apigroup.versioned_resources("v1") {
 ///          println!("Found ApiResource {}", apiresource.kind);
 ///      }
@@ -44,7 +44,7 @@ use kube_core::gvk::{GroupVersion, GroupVersionKind};
 /// #[tokio::main]
 /// async fn main() -> Result<(), kube::Error> {
 ///     let client = Client::try_default().await?;
-///     let apigroup = discovery::oneshot::group(&client, "apiregistration.k8s.io").await?;
+///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
@@ -219,7 +219,7 @@ impl ApiGroup {
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let apigroup = discovery::oneshot::group(&client, "apiregistration.k8s.io").await?;
+    ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for (ar, caps) in apigroup.recommended_resources() {
     ///         if !caps.supports_operation(verbs::LIST) {
     ///             continue;
@@ -246,7 +246,7 @@ impl ApiGroup {
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
-    ///     let apigroup = discovery::oneshot::group(&client, "apiregistration.k8s.io").await?;
+    ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
     ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///     for service in api.list(&Default::default()).await? {

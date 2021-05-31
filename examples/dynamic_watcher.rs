@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     // Turn them into a GVK
     let gvk = GroupVersionKind::gvk(&group, &version, &kind);
     // Use API discovery to identify more information about the type (like its plural)
-    let (ar, _caps) = discovery::oneshot::gvk(&client, &gvk).await?;
+    let (ar, _caps) = discovery::pinned_kind(&client, &gvk).await?;
 
     // Use the discovered kind in an Api with the ApiResource as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &ar);
