@@ -2,6 +2,12 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.55.0...master
+ * `kube`: added `Api::default_namespaced` - #209 via #534
+ * `kube`: added `config` feature - #533 via #535
+ * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module #523
+  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds #523
+  - `discovery`: moved `ApiResource` and `ApiCapabilities` (result of discovery) to `kube_core::discovery`
+  - BREAKING: removed internal `ApiResource::from_apiresource`
 
 0.55.0 / 2021-05-21
 ===================
@@ -10,7 +16,7 @@ UNRELEASED
  * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/clux/kube-rs/issues/495) + [#482](https://github.com/clux/kube-rs/issues/482)
  * `kube`: `api` BREAKING: `DynamicObject` + `Object` now takes an `ApiResource` rather than a `GroupVersionKind`
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
- * `kube`: `client` BREAKING: `kube::client::Status` moved to `kube::core::Status`
+ * `kube`: `client` BREAKING: `kube::client::Status` moved to `kube::core::Status` (accidental, re-adding in 0.56)
  * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/clux/kube-rs/issues/516) via [#517](https://github.com/clux/kube-rs/issues/517) + [#519](https://github.com/clux/kube-rs/issues/519) + [#522](https://github.com/clux/kube-rs/issues/522) + [#528](https://github.com/clux/kube-rs/issues/528) + [#530](https://github.com/clux/kube-rs/issues/530)
  * `kube`: `kube::Service` removed to allow `kube::Client` to take an abritrary `Service<http::Request<hyper::Body>>` - [#532](https://github.com/clux/kube-rs/issues/532)
 

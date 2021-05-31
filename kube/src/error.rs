@@ -75,6 +75,10 @@ pub enum Error {
     #[error("Error loading kubeconfig: {0}")]
     Kubeconfig(#[from] ConfigError),
 
+    /// Discovery errors
+    #[error("Error from discovery: {0}")]
+    Discovery(#[from] DiscoveryError),
+
     /// An error with configuring SSL occured
     #[error("SslError: {0}")]
     SslError(String),
@@ -260,12 +264,32 @@ impl From<OAuthError> for Error {
     }
 }
 
+#[derive(Error, Debug)]
+// Redundant with the error messages and machine names
+#[allow(missing_docs)]
+/// Possible errors when using API discovery
+pub enum DiscoveryError {
+    #[error("Invalid GroupVersion: {0}")]
+    InvalidGroupVersion(String),
+    #[error("Missing Kind: {0}")]
+    MissingKind(String),
+    #[error("Missing Api Group: {0}")]
+    MissingApiGroup(String),
+    #[error("Missing MissingResource: {0}")]
+    MissingResource(String),
+    #[error("Empty Api Group: {0}")]
+    EmptyApiGroup(String),
+}
+
 impl From<kube_core::Error> for Error {
     fn from(error: kube_core::Error) -> Self {
         match error {
             kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
             kube_core::Error::SerdeError(e) => Error::SerdeError(e),
             kube_core::Error::HttpError(e) => Error::HttpError(e),
+            kube_core::Error::InvalidGroupVersion(s) => {
+                Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
+            }
         }
     }
 }
