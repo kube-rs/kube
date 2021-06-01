@@ -26,7 +26,8 @@ use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
-use tower::{buffer::Buffer, util::BoxService, BoxError, Service, ServiceBuilder, ServiceExt};
+use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceBuilder, ServiceExt};
+use tower_http::map_response_body::MapResponseBodyLayer;
 
 #[cfg(feature = "gzip")]
 use crate::service::{accept_compressed, maybe_decompress};
@@ -36,6 +37,8 @@ use crate::{
     service::{set_default_headers, AuthLayer, Authentication, LogRequest, SetBaseUriLayer},
     Config, Error, Result,
 };
+
+mod body;
 
 // Binary subprotocol v4. See `Client::connect`.
 #[cfg(feature = "ws")]
@@ -59,22 +62,32 @@ impl Client {
     /// Create and initialize a [`Client`] using the given `Service`.
     ///
     /// Use [`Client::try_from`](Self::try_from) to create with a [`Config`].
-    pub fn new<S, E: Into<BoxError>>(service: S) -> Self
+    pub fn new<S, B>(service: S) -> Self
     where
-        S: Service<Request<Body>, Response = Response<Body>, Error = E> + Send + 'static,
+        S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
+        S::Error: Into<BoxError>,
+        B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
+        B::Error: std::error::Error + Send + Sync + 'static,
     {
         Self::new_with_default_ns(service, "default")
     }
 
     /// Create and initialize a [`Client`] using the given `Service` and the default namespace.
-    fn new_with_default_ns<S, E: Into<BoxError>, T: Into<String>>(service: S, default_ns: T) -> Self
+    fn new_with_default_ns<S, B, T: Into<String>>(service: S, default_ns: T) -> Self
     where
-        S: Service<Request<Body>, Response = Response<Body>, Error = E> + Send + 'static,
+        S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
+        S::Error: Into<BoxError>,
+        B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
+        B::Error: std::error::Error + Send + Sync + 'static,
     {
+        // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
+        let service = MapResponseBodyLayer::new(|b| hyper::Body::wrap_stream(body::IntoStream::new(b)))
+            .layer(service)
+            .map_err(|e| e.into());
         Self {
-            inner: Buffer::new(BoxService::new(service.map_err(|e| e.into())), 1024),
+            inner: Buffer::new(BoxService::new(service), 1024),
             default_ns: default_ns.into(),
         }
     }

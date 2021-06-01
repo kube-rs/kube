@@ -9,6 +9,13 @@ use serde_json::json;
 use tokio_native_tls::TlsConnector;
 use tower::ServiceBuilder;
 
+use tower_http::{
+    decompression::DecompressionLayer,
+    trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer},
+    LatencyUnit,
+};
+use tracing::Level;
+
 use kube::{
     api::{Api, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
     service::SetBaseUriLayer,
@@ -17,13 +24,24 @@ use kube::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
+    std::env::set_var("RUST_LOG", "info,kube=debug,tower_http=trace");
     env_logger::init();
 
     let config = Config::infer().await?;
     let cluster_url = config.cluster_url.clone();
     let common = ServiceBuilder::new()
         .layer(SetBaseUriLayer::new(cluster_url))
+        .layer(DecompressionLayer::new())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().include_headers(true))
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(
+                    DefaultOnResponse::new()
+                        .level(Level::INFO)
+                        .latency_unit(LatencyUnit::Micros),
+                ),
+        )
         .into_inner();
     let mut http = HttpConnector::new();
     http.enforce_http(false);
