@@ -4,8 +4,7 @@ use std::{
 };
 
 use futures::{ready, Future};
-use http::{header::AUTHORIZATION, Request};
-use hyper::Body;
+use http::{header::AUTHORIZATION, Request, Response};
 use pin_project::pin_project;
 use tower::{layer::Layer, BoxError, Service};
 
@@ -23,10 +22,7 @@ impl AuthLayer {
     }
 }
 
-impl<S> Layer<S> for AuthLayer
-where
-    S: Service<Request<Body>>,
-{
+impl<S> Layer<S> for AuthLayer {
     type Service = AuthService<S>;
 
     fn layer(&self, service: S) -> Self::Service {
@@ -37,28 +33,27 @@ where
     }
 }
 
-pub struct AuthService<S>
-where
-    S: Service<Request<Body>>,
-{
+pub struct AuthService<S> {
     auth: RefreshableToken,
     service: S,
 }
 
-impl<S> Service<Request<Body>> for AuthService<S>
+impl<S, ReqB, ResB> Service<Request<ReqB>> for AuthService<S>
 where
-    S: Service<Request<Body>> + Clone,
+    S: Service<Request<ReqB>, Response = Response<ResB>> + Clone,
     S::Error: Into<BoxError>,
+    ReqB: http_body::Body + Send + Unpin + 'static,
+    ResB: http_body::Body,
 {
     type Error = BoxError;
-    type Future = AuthFuture<S>;
+    type Future = AuthFuture<S, ReqB>;
     type Response = S::Response;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, mut req: Request<Body>) -> Self::Future {
+    fn call(&mut self, mut req: Request<ReqB>) -> Self::Future {
         // Comment from `AsyncFilter`
         // > In case the inner service has state that's driven to readiness and
         // > not tracked by clones (such as `Buffer`), pass the version we have
@@ -91,22 +86,24 @@ enum State<F, G> {
     Response(#[pin] G),
 }
 
-type RequestFuture = Pin<Box<dyn Future<Output = Result<Request<Body>, BoxError>> + Send>>;
+type RequestFuture<B> = Pin<Box<dyn Future<Output = Result<Request<B>, BoxError>> + Send>>;
 
 #[pin_project]
-pub struct AuthFuture<S>
+pub struct AuthFuture<S, B>
 where
-    S: Service<Request<Body>>,
+    S: Service<Request<B>>,
+    B: http_body::Body,
 {
     #[pin]
-    state: State<RequestFuture, S::Future>,
+    state: State<RequestFuture<B>, S::Future>,
     service: S,
 }
 
-impl<S> Future for AuthFuture<S>
+impl<S, B> Future for AuthFuture<S, B>
 where
-    S: Service<Request<Body>>,
+    S: Service<Request<B>>,
     S::Error: Into<BoxError>,
+    B: http_body::Body,
 {
     type Output = Result<S::Response, BoxError>;
 
@@ -141,7 +138,7 @@ mod tests {
     use hyper::Body;
     use tokio::sync::Mutex;
     use tokio_test::assert_ready_ok;
-    use tower_test::mock;
+    use tower_test::{mock, mock::Handle};
 
     use crate::{config::AuthInfo, error::ConfigError, Error};
 
@@ -149,7 +146,8 @@ mod tests {
     async fn valid_token() {
         const TOKEN: &str = "test";
         let auth = test_token(TOKEN.into());
-        let (mut service, handle) = mock::spawn_layer(AuthLayer::new(auth));
+        let (mut service, handle): (_, Handle<Request<hyper::Body>, Response<hyper::Body>>) =
+            mock::spawn_layer(AuthLayer::new(auth));
 
         let spawned = tokio::spawn(async move {
             // Receive the requests and respond

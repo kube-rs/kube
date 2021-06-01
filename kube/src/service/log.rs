@@ -1,7 +1,6 @@
 use std::task::{Context, Poll};
 
 use http::Request;
-use hyper::Body;
 use tower::Service;
 
 // `Clone` so that it can be composed with `AuthLayer`.
@@ -26,9 +25,10 @@ where
     }
 }
 
-impl<S> Service<Request<Body>> for LogRequest<S>
+impl<S, B> Service<Request<B>> for LogRequest<S>
 where
-    S: Service<Request<Body>> + Clone,
+    S: Service<Request<B>> + Clone,
+    B: http_body::Body,
 {
     type Error = S::Error;
     type Future = S::Future;
@@ -38,8 +38,8 @@ where
         self.service.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
-        tracing::debug!("{} {} {:?}", req.method(), req.uri(), req.body());
+    fn call(&mut self, req: Request<B>) -> Self::Future {
+        tracing::debug!("{} {}", req.method(), req.uri());
         self.service.call(req)
     }
 }
