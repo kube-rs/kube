@@ -29,8 +29,6 @@ use tokio_util::{
 use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceBuilder, ServiceExt};
 use tower_http::map_response_body::MapResponseBodyLayer;
 
-#[cfg(feature = "gzip")]
-use crate::service::{accept_compressed, maybe_decompress};
 use crate::{
     api::WatchEvent,
     error::{ConfigError, ErrorResponse},
@@ -431,8 +429,7 @@ impl TryFrom<Config> for Client {
         #[cfg(feature = "gzip")]
         let common = ServiceBuilder::new()
             .layer(common)
-            .map_request(accept_compressed)
-            .map_response(maybe_decompress)
+            .layer(tower_http::decompression::DecompressionLayer::new())
             .into_inner();
 
         let mut connector = HttpConnector::new();

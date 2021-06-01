@@ -21,7 +21,7 @@ native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
 rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls", "webpki"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["client", "tame-oauth"]
-gzip = ["client", "async-compression"]
+gzip = ["client", "tower-http/decompression-gzip"]
 client = ["config", "__non_core", "hyper", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
@@ -66,7 +66,6 @@ hyper-rustls = { version = "0.22.1", optional = true }
 tokio-tungstenite = { version = "0.14.0", optional = true }
 tower = { version = "0.4.6", optional = true, features = ["buffer", "util"] }
 tower-http = { version = "0.1.0", optional = true, features = ["map-response-body"] }
-async-compression = { version = "0.3.7", features = ["gzip", "tokio"], optional = true }
 hyper-timeout = {version = "0.4.1", optional = true }
 tame-oauth = { version = "0.4.7", features = ["gcp"], optional = true }
 pin-project = { version = "1.0.4", optional = true }
