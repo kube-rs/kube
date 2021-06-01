@@ -27,12 +27,17 @@ use tokio_util::{
     io::StreamReader,
 };
 use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceBuilder, ServiceExt};
-use tower_http::map_response_body::MapResponseBodyLayer;
+use tower_http::{
+    map_response_body::MapResponseBodyLayer,
+    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
+    LatencyUnit,
+};
+use tracing::Level;
 
 use crate::{
     api::WatchEvent,
     error::{ConfigError, ErrorResponse},
-    service::{set_default_headers, AuthLayer, Authentication, LogRequest, SetBaseUriLayer},
+    service::{set_default_headers, AuthLayer, Authentication, SetBaseUriLayer},
     Config, Error, Result,
 };
 
@@ -464,7 +469,15 @@ impl TryFrom<Config> for Client {
         let inner = ServiceBuilder::new()
             .layer(common)
             .option_layer(maybe_auth)
-            .layer(tower::layer::layer_fn(LogRequest::new))
+            .layer(
+                TraceLayer::new_for_http()
+                    .on_request(DefaultOnRequest::new().level(Level::DEBUG))
+                    .on_response(
+                        DefaultOnResponse::new()
+                            .level(Level::DEBUG)
+                            .latency_unit(LatencyUnit::Millis),
+                    ),
+            )
             .service(client);
         Ok(Self::new_with_default_ns(inner, default_ns))
     }
