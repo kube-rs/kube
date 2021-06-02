@@ -172,3 +172,11 @@ path = "admission_controller.rs"
 [[example]]
 name = "custom_client"
 path = "custom_client.rs"
+
+[[example]]
+name = "custom_client_tls"
+path = "custom_client_tls.rs"
+
+[[example]]
+name = "custom_client_trace"
+path = "custom_client_trace.rs"

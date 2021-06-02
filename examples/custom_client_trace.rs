@@ -1,10 +1,15 @@
-// Minimal custom client example.
+// Custom client example with TraceLayer.
+use std::time::Duration;
+
 use futures::{StreamExt, TryStreamExt};
-use hyper::client::HttpConnector;
+use http::{Request, Response};
+use hyper::{client::HttpConnector, Body};
 use hyper_tls::HttpsConnector;
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 use tower::ServiceBuilder;
+use tower_http::{decompression::DecompressionLayer, trace::TraceLayer};
+use tracing::Span;
 
 use kube::{
     api::{Api, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
@@ -14,7 +19,7 @@ use kube::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
+    std::env::set_var("RUST_LOG", "info,kube=debug,custom_client_trace=debug");
     tracing_subscriber::fmt::init();
 
     let config = Config::infer().await?;
@@ -28,6 +33,30 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::new(
         ServiceBuilder::new()
             .layer(SetBaseUriLayer::new(config.cluster_url))
+            // Add `DecompressionLayer` to make request headers interesting.
+            .layer(DecompressionLayer::new())
+            .layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(|request: &Request<Body>| {
+                        tracing::debug_span!(
+                            "HTTP",
+                            otel.name = %format!("HTTP {}", request.method()),
+                            http.method = %request.method(),
+                            http.url = %request.uri(),
+                            http.status_code = tracing::field::Empty,
+                        )
+                    })
+                    .on_request(|request: &Request<Body>, _span: &Span| {
+                        tracing::debug!("payload: {:?} headers: {:?}", request.body(), request.headers())
+                    })
+                    .on_response(|response: &Response<Body>, latency: Duration, span: &Span| {
+                        span.record(
+                            "http.status_code",
+                            &tracing::field::display(response.status().as_u16()),
+                        );
+                        tracing::debug!("finished in {}ms", latency.as_millis())
+                    }),
+            )
             .service(hyper::Client::builder().build(https)),
     );
 
