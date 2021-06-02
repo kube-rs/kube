@@ -28,11 +28,8 @@ use tokio_util::{
 };
 use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceBuilder, ServiceExt};
 use tower_http::{
-    map_response_body::MapResponseBodyLayer,
-    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
-    LatencyUnit,
+    classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
 };
-use tracing::Level;
 
 use crate::{
     api::WatchEvent,
@@ -401,6 +398,11 @@ impl TryFrom<Config> for Client {
 
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
+        use std::time::Duration;
+
+        use http::header::HeaderMap;
+        use tracing::Span;
+
         let cluster_url = config.cluster_url.clone();
         let mut default_headers = config.headers.clone();
         let timeout = config.timeout;
@@ -470,13 +472,45 @@ impl TryFrom<Config> for Client {
             .layer(common)
             .option_layer(maybe_auth)
             .layer(
+                // TODO Add OTEL attributes? https://github.com/clux/kube-rs/issues/457
+                // - https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
+                // - https://docs.rs/tracing-opentelemetry/0.13.0/tracing_opentelemetry/#semantic-conventions
+                // - https://docs.rs/tracing-opentelemetry/0.13.0/tracing_opentelemetry/#special-fields
                 TraceLayer::new_for_http()
-                    .on_request(DefaultOnRequest::new().level(Level::DEBUG))
-                    .on_response(
-                        DefaultOnResponse::new()
-                            .level(Level::DEBUG)
-                            .latency_unit(LatencyUnit::Millis),
-                    ),
+                    .make_span_with(|req: &Request<hyper::Body>| {
+                        tracing::debug_span!(
+                            "HTTP",
+                             http.method = %req.method(),
+                             http.uri = %req.uri(),
+                             http.status_code = tracing::field::Empty,
+                        )
+                    })
+                    .on_request(|_req: &Request<hyper::Body>, _span: &Span| tracing::debug!("requesting"))
+                    .on_response(|res: &Response<hyper::Body>, latency: Duration, span: &Span| {
+                        span.record("http.status_code", &res.status().as_u16());
+                        tracing::debug!("finished in {}ms", latency.as_millis())
+                    })
+                    // Explicitly disable `on_body_chunk`. The default does nothing.
+                    .on_body_chunk(())
+                    .on_eos(|_: Option<&HeaderMap>, stream_duration: Duration, _span: &Span| {
+                        tracing::debug!("stream ended after {}ms", stream_duration.as_millis())
+                    })
+                    .on_failure(|ec: ServerErrorsFailureClass, latency: Duration, span: &Span| {
+                        // Called when
+                        // - Calling the inner service errored
+                        // - Polling `Body` errored
+                        // - the response was classified as failure (5xx)
+                        // - End of stream was classified as failure
+                        match ec {
+                            ServerErrorsFailureClass::StatusCode(status) => {
+                                span.record("http.status_code", &status.as_u16());
+                                tracing::error!("failed in {}ms {}", latency.as_millis(), status)
+                            }
+                            ServerErrorsFailureClass::Error(err) => {
+                                tracing::error!("failed in {}ms {}", latency.as_millis(), err)
+                            }
+                        }
+                    }),
             )
             .service(client);
         Ok(Self::new_with_default_ns(inner, default_ns))
