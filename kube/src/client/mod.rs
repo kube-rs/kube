@@ -34,7 +34,7 @@ use tower_http::{
 use crate::{
     api::WatchEvent,
     error::{ConfigError, ErrorResponse},
-    service::{set_default_headers, AuthLayer, Authentication, SetBaseUriLayer},
+    service::{AuthLayer, Authentication, SetBaseUriLayer, SetHeadersLayer},
     Config, Error, Result,
 };
 
@@ -432,7 +432,7 @@ impl TryFrom<Config> for Client {
 
         let common = ServiceBuilder::new()
             .layer(SetBaseUriLayer::new(cluster_url))
-            .map_request(move |r| set_default_headers(r, default_headers.clone()))
+            .layer(SetHeadersLayer::new(default_headers))
             .into_inner();
 
         #[cfg(feature = "gzip")]

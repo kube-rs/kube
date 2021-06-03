@@ -6,6 +6,6 @@ mod headers;
 
 pub(crate) use self::{
     auth::{AuthLayer, Authentication},
-    headers::set_default_headers,
+    headers::SetHeadersLayer,
 };
 pub use base_uri::{SetBaseUri, SetBaseUriLayer};
