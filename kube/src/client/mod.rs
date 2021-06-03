@@ -39,6 +39,8 @@ use crate::{
 };
 
 mod body;
+// Add `into_stream()` to `http::Body`
+use body::BodyStreamExt;
 
 // Binary subprotocol v4. See `Client::connect`.
 #[cfg(feature = "ws")]
@@ -83,7 +85,7 @@ impl Client {
         B::Error: std::error::Error + Send + Sync + 'static,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
-        let service = MapResponseBodyLayer::new(|b| hyper::Body::wrap_stream(body::IntoStream::new(b)))
+        let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
             .layer(service)
             .map_err(|e| e.into());
         Self {

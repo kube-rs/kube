@@ -30,3 +30,14 @@ where
         self.project().body.poll_data(cx)
     }
 }
+
+pub trait BodyStreamExt: Body {
+    fn into_stream(self) -> IntoStream<Self>
+    where
+        Self: Sized,
+    {
+        IntoStream::new(self)
+    }
+}
+
+impl<T> BodyStreamExt for T where T: Body {}
