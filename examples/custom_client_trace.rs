@@ -2,8 +2,7 @@
 use std::time::Duration;
 
 use http::{Request, Response};
-use hyper::{client::HttpConnector, Body};
-use hyper_tls::HttpsConnector;
+use hyper::Body;
 use k8s_openapi::api::core::v1::ConfigMap;
 use tower::ServiceBuilder;
 use tower_http::{decompression::DecompressionLayer, trace::TraceLayer};
@@ -21,13 +20,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let config = Config::infer().await?;
-    // Create HttpsConnector using `native_tls::TlsConnector` based on `Config`.
-    let https = {
-        let tls = tokio_native_tls::TlsConnector::from(config.native_tls_connector()?);
-        let mut http = HttpConnector::new();
-        http.enforce_http(false);
-        HttpsConnector::from((http, tls))
-    };
+    let https = config.native_tls_https_connector()?;
     let client = Client::new(
         ServiceBuilder::new()
             .layer(SetBaseUriLayer::new(config.cluster_url))
