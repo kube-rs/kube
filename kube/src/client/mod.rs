@@ -2,10 +2,11 @@
 //!
 //! The [`Client`] uses standard kube error handling.
 //!
-//! This client can be used on its own or in conjuction with
-//! the [`Api`][crate::api::Api] type for more structured
-//! interaction with the kuberneres API.
-pub mod discovery;
+//! This client can be used on its own or in conjuction with the [`Api`][crate::api::Api]
+//! type for more structured interaction with the kubernetes API.
+//!
+//! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
+//! retrieve the resources served by the kubernetes API.
 
 use std::convert::{TryFrom, TryInto};
 
@@ -16,7 +17,7 @@ use http::{self, HeaderValue, Request, Response, StatusCode};
 use hyper::Body;
 use hyper_timeout::TimeoutConnector;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
-use kube_core::response::Status;
+pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 #[cfg(feature = "ws")]
@@ -296,7 +297,14 @@ impl Client {
             }
         }))
     }
+}
 
+/// Low level discovery methods using `k8s_openapi` types.
+///
+/// Consider using the [`discovery`](crate::discovery) module for
+/// easier-to-use variants of this functionality.
+/// The following methods might be deprecated to avoid confusion between similarly named types within `discovery`.
+impl Client {
     /// Returns apiserver version.
     pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
         self.request(Request::builder().uri("/version").body(vec![])?)

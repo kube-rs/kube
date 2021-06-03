@@ -46,6 +46,7 @@ Real world users:
 - [kdash tui](https://github.com/kdash-rs/kdash) - terminal dashboard for kubernetes
 - [logdna agent](https://github.com/logdna/logdna-agent-v2)
 - [kubeapps pinniped](https://github.com/kubeapps/kubeapps/tree/master/cmd/pinniped-proxy)
+- [kubectl-view-allocations](https://github.com/davidB/kubectl-view-allocations) - kubectl plugin to list resource allocations
 
 ## Api
 The direct `Api` type takes a client, and is constructed with either the `::all` or `::namespaced` functions:

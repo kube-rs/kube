@@ -123,6 +123,7 @@ macro_rules! cfg_error {
 
 cfg_client! {
     pub mod api;
+    pub mod discovery;
     pub mod client;
     pub(crate) mod service;
 
@@ -130,6 +131,8 @@ cfg_client! {
     pub use api::Api;
     #[doc(inline)]
     pub use client::Client;
+    #[doc(inline)]
+    pub use discovery::Discovery;
 }
 
 cfg_config! {
