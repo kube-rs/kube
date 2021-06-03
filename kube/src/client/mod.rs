@@ -13,7 +13,7 @@ use std::convert::TryFrom;
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
-use http::{self, HeaderValue, Request, Response, StatusCode};
+use http::{self, Request, Response, StatusCode};
 use hyper::{client::HttpConnector, Body};
 use hyper_timeout::TimeoutConnector;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
@@ -33,8 +33,8 @@ use tower_http::{
 
 use crate::{
     api::WatchEvent,
-    error::{ConfigError, ErrorResponse},
-    service::{AuthLayer, Authentication, SetBaseUriLayer, SetHeadersLayer},
+    error::ErrorResponse,
+    service::{Authentication, SetBaseUriLayer, SetHeadersLayer},
     Config, Error, Result,
 };
 
@@ -406,29 +406,9 @@ impl TryFrom<Config> for Client {
         use tracing::Span;
 
         let cluster_url = config.cluster_url.clone();
-        let mut default_headers = config.headers.clone();
+        let default_headers = config.headers.clone();
         let timeout = config.timeout;
         let default_ns = config.default_ns.clone();
-
-        // AuthLayer is not necessary unless `RefreshableToken`
-        let maybe_auth = match Authentication::try_from(&config.auth_info)? {
-            Authentication::None => None,
-            Authentication::Basic(s) => {
-                let mut value =
-                    HeaderValue::try_from(format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?;
-                value.set_sensitive(true);
-                default_headers.insert(http::header::AUTHORIZATION, value);
-                None
-            }
-            Authentication::Token(s) => {
-                let mut value = HeaderValue::try_from(format!("Bearer {}", &s))
-                    .map_err(ConfigError::InvalidBearerToken)?;
-                value.set_sensitive(true);
-                default_headers.insert(http::header::AUTHORIZATION, value);
-                None
-            }
-            Authentication::RefreshableToken(r) => Some(AuthLayer::new(r)),
-        };
 
         let common = ServiceBuilder::new()
             .layer(SetBaseUriLayer::new(cluster_url))
@@ -472,7 +452,7 @@ impl TryFrom<Config> for Client {
 
         let inner = ServiceBuilder::new()
             .layer(common)
-            .option_layer(maybe_auth)
+            .option_layer(Authentication::try_from(&config.auth_info)?.into_layer())
             .layer(
                 // Attribute names follow [Semantic Conventions].
                 // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md

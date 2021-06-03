@@ -11,34 +11,35 @@ use tower::{layer::Layer, BoxError, Service};
 use super::RefreshableToken;
 use crate::Result;
 
-/// `Layer` to decorate the request with `Authorization` header.
-pub struct AuthLayer {
-    auth: RefreshableToken,
+// TODO Come up with a better name
+/// `Layer` to decorate the request with `Authorization` header with token refreshing automatically.
+pub struct RefreshingTokenLayer {
+    refreshable: RefreshableToken,
 }
 
-impl AuthLayer {
-    pub(crate) fn new(auth: RefreshableToken) -> Self {
-        Self { auth }
+impl RefreshingTokenLayer {
+    pub(crate) fn new(refreshable: RefreshableToken) -> Self {
+        Self { refreshable }
     }
 }
 
-impl<S> Layer<S> for AuthLayer {
-    type Service = AuthService<S>;
+impl<S> Layer<S> for RefreshingTokenLayer {
+    type Service = RefreshingToken<S>;
 
     fn layer(&self, service: S) -> Self::Service {
-        AuthService {
-            auth: self.auth.clone(),
+        RefreshingToken {
+            refreshable: self.refreshable.clone(),
             service,
         }
     }
 }
 
-pub struct AuthService<S> {
-    auth: RefreshableToken,
+pub struct RefreshingToken<S> {
+    refreshable: RefreshableToken,
     service: S,
 }
 
-impl<S, ReqB, ResB> Service<Request<ReqB>> for AuthService<S>
+impl<S, ReqB, ResB> Service<Request<ReqB>> for RefreshingToken<S>
 where
     S: Service<Request<ReqB>, Response = Response<ResB>> + Clone,
     S::Error: Into<BoxError>,
@@ -62,7 +63,7 @@ where
         let service = self.service.clone();
         let service = std::mem::replace(&mut self.service, service);
 
-        let auth = self.auth.clone();
+        let auth = self.refreshable.clone();
         let request = async move {
             auth.to_header().await.map_err(BoxError::from).map(|value| {
                 req.headers_mut().insert(AUTHORIZATION, value);
@@ -147,7 +148,7 @@ mod tests {
         const TOKEN: &str = "test";
         let auth = test_token(TOKEN.into());
         let (mut service, handle): (_, Handle<Request<hyper::Body>, Response<hyper::Body>>) =
-            mock::spawn_layer(AuthLayer::new(auth));
+            mock::spawn_layer(RefreshingTokenLayer::new(auth));
 
         let spawned = tokio::spawn(async move {
             // Receive the requests and respond
@@ -173,7 +174,7 @@ mod tests {
         const TOKEN: &str = "\n";
         let auth = test_token(TOKEN.into());
         let (mut service, _handle) =
-            mock::spawn_layer::<Request<Body>, Response<Body>, _>(AuthLayer::new(auth));
+            mock::spawn_layer::<Request<Body>, Response<Body>, _>(RefreshingTokenLayer::new(auth));
         let err = service
             .call(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await

@@ -5,6 +5,7 @@ use http::HeaderValue;
 use jsonpath_lib::select as jsonpath_select;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
+use tower::util::Either;
 
 use crate::{
     config::{read_file_to_string, AuthInfo, AuthProviderConfig, ExecConfig},
@@ -14,16 +15,29 @@ use crate::{
 
 #[cfg(feature = "oauth")] mod oauth;
 
-mod layer;
-pub(crate) use layer::AuthLayer;
+mod add_authorization;
+mod refreshing_token;
+pub(crate) use add_authorization::AddAuthorizationLayer;
+pub(crate) use refreshing_token::RefreshingTokenLayer;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Authentication {
     None,
-    Basic(String),
-    Token(String),
+    Basic(String, String),
+    Bearer(String),
     RefreshableToken(RefreshableToken),
+}
+
+impl Authentication {
+    pub(crate) fn into_layer(self) -> Option<Either<AddAuthorizationLayer, RefreshingTokenLayer>> {
+        match self {
+            Authentication::None => None,
+            Authentication::Basic(user, pass) => Some(Either::A(AddAuthorizationLayer::basic(&user, &pass))),
+            Authentication::Bearer(token) => Some(Either::A(AddAuthorizationLayer::bearer(&token))),
+            Authentication::RefreshableToken(r) => Some(Either::B(RefreshingTokenLayer::new(r))),
+        }
+    }
 }
 
 // See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth
@@ -48,7 +62,7 @@ impl RefreshableToken {
                 // conditions where the token expires while we are refreshing
                 if Utc::now() + Duration::seconds(60) >= locked_data.1 {
                     match Authentication::try_from(&locked_data.2)? {
-                        Authentication::None | Authentication::Basic(_) | Authentication::Token(_) => {
+                        Authentication::None | Authentication::Basic(_, _) | Authentication::Bearer(_) => {
                             return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
                         }
 
@@ -96,7 +110,7 @@ impl TryFrom<&AuthInfo> for Authentication {
         if let Some(provider) = &auth_info.auth_provider {
             match token_from_provider(provider)? {
                 ProviderToken::Oidc(token) => {
-                    return Ok(Self::Token(token));
+                    return Ok(Self::Bearer(token));
                 }
 
                 ProviderToken::GcpCommand(token, Some(expiry)) => {
@@ -111,7 +125,7 @@ impl TryFrom<&AuthInfo> for Authentication {
                 }
 
                 ProviderToken::GcpCommand(token, None) => {
-                    return Ok(Self::Token(token));
+                    return Ok(Self::Bearer(token));
                 }
 
                 #[cfg(feature = "oauth")]
@@ -124,7 +138,7 @@ impl TryFrom<&AuthInfo> for Authentication {
         }
 
         if let (Some(u), Some(p)) = (&auth_info.username, &auth_info.password) {
-            return Ok(Authentication::Basic(base64::encode(&format!("{}:{}", u, p))));
+            return Ok(Authentication::Basic(u.to_owned(), p.to_owned()));
         }
 
         let (raw_token, expiration) = match &auth_info.token {
@@ -148,7 +162,7 @@ impl TryFrom<&AuthInfo> for Authentication {
         };
 
         match (raw_token, expiration) {
-            (Some(token), None) => Ok(Authentication::Token(token)),
+            (Some(token), None) => Ok(Authentication::Bearer(token)),
             (Some(token), Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken::Exec(
                 Arc::new(Mutex::new((token, expire, auth_info.clone()))),
             ))),
