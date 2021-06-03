@@ -29,7 +29,7 @@ impl Config {
     /// Create `rustls::ClientConfig`
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
-    pub fn rustls_tls_client_config(&self) -> Result<rustls::ClientConfig> {
+    pub fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
         self::rustls_tls::rustls_client_config(
             self.identity_pem.as_ref(),
             self.root_cert.as_ref(),
@@ -40,10 +40,10 @@ impl Config {
     /// Create `hyper_rustls::HttpsConnector`
     #[cfg_attr(docsrs, doc(cfg(all(feature = "client", feature = "rustls-tls"))))]
     #[cfg(all(feature = "client", feature = "rustls-tls"))]
-    pub fn rustls_tls_https_connector(
+    pub fn rustls_https_connector(
         &self,
     ) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
-        let rustls_config = std::sync::Arc::new(self.rustls_tls_client_config()?);
+        let rustls_config = std::sync::Arc::new(self.rustls_client_config()?);
         let mut http = hyper::client::HttpConnector::new();
         http.enforce_http(false);
         Ok(hyper_rustls::HttpsConnector::from((http, rustls_config)))

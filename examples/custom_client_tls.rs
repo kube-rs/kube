@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     // Pick TLS at runtime
     let use_rustls = std::env::var("USE_RUSTLS").map(|s| s == "1").unwrap_or(false);
     let client = if use_rustls {
-        let https = config.rustls_tls_https_connector()?;
+        let https = config.rustls_https_connector()?;
         Client::new(
             ServiceBuilder::new()
                 .layer(SetBaseUriLayer::new(config.cluster_url))

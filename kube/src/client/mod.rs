@@ -437,7 +437,7 @@ impl TryFrom<Config> for Client {
         #[cfg(all(not(feature = "native-tls"), feature = "rustls-tls"))]
         let connector = hyper_rustls::HttpsConnector::from((
             connector,
-            std::sync::Arc::new(config.rustls_tls_client_config()?),
+            std::sync::Arc::new(config.rustls_client_config()?),
         ));
 
         let mut connector = TimeoutConnector::new(connector);
