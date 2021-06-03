@@ -10,7 +10,7 @@ use tracing::Span;
 
 use kube::{
     api::{Api, ListParams},
-    service::SetBaseUriLayer,
+    client::SetBaseUriLayer,
     Client, Config,
 };
 

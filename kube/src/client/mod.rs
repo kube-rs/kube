@@ -31,16 +31,17 @@ use tower_http::{
     classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
 };
 
-use crate::{
-    api::WatchEvent,
-    error::ErrorResponse,
-    service::{Authentication, SetBaseUriLayer, SetHeadersLayer},
-    Config, Error, Result,
-};
+use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
 
+mod auth;
+use auth::Authentication;
+mod base_uri;
+pub use base_uri::{SetBaseUri, SetBaseUriLayer};
 mod body;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
+mod headers;
+use headers::SetHeadersLayer;
 
 // Binary subprotocol v4. See `Client::connect`.
 #[cfg(feature = "ws")]
