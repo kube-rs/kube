@@ -472,42 +472,48 @@ impl TryFrom<Config> for Client {
             .layer(common)
             .option_layer(maybe_auth)
             .layer(
-                // TODO Add OTEL attributes? https://github.com/clux/kube-rs/issues/457
-                // - https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
-                // - https://docs.rs/tracing-opentelemetry/0.13.0/tracing_opentelemetry/#semantic-conventions
-                // - https://docs.rs/tracing-opentelemetry/0.13.0/tracing_opentelemetry/#special-fields
+                // Attribute names follow [Semantic Conventions].
+                // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
                 TraceLayer::new_for_http()
                     .make_span_with(|req: &Request<hyper::Body>| {
                         tracing::debug_span!(
                             "HTTP",
                              http.method = %req.method(),
-                             http.uri = %req.uri(),
+                             http.url = %req.uri(),
                              http.status_code = tracing::field::Empty,
+                             otel.kind = "client",
+                             otel.status_code = tracing::field::Empty,
                         )
                     })
-                    .on_request(|_req: &Request<hyper::Body>, _span: &Span| tracing::debug!("requesting"))
-                    .on_response(|res: &Response<hyper::Body>, latency: Duration, span: &Span| {
-                        span.record("http.status_code", &res.status().as_u16());
-                        tracing::debug!("finished in {}ms", latency.as_millis())
+                    .on_request(|_req: &Request<hyper::Body>, _span: &Span| {
+                        tracing::debug!("requesting");
+                    })
+                    .on_response(|res: &Response<hyper::Body>, _latency: Duration, span: &Span| {
+                        let status = res.status();
+                        span.record("http.status_code", &status.as_u16());
+                        if status.is_client_error() || status.is_server_error() {
+                            span.record("otel.status_code", &"ERROR");
+                        }
                     })
                     // Explicitly disable `on_body_chunk`. The default does nothing.
                     .on_body_chunk(())
-                    .on_eos(|_: Option<&HeaderMap>, stream_duration: Duration, _span: &Span| {
-                        tracing::debug!("stream ended after {}ms", stream_duration.as_millis())
+                    .on_eos(|_: Option<&HeaderMap>, _duration: Duration, _span: &Span| {
+                        tracing::debug!("stream closed");
                     })
-                    .on_failure(|ec: ServerErrorsFailureClass, latency: Duration, span: &Span| {
+                    .on_failure(|ec: ServerErrorsFailureClass, _latency: Duration, span: &Span| {
                         // Called when
                         // - Calling the inner service errored
                         // - Polling `Body` errored
                         // - the response was classified as failure (5xx)
                         // - End of stream was classified as failure
+                        span.record("otel.status_code", &"ERROR");
                         match ec {
                             ServerErrorsFailureClass::StatusCode(status) => {
                                 span.record("http.status_code", &status.as_u16());
-                                tracing::error!("failed in {}ms {}", latency.as_millis(), status)
+                                tracing::error!("failed with status {}", status)
                             }
                             ServerErrorsFailureClass::Error(err) => {
-                                tracing::error!("failed in {}ms {}", latency.as_millis(), err)
+                                tracing::error!("failed with error {}", err)
                             }
                         }
                     }),
