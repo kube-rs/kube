@@ -11,35 +11,35 @@ use tower::{layer::Layer, BoxError, Service};
 use super::RefreshableToken;
 use crate::Result;
 
-// TODO Come up with a better name
-/// `Layer` to decorate the request with `Authorization` header with token refreshing automatically.
-pub struct RefreshingTokenLayer {
+/// `Layer` to decorate the request with `Authorization` header with refreshable token.
+/// Token is refreshed automatically when necessary.
+pub struct RefreshTokenLayer {
     refreshable: RefreshableToken,
 }
 
-impl RefreshingTokenLayer {
+impl RefreshTokenLayer {
     pub(crate) fn new(refreshable: RefreshableToken) -> Self {
         Self { refreshable }
     }
 }
 
-impl<S> Layer<S> for RefreshingTokenLayer {
-    type Service = RefreshingToken<S>;
+impl<S> Layer<S> for RefreshTokenLayer {
+    type Service = RefreshToken<S>;
 
     fn layer(&self, service: S) -> Self::Service {
-        RefreshingToken {
+        RefreshToken {
             refreshable: self.refreshable.clone(),
             service,
         }
     }
 }
 
-pub struct RefreshingToken<S> {
+pub struct RefreshToken<S> {
     refreshable: RefreshableToken,
     service: S,
 }
 
-impl<S, ReqB, ResB> Service<Request<ReqB>> for RefreshingToken<S>
+impl<S, ReqB, ResB> Service<Request<ReqB>> for RefreshToken<S>
 where
     S: Service<Request<ReqB>, Response = Response<ResB>> + Clone,
     S::Error: Into<BoxError>,
@@ -47,7 +47,7 @@ where
     ResB: http_body::Body,
 {
     type Error = BoxError;
-    type Future = AuthFuture<S, ReqB>;
+    type Future = RefreshTokenFuture<S, ReqB>;
     type Response = S::Response;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -71,7 +71,7 @@ where
             })
         };
 
-        AuthFuture {
+        RefreshTokenFuture {
             state: State::Request(Box::pin(request)),
             service,
         }
@@ -90,7 +90,7 @@ enum State<F, G> {
 type RequestFuture<B> = Pin<Box<dyn Future<Output = Result<Request<B>, BoxError>> + Send>>;
 
 #[pin_project]
-pub struct AuthFuture<S, B>
+pub struct RefreshTokenFuture<S, B>
 where
     S: Service<Request<B>>,
     B: http_body::Body,
@@ -100,7 +100,7 @@ where
     service: S,
 }
 
-impl<S, B> Future for AuthFuture<S, B>
+impl<S, B> Future for RefreshTokenFuture<S, B>
 where
     S: Service<Request<B>>,
     S::Error: Into<BoxError>,
@@ -148,7 +148,7 @@ mod tests {
         const TOKEN: &str = "test";
         let auth = test_token(TOKEN.into());
         let (mut service, handle): (_, Handle<Request<hyper::Body>, Response<hyper::Body>>) =
-            mock::spawn_layer(RefreshingTokenLayer::new(auth));
+            mock::spawn_layer(RefreshTokenLayer::new(auth));
 
         let spawned = tokio::spawn(async move {
             // Receive the requests and respond
@@ -174,7 +174,7 @@ mod tests {
         const TOKEN: &str = "\n";
         let auth = test_token(TOKEN.into());
         let (mut service, _handle) =
-            mock::spawn_layer::<Request<Body>, Response<Body>, _>(RefreshingTokenLayer::new(auth));
+            mock::spawn_layer::<Request<Body>, Response<Body>, _>(RefreshTokenLayer::new(auth));
         let err = service
             .call(Request::builder().uri("/").body(Body::empty()).unwrap())
             .await

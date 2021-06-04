@@ -4,7 +4,7 @@ use tower::util::Either;
 
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] use super::tls;
 use super::{
-    auth::{AddAuthorizationLayer, RefreshingTokenLayer},
+    auth::{AddAuthorizationLayer, RefreshTokenLayer},
     Auth, SetBaseUriLayer,
 };
 use crate::{Config, Result};
@@ -41,7 +41,7 @@ pub trait ConfigExt: private::Sealed {
     /// Optional layer to set up `Authorization` header depending on the config.
     ///
     /// Users are not allowed to call this for now.
-    fn auth_layer(&self) -> Result<Option<Either<AddAuthorizationLayer, RefreshingTokenLayer>>>;
+    fn auth_layer(&self) -> Result<Option<Either<AddAuthorizationLayer, RefreshTokenLayer>>>;
 }
 
 mod private {
@@ -88,12 +88,12 @@ impl ConfigExt for Config {
         Ok(hyper_rustls::HttpsConnector::from((http, rustls_config)))
     }
 
-    fn auth_layer(&self) -> Result<Option<Either<AddAuthorizationLayer, RefreshingTokenLayer>>> {
+    fn auth_layer(&self) -> Result<Option<Either<AddAuthorizationLayer, RefreshTokenLayer>>> {
         Ok(match Auth::try_from(&self.auth_info)? {
             Auth::None => None,
             Auth::Basic(user, pass) => Some(Either::A(AddAuthorizationLayer::basic(&user, &pass))),
             Auth::Bearer(token) => Some(Either::A(AddAuthorizationLayer::bearer(&token))),
-            Auth::RefreshableToken(r) => Some(Either::B(RefreshingTokenLayer::new(r))),
+            Auth::RefreshableToken(r) => Some(Either::B(RefreshTokenLayer::new(r))),
         })
     }
 }
