@@ -464,6 +464,7 @@ impl TryFrom<Config> for Client {
                              http.method = %req.method(),
                              http.url = %req.uri(),
                              http.status_code = tracing::field::Empty,
+                             otel.name = req.extensions().get::<&'static str>().unwrap_or(&"HTTP"),
                              otel.kind = "client",
                              otel.status_code = tracing::field::Empty,
                         )
