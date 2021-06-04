@@ -14,8 +14,6 @@ use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 #[cfg(feature = "client")] pub(crate) use utils::read_file_to_string;
 
-use http::header::HeaderMap;
-
 use std::time::Duration;
 
 /// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
@@ -27,8 +25,6 @@ pub struct Config {
     pub default_ns: String,
     /// The configured root certificate
     pub root_cert: Option<Vec<Vec<u8>>>,
-    /// Default headers to be used to communicate with the Kubernetes API
-    pub headers: HeaderMap,
     /// Timeout for calls to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
@@ -53,7 +49,6 @@ impl Config {
             cluster_url,
             default_ns: String::from("default"),
             root_cert: None,
-            headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             identity_pem: None,
@@ -111,7 +106,6 @@ impl Config {
             cluster_url,
             default_ns,
             root_cert: Some(root_cert),
-            headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             identity_pem: None,
@@ -177,7 +171,6 @@ impl Config {
             cluster_url,
             default_ns,
             root_cert,
-            headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             identity_pem,

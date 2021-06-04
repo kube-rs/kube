@@ -40,7 +40,6 @@ use body::BodyStreamExt;
 mod config_ext;
 pub use config_ext::ConfigExt;
 pub mod middleware;
-use middleware::SetHeadersLayer;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
 
 // Binary subprotocol v4. See `Client::connect`.
@@ -406,7 +405,6 @@ impl TryFrom<Config> for Client {
         use http::header::HeaderMap;
         use tracing::Span;
 
-        let default_headers = config.headers.clone();
         let timeout = config.timeout;
         let default_ns = config.default_ns.clone();
 
@@ -435,10 +433,7 @@ impl TryFrom<Config> for Client {
             hyper::Client::builder().build(connector)
         };
 
-        let stack = ServiceBuilder::new()
-            .layer(config.base_uri_layer())
-            .layer(SetHeadersLayer::new(default_headers))
-            .into_inner();
+        let stack = ServiceBuilder::new().layer(config.base_uri_layer()).into_inner();
         #[cfg(feature = "gzip")]
         let stack = ServiceBuilder::new()
             .layer(stack)
