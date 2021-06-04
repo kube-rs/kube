@@ -14,11 +14,6 @@ use crate::{
 
 #[cfg(feature = "oauth")] mod oauth;
 
-mod add_authorization;
-mod refresh_token;
-pub(crate) use add_authorization::AddAuthorizationLayer;
-pub(crate) use refresh_token::RefreshTokenLayer;
-
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Auth {

@@ -8,8 +8,7 @@ use http::{header::AUTHORIZATION, Request, Response};
 use pin_project::pin_project;
 use tower::{layer::Layer, BoxError, Service};
 
-use super::RefreshableToken;
-use crate::Result;
+use crate::{client::auth::RefreshableToken, Result};
 
 /// `Layer` to decorate the request with `Authorization` header with refreshable token.
 /// Token is refreshed automatically when necessary.

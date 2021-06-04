@@ -1,6 +1,7 @@
 use http::{header::HeaderMap, Request};
 use tower::{Layer, Service};
 
+// TODO Remove this and `headers` field from `Config`.
 /// Layer that applies [`SetHeaders`] which sets the provided headers to each request.
 #[derive(Debug, Clone)]
 pub struct SetHeadersLayer {

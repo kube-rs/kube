@@ -4,8 +4,8 @@ use tower::util::Either;
 
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] use super::tls;
 use super::{
-    auth::{AddAuthorizationLayer, RefreshTokenLayer},
-    Auth, SetBaseUriLayer,
+    auth::Auth,
+    middleware::{AddAuthorizationLayer, RefreshTokenLayer, SetBaseUriLayer},
 };
 use crate::{Config, Result};
 

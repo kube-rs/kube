@@ -34,16 +34,13 @@ use tower_http::{
 use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
 
 mod auth;
-use auth::Auth;
-mod base_uri;
-pub use base_uri::{SetBaseUri, SetBaseUriLayer};
 mod body;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
 mod config_ext;
 pub use config_ext::ConfigExt;
-mod headers;
-use headers::SetHeadersLayer;
+pub mod middleware;
+use middleware::SetHeadersLayer;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
 
 // Binary subprotocol v4. See `Client::connect`.
