@@ -40,8 +40,11 @@ pub use base_uri::{SetBaseUri, SetBaseUriLayer};
 mod body;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
+mod config_ext;
+pub use config_ext::ConfigExt;
 mod headers;
 use headers::SetHeadersLayer;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
 
 // Binary subprotocol v4. See `Client::connect`.
 #[cfg(feature = "ws")]
@@ -448,7 +451,7 @@ impl TryFrom<Config> for Client {
 
         let service = ServiceBuilder::new()
             .layer(stack)
-            .option_layer(Auth::try_from(&config.auth_info)?.into_layer())
+            .option_layer(config.auth_layer()?)
             .layer(
                 // Attribute names follow [Semantic Conventions].
                 // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md

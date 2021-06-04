@@ -5,7 +5,6 @@ use http::HeaderValue;
 use jsonpath_lib::select as jsonpath_select;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use tower::util::Either;
 
 use crate::{
     config::{read_file_to_string, AuthInfo, AuthProviderConfig, ExecConfig},
@@ -27,17 +26,6 @@ pub(crate) enum Auth {
     Basic(String, String),
     Bearer(String),
     RefreshableToken(RefreshableToken),
-}
-
-impl Auth {
-    pub(crate) fn into_layer(self) -> Option<Either<AddAuthorizationLayer, RefreshingTokenLayer>> {
-        match self {
-            Self::None => None,
-            Self::Basic(user, pass) => Some(Either::A(AddAuthorizationLayer::basic(&user, &pass))),
-            Self::Bearer(token) => Some(Either::A(AddAuthorizationLayer::bearer(&token))),
-            Self::RefreshableToken(r) => Some(Either::B(RefreshingTokenLayer::new(r))),
-        }
-    }
 }
 
 // See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth

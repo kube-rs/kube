@@ -7,7 +7,6 @@
 mod file_config;
 mod file_loader;
 mod incluster_config;
-#[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
 mod utils;
 
 use crate::{error::ConfigError, Result};
@@ -38,7 +37,7 @@ pub struct Config {
     pub accept_invalid_certs: bool,
     // TODO should keep client key and certificate separate. It's split later anyway.
     /// Client certificate and private key in PEM.
-    identity_pem: Option<Vec<u8>>,
+    pub(crate) identity_pem: Option<Vec<u8>>,
     /// Stores information to tell the cluster who you are.
     pub(crate) auth_info: AuthInfo,
 }
