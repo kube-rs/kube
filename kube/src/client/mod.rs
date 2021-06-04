@@ -411,48 +411,43 @@ impl TryFrom<Config> for Client {
         let timeout = config.timeout;
         let default_ns = config.default_ns.clone();
 
-        let common = ServiceBuilder::new()
+        let client: hyper::Client<_, Body> = {
+            let mut connector = HttpConnector::new();
+            connector.enforce_http(false);
+
+            // Note that if both `native_tls` and `rustls` is enabled, `native_tls` is used by default.
+            // To use `rustls`, disable `native_tls` or create custom client.
+            // If tls features are not enabled, http connector will be used.
+            #[cfg(feature = "native-tls")]
+            let connector = hyper_tls::HttpsConnector::from((
+                connector,
+                tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
+            ));
+            #[cfg(all(not(feature = "native-tls"), feature = "rustls-tls"))]
+            let connector = hyper_rustls::HttpsConnector::from((
+                connector,
+                std::sync::Arc::new(config.rustls_client_config()?),
+            ));
+
+            let mut connector = TimeoutConnector::new(connector);
+            connector.set_connect_timeout(timeout);
+            connector.set_read_timeout(timeout);
+
+            hyper::Client::builder().build(connector)
+        };
+
+        let stack = ServiceBuilder::new()
             .layer(SetBaseUriLayer::new(cluster_url))
             .layer(SetHeadersLayer::new(default_headers))
             .into_inner();
-
         #[cfg(feature = "gzip")]
-        let common = ServiceBuilder::new()
-            .layer(common)
+        let stack = ServiceBuilder::new()
+            .layer(stack)
             .layer(tower_http::decompression::DecompressionLayer::new())
             .into_inner();
 
-        let mut connector = HttpConnector::new();
-        connector.enforce_http(false);
-
-        // Note that if both `native_tls` and `rustls` is enabled, `native_tls` is used by default.
-        // To use `rustls`, disable `native_tls` or create custom client.
-        // If tls features are not enabled, http connector will be used.
-        #[cfg(feature = "native-tls")]
-        let connector = hyper_tls::HttpsConnector::from((
-            connector,
-            tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
-        ));
-
-        #[cfg(all(not(feature = "native-tls"), feature = "rustls-tls"))]
-        let connector = hyper_rustls::HttpsConnector::from((
-            connector,
-            std::sync::Arc::new(config.rustls_client_config()?),
-        ));
-
-        let mut connector = TimeoutConnector::new(connector);
-        if let Some(timeout) = timeout {
-            // reqwest's timeout is applied from when the request stars connecting until
-            // the response body has finished.
-            // Setting both connect and read timeout should be close enough.
-            connector.set_connect_timeout(Some(timeout));
-            // Timeout for reading the response.
-            connector.set_read_timeout(Some(timeout));
-        }
-        let client: hyper::Client<_, Body> = hyper::Client::builder().build(connector);
-
-        let inner = ServiceBuilder::new()
-            .layer(common)
+        let service = ServiceBuilder::new()
+            .layer(stack)
             .option_layer(Authentication::try_from(&config.auth_info)?.into_layer())
             .layer(
                 // Attribute names follow [Semantic Conventions].
@@ -503,7 +498,7 @@ impl TryFrom<Config> for Client {
                     }),
             )
             .service(client);
-        Ok(Self::new_with_default_ns(inner, default_ns))
+        Ok(Self::new_with_default_ns(service, default_ns))
     }
 }
 
