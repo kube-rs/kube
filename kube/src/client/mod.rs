@@ -409,7 +409,6 @@ impl TryFrom<Config> for Client {
         use http::header::HeaderMap;
         use tracing::Span;
 
-        let cluster_url = config.cluster_url.clone();
         let default_headers = config.headers.clone();
         let timeout = config.timeout;
         let default_ns = config.default_ns.clone();
@@ -440,7 +439,7 @@ impl TryFrom<Config> for Client {
         };
 
         let stack = ServiceBuilder::new()
-            .layer(SetBaseUriLayer::new(cluster_url))
+            .layer(config.base_uri_layer())
             .layer(SetHeadersLayer::new(default_headers))
             .into_inner();
         #[cfg(feature = "gzip")]

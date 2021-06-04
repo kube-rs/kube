@@ -5,7 +5,7 @@ use tower::util::Either;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] use super::tls;
 use super::{
     auth::{AddAuthorizationLayer, RefreshingTokenLayer},
-    Auth,
+    Auth, SetBaseUriLayer,
 };
 use crate::{Config, Result};
 
@@ -13,6 +13,9 @@ use crate::{Config, Result};
 ///
 /// This trait is sealed and cannot be implemented.
 pub trait ConfigExt: private::Sealed {
+    /// Layer to set the base URI of requests to the configured server.
+    fn base_uri_layer(&self) -> SetBaseUriLayer;
+
     /// Create `native_tls::TlsConnector`
     #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
     #[cfg(feature = "native-tls")]
@@ -47,6 +50,10 @@ mod private {
 }
 
 impl ConfigExt for Config {
+    fn base_uri_layer(&self) -> SetBaseUriLayer {
+        SetBaseUriLayer::new(self.cluster_url.clone())
+    }
+
     #[cfg(feature = "native-tls")]
     fn native_tls_connector(&self) -> Result<tokio_native_tls::native_tls::TlsConnector> {
         tls::native_tls::native_tls_connector(

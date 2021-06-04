@@ -4,7 +4,7 @@ use tower::ServiceBuilder;
 
 use kube::{
     api::{Api, ListParams},
-    client::{ConfigExt, SetBaseUriLayer},
+    client::ConfigExt,
     Client, Config,
 };
 
@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let https = config.native_tls_https_connector()?;
     let client = Client::new(
         ServiceBuilder::new()
-            .layer(SetBaseUriLayer::new(config.cluster_url))
+            .layer(config.base_uri_layer())
             .service(hyper::Client::builder().build(https)),
     );
 
