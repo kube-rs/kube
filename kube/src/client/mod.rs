@@ -34,7 +34,7 @@ use tower_http::{
 use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
 
 mod auth;
-use auth::Authentication;
+use auth::Auth;
 mod base_uri;
 pub use base_uri::{SetBaseUri, SetBaseUriLayer};
 mod body;
@@ -448,7 +448,7 @@ impl TryFrom<Config> for Client {
 
         let service = ServiceBuilder::new()
             .layer(stack)
-            .option_layer(Authentication::try_from(&config.auth_info)?.into_layer())
+            .option_layer(Auth::try_from(&config.auth_info)?.into_layer())
             .layer(
                 // Attribute names follow [Semantic Conventions].
                 // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md

@@ -22,20 +22,20 @@ pub(crate) use refreshing_token::RefreshingTokenLayer;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum Authentication {
+pub(crate) enum Auth {
     None,
     Basic(String, String),
     Bearer(String),
     RefreshableToken(RefreshableToken),
 }
 
-impl Authentication {
+impl Auth {
     pub(crate) fn into_layer(self) -> Option<Either<AddAuthorizationLayer, RefreshingTokenLayer>> {
         match self {
-            Authentication::None => None,
-            Authentication::Basic(user, pass) => Some(Either::A(AddAuthorizationLayer::basic(&user, &pass))),
-            Authentication::Bearer(token) => Some(Either::A(AddAuthorizationLayer::bearer(&token))),
-            Authentication::RefreshableToken(r) => Some(Either::B(RefreshingTokenLayer::new(r))),
+            Self::None => None,
+            Self::Basic(user, pass) => Some(Either::A(AddAuthorizationLayer::basic(&user, &pass))),
+            Self::Bearer(token) => Some(Either::A(AddAuthorizationLayer::bearer(&token))),
+            Self::RefreshableToken(r) => Some(Either::B(RefreshingTokenLayer::new(r))),
         }
     }
 }
@@ -61,12 +61,12 @@ impl RefreshableToken {
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
                 if Utc::now() + Duration::seconds(60) >= locked_data.1 {
-                    match Authentication::try_from(&locked_data.2)? {
-                        Authentication::None | Authentication::Basic(_, _) | Authentication::Bearer(_) => {
+                    match Auth::try_from(&locked_data.2)? {
+                        Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) => {
                             return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
                         }
 
-                        Authentication::RefreshableToken(RefreshableToken::Exec(d)) => {
+                        Auth::RefreshableToken(RefreshableToken::Exec(d)) => {
                             let (new_token, new_expire, new_info) = Arc::try_unwrap(d)
                                 .expect("Unable to unwrap Arc, this is likely a programming error")
                                 .into_inner();
@@ -77,7 +77,7 @@ impl RefreshableToken {
 
                         // Unreachable because the token source does not change
                         #[cfg(feature = "oauth")]
-                        Authentication::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
+                        Auth::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
                     }
                 }
 
@@ -100,7 +100,7 @@ impl RefreshableToken {
     }
 }
 
-impl TryFrom<&AuthInfo> for Authentication {
+impl TryFrom<&AuthInfo> for Auth {
     type Error = Error;
 
     /// Loads the authentication header from the credentials available in the kubeconfig. This supports
@@ -138,7 +138,7 @@ impl TryFrom<&AuthInfo> for Authentication {
         }
 
         if let (Some(u), Some(p)) = (&auth_info.username, &auth_info.password) {
-            return Ok(Authentication::Basic(u.to_owned(), p.to_owned()));
+            return Ok(Self::Basic(u.to_owned(), p.to_owned()));
         }
 
         let (raw_token, expiration) = match &auth_info.token {
@@ -162,11 +162,11 @@ impl TryFrom<&AuthInfo> for Authentication {
         };
 
         match (raw_token, expiration) {
-            (Some(token), None) => Ok(Authentication::Bearer(token)),
-            (Some(token), Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken::Exec(
-                Arc::new(Mutex::new((token, expire, auth_info.clone()))),
-            ))),
-            _ => Ok(Authentication::None),
+            (Some(token), None) => Ok(Self::Bearer(token)),
+            (Some(token), Some(expire)) => Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
+                Mutex::new((token, expire, auth_info.clone())),
+            )))),
+            _ => Ok(Self::None),
         }
     }
 }
@@ -385,8 +385,8 @@ mod test {
 
         let config: Kubeconfig = serde_yaml::from_str(&test_file).map_err(ConfigError::ParseYaml)?;
         let auth_info = &config.auth_infos[0].auth_info;
-        match Authentication::try_from(auth_info).unwrap() {
-            Authentication::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
+        match Auth::try_from(auth_info).unwrap() {
+            Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
                 assert_eq!(token, "my_token".to_owned());
                 let config = info.auth_provider.unwrap().config;
