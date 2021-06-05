@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 /// Possible errors when working with [`kube`][crate]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
 #[derive(Error, Debug)]
 pub enum Error {
     /// ApiError for when things fail
@@ -85,6 +86,7 @@ pub enum Error {
 
     /// An error from openssl when handling configuration
     #[cfg(feature = "native-tls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
     #[error("OpensslError: {0}")]
     OpensslError(#[from] openssl::error::ErrorStack),
 
@@ -170,6 +172,7 @@ pub enum ConfigError {
     ExecPluginFailed,
 
     #[cfg(feature = "client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 

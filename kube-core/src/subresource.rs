@@ -169,6 +169,7 @@ pub struct AttachParams {
 }
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Default for AttachParams {
     // Default matching the server's defaults.
     fn default() -> Self {
@@ -186,6 +187,7 @@ impl Default for AttachParams {
 }
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl AttachParams {
     /// Default parameters for an tty exec with stdin and stdout
     pub fn interactive_tty() -> Self {

@@ -52,6 +52,7 @@ const WS_PROTOCOL: &str = "v4.channel.k8s.io";
 /// inferring the configuration from the environment using
 /// [`Client::try_default`] or with an existing [`Config`]
 /// using [`Client::try_from`].
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 #[derive(Clone)]
 pub struct Client {
     // - `Buffer` for cheap clone

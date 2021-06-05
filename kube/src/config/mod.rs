@@ -17,6 +17,7 @@ pub use file_loader::KubeConfigOptions;
 use std::time::Duration;
 
 /// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
+#[cfg_attr(docsrs, doc(cfg(feature = "config")))]
 #[derive(Debug, Clone)]
 pub struct Config {
     /// The configured cluster url

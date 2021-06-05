@@ -135,7 +135,9 @@ pub use kube_derive::CustomResource;
 
 /// Re-exports from kube_core crate.
 pub mod core {
-    #[cfg(feature = "admission")] pub use kube_core::admission;
+    #[cfg(feature = "admission")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
+    pub use kube_core::admission;
     pub use kube_core::{
         dynamic::{self, ApiResource, DynamicObject},
         gvk::{self, GroupVersionKind, GroupVersionResource},
