@@ -157,12 +157,12 @@ Kube has basic support ([with caveats](https://github.com/clux/kube-rs/issues?q=
 
 ```toml
 [dependencies]
-kube = { version = "0.55.0", default-features = false, features = ["rustls-tls"] }
-kube-runtime = { version = "0.55.0", default-features = false, features = ["rustls-tls"] }
+kube = { version = "0.55.0", default-features = false, features = ["client", "rustls-tls"] }
+kube-runtime = { version = "0.55.0" }
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_20"] }
 ```
 
-This will pull in `hyper-rustls` and `tokio-rustls`.
+This will pull in `rustls` and `hyper-rustls`.
 
 ## musl-libc
 Kube will work with [distroless](https://github.com/clux/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/clux/kube-rs/issues/331#issuecomment-715962188)).

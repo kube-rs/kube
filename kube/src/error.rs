@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 /// Possible errors when working with [`kube`][crate]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
 #[derive(Error, Debug)]
 pub enum Error {
     /// ApiError for when things fail
@@ -47,9 +48,9 @@ pub enum Error {
     #[error("HttpError: {0}")]
     HttpError(#[from] http::Error),
 
-    /// Url conversion error
-    #[error("InternalUrlError: {0}")]
-    InternalUrlError(#[from] url::ParseError),
+    /// Failed to construct a URI.
+    #[error(transparent)]
+    InvalidUri(#[from] http::uri::InvalidUri),
 
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
@@ -85,6 +86,7 @@ pub enum Error {
 
     /// An error from openssl when handling configuration
     #[cfg(feature = "native-tls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
     #[error("OpensslError: {0}")]
     OpensslError(#[from] openssl::error::ErrorStack),
 
@@ -166,13 +168,11 @@ pub enum ConfigError {
     #[error("Unable to load in cluster token: {0}")]
     InvalidInClusterToken(#[source] Box<Error>),
 
-    #[error("Malformed url: {0}")]
-    MalformedUrl(#[from] url::ParseError),
-
     #[error("exec-plugin response did not contain a status")]
     ExecPluginFailed,
 
     #[cfg(feature = "client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 

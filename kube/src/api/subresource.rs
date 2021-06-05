@@ -2,7 +2,6 @@ use bytes::Bytes;
 use futures::Stream;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
-use tracing::instrument;
 
 use crate::{
     api::{Api, Patch, PatchParams, PostParams},
@@ -12,7 +11,9 @@ use crate::{
 use kube_core::response::Status;
 pub use kube_core::subresource::{EvictParams, LogParams};
 
-#[cfg(feature = "ws")] pub use kube_core::subresource::AttachParams;
+#[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+pub use kube_core::subresource::AttachParams;
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
@@ -24,28 +25,28 @@ where
     K: Clone + DeserializeOwned,
 {
     /// Fetch the scale subresource
-    #[instrument(skip(self), level = "trace")]
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
-        let req = self.request.get_subresource("scale", name)?;
+        let mut req = self.request.get_subresource("scale", name)?;
+        req.extensions_mut().insert("get_scale");
         self.client.request::<Scale>(req).await
     }
 
     /// Update the scale subresource
-    #[instrument(skip(self), level = "trace")]
     pub async fn patch_scale<P: serde::Serialize + Debug>(
         &self,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<Scale> {
-        let req = self.request.patch_subresource("scale", name, &pp, patch)?;
+        let mut req = self.request.patch_subresource("scale", name, &pp, patch)?;
+        req.extensions_mut().insert("patch_scale");
         self.client.request::<Scale>(req).await
     }
 
     /// Replace the scale subresource
-    #[instrument(skip(self), level = "trace")]
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
-        let req = self.request.replace_subresource("scale", name, &pp, data)?;
+        let mut req = self.request.replace_subresource("scale", name, &pp, data)?;
+        req.extensions_mut().insert("replace_scale");
         self.client.request::<Scale>(req).await
     }
 }
@@ -62,9 +63,9 @@ where
     /// Get the named resource with a status subresource
     ///
     /// This actually returns the whole K, with metadata, and spec.
-    #[instrument(skip(self), level = "trace")]
     pub async fn get_status(&self, name: &str) -> Result<K> {
-        let req = self.request.get_subresource("status", name)?;
+        let mut req = self.request.get_subresource("status", name)?;
+        req.extensions_mut().insert("get_status");
         self.client.request::<K>(req).await
     }
 
@@ -91,14 +92,14 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn patch_status<P: serde::Serialize + Debug>(
         &self,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req = self.request.patch_subresource("status", name, &pp, patch)?;
+        let mut req = self.request.patch_subresource("status", name, &pp, patch)?;
+        req.extensions_mut().insert("patch_status");
         self.client.request::<K>(req).await
     }
 
@@ -121,9 +122,9 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let req = self.request.replace_subresource("status", name, &pp, data)?;
+        let mut req = self.request.replace_subresource("status", name, &pp, data)?;
+        req.extensions_mut().insert("replace_status");
         self.client.request::<K>(req).await
     }
 }
@@ -155,16 +156,16 @@ where
     K: DeserializeOwned + Loggable,
 {
     /// Fetch logs as a string
-    #[instrument(skip(self), level = "trace")]
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
-        let req = self.request.logs(name, lp)?;
+        let mut req = self.request.logs(name, lp)?;
+        req.extensions_mut().insert("logs");
         self.client.request_text(req).await
     }
 
     /// Fetch logs as a stream of bytes
-    #[instrument(skip(self), level = "trace")]
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let req = self.request.logs(name, lp)?;
+        let mut req = self.request.logs(name, lp)?;
+        req.extensions_mut().insert("log_stream");
         self.client.request_text_stream(req).await
     }
 }
@@ -194,7 +195,8 @@ where
 {
     /// Create an eviction
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
-        let req = self.request.evict(name, ep)?;
+        let mut req = self.request.evict(name, ep)?;
+        req.extensions_mut().insert("evict");
         self.client.request::<Status>(req).await
     }
 }
@@ -236,9 +238,9 @@ where
     K: Clone + DeserializeOwned + Attachable,
 {
     /// Attach to pod
-    #[instrument(skip(self), level = "trace")]
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
-        let req = self.request.attach(name, ap)?;
+        let mut req = self.request.attach(name, ap)?;
+        req.extensions_mut().insert("attach");
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
     }
@@ -282,7 +284,6 @@ where
     K: Clone + DeserializeOwned + Executable,
 {
     /// Execute a command in a pod
-    #[instrument(skip(self), level = "trace")]
     pub async fn exec<I: Debug, T>(
         &self,
         name: &str,
@@ -293,7 +294,8 @@ where
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
-        let req = self.request.exec(name, command, ap)?;
+        let mut req = self.request.exec(name, command, ap)?;
+        req.extensions_mut().insert("exec");
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
     }

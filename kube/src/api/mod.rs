@@ -7,11 +7,14 @@ mod core_methods;
 
 mod subresource;
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use subresource::{AttachParams, Attachable, Executable};
 pub use subresource::{EvictParams, Evictable, LogParams, Loggable, ScaleSpec, ScaleStatus};
 
 // Re-exports from kube-core
-#[cfg(feature = "admission")] pub use kube_core::admission;
+#[cfg(feature = "admission")]
+#[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
+pub use kube_core::admission;
 pub(crate) use kube_core::params;
 pub use kube_core::{
     dynamic::{ApiResource, DynamicObject},
@@ -32,6 +35,7 @@ use crate::Client;
 /// This abstracts over a [`Request`] and a type `K` so that
 /// we get automatic serialization/deserialization on the api calls
 /// implemented by the dynamic [`Resource`].
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 #[derive(Clone)]
 pub struct Api<K> {
     /// The request builder object with its resource dependent url

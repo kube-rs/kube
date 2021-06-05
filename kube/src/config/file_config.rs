@@ -69,6 +69,9 @@ pub struct Cluster {
     /// PEM-encoded certificate authority certificates. Overrides `certificate_authority`
     #[serde(rename = "certificate-authority-data")]
     pub certificate_authority_data: Option<String>,
+    /// URL to the proxy to be used for all requests.
+    #[serde(rename = "proxy-url")]
+    pub proxy_url: Option<String>,
     /// Additional information for extenders so that reads and writes don't clobber unknown fields
     pub extensions: Option<Vec<NamedExtension>>,
 }
