@@ -1,15 +1,18 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.55.0...master
- * `kube`: added `Api::default_namespaced` - #209 via #534
- * `kube`: added `config` feature - #533 via #535
- * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module #523
-  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds #523
+ * see https://github.com/clux/kube-rs/compare/0.56.0...master
+
+0.56.0 / 2021-06-05
+===================
+ * `kube`: added `Api::default_namespaced` - [#209](https://github.com/clux/kube-rs/issues/209) via [#534](https://github.com/clux/kube-rs/issues/534)
+ * `kube`: added `config` feature - [#533](https://github.com/clux/kube-rs/issues/533) via [#535](https://github.com/clux/kube-rs/issues/535)
+ * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module [#523](https://github.com/clux/kube-rs/issues/523)
+  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds [#523](https://github.com/clux/kube-rs/issues/523)
   - `discovery`: moved `ApiResource` and `ApiCapabilities` (result of discovery) to `kube_core::discovery`
   - BREAKING: removed internal `ApiResource::from_apiresource`
 
- * `kube::Client` is now configurable with layers using `tower-http` #539 via #540
+ * `kube::Client` is now configurable with layers using `tower-http` [#539](https://github.com/clux/kube-rs/issues/539) via [#540](https://github.com/clux/kube-rs/issues/540)
   - three new examples added: `custom_client`, `custom_client_tls` and `custom_client_trace`
   - Big feature streamlining, big service and layer restructuring, dependency restructurings
   - Changes can hit advanced users, but unlikely to hit base use cases with `Api` and `Client`.
@@ -17,11 +20,11 @@ UNRELEASED
 
 ### TLS Enhancements
 
-- Add `kube::client::ConfigExt` extending `Config` for custom `Client`. This includes methods to configure TLS connection when building a custom client #539
+- Add `kube::client::ConfigExt` extending `Config` for custom `Client`. This includes methods to configure TLS connection when building a custom client [#539](https://github.com/clux/kube-rs/issues/539)
   - `native-tls`: `Config::native_tls_https_connector` and `Config::native_tls_connector`
   - `rustls-tls`: `Config::rustls_https_connector` and `Config::rustls_client_config`
 - Remove the requirement of having `native-tls` or `rustls-tls` enabled when `client` is enabled. Allow one, both or none.
-  - When both, the default Service will use `native-tls` because of #153. `rustls` can be still used with a custom client. Users will have an option to configure TLS at runtime.
+  - When both, the default Service will use `native-tls` because of [#153](https://github.com/clux/kube-rs/issues/153). `rustls` can be still used with a custom client. Users will have an option to configure TLS at runtime.
   - When none, HTTP connector is used.
 - Remove TLS features from `kube-runtime`
   - **BREAKING**: Features must be removed if specified
