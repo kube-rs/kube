@@ -5,7 +5,7 @@ use tower::util::Either;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] use super::tls;
 use super::{
     auth::Auth,
-    middleware::{AddAuthorizationLayer, RefreshTokenLayer, SetBaseUriLayer},
+    middleware::{AddAuthorizationLayer, AuthLayer, RefreshTokenLayer, SetBaseUriLayer},
 };
 use crate::{Config, Result};
 
@@ -15,6 +15,9 @@ use crate::{Config, Result};
 pub trait ConfigExt: private::Sealed {
     /// Layer to set the base URI of requests to the configured server.
     fn base_uri_layer(&self) -> SetBaseUriLayer;
+
+    /// Optional layer to set up `Authorization` header depending on the config.
+    fn auth_layer(&self) -> Result<Option<AuthLayer>>;
 
     /// Create `native_tls::TlsConnector`
     #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
@@ -35,13 +38,6 @@ pub trait ConfigExt: private::Sealed {
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
     fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
-
-    // TODO Try reducing exported types to minimize API surface before making this public.
-    #[doc(hidden)]
-    /// Optional layer to set up `Authorization` header depending on the config.
-    ///
-    /// Users are not allowed to call this for now.
-    fn auth_layer(&self) -> Result<Option<Either<AddAuthorizationLayer, RefreshTokenLayer>>>;
 }
 
 mod private {
@@ -52,6 +48,15 @@ mod private {
 impl ConfigExt for Config {
     fn base_uri_layer(&self) -> SetBaseUriLayer {
         SetBaseUriLayer::new(self.cluster_url.clone())
+    }
+
+    fn auth_layer(&self) -> Result<Option<AuthLayer>> {
+        Ok(match Auth::try_from(&self.auth_info)? {
+            Auth::None => None,
+            Auth::Basic(user, pass) => Some(AuthLayer(Either::A(AddAuthorizationLayer::basic(&user, &pass)))),
+            Auth::Bearer(token) => Some(AuthLayer(Either::A(AddAuthorizationLayer::bearer(&token)))),
+            Auth::RefreshableToken(r) => Some(AuthLayer(Either::B(RefreshTokenLayer::new(r)))),
+        })
     }
 
     #[cfg(feature = "native-tls")]
@@ -86,14 +91,5 @@ impl ConfigExt for Config {
         let mut http = hyper::client::HttpConnector::new();
         http.enforce_http(false);
         Ok(hyper_rustls::HttpsConnector::from((http, rustls_config)))
-    }
-
-    fn auth_layer(&self) -> Result<Option<Either<AddAuthorizationLayer, RefreshTokenLayer>>> {
-        Ok(match Auth::try_from(&self.auth_info)? {
-            Auth::None => None,
-            Auth::Basic(user, pass) => Some(Either::A(AddAuthorizationLayer::basic(&user, &pass))),
-            Auth::Bearer(token) => Some(Either::A(AddAuthorizationLayer::bearer(&token))),
-            Auth::RefreshableToken(r) => Some(Either::B(RefreshTokenLayer::new(r))),
-        })
     }
 }

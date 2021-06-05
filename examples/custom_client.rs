@@ -18,6 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::new(
         ServiceBuilder::new()
             .layer(config.base_uri_layer())
+            .option_layer(config.auth_layer()?)
             .service(hyper::Client::builder().build(https)),
     );
 
