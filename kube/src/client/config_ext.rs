@@ -5,7 +5,7 @@ use tower::util::Either;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] use super::tls;
 use super::{
     auth::Auth,
-    middleware::{AddAuthorizationLayer, AuthLayer, RefreshTokenLayer, SetBaseUriLayer},
+    middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, RefreshTokenLayer},
 };
 use crate::{Config, Result};
 
@@ -16,7 +16,7 @@ use crate::{Config, Result};
 /// This trait is sealed and cannot be implemented.
 pub trait ConfigExt: private::Sealed {
     /// Layer to set the base URI of requests to the configured server.
-    fn base_uri_layer(&self) -> SetBaseUriLayer;
+    fn base_uri_layer(&self) -> BaseUriLayer;
 
     /// Optional layer to set up `Authorization` header depending on the config.
     fn auth_layer(&self) -> Result<Option<AuthLayer>>;
@@ -106,8 +106,8 @@ mod private {
 }
 
 impl ConfigExt for Config {
-    fn base_uri_layer(&self) -> SetBaseUriLayer {
-        SetBaseUriLayer::new(self.cluster_url.clone())
+    fn base_uri_layer(&self) -> BaseUriLayer {
+        BaseUriLayer::new(self.cluster_url.clone())
     }
 
     fn auth_layer(&self) -> Result<Option<AuthLayer>> {

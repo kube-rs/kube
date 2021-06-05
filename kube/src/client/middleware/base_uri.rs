@@ -2,26 +2,26 @@
 use http::{uri, Request};
 use tower::{Layer, Service};
 
-/// Layer that applies [`SetBaseUri`] which makes all requests relative to the base URI.
+/// Layer that applies [`BaseUri`] which makes all requests relative to the URI.
 ///
-/// Path in `base_uri` is preseved.
+/// Path in the base URI is preseved.
 #[derive(Debug, Clone)]
-pub struct SetBaseUriLayer {
+pub struct BaseUriLayer {
     base_uri: http::Uri,
 }
 
-impl SetBaseUriLayer {
+impl BaseUriLayer {
     /// Set base URI of requests.
     pub fn new(base_uri: http::Uri) -> Self {
         Self { base_uri }
     }
 }
 
-impl<S> Layer<S> for SetBaseUriLayer {
-    type Service = SetBaseUri<S>;
+impl<S> Layer<S> for BaseUriLayer {
+    type Service = BaseUri<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        SetBaseUri {
+        BaseUri {
             base_uri: self.base_uri.clone(),
             inner,
         }
@@ -30,12 +30,12 @@ impl<S> Layer<S> for SetBaseUriLayer {
 
 /// Middleware that sets base URI so that all requests are relative to it.
 #[derive(Debug, Clone)]
-pub struct SetBaseUri<S> {
+pub struct BaseUri<S> {
     base_uri: http::Uri,
     inner: S,
 }
 
-impl<S, ReqBody> Service<Request<ReqBody>> for SetBaseUri<S>
+impl<S, ReqBody> Service<Request<ReqBody>> for BaseUri<S>
 where
     S: Service<Request<ReqBody>>,
 {
