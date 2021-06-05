@@ -7,13 +7,13 @@ UNRELEASED
 ===================
  * `kube`: added `Api::default_namespaced` - [#209](https://github.com/clux/kube-rs/issues/209) via [#534](https://github.com/clux/kube-rs/issues/534)
  * `kube`: added `config` feature - [#533](https://github.com/clux/kube-rs/issues/533) via [#535](https://github.com/clux/kube-rs/issues/535)
- * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module [#523](https://github.com/clux/kube-rs/issues/523)
-  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds [#523](https://github.com/clux/kube-rs/issues/523)
+ * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module [#538](https://github.com/clux/kube-rs/issues/538)
+  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds [#538](https://github.com/clux/kube-rs/issues/538)
   - `discovery`: moved `ApiResource` and `ApiCapabilities` (result of discovery) to `kube_core::discovery`
   - BREAKING: removed internal `ApiResource::from_apiresource`
 
  * `kube::Client` is now configurable with layers using `tower-http` [#539](https://github.com/clux/kube-rs/issues/539) via [#540](https://github.com/clux/kube-rs/issues/540)
-  - three new examples added: `custom_client`, `custom_client_tls` and `custom_client_trace`
+  - three new examples added: [`custom_client`](./examples/custom_client.rs), [`custom_client_tls`](./examples/custom_client_tls.rs) and [`custom_client_trace`](./examples/custom_client_trace.rs)
   - Big feature streamlining, big service and layer restructuring, dependency restructurings
   - Changes can hit advanced users, but unlikely to hit base use cases with `Api` and `Client`.
   - In depth changes broken down below:
