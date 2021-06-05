@@ -9,7 +9,9 @@ use super::{
 };
 use crate::{Config, Result};
 
-/// Extensions to `Config` for `Client`.
+/// Extensions to [`Config`](crate::Config) for custom [`Client`](crate::Client).
+///
+/// See [`Client::new`](crate::Client::new) for an example.
 ///
 /// This trait is sealed and cannot be implemented.
 pub trait ConfigExt: private::Sealed {
@@ -19,25 +21,83 @@ pub trait ConfigExt: private::Sealed {
     /// Optional layer to set up `Authorization` header depending on the config.
     fn auth_layer(&self) -> Result<Option<AuthLayer>>;
 
-    /// Create `native_tls::TlsConnector`
-    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
-    #[cfg(feature = "native-tls")]
-    fn native_tls_connector(&self) -> Result<tokio_native_tls::native_tls::TlsConnector>;
-
-    /// Create `hyper_tls::HttpsConnector`
+    /// Create [`hyper_tls::HttpsConnector`] based on config.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use kube::{client::ConfigExt, Config};
+    /// let config = Config::infer().await?;
+    /// let https = config.native_tls_https_connector()?;
+    /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
+    /// # Ok(())
+    /// # }
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
     #[cfg(feature = "native-tls")]
     fn native_tls_https_connector(&self) -> Result<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>;
 
-    /// Create `rustls::ClientConfig`
-    #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
-    #[cfg(feature = "rustls-tls")]
-    fn rustls_client_config(&self) -> Result<rustls::ClientConfig>;
-
-    /// Create `hyper_rustls::HttpsConnector`
+    /// Create [`hyper_rustls::HttpsConnector`] based on config.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use kube::{client::ConfigExt, Config};
+    /// let config = Config::infer().await?;
+    /// let https = config.rustls_https_connector()?;
+    /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
+    /// # Ok(())
+    /// # }
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
     fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
+
+    /// Create [`native_tls::TlsConnector`](tokio_native_tls::native_tls::TlsConnector) based on config.
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use hyper::client::HttpConnector;
+    /// # use kube::{client::ConfigExt, Client, Config};
+    /// let config = Config::infer().await?;
+    /// let https = {
+    ///     let tls = tokio_native_tls::TlsConnector::from(
+    ///         config.native_tls_connector()?
+    ///     );
+    ///     let mut http = HttpConnector::new();
+    ///     http.enforce_http(false);
+    ///     hyper_tls::HttpsConnector::from((http, tls))
+    /// };
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
+    #[cfg(feature = "native-tls")]
+    fn native_tls_connector(&self) -> Result<tokio_native_tls::native_tls::TlsConnector>;
+
+    /// Create [`rustls::ClientConfig`] based on config.
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use hyper::client::HttpConnector;
+    /// # use kube::{client::ConfigExt, Config};
+    /// let config = Config::infer().await?;
+    /// let https = {
+    ///     let rustls_config = std::sync::Arc::new(config.rustls_client_config()?);
+    ///     let mut http = HttpConnector::new();
+    ///     http.enforce_http(false);
+    ///     hyper_rustls::HttpsConnector::from((http, rustls_config))
+    /// };
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
+    #[cfg(feature = "rustls-tls")]
+    fn rustls_client_config(&self) -> Result<rustls::ClientConfig>;
 }
 
 mod private {

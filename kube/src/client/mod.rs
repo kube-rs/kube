@@ -48,7 +48,7 @@ const WS_PROTOCOL: &str = "v4.channel.k8s.io";
 
 /// Client for connecting with a Kubernetes cluster.
 ///
-/// The best way to instantiate the client is either by
+/// The easiest way to instantiate the client is either by
 /// inferring the configuration from the environment using
 /// [`Client::try_default`] or with an existing [`Config`]
 /// using [`Client::try_from`].
@@ -61,9 +61,34 @@ pub struct Client {
 }
 
 impl Client {
-    /// Create and initialize a [`Client`] using the given `Service`.
+    /// Create a [`Client`] using a custom `Service` stack.
     ///
-    /// Use [`Client::try_from`](Self::try_from) to create with a [`Config`].
+    /// [`ConfigExt`](crate::client::ConfigExt) provides extensions for
+    /// building a custom stack.
+    ///
+    /// To create with the default stack with a [`Config`], use
+    /// [`Client::try_from`].
+    ///
+    /// To create with the default stack with an inferred [`Config`], use
+    /// [`Client::try_default`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// use kube::{client::ConfigExt, Client, Config};
+    /// use tower::ServiceBuilder;
+    ///
+    /// let config = Config::infer().await?;
+    /// let client = Client::new(
+    ///     ServiceBuilder::new()
+    ///         .layer(config.base_uri_layer())
+    ///         .option_layer(config.auth_layer()?)
+    ///         .service(hyper::Client::new()),
+    /// );
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new<S, B>(service: S) -> Self
     where
         S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
