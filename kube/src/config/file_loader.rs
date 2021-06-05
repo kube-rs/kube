@@ -115,4 +115,17 @@ impl ConfigLoader {
             Ok(None)
         }
     }
+
+    pub fn proxy_url(&self) -> Result<Option<http::Uri>> {
+        let nonempty = |o: Option<String>| o.filter(|s| !s.is_empty());
+
+        if let Some(proxy) = nonempty(self.cluster.proxy_url.clone())
+            .or_else(|| nonempty(std::env::var("HTTP_PROXY").ok()))
+            .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
+        {
+            Ok(Some(proxy.parse::<http::Uri>()?))
+        } else {
+            Ok(None)
+        }
+    }
 }

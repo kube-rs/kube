@@ -36,6 +36,9 @@ pub struct Config {
     pub(crate) identity_pem: Option<Vec<u8>>,
     /// Stores information to tell the cluster who you are.
     pub(crate) auth_info: AuthInfo,
+    // TODO Actually support proxy or create an example with custom client
+    /// Optional proxy URL.
+    pub proxy_url: Option<http::Uri>,
 }
 
 impl Config {
@@ -53,6 +56,7 @@ impl Config {
             accept_invalid_certs: false,
             identity_pem: None,
             auth_info: AuthInfo::default(),
+            proxy_url: None,
         }
     }
 
@@ -113,6 +117,7 @@ impl Config {
                 token: Some(token),
                 ..Default::default()
             },
+            proxy_url: None,
         })
     }
 
@@ -174,6 +179,7 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             identity_pem,
+            proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
         })
     }
