@@ -3,13 +3,13 @@ use std::time::Duration;
 
 use http::{Request, Response};
 use hyper::Body;
-use k8s_openapi::api::core::v1::ConfigMap;
+use k8s_openapi::api::core::v1::Pod;
 use tower::ServiceBuilder;
 use tower_http::{decompression::DecompressionLayer, trace::TraceLayer};
 use tracing::Span;
 
 use kube::{
-    api::{Api, ListParams},
+    Api, ResourceExt,
     client::ConfigExt,
     Client, Config,
 };
@@ -54,11 +54,11 @@ async fn main() -> anyhow::Result<()> {
                     }),
             )
             .service(hyper::Client::builder().build(https)),
-    );
+    ).with_default_namespace(config.default_ns);
 
-    let cms: Api<ConfigMap> = Api::namespaced(client, "default");
-    for cm in cms.list(&ListParams::default()).await? {
-        println!("{:?}", cm);
+    let pods: Api<Pod> = Api::default_namespaced(client);
+    for p in pods.list(&Default::default()).await? {
+        println!("{}", p.name());
     }
 
     Ok(())

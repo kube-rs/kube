@@ -137,6 +137,13 @@ impl Client {
     pub(crate) fn default_ns(&self) -> &str {
         &self.default_ns
     }
+    /// Set the default namespace on a [`Client`]
+    ///
+    /// This is done by default in [`Client::try_default`], but must be done manually with custom clients.
+    pub fn with_default_namespace<T: Into<String>>(mut self, ns: T) -> Self {
+        self.default_ns = ns.into();
+        self
+    }
 
     async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
         let mut svc = self.inner.clone();
