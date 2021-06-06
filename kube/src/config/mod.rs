@@ -23,7 +23,7 @@ pub struct Config {
     /// The configured cluster url
     pub cluster_url: http::Uri,
     /// The configured default namespace
-    pub default_ns: String,
+    pub default_namespace: String,
     /// The configured root certificate
     pub root_cert: Option<Vec<Vec<u8>>>,
     /// Timeout for calls to the Kubernetes API.
@@ -51,7 +51,7 @@ impl Config {
     pub fn new(cluster_url: http::Uri) -> Self {
         Self {
             cluster_url,
-            default_ns: String::from("default"),
+            default_namespace: String::from("default"),
             root_cert: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
@@ -97,7 +97,7 @@ impl Config {
         })?;
         let cluster_url = cluster_url.parse::<http::Uri>()?;
 
-        let default_ns = incluster_config::load_default_ns()
+        let default_namespace = incluster_config::load_default_ns()
             .map_err(Box::new)
             .map_err(ConfigError::InvalidInClusterNamespace)?;
 
@@ -109,7 +109,7 @@ impl Config {
 
         Ok(Self {
             cluster_url,
-            default_ns,
+            default_namespace,
             root_cert: Some(root_cert),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
@@ -144,7 +144,7 @@ impl Config {
     async fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
         let cluster_url = loader.cluster.server.parse::<http::Uri>()?;
 
-        let default_ns = loader
+        let default_namespace = loader
             .current_context
             .namespace
             .clone()
@@ -175,7 +175,7 @@ impl Config {
 
         Ok(Self {
             cluster_url,
-            default_ns,
+            default_namespace,
             root_cert,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,

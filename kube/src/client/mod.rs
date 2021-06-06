@@ -439,7 +439,7 @@ impl TryFrom<Config> for Client {
         use tracing::Span;
 
         let timeout = config.timeout;
-        let default_ns = config.default_ns.clone();
+        let default_ns = config.default_namespace.clone();
 
         let client: hyper::Client<_, Body> = {
             let mut connector = HttpConnector::new();
@@ -525,7 +525,7 @@ impl TryFrom<Config> for Client {
                     }),
             )
             .service(client);
-        Ok(Self::new_with_default_ns(service, default_ns))
+        Ok(Self::new(service).with_default_namespace(default_ns))
     }
 }
 

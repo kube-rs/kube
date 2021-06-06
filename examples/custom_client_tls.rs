@@ -21,19 +21,17 @@ async fn main() -> anyhow::Result<()> {
     let use_rustls = std::env::var("USE_RUSTLS").map(|s| s == "1").unwrap_or(false);
     let client = (if use_rustls {
         let https = config.rustls_https_connector()?;
-        Client::new(
-            ServiceBuilder::new()
-                .layer(config.base_uri_layer())
-                .service(hyper::Client::builder().build(https)),
-        )
+        let service = ServiceBuilder::new()
+            .layer(config.base_uri_layer())
+            .service(hyper::Client::builder().build(https));
+        Client::new(service)
     } else {
         let https = config.native_tls_https_connector()?;
-        Client::new(
-            ServiceBuilder::new()
-                .layer(config.base_uri_layer())
-                .service(hyper::Client::builder().build(https)),
-        )
-    }).with_default_namespace(config.default_ns);
+        let service = ServiceBuilder::new()
+            .layer(config.base_uri_layer())
+            .service(hyper::Client::builder().build(https));
+        Client::new(service)
+    }).with_default_namespace(config.default_namespace);
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     for p in pods.list(&Default::default()).await? {

@@ -14,12 +14,11 @@ async fn main() -> anyhow::Result<()> {
 
     let config = Config::infer().await?;
     let https = config.native_tls_https_connector()?;
-    let client = Client::new(
-        tower::ServiceBuilder::new()
-            .layer(config.base_uri_layer())
-            .option_layer(config.auth_layer()?)
-            .service(hyper::Client::builder().build(https))
-    ).with_default_namespace(config.default_ns);
+    let service = tower::ServiceBuilder::new()
+        .layer(config.base_uri_layer())
+        .option_layer(config.auth_layer()?)
+        .service(hyper::Client::builder().build(https));
+    let client = Client::new(service).with_default_namespace(config.default_namespace);
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     for p in pods.list(&Default::default()).await? {
