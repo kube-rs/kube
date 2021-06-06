@@ -15,6 +15,9 @@ pub mod discovery;
 pub mod dynamic;
 pub use dynamic::DynamicObject;
 
+pub mod crd;
+pub use crd::CustomResourceExt;
+
 pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 
