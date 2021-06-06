@@ -98,25 +98,13 @@ impl Client {
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
         B::Error: std::error::Error + Send + Sync + 'static,
     {
-        Self::new_with_default_ns(service, "default")
-    }
-
-    /// Create and initialize a [`Client`] using the given `Service` and the default namespace.
-    fn new_with_default_ns<S, B, T: Into<String>>(service: S, default_ns: T) -> Self
-    where
-        S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
-        S::Future: Send + 'static,
-        S::Error: Into<BoxError>,
-        B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
-        B::Error: std::error::Error + Send + Sync + 'static,
-    {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
-        let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
+            let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
             .layer(service)
             .map_err(|e| e.into());
         Self {
             inner: Buffer::new(BoxService::new(service), 1024),
-            default_ns: default_ns.into(),
+            default_ns: "default".into(),
         }
     }
 
@@ -140,6 +128,21 @@ impl Client {
     /// Set the default namespace on a [`Client`]
     ///
     /// This is done by default in [`Client::try_default`], but must be done manually with custom clients.
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// use kube::{client::ConfigExt, Client, Config};
+    /// use tower::ServiceBuilder;
+    ///
+    /// let config = Config::infer().await?;
+    /// let service = ServiceBuilder::new()
+    ///     .layer(config.base_uri_layer())
+    ///     .option_layer(config.auth_layer()?)
+    ///     .service(hyper::Client::new());
+    /// let client = Client::new(service).with_default_namespace(config.default_namespace);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_default_namespace<T: Into<String>>(mut self, ns: T) -> Self {
         self.default_ns = ns.into();
         self
