@@ -99,7 +99,7 @@ impl Client {
         T: Into<String>
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
-            let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
+        let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
             .layer(service)
             .map_err(|e| e.into());
         Self {
