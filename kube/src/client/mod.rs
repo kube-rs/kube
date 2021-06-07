@@ -81,34 +81,22 @@ impl Client {
     /// use tower::ServiceBuilder;
     ///
     /// let config = Config::infer().await?;
-    /// let client = Client::new(
-    ///     ServiceBuilder::new()
-    ///         .layer(config.base_uri_layer())
-    ///         .option_layer(config.auth_layer()?)
-    ///         .service(hyper::Client::new()),
-    /// );
+    /// let service = ServiceBuilder::new()
+    ///     .layer(config.base_uri_layer())
+    ///     .option_layer(config.auth_layer()?)
+    ///     .service(hyper::Client::new());
+    /// let client = Client::new(service, config.default_namespace);
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new<S, B>(service: S) -> Self
+    pub fn new<S, B, T>(service: S, default_namespace: T) -> Self
     where
         S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
         B::Error: std::error::Error + Send + Sync + 'static,
-    {
-        Self::new_with_default_ns(service, "default")
-    }
-
-    /// Create and initialize a [`Client`] using the given `Service` and the default namespace.
-    fn new_with_default_ns<S, B, T: Into<String>>(service: S, default_ns: T) -> Self
-    where
-        S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
-        S::Future: Send + 'static,
-        S::Error: Into<BoxError>,
-        B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
-        B::Error: std::error::Error + Send + Sync + 'static,
+        T: Into<String>
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
         let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
@@ -116,7 +104,7 @@ impl Client {
             .map_err(|e| e.into());
         Self {
             inner: Buffer::new(BoxService::new(service), 1024),
-            default_ns: default_ns.into(),
+            default_ns: default_namespace.into(),
         }
     }
 
@@ -432,7 +420,7 @@ impl TryFrom<Config> for Client {
         use tracing::Span;
 
         let timeout = config.timeout;
-        let default_ns = config.default_ns.clone();
+        let default_ns = config.default_namespace.clone();
 
         let client: hyper::Client<_, Body> = {
             let mut connector = HttpConnector::new();
@@ -518,7 +506,7 @@ impl TryFrom<Config> for Client {
                     }),
             )
             .service(client);
-        Ok(Self::new_with_default_ns(service, default_ns))
+        Ok(Self::new(service, default_ns))
     }
 }
 
@@ -616,7 +604,7 @@ mod tests {
             );
         });
 
-        let pods: Api<Pod> = Api::namespaced(Client::new(mock_service), "default");
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
         let pod = pods.get("test").await.unwrap();
         assert_eq!(pod.metadata.annotations.unwrap().get("kube-rs").unwrap(), "test");
         spawned.await.unwrap();
