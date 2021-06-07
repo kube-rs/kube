@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .service(hyper::Client::builder().build(https));
 
-    let client = Client::new(service).with_default_namespace(config.default_namespace);
+    let client = Client::new(service, config.default_namespace);
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     for p in pods.list(&Default::default()).await? {
