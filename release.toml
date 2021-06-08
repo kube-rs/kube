@@ -1,5 +1,5 @@
 # Release process:
-# 1. cargo release minor --exclude examples --exclude tests
+# 1. cargo release minor
 # 2. verify that all crates are bumped and versions are in-line before proceeding
 # 3a. await publishing - failures can happen due to still https://github.com/sunng87/cargo-release/issues/224
 # 3b. fix failures from 3a (resume publishing manually, cd into dir, cargo publish, wait, continue for next in line)

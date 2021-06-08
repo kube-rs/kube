@@ -9,6 +9,9 @@ authors = [
 publish = false
 edition = "2018"
 
+[package.metadata.release]
+disable-release = true
+
 [features]
 default = ["native-tls", "schema", "kubederive", "ws"]
 kubederive = ["kube/derive"] # by default import kube-derive with its default features
