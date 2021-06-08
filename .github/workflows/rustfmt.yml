@@ -19,11 +19,7 @@ jobs:
           override: true
           components: rustfmt
 
-      - name: Run cargo +nightly fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all
+      - run: rustfmt +nightly --edition 2018 **/*.rs
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v3
@@ -31,7 +27,7 @@ jobs:
           commit-message: rustfmt
           title: rustfmt
           body: |
-            Changes from `cargo +nightly fmt`.
+            Changes from `rustfmt +nightly --edition 2018 **/*.rs`.
           branch: rustfmt
           # Delete branch when merged
           delete-branch: true
