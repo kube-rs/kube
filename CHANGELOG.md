@@ -2,6 +2,10 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.56.0...master
+ * `kube`: custom clients now respect default namespaces - fixes #534 via #544
+  - BREAKING: custom clients via `Client::new` must pass `config.default_namespace` as 2nd arg
+ * `kube`: Added `CustomResourceExt` trait for `kube-derive` - #497 via #545
+  - BREAKING: `kube-derive` users must import `kube::CustomResourceExt` (or `kube::core::crd::v1beta1::CustomResourceExt` if using legacy `#[kube(apiextensions = "v1beta1")]`) to use generated methods `Foo::crd` or `Foo::api_resource`
 
 0.56.0 / 2021-06-05
 ===================

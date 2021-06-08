@@ -9,7 +9,7 @@ clippy:
 
 fmt:
 	#rustup component add rustfmt --toolchain nightly
-	rustfmt +nightly --edition 2018 **/*/*.rs
+	rustfmt +nightly --edition 2018 **/*.rs
 
 doc:
 	RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch --open
