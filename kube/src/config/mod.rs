@@ -156,7 +156,7 @@ impl Config {
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
             for ca in &ca_bundle {
-                accept_invalid_certs = hacky_cert_lifetime_for_macos(&ca);
+                accept_invalid_certs = hacky_cert_lifetime_for_macos(ca);
             }
             root_cert = Some(ca_bundle);
         }

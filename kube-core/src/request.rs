@@ -30,10 +30,10 @@ impl Request {
         let mut qp = form_urlencoded::Serializer::new(target);
 
         if let Some(fields) = &lp.field_selector {
-            qp.append_pair("fieldSelector", &fields);
+            qp.append_pair("fieldSelector", fields);
         }
         if let Some(labels) = &lp.label_selector {
-            qp.append_pair("labelSelector", &labels);
+            qp.append_pair("labelSelector", labels);
         }
         if let Some(limit) = &lp.limit {
             qp.append_pair("limit", &limit.to_string());
@@ -69,10 +69,10 @@ impl Request {
         // https://github.com/kubernetes/kubernetes/issues/6513
         qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(290).to_string());
         if let Some(fields) = &lp.field_selector {
-            qp.append_pair("fieldSelector", &fields);
+            qp.append_pair("fieldSelector", fields);
         }
         if let Some(labels) = &lp.label_selector {
-            qp.append_pair("labelSelector", &labels);
+            qp.append_pair("labelSelector", labels);
         }
         if lp.bookmarks {
             qp.append_pair("allowWatchBookmarks", "true");
@@ -120,10 +120,10 @@ impl Request {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
         if let Some(fields) = &lp.field_selector {
-            qp.append_pair("fieldSelector", &fields);
+            qp.append_pair("fieldSelector", fields);
         }
         if let Some(labels) = &lp.label_selector {
-            qp.append_pair("labelSelector", &labels);
+            qp.append_pair("labelSelector", labels);
         }
         let urlstr = qp.finish();
         let body = serde_json::to_vec(&dp)?;

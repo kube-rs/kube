@@ -294,8 +294,8 @@ impl PatchParams {
         if self.force {
             qp.append_pair("force", "true");
         }
-        if let Some(ref field_manager) = self.field_manager {
-            qp.append_pair("fieldManager", &field_manager);
+        if let Some(ref fm) = self.field_manager {
+            qp.append_pair("fieldManager", fm);
         }
     }
 
