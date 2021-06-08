@@ -8,11 +8,7 @@ use tower::ServiceBuilder;
 use tower_http::{decompression::DecompressionLayer, trace::TraceLayer};
 use tracing::Span;
 
-use kube::{
-    Api, ResourceExt,
-    client::ConfigExt,
-    Client, Config,
-};
+use kube::{client::ConfigExt, Api, Client, Config, ResourceExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

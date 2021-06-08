@@ -1,11 +1,7 @@
 // Minimal custom client example.
 use k8s_openapi::api::core::v1::Pod;
 
-use kube::{
-    Api, ResourceExt,
-    client::ConfigExt,
-    Client, Config,
-};
+use kube::{client::ConfigExt, Api, Client, Config, ResourceExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
