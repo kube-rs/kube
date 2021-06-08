@@ -8,7 +8,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiext
 
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt, WatchEvent},
-    Client, CustomResource,
+    Client, CustomResource, CustomResourceExt
 };
 
 // NB: This example uses server side apply and beta1 customresources

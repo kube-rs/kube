@@ -139,6 +139,7 @@ pub mod core {
     #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
     pub use kube_core::admission;
     pub use kube_core::{
+        crd::{self, CustomResourceExt},
         dynamic::{self, ApiResource, DynamicObject},
         gvk::{self, GroupVersionKind, GroupVersionResource},
         metadata::{self, ListMeta, ObjectMeta, TypeMeta},
@@ -149,4 +150,4 @@ pub mod core {
         Resource, ResourceExt,
     };
 }
-pub use crate::core::{Resource, ResourceExt};
+pub use crate::core::{CustomResourceExt, Resource, ResourceExt};

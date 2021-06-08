@@ -222,9 +222,9 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 
         if let Some(field) = provider.config.get("token-key") {
             let json_output: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-            let token = extract_value(&json_output, &field)?;
+            let token = extract_value(&json_output, field)?;
             if let Some(field) = provider.config.get("expiry-key") {
-                let expiry = extract_value(&json_output, &field)?;
+                let expiry = extract_value(&json_output, field)?;
                 let expiry = expiry
                     .parse::<DateTime<Utc>>()
                     .map_err(ConfigError::MalformedTokenExpirationDate)?;

@@ -12,6 +12,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as a
 use kube::{
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
     Client, CustomResource,
+    core::crd::v1beta1::CustomResourceExt
 };
 
 // Own custom resource

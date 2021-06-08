@@ -38,14 +38,14 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<Scale> {
-        let mut req = self.request.patch_subresource("scale", name, &pp, patch)?;
+        let mut req = self.request.patch_subresource("scale", name, pp, patch)?;
         req.extensions_mut().insert("patch_scale");
         self.client.request::<Scale>(req).await
     }
 
     /// Replace the scale subresource
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
-        let mut req = self.request.replace_subresource("scale", name, &pp, data)?;
+        let mut req = self.request.replace_subresource("scale", name, pp, data)?;
         req.extensions_mut().insert("replace_scale");
         self.client.request::<Scale>(req).await
     }
@@ -98,7 +98,7 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let mut req = self.request.patch_subresource("status", name, &pp, patch)?;
+        let mut req = self.request.patch_subresource("status", name, pp, patch)?;
         req.extensions_mut().insert("patch_status");
         self.client.request::<K>(req).await
     }
@@ -123,7 +123,7 @@ where
     /// }
     /// ```
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let mut req = self.request.replace_subresource("status", name, &pp, data)?;
+        let mut req = self.request.replace_subresource("status", name, pp, data)?;
         req.extensions_mut().insert("replace_status");
         self.client.request::<K>(req).await
     }

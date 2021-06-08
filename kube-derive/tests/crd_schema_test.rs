@@ -44,6 +44,7 @@ fn default_nullable() -> Option<String> {
 
 #[test]
 fn test_crd_schema_matches_expected() {
+    use kube::core::CustomResourceExt;
     assert_eq!(
         Foo::crd(),
         serde_json::from_value(serde_json::json!({

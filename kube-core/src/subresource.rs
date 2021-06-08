@@ -45,7 +45,7 @@ impl Request {
         let mut qp = form_urlencoded::Serializer::new(target);
 
         if let Some(container) = &lp.container {
-            qp.append_pair("container", &container);
+            qp.append_pair("container", container);
         }
 
         if lp.follow {

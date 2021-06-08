@@ -5,6 +5,9 @@ authors = ["clux <sszynrae@gmail.com>"]
 publish = false
 edition = "2018"
 
+[package.metadata.release]
+disable-release = true
+
 [[bin]]
 name = "dapp"
 path = "dapp.rs"
