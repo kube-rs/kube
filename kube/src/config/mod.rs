@@ -14,32 +14,32 @@ use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 #[cfg(feature = "client")] pub(crate) use utils::read_file_to_string;
 
-use http::header::HeaderMap;
-
 use std::time::Duration;
 
 /// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
+#[cfg_attr(docsrs, doc(cfg(feature = "config")))]
 #[derive(Debug, Clone)]
 pub struct Config {
     /// The configured cluster url
-    pub cluster_url: url::Url,
+    pub cluster_url: http::Uri,
     /// The configured default namespace
-    pub default_ns: String,
+    pub default_namespace: String,
     /// The configured root certificate
     pub root_cert: Option<Vec<Vec<u8>>>,
-    /// Default headers to be used to communicate with the Kubernetes API
-    pub headers: HeaderMap,
     /// Timeout for calls to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
-    /// Client certs and key in PEM format and a password for a client to create `Identity` with.
-    /// Password is only used with `native_tls` to create a PKCS12 archive.
-    pub(crate) identity: Option<(Vec<u8>, String)>,
+    // TODO should keep client key and certificate separate. It's split later anyway.
+    /// Client certificate and private key in PEM.
+    pub(crate) identity_pem: Option<Vec<u8>>,
     /// Stores information to tell the cluster who you are.
     pub(crate) auth_info: AuthInfo,
+    // TODO Actually support proxy or create an example with custom client
+    /// Optional proxy URL.
+    pub proxy_url: Option<http::Uri>,
 }
 
 impl Config {
@@ -48,16 +48,16 @@ impl Config {
     ///
     /// Most likely you want to use [`Config::infer`] to infer the config from
     /// the environment.
-    pub fn new(cluster_url: url::Url) -> Self {
+    pub fn new(cluster_url: http::Uri) -> Self {
         Self {
             cluster_url,
-            default_ns: String::from("default"),
+            default_namespace: String::from("default"),
             root_cert: None,
-            headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
-            identity: None,
+            identity_pem: None,
             auth_info: AuthInfo::default(),
+            proxy_url: None,
         }
     }
 
@@ -95,9 +95,9 @@ impl Config {
             hostenv: incluster_config::SERVICE_HOSTENV,
             portenv: incluster_config::SERVICE_PORTENV,
         })?;
-        let cluster_url = url::Url::parse(&cluster_url)?;
+        let cluster_url = cluster_url.parse::<http::Uri>()?;
 
-        let default_ns = incluster_config::load_default_ns()
+        let default_namespace = incluster_config::load_default_ns()
             .map_err(Box::new)
             .map_err(ConfigError::InvalidInClusterNamespace)?;
 
@@ -109,16 +109,16 @@ impl Config {
 
         Ok(Self {
             cluster_url,
-            default_ns,
+            default_namespace,
             root_cert: Some(root_cert),
-            headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
-            identity: None,
+            identity_pem: None,
             auth_info: AuthInfo {
                 token: Some(token),
                 ..Default::default()
             },
+            proxy_url: None,
         })
     }
 
@@ -142,9 +142,9 @@ impl Config {
     }
 
     async fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
-        let cluster_url = url::Url::parse(&loader.cluster.server)?;
+        let cluster_url = loader.cluster.server.parse::<http::Uri>()?;
 
-        let default_ns = loader
+        let default_namespace = loader
             .current_context
             .namespace
             .clone()
@@ -156,7 +156,7 @@ impl Config {
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
             for ca in &ca_bundle {
-                accept_invalid_certs = hacky_cert_lifetime_for_macos(&ca);
+                accept_invalid_certs = hacky_cert_lifetime_for_macos(ca);
             }
             root_cert = Some(ca_bundle);
         }
@@ -175,12 +175,12 @@ impl Config {
 
         Ok(Self {
             cluster_url,
-            default_ns,
+            default_namespace,
             root_cert,
-            headers: HeaderMap::new(),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
-            identity: identity_pem.map(|i| (i, String::from(IDENTITY_PASSWORD))),
+            identity_pem,
+            proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
         })
     }
@@ -189,7 +189,6 @@ impl Config {
 // https://github.com/clux/kube-rs/issues/146#issuecomment-590924397
 /// Default Timeout
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
-const IDENTITY_PASSWORD: &str = " ";
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]
@@ -245,6 +244,6 @@ mod tests {
         std::fs::write(file.path(), cfgraw).unwrap();
         std::env::set_var("KUBECONFIG", file.path());
         let kubeconfig = Config::infer().await.unwrap();
-        assert_eq!(kubeconfig.cluster_url.into_string(), "https://0.0.0.0:6443/");
+        assert_eq!(kubeconfig.cluster_url, "https://0.0.0.0:6443/");
     }
 }

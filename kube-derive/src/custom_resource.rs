@@ -251,6 +251,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let apiext = quote! {
         k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident
     };
+    let extver = quote! {
+        kube::core::crd::#v1ident
+    };
 
     let short_json = serde_json::to_string(&shortnames).unwrap();
     let crd_meta_name = format!("{}.{}", plural, group);
@@ -329,10 +332,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    // Implement the ::crd and ::api_resource methods (fine to not have in a trait as its a generated type)
+    // Implement the CustomResourcExt trait to allow users writing generic logic on top of them
     let impl_crd = quote! {
-        impl #rootident {
-            pub fn crd() -> #apiext::CustomResourceDefinition {
+        impl #extver::CustomResourceExt for #rootident {
+            fn crd() -> #apiext::CustomResourceDefinition {
                 let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
                 let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                     None
@@ -358,7 +361,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     .expect("valid custom resource from #[kube(attrs..)]")
             }
 
-            pub fn api_resource() -> kube::core::ApiResource {
+            fn api_resource() -> kube::core::ApiResource {
                 kube::core::ApiResource::erase::<Self>(&())
             }
         }

@@ -1,7 +1,7 @@
 [package]
 name = "kube-core"
 description = "Kube shared types, traits and client-less behavior"
-version = "0.55.0"
+version = "0.56.0"
 authors = [
   "clux <sszynrae@gmail.com>",
   "kazk <kazk.dev@gmail.com>",
@@ -20,7 +20,7 @@ jsonpatch = ["json-patch"]
 serde = { version = "1.0.118", features = ["derive"] }
 serde_json = "1.0.61"
 thiserror = "1.0.23"
-url = "2.2.0"
+form_urlencoded = "1.0.1"
 http = "0.2.2"
 json-patch = { version = "0.2.6", optional = true }
 

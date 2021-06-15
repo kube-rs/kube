@@ -8,13 +8,13 @@
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
 
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
-use http::{self, HeaderValue, Request, Response, StatusCode};
-use hyper::Body;
+use http::{self, Request, Response, StatusCode};
+use hyper::{client::HttpConnector, Body};
 use hyper_timeout::TimeoutConnector;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
@@ -26,17 +26,21 @@ use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
-use tower::{buffer::Buffer, util::BoxService, BoxError, Service, ServiceBuilder, ServiceExt};
-
-
-#[cfg(feature = "gzip")]
-use crate::service::{accept_compressed, maybe_decompress};
-use crate::{
-    api::WatchEvent,
-    error::{ConfigError, ErrorResponse},
-    service::{set_cluster_url, set_default_headers, AuthLayer, Authentication, HttpsConnector, LogRequest},
-    Config, Error, Result,
+use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceBuilder, ServiceExt};
+use tower_http::{
+    classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
 };
+
+use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
+
+mod auth;
+mod body;
+// Add `into_stream()` to `http::Body`
+use body::BodyStreamExt;
+mod config_ext;
+pub use config_ext::ConfigExt;
+pub mod middleware;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
 
 // Binary subprotocol v4. See `Client::connect`.
 #[cfg(feature = "ws")]
@@ -44,10 +48,11 @@ const WS_PROTOCOL: &str = "v4.channel.k8s.io";
 
 /// Client for connecting with a Kubernetes cluster.
 ///
-/// The best way to instantiate the client is either by
+/// The easiest way to instantiate the client is either by
 /// inferring the configuration from the environment using
 /// [`Client::try_default`] or with an existing [`Config`]
 /// using [`Client::try_from`].
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 #[derive(Clone)]
 pub struct Client {
     // - `Buffer` for cheap clone
@@ -57,26 +62,49 @@ pub struct Client {
 }
 
 impl Client {
-    /// Create and initialize a [`Client`] using the given `Service`.
+    /// Create a [`Client`] using a custom `Service` stack.
     ///
-    /// Use [`Client::try_from`](Self::try_from) to create with a [`Config`].
-    pub fn new<S>(service: S) -> Self
+    /// [`ConfigExt`](crate::client::ConfigExt) provides extensions for
+    /// building a custom stack.
+    ///
+    /// To create with the default stack with a [`Config`], use
+    /// [`Client::try_from`].
+    ///
+    /// To create with the default stack with an inferred [`Config`], use
+    /// [`Client::try_default`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// use kube::{client::ConfigExt, Client, Config};
+    /// use tower::ServiceBuilder;
+    ///
+    /// let config = Config::infer().await?;
+    /// let service = ServiceBuilder::new()
+    ///     .layer(config.base_uri_layer())
+    ///     .option_layer(config.auth_layer()?)
+    ///     .service(hyper::Client::new());
+    /// let client = Client::new(service, config.default_namespace);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new<S, B, T>(service: S, default_namespace: T) -> Self
     where
-        S: Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
+        S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
+        S::Error: Into<BoxError>,
+        B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
+        B::Error: std::error::Error + Send + Sync + 'static,
+        T: Into<String>
     {
-        Self::new_with_default_ns(service, "default")
-    }
-
-    /// Create and initialize a [`Client`] using the given `Service` and the default namespace.
-    fn new_with_default_ns<S, T: Into<String>>(service: S, default_ns: T) -> Self
-    where
-        S: Service<Request<Body>, Response = Response<Body>, Error = BoxError> + Send + 'static,
-        S::Future: Send + 'static,
-    {
+        // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
+        let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
+            .layer(service)
+            .map_err(|e| e.into());
         Self {
             inner: Buffer::new(BoxService::new(service), 1024),
-            default_ns: default_ns.into(),
+            default_ns: default_namespace.into(),
         }
     }
 
@@ -386,61 +414,99 @@ impl TryFrom<Config> for Client {
 
     /// Convert [`Config`] into a [`Client`]
     fn try_from(config: Config) -> Result<Self> {
-        let cluster_url = config.cluster_url.clone();
-        let mut default_headers = config.headers.clone();
-        let timeout = config.timeout;
-        let default_ns = config.default_ns.clone();
+        use std::time::Duration;
 
-        // AuthLayer is not necessary unless `RefreshableToken`
-        let maybe_auth = match Authentication::try_from(&config.auth_info)? {
-            Authentication::None => None,
-            Authentication::Basic(s) => {
-                let mut value =
-                    HeaderValue::try_from(format!("Basic {}", &s)).map_err(ConfigError::InvalidBasicAuth)?;
-                value.set_sensitive(true);
-                default_headers.insert(http::header::AUTHORIZATION, value);
-                None
-            }
-            Authentication::Token(s) => {
-                let mut value = HeaderValue::try_from(format!("Bearer {}", &s))
-                    .map_err(ConfigError::InvalidBearerToken)?;
-                value.set_sensitive(true);
-                default_headers.insert(http::header::AUTHORIZATION, value);
-                None
-            }
-            Authentication::RefreshableToken(r) => Some(AuthLayer::new(r)),
+        use http::header::HeaderMap;
+        use tracing::Span;
+
+        let timeout = config.timeout;
+        let default_ns = config.default_namespace.clone();
+
+        let client: hyper::Client<_, Body> = {
+            let mut connector = HttpConnector::new();
+            connector.enforce_http(false);
+
+            // Note that if both `native_tls` and `rustls` is enabled, `native_tls` is used by default.
+            // To use `rustls`, disable `native_tls` or create custom client.
+            // If tls features are not enabled, http connector will be used.
+            #[cfg(feature = "native-tls")]
+            let connector = hyper_tls::HttpsConnector::from((
+                connector,
+                tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
+            ));
+            #[cfg(all(not(feature = "native-tls"), feature = "rustls-tls"))]
+            let connector = hyper_rustls::HttpsConnector::from((
+                connector,
+                std::sync::Arc::new(config.rustls_client_config()?),
+            ));
+
+            let mut connector = TimeoutConnector::new(connector);
+            connector.set_connect_timeout(timeout);
+            connector.set_read_timeout(timeout);
+
+            hyper::Client::builder().build(connector)
         };
 
-        let common = ServiceBuilder::new()
-            .map_request(move |r| set_cluster_url(r, &cluster_url))
-            .map_request(move |r| set_default_headers(r, default_headers.clone()))
-            .into_inner();
-
+        let stack = ServiceBuilder::new().layer(config.base_uri_layer()).into_inner();
         #[cfg(feature = "gzip")]
-        let common = ServiceBuilder::new()
-            .layer(common)
-            .map_request(accept_compressed)
-            .map_response(maybe_decompress)
+        let stack = ServiceBuilder::new()
+            .layer(stack)
+            .layer(tower_http::decompression::DecompressionLayer::new())
             .into_inner();
 
-        let https: HttpsConnector<_> = config.try_into()?;
-        let mut connector = TimeoutConnector::new(https);
-        if let Some(timeout) = timeout {
-            // reqwest's timeout is applied from when the request stars connecting until
-            // the response body has finished.
-            // Setting both connect and read timeout should be close enough.
-            connector.set_connect_timeout(Some(timeout));
-            // Timeout for reading the response.
-            connector.set_read_timeout(Some(timeout));
-        }
-        let client: hyper::Client<_, Body> = hyper::Client::builder().build(connector);
-
-        let inner = ServiceBuilder::new()
-            .layer(common)
-            .option_layer(maybe_auth)
-            .layer(tower::layer::layer_fn(LogRequest::new))
+        let service = ServiceBuilder::new()
+            .layer(stack)
+            .option_layer(config.auth_layer()?)
+            .layer(
+                // Attribute names follow [Semantic Conventions].
+                // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
+                TraceLayer::new_for_http()
+                    .make_span_with(|req: &Request<hyper::Body>| {
+                        tracing::debug_span!(
+                            "HTTP",
+                             http.method = %req.method(),
+                             http.url = %req.uri(),
+                             http.status_code = tracing::field::Empty,
+                             otel.name = req.extensions().get::<&'static str>().unwrap_or(&"HTTP"),
+                             otel.kind = "client",
+                             otel.status_code = tracing::field::Empty,
+                        )
+                    })
+                    .on_request(|_req: &Request<hyper::Body>, _span: &Span| {
+                        tracing::debug!("requesting");
+                    })
+                    .on_response(|res: &Response<hyper::Body>, _latency: Duration, span: &Span| {
+                        let status = res.status();
+                        span.record("http.status_code", &status.as_u16());
+                        if status.is_client_error() || status.is_server_error() {
+                            span.record("otel.status_code", &"ERROR");
+                        }
+                    })
+                    // Explicitly disable `on_body_chunk`. The default does nothing.
+                    .on_body_chunk(())
+                    .on_eos(|_: Option<&HeaderMap>, _duration: Duration, _span: &Span| {
+                        tracing::debug!("stream closed");
+                    })
+                    .on_failure(|ec: ServerErrorsFailureClass, _latency: Duration, span: &Span| {
+                        // Called when
+                        // - Calling the inner service errored
+                        // - Polling `Body` errored
+                        // - the response was classified as failure (5xx)
+                        // - End of stream was classified as failure
+                        span.record("otel.status_code", &"ERROR");
+                        match ec {
+                            ServerErrorsFailureClass::StatusCode(status) => {
+                                span.record("http.status_code", &status.as_u16());
+                                tracing::error!("failed with status {}", status)
+                            }
+                            ServerErrorsFailureClass::Error(err) => {
+                                tracing::error!("failed with error {}", err)
+                            }
+                        }
+                    }),
+            )
             .service(client);
-        Ok(Self::new_with_default_ns(inner, default_ns))
+        Ok(Self::new(service, default_ns))
     }
 }
 
@@ -538,7 +604,7 @@ mod tests {
             );
         });
 
-        let pods: Api<Pod> = Api::namespaced(Client::new(mock_service), "default");
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
         let pod = pods.get("test").await.unwrap();
         assert_eq!(pod.metadata.annotations.get("kube-rs").unwrap(), "test");
         spawned.await.unwrap();

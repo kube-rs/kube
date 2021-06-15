@@ -9,22 +9,28 @@ authors = [
 publish = false
 edition = "2018"
 
+[package.metadata.release]
+disable-release = true
+
 [features]
 default = ["native-tls", "schema", "kubederive", "ws"]
 kubederive = ["kube/derive"] # by default import kube-derive with its default features
 schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
-native-tls = ["kube/native-tls", "kube-runtime/native-tls"]
-rustls-tls = ["kube/rustls-tls", "kube-runtime/rustls-tls"]
+native-tls = ["kube/client", "kube/native-tls"]
+rustls-tls = ["kube/client", "kube/rustls-tls"]
 ws = ["kube/ws"]
+
+[dependencies]
+tokio-util = "0.6.0"
 
 [dev-dependencies]
 anyhow = "1.0.37"
 env_logger = "0.8.2"
 futures = "0.3.8"
-kube = { path = "../kube", version = "^0.55.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.55.0", default-features = false } # only needed to opt out of schema
-kube-runtime = { path = "../kube-runtime", version = "^0.55.0", default-features = false }
-kube-core = { path = "../kube-core", version = "^0.55.0", default-features = false }
+kube = { path = "../kube", version = "^0.56.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.56.0", default-features = false } # only needed to opt out of schema
+kube-runtime = { path = "../kube-runtime", version = "^0.56.0"}
+kube-core = { path = "../kube-core", version = "^0.56.0", default-features = false }
 k8s-openapi = { version = "0.11.0", features = ["v1_20"], default-features = false }
 log = "0.4.11"
 serde = { version = "1.0.118", features = ["derive"] }
@@ -43,6 +49,9 @@ tracing-subscriber = "0.2"
 warp = { version = "0.3", features = ["tls"] }
 http = "0.2.3"
 json-patch = "0.2.6"
+tower = { version = "0.4.6" }
+tower-http = { version = "0.1.0", features = ["trace", "decompression-gzip"] }
+hyper = { version = "0.14.2", features = ["client", "http1", "stream", "tcp"] }
 
 [[example]]
 name = "configmapgen_controller"
@@ -160,5 +169,15 @@ path = "secret_reflector.rs"
 name = "admission_controller"
 path = "admission_controller.rs"
 
-[dependencies]
-tokio-util = "0.6.0"
+[[example]]
+name = "custom_client"
+path = "custom_client.rs"
+
+[[example]]
+name = "custom_client_tls"
+path = "custom_client_tls.rs"
+required-features = ["native-tls", "rustls-tls"]
+
+[[example]]
+name = "custom_client_trace"
+path = "custom_client_trace.rs"

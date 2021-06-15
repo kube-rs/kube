@@ -1,5 +1,5 @@
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
-use kube::{CustomResource, Resource};
+use kube::{CustomResource, CustomResourceExt, Resource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

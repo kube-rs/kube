@@ -40,14 +40,14 @@ use kube_core::{
 pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
     if apigroup == ApiGroup::CORE_GROUP {
         let coreapis = client.list_core_api_versions().await?;
-        return ApiGroup::query_core(&client, coreapis).await;
+        return ApiGroup::query_core(client, coreapis).await;
     } else {
         let api_groups = client.list_api_groups().await?;
         for g in api_groups.groups {
             if g.name != apigroup {
                 continue;
             }
-            return ApiGroup::query_apis(&client, g).await;
+            return ApiGroup::query_apis(client, g).await;
         }
     }
     Err(DiscoveryError::MissingApiGroup(apigroup.to_string()).into())
@@ -77,7 +77,7 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
 /// than a single `kind`.
 /// If you only need a single `kind`, [`oneshot::pinned_kind`](crate::discovery::pinned_kind) is the best solution.
 pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup> {
-    ApiGroup::query_gv(&client, gv).await
+    ApiGroup::query_gv(client, gv).await
 }
 
 /// Single discovery for a single GVK
@@ -100,5 +100,5 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 /// }
 /// ```
 pub async fn pinned_kind(client: &Client, gvk: &GroupVersionKind) -> Result<(ApiResource, ApiCapabilities)> {
-    ApiGroup::query_gvk(client, &gvk).await
+    ApiGroup::query_gvk(client, gvk).await
 }

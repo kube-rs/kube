@@ -42,10 +42,10 @@ impl Request {
     /// Get a pod logs
     pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
         let target = format!("{}/{}/log?", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
 
         if let Some(container) = &lp.container {
-            qp.append_pair("container", &container);
+            qp.append_pair("container", container);
         }
 
         if lp.follow {
@@ -102,7 +102,7 @@ impl Request {
         // This is technically identical to Request::create, but different url
         let pp = &ep.post_options;
         pp.validate()?;
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }
@@ -169,6 +169,7 @@ pub struct AttachParams {
 }
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Default for AttachParams {
     // Default matching the server's defaults.
     fn default() -> Self {
@@ -186,6 +187,7 @@ impl Default for AttachParams {
 }
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl AttachParams {
     /// Default parameters for an tty exec with stdin and stdout
     pub fn interactive_tty() -> Self {
@@ -263,7 +265,7 @@ impl AttachParams {
         Ok(())
     }
 
-    fn append_to_url_serializer(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
+    fn append_to_url_serializer(&self, qp: &mut form_urlencoded::Serializer<String>) {
         if self.stdin {
             qp.append_pair("stdin", "true");
         }
@@ -290,7 +292,7 @@ impl Request {
         ap.validate()?;
 
         let target = format!("{}/{}/attach?", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer(&mut qp);
 
         let req = http::Request::get(qp.finish());
@@ -313,7 +315,7 @@ impl Request {
         ap.validate()?;
 
         let target = format!("{}/{}/exec?", self.url_path, name);
-        let mut qp = url::form_urlencoded::Serializer::new(target);
+        let mut qp = form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer(&mut qp);
 
         for c in command.into_iter() {

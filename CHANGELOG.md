@@ -1,13 +1,59 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.55.0...master
- * `kube`: added `Api::default_namespaced` - #209 via #534
- * `kube`: added `config` feature - #533 via #535
- * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module #523
-  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds #523
+ * see https://github.com/clux/kube-rs/compare/0.56.0...master
+ * `kube`: custom clients now respect default namespaces - fixes #534 via #544
+  - BREAKING: custom clients via `Client::new` must pass `config.default_namespace` as 2nd arg
+ * `kube`: Added `CustomResourceExt` trait for `kube-derive` - #497 via #545
+  - BREAKING: `kube-derive` users must import `kube::CustomResourceExt` (or `kube::core::crd::v1beta1::CustomResourceExt` if using legacy `#[kube(apiextensions = "v1beta1")]`) to use generated methods `Foo::crd` or `Foo::api_resource`
+
+0.56.0 / 2021-06-05
+===================
+ * `kube`: added `Api::default_namespaced` - [#209](https://github.com/clux/kube-rs/issues/209) via [#534](https://github.com/clux/kube-rs/issues/534)
+ * `kube`: added `config` feature - [#533](https://github.com/clux/kube-rs/issues/533) via [#535](https://github.com/clux/kube-rs/issues/535)
+ * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module [#538](https://github.com/clux/kube-rs/issues/538)
+  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds [#538](https://github.com/clux/kube-rs/issues/538)
   - `discovery`: moved `ApiResource` and `ApiCapabilities` (result of discovery) to `kube_core::discovery`
   - BREAKING: removed internal `ApiResource::from_apiresource`
+
+ * `kube::Client` is now configurable with layers using `tower-http` [#539](https://github.com/clux/kube-rs/issues/539) via [#540](https://github.com/clux/kube-rs/issues/540)
+  - three new examples added: [`custom_client`](./examples/custom_client.rs), [`custom_client_tls`](./examples/custom_client_tls.rs) and [`custom_client_trace`](./examples/custom_client_trace.rs)
+  - Big feature streamlining, big service and layer restructuring, dependency restructurings
+  - Changes can hit advanced users, but unlikely to hit base use cases with `Api` and `Client`.
+  - In depth changes broken down below:
+
+### TLS Enhancements
+
+- Add `kube::client::ConfigExt` extending `Config` for custom `Client`. This includes methods to configure TLS connection when building a custom client [#539](https://github.com/clux/kube-rs/issues/539)
+  - `native-tls`: `Config::native_tls_https_connector` and `Config::native_tls_connector`
+  - `rustls-tls`: `Config::rustls_https_connector` and `Config::rustls_client_config`
+- Remove the requirement of having `native-tls` or `rustls-tls` enabled when `client` is enabled. Allow one, both or none.
+  - When both, the default Service will use `native-tls` because of [#153](https://github.com/clux/kube-rs/issues/153). `rustls` can be still used with a custom client. Users will have an option to configure TLS at runtime.
+  - When none, HTTP connector is used.
+- Remove TLS features from `kube-runtime`
+  - **BREAKING**: Features must be removed if specified
+- Remove `client` feature from `native-tls` and `rust-tls` features
+  - `config` + `native-tls`/`rustls-tls` can be used independently, e.g., to create a simple HTTP client
+  - **BREAKING**: `client` feature must be added if `default-features = false`
+
+### Layers
+- `ConfigExt::base_uri_layer` (`BaseUriLayer`) to set cluster URL (#539)
+- `ConfigExt::auth_layer` that returns optional layer to manage `Authorization` header (#539)
+- `gzip`: Replaced custom decompression module with [`DecompressionLayer`](https://docs.rs/tower-http/0.1.0/tower_http/decompression/index.html) from `tower-http` (#539)
+- Replaced custom `LogRequest` with [`TraceLayer`](https://docs.rs/tower-http/0.1.0/tower_http/trace/index.html) from `tower-http` (#539)
+  - Request body is no longer shown
+- Basic and Bearer authentication using `AddAuthorizationLayer` (borrowing from https://github.com/tower-rs/tower-http/pull/95 until released)
+- **BREAKING**: Remove `headers` from `Config`. Injecting arbitrary headers is now done with a layer on a custom client.
+
+### Dependency Changes
+
+- Remove `static_assertions` since it's no longer used
+- Replace `tokio_rustls` with `rustls` and `webpki` since we're not using `tokio_rustls` directly
+- Replace uses of `rustls::internal::pemfile` with `rustls-pemfile`
+- Remove `url` and always use `http::Uri`
+  - **BREAKING**: `Config::cluster_url` is now `http::Uri`
+  - **BREAKING**: `Error::InternalUrlError(url::ParseError)` and `Error::MalformedUrl(url::ParseError)` replaced by `Error::InvalidUri(http::uri::InvalidUri)`
+
 
 0.55.0 / 2021-05-21
 ===================

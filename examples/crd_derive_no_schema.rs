@@ -34,9 +34,10 @@ properties:
 #[cfg(not(feature = "schema"))]
 impl Bar {
     fn crd_with_manual_schema() -> CustomResourceDefinition {
+        use kube::CustomResourceExt;
         let schema: JSONSchemaProps = serde_yaml::from_str(MANUAL_SCHEMA).expect("invalid schema");
 
-        let mut crd = Self::crd();
+        let mut crd = <Self as CustomResourceExt>::crd();
         crd.spec.versions.iter_mut().for_each(|v| {
             v.schema = Some(CustomResourceValidation {
                 open_api_v3_schema: Some(schema.clone()),

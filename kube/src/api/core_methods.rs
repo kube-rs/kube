@@ -2,7 +2,6 @@ use either::Either;
 use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
-use tracing::instrument;
 
 use crate::{api::Api, Result};
 use kube_core::{object::ObjectList, params::*, response::Status, WatchEvent};
@@ -25,9 +24,9 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn get(&self, name: &str) -> Result<K> {
-        let req = self.request.get(name)?;
+        let mut req = self.request.get(name)?;
+        req.extensions_mut().insert("get");
         self.client.request::<K>(req).await
     }
 
@@ -49,9 +48,9 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let req = self.request.list(&lp)?;
+        let mut req = self.request.list(lp)?;
+        req.extensions_mut().insert("list");
         self.client.request::<ObjectList<K>>(req).await
     }
 
@@ -71,13 +70,13 @@ where
     ///     - Tradeoff between the two
     ///     - Easy partially filling of native [`k8s_openapi`] types (most fields optional)
     ///     - Partial safety against runtime errors (at least you must write valid JSON)
-    #[instrument(skip(self), level = "trace")]
     pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = self.request.create(&pp, bytes)?;
+        let mut req = self.request.create(pp, bytes)?;
+        req.extensions_mut().insert("create");
         self.client.request::<K>(req).await
     }
 
@@ -103,9 +102,9 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let req = self.request.delete(name, &dp)?;
+        let mut req = self.request.delete(name, dp)?;
+        req.extensions_mut().insert("delete");
         self.client.request_status::<K>(req).await
     }
 
@@ -136,13 +135,13 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn delete_collection(
         &self,
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let req = self.request.delete_collection(&dp, &lp)?;
+        let mut req = self.request.delete_collection(dp, lp)?;
+        req.extensions_mut().insert("delete_collection");
         self.client.request_status::<ObjectList<K>>(req).await
     }
 
@@ -175,14 +174,14 @@ where
     /// ```
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
-    #[instrument(skip(self), level = "trace")]
     pub async fn patch<P: Serialize + Debug>(
         &self,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req = self.request.patch(name, &pp, patch)?;
+        let mut req = self.request.patch(name, pp, patch)?;
+        req.extensions_mut().insert("patch");
         self.client.request::<K>(req).await
     }
 
@@ -230,13 +229,13 @@ where
     /// ```
     ///
     /// Consider mutating the result of `api.get` rather than recreating it.
-    #[instrument(skip(self), level = "trace")]
     pub async fn replace(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = self.request.replace(name, &pp, bytes)?;
+        let mut req = self.request.replace(name, pp, bytes)?;
+        req.extensions_mut().insert("replace");
         self.client.request::<K>(req).await
     }
 
@@ -277,13 +276,13 @@ where
     /// ```
     /// [`ListParams::timeout`]: super::ListParams::timeout
     /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
-    #[instrument(skip(self), level = "trace")]
     pub async fn watch(
         &self,
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let req = self.request.watch(&lp, &version)?;
+        let mut req = self.request.watch(lp, version)?;
+        req.extensions_mut().insert("watch");
         self.client.request_events::<K>(req).await
     }
 }

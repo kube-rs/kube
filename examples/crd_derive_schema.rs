@@ -6,7 +6,7 @@ use kube::{
         Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, ListParams, Patch, PatchParams,
         PostParams, WatchEvent,
     },
-    Client, CustomResource,
+    Client, CustomResource, CustomResourceExt,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

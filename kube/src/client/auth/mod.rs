@@ -14,15 +14,12 @@ use crate::{
 
 #[cfg(feature = "oauth")] mod oauth;
 
-mod layer;
-pub(crate) use layer::AuthLayer;
-
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum Authentication {
+pub(crate) enum Auth {
     None,
-    Basic(String),
-    Token(String),
+    Basic(String, String),
+    Bearer(String),
     RefreshableToken(RefreshableToken),
 }
 
@@ -47,12 +44,12 @@ impl RefreshableToken {
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
                 if Utc::now() + Duration::seconds(60) >= locked_data.1 {
-                    match Authentication::try_from(&locked_data.2)? {
-                        Authentication::None | Authentication::Basic(_) | Authentication::Token(_) => {
+                    match Auth::try_from(&locked_data.2)? {
+                        Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) => {
                             return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
                         }
 
-                        Authentication::RefreshableToken(RefreshableToken::Exec(d)) => {
+                        Auth::RefreshableToken(RefreshableToken::Exec(d)) => {
                             let (new_token, new_expire, new_info) = Arc::try_unwrap(d)
                                 .expect("Unable to unwrap Arc, this is likely a programming error")
                                 .into_inner();
@@ -63,7 +60,7 @@ impl RefreshableToken {
 
                         // Unreachable because the token source does not change
                         #[cfg(feature = "oauth")]
-                        Authentication::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
+                        Auth::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
                     }
                 }
 
@@ -86,7 +83,7 @@ impl RefreshableToken {
     }
 }
 
-impl TryFrom<&AuthInfo> for Authentication {
+impl TryFrom<&AuthInfo> for Auth {
     type Error = Error;
 
     /// Loads the authentication header from the credentials available in the kubeconfig. This supports
@@ -96,7 +93,7 @@ impl TryFrom<&AuthInfo> for Authentication {
         if let Some(provider) = &auth_info.auth_provider {
             match token_from_provider(provider)? {
                 ProviderToken::Oidc(token) => {
-                    return Ok(Self::Token(token));
+                    return Ok(Self::Bearer(token));
                 }
 
                 ProviderToken::GcpCommand(token, Some(expiry)) => {
@@ -111,7 +108,7 @@ impl TryFrom<&AuthInfo> for Authentication {
                 }
 
                 ProviderToken::GcpCommand(token, None) => {
-                    return Ok(Self::Token(token));
+                    return Ok(Self::Bearer(token));
                 }
 
                 #[cfg(feature = "oauth")]
@@ -124,7 +121,7 @@ impl TryFrom<&AuthInfo> for Authentication {
         }
 
         if let (Some(u), Some(p)) = (&auth_info.username, &auth_info.password) {
-            return Ok(Authentication::Basic(base64::encode(&format!("{}:{}", u, p))));
+            return Ok(Self::Basic(u.to_owned(), p.to_owned()));
         }
 
         let (raw_token, expiration) = match &auth_info.token {
@@ -148,11 +145,11 @@ impl TryFrom<&AuthInfo> for Authentication {
         };
 
         match (raw_token, expiration) {
-            (Some(token), None) => Ok(Authentication::Token(token)),
-            (Some(token), Some(expire)) => Ok(Authentication::RefreshableToken(RefreshableToken::Exec(
-                Arc::new(Mutex::new((token, expire, auth_info.clone()))),
-            ))),
-            _ => Ok(Authentication::None),
+            (Some(token), None) => Ok(Self::Bearer(token)),
+            (Some(token), Some(expire)) => Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
+                Mutex::new((token, expire, auth_info.clone())),
+            )))),
+            _ => Ok(Self::None),
         }
     }
 }
@@ -225,9 +222,9 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 
         if let Some(field) = provider.config.get("token-key") {
             let json_output: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-            let token = extract_value(&json_output, &field)?;
+            let token = extract_value(&json_output, field)?;
             if let Some(field) = provider.config.get("expiry-key") {
-                let expiry = extract_value(&json_output, &field)?;
+                let expiry = extract_value(&json_output, field)?;
                 let expiry = expiry
                     .parse::<DateTime<Utc>>()
                     .map_err(ConfigError::MalformedTokenExpirationDate)?;
@@ -371,8 +368,8 @@ mod test {
 
         let config: Kubeconfig = serde_yaml::from_str(&test_file).map_err(ConfigError::ParseYaml)?;
         let auth_info = &config.auth_infos[0].auth_info;
-        match Authentication::try_from(auth_info).unwrap() {
-            Authentication::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
+        match Auth::try_from(auth_info).unwrap() {
+            Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
                 assert_eq!(token, "my_token".to_owned());
                 let config = info.auth_provider.unwrap().config;
