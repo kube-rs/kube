@@ -52,7 +52,7 @@ impl ApiResource {
     /// Otherwise consider using [`ApiResource::from_gvk_with_plural`](crate::discovery::ApiResource::from_gvk_with_plural)
     /// to explicitly set the plural, or run api discovery on it via `kube::discovery`.
     pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
-        ApiResource::from_gvk_with_plural(gvk, &crate::resource::to_plural(&gvk.kind.to_ascii_lowercase()))
+        ApiResource::from_gvk_with_plural(gvk, &to_plural(&gvk.kind.to_ascii_lowercase()))
     }
 }
 
@@ -105,5 +105,102 @@ impl ApiCapabilities {
     /// Checks that given verb is supported on this resource.
     pub fn supports_operation(&self, operation: &str) -> bool {
         self.operations.iter().any(|op| op == operation)
+    }
+}
+
+// Simple pluralizer. Handles the special cases.
+pub(crate) fn to_plural(word: &str) -> String {
+    if word == "endpoints" || word == "endpointslices" {
+        return word.to_owned();
+    } else if word == "nodemetrics" {
+        return "nodes".to_owned();
+    } else if word == "podmetrics" {
+        return "pods".to_owned();
+    }
+
+    // Words ending in s, x, z, ch, sh will be pluralized with -es (eg. foxes).
+    if word.ends_with('s')
+        || word.ends_with('x')
+        || word.ends_with('z')
+        || word.ends_with("ch")
+        || word.ends_with("sh")
+    {
+        return format!("{}es", word);
+    }
+
+    // Words ending in y that are preceded by a consonant will be pluralized by
+    // replacing y with -ies (eg. puppies).
+    if word.ends_with('y') {
+        if let Some(c) = word.chars().nth(word.len() - 2) {
+            if !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u') {
+                // Remove 'y' and add `ies`
+                let mut chars = word.chars();
+                chars.next_back();
+                return format!("{}ies", chars.as_str());
+            }
+        }
+    }
+
+    // All other words will have "s" added to the end (eg. days).
+    format!("{}s", word)
+}
+
+#[test]
+fn test_to_plural_native() {
+    // Extracted from `swagger.json`
+    #[rustfmt::skip]
+    let native_kinds = vec![
+        ("APIService", "apiservices"),
+        ("Binding", "bindings"),
+        ("CertificateSigningRequest", "certificatesigningrequests"),
+        ("ClusterRole", "clusterroles"), ("ClusterRoleBinding", "clusterrolebindings"),
+        ("ComponentStatus", "componentstatuses"),
+        ("ConfigMap", "configmaps"),
+        ("ControllerRevision", "controllerrevisions"),
+        ("CronJob", "cronjobs"),
+        ("CSIDriver", "csidrivers"), ("CSINode", "csinodes"), ("CSIStorageCapacity", "csistoragecapacities"),
+        ("CustomResourceDefinition", "customresourcedefinitions"),
+        ("DaemonSet", "daemonsets"),
+        ("Deployment", "deployments"),
+        ("Endpoints", "endpoints"), ("EndpointSlice", "endpointslices"),
+        ("Event", "events"),
+        ("FlowSchema", "flowschemas"),
+        ("HorizontalPodAutoscaler", "horizontalpodautoscalers"),
+        ("Ingress", "ingresses"), ("IngressClass", "ingressclasses"),
+        ("Job", "jobs"),
+        ("Lease", "leases"),
+        ("LimitRange", "limitranges"),
+        ("LocalSubjectAccessReview", "localsubjectaccessreviews"),
+        ("MutatingWebhookConfiguration", "mutatingwebhookconfigurations"),
+        ("Namespace", "namespaces"),
+        ("NetworkPolicy", "networkpolicies"),
+        ("Node", "nodes"),
+        ("PersistentVolumeClaim", "persistentvolumeclaims"),
+        ("PersistentVolume", "persistentvolumes"),
+        ("PodDisruptionBudget", "poddisruptionbudgets"),
+        ("Pod", "pods"),
+        ("PodSecurityPolicy", "podsecuritypolicies"),
+        ("PodTemplate", "podtemplates"),
+        ("PriorityClass", "priorityclasses"),
+        ("PriorityLevelConfiguration", "prioritylevelconfigurations"),
+        ("ReplicaSet", "replicasets"),
+        ("ReplicationController", "replicationcontrollers"),
+        ("ResourceQuota", "resourcequotas"),
+        ("Role", "roles"), ("RoleBinding", "rolebindings"),
+        ("RuntimeClass", "runtimeclasses"),
+        ("Secret", "secrets"),
+        ("SelfSubjectAccessReview", "selfsubjectaccessreviews"),
+        ("SelfSubjectRulesReview", "selfsubjectrulesreviews"),
+        ("ServiceAccount", "serviceaccounts"),
+        ("Service", "services"),
+        ("StatefulSet", "statefulsets"),
+        ("StorageClass", "storageclasses"), ("StorageVersion", "storageversions"),
+        ("SubjectAccessReview", "subjectaccessreviews"),
+        ("TokenReview", "tokenreviews"),
+        ("ValidatingWebhookConfiguration", "validatingwebhookconfigurations"),
+        ("VolumeAttachment", "volumeattachments"),
+    ];
+    for (kind, plural) in native_kinds {
+        assert_eq!(to_plural(&kind.to_ascii_lowercase()), plural);
     }
 }
