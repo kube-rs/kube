@@ -16,7 +16,7 @@ path = "dapp.rs"
 anyhow = "1.0.37"
 env_logger = "0.8.2"
 futures = "0.3.8"
-kube = { path = "../kube", version = "^0.56.0"}
+kube = { path = "../kube", version = "^0.57.0"}
 k8s-openapi = { version = "0.12.0", features = ["v1_20"], default-features = false }
 log = "0.4.11"
 serde_json = "1.0.61"
