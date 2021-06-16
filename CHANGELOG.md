@@ -9,7 +9,7 @@ UNRELEASED
   - BREAKING: `k8s_openapi` bumped to [0.12.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.12.0)
     * Generated structs simplified + `Resource` trait expanded
     * Adds support for kubernetes `v1_21`
- * `kube` resource plurals is no longer inferred from `k8s-openapi` structs
+ * `kube` resource plurals is no longer inferred from `k8s-openapi` structs - #284 via #556
 
 0.56.0 / 2021-06-05
 ===================
