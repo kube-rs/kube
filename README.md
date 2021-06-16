@@ -1,5 +1,4 @@
 # kube-rs
-
 [![CircleCI](https://circleci.com/gh/clux/kube-rs.svg?style=shield)](https://circleci.com/gh/clux/kube-rs)
 [![Client Capabilities](https://img.shields.io/badge/Kubernetes%20client-Silver-blue.svg?style=plastic&colorB=C0C0C0&colorA=306CE8)](http://bit.ly/kubernetes-client-capabilities-badge)
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-beta-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
@@ -11,7 +10,6 @@ Rust client for [Kubernetes](http://kubernetes.io) in the style of a more generi
 These crates make certain assumptions about the kubernetes [apimachinery](https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go) + [api concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/) to enable generic abstractions. These abstractions allow rust reinterpretations of reflectors, informers, controllers, and custom resource interfaces, so that you can write applications easily.
 
 ## Installation
-
 Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) types corresponding for your cluster version:
 
 ```toml
@@ -26,12 +24,10 @@ k8s-openapi = { version = "0.12.0", default-features = false, features = ["v1_20
 We recommend turning off `default-features` for `k8s-openapi` to speed up your compilation.
 
 ## Upgrading
-
 Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
 All crates herein are versioned and [released](./release.toml) together to guarantee [compatibility before 1.0](https://github.com/clux/kube-rs/issues/508).
 
 ## Usage
-
 See the [examples directory](./examples) for how to use any of these crates.
 
 - **[kube API Docs](https://docs.rs/kube/)**
@@ -53,7 +49,6 @@ Real world users:
 - [kubectl-view-allocations](https://github.com/davidB/kubectl-view-allocations) - kubectl plugin to list resource allocations
 
 ## Api
-
 The direct `Api` type takes a client, and is constructed with either the `::all` or `::namespaced` functions:
 
 ```rust
@@ -76,7 +71,6 @@ pods.delete("blog", &DeleteParams::default()).await?;
 See the examples ending in `_api` examples for more detail.
 
 ## Custom Resource Definitions
-
 Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](https://docs.rs/kube/latest/kube/derive.CustomResource.html).
 
 You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec struct:
@@ -104,12 +98,11 @@ There are a ton of kubebuilder-like instructions that you can annotate with here
 **NB:** `#[derive(CustomResource)]` requires the `derive` feature enabled on `kube`.
 
 ## Runtime
-
 The `kube_runtime` crate contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
 
 ### Watchers
-
 A low level streaming interface (similar to informers) that presents `Applied`, `Deleted` or `Restarted` events.
+
 
 ```rust
 let api = Api::<Pod>::namespaced(client, "default");
@@ -128,7 +121,6 @@ while let Some(event) = apply_events.try_next().await? {
 NB: the plain stream items a `watcher` returns are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities like `try_flatten_applied` or `try_flatten_touched`.
 
 ## Reflectors
-
 A `reflector` is a `watcher` with `Store` on `K`. It acts on all the `Event<K>` exposed by `watcher` to ensure that the state in the `Store` is as accurate as possible.
 
 ```rust
@@ -143,7 +135,6 @@ let rf = reflector(store, watcher(nodes, lp));
 At this point you can listen to the `reflector` as if it was a `watcher`, but you can also query the `reader` at any point.
 
 ### Controllers
-
 A `Controller` is a `reflector` along with an arbitrary number of watchers that schedule events internally to send events through a reconciler:
 
 ```rust
@@ -162,7 +153,6 @@ Controller::new(root_kind_api, ListParams::default())
 Here `reconcile` and `error_policy` refer to functions you define. The first will be called when the root or child elements change, and the second when the `reconciler` returns an `Err`.
 
 ## Rustls
-
 Kube has basic support ([with caveats](https://github.com/clux/kube-rs/issues?q=is%3Aissue+is%3Aopen+rustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
 
 ```toml
@@ -175,9 +165,7 @@ k8s-openapi = { version = "0.12.0", default-features = false, features = ["v1_20
 This will pull in `rustls` and `hyper-rustls`.
 
 ## musl-libc
-
 Kube will work with [distroless](https://github.com/clux/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/clux/kube-rs/issues/331#issuecomment-715962188)).
 
 ## License
-
 Apache 2.0 licensed. See LICENSE for details.
