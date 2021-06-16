@@ -44,15 +44,7 @@ pub trait Resource {
     /// Returns the plural name of the kind
     ///
     /// This is known as the resource in apimachinery, we rename it for disambiguation.
-    /// By default, we infer this name through pluralization.
-    ///
-    /// The pluralization process is not recommended to be relied upon, and is only used for
-    /// `k8s_openapi` types, where we maintain a list of special pluralisations for compatibility.
-    ///
-    /// Thus when used with `DynamicObject` or `kube-derive`, we override this with correct values.
-    fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
-        to_plural(&Self::kind(dt).to_ascii_lowercase()).into()
-    }
+    fn plural(dt: &Self::DynamicType) -> Cow<'_, str>;
 
     /// Creates a url path for http requests for this resource
     fn url_path(dt: &Self::DynamicType, namespace: Option<&str>) -> String {
@@ -100,6 +92,10 @@ where
 
     fn api_version(_: &()) -> Cow<'_, str> {
         K::API_VERSION.into()
+    }
+
+    fn plural(_: &()) -> Cow<'_, str> {
+        K::URL_PATH_SEGMENT.into()
     }
 
     fn meta(&self) -> &ObjectMeta {
