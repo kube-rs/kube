@@ -192,7 +192,7 @@ impl PostParams {
 /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 /// let r = Role {
 ///     metadata: ObjectMeta { name: Some("user".into()), ..ObjectMeta::default() },
-///     rules: Some(vec![])
+///     rules: vec![]
 /// };
 /// let patch = Patch::Apply(&r);
 /// ```

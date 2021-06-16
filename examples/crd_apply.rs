@@ -92,12 +92,10 @@ async fn wait_for_crd_ready(crds: &Api<CustomResourceDefinition>) -> anyhow::Res
         if let WatchEvent::Modified(s) = status {
             info!("Modify event for {}", s.name());
             if let Some(s) = s.status {
-                if let Some(conds) = s.conditions {
-                    if let Some(pcond) = conds.iter().find(|c| c.type_ == "NamesAccepted") {
-                        if pcond.status == "True" {
-                            info!("crd was accepted: {:?}", pcond);
-                            return Ok(());
-                        }
+                if let Some(pcond) = s.conditions.iter().find(|c| c.type_ == "NamesAccepted") {
+                    if pcond.status == "True" {
+                        info!("crd was accepted: {:?}", pcond);
+                        return Ok(());
                     }
                 }
             }

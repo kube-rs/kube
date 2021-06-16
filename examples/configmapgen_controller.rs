@@ -61,13 +61,13 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     let cm = ConfigMap {
         metadata: ObjectMeta {
             name: generator.metadata.name.clone(),
-            owner_references: Some(vec![OwnerReference {
+            owner_references: vec![OwnerReference {
                 controller: Some(true),
                 ..object_to_owner_reference::<ConfigMapGenerator>(generator.metadata.clone())?
-            }]),
+            }],
             ..ObjectMeta::default()
         },
-        data: Some(contents),
+        data: contents,
         ..Default::default()
     };
     let cm_api = Api::<ConfigMap>::namespaced(
