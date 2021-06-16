@@ -50,7 +50,6 @@ pub struct StatusCause {
     pub field: String,
 }
 
-
 #[cfg(test)]
 mod test {
     use super::Status;
