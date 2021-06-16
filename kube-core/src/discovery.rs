@@ -109,7 +109,7 @@ impl ApiCapabilities {
 }
 
 // Simple pluralizer. Handles the special cases.
-pub(crate) fn to_plural(word: &str) -> String {
+fn to_plural(word: &str) -> String {
     if word == "endpoints" || word == "endpointslices" {
         return word.to_owned();
     } else if word == "nodemetrics" {
