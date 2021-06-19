@@ -2,6 +2,8 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.57.0...master
+ * `kube`: subresource marker traits renamed congation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - #536 via #560
+ * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - #559
 
 0.57.0 / 2021-06-16
 ===================
