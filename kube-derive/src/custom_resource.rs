@@ -25,6 +25,8 @@ struct KubeAttrs {
     derives: Vec<String>,
     #[darling(default)]
     status: Option<String>,
+    #[darling(multiple, rename = "category")]
+    categories: Vec<String>,
     #[darling(multiple, rename = "shortname")]
     shortnames: Vec<String>,
     #[darling(multiple, rename = "printcolumn")]
@@ -68,6 +70,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         status,
         plural,
         singular,
+        categories,
         shortnames,
         printcolums,
         apiextensions,
@@ -255,6 +258,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         kube::core::crd::#v1ident
     };
 
+    let categories_json = serde_json::to_string(&categories).unwrap();
     let short_json = serde_json::to_string(&shortnames).unwrap();
     let crd_meta_name = format!("{}.{}", plural, group);
     let crd_meta = quote! { { "name": #crd_meta_name } };
@@ -287,6 +291,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     "group": #group,
                     "scope": #scope,
                     "names": {
+                        "categories": categories,
                         "plural": #plural,
                         "singular": #name,
                         "kind": #kind,
@@ -314,6 +319,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     "group": #group,
                     "scope": #scope,
                     "names": {
+                        "categories": categories,
                         "plural": #plural,
                         "singular": #name,
                         "kind": #kind,
@@ -342,6 +348,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 } else {
                     serde_json::from_str(#scale_code).expect("valid scale subresource json")
                 };
+                let categories: Vec<String> = serde_json::from_str(#categories_json).expect("valid categories");
                 let shorts : Vec<String> = serde_json::from_str(#short_json).expect("valid shortnames");
                 let subres = if #has_status {
                     if let Some(s) = &scale {
