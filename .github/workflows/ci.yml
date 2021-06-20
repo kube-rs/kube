@@ -92,8 +92,6 @@ jobs:
 
       - name: Create resource
         run: kubectl apply -f tests/deployment.yaml -n apps
-      # - name: Show rollout status
-      #   run: kubectl rollout status deployment/dapp -n apps --watch=true --timeout=5m
       - run: kubectl get all -n apps
       - run: kubectl describe jobs/dapp -n apps
       - name: Wait for job to complete
