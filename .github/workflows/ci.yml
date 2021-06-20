@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  cargo_test:
+  cargo-test:
     strategy:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
@@ -35,6 +35,10 @@ jobs:
         run: cargo test --doc --all -j6
       - name: Test examples
         run: cargo test -p examples --examples -j6
+      - name: Compile check remaining examples
+        # No OS specific code in examples, run this on fastest executor
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo build -j4 -p examples
 
       # Feature tests
       - name: Test kube with features native-tls,ws,oauth
