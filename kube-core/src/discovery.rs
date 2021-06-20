@@ -56,7 +56,6 @@ impl ApiResource {
     }
 }
 
-
 /// Resource scope
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Scope {

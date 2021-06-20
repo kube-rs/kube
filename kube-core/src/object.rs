@@ -212,7 +212,6 @@ where
 #[derive(Clone, Deserialize, Serialize, Default, Debug)]
 pub struct NotUsed {}
 
-
 #[cfg(test)]
 mod test {
     use super::{ApiResource, NotUsed, Object};

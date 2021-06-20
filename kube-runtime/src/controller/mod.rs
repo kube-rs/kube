@@ -13,9 +13,8 @@ use crate::{
 };
 use derivative::Derivative;
 use futures::{
-    channel, future,
-    stream::{self, SelectAll},
-    FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
+    channel, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream,
+    TryStreamExt,
 };
 use kube::api::{Api, DynamicObject, ListParams, Resource};
 use serde::de::DeserializeOwned;
@@ -299,7 +298,7 @@ where
 {
     // NB: Need to Unpin for stream::select_all
     // TODO: get an arbitrary std::error::Error in here?
-    selector: SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
+    trigger_selector: stream::SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
     dyntype: K::DynamicType,
     reader: Store<K>,
 }
@@ -334,15 +333,15 @@ where
     pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
-        let mut selector = stream::SelectAll::new();
+        let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
             try_flatten_applied(reflector(writer, watcher(owned_api, lp))),
             dyntype.clone(),
         )
         .boxed();
-        selector.push(self_watcher);
+        trigger_selector.push(self_watcher);
         Self {
-            selector,
+            trigger_selector,
             dyntype,
             reader,
         }
@@ -370,7 +369,7 @@ where
         Child::DynamicType: Debug + Eq + Hash,
     {
         let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)), self.dyntype.clone());
-        self.selector.push(child_watcher.boxed());
+        self.trigger_selector.push(child_watcher.boxed());
         self
     }
 
@@ -390,7 +389,56 @@ where
         I::IntoIter: Send,
     {
         let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), mapper);
-        self.selector.push(other_watcher.boxed());
+        self.trigger_selector.push(other_watcher.boxed());
+        self
+    }
+
+    /// Trigger a reconciliation for all managed objects whenever `trigger` emits a value
+    ///
+    /// For example, this can be used to reconcile all objects whenever the controller's configuration changes.
+    ///
+    /// To reconcile all objects when a new line is entered:
+    ///
+    /// ```rust
+    /// # async fn foo() {
+    /// use futures::stream::StreamExt;
+    /// use k8s_openapi::api::core::v1::ConfigMap;
+    /// use kube::{api::ListParams, Api, Client, ResourceExt};
+    /// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+    /// use std::convert::Infallible;
+    /// use tokio::io::{stdin, AsyncBufReadExt, BufReader};
+    /// use tokio_stream::wrappers::LinesStream;
+    /// Controller::new(
+    ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
+    ///     ListParams::default(),
+    /// )
+    /// .reconcile_all_on(LinesStream::new(BufReader::new(stdin()).lines()).map(|_| ()))
+    /// .run(
+    ///     |o, _| async move {
+    ///         println!("Reconciling {}", o.name());
+    ///         Ok(ReconcilerAction { requeue_after: None })
+    ///     },
+    ///     |err: &Infallible, _| Err(err).unwrap(),
+    ///     Context::new(()),
+    /// );
+    /// # }
+    /// ```
+    pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
+        let store = self.store();
+        let dyntype = self.dyntype.clone();
+        self.trigger_selector.push(
+            trigger
+                .flat_map(move |()| {
+                    let dyntype = dyntype.clone();
+                    stream::iter(
+                        store
+                            .state()
+                            .into_iter()
+                            .map(move |obj| Ok(ObjectRef::from_obj_with(&obj, dyntype.clone()))),
+                    )
+                })
+                .boxed(),
+        );
         self
     }
 
@@ -417,7 +465,7 @@ where
             error_policy,
             context,
             self.reader,
-            self.selector,
+            self.trigger_selector,
         )
     }
 }
