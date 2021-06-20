@@ -4,9 +4,6 @@ on:
   push:
   pull_request:
 
-# NOTE `actions-rs/cargo` can't run commands in subdirectory at the moment.
-# https://github.com/actions-rs/cargo/issues/86
-# Workaround with `--manifest-path`.
 jobs:
   cargo_test:
     strategy:
@@ -29,64 +26,32 @@ jobs:
       - uses: Swatinem/rust-cache@v1
 
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
+        run: cargo build
       - name: Test kube_runtime
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -p kube-runtime
+        run: cargo test -p kube-runtime
       - name: Test kube
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -p kube
+        run: cargo test -p kube
       - name: Test kube_derive
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -p kube-derive
+        run: cargo test -p kube-derive
       # REVIEW This runs tests again
       - name: Test all
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --lib --all -j4
+        run: cargo test --lib --all -j4
       - name: Test docs
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --doc --all -j4
+        run: cargo test --doc --all -j4
 
       # kube features
       - name: Test kube with features native-tls,ws,oauth
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path kube/Cargo.toml --lib --no-default-features --features=native-tls,ws,oauth
+        run: cargo test --manifest-path kube/Cargo.toml --lib --no-default-features --features=native-tls,ws,oauth
       - name: Test kube with features rustls-tls,ws,oauth
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path kube/Cargo.toml --lib --no-default-features --features=rustls-tls,ws,oauth
+        run: cargo test --manifest-path kube/Cargo.toml --lib --no-default-features --features=rustls-tls,ws,oauth
 
       # examples
       - name: Test examples
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -p examples -j4
+        run: cargo test -p examples -j4
       - name: Build examples
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path examples/Cargo.toml
+        run: cargo build --manifest-path examples/Cargo.toml
       - name: Test crd_derive_no_schema example
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path examples/Cargo.toml --example crd_derive_no_schema --no-default-features --features=native-tls
+        run: cargo test --manifest-path examples/Cargo.toml --example crd_derive_no_schema --no-default-features --features=native-tls
 
   integration:
     # TODO Compile static binary once
