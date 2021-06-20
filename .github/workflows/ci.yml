@@ -33,12 +33,8 @@ jobs:
         run: cargo test --lib --all -j6
       - name: Run workspace doc tests
         run: cargo test --doc --all -j6
-
-      # Examples
-      - name: Build examples
-        run: cargo build -p examples --examples -j6
       - name: Test examples
-        run: cargo test -p examples -j6
+        run: cargo test -p examples --examples -j6
 
       # Feature tests
       - name: Test kube with features native-tls,ws,oauth
@@ -50,13 +46,11 @@ jobs:
         run: cargo test -p examples --example crd_derive_no_schema --no-default-features --features=native-tls
 
   integration:
-    # TODO Compile static binary once
-    # TODO Test macos and win
+    # Integration tests are linux only
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
-      # NOTE caching is probably not as effective because clux/muslrust uses nightly.
       - uses: actions/cache@v2
         with:
           path: |
@@ -77,12 +71,14 @@ jobs:
 
       - name: Compile dapp
         run: |
+          mkdir -p ~/.cargo/{git,registry}
           docker run --rm -t \
               --mount type=bind,source=${{ github.workspace }},target=/volume \
-              --mount type=bind,source=$HOME/.cargo,target=/root/.cargo \
+              --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
+              --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
               clux/muslrust:stable \
-              cargo build -p tests --release
-          cp target/release/dapp tests/
+              cargo build -p tests --release -v
+          cp target/x86_64-unknown-linux-musl/release/dapp tests/
 
       - name: Build image
         run: "docker build -t clux/kube-dapp:${{ github.sha }} tests/"
@@ -95,10 +91,9 @@ jobs:
       # - name: Show rollout status
       #   run: kubectl rollout status deployment/dapp -n apps --watch=true --timeout=5m
       - run: kubectl get all -n apps
-      - name: Describe resource
-        run: kubectl describe deployment/dapp -n apps
-
-      - run: kubectl get all -n apps
-      - run: kubectl describe deploy dapp -n apps
-      - run: kubectl wait --for=condition=Completed deploy/dapp -n apps --timeout=60s || kubectl logs -f deploy/dapp -p -n apps
-      - run: kubectl get all -n apps
+      - run: kubectl describe jobs/dapp -n apps
+      - name: Wait for job to complete
+        run: |
+          kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
+          kubectl get all -n apps
+          kubectl wait --for=condition=complete job/dapp -n apps --timeout=10s || kubectl get pods -n apps | grep dapp | grep Completed

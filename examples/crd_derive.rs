@@ -200,11 +200,9 @@ fn verify_resource() {
 }
 
 #[tokio::test]
-async fn verify_api_gen() {
-    use kube::{Api, Client};
-    let client = Client::try_default().await.unwrap();
-    let api: Api<FooCrd> = Api::namespaced(client, "myns");
-    assert_eq!(api.resource_url(), "/apis/clux.dev/v1/namespaces/myns/fooz");
+async fn verify_url_gen() {
+    let url = FooCrd::url_path(&(), Some("myns".into()));
+    assert_eq!(url, "/apis/clux.dev/v1/namespaces/myns/fooz");
 }
 
 #[test]
