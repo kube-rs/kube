@@ -397,6 +397,33 @@ where
     /// Trigger a reconciliation for all managed objects whenever `trigger` emits a value
     ///
     /// For example, this can be used to reconcile all objects whenever the controller's configuration changes.
+    ///
+    /// To reconcile all objects when a new line is entered:
+    ///
+    /// ```rust
+    /// # async fn foo() {
+    /// use futures::stream::StreamExt;
+    /// use k8s_openapi::api::core::v1::ConfigMap;
+    /// use kube::{api::ListParams, Api, Client, ResourceExt};
+    /// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+    /// use std::convert::Infallible;
+    /// use tokio::io::{stdin, AsyncBufReadExt, BufReader};
+    /// use tokio_stream::wrappers::LinesStream;
+    /// Controller::new(
+    ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
+    ///     ListParams::default(),
+    /// )
+    /// .reconcile_all_on(LinesStream::new(BufReader::new(stdin()).lines()).map(|_| ()))
+    /// .run(
+    ///     |o, _| async move {
+    ///         println!("Reconciling {}", o.name());
+    ///         Ok(ReconcilerAction { requeue_after: None })
+    ///     },
+    ///     |err: &Infallible, _| Err(err).unwrap(),
+    ///     Context::new(()),
+    /// );
+    /// # }
+    /// ```
     pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
         let store = self.store();
         let dyntype = self.dyntype.clone();
