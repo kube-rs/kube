@@ -7,7 +7,7 @@ on:
 jobs:
   cargo_test:
     strategy:
-      # Prevent GitHub from canceling all in-progress jobs when a matrix job fails.
+      # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -25,33 +25,29 @@ jobs:
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v1
 
-      - name: Build
+      - name: Build workspace
         run: cargo build
-      - name: Test kube_runtime
-        run: cargo test -p kube-runtime
-      - name: Test kube
-        run: cargo test -p kube
-      - name: Test kube_derive
-        run: cargo test -p kube-derive
-      # REVIEW This runs tests again
-      - name: Test all
-        run: cargo test --lib --all -j4
-      - name: Test docs
-        run: cargo test --doc --all -j4
 
-      # kube features
-      - name: Test kube with features native-tls,ws,oauth
-        run: cargo test --manifest-path kube/Cargo.toml --lib --no-default-features --features=native-tls,ws,oauth
-      - name: Test kube with features rustls-tls,ws,oauth
-        run: cargo test --manifest-path kube/Cargo.toml --lib --no-default-features --features=rustls-tls,ws,oauth
+      # Workspace tests
+      - name: Run workspace unit tests
+        run: cargo test --lib --all -j6
+      - name: Run workspace doc tests
+        run: cargo test --doc --all -j6
 
-      # examples
-      - name: Test examples
-        run: cargo test -p examples -j4
+      # Examples
       - name: Build examples
-        run: cargo build --manifest-path examples/Cargo.toml
+        run: cargo build -p examples --examples -j6
+      - name: Test examples
+        run: cargo test -p examples -j6
+
+      # Feature tests
+      - name: Test kube with features native-tls,ws,oauth
+        run: cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
+      - name: Test kube with features rustls-tls,ws,oauth
+        run: cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
+      # Feature tests in examples
       - name: Test crd_derive_no_schema example
-        run: cargo test --manifest-path examples/Cargo.toml --example crd_derive_no_schema --no-default-features --features=native-tls
+        run: cargo test -p examples --example crd_derive_no_schema --no-default-features --features=native-tls
 
   integration:
     # TODO Compile static binary once
@@ -84,7 +80,7 @@ jobs:
           docker run --rm -t \
               --mount type=bind,source=${{ github.workspace }},target=/volume \
               --mount type=bind,source=$HOME/.cargo,target=/root/.cargo \
-              clux/muslrust:latest \
+              clux/muslrust:stable \
               cargo build -p tests --release
           cp target/release/dapp tests/
 

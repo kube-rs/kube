@@ -7,19 +7,19 @@ orbs:
 workflows:
   version: 2
   all_jobs:
-    jobs:
-      - cargo_test
+    jobs: []
+      #- cargo_test
       # windows executor costs money :/
       #- windows_test
       # kubernetes flow:
-      - kind_compile
-      - kind_k8s:
-          requires:
-            - kind_compile
-          filters:
-            branches:
-              ignore:
-                - master
+      #- kind_compile
+      #- kind_k8s:
+      #    requires:
+      #      - kind_compile
+      #    filters:
+      #      branches:
+      #        ignore:
+      #          - master
 
 docker_login: &docker_login
   # Optional auth (wont work on pr builds, but we don't need this)
