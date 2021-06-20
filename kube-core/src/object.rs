@@ -188,6 +188,10 @@ where
         dt.kind.as_str().into()
     }
 
+    fn plural(dt: &ApiResource) -> Cow<'_, str> {
+        dt.plural.as_str().into()
+    }
+
     fn api_version(dt: &ApiResource) -> Cow<'_, str> {
         dt.api_version.as_str().into()
     }

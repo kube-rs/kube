@@ -29,19 +29,18 @@ async fn main() -> Result<()> {
 
 fn pod_unready(p: &Pod) -> Option<String> {
     let status = p.status.as_ref().unwrap();
-    if let Some(conds) = &status.conditions {
-        let failed = conds
-            .into_iter()
-            .filter(|c| c.type_ == "Ready" && c.status == "False")
-            .map(|c| c.message.clone().unwrap_or_default())
-            .collect::<Vec<_>>()
-            .join(",");
-        if !failed.is_empty() {
-            if p.metadata.labels.as_ref().unwrap().contains_key("job-name") {
-                return None; // ignore job based pods, they are meant to exit 0
-            }
-            return Some(format!("Unready pod {}: {}", p.name(), failed));
+    let failed = status
+        .conditions
+        .iter()
+        .filter(|c| c.type_ == "Ready" && c.status == "False")
+        .map(|c| c.message.clone().unwrap_or_default())
+        .collect::<Vec<_>>()
+        .join(",");
+    if !failed.is_empty() {
+        if p.metadata.labels.contains_key("job-name") {
+            return None; // ignore job based pods, they are meant to exit 0
         }
+        return Some(format!("Unready pod {}: {}", p.name(), failed));
     }
     None
 }

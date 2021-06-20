@@ -1,11 +1,22 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.56.0...master
- * `kube`: custom clients now respect default namespaces - fixes #534 via #544
+ * see https://github.com/clux/kube-rs/compare/0.57.0...master
+ * `kube`: subresource marker traits renamed congation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - #536 via #560
+ * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - #559
+
+0.57.0 / 2021-06-16
+===================
+ * `kube`: custom clients now respect default namespaces - fixes [#534](https://github.com/clux/kube-rs/issues/534) via [#544](https://github.com/clux/kube-rs/issues/544)
   - BREAKING: custom clients via `Client::new` must pass `config.default_namespace` as 2nd arg
- * `kube`: Added `CustomResourceExt` trait for `kube-derive` - #497 via #545
+ * `kube`: Added `CustomResourceExt` trait for `kube-derive` - [#497](https://github.com/clux/kube-rs/issues/497) via [#545](https://github.com/clux/kube-rs/issues/545)
   - BREAKING: `kube-derive` users must import `kube::CustomResourceExt` (or `kube::core::crd::v1beta1::CustomResourceExt` if using legacy `#[kube(apiextensions = "v1beta1")]`) to use generated methods `Foo::crd` or `Foo::api_resource`
+  - BREAKING: `k8s_openapi` bumped to [0.12.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.12.0) - [#531](https://github.com/clux/kube-rs/pull/531)
+    * Generated structs simplified + `Resource` trait expanded
+    * Adds support for kubernetes `v1_21`
+    * Contains bugfix for [kubernetes#102159](https://github.com/kubernetes/kubernetes/pull/102159)
+ * `kube` resource plurals is no longer inferred from `k8s-openapi` structs - [#284](https://github.com/clux/kube-rs/issues/284) via [#556](https://github.com/clux/kube-rs/issues/556)
+  - BREAKING: `kube::Resource` trait now requires a `plural` implementation
 
 0.56.0 / 2021-06-05
 ===================

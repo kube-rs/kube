@@ -147,13 +147,13 @@ fn log_path() {
 }
 
 /// Marker trait for objects that has logs
-pub trait Loggable {}
+pub trait Log {}
 
-impl Loggable for k8s_openapi::api::core::v1::Pod {}
+impl Log for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
-    K: DeserializeOwned + Loggable,
+    K: DeserializeOwned + Log,
 {
     /// Fetch logs as a string
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
@@ -185,13 +185,13 @@ fn evict_path() {
 }
 
 /// Marker trait for objects that can be evicted
-pub trait Evictable {}
+pub trait Evict {}
 
-impl Evictable for k8s_openapi::api::core::v1::Pod {}
+impl Evict for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
-    K: DeserializeOwned + Evictable,
+    K: DeserializeOwned + Evict,
 {
     /// Create an eviction
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
@@ -225,17 +225,17 @@ fn attach_path() {
 /// Marker trait for objects that has attach
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub trait Attachable {}
+pub trait Attach {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl Attachable for k8s_openapi::api::core::v1::Pod {}
+impl Attach for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Attachable,
+    K: Clone + DeserializeOwned + Attach,
 {
     /// Attach to pod
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
@@ -271,17 +271,17 @@ fn exec_path() {
 /// Marker trait for objects that has exec
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub trait Executable {}
+pub trait Execute {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl Executable for k8s_openapi::api::core::v1::Pod {}
+impl Execute for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Executable,
+    K: Clone + DeserializeOwned + Execute,
 {
     /// Execute a command in a pod
     pub async fn exec<I: Debug, T>(

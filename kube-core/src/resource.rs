@@ -1,6 +1,5 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
-use once_cell::sync::Lazy;
 use std::{borrow::Cow, collections::BTreeMap};
 
 /// An accessor trait for a kubernetes Resource.
@@ -45,15 +44,7 @@ pub trait Resource {
     /// Returns the plural name of the kind
     ///
     /// This is known as the resource in apimachinery, we rename it for disambiguation.
-    /// By default, we infer this name through pluralization.
-    ///
-    /// The pluralization process is not recommended to be relied upon, and is only used for
-    /// `k8s_openapi` types, where we maintain a list of special pluralisations for compatibility.
-    ///
-    /// Thus when used with `DynamicObject` or `kube-derive`, we override this with correct values.
-    fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
-        to_plural(&Self::kind(dt).to_ascii_lowercase()).into()
-    }
+    fn plural(dt: &Self::DynamicType) -> Cow<'_, str>;
 
     /// Creates a url path for http requests for this resource
     fn url_path(dt: &Self::DynamicType, namespace: Option<&str>) -> String {
@@ -103,6 +94,10 @@ where
         K::API_VERSION.into()
     }
 
+    fn plural(_: &()) -> Cow<'_, str> {
+        K::URL_PATH_SEGMENT.into()
+    }
+
     fn meta(&self) -> &ObjectMeta {
         self.metadata()
     }
@@ -148,10 +143,6 @@ pub trait ResourceExt: Resource {
     fn finalizers_mut(&mut self) -> &mut Vec<String>;
 }
 
-// TODO: replace with ordinary static when BTreeMap::new() is no longer
-// const-unstable.
-static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(BTreeMap::new);
-
 impl<K: Resource> ResourceExt for K {
     fn name(&self) -> String {
         self.meta().name.clone().expect(".metadata.name missing")
@@ -170,131 +161,34 @@ impl<K: Resource> ResourceExt for K {
     }
 
     fn labels(&self) -> &BTreeMap<String, String> {
-        self.meta().labels.as_ref().unwrap_or_else(|| &*EMPTY_MAP)
+        &self.meta().labels
     }
 
     fn labels_mut(&mut self) -> &mut BTreeMap<String, String> {
-        self.meta_mut().labels.get_or_insert_with(BTreeMap::new)
+        &mut self.meta_mut().labels
     }
 
     fn annotations(&self) -> &BTreeMap<String, String> {
-        self.meta().annotations.as_ref().unwrap_or_else(|| &*EMPTY_MAP)
+        &self.meta().annotations
     }
 
     fn annotations_mut(&mut self) -> &mut BTreeMap<String, String> {
-        self.meta_mut().annotations.get_or_insert_with(BTreeMap::new)
+        &mut self.meta_mut().annotations
     }
 
     fn owner_references(&self) -> &[OwnerReference] {
-        self.meta().owner_references.as_deref().unwrap_or_default()
+        self.meta().owner_references.as_slice()
     }
 
     fn owner_references_mut(&mut self) -> &mut Vec<OwnerReference> {
-        self.meta_mut().owner_references.get_or_insert_with(Vec::new)
+        &mut self.meta_mut().owner_references
     }
 
     fn finalizers(&self) -> &[String] {
-        self.meta().finalizers.as_deref().unwrap_or_default()
+        self.meta().finalizers.as_slice()
     }
 
     fn finalizers_mut(&mut self) -> &mut Vec<String> {
-        self.meta_mut().finalizers.get_or_insert_with(Vec::new)
-    }
-}
-
-// Simple pluralizer. Handles the special cases.
-pub(crate) fn to_plural(word: &str) -> String {
-    if word == "endpoints" || word == "endpointslices" {
-        return word.to_owned();
-    } else if word == "nodemetrics" {
-        return "nodes".to_owned();
-    } else if word == "podmetrics" {
-        return "pods".to_owned();
-    }
-
-    // Words ending in s, x, z, ch, sh will be pluralized with -es (eg. foxes).
-    if word.ends_with('s')
-        || word.ends_with('x')
-        || word.ends_with('z')
-        || word.ends_with("ch")
-        || word.ends_with("sh")
-    {
-        return format!("{}es", word);
-    }
-
-    // Words ending in y that are preceded by a consonant will be pluralized by
-    // replacing y with -ies (eg. puppies).
-    if word.ends_with('y') {
-        if let Some(c) = word.chars().nth(word.len() - 2) {
-            if !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u') {
-                // Remove 'y' and add `ies`
-                let mut chars = word.chars();
-                chars.next_back();
-                return format!("{}ies", chars.as_str());
-            }
-        }
-    }
-
-    // All other words will have "s" added to the end (eg. days).
-    format!("{}s", word)
-}
-
-#[test]
-fn test_to_plural_native() {
-    // Extracted from `swagger.json`
-    #[rustfmt::skip]
-    let native_kinds = vec![
-        ("APIService", "apiservices"),
-        ("Binding", "bindings"),
-        ("CertificateSigningRequest", "certificatesigningrequests"),
-        ("ClusterRole", "clusterroles"), ("ClusterRoleBinding", "clusterrolebindings"),
-        ("ComponentStatus", "componentstatuses"),
-        ("ConfigMap", "configmaps"),
-        ("ControllerRevision", "controllerrevisions"),
-        ("CronJob", "cronjobs"),
-        ("CSIDriver", "csidrivers"), ("CSINode", "csinodes"), ("CSIStorageCapacity", "csistoragecapacities"),
-        ("CustomResourceDefinition", "customresourcedefinitions"),
-        ("DaemonSet", "daemonsets"),
-        ("Deployment", "deployments"),
-        ("Endpoints", "endpoints"), ("EndpointSlice", "endpointslices"),
-        ("Event", "events"),
-        ("FlowSchema", "flowschemas"),
-        ("HorizontalPodAutoscaler", "horizontalpodautoscalers"),
-        ("Ingress", "ingresses"), ("IngressClass", "ingressclasses"),
-        ("Job", "jobs"),
-        ("Lease", "leases"),
-        ("LimitRange", "limitranges"),
-        ("LocalSubjectAccessReview", "localsubjectaccessreviews"),
-        ("MutatingWebhookConfiguration", "mutatingwebhookconfigurations"),
-        ("Namespace", "namespaces"),
-        ("NetworkPolicy", "networkpolicies"),
-        ("Node", "nodes"),
-        ("PersistentVolumeClaim", "persistentvolumeclaims"),
-        ("PersistentVolume", "persistentvolumes"),
-        ("PodDisruptionBudget", "poddisruptionbudgets"),
-        ("Pod", "pods"),
-        ("PodSecurityPolicy", "podsecuritypolicies"),
-        ("PodTemplate", "podtemplates"),
-        ("PriorityClass", "priorityclasses"),
-        ("PriorityLevelConfiguration", "prioritylevelconfigurations"),
-        ("ReplicaSet", "replicasets"),
-        ("ReplicationController", "replicationcontrollers"),
-        ("ResourceQuota", "resourcequotas"),
-        ("Role", "roles"), ("RoleBinding", "rolebindings"),
-        ("RuntimeClass", "runtimeclasses"),
-        ("Secret", "secrets"),
-        ("SelfSubjectAccessReview", "selfsubjectaccessreviews"),
-        ("SelfSubjectRulesReview", "selfsubjectrulesreviews"),
-        ("ServiceAccount", "serviceaccounts"),
-        ("Service", "services"),
-        ("StatefulSet", "statefulsets"),
-        ("StorageClass", "storageclasses"), ("StorageVersion", "storageversions"),
-        ("SubjectAccessReview", "subjectaccessreviews"),
-        ("TokenReview", "tokenreviews"),
-        ("ValidatingWebhookConfiguration", "validatingwebhookconfigurations"),
-        ("VolumeAttachment", "volumeattachments"),
-    ];
-    for (kind, plural) in native_kinds {
-        assert_eq!(to_plural(&kind.to_ascii_lowercase()), plural);
+        &mut self.meta_mut().finalizers
     }
 }
