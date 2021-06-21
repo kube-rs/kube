@@ -5,6 +5,7 @@ members = [
   "kube-core",
   "kube-derive",
   "kube-runtime",
+  "kube-test",
 
   # internal
   "tests",
