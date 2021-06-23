@@ -12,6 +12,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      # windows evar
+      VCPKGRS_DYNAMIC: 1
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -24,6 +27,18 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v1
+
+      # windows specific caching (openssl vcpkg install)
+      - uses: lukka/run-vcpkg@v6
+        if: matrix.os == 'windows-latest'
+        with:
+          vcpkgArguments: 'openssl:x64-windows'
+          vcpkgDirectory: '${{ runner.workspace }}/b/vcpkg'
+          vcpkgGitCommitId: 'master'
+      #- run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+      #  if: matrix.os == 'windows-latest'
+      #- run: $VCPKG_ROOT/vcpkg install openssl:x64-windows
+      #  if: matrix.os == 'windows-latest'
 
       - name: Build workspace
         run: cargo build
