@@ -1,6 +1,5 @@
 [workspace]
 default-members = ["kube"]
-resolver = "2"
 members = [
   "kube",
   "kube-core",
