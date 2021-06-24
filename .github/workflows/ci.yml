@@ -10,10 +10,9 @@ jobs:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
+        # TODO: add windows-latest (see #566)
     runs-on: ${{ matrix.os }}
-    env:
-      VCPKGRS_DYNAMIC: 1
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -26,15 +25,6 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v1
-
-      # windows somehow needs ~6 minutes to install openssl
-      - name: Windows vcpkg install openssl and cache
-        uses: lukka/run-vcpkg@v6
-        if: matrix.os == 'windows-latest'
-        with:
-          vcpkgArguments: 'openssl:x64-windows'
-          vcpkgDirectory: '${{ runner.workspace }}/b/vcpkg'
-          vcpkgGitCommitId: 'master'
 
       # Real CI work starts here
       - name: Build workspace
