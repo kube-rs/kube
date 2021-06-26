@@ -1,16 +1,21 @@
 # Release process:
-# 1. cargo release minor
+# 1. PUBLISH_GRACE_SLEEP=30 cargo release minor
 # 2. verify that all crates are bumped and versions are in-line before proceeding
-# 3a. await publishing - failures can happen due to still https://github.com/sunng87/cargo-release/issues/224
+# 3a. await publishing - failures can happen due to still https://github.com/sunng87/cargo-release/issues/224 (but should not with sufficient grace-sleep)
 # 3b. fix failures from 3a (resume publishing manually, cd into dir, cargo publish, wait, continue for next in line)
 # 4. check the consolidated commit (and commit message, templating fails now)
 # 5. ./postrelease.sh
 
-# Dependencies; cargo-release, cargo-tree, sd, ripgrep
+# Reference
+# https://github.com/sunng87/cargo-release/blob/master/docs/reference.md
+# Dependencies in hooks; cargo-release, cargo-tree, sd, ripgrep
+
 consolidate-commits = true
 no-dev-version = true # bumps happen right before release
 pre-release-hook = ["../prerelease.sh"]
-
-# Because of the potential failures in 3, we have to tag and push ourselves
+# figure out which one actually triggers here (TODO: raise a bug about 4)
+post-release-commit-message = "Release {{version}}"
+pre-release-commit-message = "release {{version}}"
+# leave tagging to postrelease script (due to potential failures in 3 and 4)
 disable-push = true
 disable-tag = true
