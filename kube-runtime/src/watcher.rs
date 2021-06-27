@@ -220,7 +220,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// ```
 /// [`try_flatten_applied`]: super::utils::try_flatten_applied
 /// [`reflector`]: super::reflector::reflector
-/// [`Api::watch`]: https://docs.rs/kube/*/kube/struct.Api.html#method.watch
+/// [`Api::watch`]: kube::Api::watch
 ///
 /// # Recovery
 ///

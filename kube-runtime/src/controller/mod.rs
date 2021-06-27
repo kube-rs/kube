@@ -416,8 +416,11 @@ where
 {
     /// Create a Controller on a type `K`
     ///
-    /// Configure `ListParams` and `Api` so you only get reconcile events
-    /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
+    /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
+    ///
+    /// The [`ListParams`] controls to the possible subset of objects of `K` that you want to manage
+    /// and receive reconcile events for.
+    /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
     #[must_use]
     pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
         Self::new_with(owned_api, lp, Default::default())
@@ -431,11 +434,18 @@ where
 {
     /// Create a Controller on a type `K`
     ///
-    /// Configure `ListParams` and `Api` so you only get reconcile events
-    /// for the correct `Api` scope (cluster/all/namespaced), or `ListParams` subset
+    /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
-    /// Unlike `new`, this function accepts `K::DynamicType` so it can be used with dynamic
-    /// resources.
+    /// The [`ListParams`] lets you define a possible subset of objects of `K` that you want the [`Api`]
+    /// to watch - in the Api's  configured scope - and receive reconcile events for.
+    /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
+    ///
+    /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::new`] for static types.
+    ///
+    /// [`ListParams`]: kube::api::ListParams
+    /// [`Api`]: kube::Api
+    /// [`dynamic`]: kube::core::dynamic
+    /// [`ListParams::default`]: kube::api::ListParams::default
     pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
@@ -466,14 +476,16 @@ where
         self.reader.clone()
     }
 
-    /// Indicate child objets `K` owns and be notified when they change
+    /// Specify `Child` objects which `K` owns and should be watched
     ///
-    /// This type `Child` must have [`OwnerReference`] set to point back to `K`.
-    /// You can customize the parameters used by the underlying `watcher` if
-    /// only a subset of `Child` entries are required.
-    /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
+    /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `Child`.
+    /// All owned `Child` objects **must** contain an [`OwnerReference`] pointing back to a `K`.
     ///
-    /// [`OwnerReference`]: https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.OwnerReference.html
+    /// The [`ListParams`] refer to the possible subset of `Child` objects that you want the [`Api`]
+    ///  to watch - in the Api's configured scope - and receive reconcile events for.
+    /// To watch the full set of `Child` objects in the given `Api` scope, you can use [`ListParams::default`].
+    ///
+    /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
     pub fn owns<Child: Clone + Resource<DynamicType=()> + DeserializeOwned + Debug + Send + 'static>(
         self,
         api: Api<Child>,
@@ -485,12 +497,7 @@ where
 
     /// Indicate child objets `K` owns and be notified when they change
     ///
-    /// This type `Child` must have [`OwnerReference`] set to point back to `K`.
-    /// You can customize the parameters used by the underlying `watcher` if
-    /// only a subset of `Child` entries are required.
-    /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
-    ///
-    /// [`OwnerReference`]: https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.OwnerReference.html
+    /// Same as [`Controller::owns`], but accepts a `DynamicType` so it can be used with dynamic resources.
     pub fn owns_with<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
         mut self,
         api: Api<Child>,
@@ -509,9 +516,18 @@ where
         self
     }
 
-    /// Indicate an object to watch with a custom mapper
+    /// Specify `Watched` object which `K` has a custom relation to and should be watched
     ///
-    /// This mapper should return something like `Option<ObjectRef<K>>`
+    /// To define the `Watched` relation with `K`, you **must** define a custom relation mapper, which,
+    /// when given a `Watched` object, returns an option or iterator of relevant `ObjectRef<K>` to reconcile.
+    ///
+    /// If the relation `K` has to `Watched` is that `K` owns `Watched`, consider using [`Controller::owns`].
+    ///
+    /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `Watched`.
+    ///
+    /// The [`ListParams`] refer to the possible subset of `Watched` objects that you want the [`Api`]
+    /// to watch - in the Api's configured scope - and run through the custom mapper.
+    /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`ListParams::default`].
     pub fn watches<
         Other: Clone + Resource<DynamicType=()> + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
@@ -527,9 +543,9 @@ where
         self.watches_with(api, (), lp, mapper)
     }
 
-    /// Indicate an object to watch with a custom mapper
+    /// Specify `Watched` object which `K` has a custom relation to and should be watched
     ///
-    /// This mapper should return something like `Option<ObjectRef<K>>`
+    /// Same as [`Controller::watches`], but accepts a `DynamicType` so it can be used with dynamic resources.
     pub fn watches_with<
         Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
