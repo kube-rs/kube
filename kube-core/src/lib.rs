@@ -1,7 +1,11 @@
 //! Crate with types and traits necessary for interacting with the Kubernetes API
 //!
-//! This crate is available as a minimal alternative to `kube` where a client is not available.
-//! The same information here is always re-exported from `kube` under `kube::core`.
+//! This crate provides the minimal apimachinery necessary to make requests to the kubernetes API.
+//!
+//! It does not export export a client, but it also has almost no dependencies.
+//!
+//! Everything in this crate is re-exported from [`kube`](https://crates.io/crates/kube)
+//! (even with zero features) under [`kube::core`]((https://docs.rs/kube/*/kube/core/index.html)).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
