@@ -11,19 +11,37 @@ use snafu::{ResultExt, Snafu};
 use std::{error::Error as StdError, fmt::Debug};
 
 #[derive(Debug, Snafu)]
-pub enum Error<ApplyErr, CleanupErr>
+pub enum Error<ReconcileErr>
 where
-    ApplyErr: StdError + 'static,
-    CleanupErr: StdError + 'static,
+    ReconcileErr: StdError + 'static,
 {
     #[snafu(display("failed to apply object: {}", source))]
-    ApplyFailed { source: ApplyErr },
+    ApplyFailed { source: ReconcileErr },
     #[snafu(display("failed to clean up object: {}", source))]
-    CleanupFailed { source: CleanupErr },
+    CleanupFailed { source: ReconcileErr },
     #[snafu(display("failed to add finalizer: {}", source))]
     AddFinalizer { source: kube::Error },
     #[snafu(display("failed to remove finalizer: {}", source))]
     RemoveFinalizer { source: kube::Error },
+}
+
+struct FinalizerState {
+    finalizer_index: Option<usize>,
+    is_deleting: bool,
+}
+
+impl FinalizerState {
+    fn for_object<K: Metadata<Ty = ObjectMeta>>(obj: &K, finalizer_name: &str) -> Self {
+        Self {
+            finalizer_index: obj.metadata().finalizers.as_ref().and_then(|fins| {
+                fins.iter()
+                    .enumerate()
+                    .find(|(_, fin)| *fin == finalizer_name)
+                    .map(|(i, _)| i)
+            }),
+            is_deleting: obj.metadata().deletion_timestamp.is_some(),
+        }
+    }
 }
 
 /// Reconcile an object in a way that requires cleanup before an object can be deleted. It does this by
@@ -39,70 +57,81 @@ where
 /// 2. Reconciler sees object
 /// 3. `finalizer` adds `finalizer_name` to [`ObjectMeta::finalizers`]
 /// 4. Reconciler sees updated object
-/// 5. `finalizer` runs `apply`
+/// 5. `finalizer` runs [`Event::Apply`]
 /// 6. User updates object
 /// 7. Reconciler sees updated object
-/// 8. `finalizer` runs `apply`
+/// 8. `finalizer` runs [`Event::Apply`]
 /// 9. User deletes object
 /// 10. Reconciler sees deleting object
-/// 11. `finalizer` runs `cleanup`
+/// 11. `finalizer` runs [`Event::Cleanup`]
 /// 12. `finalizer` removes `finalizer_name` from [`ObjectMeta::finalizers`]
 /// 13. Kubernetes sees that all [`ObjectMeta::finalizers`] are gone and finally deletes the object
 ///
 /// # Guarantees
 ///
-/// If `apply` is ever started then `cleanup` must succeed before the Kubernetes object deletion completes.
+/// If [`Event::Apply`] is ever started then [`Event::Cleanup`] must succeed before the Kubernetes object deletion completes.
 ///
 /// # Assumptions
 ///
 /// `finalizer_name` must be unique among the controllers interacting with the object
 ///
-/// `apply` and `cleanup` must both be idempotent, and tolerate being executed several times (even if previously cancelled).
+/// [`Event::Apply`] and [`Event::Cleanup`] must both be idempotent, and tolerate being executed several times (even if previously cancelled).
 ///
-/// `cleanup` must tolerate `apply` never having ran at all, or never having succeeded. Keep in mind that
+/// [`Event::Cleanup`] must tolerate [`Event::Apply`] never having ran at all, or never having succeeded. Keep in mind that
 /// even infallible `.await`s are cancellation points.
 ///
 /// # Caveats
 ///
 /// Object deletes will get stuck while the controller is not running, or if `cleanup` fails for some reason.
 ///
+/// `reconcile` should take the object that the [`Event`] contains, rather than trying to reuse `obj`, since it may have been updated.
+///
 /// # Errors
 ///
-/// `apply` and `cleanup` are both fallible, their errors are passed through as [`Error::ApplyFailed`]
+/// [`Event::Apply`] and [`Event::Cleanup`] are both fallible, their errors are passed through as [`Error::ApplyFailed`]
 /// and [`Error::CleanupFailed`], respectively.
 ///
 /// In addition, adding and removing the finalizer itself may fail. In particular, this may be because of
-/// network errors, or because another `finalizer` was updated in the meantime on the same object.
-pub async fn finalizer<K, ApplyFut, CleanupFut>(
+/// network errors, lacking permissions, or because another `finalizer` was updated in the meantime on the same object.
+pub async fn finalizer<K, ReconcileFut>(
     api: &Api<K>,
     finalizer_name: &str,
     obj: K,
-    apply: impl FnOnce(K) -> ApplyFut,
-    cleanup: impl FnOnce(K) -> CleanupFut,
-) -> Result<ReconcilerAction, Error<ApplyFut::Error, CleanupFut::Error>>
+    reconcile: impl FnOnce(Event<K>) -> ReconcileFut,
+) -> Result<ReconcilerAction, Error<ReconcileFut::Error>>
 where
     K: Metadata<Ty = ObjectMeta> + Clone + DeserializeOwned + Serialize + Debug,
-    ApplyFut: TryFuture<Ok = ReconcilerAction>,
-    ApplyFut::Error: StdError + 'static,
-    CleanupFut: TryFuture<Ok = ()>,
-    CleanupFut::Error: StdError + 'static,
+    ReconcileFut: TryFuture<Ok = ReconcilerAction>,
+    ReconcileFut::Error: StdError + 'static,
 {
-    if let Some((finalizer_i, _)) = obj
-        .metadata()
-        .finalizers
-        .as_ref()
-        .and_then(|fins| fins.iter().enumerate().find(|(_, fin)| *fin == finalizer_name))
-    {
-        if obj.metadata().deletion_timestamp.is_none() {
-            apply(obj).into_future().await.context(ApplyFailed)
-        } else {
+    match FinalizerState::for_object(&obj, finalizer_name) {
+        FinalizerState {
+            finalizer_index: Some(_),
+            is_deleting: false,
+        } => reconcile(Event::Apply(obj))
+            .into_future()
+            .await
+            .context(ApplyFailed),
+        FinalizerState {
+            finalizer_index: Some(finalizer_i),
+            is_deleting: true,
+        } => {
+            // Cleanup reconciliation must succeed before it's safe to remove the finalizer
             let name = obj.metadata().name.clone().unwrap();
-            cleanup(obj).into_future().await.context(CleanupFailed)?;
+            let action = reconcile(Event::Cleanup(obj))
+                .into_future()
+                .await
+                // Short-circuit, so that we keep the finalizer if cleanup fails
+                .context(CleanupFailed)?;
+            // Cleanup was successful, remove the finalizer so that deletion can continue
             let finalizer_path = format!("/metadata/finalizers/{}", finalizer_i);
             api.patch::<K>(
                 &name,
                 &PatchParams::default(),
                 &Patch::Json(json_patch::Patch(vec![
+                    // All finalizers run concurrently and we use an integer index
+                    // `Test` ensures that we fail instead of deleting someone else's finalizer
+                    // (in which case a new `Cleanup` event will be sent)
                     PatchOperation::Test(TestOperation {
                         path: finalizer_path.clone(),
                         value: finalizer_name.into(),
@@ -112,10 +141,13 @@ where
             )
             .await
             .context(RemoveFinalizer)?;
-            Ok(ReconcilerAction { requeue_after: None })
+            Ok(action)
         }
-    } else {
-        if obj.metadata().deletion_timestamp.is_none() {
+        FinalizerState {
+            finalizer_index: None,
+            is_deleting: false,
+        } => {
+            // Finalizer must be added before it's safe to run an `Apply` reconciliation
             let patch = json_patch::Patch(if obj.metadata().finalizers.is_none() {
                 vec![
                     PatchOperation::Test(TestOperation {
@@ -140,7 +172,37 @@ where
             )
             .await
             .context(AddFinalizer)?;
+            // No point applying here, since the patch will cause a new reconciliation
+            Ok(ReconcilerAction { requeue_after: None })
         }
-        Ok(ReconcilerAction { requeue_after: None })
+        FinalizerState {
+            finalizer_index: None,
+            is_deleting: true,
+        } => {
+            // Our work here is done
+            Ok(ReconcilerAction { requeue_after: None })
+        }
     }
+}
+
+/// A representation of an action that should be taken by a reconciler.
+pub enum Event<K> {
+    /// The reconciler should ensure that the actual state matches the state desired in the object.
+    ///
+    /// This must be idempotent, since it may be recalled if, for example (this list is non-exhaustive):
+    ///
+    /// - The controller is restarted
+    /// - The object is updated
+    /// - The reconciliation fails
+    /// - The grinch attacks
+    Apply(K),
+    /// The object is being deleted, and the reconciler should remove all resources that it owns.
+    ///
+    /// This must be idempotent, since it may be recalled if, for example (this list is non-exhaustive):
+    ///
+    /// - The controller is restarted while the deletion is in progress
+    /// - The reconciliation fails
+    /// - Another finalizer was removed in the meantime
+    /// - The grinch's heart grows a size or two
+    Cleanup(K),
 }
