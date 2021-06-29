@@ -359,7 +359,7 @@ where
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
 ///     Controller::new(cmgs, ListParams::default())
-///         .owns(cms, ListParams::default())
+///         .owns(cms, (), ListParams::default())
 ///         .run(reconcile, error_policy, context)
 ///         .for_each(|res| async move {
 ///             match res {
