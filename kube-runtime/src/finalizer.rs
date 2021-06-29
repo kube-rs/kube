@@ -7,7 +7,7 @@ use kube::{
     Api,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
 use std::{error::Error as StdError, fmt::Debug};
 
 #[derive(Debug, Snafu)]
@@ -23,6 +23,8 @@ where
     AddFinalizer { source: kube::Error },
     #[snafu(display("failed to remove finalizer: {}", source))]
     RemoveFinalizer { source: kube::Error },
+    #[snafu(display("object has no name"))]
+    UnnamedObject,
 }
 
 struct FinalizerState {
@@ -118,7 +120,7 @@ where
             is_deleting: true,
         } => {
             // Cleanup reconciliation must succeed before it's safe to remove the finalizer
-            let name = obj.metadata().name.clone().unwrap();
+            let name = obj.metadata().name.clone().context(UnnamedObject)?;
             let action = reconcile(Event::Cleanup(obj))
                 .into_future()
                 .await
@@ -167,7 +169,7 @@ where
                 })]
             });
             api.patch::<K>(
-                obj.metadata().name.as_deref().unwrap(),
+                obj.metadata().name.as_deref().context(UnnamedObject)?,
                 &PatchParams::default(),
                 &Patch::Json(patch),
             )
