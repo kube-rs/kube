@@ -1,0 +1,120 @@
+// Demonstrates a controller some outside resource that it needs to clean up when the owner is deleted
+
+// NOTE: This is designed to demonstrate how to use finalizers, but is not in itself a good use case for them.
+// If you actually want to clean up other Kubernetes objects then you should use `ownerReferences` instead and let
+// k8s garbage collect the children.
+
+use futures::StreamExt;
+use k8s_openapi::api::core::v1::{ConfigMap, Secret};
+use kube::{
+    api::{DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
+    error::ErrorResponse,
+};
+use kube_runtime::{
+    controller::{Context, ReconcilerAction},
+    finalizer::{finalizer, Event},
+    Controller,
+};
+use snafu::{OptionExt, ResultExt, Snafu};
+use std::time::Duration;
+
+#[derive(Debug, Snafu)]
+enum Error {
+    NoName,
+    NoNamespace,
+    UpdateSecret { source: kube::Error },
+    DeleteSecret { source: kube::Error },
+}
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+fn api_in_ns_of_object<K: Resource, K2: Resource<DynamicType = ()>>(
+    object: &K,
+    kube: kube::Client,
+) -> Result<kube::Api<K2>> {
+    Ok(kube::Api::<K2>::namespaced(
+        kube,
+        object.meta().namespace.as_deref().context(NoNamespace)?,
+    ))
+}
+
+fn secret_name_for_configmap(cm_name: &str) -> String {
+    format!("cm---{}", cm_name)
+}
+
+async fn apply(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
+    println!("Reconciling {:?}", cm);
+    let secret_name = secret_name_for_configmap(cm.metadata.name.as_deref().context(NoName)?);
+    secrets
+        .patch(
+            &secret_name,
+            &PatchParams::apply("configmap-secret-syncer.nullable.se"),
+            &Patch::Apply(Secret {
+                metadata: ObjectMeta {
+                    name: Some(secret_name.clone()),
+                    ..ObjectMeta::default()
+                },
+                string_data: cm.data,
+                data: cm.binary_data,
+                ..Secret::default()
+            }),
+        )
+        .await
+        .context(UpdateSecret)?;
+    Ok(ReconcilerAction { requeue_after: None })
+}
+
+async fn cleanup(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
+    println!("Cleaning up {:?}", cm);
+    secrets
+        .delete(
+            &secret_name_for_configmap(cm.metadata.name.as_deref().unwrap()),
+            &DeleteParams::default(),
+        )
+        .await
+        .map(|_| ())
+        .or_else(|err| match err {
+            // Object is already deleted
+            kube::Error::Api(ErrorResponse { code: 404, .. }) => Ok(()),
+            err => Err(err),
+        })
+        .context(DeleteSecret)?;
+    Ok(ReconcilerAction { requeue_after: None })
+}
+
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
+    env_logger::init();
+    let kube = kube::Client::try_default().await?;
+    let all_cms = kube::Api::<ConfigMap>::all(kube.clone());
+    Controller::new(
+        all_cms,
+        ListParams::default().labels("configmap-secret-syncer.nullable.se/sync=true"),
+    )
+    .run(
+        |cm, _| {
+            let cms = api_in_ns_of_object::<_, ConfigMap>(&cm, kube.clone()).unwrap();
+            let secrets = api_in_ns_of_object::<_, Secret>(&cm, kube.clone()).unwrap();
+            async move {
+                finalizer(
+                    &cms,
+                    "configmap-secret-syncer.nullable.se/cleanup",
+                    cm,
+                    |event| async {
+                        match event {
+                            Event::Apply(cm) => apply(cm, &secrets).await,
+                            Event::Cleanup(cm) => cleanup(cm, &secrets).await,
+                        }
+                    },
+                )
+                .await
+            }
+        },
+        |_err, _| ReconcilerAction {
+            requeue_after: Some(Duration::from_secs(2)),
+        },
+        Context::new(()),
+    )
+    .for_each(|msg| async move { println!("Reconciled: {:?}", msg) })
+    .await;
+    Ok(())
+}
