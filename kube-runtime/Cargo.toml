@@ -23,6 +23,7 @@ tokio = { version = "1.0.1", features = ["time"] }
 snafu = { version = "0.6.10", features = ["futures"] }
 dashmap = "4.0.1"
 tokio-util = { version = "0.6.0", features = ["time"] }
+tracing = "0.1.26"
 
 [dependencies.k8s-openapi]
 version = "0.12.0"
