@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,multi_watcher=debug,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
+    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let deploys: Api<Deployment> = Api::namespaced(client.clone(), &namespace);
     let cms: Api<ConfigMap> = Api::namespaced(client.clone(), &namespace);
@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
         try_flatten_applied(sec_watcher).map_ok(Watched::Secret).boxed(),
     ]);
     // SelectAll Stream elements must have the same Item, so all packed in this:
+    #[allow(clippy::large_enum_variant)]
     enum Watched {
         Config(ConfigMap),
         Deploy(Deployment),

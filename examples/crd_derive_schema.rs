@@ -121,7 +121,7 @@ async fn main() -> Result<()> {
     assert!(create_crd(client.clone()).await.is_ok());
 
     // Test creating Foo resource.
-    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
+    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let foos = Api::<Foo>::namespaced(client.clone(), &namespace);
     // Create with defaults using typed Api first.
     // `non_nullable` and `non_nullable_with_default` are set to empty strings.
@@ -196,7 +196,7 @@ async fn main() -> Result<()> {
                 "Foo.clux.dev \"qux\" is invalid: spec.non_nullable: Required value"
             );
         }
-        _ => assert!(false),
+        _ => panic!(),
     }
 
     // Test the manually specified merge strategy

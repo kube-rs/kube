@@ -13,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
+    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // Create a Job
     let job_name = "empty-job";
@@ -71,10 +71,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Clean up the old job record..
     info!("Deleting the job record.");
-    let mut dp = DeleteParams::default();
-    dp.dry_run = true;
-    jobs.delete("empty-job", &dp).await?;
-    dp.dry_run = false;
-    jobs.delete("empty-job", &dp).await?;
+    jobs.delete("empty-job", &DeleteParams {
+        dry_run: true,
+        ..DeleteParams::default()
+    })
+    .await?;
+    jobs.delete("empty-job", &DeleteParams {
+        dry_run: false,
+        ..DeleteParams::default()
+    })
+    .await?;
     Ok(())
 }
