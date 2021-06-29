@@ -10,7 +10,7 @@
 //!
 //! ```rust,no_run
 //! use futures::{StreamExt, TryStreamExt};
-//! use kube::api::{Api, Meta, ListParams, PostParams, WatchEvent};
+//! use kube::api::{Api, ResourceExt, ListParams, PostParams, WatchEvent};
 //! use kube::Client;
 //! use k8s_openapi::api::core::v1::Pod;
 //!
@@ -54,13 +54,13 @@
 //!     // Observe the pods phase for 10 seconds
 //!     while let Some(status) = stream.try_next().await? {
 //!         match status {
-//!             WatchEvent::Added(o) => println!("Added {}", Meta::name(&o)),
+//!             WatchEvent::Added(o) => println!("Added {}", o.name()),
 //!             WatchEvent::Modified(o) => {
 //!                 let s = o.status.as_ref().expect("status exists on pod");
 //!                 let phase = s.phase.clone().unwrap_or_default();
-//!                 println!("Modified: {} with phase: {}", Meta::name(&o), phase);
+//!                 println!("Modified: {} with phase: {}", o.name(), phase);
 //!             }
-//!             WatchEvent::Deleted(o) => println!("Deleted {}", Meta::name(&o)),
+//!             WatchEvent::Deleted(o) => println!("Deleted {}", o.name()),
 //!             WatchEvent::Error(e) => println!("Error {}", e),
 //!             _ => {}
 //!         }
@@ -74,33 +74,80 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-#[macro_use] extern crate static_assertions;
-assert_cfg!(
-    all(
-        not(all(feature = "native-tls", feature = "rustls-tls")),
-        any(feature = "native-tls", feature = "rustls-tls")
-    ),
-    "Must use exactly one of native-tls or rustls-tls features"
-);
+macro_rules! cfg_client {
+    ($($item:item)*) => {
+        $(
+            #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+            #[cfg(feature = "client")]
+            $item
+        )*
+    }
+}
+macro_rules! cfg_config {
+    ($($item:item)*) => {
+        $(
+            #[cfg_attr(docsrs, doc(cfg(feature = "config")))]
+            #[cfg(feature = "config")]
+            $item
+        )*
+    }
+}
 
-#[macro_use] extern crate log;
+macro_rules! cfg_error {
+    ($($item:item)*) => {
+        $(
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
+            #[cfg(any(feature = "config", feature = "client"))]
+            $item
+        )*
+    }
+}
 
-pub mod api;
-pub mod client;
-pub mod config;
-pub mod service;
+cfg_client! {
+    pub mod api;
+    pub mod discovery;
+    pub mod client;
 
-pub mod error;
+    #[doc(inline)]
+    pub use api::Api;
+    #[doc(inline)]
+    pub use client::Client;
+    #[doc(inline)]
+    pub use discovery::Discovery;
+}
+
+cfg_config! {
+    pub mod config;
+    #[doc(inline)]
+    pub use config::Config;
+}
+
+cfg_error! {
+    pub mod error;
+    #[doc(inline)] pub use error::Error;
+    /// Convient alias for `Result<T, Error>`
+    pub type Result<T, E = Error> = std::result::Result<T, E>;
+}
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-pub use api::{Api, DynamicResource, Resource};
-#[doc(inline)] pub use client::Client;
-#[doc(inline)] pub use config::Config;
-#[doc(inline)] pub use error::Error;
-#[doc(inline)] pub use service::Service;
-
-/// Convient alias for `Result<T, Error>`
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+/// Re-exports from kube_core crate.
+pub mod core {
+    #[cfg(feature = "admission")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
+    pub use kube_core::admission;
+    pub use kube_core::{
+        crd::{self, CustomResourceExt},
+        dynamic::{self, ApiResource, DynamicObject},
+        gvk::{self, GroupVersionKind, GroupVersionResource},
+        metadata::{self, ListMeta, ObjectMeta, TypeMeta},
+        object::{self, NotUsed, Object, ObjectList},
+        request::{self, Request},
+        response::{self, Status},
+        watch::{self, WatchEvent},
+        Resource, ResourceExt,
+    };
+}
+pub use crate::core::{CustomResourceExt, Resource, ResourceExt};

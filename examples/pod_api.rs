@@ -1,17 +1,16 @@
-#[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, Patch, PatchParams, PostParams, WatchEvent},
+    api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt, WatchEvent},
     Client,
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
 
@@ -19,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let pods: Api<Pod> = Api::namespaced(client, &namespace);
 
     // Create Pod blog
-    info!("Creating Pod instance blog");
+    tracing::info!("Creating Pod instance blog");
     let p: Pod = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Pod",
@@ -35,9 +34,9 @@ async fn main() -> anyhow::Result<()> {
     let pp = PostParams::default();
     match pods.create(&pp, &p).await {
         Ok(o) => {
-            let name = Meta::name(&o);
-            assert_eq!(Meta::name(&p), name);
-            info!("Created {}", name);
+            let name = o.name();
+            assert_eq!(p.name(), name);
+            tracing::info!("Created {}", name);
             // wait for it..
             std::thread::sleep(std::time::Duration::from_millis(5_000));
         }
@@ -52,31 +51,31 @@ async fn main() -> anyhow::Result<()> {
     let mut stream = pods.watch(&lp, "0").await?.boxed();
     while let Some(status) = stream.try_next().await? {
         match status {
-            WatchEvent::Added(o) => info!("Added {}", Meta::name(&o)),
+            WatchEvent::Added(o) => tracing::info!("Added {}", o.name()),
             WatchEvent::Modified(o) => {
                 let s = o.status.as_ref().expect("status exists on pod");
                 let phase = s.phase.clone().unwrap_or_default();
-                info!("Modified: {} with phase: {}", Meta::name(&o), phase);
+                tracing::info!("Modified: {} with phase: {}", o.name(), phase);
             }
-            WatchEvent::Deleted(o) => info!("Deleted {}", Meta::name(&o)),
-            WatchEvent::Error(e) => error!("Error {}", e),
+            WatchEvent::Deleted(o) => tracing::info!("Deleted {}", o.name()),
+            WatchEvent::Error(e) => tracing::error!("Error {}", e),
             _ => {}
         }
     }
 
     // Verify we can get it
-    info!("Get Pod blog");
+    tracing::info!("Get Pod blog");
     let p1cpy = pods.get("blog").await?;
     if let Some(spec) = &p1cpy.spec {
-        info!("Got blog pod with containers: {:?}", spec.containers);
+        tracing::info!("Got blog pod with containers: {:?}", spec.containers);
         assert_eq!(spec.containers[0].name, "blog");
     }
 
     // Replace its spec
-    info!("Patch Pod blog");
+    tracing::info!("Patch Pod blog");
     let patch = json!({
         "metadata": {
-            "resourceVersion": Meta::resource_ver(&p1cpy),
+            "resourceVersion": p1cpy.resource_version(),
         },
         "spec": {
             "activeDeadlineSeconds": 5
@@ -88,14 +87,14 @@ async fn main() -> anyhow::Result<()> {
 
     let lp = ListParams::default().fields(&format!("metadata.name={}", "blog")); // only want results for our pod
     for p in pods.list(&lp).await? {
-        info!("Found Pod: {}", Meta::name(&p));
+        tracing::info!("Found Pod: {}", p.name());
     }
 
     // Delete it
     let dp = DeleteParams::default();
     pods.delete("blog", &dp).await?.map_left(|pdel| {
-        assert_eq!(Meta::name(&pdel), "blog");
-        info!("Deleting blog pod started: {:?}", pdel);
+        assert_eq!(pdel.name(), "blog");
+        tracing::info!("Deleting blog pod started: {:?}", pdel);
     });
 
     Ok(())

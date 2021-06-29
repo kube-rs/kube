@@ -3,7 +3,7 @@
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube::{
-    api::{ListParams, Meta, WatchEvent},
+    api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
 };
 use serde::de::DeserializeOwned;
@@ -86,7 +86,7 @@ impl<K> Event<K> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 /// The internal finite state machine driving the [`watcher`]
-enum State<K: Meta + Clone> {
+enum State<K: Resource + Clone> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
     Empty,
     /// The initial LIST was successful, so we should move on to starting the actual watch.
@@ -108,7 +108,7 @@ enum State<K: Meta + Clone> {
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
-async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
+async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     state: State<K>,
@@ -134,14 +134,14 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Debug + Send + 's
             mut stream,
         } => match stream.next().await {
             Some(Ok(WatchEvent::Added(obj))) | Some(Ok(WatchEvent::Modified(obj))) => {
-                let resource_version = obj.resource_ver().unwrap();
+                let resource_version = obj.resource_version().unwrap();
                 (Some(Ok(Event::Applied(obj))), State::Watching {
                     resource_version,
                     stream,
                 })
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
-                let resource_version = obj.resource_ver().unwrap();
+                let resource_version = obj.resource_version().unwrap();
                 (Some(Ok(Event::Deleted(obj))), State::Watching {
                     resource_version,
                     stream,
@@ -173,7 +173,7 @@ async fn step_trampolined<K: Meta + Clone + DeserializeOwned + Debug + Send + 's
 }
 
 /// Trampoline helper for `step_trampolined`
-async fn step<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
+async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: &Api<K>,
     list_params: &ListParams,
     mut state: State<K>,
@@ -200,7 +200,7 @@ async fn step<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// direct users may want to flatten composite events with [`try_flatten_applied`]:
 ///
 /// ```no_run
-/// use kube::{api::{Api, ListParams, Meta}, Client};
+/// use kube::{api::{Api, ListParams, ResourceExt}, Client};
 /// use kube_runtime::{utils::try_flatten_applied, watcher};
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::{StreamExt, TryStreamExt};
@@ -211,7 +211,7 @@ async fn step<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///     let watcher = watcher(pods, ListParams::default());
 ///     try_flatten_applied(watcher)
 ///         .try_for_each(|p| async move {
-///          println!("Applied: {}", Meta::name(&p));
+///          println!("Applied: {}", p.name());
 ///             Ok(())
 ///         })
 ///         .await?;
@@ -232,7 +232,7 @@ async fn step<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
 /// an [`Event::Restarted`].
-pub fn watcher<K: Meta + Clone + DeserializeOwned + Debug + Send + 'static>(
+pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {

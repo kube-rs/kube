@@ -2,7 +2,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
-    api::{Api, ListParams, Meta},
+    api::{Api, ListParams, ResourceExt},
     Client,
 };
 use kube_runtime::{utils::try_flatten_applied, watcher};
@@ -26,14 +26,13 @@ async fn main() -> anyhow::Result<()> {
 
 // A simple node problem detector
 async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result<()> {
-    let name = Meta::name(&o);
+    let name = o.name();
     // Nodes often modify a lot - only print broken nodes
     if let Some(true) = o.spec.unwrap().unschedulable {
         let failed = o
             .status
             .unwrap()
             .conditions
-            .unwrap()
             .into_iter()
             .filter(|c| {
                 // In a failed state either some of the extra conditions are not False

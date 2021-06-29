@@ -1,7 +1,7 @@
 use futures::prelude::*;
 use kube::{
-    api::{DynamicObject, GroupVersionKind, ListParams, Meta},
-    Api, Client,
+    api::{DynamicObject, GroupVersionKind, ListParams, ResourceExt},
+    discovery, Api, Client,
 };
 use kube_runtime::{utils::try_flatten_applied, watcher};
 use std::env;
@@ -18,15 +18,18 @@ async fn main() -> anyhow::Result<()> {
     let kind = env::var("KIND").unwrap_or_else(|_| "Foo".into());
 
     // Turn them into a GVK
-    let gvk = GroupVersionKind::from_dynamic_gvk(&group, &version, &kind);
-    // Use them in an Api with the GVK as its DynamicType
-    let api = Api::<DynamicObject>::all_with(client, &gvk);
+    let gvk = GroupVersionKind::gvk(&group, &version, &kind);
+    // Use API discovery to identify more information about the type (like its plural)
+    let (ar, _caps) = discovery::pinned_kind(&client, &gvk).await?;
+
+    // Use the discovered kind in an Api with the ApiResource as its DynamicType
+    let api = Api::<DynamicObject>::all_with(client, &ar);
 
     // Fully compatible with kube-runtime
     let watcher = watcher(api, ListParams::default());
     try_flatten_applied(watcher)
         .try_for_each(|p| async move {
-            log::info!("Applied: {}", Meta::name(&p));
+            log::info!("Applied: {}", p.name());
             Ok(())
         })
         .await?;

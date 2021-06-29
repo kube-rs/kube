@@ -33,12 +33,13 @@ struct FinalizerState {
 impl FinalizerState {
     fn for_object<K: Metadata<Ty = ObjectMeta>>(obj: &K, finalizer_name: &str) -> Self {
         Self {
-            finalizer_index: obj.metadata().finalizers.as_ref().and_then(|fins| {
-                fins.iter()
-                    .enumerate()
-                    .find(|(_, fin)| *fin == finalizer_name)
-                    .map(|(i, _)| i)
-            }),
+            finalizer_index: obj
+                .metadata()
+                .finalizers
+                .iter()
+                .enumerate()
+                .find(|(_, fin)| *fin == finalizer_name)
+                .map(|(i, _)| i),
             is_deleting: obj.metadata().deletion_timestamp.is_some(),
         }
     }
@@ -148,7 +149,7 @@ where
             is_deleting: false,
         } => {
             // Finalizer must be added before it's safe to run an `Apply` reconciliation
-            let patch = json_patch::Patch(if obj.metadata().finalizers.is_none() {
+            let patch = json_patch::Patch(if obj.metadata().finalizers.is_empty() {
                 vec![
                     PatchOperation::Test(TestOperation {
                         path: "/metadata/finalizers".to_string(),

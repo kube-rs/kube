@@ -1,11 +1,11 @@
 //! Error handling in [`kube`][crate]
-
 use http::header::InvalidHeaderValue;
-use serde::{Deserialize, Serialize};
+pub use kube_core::ErrorResponse;
 use std::path::PathBuf;
 use thiserror::Error;
 
 /// Possible errors when working with [`kube`][crate]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
 #[derive(Error, Debug)]
 pub enum Error {
     /// ApiError for when things fail
@@ -22,9 +22,11 @@ pub enum Error {
     Connection(std::io::Error),
 
     /// Hyper error
+    #[cfg(feature = "client")]
     #[error("HyperError: {0}")]
     HyperError(#[from] hyper::Error),
     /// Service error
+    #[cfg(feature = "client")]
     #[error("ServiceError: {0}")]
     Service(tower::BoxError),
 
@@ -46,9 +48,9 @@ pub enum Error {
     #[error("HttpError: {0}")]
     HttpError(#[from] http::Error),
 
-    /// Url conversion error
-    #[error("InternalUrlError: {0}")]
-    InternalUrlError(#[from] url::ParseError),
+    /// Failed to construct a URI.
+    #[error(transparent)]
+    InvalidUri(#[from] http::uri::InvalidUri),
 
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
@@ -70,13 +72,13 @@ pub enum Error {
     #[error("Request validation failed with {0}")]
     RequestValidation(String),
 
-    /// A dynamic resource conversion failure
-    #[error("Dynamic resource conversion failed {0}")]
-    DynamicResource(String),
-
     /// Configuration error
     #[error("Error loading kubeconfig: {0}")]
     Kubeconfig(#[from] ConfigError),
+
+    /// Discovery errors
+    #[error("Error from discovery: {0}")]
+    Discovery(#[from] DiscoveryError),
 
     /// An error with configuring SSL occured
     #[error("SslError: {0}")]
@@ -84,6 +86,7 @@ pub enum Error {
 
     /// An error from openssl when handling configuration
     #[cfg(feature = "native-tls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
     #[error("OpensslError: {0}")]
     OpensslError(#[from] openssl::error::ErrorStack),
 
@@ -165,12 +168,11 @@ pub enum ConfigError {
     #[error("Unable to load in cluster token: {0}")]
     InvalidInClusterToken(#[source] Box<Error>),
 
-    #[error("Malformed url: {0}")]
-    MalformedUrl(#[from] url::ParseError),
-
     #[error("exec-plugin response did not contain a status")]
     ExecPluginFailed,
 
+    #[cfg(feature = "client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
     #[error("Malformed token expiration date: {0}")]
     MalformedTokenExpirationDate(#[source] chrono::ParseError),
 
@@ -262,18 +264,32 @@ impl From<OAuthError> for Error {
     }
 }
 
-/// An error response from the API.
-#[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
-#[error("{message}: {reason}")]
-pub struct ErrorResponse {
-    /// The status
-    pub status: String,
-    /// A message about the error
-    #[serde(default)]
-    pub message: String,
-    /// The reason for the error
-    #[serde(default)]
-    pub reason: String,
-    /// The error code
-    pub code: u16,
+#[derive(Error, Debug)]
+// Redundant with the error messages and machine names
+#[allow(missing_docs)]
+/// Possible errors when using API discovery
+pub enum DiscoveryError {
+    #[error("Invalid GroupVersion: {0}")]
+    InvalidGroupVersion(String),
+    #[error("Missing Kind: {0}")]
+    MissingKind(String),
+    #[error("Missing Api Group: {0}")]
+    MissingApiGroup(String),
+    #[error("Missing MissingResource: {0}")]
+    MissingResource(String),
+    #[error("Empty Api Group: {0}")]
+    EmptyApiGroup(String),
+}
+
+impl From<kube_core::Error> for Error {
+    fn from(error: kube_core::Error) -> Self {
+        match error {
+            kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
+            kube_core::Error::SerdeError(e) => Error::SerdeError(e),
+            kube_core::Error::HttpError(e) => Error::HttpError(e),
+            kube_core::Error::InvalidGroupVersion(s) => {
+                Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
+            }
+        }
+    }
 }

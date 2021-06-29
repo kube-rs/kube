@@ -1,5 +1,10 @@
-on: [push]
+# When pushed to master, run `cargo +nightly fmt --all` and open a PR.
 name: rustfmt
+on:
+  push:
+    # Limit to `master` because this action creates a PR
+    branches:
+      - master
 jobs:
   rustfmt_nightly:
     runs-on: ubuntu-latest
@@ -14,8 +19,15 @@ jobs:
           override: true
           components: rustfmt
 
-      - name: Run cargo +nightly fmt
-        uses: actions-rs/cargo@v1
+      - run: rustfmt +nightly --edition 2018 **/*.rs
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
         with:
-          command: fmt
-          args: --all -- --check
+          commit-message: rustfmt
+          title: rustfmt
+          body: |
+            Changes from `rustfmt +nightly --edition 2018 **/*.rs`.
+          branch: rustfmt
+          # Delete branch when merged
+          delete-branch: true

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
     group = "clux.dev",
     version = "v1",
     kind = "Foo",
+    category = "clux",
     namespaced,
     derive = "PartialEq"
 )]
@@ -44,6 +45,7 @@ fn default_nullable() -> Option<String> {
 
 #[test]
 fn test_crd_schema_matches_expected() {
+    use kube::core::CustomResourceExt;
     assert_eq!(
         Foo::crd(),
         serde_json::from_value(serde_json::json!({
@@ -55,6 +57,7 @@ fn test_crd_schema_matches_expected() {
             "spec": {
                 "group": "clux.dev",
                 "names": {
+                    "categories": ["clux"],
                     "kind": "Foo",
                     "plural": "foos",
                     "shortNames": [],

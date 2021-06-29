@@ -4,7 +4,7 @@ use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 
 use kube::{
-    api::{Api, EvictParams, ListParams, Meta, PostParams, WatchEvent},
+    api::{Api, EvictParams, ListParams, PostParams, ResourceExt, WatchEvent},
     Client,
 };
 
@@ -44,12 +44,12 @@ async fn main() -> anyhow::Result<()> {
     while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(o) => {
-                info!("Added {}", Meta::name(&o));
+                info!("Added {}", o.name());
             }
             WatchEvent::Modified(o) => {
                 let s = o.status.as_ref().expect("status exists on pod");
                 if s.phase.clone().unwrap_or_default() == "Running" {
-                    info!("Ready to evict to {}", Meta::name(&o));
+                    info!("Ready to evict to {}", o.name());
                     break;
                 }
             }

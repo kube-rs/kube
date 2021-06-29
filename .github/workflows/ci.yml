@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  cargo-test:
+    strategy:
+      # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        # TODO: add windows-latest (see #566)
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          toolchain: stable
+          profile: minimal
+      # Smart caching for Rust projects.
+      # Includes workaround for macos cache corruption.
+      # - https://github.com/rust-lang/cargo/issues/8603
+      # - https://github.com/actions/cache/issues/403
+      - uses: Swatinem/rust-cache@v1
+
+      # Real CI work starts here
+      - name: Build workspace
+        run: cargo build
+
+      # Workspace tests
+      - name: Run workspace unit tests
+        run: cargo test --lib --all -j6
+      - name: Run workspace doc tests
+        run: cargo test --doc --all -j6
+      - name: Test examples
+        run: cargo test -p examples --examples -j6
+      - name: Compile check remaining examples
+        # No OS specific code in examples, run this on fastest executor
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo build -j4 -p examples
+
+      # Feature tests
+      - name: Test kube with features native-tls,ws,oauth
+        run: cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
+        if: matrix.os == 'ubuntu-latest'
+      - name: Test kube with features rustls-tls,ws,oauth
+        run: cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
+        if: matrix.os == 'ubuntu-latest'
+      # Feature tests in examples
+      - name: Test crd_derive_no_schema example
+        run: cargo test -p examples --example crd_derive_no_schema --no-default-features --features=native-tls
+        if: matrix.os == 'ubuntu-latest'
+
+  integration:
+    # Integration tests are linux only
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+            target
+          key: musl-cargo-${{ hashFiles('**/Cargo.toml') }}
+
+      - uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: v1.20
+          # k3d-kube
+          k3d-name: kube
+          # Used to avoid rate limits when fetching the releases from k3s repo.
+          # Anonymous access is limited to 60 requests / hour / worker
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compile dapp
+        run: |
+          mkdir -p ~/.cargo/{git,registry}
+          docker run --rm -t \
+              --mount type=bind,source=${{ github.workspace }},target=/volume \
+              --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
+              --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
+              clux/muslrust:stable \
+              cargo build -p tests --release -v
+          cp target/x86_64-unknown-linux-musl/release/dapp tests/
+
+      - name: Build image
+        run: "docker build -t clux/kube-dapp:${{ github.sha }} tests/"
+      - name: Import image
+        run: "k3d image import clux/kube-dapp:${{ github.sha }} --cluster kube"
+      - run: sed -i 's/latest/${{ github.sha }}/g' tests/deployment.yaml
+
+      - name: Create resource
+        run: kubectl apply -f tests/deployment.yaml -n apps
+      - run: kubectl get all -n apps
+      - run: kubectl describe jobs/dapp -n apps
+      - name: Wait for job to complete
+        run: |
+          kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
+          kubectl get all -n apps
+          kubectl wait --for=condition=complete job/dapp -n apps --timeout=10s || kubectl get pods -n apps | grep dapp | grep Completed

@@ -1,6 +1,6 @@
 use derivative::Derivative;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
-use kube::api::{DynamicObject, Meta};
+use kube::api::{DynamicObject, Resource, ResourceExt};
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
@@ -28,7 +28,7 @@ use std::{
 ///     ObjectRef::<Secret>::new("a").erase(),
 /// );
 /// ```
-pub struct ObjectRef<K: Meta> {
+pub struct ObjectRef<K: Resource> {
     dyntype: K::DynamicType,
     /// The name of the object
     pub name: String,
@@ -46,7 +46,7 @@ pub struct ObjectRef<K: Meta> {
     pub namespace: Option<String>,
 }
 
-impl<K: Meta> ObjectRef<K>
+impl<K: Resource> ObjectRef<K>
 where
     K::DynamicType: Default,
 {
@@ -58,13 +58,13 @@ where
     #[must_use]
     pub fn from_obj(obj: &K) -> Self
     where
-        K: Meta,
+        K: Resource,
     {
         Self::from_obj_with(obj, Default::default())
     }
 }
 
-impl<K: Meta> ObjectRef<K> {
+impl<K: Resource> ObjectRef<K> {
     #[must_use]
     pub fn new_with(name: &str, dyntype: K::DynamicType) -> Self {
         Self {
@@ -80,10 +80,13 @@ impl<K: Meta> ObjectRef<K> {
         self
     }
 
+    /// Creates `ObjectRef` from the resource and dynamic type.
+    /// Panics if name is missing (name always exists if the object
+    /// was returned from the apiserver)
     #[must_use]
     pub fn from_obj_with(obj: &K, dyntype: K::DynamicType) -> Self
     where
-        K: Meta,
+        K: Resource,
     {
         Self {
             dyntype,
@@ -117,7 +120,7 @@ impl<K: Meta> ObjectRef<K> {
     /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
     /// has a corresponding `Endpoints`, but it wouldn't make sense to convert a `Pod` into a `Deployment`.
     #[must_use]
-    pub fn into_kind_unchecked<K2: Meta>(self, dt2: K2::DynamicType) -> ObjectRef<K2> {
+    pub fn into_kind_unchecked<K2: Resource>(self, dt2: K2::DynamicType) -> ObjectRef<K2> {
         ObjectRef {
             dyntype: dt2,
             name: self.name,
@@ -127,18 +130,14 @@ impl<K: Meta> ObjectRef<K> {
 
     pub fn erase(self) -> ObjectRef<DynamicObject> {
         ObjectRef {
-            dyntype: kube::api::GroupVersionKind::from_dynamic_gvk(
-                K::group(&self.dyntype).as_ref(),
-                K::version(&self.dyntype).as_ref(),
-                K::kind(&self.dyntype).as_ref(),
-            ),
+            dyntype: kube::api::ApiResource::erase::<K>(&self.dyntype),
             name: self.name,
             namespace: self.namespace,
         }
     }
 }
 
-impl<K: Meta> Display for ObjectRef<K> {
+impl<K: Resource> Display for ObjectRef<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

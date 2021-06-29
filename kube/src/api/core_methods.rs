@@ -1,97 +1,15 @@
 use either::Either;
 use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, iter};
-use tracing::instrument;
+use std::fmt::Debug;
 
-use crate::{
-    api::{DeleteParams, ListParams, Meta, ObjectList, Patch, PatchParams, PostParams, Resource, WatchEvent},
-    client::{Client, Status},
-    Result,
-};
-
-/// A generic Api abstraction
-///
-/// This abstracts over a [`Resource`] and a type `K` so that
-/// we get automatic serialization/deserialization on the api calls
-/// implemented by the dynamic [`Resource`].
-#[derive(Clone)]
-pub struct Api<K> {
-    /// The request creator object
-    pub(crate) resource: Resource,
-    /// The client to use (from this library)
-    pub(crate) client: Client,
-    /// Underlying Object unstored
-    ///
-    /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
-    /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
-    /// is `Send`, even if `K` may not be).
-    pub(crate) phantom: iter::Empty<K>,
-}
-
-/// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K> Api<K>
-where
-    K: Meta,
-    <K as Meta>::DynamicType: Default,
-{
-    /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all(client: Client) -> Self {
-        Self::all_with(client, &Default::default())
-    }
-
-    /// Namespaced resource within a given namespace
-    pub fn namespaced(client: Client, ns: &str) -> Self {
-        Self::namespaced_with(client, ns, &Default::default())
-    }
-}
-
-/// Expose same interface as Api for controlling scope/group/versions/ns
-impl<K> Api<K>
-where
-    K: Meta,
-{
-    /// Cluster level resources, or resources viewed across all namespaces
-    ///
-    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
-        let resource = Resource::all_with::<K>(dyntype);
-        Self {
-            resource,
-            client,
-            phantom: iter::empty(),
-        }
-    }
-
-    /// Namespaced resource within a given namespace
-    ///
-    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
-        let resource = Resource::namespaced_with::<K>(ns, dyntype);
-        Self {
-            resource,
-            client,
-            phantom: iter::empty(),
-        }
-    }
-
-    /// Returns reference to the underlying `Resource` object.
-    /// It can be used to make low-level requests or as a `DynamicType`
-    /// for a `DynamicObject`.
-    pub fn resource(&self) -> &Resource {
-        &self.resource
-    }
-
-    /// Consume self and return the [`Client`]
-    pub fn into_client(self) -> Client {
-        self.into()
-    }
-}
+use crate::{api::Api, Result};
+use kube_core::{object::ObjectList, params::*, response::Status, WatchEvent};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Meta + Debug,
+    K: Clone + DeserializeOwned + Debug,
 {
     /// Get a named resource
     ///
@@ -106,9 +24,9 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn get(&self, name: &str) -> Result<K> {
-        let req = self.resource.get(name)?;
+        let mut req = self.request.get(name)?;
+        req.extensions_mut().insert("get");
         self.client.request::<K>(req).await
     }
 
@@ -117,7 +35,7 @@ where
     /// You get use this to get everything, or a subset matching fields/labels, say:
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, Meta}, Client};
+    /// use kube::{api::{Api, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -125,14 +43,14 @@ where
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
     ///     for p in pods.list(&lp).await? {
-    ///         println!("Found Pod: {}", Meta::name(&p));
+    ///         println!("Found Pod: {}", p.name());
     ///     }
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let req = self.resource.list(&lp)?;
+        let mut req = self.request.list(lp)?;
+        req.extensions_mut().insert("list");
         self.client.request::<ObjectList<K>>(req).await
     }
 
@@ -152,13 +70,13 @@ where
     ///     - Tradeoff between the two
     ///     - Easy partially filling of native [`k8s_openapi`] types (most fields optional)
     ///     - Partial safety against runtime errors (at least you must write valid JSON)
-    #[instrument(skip(self), level = "trace")]
     pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = self.resource.create(&pp, bytes)?;
+        let mut req = self.request.create(pp, bytes)?;
+        req.extensions_mut().insert("create");
         self.client.request::<K>(req).await
     }
 
@@ -184,9 +102,9 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let req = self.resource.delete(name, &dp)?;
+        let mut req = self.request.delete(name, dp)?;
+        req.extensions_mut().insert("delete");
         self.client.request_status::<K>(req).await
     }
 
@@ -199,7 +117,7 @@ where
     /// 4XX and 5XX status types are returned as an [`Err(kube::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
-    /// use kube::{api::{Api, DeleteParams, ListParams, Meta}, Client};
+    /// use kube::{api::{Api, DeleteParams, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -207,7 +125,7 @@ where
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
     ///         either::Left(list) => {
-    ///             let names: Vec<_> = list.iter().map(Meta::name).collect();
+    ///             let names: Vec<_> = list.iter().map(ResourceExt::name).collect();
     ///             println!("Deleting collection of pods: {:?}", names);
     ///         },
     ///         either::Right(status) => {
@@ -217,13 +135,13 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[instrument(skip(self), level = "trace")]
     pub async fn delete_collection(
         &self,
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let req = self.resource.delete_collection(&dp, &lp)?;
+        let mut req = self.request.delete_collection(dp, lp)?;
+        req.extensions_mut().insert("delete_collection");
         self.client.request_status::<ObjectList<K>>(req).await
     }
 
@@ -232,7 +150,7 @@ where
     /// Takes a [`Patch`] along with [`PatchParams`] for the call.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PatchParams, Patch, Meta}, Client};
+    /// use kube::{api::{Api, PatchParams, Patch, Resource}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -256,14 +174,14 @@ where
     /// ```
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
-    #[instrument(skip(self), level = "trace")]
     pub async fn patch<P: Serialize + Debug>(
         &self,
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let req = self.resource.patch(name, &pp, patch)?;
+        let mut req = self.request.patch(name, pp, patch)?;
+        req.extensions_mut().insert("patch");
         self.client.request::<K>(req).await
     }
 
@@ -276,7 +194,7 @@ where
     /// Thus, to use this function, you need to do a `get` then a `replace` with its result.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PostParams, Meta}, Client};
+    /// use kube::{api::{Api, PostParams, ResourceExt}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {
@@ -288,7 +206,7 @@ where
     ///         "kind": "Job",
     ///         "metadata": {
     ///             "name": "baz",
-    ///             "resourceVersion": Meta::resource_ver(&j),
+    ///             "resourceVersion": j.resource_version(),
     ///         },
     ///         "spec": {
     ///             "template": {
@@ -311,13 +229,13 @@ where
     /// ```
     ///
     /// Consider mutating the result of `api.get` rather than recreating it.
-    #[instrument(skip(self), level = "trace")]
     pub async fn replace(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data)?;
-        let req = self.resource.replace(name, &pp, bytes)?;
+        let mut req = self.request.replace(name, pp, bytes)?;
+        req.extensions_mut().insert("replace");
         self.client.request::<K>(req).await
     }
 
@@ -333,7 +251,7 @@ where
     /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, Meta, WatchEvent}, Client};
+    /// use kube::{api::{Api, ListParams, ResourceExt, WatchEvent}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
     /// #[tokio::main]
@@ -346,9 +264,9 @@ where
     ///     let mut stream = jobs.watch(&lp, "0").await?.boxed();
     ///     while let Some(status) = stream.try_next().await? {
     ///         match status {
-    ///             WatchEvent::Added(s) => println!("Added {}", Meta::name(&s)),
-    ///             WatchEvent::Modified(s) => println!("Modified: {}", Meta::name(&s)),
-    ///             WatchEvent::Deleted(s) => println!("Deleted {}", Meta::name(&s)),
+    ///             WatchEvent::Added(s) => println!("Added {}", s.name()),
+    ///             WatchEvent::Modified(s) => println!("Modified: {}", s.name()),
+    ///             WatchEvent::Deleted(s) => println!("Deleted {}", s.name()),
     ///             WatchEvent::Bookmark(s) => {},
     ///             WatchEvent::Error(s) => println!("{}", s),
     ///         }
@@ -358,19 +276,13 @@ where
     /// ```
     /// [`ListParams::timeout`]: super::ListParams::timeout
     /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
-    #[instrument(skip(self), level = "trace")]
     pub async fn watch(
         &self,
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let req = self.resource.watch(&lp, &version)?;
+        let mut req = self.request.watch(lp, version)?;
+        req.extensions_mut().insert("watch");
         self.client.request_events::<K>(req).await
-    }
-}
-
-impl<K> From<Api<K>> for Client {
-    fn from(api: Api<K>) -> Self {
-        api.client
     }
 }

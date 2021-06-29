@@ -10,17 +10,17 @@ mod custom_resource;
 /// A custom derive for kubernetes custom resource definitions.
 ///
 /// This will generate a **root object** containing your spec and metadata.
-/// This root object will implement the [`k8s_openapi::Metadata`] + [`k8s_openapi::Resource`]
-/// traits so it can be used with [`kube::Api`].
+/// This root object will implement the [`kube::Resource`] trait
+/// so it can be used with [`kube::Api`].
 ///
-/// The generated type will also implement a `::crd` method to generate the crd
-/// at the specified api version (or `v1` if unspecified).
+/// The generated type will also implement kube's [`kube::CustomResourceExt`] trait to generate the crd
+/// and generate [`kube::core::ApiResource`] information for use with the dynamic api.
 ///
 /// # Example
 ///
 /// ```rust
 /// use serde::{Serialize, Deserialize};
-/// use k8s_openapi::Resource;
+/// use kube::{Resource, CustomResourceExt};
 /// use kube_derive::CustomResource;
 /// use schemars::JsonSchema;
 ///
@@ -30,7 +30,7 @@ mod custom_resource;
 ///     info: String,
 /// }
 ///
-/// println!("kind = {}", Foo::KIND); // impl k8s_openapi::Resource
+/// println!("kind = {}", Foo::kind(&())); // impl kube::Resource
 /// let f = Foo::new("foo-1", FooSpec {
 ///     info: "informative info".into(),
 /// });
@@ -72,7 +72,8 @@ mod custom_resource;
 /// The version for `CustomResourceDefinition` desired in the `apiextensions.k8s.io` group.
 /// Default is `v1` (for clusters >= 1.17). If using kubernetes <= 1.16 please use `v1beta1`.
 ///
-/// **NOTE**: Support for `v1` requires deriving the openapi v3 `JsonSchema` via the `schemars` dependency.
+/// - **NOTE**: Support for `v1` requires deriving the openapi v3 `JsonSchema` via the `schemars` dependency.
+/// - **NOTE**: When using `v1beta` the associated `CustomResourceExt` trait lives in `kube::core::crd::v1beta`
 ///
 /// ### `#[kube(singular = "nonstandard-singular")]`
 /// To specify the singular name. Defaults to lowercased `kind`.
@@ -149,8 +150,7 @@ mod custom_resource;
 ///     spec: FooSpec,
 ///     status: Option<FooStatus>,
 /// }
-/// impl k8s_openapi::Resource for FooCrd {...}
-/// impl k8s_openapi::Metadata for FooCrd {...}
+/// impl kube::Resource for FooCrd {...}
 ///
 /// impl FooCrd {
 ///     pub fn new(name: &str, spec: FooSpec) -> Self { ... }
@@ -196,8 +196,9 @@ mod custom_resource;
 ///
 /// [`kube`]: https://docs.rs/kube
 /// [`kube::Api`]: https://docs.rs/kube/*/kube/struct.Api.html
-/// [`k8s_openapi::Metadata`]: https://docs.rs/k8s-openapi/*/k8s_openapi/trait.Metadata.html
-/// [`k8s_openapi::Resource`]: https://docs.rs/k8s-openapi/*/k8s_openapi/trait.Resource.html
+/// [`kube::Resource`]: https://docs.rs/kube/*/kube/trait.Resource.html
+/// [`kube::core::ApiResource`]: https://docs.rs/kube/*/kube/core/struct.ApiResource.html
+/// [`kube::CustomResourceExt`]: https://docs.rs/kube/*/kube/trait.CustomResourceExt.html
 #[proc_macro_derive(CustomResource, attributes(kube))]
 pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     custom_resource::derive(proc_macro2::TokenStream::from(input)).into()

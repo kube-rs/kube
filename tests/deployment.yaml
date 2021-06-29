@@ -75,64 +75,26 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
-# Expose the http port of the service
-apiVersion: v1
-kind: Service
+# Main job
+apiVersion: batch/v1
+kind: Job
 metadata:
   name: dapp
   namespace: apps
   labels:
     app: dapp
 spec:
-  ports:
-  - port: 80
-    targetPort: 8080
-    protocol: TCP
-    name: http
-  selector:
-    app: dapp
-
----
-# Main deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: dapp
-  namespace: apps
-  labels:
-    app: dapp
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: dapp
   template:
     metadata:
       labels:
         app: dapp
     spec:
       serviceAccountName: dapp
+      restartPolicy: Never
       containers:
       - name: dapp
         image: "clux/kube-dapp:latest"
         imagePullPolicy: IfNotPresent
-        resources:
-          limits:
-            cpu: 200m
-            memory: 256Mi
-          requests:
-            cpu: 50m
-            memory: 100Mi
-        #ports:
-        #- name: http
-        #  containerPort: 8080
-        #  protocol: TCP
-        #readinessProbe:
-        #  httpGet:
-        #    path: /health
-        #    port: http
-        #  initialDelaySeconds: 5
-        #  periodSeconds: 5
         env:
         - name: NAMESPACE
           value: "apps"

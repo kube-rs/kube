@@ -1,10 +1,9 @@
-///! A port of *Optionals from apimachinery/types.go
+//! A port of request parameter *Optionals from apimachinery/types.go
 use crate::{Error, Result};
 use serde::Serialize;
 
 /// Common query parameters used in watch/list/delete calls on collections
 #[derive(Clone, Debug)]
-#[allow(missing_docs)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///
@@ -169,7 +168,7 @@ impl PostParams {
 /// See [kubernetes patch docs](https://kubernetes.io/docs/tasks/run-application/update-api-object-kubectl-patch/#use-a-json-merge-patch-to-update-a-deployment) for the older patch types.
 ///
 /// Note that patches have different effects on different fields depending on their merge strategies.
-/// These strategies are configurable when deriving your [`CustomResource`](kube_derive::CustomResource#customizing-schemas).
+/// These strategies are configurable when deriving your [`CustomResource`](https://docs.rs/kube-derive/*/kube_derive/derive.CustomResource.html#customizing-schemas).
 ///
 /// # Creating a patch via serde_json
 /// ```
@@ -193,7 +192,7 @@ impl PostParams {
 /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 /// let r = Role {
 ///     metadata: ObjectMeta { name: Some("user".into()), ..ObjectMeta::default() },
-///     rules: Some(vec![])
+///     rules: vec![]
 /// };
 /// let patch = Patch::Apply(&r);
 /// ```
@@ -281,20 +280,22 @@ impl PatchParams {
             }
         }
         if self.force && !patch.is_apply() {
-            warn!("PatchParams::force only works with Patch::Apply");
+            return Err(Error::RequestValidation(
+                "PatchParams::force only works with Patch::Apply".into(),
+            ));
         }
         Ok(())
     }
 
-    pub(crate) fn populate_qp(&self, qp: &mut url::form_urlencoded::Serializer<String>) {
+    pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
         if self.dry_run {
-            qp.append_pair("dryRun", "true");
+            qp.append_pair("dryRun", "All");
         }
         if self.force {
             qp.append_pair("force", "true");
         }
-        if let Some(ref field_manager) = self.field_manager {
-            qp.append_pair("fieldManager", &field_manager);
+        if let Some(ref fm) = self.field_manager {
+            qp.append_pair("fieldManager", fm);
         }
     }
 

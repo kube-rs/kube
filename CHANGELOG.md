@@ -1,30 +1,156 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.51.0...master
- * `kube-derive`: allow overriding `#[kube(plural)]` and `#[kube(singular)]` - #458 via #463
- * `kube`: added tracing instrumentation for io operations in `kube::Api` - #455
- * `kube`: `DeleteParams`'s `Preconditions` is now public - #459 via #460
- * `kube`: remove dependency on duplicate `derive_accept_key` for `ws` - #452
- * `kube`: Properly verify websocket keys in `ws` handshake - #447
- * `kube`: BREAKING: removed optional, and deprecated `runtime` module - #454
- * `kube`: BREAKING: `ListParams` bookmarks default enabled - #226 via #445
+ * see https://github.com/clux/kube-rs/compare/0.57.0...master
+ * `kube`: `BREAKING`: subresource marker traits renamed congation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - #536 via #560
+ * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - #559
+
+0.57.0 / 2021-06-16
+===================
+ * `kube`: custom clients now respect default namespaces - fixes [#534](https://github.com/clux/kube-rs/issues/534) via [#544](https://github.com/clux/kube-rs/issues/544)
+  - BREAKING: custom clients via `Client::new` must pass `config.default_namespace` as 2nd arg
+ * `kube`: Added `CustomResourceExt` trait for `kube-derive` - [#497](https://github.com/clux/kube-rs/issues/497) via [#545](https://github.com/clux/kube-rs/issues/545)
+  - BREAKING: `kube-derive` users must import `kube::CustomResourceExt` (or `kube::core::crd::v1beta1::CustomResourceExt` if using legacy `#[kube(apiextensions = "v1beta1")]`) to use generated methods `Foo::crd` or `Foo::api_resource`
+  - BREAKING: `k8s_openapi` bumped to [0.12.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.12.0) - [#531](https://github.com/clux/kube-rs/pull/531)
+    * Generated structs simplified + `Resource` trait expanded
+    * Adds support for kubernetes `v1_21`
+    * Contains bugfix for [kubernetes#102159](https://github.com/kubernetes/kubernetes/pull/102159)
+ * `kube` resource plurals is no longer inferred from `k8s-openapi` structs - [#284](https://github.com/clux/kube-rs/issues/284) via [#556](https://github.com/clux/kube-rs/issues/556)
+  - BREAKING: `kube::Resource` trait now requires a `plural` implementation
+
+0.56.0 / 2021-06-05
+===================
+ * `kube`: added `Api::default_namespaced` - [#209](https://github.com/clux/kube-rs/issues/209) via [#534](https://github.com/clux/kube-rs/issues/534)
+ * `kube`: added `config` feature - [#533](https://github.com/clux/kube-rs/issues/533) via [#535](https://github.com/clux/kube-rs/issues/535)
+ * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module [#538](https://github.com/clux/kube-rs/issues/538)
+  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds [#538](https://github.com/clux/kube-rs/issues/538)
+  - `discovery`: moved `ApiResource` and `ApiCapabilities` (result of discovery) to `kube_core::discovery`
+  - BREAKING: removed internal `ApiResource::from_apiresource`
+
+ * `kube::Client` is now configurable with layers using `tower-http` [#539](https://github.com/clux/kube-rs/issues/539) via [#540](https://github.com/clux/kube-rs/issues/540)
+  - three new examples added: [`custom_client`](./examples/custom_client.rs), [`custom_client_tls`](./examples/custom_client_tls.rs) and [`custom_client_trace`](./examples/custom_client_trace.rs)
+  - Big feature streamlining, big service and layer restructuring, dependency restructurings
+  - Changes can hit advanced users, but unlikely to hit base use cases with `Api` and `Client`.
+  - In depth changes broken down below:
+
+### TLS Enhancements
+
+- Add `kube::client::ConfigExt` extending `Config` for custom `Client`. This includes methods to configure TLS connection when building a custom client [#539](https://github.com/clux/kube-rs/issues/539)
+  - `native-tls`: `Config::native_tls_https_connector` and `Config::native_tls_connector`
+  - `rustls-tls`: `Config::rustls_https_connector` and `Config::rustls_client_config`
+- Remove the requirement of having `native-tls` or `rustls-tls` enabled when `client` is enabled. Allow one, both or none.
+  - When both, the default Service will use `native-tls` because of [#153](https://github.com/clux/kube-rs/issues/153). `rustls` can be still used with a custom client. Users will have an option to configure TLS at runtime.
+  - When none, HTTP connector is used.
+- Remove TLS features from `kube-runtime`
+  - **BREAKING**: Features must be removed if specified
+- Remove `client` feature from `native-tls` and `rust-tls` features
+  - `config` + `native-tls`/`rustls-tls` can be used independently, e.g., to create a simple HTTP client
+  - **BREAKING**: `client` feature must be added if `default-features = false`
+
+### Layers
+- `ConfigExt::base_uri_layer` (`BaseUriLayer`) to set cluster URL (#539)
+- `ConfigExt::auth_layer` that returns optional layer to manage `Authorization` header (#539)
+- `gzip`: Replaced custom decompression module with [`DecompressionLayer`](https://docs.rs/tower-http/0.1.0/tower_http/decompression/index.html) from `tower-http` (#539)
+- Replaced custom `LogRequest` with [`TraceLayer`](https://docs.rs/tower-http/0.1.0/tower_http/trace/index.html) from `tower-http` (#539)
+  - Request body is no longer shown
+- Basic and Bearer authentication using `AddAuthorizationLayer` (borrowing from https://github.com/tower-rs/tower-http/pull/95 until released)
+- **BREAKING**: Remove `headers` from `Config`. Injecting arbitrary headers is now done with a layer on a custom client.
+
+### Dependency Changes
+
+- Remove `static_assertions` since it's no longer used
+- Replace `tokio_rustls` with `rustls` and `webpki` since we're not using `tokio_rustls` directly
+- Replace uses of `rustls::internal::pemfile` with `rustls-pemfile`
+- Remove `url` and always use `http::Uri`
+  - **BREAKING**: `Config::cluster_url` is now `http::Uri`
+  - **BREAKING**: `Error::InternalUrlError(url::ParseError)` and `Error::MalformedUrl(url::ParseError)` replaced by `Error::InvalidUri(http::uri::InvalidUri)`
+
+
+0.55.0 / 2021-05-21
+===================
+ * `kube`: `client` feature added (default-enabled) - [#528](https://github.com/clux/kube-rs/issues/528)
+ * `kube`: `PatchParams` force now only works with `Patch::Apply` [#528](https://github.com/clux/kube-rs/issues/528)
+ * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/clux/kube-rs/issues/495) + [#482](https://github.com/clux/kube-rs/issues/482)
+ * `kube`: `api` BREAKING: `DynamicObject` + `Object` now takes an `ApiResource` rather than a `GroupVersionKind`
+ * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
+ * `kube`: `client` BREAKING: `kube::client::Status` moved to `kube::core::Status` (accidental, re-adding in 0.56)
+ * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/clux/kube-rs/issues/516) via [#517](https://github.com/clux/kube-rs/issues/517) + [#519](https://github.com/clux/kube-rs/issues/519) + [#522](https://github.com/clux/kube-rs/issues/522) + [#528](https://github.com/clux/kube-rs/issues/528) + [#530](https://github.com/clux/kube-rs/issues/530)
+ * `kube`: `kube::Service` removed to allow `kube::Client` to take an abritrary `Service<http::Request<hyper::Body>>` - [#532](https://github.com/clux/kube-rs/issues/532)
+
+0.54.0 / 2021-05-19
+===================
+ * yanked 30 minutes after release due to [#525](https://github.com/clux/kube-rs/issues/525)
+ * changes lifted to 0.55.0
+
+0.53.0 / 2021-05-15
+===================
+ * `kube`: `admission` controller module added under feature - [#477](https://github.com/clux/kube-rs/issues/477) via [#484](https://github.com/clux/kube-rs/issues/484) + fixes in [#488](https://github.com/clux/kube-rs/issues/488) [#498](https://github.com/clux/kube-rs/issues/498) [#499](https://github.com/clux/kube-rs/issues/499) + [#507](https://github.com/clux/kube-rs/issues/507) + [#509](https://github.com/clux/kube-rs/issues/509)
+ * `kube`: `config` parsing of pem blobs now resilient against missing newlines - [#504](https://github.com/clux/kube-rs/issues/504) via [#505](https://github.com/clux/kube-rs/issues/505)
+ * `kube`: `discovery` module added to simplify dynamic api usage - [#491](https://github.com/clux/kube-rs/issues/491)
+ * `kube`: `api` BREAKING: `DynamicObject::namespace` renamed to `::within` - [#502](https://github.com/clux/kube-rs/issues/502)
+ * `kube`: `api` BREAKING: added `ResourceExt` trait moving the getters from `Resource` trait - [#486](https://github.com/clux/kube-rs/issues/486)
+ * `kube`: `api` added a generic interface for subresources via `Request` - [#487](https://github.com/clux/kube-rs/issues/487)
+ * `kube`: `api` fix bug in `PatchParams::dry_run` not being serialized correctly - [#511](https://github.com/clux/kube-rs/issues/511)
+
+### 0.53.0 Migration Guide
+The most likely issue you'll run into is from `kube` when using `Resource` trait which has been split:
+
+```diff
++use kube::api::ResouceExt;
+-    let name = Resource::name(&foo);
+-    let ns = Resource::namespace(&foo).expect("foo is namespaced");
++    let name = ResourceExt::name(&foo);
++    let ns = ResourceExt::namespace(&foo).expect("foo is namespaced");
+```
+
+0.52.0 / 2021-03-31
+===================
+ * `kube-derive`: allow overriding `#[kube(plural)]` and `#[kube(singular)]` - [#458](https://github.com/clux/kube-rs/issues/458) via [#463](https://github.com/clux/kube-rs/issues/463)
+ * `kube`: added tracing instrumentation for io operations in `kube::Api` - [#455](https://github.com/clux/kube-rs/issues/455)
+ * `kube`: `DeleteParams`'s `Preconditions` is now public - [#459](https://github.com/clux/kube-rs/issues/459) via [#460](https://github.com/clux/kube-rs/issues/460)
+ * `kube`: remove dependency on duplicate `derive_accept_key` for `ws` - [#452](https://github.com/clux/kube-rs/issues/452)
+ * `kube`: Properly verify websocket keys in `ws` handshake - [#447](https://github.com/clux/kube-rs/issues/447)
+ * `kube`: BREAKING: removed optional, and deprecated `runtime` module - [#454](https://github.com/clux/kube-rs/issues/454)
+ * `kube`: BREAKING: `ListParams` bookmarks default enabled - [#226](https://github.com/clux/kube-rs/issues/226) via [#445](https://github.com/clux/kube-rs/issues/445)
    - renames member `::allow_bookmarks` to `::bookmarks`
-   - `::default()` sets `bookmark` to `true` to avoid bad bad defaults #219
+   - `::default()` sets `bookmark` to `true` to avoid bad bad defaults [#219](https://github.com/clux/kube-rs/issues/219)
    - method `::allow_bookmarks()` replaced by `::disable_bookmarks()`
- * `kube`: BREAKING: Mostly internal changes to the `Meta` trait to support dynamic types #385
-   - BREAKING: `Meta` trait now takes an optional associated type for runtime type info: `Family`
-     * THIS SHOULD NOT AFFECT YOU UNLESS YOU ARE IMPLEMENTING / CUSTOMISING THE TRAIT DIRECTLY
-   - New dynamic helper object `GroupVersionKind` introduced
-   - `DynamicObject` added to represent a dynamic kubernetes object
+ * `kube`: `DynamicObject` and `GroupVersionKind` introduced for full dynamic object support
+ * `kube-runtime`: watchers/reflectors/controllers can be used with dynamic objects from api discovery
+ * `kube`: Pluralisation now only happens for `k8s_openapi` objects by default [#481](https://github.com/clux/kube-rs/issues/481)
+   - inflector dependency removed [#471](https://github.com/clux/kube-rs/issues/471)
+   - added internal pluralisation helper for `k8s_openapi` objects
+ * `kube`: BREAKING: Restructuring of low level `Resource` request builder [#474](https://github.com/clux/kube-rs/issues/474)
+   - `Resource` renamed to `Request` and requires only a `path_url` to construct
+ * `kube`: BREAKING: Mostly internal `Meta` trait revamped to support dynamic types
+   - `Meta` renamed to `kube::Resource` to mimic `k8s_openapi::Resource` [#478](https://github.com/clux/kube-rs/issues/478)
+   - The trait now takes an optional associated type for runtime type info: `DynamicType` [#385](https://github.com/clux/kube-rs/issues/385)
    - `Api::all_with` + `Api::namespaced_with` added for querying with dynamic families
-   - see `dynamic_watcher` example
+   - see `dynamic_watcher` + `dynamic_api` for example usage
  * `kube-runtime`: BREAKING: lower level interface changes as a result of `kube::api::Meta` trait:
   - THESE SHOULD NOT AFFECT YOU UNLESS YOU ARE IMPLEMENTING / CUSTOMISING LOW LEVEL TYPES DIRECTLY
-  - `ObjectRef` now generic over `K: Meta` rather than `RuntimeResource`
-  - `reflector::{Writer, Store}` takes a `K: Meta` rather than a `K: k8s_openapi::Resource`
-  - Possible to use `watcher` or `Controller`'s on `GroupVersionKind` types now.
+  - `ObjectRef` now generic over `kube::Resource` rather than `RuntimeResource`
+  - `reflector::{Writer, Store}` takes a `kube::Resource` rather than a `k8s_openapi::Resource`
+ * `kube-derive`: BREAKING: Generated type no longer generates `k8s-openapi` traits
+  - This allows correct pluralisation via `#[kube(plural = "mycustomplurals")]` [#467](https://github.com/clux/kube-rs/issues/467) via [#481](https://github.com/clux/kube-rs/issues/481)
 
+### 0.52.0 Migration Guide
+While we had a few breaking changes. Most are to low level internal interfaces and should not change much, but some changes you might need to make:
+
+#### kube
+- if using the old, low-level `kube::api::Resource`, please consider the easier `kube::Api`, or look at tests in `request.rs` or `typed.rs` if you need the low level interface
+- search replace `kube::api::Meta` with `kube::Resource` if used - trait was renamed
+- if implementing the trait, add `type DynamicType = ();` to the impl
+- remove calls to `ListParams::allow_bookmarks` (allow default)
+- handle `WatchEvent::Bookmark` or set `ListParams::disable_bookmarks()`
+- look at examples if replacing the long deprecated legacy runtime
+
+#### kube-derive
+The following constants from `k8s_openapi::Resource` no longer exist. Please `use kube::Resource` and:
+- replace `Foo::KIND` with `Foo::kind(&())`
+- replace `Foo::GROUP` with `Foo::group(&())`
+- replace `Foo::VERSION` with `Foo::version(&())`
+- replace `Foo::API_VERSION` with `Foo::api_version(&())`
 
 0.51.0 / 2021-02-28
 ===================

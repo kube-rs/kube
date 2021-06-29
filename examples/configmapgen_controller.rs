@@ -6,7 +6,7 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
 };
 use kube::{
-    api::{ListParams, Meta, Patch, PatchParams},
+    api::{ListParams, Patch, PatchParams, Resource},
     Api, Client, CustomResource,
 };
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
@@ -36,7 +36,9 @@ struct ConfigMapGeneratorSpec {
     content: String,
 }
 
-fn object_to_owner_reference<K: Meta<DynamicType = ()>>(meta: ObjectMeta) -> Result<OwnerReference, Error> {
+fn object_to_owner_reference<K: Resource<DynamicType = ()>>(
+    meta: ObjectMeta,
+) -> Result<OwnerReference, Error> {
     Ok(OwnerReference {
         api_version: K::api_version(&()).to_string(),
         kind: K::kind(&()).to_string(),
@@ -59,13 +61,13 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     let cm = ConfigMap {
         metadata: ObjectMeta {
             name: generator.metadata.name.clone(),
-            owner_references: Some(vec![OwnerReference {
+            owner_references: vec![OwnerReference {
                 controller: Some(true),
                 ..object_to_owner_reference::<ConfigMapGenerator>(generator.metadata.clone())?
-            }]),
+            }],
             ..ObjectMeta::default()
         },
-        data: Some(contents),
+        data: contents,
         ..Default::default()
     };
     let cm_api = Api::<ConfigMap>::namespaced(
