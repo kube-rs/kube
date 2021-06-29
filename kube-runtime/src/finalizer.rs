@@ -1,10 +1,9 @@
 use crate::controller::ReconcilerAction;
 use futures::{TryFuture, TryFutureExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
-use k8s_openapi::Metadata;
 use kube::{
-    api::{ObjectMeta, Patch, PatchParams},
-    Api,
+    api::{Patch, PatchParams},
+    Api, Resource,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -33,16 +32,16 @@ struct FinalizerState {
 }
 
 impl FinalizerState {
-    fn for_object<K: Metadata<Ty = ObjectMeta>>(obj: &K, finalizer_name: &str) -> Self {
+    fn for_object<K: Resource>(obj: &K, finalizer_name: &str) -> Self {
         Self {
             finalizer_index: obj
-                .metadata()
+                .meta()
                 .finalizers
                 .iter()
                 .enumerate()
                 .find(|(_, fin)| *fin == finalizer_name)
                 .map(|(i, _)| i),
-            is_deleting: obj.metadata().deletion_timestamp.is_some(),
+            is_deleting: obj.meta().deletion_timestamp.is_some(),
         }
     }
 }
@@ -103,7 +102,7 @@ pub async fn finalizer<K, ReconcileFut>(
     reconcile: impl FnOnce(Event<K>) -> ReconcileFut,
 ) -> Result<ReconcilerAction, Error<ReconcileFut::Error>>
 where
-    K: Metadata<Ty = ObjectMeta> + Clone + DeserializeOwned + Serialize + Debug,
+    K: Resource + Clone + DeserializeOwned + Serialize + Debug,
     ReconcileFut: TryFuture<Ok = ReconcilerAction>,
     ReconcileFut::Error: StdError + 'static,
 {
@@ -120,7 +119,7 @@ where
             is_deleting: true,
         } => {
             // Cleanup reconciliation must succeed before it's safe to remove the finalizer
-            let name = obj.metadata().name.clone().context(UnnamedObject)?;
+            let name = obj.meta().name.clone().context(UnnamedObject)?;
             let action = reconcile(Event::Cleanup(obj))
                 .into_future()
                 .await
@@ -151,7 +150,7 @@ where
             is_deleting: false,
         } => {
             // Finalizer must be added before it's safe to run an `Apply` reconciliation
-            let patch = json_patch::Patch(if obj.metadata().finalizers.is_empty() {
+            let patch = json_patch::Patch(if obj.meta().finalizers.is_empty() {
                 vec![
                     PatchOperation::Test(TestOperation {
                         path: "/metadata/finalizers".to_string(),
@@ -169,7 +168,7 @@ where
                 })]
             });
             api.patch::<K>(
-                obj.metadata().name.as_deref().context(UnnamedObject)?,
+                obj.meta().name.as_deref().context(UnnamedObject)?,
                 &PatchParams::default(),
                 &Patch::Json(patch),
             )
