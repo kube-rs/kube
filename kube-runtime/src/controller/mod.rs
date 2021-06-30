@@ -256,13 +256,16 @@ where
             Runner::new(scheduler(s), move |request| {
                 let request = request.clone();
                 match store.get(&request.obj_ref) {
-                    Some(obj) => reconciler(obj, context.clone())
+                    Some(obj) => {
+                        let reconciler_span = info_span!("reconciling object", "object.ref" = %request.obj_ref, object.reason = %request.reason);
+                        reconciler_span.in_scope(|| reconciler(obj, context.clone()))
                         .into_future()
-                        .instrument(info_span!("reconciling object", "object.ref" = %request.obj_ref, object.reason = %request.reason))
+                        .instrument(reconciler_span)
                         // Reconciler errors are OK from the applier's PoV, we need to apply the error policy
                         // to them separately
                         .map(|res| Ok((request.obj_ref, res)))
-                        .left_future(),
+                        .left_future()
+                    },
                     None => future::err(
                         ObjectNotFound {
                             obj_ref: request.obj_ref.erase(),
@@ -557,7 +560,10 @@ where
     {
         applier(
             move |obj, ctx| {
-                CancelableJoinHandle::spawn(reconciler(obj, ctx).into_future(), &Handle::current())
+                CancelableJoinHandle::spawn(
+                    reconciler(obj, ctx).into_future().in_current_span(),
+                    &Handle::current(),
+                )
             },
             error_policy,
             context,
