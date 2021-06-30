@@ -1,6 +1,6 @@
 #[macro_use] extern crate log;
 use color_eyre::{Report, Result};
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use k8s_openapi::{
     api::core::v1::ConfigMap,
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
@@ -13,7 +13,7 @@ use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, io::BufRead};
 use tokio::time::Duration;
 
 #[derive(Debug, Snafu)]
@@ -54,6 +54,10 @@ fn object_to_owner_reference<K: Resource<DynamicType = ()>>(
 
 /// Controller triggers this whenever our main object or our children changed
 async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<ReconcilerAction, Error> {
+    log::info!("working hard");
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    log::info!("hard work is done!");
+
     let client = ctx.get_ref().client.clone();
 
     let mut contents = BTreeMap::new();
@@ -112,16 +116,45 @@ async fn main() -> Result<()> {
     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
     let cms = Api::<ConfigMap>::all(client.clone());
 
-    Controller::new(cmgs, ListParams::default())
-        .owns(cms, ListParams::default())
-        .run(reconcile, error_policy, Context::new(Data { client }))
-        .for_each(|res| async move {
-            match res {
-                Ok(o) => info!("reconciled {:?}", o),
-                Err(e) => warn!("reconcile failed: {}", Report::from(e)),
-            }
-        })
-        .await;
+    log::info!("starting configmapgen-controller");
+    log::info!("press <enter> to force a reconciliation of all objects");
+    log::info!("press <ctrl>+c to shut down gracefully");
 
+    let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
+    // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
+    // and its worker prevents the Tokio runtime from shutting down.
+    std::thread::spawn(move || {
+        for _ in std::io::BufReader::new(std::io::stdin()).lines() {
+            let _ = reload_tx.try_send(());
+        }
+    });
+
+    let (graceful_shutdown_tx, graceful_shutdown_rx) = futures::channel::oneshot::channel();
+    let forceful_shutdown = async {
+        tokio::signal::ctrl_c().await.unwrap();
+        graceful_shutdown_tx.send(()).unwrap();
+        log::info!("starting graceful shutdown, press <ctrl>+c again to shut down forcefully");
+        tokio::signal::ctrl_c().await.unwrap();
+        log::info!("forceful shutdown requested");
+        std::process::exit(0);
+    };
+
+    futures::future::select(
+        Controller::new(cmgs, ListParams::default())
+            .owns(cms, ListParams::default())
+            .reconcile_all_on(reload_rx.map(|_| ()))
+            .graceful_shutdown_on(graceful_shutdown_rx.map(|_| ()))
+            .run(reconcile, error_policy, Context::new(Data { client }))
+            .for_each(|res| async move {
+                match res {
+                    Ok(o) => info!("reconciled {:?}", o),
+                    Err(e) => warn!("reconcile failed: {}", Report::from(e)),
+                }
+            })
+            .boxed(),
+        forceful_shutdown.boxed(),
+    )
+    .await;
+    log::info!("controller terminated");
     Ok(())
 }

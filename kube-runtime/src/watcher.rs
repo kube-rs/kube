@@ -133,7 +133,7 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
             resource_version,
             mut stream,
         } => match stream.next().await {
-            Some(Ok(WatchEvent::Added(obj))) | Some(Ok(WatchEvent::Modified(obj))) => {
+            Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_version().unwrap();
                 (Some(Ok(Event::Applied(obj))), State::Watching {
                     resource_version,

@@ -8,13 +8,17 @@ use crate::{
         ObjectRef,
     },
     scheduler::{self, scheduler, ScheduleRequest},
-    utils::{try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle},
+    utils::{
+        try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle,
+        KubeRuntimeStreamExt,
+    },
     watcher::{self, watcher},
 };
 use derivative::Derivative;
 use futures::{
-    channel, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream,
-    TryStreamExt,
+    channel,
+    future::{self, BoxFuture},
+    stream, Future, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
 use kube::api::{Api, DynamicObject, ListParams, Resource};
 use serde::de::DeserializeOwned;
@@ -103,7 +107,7 @@ where
         let dt = owner_type.clone();
         meta.owner_references
             .into_iter()
-            .flat_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, dt.clone()))
+            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, dt.clone()))
     })
 }
 
@@ -162,6 +166,7 @@ where
     QueueStream: TryStream<Ok = ObjectRef<K>>,
     QueueStream::Error: std::error::Error + 'static,
 {
+    let (scheduler_shutdown_tx, scheduler_shutdown_rx) = channel::oneshot::channel();
     let err_context = context.clone();
     let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ObjectRef<K>>>(100);
     // Create a stream of ObjectRefs that need to be reconciled
@@ -169,12 +174,22 @@ where
         // input: stream combining scheduled tasks and user specified inputs event
         Box::pin(stream::select(
             // 1. inputs from users queue stream
-            queue.context(QueueError).map_ok(|obj_ref| ScheduleRequest {
-                message: obj_ref,
-                run_at: Instant::now() + Duration::from_millis(1),
-            }),
+            queue
+                .context(QueueError)
+                .map_ok(|obj_ref| ScheduleRequest {
+                    message: obj_ref,
+                    run_at: Instant::now() + Duration::from_millis(1),
+                })
+                .on_complete(async move {
+                    // On error: scheduler has already been shut down and there is nothing for us to do
+                    let _ = scheduler_shutdown_tx.send(());
+                    tracing::debug!("applier queue terminated, starting graceful shutdown")
+                }),
             // 2. requests sent to scheduler_tx
-            scheduler_rx.map(Ok),
+            scheduler_rx
+                .map(Ok)
+                .take_until(scheduler_shutdown_rx)
+                .on_complete(async { tracing::debug!("applier scheduler consumer terminated") }),
         )),
         // all the Oks from the select gets passed through the scheduler stream, and are then executed
         move |s| {
@@ -198,8 +213,10 @@ where
             })
             .context(SchedulerDequeueFailed)
             .map(|res| res.and_then(|x| x))
+            .on_complete(async { tracing::debug!("applier runner terminated") })
         },
     )
+    .on_complete(async { tracing::debug!("applier runner-merge terminated") })
     // finally, for each completed reconcile call:
     .and_then(move |(obj_ref, reconciler_result)| {
         let ReconcilerAction { requeue_after } = match &reconciler_result {
@@ -223,6 +240,7 @@ where
                 .context(ReconcilerFailed)
         }
     })
+    .on_complete(async { tracing::debug!("applier terminated") })
 }
 
 /// Controller
@@ -297,8 +315,8 @@ where
     K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
-    // TODO: get an arbitrary std::error::Error in here?
     trigger_selector: stream::SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
+    shutdown_selector: Vec<BoxFuture<'static, ()>>,
     dyntype: K::DynamicType,
     reader: Store<K>,
 }
@@ -342,6 +360,10 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
+            shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
             dyntype,
             reader,
         }
@@ -400,19 +422,25 @@ where
     /// To reconcile all objects when a new line is entered:
     ///
     /// ```rust
-    /// # async fn foo() {
+    /// # async {
     /// use futures::stream::StreamExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{api::ListParams, Api, Client, ResourceExt};
     /// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
-    /// use std::convert::Infallible;
-    /// use tokio::io::{stdin, AsyncBufReadExt, BufReader};
-    /// use tokio_stream::wrappers::LinesStream;
+    /// use std::{convert::Infallible, io::BufRead};
+    /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
+    /// // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
+    /// // and its worker prevents the Tokio runtime from shutting down.
+    /// std::thread::spawn(move || {
+    ///     for _ in std::io::BufReader::new(std::io::stdin()).lines() {
+    ///         let _ = reload_tx.try_send(());
+    ///     }
+    /// });
     /// Controller::new(
     ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
     ///     ListParams::default(),
     /// )
-    /// .reconcile_all_on(LinesStream::new(BufReader::new(stdin()).lines()).map(|_| ()))
+    /// .reconcile_all_on(reload_rx.map(|_| ()))
     /// .run(
     ///     |o, _| async move {
     ///         println!("Reconciling {}", o.name());
@@ -421,8 +449,12 @@ where
     ///     |err: &Infallible, _| Err(err).unwrap(),
     ///     Context::new(()),
     /// );
-    /// # }
+    /// # };
     /// ```
+    ///
+    /// This can be called multiple times, in which case they are additive; reconciles are scheduled whenever *any* [`Stream`] emits a new item.
+    ///
+    /// If a [`Stream`] is terminated (by emitting [`None`]) then the [`Controller`] keeps running, but the [`Stream`] stops being polled.
     pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
         let store = self.store();
         let dyntype = self.dyntype.clone();
@@ -439,6 +471,45 @@ where
                 })
                 .boxed(),
         );
+        self
+    }
+
+    /// Start a graceful shutdown when `trigger` resolves. Once a graceful shutdown has been initiated:
+    ///
+    /// - No new reconciliations are started from the scheduler
+    /// - The underlying Kubernetes watch is terminated
+    /// - All running reconciliations are allowed to finish
+    /// - [`Controller::run`]'s [`Stream`] terminates once all running reconciliations are done.
+    ///
+    /// For example, to stop the reconciler whenever the user presses Ctrl+C:
+    ///
+    /// ```rust
+    /// # async {
+    /// use futures::future::FutureExt;
+    /// use k8s_openapi::api::core::v1::ConfigMap;
+    /// use kube::{api::ListParams, Api, Client, ResourceExt};
+    /// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+    /// use std::convert::Infallible;
+    /// Controller::new(
+    ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
+    ///     ListParams::default(),
+    /// )
+    /// .graceful_shutdown_on(tokio::signal::ctrl_c().map(|_| ()))
+    /// .run(
+    ///     |o, _| async move {
+    ///         println!("Reconciling {}", o.name());
+    ///         Ok(ReconcilerAction { requeue_after: None })
+    ///     },
+    ///     |err: &Infallible, _| Err(err).unwrap(),
+    ///     Context::new(()),
+    /// );
+    /// # };
+    /// ```
+    ///
+    /// This can be called multiple times, in which case they are additive; the [`Controller`] starts to terminate
+    /// as soon as *any* [`Future`] resolves.
+    pub fn graceful_shutdown_on(mut self, trigger: impl Future<Output = ()> + Send + Sync + 'static) -> Self {
+        self.shutdown_selector.push(trigger.boxed());
         self
     }
 
@@ -465,7 +536,8 @@ where
             error_policy,
             context,
             self.reader,
-            self.trigger_selector,
+            self.trigger_selector
+                .take_until(future::select_all(self.shutdown_selector)),
         )
     }
 }
