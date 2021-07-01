@@ -316,7 +316,14 @@ where
 {
     // NB: Need to Unpin for stream::select_all
     trigger_selector: stream::SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
-    shutdown_selector: Vec<BoxFuture<'static, ()>>,
+    /// [`run`] starts a graceful shutdown when any of these [`Future`]s complete,
+    /// refusing to start any new reconciliations but letting any existing ones finish.
+    graceful_shutdown_selector: Vec<BoxFuture<'static, ()>>,
+    /// [`run`] terminates immediately when any of these [`Future`]s complete,
+    /// requesting that all running reconciliations be aborted.
+    /// However, note that they *will* keep running until their next yield point (`.await`),
+    /// blocking [`tokio::runtime::Runtime`] destruction (unless you follow up by calling [`std::process:exit`] after `run`).
+    forceful_shutdown_selector: Vec<BoxFuture<'static, ()>>,
     dyntype: K::DynamicType,
     reader: Store<K>,
 }
@@ -360,7 +367,11 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
-            shutdown_selector: vec![
+            graceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            forceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
             ],
@@ -509,7 +520,62 @@ where
     /// This can be called multiple times, in which case they are additive; the [`Controller`] starts to terminate
     /// as soon as *any* [`Future`] resolves.
     pub fn graceful_shutdown_on(mut self, trigger: impl Future<Output = ()> + Send + Sync + 'static) -> Self {
-        self.shutdown_selector.push(trigger.boxed());
+        self.graceful_shutdown_selector.push(trigger.boxed());
+        self
+    }
+
+    /// Initiate graceful shutdown on Ctrl+C or SIGTERM (on Unix), waiting for all reconcilers to finish.
+    ///
+    /// Once a graceful shutdown has been initiated, Ctrl+C (or SIGTERM) can be sent again
+    /// to request a forceful shutdown (requesting that all reconcilers abort on the next yield point).
+    ///
+    /// NOTE: On Unix this leaves the default handlers for SIGINT and SIGTERM disabled after the [`Controller`] has
+    /// terminated. If you run this in a process containing more tasks than just the [`Controller`], ensure that
+    /// all other tasks either terminate when the [`Controller`] does, that they have their own signal handlers,
+    /// or use [`Controller::graceful_shutdown_on`] to manage your own shutdown strategy.
+    ///
+    /// NOTE: If developing a Windows service then you need to listen to its lifecycle events instead, and hook that into
+    /// [`Controller::graceful_shutdown_on`].
+    ///
+    /// NOTE: [`Controller::run`] terminates as soon as a forceful shutdown is requested, but leaves the reconcilers running
+    /// in the background while they terminate. This will block [`tokio::runtime::Runtime`] termination until they actually terminate,
+    /// unless you run [`std::process::exit`] afterwards.
+    pub fn shutdown_on_signal(mut self) -> Self {
+        async fn shutdown_signal() {
+            futures::future::select(
+                tokio::signal::ctrl_c().map(|_| ()).boxed(),
+                #[cfg(unix)]
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                    .unwrap()
+                    .recv()
+                    .map(|_| ())
+                    .boxed(),
+                // Assume that ctrl_c is enough on non-Unix platforms (such as Windows)
+                #[cfg(not(unix))]
+                futures::future::pending(),
+            )
+            .await;
+        }
+
+        let (graceful_tx, graceful_rx) = channel::oneshot::channel();
+        self.graceful_shutdown_selector
+            .push(graceful_rx.map(|_| ()).boxed());
+        self.forceful_shutdown_selector.push(
+            async {
+                tracing::info!("press ctrl+c to shut down gracefully");
+                shutdown_signal().await;
+                if let Ok(()) = graceful_tx.send(()) {
+                    tracing::info!("graceful shutdown requested, press ctrl+c again to force shutdown");
+                } else {
+                    tracing::info!(
+                        "graceful shutdown already requested, press ctrl+c again to force shutdown"
+                    );
+                }
+                shutdown_signal().await;
+                tracing::info!("forced shutdown requested");
+            }
+            .boxed(),
+        );
         self
     }
 
@@ -537,8 +603,9 @@ where
             context,
             self.reader,
             self.trigger_selector
-                .take_until(future::select_all(self.shutdown_selector)),
+                .take_until(future::select_all(self.graceful_shutdown_selector)),
         )
+        .take_until(futures::future::select_all(self.forceful_shutdown_selector))
     }
 }
 

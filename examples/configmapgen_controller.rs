@@ -1,6 +1,6 @@
 #[macro_use] extern crate log;
 use color_eyre::{Report, Result};
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use k8s_openapi::{
     api::core::v1::ConfigMap,
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
@@ -118,7 +118,6 @@ async fn main() -> Result<()> {
 
     log::info!("starting configmapgen-controller");
     log::info!("press <enter> to force a reconciliation of all objects");
-    log::info!("press <ctrl>+c to shut down gracefully");
 
     let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
     // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
@@ -129,32 +128,18 @@ async fn main() -> Result<()> {
         }
     });
 
-    let (graceful_shutdown_tx, graceful_shutdown_rx) = futures::channel::oneshot::channel();
-    let forceful_shutdown = async {
-        tokio::signal::ctrl_c().await.unwrap();
-        graceful_shutdown_tx.send(()).unwrap();
-        log::info!("starting graceful shutdown, press <ctrl>+c again to shut down forcefully");
-        tokio::signal::ctrl_c().await.unwrap();
-        log::info!("forceful shutdown requested");
-        std::process::exit(0);
-    };
-
-    futures::future::select(
-        Controller::new(cmgs, ListParams::default())
-            .owns(cms, ListParams::default())
-            .reconcile_all_on(reload_rx.map(|_| ()))
-            .graceful_shutdown_on(graceful_shutdown_rx.map(|_| ()))
-            .run(reconcile, error_policy, Context::new(Data { client }))
-            .for_each(|res| async move {
-                match res {
-                    Ok(o) => info!("reconciled {:?}", o),
-                    Err(e) => warn!("reconcile failed: {}", Report::from(e)),
-                }
-            })
-            .boxed(),
-        forceful_shutdown.boxed(),
-    )
-    .await;
+    Controller::new(cmgs, ListParams::default())
+        .owns(cms, ListParams::default())
+        .reconcile_all_on(reload_rx.map(|_| ()))
+        .shutdown_on_signal()
+        .run(reconcile, error_policy, Context::new(Data { client }))
+        .for_each(|res| async move {
+            match res {
+                Ok(o) => info!("reconciled {:?}", o),
+                Err(e) => warn!("reconcile failed: {}", Report::from(e)),
+            }
+        })
+        .await;
     log::info!("controller terminated");
     Ok(())
 }
