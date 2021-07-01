@@ -227,13 +227,13 @@ where
         async move {
             // Transmit the requeue request to the scheduler (picked up again at top)
             if let Some(delay) = requeue_after {
-                scheduler_tx
+                // Failure to schedule item = in graceful shutdown mode, ignore
+                let _ = scheduler_tx
                     .send(ScheduleRequest {
                         message: obj_ref.clone(),
                         run_at: Instant::now() + delay,
                     })
-                    .await
-                    .expect("Message could not be sent to scheduler_rx");
+                    .await;
             }
             reconciler_result
                 .map(|action| (obj_ref, action))
