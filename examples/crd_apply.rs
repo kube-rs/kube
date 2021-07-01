@@ -51,7 +51,6 @@ async fn main() -> anyhow::Result<()> {
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
 
     // 1. Apply from a full struct (e.g. equivalent to replace w/o resource_version)
-    #[allow(clippy::blacklisted_name)]
     let foo = Foo::new("baz", FooSpec {
         name: "baz".into(),
         info: Some("old baz".into()),
