@@ -474,6 +474,23 @@ where
     /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
     ///
     /// [`OwnerReference`]: https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.OwnerReference.html
+    pub fn owns<Child: Clone + Resource<DynamicType=()> + DeserializeOwned + Debug + Send + 'static>(
+        self,
+        api: Api<Child>,
+        lp: ListParams,
+    ) -> Self
+    {
+        self.owns_with(api, (), lp)
+    }
+
+    /// Indicate child objets `K` owns and be notified when they change
+    ///
+    /// This type `Child` must have [`OwnerReference`] set to point back to `K`.
+    /// You can customize the parameters used by the underlying `watcher` if
+    /// only a subset of `Child` entries are required.
+    /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
+    ///
+    /// [`OwnerReference`]: https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.OwnerReference.html
     pub fn owns_with<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
         mut self,
         api: Api<Child>,
@@ -492,40 +509,20 @@ where
         self
     }
 
-    /// Indicate child objets `K` owns and be notified when they change
-    ///
-    /// This type `Child` must have [`OwnerReference`] set to point back to `K`.
-    /// You can customize the parameters used by the underlying `watcher` if
-    /// only a subset of `Child` entries are required.
-    /// The `api` must have the correct scope (cluster/all namespaces, or namespaced)
-    ///
-    /// [`OwnerReference`]: https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.OwnerReference.html
-    pub fn owns<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
-        mut self,
-        api: Api<Child>,
-        lp: ListParams,
-    ) -> Self
-    where
-        Child::DynamicType: Debug + Eq + Hash + Clone,
-    {
-        self.owns_with(api, (), lp)
-    }
-
     /// Indicate an object to watch with a custom mapper
     ///
     /// This mapper should return something like `Option<ObjectRef<K>>`
     pub fn watches<
-        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource<DynamicType=()> + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
     >(
-        mut self,
+        self,
         api: Api<Other>,
         lp: ListParams,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
         I::IntoIter: Send,
-        Other::DynamicType: Clone,
     {
         self.watches_with(api, (), lp, mapper)
     }
