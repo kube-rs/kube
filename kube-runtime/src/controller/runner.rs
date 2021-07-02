@@ -93,7 +93,7 @@ mod tests {
     use crate::scheduler::{scheduler, ScheduleRequest};
     use futures::{
         channel::{mpsc, oneshot},
-        poll, SinkExt, TryStreamExt,
+        future, poll, SinkExt, TryStreamExt,
     };
     use std::{cell::RefCell, time::Duration};
     use tokio::{
@@ -135,8 +135,15 @@ mod tests {
             })
             .await
             .unwrap();
-        drop(sched_tx);
-        runner.await.unwrap();
+        let ((), run) = future::join(
+            async {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                drop(sched_tx);
+            },
+            runner,
+        )
+        .await;
+        run.unwrap();
         // Validate that we actually ran both requests
         assert_eq!(count, 2);
     }

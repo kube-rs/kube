@@ -4,6 +4,9 @@ UNRELEASED
  * see https://github.com/clux/kube-rs/compare/0.57.0...master
  * `kube`: `BREAKING`: subresource marker traits renamed conjugation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - #536 via #560
  * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - #559
+ * `kube-runtime` added `Controller::graceful_shutdown_on` for shutting down the `Controller` while waiting for running reconciliations to finish
+  - BREAKING: `controller::applier` now starts a graceful shutdown when the `queue` terminates
+  - BREAKING: `scheduler` now shuts down immediately when `requests` terminates, rather than waiting for the pending reconciliations to drain
  * `kube-runtime` added tracking for reconciliation reason
   - BREAKING: `Controller::owns` and `Controller::watches` now take a `dyntype` argument. If the watched type is static at compile-time then you can simply pass `()`
   - BREAKING: `controller::trigger_*` now returns a `ReconcileRequest` rather than `ObjectRef`. The `ObjectRef` can be accessed via the `obj_ref` field
