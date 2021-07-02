@@ -37,7 +37,6 @@ pub struct FooStatus {
 
 fn main() {
     println!("Kind {}", FooCrd::kind(&()));
-    #[allow(clippy::blacklisted_name)]
     let mut foo = FooCrd::new("hi", MyFoo {
         name: "hi".into(),
         info: None,

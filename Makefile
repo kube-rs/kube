@@ -4,7 +4,7 @@ clippy:
 	#rustup component add clippy --toolchain nightly
 	touch kube/src/lib.rs
 	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls
-	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls --examples -- --allow clippy::or_fun_call --allow clippy::blacklisted_name
+	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls --examples
 	cd kube-derive && cargo +nightly clippy
 
 fmt:
