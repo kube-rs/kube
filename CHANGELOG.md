@@ -8,7 +8,7 @@ UNRELEASED
   - BREAKING: `controller::applier` now starts a graceful shutdown when the `queue` terminates
   - BREAKING: `scheduler` now shuts down immediately when `requests` terminates, rather than waiting for the pending reconciliations to drain
  * `kube-runtime` added tracking for reconciliation reason
-  - BREAKING: `Controller::owns` and `Controller::watches` now take a `dyntype` argument. If the watched type is static at compile-time then you can simply pass `()`
+  - Added: `Controller::owns_with` and `Controller::watches_with` to pass a `dyntype` argument for dynamic `Api`s.
   - BREAKING: `controller::trigger_*` now returns a `ReconcileRequest` rather than `ObjectRef`. The `ObjectRef` can be accessed via the `obj_ref` field
 
 0.57.0 / 2021-06-16
