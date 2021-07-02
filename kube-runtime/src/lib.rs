@@ -18,12 +18,14 @@
 #![allow(clippy::type_repetition_in_bounds)]
 
 pub mod controller;
+pub mod finalizer;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;
 pub mod watcher;
 
 pub use controller::{applier, Controller};
+pub use finalizer::finalizer;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use watcher::watcher;

@@ -181,3 +181,7 @@ required-features = ["native-tls", "rustls-tls"]
 [[example]]
 name = "custom_client_trace"
 path = "custom_client_trace.rs"
+
+[[example]]
+name = "secret_syncer"
+path = "secret_syncer.rs"
