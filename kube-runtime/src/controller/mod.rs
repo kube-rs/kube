@@ -23,9 +23,15 @@ use futures::{
 use kube::api::{Api, DynamicObject, ListParams, Resource};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
-use std::{fmt::Debug, hash::Hash, sync::Arc, time::Duration};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+    sync::Arc,
+    time::Duration,
+};
 use stream::BoxStream;
 use tokio::{runtime::Handle, time::Instant};
+use tracing::{info_span, Instrument};
 
 mod future_hash_map;
 mod runner;
@@ -64,14 +70,15 @@ pub struct ReconcilerAction {
 pub fn trigger_with<T, K, I, S>(
     stream: S,
     mapper: impl Fn(T) -> I,
-) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
+) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
 where
     S: TryStream<Ok = T>,
-    I: IntoIterator<Item = ObjectRef<K>>,
+    I: IntoIterator,
+    I::Item: Into<ReconcileRequest<K>>,
     K: Resource,
 {
     stream
-        .map_ok(move |obj| stream::iter(mapper(obj).into_iter().map(Ok)))
+        .map_ok(move |obj| stream::iter(mapper(obj).into_iter().map(Into::into).map(Ok)))
         .try_flatten()
 }
 
@@ -79,14 +86,17 @@ where
 pub fn trigger_self<K, S>(
     stream: S,
     dyntype: K::DynamicType,
-) -> impl Stream<Item = Result<ObjectRef<K>, S::Error>>
+) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
 where
     S: TryStream<Ok = K>,
     K: Resource,
     K::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
-        Some(ObjectRef::from_obj_with(&obj, dyntype.clone()))
+        Some(ReconcileRequest {
+            obj_ref: ObjectRef::from_obj_with(&obj, dyntype.clone()),
+            reason: ReconcileReason::ObjectUpdated,
+        })
     })
 }
 
@@ -94,20 +104,29 @@ where
 pub fn trigger_owners<KOwner, S>(
     stream: S,
     owner_type: KOwner::DynamicType,
-) -> impl Stream<Item = Result<ObjectRef<KOwner>, S::Error>>
+    child_type: <S::Ok as Resource>::DynamicType,
+) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
 where
     S: TryStream,
     S::Ok: Resource,
+    <S::Ok as Resource>::DynamicType: Clone,
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
         let meta = obj.meta().clone();
         let ns = meta.namespace;
-        let dt = owner_type.clone();
+        let owner_type = owner_type.clone();
+        let child_ref = ObjectRef::from_obj_with(&obj, child_type.clone()).erase();
         meta.owner_references
             .into_iter()
-            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, dt.clone()))
+            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
+            .map(move |owner_ref| ReconcileRequest {
+                obj_ref: owner_ref,
+                reason: ReconcileReason::RelatedObjectUpdated {
+                    obj_ref: child_ref.clone(),
+                },
+            })
     })
 }
 
@@ -140,6 +159,61 @@ impl<T> Context<T> {
     }
 }
 
+/// A request to reconcile an object, annotated with why that request was made.
+///
+/// NOTE: The reason is ignored for comparison purposes. This means that, for example,
+/// an object can only occupy one scheduler slot, even if it has been scheduled for multiple reasons.
+/// In this case, only *the first* reason is stored.
+#[derive(Derivative)]
+#[derivative(
+    Debug(bound = "K::DynamicType: Debug"),
+    Clone(bound = "K::DynamicType: Clone"),
+    PartialEq(bound = "K::DynamicType: PartialEq"),
+    Eq(bound = "K::DynamicType: Eq"),
+    Hash(bound = "K::DynamicType: Hash")
+)]
+pub struct ReconcileRequest<K: Resource> {
+    pub obj_ref: ObjectRef<K>,
+    #[derivative(PartialEq = "ignore", Hash = "ignore")]
+    pub reason: ReconcileReason,
+}
+
+impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
+    fn from(obj_ref: ObjectRef<K>) -> Self {
+        ReconcileRequest {
+            obj_ref,
+            reason: ReconcileReason::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ReconcileReason {
+    Unknown,
+    ObjectUpdated,
+    RelatedObjectUpdated { obj_ref: ObjectRef<DynamicObject> },
+    ReconcilerRequestedRetry,
+    ErrorPolicyRequestedRetry,
+    BulkReconcile,
+    Custom { reason: String },
+}
+
+impl Display for ReconcileReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReconcileReason::Unknown => f.write_str("unknown"),
+            ReconcileReason::ObjectUpdated => f.write_str("object updated"),
+            ReconcileReason::RelatedObjectUpdated { obj_ref: object } => {
+                f.write_fmt(format_args!("related object updated: {}", object))
+            }
+            ReconcileReason::BulkReconcile => f.write_str("bulk reconcile requested"),
+            ReconcileReason::ReconcilerRequestedRetry => f.write_str("reconciler requested retry"),
+            ReconcileReason::ErrorPolicyRequestedRetry => f.write_str("error policy requested retry"),
+            ReconcileReason::Custom { reason } => f.write_str(reason),
+        }
+    }
+}
+
 /// Apply a reconciler to an input stream, with a given retry policy
 ///
 /// Takes a `store` parameter for the core objects, which should usually be updated by a [`reflector`].
@@ -163,28 +237,27 @@ where
     K::DynamicType: Debug + Eq + Hash + Clone + Unpin,
     ReconcilerFut: TryFuture<Ok = ReconcilerAction> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
-    QueueStream: TryStream<Ok = ObjectRef<K>>,
+    QueueStream: TryStream,
+    QueueStream::Ok: Into<ReconcileRequest<K>>,
     QueueStream::Error: std::error::Error + 'static,
 {
     let (scheduler_shutdown_tx, scheduler_shutdown_rx) = channel::oneshot::channel();
     let err_context = context.clone();
-    let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ObjectRef<K>>>(100);
+    let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(100);
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
         Box::pin(stream::select(
             // 1. inputs from users queue stream
-            queue
-                .context(QueueError)
-                .map_ok(|obj_ref| ScheduleRequest {
-                    message: obj_ref,
-                    run_at: Instant::now() + Duration::from_millis(1),
-                })
-                .on_complete(async move {
-                    // On error: scheduler has already been shut down and there is nothing for us to do
-                    let _ = scheduler_shutdown_tx.send(());
-                    tracing::debug!("applier queue terminated, starting graceful shutdown")
-                }),
+            queue.context(QueueError).map_ok(|request| ScheduleRequest {
+                message: request.into(),
+                run_at: Instant::now() + Duration::from_millis(1),
+            })
+            .on_complete(async move {
+                // On error: scheduler has already been shut down and there is nothing for us to do
+                let _ = scheduler_shutdown_tx.send(());
+                tracing::debug!("applier queue terminated, starting graceful shutdown")
+            }),
             // 2. requests sent to scheduler_tx
             scheduler_rx
                 .map(Ok)
@@ -193,18 +266,22 @@ where
         )),
         // all the Oks from the select gets passed through the scheduler stream, and are then executed
         move |s| {
-            Runner::new(scheduler(s), move |obj_ref| {
-                let obj_ref = obj_ref.clone();
-                match store.get(&obj_ref) {
-                    Some(obj) => reconciler(obj, context.clone())
+            Runner::new(scheduler(s), move |request| {
+                let request = request.clone();
+                match store.get(&request.obj_ref) {
+                    Some(obj) => {
+                        let reconciler_span = info_span!("reconciling object", "object.ref" = %request.obj_ref, object.reason = %request.reason);
+                        reconciler_span.in_scope(|| reconciler(obj, context.clone()))
                         .into_future()
+                        .instrument(reconciler_span)
                         // Reconciler errors are OK from the applier's PoV, we need to apply the error policy
                         // to them separately
-                        .map(|res| Ok((obj_ref, res)))
-                        .left_future(),
+                        .map(|res| Ok((request.obj_ref, res)))
+                        .left_future()
+                    },
                     None => future::err(
                         ObjectNotFound {
-                            obj_ref: obj_ref.erase(),
+                            obj_ref: request.obj_ref.erase(),
                         }
                         .build(),
                     )
@@ -219,9 +296,13 @@ where
     .on_complete(async { tracing::debug!("applier runner-merge terminated") })
     // finally, for each completed reconcile call:
     .and_then(move |(obj_ref, reconciler_result)| {
-        let ReconcilerAction { requeue_after } = match &reconciler_result {
-            Ok(action) => action.clone(),                       // do what user told us
-            Err(err) => error_policy(err, err_context.clone()), // reconciler fn call failed
+        let (ReconcilerAction { requeue_after }, requeue_reason) = match &reconciler_result {
+            Ok(action) =>
+                // do what user told us
+                (action.clone(), ReconcileReason::ReconcilerRequestedRetry),
+            Err(err) =>
+                // reconciler fn call failed
+                (error_policy(err, err_context.clone()), ReconcileReason::ErrorPolicyRequestedRetry),
         };
         let mut scheduler_tx = scheduler_tx.clone();
         async move {
@@ -230,7 +311,7 @@ where
                 // Failure to schedule item = in graceful shutdown mode, ignore
                 let _ = scheduler_tx
                     .send(ScheduleRequest {
-                        message: obj_ref.clone(),
+                        message: ReconcileRequest {obj_ref: obj_ref.clone(), reason: requeue_reason},
                         run_at: Instant::now() + delay,
                     })
                     .await;
@@ -297,7 +378,7 @@ where
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
 ///     Controller::new(cmgs, ListParams::default())
-///         .owns(cms, ListParams::default())
+///         .owns(cms, (), ListParams::default())
 ///         .run(reconcile, error_policy, context)
 ///         .for_each(|res| async move {
 ///             match res {
@@ -315,7 +396,7 @@ where
     K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
-    trigger_selector: stream::SelectAll<BoxStream<'static, Result<ObjectRef<K>, watcher::Error>>>,
+    trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
     /// [`run`] starts a graceful shutdown when any of these [`Future`]s complete,
     /// refusing to start any new reconciliations but letting any existing ones finish.
     graceful_shutdown_selector: Vec<BoxFuture<'static, ()>>,
@@ -396,12 +477,17 @@ where
     pub fn owns<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
         mut self,
         api: Api<Child>,
+        dyntype: Child::DynamicType,
         lp: ListParams,
     ) -> Self
     where
-        Child::DynamicType: Debug + Eq + Hash,
+        Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners(try_flatten_touched(watcher(api, lp)), self.dyntype.clone());
+        let child_watcher = trigger_owners(
+            try_flatten_touched(watcher(api, lp)),
+            self.dyntype.clone(),
+            dyntype,
+        );
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -415,13 +501,25 @@ where
     >(
         mut self,
         api: Api<Other>,
+        dyntype: Other::DynamicType,
         lp: ListParams,
-        mapper: impl Fn(Other) -> I + Send + 'static,
+        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
         I::IntoIter: Send,
+        Other::DynamicType: Clone,
     {
-        let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), mapper);
+        let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), move |obj| {
+            let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
+            mapper(obj)
+                .into_iter()
+                .map(move |mapped_obj_ref| ReconcileRequest {
+                    obj_ref: mapped_obj_ref,
+                    reason: ReconcileReason::RelatedObjectUpdated {
+                        obj_ref: watched_obj_ref.clone(),
+                    },
+                })
+        });
         self.trigger_selector.push(other_watcher.boxed());
         self
     }
@@ -473,12 +571,12 @@ where
             trigger
                 .flat_map(move |()| {
                     let dyntype = dyntype.clone();
-                    stream::iter(
-                        store
-                            .state()
-                            .into_iter()
-                            .map(move |obj| Ok(ObjectRef::from_obj_with(&obj, dyntype.clone()))),
-                    )
+                    stream::iter(store.state().into_iter().map(move |obj| {
+                        Ok(ReconcileRequest {
+                            obj_ref: ObjectRef::from_obj_with(&obj, dyntype.clone()),
+                            reason: ReconcileReason::BulkReconcile,
+                        })
+                    }))
                 })
                 .boxed(),
         );
@@ -597,7 +695,10 @@ where
     {
         applier(
             move |obj, ctx| {
-                CancelableJoinHandle::spawn(reconciler(obj, ctx).into_future(), &Handle::current())
+                CancelableJoinHandle::spawn(
+                    reconciler(obj, ctx).into_future().in_current_span(),
+                    &Handle::current(),
+                )
             },
             error_policy,
             context,

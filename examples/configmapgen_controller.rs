@@ -129,7 +129,7 @@ async fn main() -> Result<()> {
     });
 
     Controller::new(cmgs, ListParams::default())
-        .owns(cms, ListParams::default())
+        .owns(cms, (), ListParams::default())
         .reconcile_all_on(reload_rx.map(|_| ()))
         .shutdown_on_signal()
         .run(reconcile, error_policy, Context::new(Data { client }))

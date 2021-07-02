@@ -7,7 +7,7 @@ use kube_runtime::{reflector, watcher};
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
+    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let api: Api<Pod> = Api::namespaced(client, &namespace);
     let store_w = reflector::store::Writer::default();
