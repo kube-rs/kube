@@ -92,8 +92,9 @@ async fn main() -> color_eyre::Result<()> {
     )
     .run(
         |cm, _| {
-            let cms = api_in_ns_of_object::<_, ConfigMap>(&cm, kube.clone()).unwrap();
-            let secrets = api_in_ns_of_object::<_, Secret>(&cm, kube.clone()).unwrap();
+            let ns = cm.meta().namespace.as_deref().context(NoNamespace)?;
+            let cms: Api<ConfigMap> = Api::namespaced(kube.clone(), ns);
+            let secrets: Api<Secret> = Api::namespaced(kube.clone(), ns);
             async move {
                 finalizer(
                     &cms,
