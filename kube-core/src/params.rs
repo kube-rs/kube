@@ -47,6 +47,7 @@ pub struct ListParams {
 }
 
 impl Default for ListParams {
+    /// Default `ListParams` without any constricting selectors
     fn default() -> Self {
         Self {
             // bookmarks stable since 1.17, and backwards compatible
