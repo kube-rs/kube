@@ -28,13 +28,13 @@ enum Error {
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-fn secret_name_for_configmap(cm_name: &str) -> String {
-    format!("cm---{}", cm_name)
+fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
+    Ok(format!("cm---{}", cm.metadata.name.as_deref().context(NoName)?))
 }
 
 async fn apply(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
     println!("Reconciling {:?}", cm);
-    let secret_name = secret_name_for_configmap(cm.metadata.name.as_deref().context(NoName)?);
+    let secret_name = secret_name_for_configmap(&cm)?;
     secrets
         .patch(
             &secret_name,
@@ -57,10 +57,7 @@ async fn apply(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerA
 async fn cleanup(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
     println!("Cleaning up {:?}", cm);
     secrets
-        .delete(
-            &secret_name_for_configmap(cm.metadata.name.as_deref().unwrap()),
-            &DeleteParams::default(),
-        )
+        .delete(&secret_name_for_configmap(&cm)?, &DeleteParams::default())
         .await
         .map(|_| ())
         .or_else(|err| match err {
