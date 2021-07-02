@@ -13,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let client = Client::try_default().await?;
 
-    let namespace = std::env::var("NAMESPACE").unwrap_or("default".into());
+    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let store = reflector::store::Writer::<Deployment>::default();
     let reader = store.as_reader();
