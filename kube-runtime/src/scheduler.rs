@@ -1,9 +1,6 @@
 //! Delays and deduplicates [`Stream`] items
 
-use futures::{
-    stream::{Fuse, FusedStream},
-    Stream, StreamExt,
-};
+use futures::{stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use snafu::{Backtrace, ResultExt, Snafu};
 use std::{
@@ -101,9 +98,9 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
         &mut self,
         cx: &mut Context<'_>,
         can_take_message: impl Fn(&T) -> bool,
-    ) -> Poll<Option<Result<T, time::error::Error>>> {
+    ) -> Poll<Result<T, time::error::Error>> {
         if let Some(msg) = self.pending.iter().find(|msg| can_take_message(*msg)).cloned() {
-            return Poll::Ready(Some(Ok(self.pending.take(&msg).unwrap())));
+            return Poll::Ready(Ok(self.pending.take(&msg).unwrap()));
         }
 
         loop {
@@ -114,20 +111,12 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
                     "Expired message was popped from the Scheduler queue, but was not in the metadata map",
                 );
                     if can_take_message(&msg) {
-                        break Poll::Ready(Some(Ok(msg)));
+                        break Poll::Ready(Ok(msg));
                     }
                     self.pending.insert(msg);
                 }
-                Poll::Ready(Some(Err(err))) => break Poll::Ready(Some(Err(err))),
-                Poll::Ready(None) => {
-                    break if self.pending.is_empty() {
-                        Poll::Ready(None)
-                    } else {
-                        // There are still remaining pending messages, so we're not done quite yet..
-                        Poll::Pending
-                    };
-                }
-                Poll::Pending => break Poll::Pending,
+                Poll::Ready(Some(Err(err))) => break Poll::Ready(Err(err)),
+                Poll::Ready(None) | Poll::Pending => break Poll::Pending,
             }
         }
     }
@@ -152,21 +141,16 @@ where
         let can_take_message = &this.can_take_message;
         let mut scheduler = this.scheduler.as_mut().project();
 
-        while let Poll::Ready(Some(request)) = scheduler.requests.as_mut().poll_next(cx) {
-            scheduler.schedule_message(request);
+        loop {
+            match scheduler.requests.as_mut().poll_next(cx) {
+                Poll::Ready(Some(request)) => scheduler.schedule_message(request),
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Pending => break,
+            }
         }
 
         match scheduler.poll_pop_queue_message(cx, &can_take_message) {
-            Poll::Ready(Some(expired)) => Poll::Ready(Some(expired.context(TimerError))),
-            Poll::Ready(None) => {
-                if scheduler.requests.is_terminated() {
-                    // The source queue has terminated, and all outstanding requests are done, so terminate
-                    Poll::Ready(None)
-                } else {
-                    // The delay queue is empty, but we may get more requests in the future...
-                    Poll::Pending
-                }
-            }
+            Poll::Ready(expired) => Poll::Ready(Some(expired.context(TimerError))),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -221,16 +205,20 @@ where
 /// Items can be "held pending" if the item doesn't match some predicate. Items trying to schedule an item
 /// that is already pending will be discarded (since it is already going to be emitted as soon as the consumer
 /// is ready for it).
+///
+/// The [`Scheduler`] terminates as soon as `requests` does.
 pub fn scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(requests: S) -> Scheduler<T, S> {
     Scheduler::new(requests)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::KubeRuntimeStreamExt;
+
     use super::{scheduler, ScheduleRequest};
-    use futures::{channel::mpsc, poll, stream, FutureExt, SinkExt, StreamExt};
+    use futures::{channel::mpsc, future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
     use std::task::Poll;
-    use tokio::time::{advance, pause, Duration, Instant};
+    use tokio::time::{advance, pause, sleep, Duration, Instant};
 
     fn unwrap_poll<T>(poll: Poll<T>) -> T {
         if let Poll::Ready(x) = poll {
@@ -243,10 +231,13 @@ mod tests {
     #[tokio::test]
     async fn scheduler_should_hold_and_release_items() {
         pause();
-        let mut scheduler = Box::pin(scheduler(stream::iter(vec![ScheduleRequest {
-            message: 1_u8,
-            run_at: Instant::now(),
-        }])));
+        let mut scheduler = Box::pin(scheduler(
+            stream::iter(vec![ScheduleRequest {
+                message: 1_u8,
+                run_at: Instant::now(),
+            }])
+            .on_complete(sleep(Duration::from_secs(4))),
+        ));
         assert!(!scheduler.contains_pending(&1));
         assert!(poll!(scheduler.as_mut().hold_unless(|_| false).next()).is_pending());
         assert!(scheduler.contains_pending(&1));
@@ -278,23 +269,34 @@ mod tests {
         })
         .await
         .unwrap();
-        drop(tx);
-        assert_eq!(scheduler.next().await.unwrap().unwrap(), 1);
-        assert!(scheduler.next().await.is_none());
+        future::join(
+            async {
+                sleep(Duration::from_secs(2)).await;
+                drop(tx);
+            },
+            async {
+                assert_eq!(scheduler.next().await.unwrap().unwrap(), 1);
+                assert!(scheduler.next().await.is_none())
+            },
+        )
+        .await;
     }
 
     #[tokio::test]
     async fn scheduler_pending_message_should_not_block_head_of_line() {
-        let mut scheduler = Box::pin(scheduler(stream::iter(vec![
-            ScheduleRequest {
-                message: 1,
-                run_at: Instant::now(),
-            },
-            ScheduleRequest {
-                message: 2,
-                run_at: Instant::now(),
-            },
-        ])));
+        let mut scheduler = Box::pin(scheduler(
+            stream::iter(vec![
+                ScheduleRequest {
+                    message: 1,
+                    run_at: Instant::now(),
+                },
+                ScheduleRequest {
+                    message: 2,
+                    run_at: Instant::now(),
+                },
+            ])
+            .on_complete(sleep(Duration::from_secs(2))),
+        ));
         assert_eq!(
             scheduler
                 .as_mut()
@@ -310,16 +312,20 @@ mod tests {
     #[tokio::test]
     async fn scheduler_should_emit_items_as_requested() {
         pause();
-        let mut scheduler = scheduler(stream::iter(vec![
-            ScheduleRequest {
-                message: 1_u8,
-                run_at: Instant::now() + Duration::from_secs(1),
-            },
-            ScheduleRequest {
-                message: 2,
-                run_at: Instant::now() + Duration::from_secs(3),
-            },
-        ]));
+        let scheduler = scheduler(
+            stream::iter(vec![
+                ScheduleRequest {
+                    message: 1_u8,
+                    run_at: Instant::now() + Duration::from_secs(1),
+                },
+                ScheduleRequest {
+                    message: 2,
+                    run_at: Instant::now() + Duration::from_secs(3),
+                },
+            ])
+            .on_complete(sleep(Duration::from_secs(5))),
+        );
+        pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
         assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), 1);
@@ -333,16 +339,20 @@ mod tests {
     #[tokio::test]
     async fn scheduler_dedupe_should_keep_earlier_item() {
         pause();
-        let mut scheduler = scheduler(stream::iter(vec![
-            ScheduleRequest {
-                message: (),
-                run_at: Instant::now() + Duration::from_secs(1),
-            },
-            ScheduleRequest {
-                message: (),
-                run_at: Instant::now() + Duration::from_secs(3),
-            },
-        ]));
+        let scheduler = scheduler(
+            stream::iter(vec![
+                ScheduleRequest {
+                    message: (),
+                    run_at: Instant::now() + Duration::from_secs(1),
+                },
+                ScheduleRequest {
+                    message: (),
+                    run_at: Instant::now() + Duration::from_secs(3),
+                },
+            ])
+            .on_complete(sleep(Duration::from_secs(5))),
+        );
+        pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
         scheduler.next().now_or_never().unwrap().unwrap().unwrap();
@@ -353,16 +363,20 @@ mod tests {
     #[tokio::test]
     async fn scheduler_dedupe_should_replace_later_item() {
         pause();
-        let mut scheduler = scheduler(stream::iter(vec![
-            ScheduleRequest {
-                message: (),
-                run_at: Instant::now() + Duration::from_secs(3),
-            },
-            ScheduleRequest {
-                message: (),
-                run_at: Instant::now() + Duration::from_secs(1),
-            },
-        ]));
+        let scheduler = scheduler(
+            stream::iter(vec![
+                ScheduleRequest {
+                    message: (),
+                    run_at: Instant::now() + Duration::from_secs(3),
+                },
+                ScheduleRequest {
+                    message: (),
+                    run_at: Instant::now() + Duration::from_secs(1),
+                },
+            ])
+            .on_complete(sleep(Duration::from_secs(5))),
+        );
+        pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
         scheduler.next().now_or_never().unwrap().unwrap().unwrap();
