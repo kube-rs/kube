@@ -9,6 +9,7 @@ use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 use kube::{
     api::{DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
     error::ErrorResponse,
+    Api,
 };
 use kube_runtime::{
     controller::{Context, ReconcilerAction},
@@ -26,16 +27,6 @@ enum Error {
     DeleteSecret { source: kube::Error },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
-
-fn api_in_ns_of_object<K: Resource, K2: Resource<DynamicType = ()>>(
-    object: &K,
-    kube: kube::Client,
-) -> Result<kube::Api<K2>> {
-    Ok(kube::Api::<K2>::namespaced(
-        kube,
-        object.meta().namespace.as_deref().context(NoNamespace)?,
-    ))
-}
 
 fn secret_name_for_configmap(cm_name: &str) -> String {
     format!("cm---{}", cm_name)
@@ -92,7 +83,7 @@ async fn main() -> color_eyre::Result<()> {
     )
     .run(
         |cm, _| {
-            let ns = cm.meta().namespace.as_deref().context(NoNamespace)?;
+            let ns = cm.meta().namespace.as_deref().context(NoNamespace).unwrap();
             let cms: Api<ConfigMap> = Api::namespaced(kube.clone(), ns);
             let secrets: Api<Secret> = Api::namespaced(kube.clone(), ns);
             async move {
