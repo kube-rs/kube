@@ -13,7 +13,7 @@ use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, io::BufRead};
 use tokio::time::Duration;
 
 #[derive(Debug, Snafu)]
@@ -54,6 +54,10 @@ fn object_to_owner_reference<K: Resource<DynamicType = ()>>(
 
 /// Controller triggers this whenever our main object or our children changed
 async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<ReconcilerAction, Error> {
+    log::info!("working hard");
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    log::info!("hard work is done!");
+
     let client = ctx.get_ref().client.clone();
 
     let mut contents = BTreeMap::new();
@@ -112,8 +116,22 @@ async fn main() -> Result<()> {
     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
     let cms = Api::<ConfigMap>::all(client.clone());
 
+    log::info!("starting configmapgen-controller");
+    log::info!("press <enter> to force a reconciliation of all objects");
+
+    let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
+    // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
+    // and its worker prevents the Tokio runtime from shutting down.
+    std::thread::spawn(move || {
+        for _ in std::io::BufReader::new(std::io::stdin()).lines() {
+            let _ = reload_tx.try_send(());
+        }
+    });
+
     Controller::new(cmgs, ListParams::default())
         .owns(cms, (), ListParams::default())
+        .reconcile_all_on(reload_rx.map(|_| ()))
+        .shutdown_on_signal()
         .run(reconcile, error_policy, Context::new(Data { client }))
         .for_each(|res| async move {
             match res {
@@ -122,6 +140,6 @@ async fn main() -> Result<()> {
             }
         })
         .await;
-
+    log::info!("controller terminated");
     Ok(())
 }

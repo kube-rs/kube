@@ -67,8 +67,8 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = self.project();
-        let mut inner = this.inner.lock().unwrap();
-        let mut inner = Pin::new(&mut *inner);
+        let inner = this.inner.lock().unwrap();
+        let mut inner = Pin::new(inner);
         let inner_peek = inner.as_mut().peek();
         pin_mut!(inner_peek);
         match inner_peek.poll(cx) {
@@ -173,3 +173,38 @@ impl<T> Future for CancelableJoinHandle<T> {
         )
     }
 }
+
+#[pin_project]
+pub(crate) struct OnComplete<S, F> {
+    #[pin]
+    stream: stream::Fuse<S>,
+    #[pin]
+    on_complete: F,
+}
+
+impl<S: Stream, F: Future<Output = ()>> Stream for OnComplete<S, F> {
+    type Item = S::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        match this.stream.poll_next(cx) {
+            Poll::Ready(None) => match this.on_complete.poll(cx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(()) => Poll::Ready(None),
+            },
+            x => x,
+        }
+    }
+}
+
+pub(crate) trait KubeRuntimeStreamExt: Stream + Sized {
+    /// Runs the [`Future`] `on_complete` once the [`Stream`] finishes (by returning [`None`]).
+    fn on_complete<F: Future<Output = ()>>(self, on_complete: F) -> OnComplete<Self, F> {
+        OnComplete {
+            stream: self.fuse(),
+            on_complete,
+        }
+    }
+}
+
+impl<S: Stream> KubeRuntimeStreamExt for S {}
