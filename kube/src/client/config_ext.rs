@@ -113,8 +113,12 @@ impl ConfigExt for Config {
     fn auth_layer(&self) -> Result<Option<AuthLayer>> {
         Ok(match Auth::try_from(&self.auth_info)? {
             Auth::None => None,
-            Auth::Basic(user, pass) => Some(AuthLayer(Either::A(AddAuthorizationLayer::basic(&user, &pass)))),
-            Auth::Bearer(token) => Some(AuthLayer(Either::A(AddAuthorizationLayer::bearer(&token)))),
+            Auth::Basic(user, pass) => Some(AuthLayer(Either::A(
+                AddAuthorizationLayer::basic(&user, &pass).as_sensitive(true),
+            ))),
+            Auth::Bearer(token) => Some(AuthLayer(Either::A(
+                AddAuthorizationLayer::bearer(&token).as_sensitive(true),
+            ))),
             Auth::RefreshableToken(r) => Some(AuthLayer(Either::B(RefreshTokenLayer::new(r)))),
         })
     }
