@@ -495,7 +495,7 @@ where
         self.owns_with(api, (), lp)
     }
 
-    /// Indicate child objets `K` owns and be notified when they change
+    /// Specify `Child` objects which `K` owns and should be watched
     ///
     /// Same as [`Controller::owns`], but accepts a `DynamicType` so it can be used with dynamic resources.
     pub fn owns_with<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
