@@ -12,11 +12,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Extract release info from CHANGELOG
-        if: startsWith(github.ref, 'refs/tags/')
         run: grep $(date +%Y-%m-%d) -A 250 CHANGELOG.md | tail -n +3 | sed '1,/===================/!d' | head -n -3 > release.txt
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
