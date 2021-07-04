@@ -36,7 +36,7 @@ jobs:
           version: '0.18.0'
           out-type: Lcov
           timeout: 600
-          args: '--all -- --test-threads 1'
+          args: '--all -e tests -- --test-threads 1'
       - name: Coveralls Finished
         uses: coverallsapp/github-action@master
         if: startsWith(github.ref, 'refs/tags/')
