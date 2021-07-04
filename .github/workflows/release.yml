@@ -35,6 +35,7 @@ jobs:
         with:
           version: '0.18.0'
           out-type: Lcov
+          timeout: 500
           args: '--all -- --test-threads 1'
       - name: Coveralls Finished
         uses: coverallsapp/github-action@master
