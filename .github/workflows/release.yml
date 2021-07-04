@@ -1,6 +1,9 @@
 name: Release
 
-on: push
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   build:
@@ -24,13 +27,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Install stable toolchain
-        if: startsWith(github.ref, 'refs/tags/')
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
       - name: Run cargo-tarpaulin
-        if: startsWith(github.ref, 'refs/tags/')
         uses: actions-rs/tarpaulin@v0.1
         with:
           version: '0.18.0'
@@ -39,7 +40,6 @@ jobs:
           args: '--all -e tests -- --test-threads 1'
       - name: Coveralls Finished
         uses: coverallsapp/github-action@master
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: ./lcov.info
