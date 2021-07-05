@@ -14,6 +14,9 @@ UNRELEASED
   - Added: `Controller::owns_with` and `Controller::watches_with` to pass a `dyntype` argument for dynamic `Api`s - #575
   - BREAKING: `controller::trigger_*` now returns a `ReconcileRequest` rather than `ObjectRef`. The `ObjectRef` can be accessed via the `obj_ref` field
 
+### Known Issues
+- Api::replace can fail to unset list values with k8s-openapi 0.12 #581
+
 0.57.0 / 2021-06-16
 ===================
  * `kube`: custom clients now respect default namespaces - fixes [#534](https://github.com/clux/kube-rs/issues/534) via [#544](https://github.com/clux/kube-rs/issues/544)
@@ -26,6 +29,9 @@ UNRELEASED
     * Contains bugfix for [kubernetes#102159](https://github.com/kubernetes/kubernetes/pull/102159)
  * `kube` resource plurals is no longer inferred from `k8s-openapi` structs - [#284](https://github.com/clux/kube-rs/issues/284) via [#556](https://github.com/clux/kube-rs/issues/556)
   - BREAKING: `kube::Resource` trait now requires a `plural` implementation
+
+### Known Issues
+- Api::replace can fail to unset list values with k8s-openapi 0.12 #581
 
 0.56.0 / 2021-06-05
 ===================
