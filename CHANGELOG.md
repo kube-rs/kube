@@ -1,21 +1,24 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/clux/kube-rs/compare/0.57.0...master
- * `kube`: `BREAKING`: subresource marker traits renamed conjugation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - #536 via #560
- * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - #559
- * `kube-runtime` added `finalizer` helper #291 via #475
- * `kube-runtime` added tracing for why reconciliations happened #457 via #571
- * `kube-runtime` added `Controller::reconcile_all_on` to allow scheduling all objects for reconciliation #551 via #555
- * `kube-runtime` added `Controller::graceful_shutdown_on` for shutting down the `Controller` while waiting for running reconciliations to finish - #552 via #573
+ * see https://github.com/clux/kube-rs/compare/0.58.0...master
+
+0.58.0 / 2021-07-05
+===================
+ * `kube`: `BREAKING`: subresource marker traits renamed conjugation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - [#536](https://github.com/clux/kube-rs/issues/536) via [#560](https://github.com/clux/kube-rs/issues/560)
+ * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - [#559](https://github.com/clux/kube-rs/issues/559)
+ * `kube-runtime` added `finalizer` helper [#291](https://github.com/clux/kube-rs/issues/291) via [#475](https://github.com/clux/kube-rs/issues/475)
+ * `kube-runtime` added tracing for why reconciliations happened [#457](https://github.com/clux/kube-rs/issues/457) via [#571](https://github.com/clux/kube-rs/issues/571)
+ * `kube-runtime` added `Controller::reconcile_all_on` to allow scheduling all objects for reconciliation [#551](https://github.com/clux/kube-rs/issues/551) via [#555](https://github.com/clux/kube-rs/issues/555)
+ * `kube-runtime` added `Controller::graceful_shutdown_on` for shutting down the `Controller` while waiting for running reconciliations to finish - [#552](https://github.com/clux/kube-rs/issues/552) via [#573](https://github.com/clux/kube-rs/issues/573)
   - BREAKING: `controller::applier` now starts a graceful shutdown when the `queue` terminates
   - BREAKING: `scheduler` now shuts down immediately when `requests` terminates, rather than waiting for the pending reconciliations to drain
  * `kube-runtime` added tracking for reconciliation reason
-  - Added: `Controller::owns_with` and `Controller::watches_with` to pass a `dyntype` argument for dynamic `Api`s - #575
+  - Added: `Controller::owns_with` and `Controller::watches_with` to pass a `dyntype` argument for dynamic `Api`s - [#575](https://github.com/clux/kube-rs/issues/575)
   - BREAKING: `controller::trigger_*` now returns a `ReconcileRequest` rather than `ObjectRef`. The `ObjectRef` can be accessed via the `obj_ref` field
 
 ### Known Issues
-- Api::replace can fail to unset list values with k8s-openapi 0.12 #581
+- Api::replace can fail to unset list values with k8s-openapi 0.12 [#581](https://github.com/clux/kube-rs/issues/581)
 
 0.57.0 / 2021-06-16
 ===================
@@ -31,7 +34,7 @@ UNRELEASED
   - BREAKING: `kube::Resource` trait now requires a `plural` implementation
 
 ### Known Issues
-- Api::replace can fail to unset list values with k8s-openapi 0.12 #581
+- Api::replace can fail to unset list values with k8s-openapi 0.12 [#581](https://github.com/clux/kube-rs/issues/581)
 
 0.56.0 / 2021-06-05
 ===================
