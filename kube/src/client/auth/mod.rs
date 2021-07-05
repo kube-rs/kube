@@ -213,7 +213,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 
         if !output.status.success() {
             return Err(ConfigError::AuthExecRun {
-                cmd: format! {"{} {}", cmd, params},
+                cmd: format!("{} {}", cmd, params),
                 status: output.status,
                 out: output,
             }
