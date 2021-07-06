@@ -2,6 +2,7 @@
 UNRELEASED
 ===================
  * see https://github.com/clux/kube-rs/compare/0.58.0...master
+ * `kube-runtime`: fix non-unix builds - #582
 
 0.58.0 / 2021-07-05
 ===================
