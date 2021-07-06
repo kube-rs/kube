@@ -701,7 +701,7 @@ where
                     .boxed(),
                 // Assume that ctrl_c is enough on non-Unix platforms (such as Windows)
                 #[cfg(not(unix))]
-                futures::future::pending(),
+                futures::future::pending::<()>(),
             )
             .await;
         }
