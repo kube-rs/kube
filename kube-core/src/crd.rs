@@ -12,6 +12,10 @@ pub mod v1 {
         ///
         /// This is using the stable v1::CustomResourceDefinitions (present in kubernetes >= 1.16)
         fn crd() -> super::apiexts::v1::CustomResourceDefinition;
+        /// Helper to return the name of this `CustomResourceDefinition` in kubernetes.
+        ///
+        /// This is not the name of an _instance_ of this custom resource but the definition itself.
+        fn crd_name() -> String;
         /// Helper to generate the api information type for use with the dynamic `Api`
         fn api_resource() -> crate::discovery::ApiResource;
     }
@@ -27,6 +31,10 @@ pub mod v1beta1 {
         ///
         /// This is using v1beta1::CustomResourceDefinitions (which will be removed in kubernetes 1.22)
         fn crd() -> super::apiexts::v1beta1::CustomResourceDefinition;
+        /// Helper to return the name of this `CustomResourceDefinition` in kubernetes.
+        ///
+        /// This is not the name of an _instance_ of this custom resource but the definition itself.
+        fn crd_name() -> String;
         /// Helper to generate the api information type for use with the dynamic `Api`
         fn api_resource() -> crate::discovery::ApiResource;
     }
