@@ -368,6 +368,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     .expect("valid custom resource from #[kube(attrs..)]")
             }
 
+            fn crd_name() -> &'static str {
+                #crd_meta_name
+            }
+
             fn api_resource() -> kube::core::ApiResource {
                 kube::core::ApiResource::erase::<Self>(&())
             }
