@@ -1,11 +1,12 @@
 //! Type information structs for API discovery
 use crate::{gvk::GroupVersionKind, resource::Resource};
+use serde::{Deserialize, Serialize};
 
 /// Information about a Kubernetes API resource
 ///
 /// Enough information to use it like a `Resource` by passing it to the dynamic `Api`
 /// constructors like `Api::all_with` and `Api::namespaced_with`.
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ApiResource {
     /// Resource group, empty for core group.
     pub group: String,
