@@ -16,11 +16,8 @@ use std::borrow::Cow;
 /// and is generally produced from list/watch/delete collection queries on an [`Resource`](super::Resource).
 ///
 /// This is almost equivalent to [`k8s_openapi::List<T>`](k8s_openapi::List), but iterable.
-#[derive(Deserialize, Debug)]
-pub struct ObjectList<T>
-where
-    T: Clone,
-{
+#[derive(Clone, Deserialize, Debug)]
+pub struct ObjectList<T> {
     // NB: kind and apiVersion can be set here, but no need for it atm
     /// ListMeta - only really used for its `resourceVersion`
     ///
@@ -32,7 +29,7 @@ where
     pub items: Vec<T>,
 }
 
-impl<T: Clone> ObjectList<T> {
+impl<T> ObjectList<T> {
     /// `iter` returns an Iterator over the elements of this ObjectList
     ///
     /// # Example
@@ -75,7 +72,7 @@ impl<T: Clone> ObjectList<T> {
     }
 }
 
-impl<T: Clone> IntoIterator for ObjectList<T> {
+impl<T> IntoIterator for ObjectList<T> {
     type IntoIter = ::std::vec::IntoIter<Self::Item>;
     type Item = T;
 
@@ -84,7 +81,7 @@ impl<T: Clone> IntoIterator for ObjectList<T> {
     }
 }
 
-impl<'a, T: Clone> IntoIterator for &'a ObjectList<T> {
+impl<'a, T> IntoIterator for &'a ObjectList<T> {
     type IntoIter = ::std::slice::Iter<'a, T>;
     type Item = &'a T;
 
@@ -93,7 +90,7 @@ impl<'a, T: Clone> IntoIterator for &'a ObjectList<T> {
     }
 }
 
-impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
+impl<'a, T> IntoIterator for &'a mut ObjectList<T> {
     type IntoIter = ::std::slice::IterMut<'a, T>;
     type Item = &'a mut T;
 

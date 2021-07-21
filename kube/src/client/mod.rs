@@ -10,7 +10,12 @@
 
 use std::convert::TryFrom;
 
-use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
+use crate::{
+    api::WatchEvent,
+    client::verb::{GetApiserverVersion, ListApiGroups},
+    error::ErrorResponse,
+    Config, Error, Result,
+};
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt};
@@ -35,15 +40,15 @@ use tower_http::{
 
 mod auth;
 mod body;
-mod decoder;
-mod scope;
-mod verb;
+pub mod decoder;
+pub mod scope;
+pub mod verb;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
 mod config_ext;
 pub use config_ext::ConfigExt;
 
-use self::verb::Verb;
+use self::verb::{ListApiGroupResources, ListCoreApiVersions, Verb};
 pub mod middleware;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
 
@@ -54,16 +59,18 @@ const WS_PROTOCOL: &str = "v4.channel.k8s.io";
 #[derive(Snafu, Debug)]
 #[allow(missing_docs)]
 /// Failed to perform an API call
-pub enum CallError<DecodeErr: std::error::Error + 'static> {
+pub enum CallError {
     /// Failed to build the API request
     #[snafu(display("failed to build api request: {}", source))]
     BuildRequestFailed { source: verb::Error },
     /// API request failed
     #[snafu(display("kube api request failed: {}", source))]
-    RequestFailed { source: Error },
+    RequestFailed { source: Box<Error> },
     /// Failed to decode API response
     #[snafu(display("failed to decode api response: {}", source))]
-    DecodeFailed { source: DecodeErr },
+    DecodeFailed {
+        source: Box<dyn std::error::Error + Send + Sync + 'static>,
+    },
 }
 
 /// Client for connecting with a Kubernetes cluster.
@@ -147,17 +154,15 @@ impl Client {
     }
 
     /// Perform a request described by a [`Verb`]
-    pub async fn call<V: Verb>(
-        &self,
-        verb: V,
-    ) -> Result<<V::ResponseDecoder as TryFuture>::Ok, CallError<<V::ResponseDecoder as TryFuture>::Error>>
+    pub async fn call<V: Verb>(&self, verb: V) -> Result<<V::ResponseDecoder as TryFuture>::Ok, CallError>
     where
-        <V::ResponseDecoder as TryFuture>::Error: std::error::Error + 'static,
+        <V::ResponseDecoder as TryFuture>::Error: std::error::Error + Send + Sync + 'static,
     {
         let req = verb.to_http_request().context(BuildRequestFailed)?;
-        V::ResponseDecoder::from(self.send(req).await.context(RequestFailed)?)
+        V::ResponseDecoder::from(self.send(req).await.map_err(Box::new).context(RequestFailed)?)
             .into_future()
             .await
+            .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync + 'static>)
             .context(DecodeFailed)
     }
 
@@ -169,17 +174,12 @@ impl Client {
             .map_err(Error::Service)?
             .call(request)
             .await
-            .map_err(|err| {
-                if err.is::<Error>() {
-                    // Error decorating request
-                    *err.downcast::<Error>().expect("kube::Error")
-                } else if err.is::<hyper::Error>() {
-                    // Error requesting
-                    Error::HyperError(*err.downcast::<hyper::Error>().expect("hyper::Error"))
-                } else {
-                    // Errors from other middlewares
-                    Error::Service(err)
-                }
+            .map_err(|err| match err.downcast::<Error>() {
+                Ok(err) => *err,
+                Err(err) => match err.downcast::<hyper::Error>() {
+                    Ok(err) => Error::HyperError(*err),
+                    Err(err) => Error::Service(err),
+                },
             })?;
         Ok(res)
     }
@@ -231,6 +231,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and deserialize the response
     /// as JSON to some known type.
+    #[deprecated(note = "use Client::call instead", since = "0.59.0")]
     pub async fn request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
@@ -370,13 +371,12 @@ impl Client {
 impl Client {
     /// Returns apiserver version.
     pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
-        self.request(Request::builder().uri("/version").body(vec![])?)
-            .await
+        Ok(self.call(GetApiserverVersion).await?)
     }
 
     /// Lists api groups that apiserver serves.
     pub async fn list_api_groups(&self) -> Result<k8s_meta_v1::APIGroupList> {
-        self.request(Request::builder().uri("/apis").body(vec![])?).await
+        Ok(self.call(ListApiGroups).await?)
     }
 
     /// Lists resources served in given API group.
@@ -398,19 +398,18 @@ impl Client {
     /// # }
     /// ```
     pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
-        let url = format!("/apis/{}", apiversion);
-        self.request(Request::builder().uri(url).body(vec![])?).await
+        let (group, version) = apiversion.split_once('/').unwrap_or(("", apiversion));
+        Ok(self.call(ListApiGroupResources { group, version }).await?)
     }
 
     /// Lists versions of `core` a.k.a. `""` legacy API group.
     pub async fn list_core_api_versions(&self) -> Result<k8s_meta_v1::APIVersions> {
-        self.request(Request::builder().uri("/api").body(vec![])?).await
+        Ok(self.call(ListCoreApiVersions).await?)
     }
 
     /// Lists resources served in particular `core` group version.
     pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
-        let url = format!("/api/{}", version);
-        self.request(Request::builder().uri(url).body(vec![])?).await
+        self.list_api_group_resources(version).await
     }
 }
 

@@ -17,6 +17,10 @@ pub enum Error {
     #[error("ApiError: {0} ({0:?})")]
     Api(#[source] ErrorResponse),
 
+    /// Call failed
+    #[error("CallError: {0}")]
+    ClientCall(#[from] crate::client::CallError),
+
     /// ConnectionError for when TcpStream fails to connect.
     #[error("ConnectionError: {0}")]
     Connection(std::io::Error),

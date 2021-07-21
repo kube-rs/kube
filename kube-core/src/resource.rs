@@ -22,7 +22,7 @@ pub trait Resource {
     /// as type of this information.
     ///
     /// See [`DynamicObject`](crate::dynamic::DynamicObject) for a valid implementation of non-k8s-openapi resources.
-    type DynamicType: Send + Sync + 'static;
+    type DynamicType: Clone + Send + Sync + 'static;
 
     /// Returns kind of this object
     fn kind(dt: &Self::DynamicType) -> Cow<'_, str>;

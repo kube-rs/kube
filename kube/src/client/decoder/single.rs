@@ -1,3 +1,5 @@
+//! Single-value decoder
+
 use bytes::{Buf, Bytes};
 use futures::{ready, Future, StreamExt};
 use http::Response;
@@ -7,15 +9,20 @@ use snafu::{ResultExt, Snafu};
 use std::{io::Read, marker::PhantomData, task::Poll};
 
 #[derive(Debug, Snafu)]
+#[allow(missing_docs)]
+/// Failed to decode body
 pub enum Error {
+    /// Failed to read body
     #[snafu(display("read failed: {}", source))]
     ReadFailed { source: hyper::Error },
+    /// Failed to deserialize body
     #[snafu(display("deserialize failed: {}", source))]
     DeserializeFailed { source: serde_json::Error },
 }
 
+/// Decode a single JSON value
 pub struct DecodeSingle<K> {
-    tpe: PhantomData<*const K>,
+    tpe: PhantomData<fn() -> K>,
     chunks: Vec<Bytes>,
     body: Body,
 }
@@ -33,10 +40,7 @@ impl<K> From<Response<Body>> for DecodeSingle<K> {
 impl<K: DeserializeOwned> Future for DecodeSingle<K> {
     type Output = Result<K, Error>;
 
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         loop {
             break match ready!(self.body.poll_next_unpin(cx)) {
                 Some(Ok(chunk)) => {

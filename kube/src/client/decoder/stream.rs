@@ -1,3 +1,5 @@
+//! Stream decoder
+
 use bytes::Bytes;
 use futures::{ready, stream::MapErr, Future, Stream, StreamExt, TryStreamExt};
 use http::Response;
@@ -11,25 +13,27 @@ use tokio_util::{
 };
 
 #[derive(Debug, Snafu)]
+#[allow(missing_docs)]
+/// Failed to decode body
 pub enum Error {
+    /// Failed to read body
     #[snafu(display("read failed: {}", source))]
     ReadFailed { source: LinesCodecError },
+    /// Failed to deserialize body
     #[snafu(display("deserialize failed: {}", source))]
     DeserializeFailed { source: serde_json::Error },
 }
 
+/// Decode a stream of newline-separate JSON values
 pub struct DecodeStream<K> {
-    tpe: PhantomData<*const K>,
+    tpe: PhantomData<fn() -> K>,
     body: Option<Body>,
 }
 
 impl<K> Future for DecodeStream<K> {
     type Output = Result<DecodeStreamStream<K>, Infallible>;
 
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(mut self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         Poll::Ready(Ok(DecodeStreamStream {
             tpe: self.tpe,
             body: FramedRead::new(
@@ -54,13 +58,11 @@ impl<K> From<Response<Body>> for DecodeStream<K> {
     }
 }
 
+/// Helper stream returned by [`DecodeStream`]
 pub struct DecodeStreamStream<K> {
-    tpe: PhantomData<*const K>,
+    tpe: PhantomData<fn() -> K>,
     #[allow(clippy::type_complexity)]
-    body: FramedRead<
-        StreamReader<MapErr<Body, fn(hyper::Error) -> std::io::Error>, Bytes>,
-        LinesCodec,
-    >,
+    body: FramedRead<StreamReader<MapErr<Body, fn(hyper::Error) -> std::io::Error>, Bytes>, LinesCodec>,
 }
 
 impl<K: DeserializeOwned> Stream for DecodeStreamStream<K> {

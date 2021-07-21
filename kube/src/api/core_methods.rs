@@ -3,13 +3,17 @@ use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
-use crate::{api::Api, Result};
-use kube_core::{object::ObjectList, params::*, response::Status, WatchEvent};
+use crate::{
+    api::Api,
+    client::verb::{Get, List},
+    Result,
+};
+use kube_core::{object::ObjectList, params::*, response::Status, Resource, WatchEvent};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Debug,
+    K: Clone + DeserializeOwned + Debug + Resource,
 {
     /// Get a named resource
     ///
@@ -25,9 +29,14 @@ where
     /// }
     /// ```
     pub async fn get(&self, name: &str) -> Result<K> {
-        let mut req = self.request.get(name)?;
-        req.extensions_mut().insert("get");
-        self.client.request::<K>(req).await
+        Ok(self
+            .client
+            .call(Get {
+                name,
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+            })
+            .await?)
     }
 
     /// Get a list of resources
@@ -49,9 +58,13 @@ where
     /// }
     /// ```
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let mut req = self.request.list(lp)?;
-        req.extensions_mut().insert("list");
-        self.client.request::<ObjectList<K>>(req).await
+        Ok(self
+            .client
+            .call(List {
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+            })
+            .await?)
     }
 
     /// Create a resource

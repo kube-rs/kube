@@ -8,8 +8,8 @@ use crate::{
     Result,
 };
 
-use kube_core::response::Status;
 pub use kube_core::subresource::{EvictParams, LogParams};
+use kube_core::{response::Status, Resource};
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
@@ -22,7 +22,7 @@ pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned,
+    K: Clone + DeserializeOwned + Resource,
 {
     /// Fetch the scale subresource
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
@@ -58,7 +58,7 @@ where
 /// Methods for [status subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource).
 impl<K> Api<K>
 where
-    K: DeserializeOwned,
+    K: DeserializeOwned + Resource,
 {
     /// Get the named resource with a status subresource
     ///
@@ -153,7 +153,7 @@ impl Log for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
-    K: DeserializeOwned + Log,
+    K: DeserializeOwned + Log + Resource,
 {
     /// Fetch logs as a string
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
@@ -191,7 +191,7 @@ impl Evict for k8s_openapi::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
-    K: DeserializeOwned + Evict,
+    K: DeserializeOwned + Evict + Resource,
 {
     /// Create an eviction
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
@@ -235,7 +235,7 @@ impl Attach for k8s_openapi::api::core::v1::Pod {}
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Attach,
+    K: Clone + DeserializeOwned + Attach + Resource,
 {
     /// Attach to pod
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
@@ -281,7 +281,7 @@ impl Execute for k8s_openapi::api::core::v1::Pod {}
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Execute,
+    K: Clone + DeserializeOwned + Execute + Resource,
 {
     /// Execute a command in a pod
     pub async fn exec<I: Debug, T>(
