@@ -10,9 +10,10 @@
 
 use std::convert::TryFrom;
 
+use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
 use bytes::Bytes;
 use either::{Either, Left, Right};
-use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
+use futures::{self, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
 use hyper::{client::HttpConnector, Body};
 use hyper_timeout::TimeoutConnector;
@@ -20,6 +21,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
+use snafu::{ResultExt, Snafu};
 #[cfg(feature = "ws")]
 use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
 use tokio_util::{
@@ -31,20 +33,38 @@ use tower_http::{
     classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
 };
 
-use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
-
 mod auth;
 mod body;
+mod decoder;
+mod scope;
+mod verb;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
 mod config_ext;
 pub use config_ext::ConfigExt;
+
+use self::verb::Verb;
 pub mod middleware;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
 
 // Binary subprotocol v4. See `Client::connect`.
 #[cfg(feature = "ws")]
 const WS_PROTOCOL: &str = "v4.channel.k8s.io";
+
+#[derive(Snafu, Debug)]
+#[allow(missing_docs)]
+/// Failed to perform an API call
+pub enum CallError<DecodeErr: std::error::Error + 'static> {
+    /// Failed to build the API request
+    #[snafu(display("failed to build api request: {}", source))]
+    BuildRequestFailed { source: verb::Error },
+    /// API request failed
+    #[snafu(display("kube api request failed: {}", source))]
+    RequestFailed { source: Error },
+    /// Failed to decode API response
+    #[snafu(display("failed to decode api response: {}", source))]
+    DecodeFailed { source: DecodeErr },
+}
 
 /// Client for connecting with a Kubernetes cluster.
 ///
@@ -96,7 +116,7 @@ impl Client {
         S::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
         B::Error: std::error::Error + Send + Sync + 'static,
-        T: Into<String>
+        T: Into<String>,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
         let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
@@ -124,6 +144,21 @@ impl Client {
 
     pub(crate) fn default_ns(&self) -> &str {
         &self.default_ns
+    }
+
+    /// Perform a request described by a [`Verb`]
+    pub async fn call<V: Verb>(
+        &self,
+        verb: V,
+    ) -> Result<<V::ResponseDecoder as TryFuture>::Ok, CallError<<V::ResponseDecoder as TryFuture>::Error>>
+    where
+        <V::ResponseDecoder as TryFuture>::Error: std::error::Error + 'static,
+    {
+        let req = verb.to_http_request().context(BuildRequestFailed)?;
+        V::ResponseDecoder::from(self.send(req).await.context(RequestFailed)?)
+            .into_future()
+            .await
+            .context(DecodeFailed)
     }
 
     async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
