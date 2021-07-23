@@ -41,7 +41,7 @@ Official examples:
 
 Real world users:
 
-- [krustlet](https://github.com/deislabs/krustlet) - a complete `WASM` running `kubelet`
+- [krustlet](https://github.com/krustlet/krustlet) - a complete `WASM` running `kubelet`
 - [stackabletech operators](https://github.com/stackabletech) - ([kafka](https://github.com/stackabletech/kafka-operator), [zookeeper](https://github.com/stackabletech/zookeeper-operator), and more)
 - [kdash tui](https://github.com/kdash-rs/kdash) - terminal dashboard for kubernetes
 - [logdna agent](https://github.com/logdna/logdna-agent-v2)
