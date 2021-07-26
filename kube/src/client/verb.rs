@@ -1,9 +1,15 @@
 //! Operations supported by kube
 
+use std::{str::FromStr, time::Duration};
+
 use futures::TryFuture;
-use http::{Request, Response};
+use http::{Request, Response, Uri};
 use hyper::Body;
-use kube_core::{object::ObjectList, params, Resource, WatchEvent};
+use kube_core::{
+    object::ObjectList,
+    params::{self, ListParams},
+    Resource, WatchEvent,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 
@@ -69,14 +75,64 @@ pub struct List<'a, Kind: Resource, Scope> {
     pub scope: &'a Scope,
     /// The type of the objects
     pub dyn_type: &'a Kind::DynamicType,
+    /// The query to filter the objects by
+    pub query: &'a Query<'a>,
+
+    /// Limit the number of results.
+    ///
+    /// If there are more results, the server will respond with a continue token which can be used to fetch another page
+    /// of results. See the [Kubernetes API docs](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks)
+    /// for pagination details.
+    pub limit: Option<u32>,
+
+    /// Fetch a second page of results.
+    ///
+    /// After listing results with a `limit`, a continue token can be used to fetch another page of results.
+    pub continue_token: Option<&'a str>,
 }
 impl<'a, Kind: Resource + DeserializeOwned, Scope: scope::Scope> Verb for List<'a, Kind, Scope> {
     type ResponseDecoder = DecodeSingle<ObjectList<Kind>>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
-        Request::get(Kind::url_path(&self.dyn_type, self.scope.namespace()))
-            .body(Body::empty())
-            .context(BuildRequestFailed)
+        let mut url = format!("{}?", Kind::url_path(&self.dyn_type, self.scope.namespace()));
+        let mut qp = form_urlencoded::Serializer::new(&mut url);
+        self.query.populate_qp(&mut qp);
+        if let Some(limit) = self.limit {
+            qp.append_pair("limit", &limit.to_string());
+        }
+        if let Some(cont) = self.continue_token {
+            qp.append_pair("continue", cont);
+        }
+        Request::get(url).body(Body::empty()).context(BuildRequestFailed)
+    }
+}
+/// Common query parameters used to select multiple objects
+#[derive(Default)]
+pub struct Query<'a> {
+    /// A selector to restrict the list of returned objects by their labels.
+    ///
+    /// Defaults to everything if `None`.
+    pub label_selector: Option<&'a str>,
+    /// A selector to restrict the list of returned objects by their fields.
+    ///
+    /// Defaults to everything if `None`.
+    pub field_selector: Option<&'a str>,
+}
+impl<'a> Query<'a> {
+    fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<&mut String>) {
+        if let Some(labels) = self.label_selector {
+            qp.append_pair("labelSelector", labels);
+        }
+        if let Some(fields) = self.field_selector {
+            qp.append_pair("fieldSelector", fields);
+        }
+    }
+
+    pub(crate) fn from_list_params(lp: &'a ListParams) -> Self {
+        Self {
+            label_selector: lp.label_selector.as_deref(),
+            field_selector: lp.field_selector.as_deref(),
+        }
     }
 }
 
@@ -86,17 +142,26 @@ pub struct Watch<'a, Kind: Resource, Scope> {
     pub scope: &'a Scope,
     /// The type of the objects
     pub dyn_type: &'a Kind::DynamicType,
+    /// The query to filter the objects by
+    pub query: &'a Query<'a>,
+    /// The `resourceVersion` to report events newer than
+    pub version: &'a str,
+    /// Upper bound on how long the watch should be active for, rounded down to the nearest second
+    pub timeout: Option<Duration>,
 }
 impl<'a, Kind: Resource, Scope: scope::Scope> Verb for Watch<'a, Kind, Scope> {
     type ResponseDecoder = DecodeStream<WatchEvent<Kind>>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
-        Request::get(format!(
-            "{}?watch=1",
-            Kind::url_path(&self.dyn_type, self.scope.namespace()),
-        ))
-        .body(Body::empty())
-        .context(BuildRequestFailed)
+        let mut url = format!("{}?", Kind::url_path(&self.dyn_type, self.scope.namespace()),);
+        let mut qp = form_urlencoded::Serializer::new(&mut url);
+        qp.append_pair("watch", "1");
+        qp.append_pair("resourceVersion", self.version);
+        qp.append_pair("allowWatchBookmarks", "1");
+        if let Some(timeout) = self.timeout {
+            qp.append_pair("timeoutSeconds", &timeout.as_secs().to_string());
+        }
+        Request::get(url).body(Body::empty()).context(BuildRequestFailed)
     }
 }
 

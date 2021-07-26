@@ -1,11 +1,11 @@
 use either::Either;
 use futures::{Stream, TryStreamExt};
 use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
 use crate::{
     api::Api,
-    client::verb::{self, Create, Delete, DeleteCollection, Get, List, Replace, Watch},
+    client::verb::{self, Create, Delete, DeleteCollection, Get, List, Query, Replace, Watch},
     Result,
 };
 use kube_core::{object::ObjectList, params::*, response::Status, Resource, WatchEvent};
@@ -63,6 +63,9 @@ where
             .call(List {
                 scope: &self.scope,
                 dyn_type: &self.dyn_type,
+                query: &Query::from_list_params(lp),
+                limit: lp.limit,
+                continue_token: lp.continue_token.as_deref(),
             })
             .await?)
     }
@@ -323,6 +326,9 @@ where
             .call(Watch::<K, _> {
                 scope: &self.scope,
                 dyn_type: &self.dyn_type,
+                query: &Query::from_list_params(lp),
+                version,
+                timeout: lp.timeout.map(|timeout| Duration::from_secs(timeout.into())),
             })
             .await?
             .err_into())
