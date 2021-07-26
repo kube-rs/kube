@@ -3,7 +3,7 @@
 use futures::TryFuture;
 use http::{Request, Response};
 use hyper::Body;
-use kube_core::{object::ObjectList, Resource, WatchEvent};
+use kube_core::{object::ObjectList, params, Resource, WatchEvent};
 use serde::{de::DeserializeOwned, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 
@@ -109,11 +109,111 @@ pub struct Create<'a, Kind: Resource, Scope> {
     /// The type of the object
     pub dyn_type: &'a Kind::DynamicType,
 }
-impl<'a, Kind: Resource + Serialize, Scope: scope::Scope> Verb for Create<'a, Kind, Scope> {
-    type ResponseDecoder = DecodeStream<Kind>;
+impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Verb
+    for Create<'a, Kind, Scope>
+{
+    type ResponseDecoder = DecodeSingle<Kind>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
         Request::post(format!(
+            "{}/{}",
+            Kind::url_path(&self.dyn_type, self.scope.namespace()),
+            self.object.meta().name.as_ref().context(UnnamedObject)?
+        ))
+        .body(Body::from(
+            serde_json::to_vec(self.object).context(SerializeFailed)?,
+        ))
+        .context(BuildRequestFailed)
+    }
+}
+
+/// Delete a named object
+pub struct Delete<'a, Kind: Resource, Scope> {
+    /// The name of the object to be deleted
+    pub name: &'a str,
+    /// The scope for the object to be deleted from
+    pub scope: &'a Scope,
+    /// The type of the object
+    pub dyn_type: &'a Kind::DynamicType,
+}
+impl<'a, Kind: Resource + DeserializeOwned, Scope: scope::Scope> Verb for Delete<'a, Kind, Scope> {
+    type ResponseDecoder = DecodeSingle<Kind>;
+
+    fn to_http_request(&self) -> Result<Request<Body>> {
+        Request::delete(format!(
+            "{}/{}",
+            Kind::url_path(&self.dyn_type, self.scope.namespace()),
+            self.name
+        ))
+        .body(Body::empty())
+        .context(BuildRequestFailed)
+    }
+}
+
+/// Delete objects matching a search query
+pub struct DeleteCollection<'a, Kind: Resource, Scope> {
+    /// The scope for the object to be deleted from
+    pub scope: &'a Scope,
+    /// The type of the objects
+    pub dyn_type: &'a Kind::DynamicType,
+}
+impl<'a, Kind: Resource + DeserializeOwned, Scope: scope::Scope> Verb for DeleteCollection<'a, Kind, Scope> {
+    type ResponseDecoder = DecodeSingle<ObjectList<Kind>>;
+
+    fn to_http_request(&self) -> Result<Request<Body>> {
+        Request::delete(Kind::url_path(&self.dyn_type, self.scope.namespace()))
+            .body(Body::empty())
+            .context(BuildRequestFailed)
+    }
+}
+
+/// Patch a named object
+pub struct Patch<'a, Kind: Resource + Serialize, Scope> {
+    /// The name of the object to patch
+    pub name: &'a str,
+    /// The scope of the object
+    pub scope: &'a Scope,
+    /// The type of the objects
+    pub dyn_type: &'a Kind::DynamicType,
+    /// The patch to be applied
+    pub patch: &'a params::Patch<Kind>,
+}
+impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Verb for Patch<'a, Kind, Scope>
+where
+    params::Patch<Kind>: Serialize,
+{
+    type ResponseDecoder = DecodeSingle<Kind>;
+
+    fn to_http_request(&self) -> Result<Request<Body>> {
+        Request::patch(format!(
+            "{}/{}",
+            Kind::url_path(&self.dyn_type, self.scope.namespace()),
+            self.name
+        ))
+        .body(Body::from(
+            serde_json::to_vec(self.patch).context(SerializeFailed)?,
+        ))
+        .context(BuildRequestFailed)
+    }
+}
+
+/// Replace a named existing object
+pub struct Replace<'a, Kind: Resource, Scope> {
+    /// The object to replace
+    /// Requires `metadata.resourceVersion` to be `Some`
+    pub object: &'a Kind,
+    /// The scope of the object
+    pub scope: &'a Scope,
+    /// The type of the objects
+    pub dyn_type: &'a Kind::DynamicType,
+}
+impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Verb
+    for Replace<'a, Kind, Scope>
+{
+    type ResponseDecoder = DecodeSingle<Kind>;
+
+    fn to_http_request(&self) -> Result<Request<Body>> {
+        Request::patch(format!(
             "{}/{}",
             Kind::url_path(&self.dyn_type, self.scope.namespace()),
             self.object.meta().name.as_ref().context(UnnamedObject)?

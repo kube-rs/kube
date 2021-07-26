@@ -232,6 +232,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and deserialize the response
     /// as JSON to some known type.
     #[deprecated(note = "use Client::call instead", since = "0.59.0")]
+    #[allow(deprecated)]
     pub async fn request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
@@ -246,6 +247,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
+    #[deprecated(note = "use Client::call instead", since = "0.59.0")]
     pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
         let res = self.send(request.map(Body::from)).await?;
         let status = res.status();
@@ -259,6 +261,7 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back the response
     /// as a stream of bytes
+    #[deprecated(note = "use Client::call instead", since = "0.59.0")]
     pub async fn request_text_stream(
         &self,
         request: Request<Vec<u8>>,
@@ -270,6 +273,8 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back either an object
     /// deserialized as JSON or a [`Status`] Object.
+    #[deprecated(note = "use Client::call instead", since = "0.59.0")]
+    #[allow(deprecated)]
     pub async fn request_status<T>(&self, request: Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
@@ -292,6 +297,7 @@ impl Client {
     }
 
     /// Perform a raw request and get back a stream of [`WatchEvent`] objects
+    #[deprecated(note = "use Client::call instead", since = "0.59.0")]
     pub async fn request_events<T>(
         &self,
         request: Request<Vec<u8>>,

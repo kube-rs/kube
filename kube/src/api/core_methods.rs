@@ -1,11 +1,11 @@
 use either::Either;
-use futures::Stream;
+use futures::{Stream, TryStreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 use crate::{
     api::Api,
-    client::verb::{Get, List},
+    client::verb::{self, Create, Delete, DeleteCollection, Get, List, Replace, Watch},
     Result,
 };
 use kube_core::{object::ObjectList, params::*, response::Status, Resource, WatchEvent};
@@ -87,10 +87,14 @@ where
     where
         K: Serialize,
     {
-        let bytes = serde_json::to_vec(&data)?;
-        let mut req = self.request.create(pp, bytes)?;
-        req.extensions_mut().insert("create");
-        self.client.request::<K>(req).await
+        Ok(self
+            .client
+            .call(Create::<K, _> {
+                object: &data,
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+            })
+            .await?)
     }
 
     /// Delete a named resource
@@ -116,9 +120,15 @@ where
     /// }
     /// ```
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let mut req = self.request.delete(name, dp)?;
-        req.extensions_mut().insert("delete");
-        self.client.request_status::<K>(req).await
+        Ok(self
+            .client
+            .call(Delete::<K, _> {
+                name,
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+            })
+            .await?)
+        .map(Either::Left)
     }
 
     /// Delete a collection of resources
@@ -153,9 +163,14 @@ where
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let mut req = self.request.delete_collection(dp, lp)?;
-        req.extensions_mut().insert("delete_collection");
-        self.client.request_status::<ObjectList<K>>(req).await
+        Ok(self
+            .client
+            .call(DeleteCollection::<K, _> {
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+            })
+            .await?)
+        .map(Either::Left)
     }
 
     /// Patch a subset of a resource's properties
@@ -187,15 +202,20 @@ where
     /// ```
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
-    pub async fn patch<P: Serialize + Debug>(
-        &self,
-        name: &str,
-        pp: &PatchParams,
-        patch: &Patch<P>,
-    ) -> Result<K> {
-        let mut req = self.request.patch(name, pp, patch)?;
-        req.extensions_mut().insert("patch");
-        self.client.request::<K>(req).await
+    pub async fn patch(&self, name: &str, pp: &PatchParams, patch: &Patch<K>) -> Result<K>
+    where
+        K: Serialize,
+        Patch<K>: Serialize,
+    {
+        Ok(self
+            .client
+            .call(verb::Patch::<K, _> {
+                name,
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+                patch,
+            })
+            .await?)
     }
 
     /// Replace a resource entirely with a new one
@@ -246,10 +266,14 @@ where
     where
         K: Serialize,
     {
-        let bytes = serde_json::to_vec(&data)?;
-        let mut req = self.request.replace(name, pp, bytes)?;
-        req.extensions_mut().insert("replace");
-        self.client.request::<K>(req).await
+        Ok(self
+            .client
+            .call(Replace::<K, _> {
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+                object: data,
+            })
+            .await?)
     }
 
     /// Watch a list of resources
@@ -294,8 +318,13 @@ where
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let mut req = self.request.watch(lp, version)?;
-        req.extensions_mut().insert("watch");
-        self.client.request_events::<K>(req).await
+        Ok(self
+            .client
+            .call(Watch::<K, _> {
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+            })
+            .await?
+            .err_into())
     }
 }

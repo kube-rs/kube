@@ -20,6 +20,9 @@ pub enum Error {
     /// Call failed
     #[error("CallError: {0}")]
     ClientCall(#[from] crate::client::CallError),
+    /// Failed to decode stream
+    #[error("DecodeStreamError: {0}")]
+    DecodeStream(#[from] crate::client::decoder::stream::Error),
 
     /// ConnectionError for when TcpStream fails to connect.
     #[error("ConnectionError: {0}")]
