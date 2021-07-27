@@ -198,7 +198,7 @@ where
     ///         }
     ///     });
     ///     let params = PatchParams::apply("myapp");
-    ///     let patch = Patch::Apply(&patch);
+    ///     let patch = Patch::<Pod>::Apply(serde_json::from_value(patch)?);
     ///     let o_patched = pods.patch("blog", &params, &patch).await?;
     ///     Ok(())
     /// }
@@ -208,7 +208,6 @@ where
     pub async fn patch(&self, name: &str, pp: &PatchParams, patch: &Patch<K>) -> Result<K>
     where
         K: Serialize,
-        Patch<K>: Serialize,
     {
         Ok(self
             .client

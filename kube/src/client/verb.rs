@@ -3,7 +3,7 @@
 use std::{str::FromStr, time::Duration};
 
 use futures::TryFuture;
-use http::{Request, Response, Uri};
+use http::{header::CONTENT_TYPE, Request, Response, Uri};
 use hyper::Body;
 use kube_core::{
     object::ObjectList,
@@ -233,7 +233,7 @@ impl<'a, Kind: Resource + DeserializeOwned, Scope: scope::Scope> Verb for Delete
 }
 
 /// Patch a named object
-pub struct Patch<'a, Kind: Resource + Serialize, Scope> {
+pub struct Patch<'a, Kind: Resource, Scope> {
     /// The name of the object to patch
     pub name: &'a str,
     /// The scope of the object
@@ -243,10 +243,7 @@ pub struct Patch<'a, Kind: Resource + Serialize, Scope> {
     /// The patch to be applied
     pub patch: &'a params::Patch<Kind>,
 }
-impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Verb for Patch<'a, Kind, Scope>
-where
-    params::Patch<Kind>: Serialize,
-{
+impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Verb for Patch<'a, Kind, Scope> {
     type ResponseDecoder = DecodeSingle<Kind>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
@@ -255,9 +252,8 @@ where
             Kind::url_path(&self.dyn_type, self.scope.namespace()),
             self.name
         ))
-        .body(Body::from(
-            serde_json::to_vec(self.patch).context(SerializeFailed)?,
-        ))
+        .header(CONTENT_TYPE, self.patch.content_type())
+        .body(Body::from(self.patch.serialize().context(SerializeFailed)?))
         .context(BuildRequestFailed)
     }
 }

@@ -199,7 +199,7 @@ impl PostParams {
 /// ```
 #[non_exhaustive]
 #[derive(Debug)]
-pub enum Patch<T: Serialize> {
+pub enum Patch<T> {
     /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
     ///
     /// Requires kubernetes >= 1.16
@@ -226,12 +226,13 @@ pub enum Patch<T: Serialize> {
     Strategic(T),
 }
 
-impl<T: Serialize> Patch<T> {
+impl<T> Patch<T> {
     pub(crate) fn is_apply(&self) -> bool {
         matches!(self, Patch::Apply(_))
     }
 
-    pub(crate) fn content_type(&self) -> &'static str {
+    /// The MIME content type for the patch
+    pub fn content_type(&self) -> &'static str {
         match &self {
             Self::Apply(_) => "application/apply-patch+yaml",
             #[cfg(feature = "jsonpatch")]
@@ -244,7 +245,8 @@ impl<T: Serialize> Patch<T> {
 }
 
 impl<T: Serialize> Patch<T> {
-    pub(crate) fn serialize(&self) -> Result<Vec<u8>> {
+    /// Try to serialize the patch object to JSON
+    pub fn serialize(&self) -> Result<Vec<u8>, serde_json::Error> {
         match self {
             Self::Apply(p) => serde_json::to_vec(p),
             #[cfg(feature = "jsonpatch")]
@@ -253,7 +255,6 @@ impl<T: Serialize> Patch<T> {
             Self::Strategic(p) => serde_json::to_vec(p),
             Self::Merge(p) => serde_json::to_vec(p),
         }
-        .map_err(Into::into)
     }
 }
 
