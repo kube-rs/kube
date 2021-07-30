@@ -268,15 +268,16 @@ where
         move |s| {
             Runner::new(scheduler(s), move |request| {
                 let request = request.clone();
+                let reconciler_span = info_span!("reconciling object", "object.ref" = %request.obj_ref, object.reason = tracing::field::Empty);
                 match store.get(&request.obj_ref) {
                     Some(obj) => {
-                        let reconciler_span = info_span!("reconciling object", "object.ref" = %request.obj_ref, object.reason = %request.reason);
+                        reconciler_span.record("object.reason", &tracing::field::display(&request.reason));
                         reconciler_span.in_scope(|| reconciler(obj, context.clone()))
                         .into_future()
-                        .instrument(reconciler_span)
+                        .instrument(reconciler_span.clone())
                         // Reconciler errors are OK from the applier's PoV, we need to apply the error policy
                         // to them separately
-                        .map(|res| Ok((request.obj_ref, res)))
+                        .map(|res| Ok((request.obj_ref, res, reconciler_span)))
                         .left_future()
                     },
                     None => future::err(
@@ -295,14 +296,14 @@ where
     )
     .on_complete(async { tracing::debug!("applier runner-merge terminated") })
     // finally, for each completed reconcile call:
-    .and_then(move |(obj_ref, reconciler_result)| {
+    .and_then(move |(obj_ref, reconciler_result, reconciler_span)| {
         let (ReconcilerAction { requeue_after }, requeue_reason) = match &reconciler_result {
             Ok(action) =>
                 // do what user told us
                 (action.clone(), ReconcileReason::ReconcilerRequestedRetry),
             Err(err) =>
                 // reconciler fn call failed
-                (error_policy(err, err_context.clone()), ReconcileReason::ErrorPolicyRequestedRetry),
+                (reconciler_span.in_scope(|| error_policy(err, err_context.clone())), ReconcileReason::ErrorPolicyRequestedRetry),
         };
         let mut scheduler_tx = scheduler_tx.clone();
         async move {
@@ -486,12 +487,11 @@ where
     /// To watch the full set of `Child` objects in the given `Api` scope, you can use [`ListParams::default`].
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
-    pub fn owns<Child: Clone + Resource<DynamicType=()> + DeserializeOwned + Debug + Send + 'static>(
+    pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
         self,
         api: Api<Child>,
         lp: ListParams,
-    ) -> Self
-    {
+    ) -> Self {
         self.owns_with(api, (), lp)
     }
 
@@ -529,7 +529,7 @@ where
     /// to watch - in the Api's configured scope - and run through the custom mapper.
     /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`ListParams::default`].
     pub fn watches<
-        Other: Clone + Resource<DynamicType=()> + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
     >(
         self,
