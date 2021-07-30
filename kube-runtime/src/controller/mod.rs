@@ -268,10 +268,9 @@ where
         move |s| {
             Runner::new(scheduler(s), move |request| {
                 let request = request.clone();
-                let reconciler_span = info_span!("reconciling object", "object.ref" = %request.obj_ref, object.reason = tracing::field::Empty);
                 match store.get(&request.obj_ref) {
                     Some(obj) => {
-                        reconciler_span.record("object.reason", &tracing::field::display(&request.reason));
+                        let reconciler_span = info_span!("reconciling object", "object.ref" = %request.obj_ref, object.reason = %request.reason);
                         reconciler_span.in_scope(|| reconciler(obj, context.clone()))
                         .into_future()
                         .instrument(reconciler_span.clone())
