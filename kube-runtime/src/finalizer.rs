@@ -127,7 +127,7 @@ where
                 .context(CleanupFailed)?;
             // Cleanup was successful, remove the finalizer so that deletion can continue
             let finalizer_path = format!("/metadata/finalizers/{}", finalizer_i);
-            api.patch::<K>(
+            api.patch(
                 &name,
                 &PatchParams::default(),
                 &Patch::Json(json_patch::Patch(vec![
@@ -167,7 +167,7 @@ where
                     value: finalizer_name.into(),
                 })]
             });
-            api.patch::<K>(
+            api.patch(
                 obj.meta().name.as_deref().context(UnnamedObject)?,
                 &PatchParams::default(),
                 &Patch::Json(patch),

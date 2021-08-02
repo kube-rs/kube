@@ -1,6 +1,7 @@
 //! Scopes delimiting which objects an API call applies to
 
 use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope};
+use kube_core::Resource;
 
 /// A scope for interacting with Kubernetes objects
 pub trait Scope {
@@ -48,6 +49,15 @@ impl DynamicScope {
         match self {
             DynamicScope::Cluster(scope) => scope,
             DynamicScope::Namespace(scope) => scope,
+        }
+    }
+
+    pub(crate) fn of_object<T: Resource>(object: &T) -> Self {
+        match &object.meta().namespace {
+            Some(ns) => DynamicScope::Namespace(NamespaceScope {
+                namespace: ns.to_string(),
+            }),
+            None => DynamicScope::Cluster(ClusterScope),
         }
     }
 }

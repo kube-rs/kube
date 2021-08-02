@@ -5,7 +5,9 @@ use std::{fmt::Debug, time::Duration};
 
 use crate::{
     api::Api,
-    client::verb::{self, Create, Delete, DeleteCollection, Get, List, Query, Replace, Watch},
+    client::verb::{
+        self, Create, Delete, DeleteCollection, DeleteMode, Get, List, Query, Replace, Watch, WriteMode,
+    },
     Result,
 };
 use kube_core::{object::ObjectList, params::*, response::Status, Resource, WatchEvent};
@@ -92,10 +94,10 @@ where
     {
         Ok(self
             .client
-            .call(Create::<K, _> {
-                object: &data,
-                scope: &self.scope,
+            .call(Create::<K> {
+                object: data,
                 dyn_type: &self.dyn_type,
+                write_mode: &WriteMode::from_post_params(pp),
             })
             .await?)
     }
@@ -129,6 +131,7 @@ where
                 name,
                 scope: &self.scope,
                 dyn_type: &self.dyn_type,
+                delete_mode: &DeleteMode::from_delete_params(dp),
             })
             .await?)
         .map(Either::Left)
@@ -171,6 +174,8 @@ where
             .call(DeleteCollection::<K, _> {
                 scope: &self.scope,
                 dyn_type: &self.dyn_type,
+                query: &Query::from_list_params(lp),
+                delete_mode: &DeleteMode::from_delete_params(dp),
             })
             .await?)
         .map(Either::Left)
@@ -215,7 +220,12 @@ where
                 name,
                 scope: &self.scope,
                 dyn_type: &self.dyn_type,
+                force: pp.force,
                 patch,
+                write_mode: &WriteMode {
+                    dry_run: pp.dry_run,
+                    field_manager: pp.field_manager.as_deref(),
+                },
             })
             .await?)
     }
@@ -274,6 +284,7 @@ where
                 scope: &self.scope,
                 dyn_type: &self.dyn_type,
                 object: data,
+                write_mode: &WriteMode::from_post_params(pp),
             })
             .await?)
     }

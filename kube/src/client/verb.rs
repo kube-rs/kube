@@ -1,22 +1,20 @@
 //! Operations supported by kube
 
-use std::{str::FromStr, time::Duration};
-
+use crate::client::{
+    decoder::{DecodeSingle, DecodeStream},
+    scope::{self, DynamicScope, NativeScope, Scope},
+};
 use futures::TryFuture;
-use http::{header::CONTENT_TYPE, Request, Response, Uri};
+use http::{header::CONTENT_TYPE, Request, Response};
 use hyper::Body;
 use kube_core::{
     object::ObjectList,
-    params::{self, ListParams},
+    params::{self, DeleteParams, ListParams, PostParams, Preconditions, PropagationPolicy},
     Resource, WatchEvent,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
-
-use crate::client::{
-    decoder::{DecodeSingle, DecodeStream},
-    scope::{self, NativeScope},
-};
+use std::time::Duration;
 
 #[derive(Snafu, Debug)]
 #[allow(missing_docs)]
@@ -61,7 +59,7 @@ impl<'a, Kind: Resource + DeserializeOwned, Scope: NativeScope<Kind>> Verb for G
     fn to_http_request(&self) -> Result<Request<Body>> {
         Request::get(format!(
             "{}/{}",
-            Kind::url_path(&self.dyn_type, self.scope.namespace()),
+            Kind::url_path(self.dyn_type, self.scope.namespace()),
             self.name
         ))
         .body(Body::empty())
@@ -94,7 +92,7 @@ impl<'a, Kind: Resource + DeserializeOwned, Scope: scope::Scope> Verb for List<'
     type ResponseDecoder = DecodeSingle<ObjectList<Kind>>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
-        let mut url = format!("{}?", Kind::url_path(&self.dyn_type, self.scope.namespace()));
+        let mut url = format!("{}?", Kind::url_path(self.dyn_type, self.scope.namespace()));
         let mut qp = form_urlencoded::Serializer::new(&mut url);
         self.query.populate_qp(&mut qp);
         if let Some(limit) = self.limit {
@@ -153,7 +151,7 @@ impl<'a, Kind: Resource, Scope: scope::Scope> Verb for Watch<'a, Kind, Scope> {
     type ResponseDecoder = DecodeStream<WatchEvent<Kind>>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
-        let mut url = format!("{}?", Kind::url_path(&self.dyn_type, self.scope.namespace()),);
+        let mut url = format!("{}?", Kind::url_path(self.dyn_type, self.scope.namespace()),);
         let mut qp = form_urlencoded::Serializer::new(&mut url);
         qp.append_pair("watch", "1");
         qp.append_pair("resourceVersion", self.version);
@@ -166,29 +164,56 @@ impl<'a, Kind: Resource, Scope: scope::Scope> Verb for Watch<'a, Kind, Scope> {
 }
 
 /// Create a new object
-pub struct Create<'a, Kind: Resource, Scope> {
+pub struct Create<'a, Kind: Resource> {
     /// The object to be created
     pub object: &'a Kind,
-    /// The scope for the object to be created in
-    pub scope: &'a Scope,
     /// The type of the object
     pub dyn_type: &'a Kind::DynamicType,
+    /// The mode used when writing
+    pub write_mode: &'a WriteMode<'a>,
 }
-impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Verb
-    for Create<'a, Kind, Scope>
-{
+impl<'a, Kind: Resource + Serialize + DeserializeOwned> Verb for Create<'a, Kind> {
     type ResponseDecoder = DecodeSingle<Kind>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
-        Request::post(format!(
-            "{}/{}",
-            Kind::url_path(&self.dyn_type, self.scope.namespace()),
+        let mut url = format!(
+            "{}/{}?",
+            Kind::url_path(self.dyn_type, DynamicScope::of_object(self.object).namespace()),
             self.object.meta().name.as_ref().context(UnnamedObject)?
-        ))
-        .body(Body::from(
-            serde_json::to_vec(self.object).context(SerializeFailed)?,
-        ))
-        .context(BuildRequestFailed)
+        );
+        let mut qp = form_urlencoded::Serializer::new(&mut url);
+        self.write_mode.populate_qp(&mut qp);
+        Request::post(url)
+            .body(Body::from(
+                serde_json::to_vec(self.object).context(SerializeFailed)?,
+            ))
+            .context(BuildRequestFailed)
+    }
+}
+/// Specifies how to write modifications
+pub struct WriteMode<'a> {
+    /// When present, indicates that modifications should not be persisted.
+    pub dry_run: bool,
+
+    /// fieldManager is a name of the actor that is making changes. Required for [`Patch::Apply`]
+    /// optional for everything else.
+    pub field_manager: Option<&'a str>,
+}
+impl<'a> WriteMode<'a> {
+    fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<&mut String>) {
+        if self.dry_run {
+            qp.append_pair("dryRun", "All");
+        }
+        if let Some(fm) = self.field_manager {
+            qp.append_pair("fieldManager", fm);
+        }
+    }
+
+    pub(crate) fn from_post_params(pp: &'a PostParams) -> Self {
+        Self {
+            dry_run: pp.dry_run,
+            field_manager: pp.field_manager.as_deref(),
+        }
     }
 }
 
@@ -200,6 +225,8 @@ pub struct Delete<'a, Kind: Resource, Scope> {
     pub scope: &'a Scope,
     /// The type of the object
     pub dyn_type: &'a Kind::DynamicType,
+    /// The mode used when deleting
+    pub delete_mode: &'a DeleteMode<'a>,
 }
 impl<'a, Kind: Resource + DeserializeOwned, Scope: scope::Scope> Verb for Delete<'a, Kind, Scope> {
     type ResponseDecoder = DecodeSingle<Kind>;
@@ -207,11 +234,47 @@ impl<'a, Kind: Resource + DeserializeOwned, Scope: scope::Scope> Verb for Delete
     fn to_http_request(&self) -> Result<Request<Body>> {
         Request::delete(format!(
             "{}/{}",
-            Kind::url_path(&self.dyn_type, self.scope.namespace()),
+            Kind::url_path(self.dyn_type, self.scope.namespace()),
             self.name
         ))
-        .body(Body::empty())
+        .body(Body::from(
+            serde_json::to_vec(self.delete_mode).context(SerializeFailed)?,
+        ))
         .context(BuildRequestFailed)
+    }
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+/// Specifies how to delete objects
+pub struct DeleteMode<'a> {
+    /// When present, indicates that modifications should not be persisted.
+    pub dry_run: bool,
+
+    /// The duration before the object should be deleted, rounded down to the nearest second.
+    ///
+    /// The value zero indicates delete immediately.
+    /// If this value is `None`, the default grace period for the specified type will be used.
+    pub grace_period_seconds: Option<Duration>,
+
+    /// Whether or how garbage collection is performed.
+    ///
+    /// The default policy is decided by the existing finalizer set in
+    /// `metadata.finalizers`, and the resource-specific default policy.
+    pub propagation_policy: Option<&'a PropagationPolicy>,
+
+    /// Condtions that must be fulfilled before a deletion is carried out
+    ///
+    /// If not possible, a `409 Conflict` status will be returned.
+    pub preconditions: Option<&'a Preconditions>,
+}
+impl<'a> DeleteMode<'a> {
+    pub(crate) fn from_delete_params(dp: &'a DeleteParams) -> Self {
+        Self {
+            dry_run: dp.dry_run,
+            grace_period_seconds: dp.grace_period_seconds.map(u64::from).map(Duration::from_secs),
+            propagation_policy: dp.propagation_policy.as_ref(),
+            preconditions: dp.preconditions.as_ref(),
+        }
     }
 }
 
@@ -221,13 +284,22 @@ pub struct DeleteCollection<'a, Kind: Resource, Scope> {
     pub scope: &'a Scope,
     /// The type of the objects
     pub dyn_type: &'a Kind::DynamicType,
+    /// The query to filter the objects by
+    pub query: &'a Query<'a>,
+    /// The mode used when deleting
+    pub delete_mode: &'a DeleteMode<'a>,
 }
 impl<'a, Kind: Resource + DeserializeOwned, Scope: scope::Scope> Verb for DeleteCollection<'a, Kind, Scope> {
     type ResponseDecoder = DecodeSingle<ObjectList<Kind>>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
-        Request::delete(Kind::url_path(&self.dyn_type, self.scope.namespace()))
-            .body(Body::empty())
+        let mut url = format!("{}?", Kind::url_path(self.dyn_type, self.scope.namespace()));
+        let mut qp = form_urlencoded::Serializer::new(&mut url);
+        self.query.populate_qp(&mut qp);
+        Request::delete(url)
+            .body(Body::from(
+                serde_json::to_vec(self.delete_mode).context(SerializeFailed)?,
+            ))
             .context(BuildRequestFailed)
     }
 }
@@ -242,19 +314,29 @@ pub struct Patch<'a, Kind: Resource, Scope> {
     pub dyn_type: &'a Kind::DynamicType,
     /// The patch to be applied
     pub patch: &'a params::Patch<Kind>,
+    /// Whether to ignore conflicts where fields are owned by other field managers
+    pub force: bool,
+    /// The mode used when deleting
+    pub write_mode: &'a WriteMode<'a>,
 }
 impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Verb for Patch<'a, Kind, Scope> {
     type ResponseDecoder = DecodeSingle<Kind>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
-        Request::patch(format!(
-            "{}/{}",
-            Kind::url_path(&self.dyn_type, self.scope.namespace()),
+        let mut url = format!(
+            "{}/{}?",
+            Kind::url_path(self.dyn_type, self.scope.namespace()),
             self.name
-        ))
-        .header(CONTENT_TYPE, self.patch.content_type())
-        .body(Body::from(self.patch.serialize().context(SerializeFailed)?))
-        .context(BuildRequestFailed)
+        );
+        let mut qp = form_urlencoded::Serializer::new(&mut url);
+        if self.force {
+            qp.append_pair("force", "1");
+        }
+        self.write_mode.populate_qp(&mut qp);
+        Request::patch(url)
+            .header(CONTENT_TYPE, self.patch.content_type())
+            .body(Body::from(self.patch.serialize().context(SerializeFailed)?))
+            .context(BuildRequestFailed)
     }
 }
 
@@ -267,6 +349,8 @@ pub struct Replace<'a, Kind: Resource, Scope> {
     pub scope: &'a Scope,
     /// The type of the objects
     pub dyn_type: &'a Kind::DynamicType,
+    /// The mode used when deleting
+    pub write_mode: &'a WriteMode<'a>,
 }
 impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Verb
     for Replace<'a, Kind, Scope>
@@ -274,15 +358,18 @@ impl<'a, Kind: Resource + Serialize + DeserializeOwned, Scope: scope::Scope> Ver
     type ResponseDecoder = DecodeSingle<Kind>;
 
     fn to_http_request(&self) -> Result<Request<Body>> {
-        Request::patch(format!(
-            "{}/{}",
-            Kind::url_path(&self.dyn_type, self.scope.namespace()),
+        let mut url = format!(
+            "{}/{}?",
+            Kind::url_path(self.dyn_type, self.scope.namespace()),
             self.object.meta().name.as_ref().context(UnnamedObject)?
-        ))
-        .body(Body::from(
-            serde_json::to_vec(self.object).context(SerializeFailed)?,
-        ))
-        .context(BuildRequestFailed)
+        );
+        let mut qp = form_urlencoded::Serializer::new(&mut url);
+        self.write_mode.populate_qp(&mut qp);
+        Request::put(url)
+            .body(Body::from(
+                serde_json::to_vec(self.object).context(SerializeFailed)?,
+            ))
+            .context(BuildRequestFailed)
     }
 }
 
