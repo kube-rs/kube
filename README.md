@@ -35,9 +35,9 @@ See the [examples directory](./examples) for how to use any of these crates.
 
 Official examples:
 
-- [version-rs](https://github.com/clux/version-rs): super lightweight reflector deployment with actix 2 and prometheus metrics
+- [version-rs](https://github.com/kube-rs/version-rs): super lightweight reflector deployment with actix 2 and prometheus metrics
 
-- [controller-rs](https://github.com/clux/controller-rs): `Controller` owned by a `Manager` inside actix
+- [controller-rs](https://github.com/kube-rs/controller-rs): `Controller` owned by a `Manager` inside actix
 
 Real world users:
 
@@ -165,7 +165,7 @@ k8s-openapi = { version = "0.12.0", default-features = false, features = ["v1_20
 This will pull in `rustls` and `hyper-rustls`.
 
 ## musl-libc
-Kube will work with [distroless](https://github.com/clux/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/kube-rs/kube-rs/issues/331#issuecomment-715962188)).
+Kube will work with [distroless](https://github.com/kube-rs/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/kube-rs/kube-rs/issues/331#issuecomment-715962188)).
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.
