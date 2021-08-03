@@ -117,7 +117,7 @@ impl ListParams {
     /// Disables watch bookmarks to simplify watch handling
     ///
     /// This is not recommended to use with production watchers as it can cause desyncs.
-    /// See [#219](https://github.com/clux/kube-rs/issues/219) for details.
+    /// See [#219](https://github.com/kube-rs/kube-rs/issues/219) for details.
     pub fn disable_bookmarks(mut self) -> Self {
         self.bookmarks = false;
         self

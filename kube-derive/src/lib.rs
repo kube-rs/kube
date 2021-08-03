@@ -52,7 +52,7 @@ mod custom_resource;
 ///
 /// This example posts the generated `::crd` to the `CustomResourceDefinition` API.
 /// After this has been accepted (few secs max), you can start using `foos` as a normal
-/// kube `Api` object. See the `crd_` prefixed [examples](https://github.com/clux/kube-rs/blob/master/examples/)
+/// kube `Api` object. See the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples/)
 /// for details on this.
 ///
 /// ## Required properties
@@ -161,18 +161,18 @@ mod custom_resource;
 /// ## Customizing Schemas
 /// Should you need to customize the schemas, you can use:
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
-/// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/clux/kube-rs/blob/master/examples/crd_derive.rs))
-/// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/clux/kube-rs/issues/129#issuecomment-750852916)
+/// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive.rs))
+/// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/kube-rs/kube-rs/issues/129#issuecomment-750852916)
 ///
 /// In general, you will need to override parts of the schemas (for fields in question) when you are:
 /// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
-/// - **customizing [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy)** (e.g. like in the [`crd_derive_schema` example](https://github.com/clux/kube-rs/blob/master/examples/crd_derive_schema.rs))
-/// - **customizing [certain kubebuilder like validation rules](https://github.com/clux/kube-rs/issues/129#issuecomment-749463718)** (tail the issue for state of affairs)
+/// - **customizing [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy)** (e.g. like in the [`crd_derive_schema` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive_schema.rs))
+/// - **customizing [certain kubebuilder like validation rules](https://github.com/kube-rs/kube-rs/issues/129#issuecomment-749463718)** (tail the issue for state of affairs)
 /// - **embedding k8s-openapi types** within your structs (see [k8s-openapi#86](https://github.com/Arnavion/k8s-openapi/issues/86))
 ///
 /// See [kubernetes openapi validation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation) for the format of the OpenAPI v3 schemas.
 ///
-/// If you have to override a lot, [you can opt-out of schema-generation entirely](https://github.com/clux/kube-rs/issues/355#issuecomment-751253657)
+/// If you have to override a lot, [you can opt-out of schema-generation entirely](https://github.com/kube-rs/kube-rs/issues/355#issuecomment-751253657)
 ///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.

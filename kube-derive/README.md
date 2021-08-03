@@ -16,4 +16,4 @@ See the **[kube-derive API Docs](https://docs.rs/kube-derive/)**
 See the `crd_` prefixed [examples](../examples) for more.
 
 ## Development
-Help very welcome! Kubebuilder like features, testing improvement, openapi feature. See https://github.com/clux/kube-rs/labels/derive
+Help very welcome! Kubebuilder like features, testing improvement, openapi feature. See https://github.com/kube-rs/kube-rs/labels/derive
