@@ -1,5 +1,5 @@
 # kube-rs
-[![CI](https://github.com/clux/kube-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/clux/kube-rs/actions/workflows/ci.yml)
+[![CI](https://github.com/kube-rs/kube-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/kube-rs/kube-rs/actions/workflows/ci.yml)
 [![Client Capabilities](https://img.shields.io/badge/Kubernetes%20client-Silver-blue.svg?style=plastic&colorB=C0C0C0&colorA=306CE8)](http://bit.ly/kubernetes-client-capabilities-badge)
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-beta-green.svg?style=plastic&colorA=306CE8)](http://bit.ly/kubernetes-client-support-badge)
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
@@ -19,13 +19,13 @@ kube-runtime = "0.58.1"
 k8s-openapi = { version = "0.12.0", default-features = false, features = ["v1_20"] }
 ```
 
-[Features are available](https://github.com/clux/kube-rs/blob/master/kube/Cargo.toml#L18).
+[Features are available](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
 
 We recommend turning off `default-features` for `k8s-openapi` to speed up your compilation.
 
 ## Upgrading
 Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
-All crates herein are versioned and [released](./release.toml) together to guarantee [compatibility before 1.0](https://github.com/clux/kube-rs/issues/508).
+All crates herein are versioned and [released](./release.toml) together to guarantee [compatibility before 1.0](https://github.com/kube-rs/kube-rs/issues/508).
 
 ## Usage
 See the [examples directory](./examples) for how to use any of these crates.
@@ -153,7 +153,7 @@ Controller::new(root_kind_api, ListParams::default())
 Here `reconcile` and `error_policy` refer to functions you define. The first will be called when the root or child elements change, and the second when the `reconciler` returns an `Err`.
 
 ## Rustls
-Kube has basic support ([with caveats](https://github.com/clux/kube-rs/issues?q=is%3Aissue+is%3Aopen+rustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
+Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues?q=is%3Aissue+is%3Aopen+rustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
 
 ```toml
 [dependencies]
@@ -165,7 +165,7 @@ k8s-openapi = { version = "0.12.0", default-features = false, features = ["v1_20
 This will pull in `rustls` and `hyper-rustls`.
 
 ## musl-libc
-Kube will work with [distroless](https://github.com/clux/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/clux/kube-rs/issues/331#issuecomment-715962188)).
+Kube will work with [distroless](https://github.com/clux/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/kube-rs/kube-rs/issues/331#issuecomment-715962188)).
 
 ## License
 Apache 2.0 licensed. See LICENSE for details.

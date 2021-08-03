@@ -107,7 +107,7 @@ impl Discovery {
     ///     Ok(())
     /// }
     /// ```
-    /// See a bigger example in [examples/dynamic.api](https://github.com/clux/kube-rs/blob/master/examples/dynamic_api.rs)
+    /// See a bigger example in [examples/dynamic.api](https://github.com/kube-rs/kube-rs/blob/master/examples/dynamic_api.rs)
     pub async fn run(mut self) -> Result<Self> {
         self.groups.clear();
         let api_groups = self.client.list_api_groups().await?;

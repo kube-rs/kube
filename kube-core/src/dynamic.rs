@@ -1,6 +1,6 @@
 //! Contains types for using resource kinds not known at compile-time.
 //!
-//! For concrete usage see [examples prefixed with dynamic_](https://github.com/clux/kube-rs/tree/master/examples).
+//! For concrete usage see [examples prefixed with dynamic_](https://github.com/kube-rs/kube-rs/tree/master/examples).
 
 pub use crate::discovery::ApiResource;
 use crate::{metadata::TypeMeta, resource::Resource};

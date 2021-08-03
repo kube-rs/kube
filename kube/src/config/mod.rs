@@ -192,7 +192,7 @@ impl Config {
     }
 }
 
-// https://github.com/clux/kube-rs/issues/146#issuecomment-590924397
+// https://github.com/kube-rs/kube-rs/issues/146#issuecomment-590924397
 /// Default Timeout
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 

@@ -1,6 +1,6 @@
 # integration tests
 
-This is a working example of a kubernetes application `dapp`, that is deployed on CI during circle's `kind_k8s` and `kind_compile` job. See [this part of the .circleci/config](https://github.com/clux/kube-rs/blob/9837d60246a0528f8d810243fe544014d1e51dca/.circleci/config.yml#L32-L84).
+This is a working example of a kubernetes application `dapp`, that is deployed on CI during circle's `kind_k8s` and `kind_compile` job. See [this part of the .circleci/config](https://github.com/kube-rs/kube-rs/blob/9837d60246a0528f8d810243fe544014d1e51dca/.circleci/config.yml#L32-L84).
 
 ## Behavior
 The app currently only does what the `job_api` example does, but from within the cluster, so it needs the rbac permissions to `create` a `job` in `batch`.
