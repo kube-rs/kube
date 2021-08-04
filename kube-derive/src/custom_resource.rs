@@ -109,6 +109,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             fn status(&self) -> Option<&#ident> {
                 self.status.as_ref()
             }
+
+            fn status_mut(&mut self) -> Option<&mut #ident> {
+                self.status.as_mut()
+            }
         };
 
         let statustype = quote! {
@@ -121,6 +125,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         let snd = quote! {};
         let statusimpl = quote! {
             fn status(&self) -> Option<&Self::Status> {
+                None
+            }
+
+            fn status_mut(&self) -> Option<&mut Self::Status> {
                 None
             }
         };
@@ -402,6 +410,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
             fn spec(&self) -> &#ident {
                 &self.spec
+            }
+
+            fn spec_mut(&mut self) -> &mut #ident {
+                &mut self.spec
             }
 
             #statusimpl

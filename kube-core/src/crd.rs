@@ -30,7 +30,13 @@ pub mod v1 {
         fn spec(&self) -> &Self::Spec;
 
         /// TODO: Docs
+        fn spec_mut(&mut self) -> &mut Self::Spec;
+
+        /// TODO: Docs
         fn status(&self) -> Option<&Self::Status>;
+
+        /// TODO: Docs
+        fn status_mut(&mut self) -> Option<&mut Self::Status>;
     }
 }
 
@@ -62,7 +68,13 @@ pub mod v1beta1 {
         fn spec(&self) -> &Self::Spec;
 
         /// TODO: Docs
+        fn spec_mut(&mut self) -> &mut Self::Spec;
+
+        /// TODO: Docs
         fn status(&self) -> Option<&Self::Status>;
+
+        /// TODO: Docs
+        fn status_mut(&mut self) -> Option<&mut Self::Status>;
     }
 }
 

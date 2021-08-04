@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
     kind = "Foo",
     plural = "fooz",
     struct = "FooCrd",
+    status = "FooStatus",
     namespaced,
     derive = "PartialEq",
     derive = "Default",
