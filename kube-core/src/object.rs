@@ -102,6 +102,39 @@ impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
     }
 }
 
+/// A trait to access the `spec` for all Kubernetes objects that have one.
+///
+/// Some built-in Kubernetes resources and all custom resources do have a `spec` field.
+/// This trait can be used to access this field.
+///
+/// Note: Not all Kubernetes resources have a spec (e.g. `ConfigMap`, `Secret`, ...).
+pub trait HasSpec {
+
+    /// TODO
+    type Spec;
+
+    /// TODO
+    fn spec(&self) -> &Self::Spec;
+
+    /// TODO
+    fn spec_mut(&mut self) -> &mut Self::Spec;
+}
+
+/// TODO
+pub trait HasStatus {
+    /// TODO
+    type Status;
+
+    /// TODO
+    fn status(&self) -> Option<&Self::Status>;
+
+    /// TODO
+    fn status_mut(&mut self) -> &mut Option<Self::Status>;
+}
+
+
+
+
 // -------------------------------------------------------
 
 /// A standard Kubernetes object with `.spec` and `.status`.
@@ -204,6 +237,40 @@ where
         &mut self.metadata
     }
 }
+
+impl<P, U> HasSpec for Object<P, U> where
+    P: Clone,
+    U: Clone,
+{
+    type Spec = P;
+
+    fn spec(&self) -> &Self::Spec {
+        &self.spec
+    }
+
+    fn spec_mut(&mut self) -> &mut Self::Spec {
+        &mut self.spec
+    }
+}
+
+impl<P, U> HasStatus for Object<P, U>
+    where
+    P: Clone,
+    U: Clone,
+{
+    type Status = U;
+
+    fn status(&self) -> Option<&Self::Status> {
+        self.status.as_ref()
+    }
+
+    fn status_mut(&mut self) -> &mut Option<Self::Status> {
+        &mut self.status
+    }
+}
+
+
+
 
 /// Empty struct for when data should be discarded
 ///

@@ -1,6 +1,6 @@
 use darling::FromDeriveInput;
-use proc_macro2::{Ident, Span};
-use syn::{Data, DeriveInput, Path};
+use proc_macro2::{Ident, Span, TokenStream};
+use syn::{Data, DeriveInput, Path, Visibility};
 
 /// Values we can parse from #[kube(attrs)]
 #[derive(Debug, Default, FromDeriveInput)]
@@ -97,49 +97,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let rootident = Ident::new(&struct_name, Span::call_site());
 
     // if status set, also add that
-    let (statusq, statusdef, statusimpl, statustype) = if let Some(status_name) = &status {
-        let ident = format_ident!("{}", status_name);
-        let fst = quote! {
-            #[serde(skip_serializing_if = "Option::is_none")]
-            #visibility status: Option<#ident>,
-        };
-        let snd = quote! { status: None, };
-
-        let statusimpl = quote! {
-            fn status(&self) -> Option<&#ident> {
-                self.status.as_ref()
-            }
-
-            fn status_mut(&mut self) -> Option<&mut #ident> {
-                self.status.as_mut()
-            }
-        };
-
-        let statustype = quote! {
-            type Status = #ident;
-        };
-
-        (fst, snd, statusimpl, statustype)
-    } else {
-        let fst = quote! {};
-        let snd = quote! {};
-        let statusimpl = quote! {
-            fn status(&self) -> Option<&Self::Status> {
-                None
-            }
-
-            fn status_mut(&self) -> Option<&mut Self::Status> {
-                None
-            }
-        };
-        let statustype = quote! {
-            type Status = ();
-        };
-        (fst, snd, statusimpl, statustype)
-    };
+    let (statusq, statusdef, impl_hasstatus) = process_status(&rootident, &status, &visibility);
     let has_status = status.is_some();
-    let mut has_default = false;
 
+    // Always add some derives and filter out `Default` if requested because we'll implement that manually
+    // TODO: Move into function
     let mut derive_paths: Vec<Path> = vec![];
     for d in ["::serde::Serialize", "::serde::Deserialize", "Clone", "Debug"].iter() {
         match syn::parse_str(*d) {
@@ -147,6 +109,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             Ok(d) => derive_paths.push(d),
         }
     }
+
+    let mut has_default = false;
     for d in &derives {
         if d == "Default" {
             has_default = true; // overridden manually to avoid confusion
@@ -365,13 +329,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    // Implement the CustomResourcExt trait to allow users writing generic logic on top of them
+    // Implement the CustomResourceExt trait to allow users writing generic logic on top of them
     let impl_crd = quote! {
         impl #extver::CustomResourceExt for #rootident {
-
-            type Spec = #ident;
-
-            #statustype
 
             fn crd() -> #apiext::CustomResourceDefinition {
                 let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
@@ -408,6 +368,14 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 kube::core::ApiResource::erase::<Self>(&())
             }
 
+        }
+    };
+
+    // Implement the kube::core::object::HasSpec trait
+    let impl_hasspec = quote! {
+        impl kube::core::object::HasSpec for #rootident {
+            type Spec = #ident;
+
             fn spec(&self) -> &#ident {
                 &self.spec
             }
@@ -415,9 +383,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             fn spec_mut(&mut self) -> &mut #ident {
                 &mut self.spec
             }
-
-            #statusimpl
-
         }
     };
 
@@ -427,7 +392,42 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #impl_resource
         #impl_default
         #impl_crd
+        #impl_hasspec
+        #impl_hasstatus
     }
+}
+
+fn process_status(rootident: &Ident, status: &Option<String>, visibility: &Visibility) -> (TokenStream, TokenStream, TokenStream) {
+    let (statusq, statusdef, statusimpl) = if let Some(status_name) = &status {
+        let ident = format_ident!("{}", status_name);
+        let fst = quote! {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            #visibility status: Option<#ident>,
+        };
+        let snd = quote! { status: None, };
+
+        let statusimpl = quote! {
+            impl kube::core::object::HasStatus for #rootident {
+
+                type Status = #ident;
+
+                fn status(&self) -> Option<&#ident> {
+                    self.status.as_ref()
+                }
+
+                fn status_mut(&mut self) -> &mut Option<#ident> {
+                    &mut self.status
+                }
+            }
+        };
+        (fst, snd, statusimpl)
+    } else {
+        let fst = quote! {};
+        let snd = quote! {};
+        let statusimpl = quote! {};
+        (fst, snd, statusimpl)
+    };
+    (statusq, statusdef, statusimpl)
 }
 
 // Simple pluralizer.

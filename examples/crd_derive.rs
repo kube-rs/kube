@@ -1,5 +1,5 @@
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
-use kube::{CustomResource, CustomResourceExt, Resource};
+use kube::{CustomResource, Resource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +45,8 @@ fn main() {
         is_bad: true,
         conditions: vec![],
     });
+    use kube::core::object::HasSpec;
+    use kube::core::object::HasStatus;
     println!("{:?}", foo.spec());
     println!("{:?}", foo.status());
 }
