@@ -22,6 +22,7 @@ UNRELEASED
   - BREAKING: `scheduler` now shuts down immediately when `requests` terminates, rather than waiting for the pending reconciliations to drain
  * `kube-runtime` added tracking for reconciliation reason
   - Added: `Controller::owns_with` and `Controller::watches_with` to pass a `dyntype` argument for dynamic `Api`s - [#575](https://github.com/kube-rs/kube-rs/issues/575)
+  - BREAKING: `Controller::owns` signature changed to not allow `DynamicType`s.
   - BREAKING: `controller::trigger_*` now returns a `ReconcileRequest` rather than `ObjectRef`. The `ObjectRef` can be accessed via the `obj_ref` field
 
 ### Known Issues
