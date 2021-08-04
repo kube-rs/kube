@@ -8,7 +8,6 @@ pub mod v1 {
     ///
     /// This trait variant is implemented by default (or when `#[kube(apiextensions = "v1")]`)
     pub trait CustomResourceExt {
-
         /// Helper to generate the CRD including the JsonSchema
         ///
         /// This is using the stable v1::CustomResourceDefinitions (present in kubernetes >= 1.16)

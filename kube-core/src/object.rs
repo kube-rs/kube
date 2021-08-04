@@ -102,38 +102,45 @@ impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
     }
 }
 
-/// A trait to access the `spec` for all Kubernetes objects that have one.
+/// A trait to access the `spec` of a Kubernetes resource.
 ///
 /// Some built-in Kubernetes resources and all custom resources do have a `spec` field.
 /// This trait can be used to access this field.
 ///
+/// This trait is automatically implemented by the kube-derive macro and is _not_ currently
+/// implemented for the Kubernetes API objects from `k8s_openapi`.
+///
 /// Note: Not all Kubernetes resources have a spec (e.g. `ConfigMap`, `Secret`, ...).
 pub trait HasSpec {
-
-    /// TODO
+    /// The type of the `spec` of this resource
     type Spec;
 
-    /// TODO
+    /// Returns a reference to the `spec` object
     fn spec(&self) -> &Self::Spec;
 
-    /// TODO
+    /// Returns a mutable reference to the `spec` object
     fn spec_mut(&mut self) -> &mut Self::Spec;
 }
 
-/// TODO
+/// A trait to access the `status` of a Kubernetes resource.
+///
+/// Some built-in Kubernetes resources and custom resources do have a `status` field.
+/// This trait can be used to access this field.
+///
+/// This trait is automatically implemented by the kube-derive macro and is _not_ currently
+/// implemented for the Kubernetes API objects from `k8s_openapi`.
+///
+/// Note: Not all Kubernetes resources have a status (e.g. `ConfigMap`, `Secret`, ...).
 pub trait HasStatus {
-    /// TODO
+    /// The type of the `status` object
     type Status;
 
-    /// TODO
+    /// Returns an optional reference to the `status` of the object
     fn status(&self) -> Option<&Self::Status>;
 
-    /// TODO
+    /// Returns an optional mutable reference to the `status` object
     fn status_mut(&mut self) -> &mut Option<Self::Status>;
 }
-
-
-
 
 // -------------------------------------------------------
 
@@ -238,7 +245,8 @@ where
     }
 }
 
-impl<P, U> HasSpec for Object<P, U> where
+impl<P, U> HasSpec for Object<P, U>
+where
     P: Clone,
     U: Clone,
 {
@@ -254,7 +262,7 @@ impl<P, U> HasSpec for Object<P, U> where
 }
 
 impl<P, U> HasStatus for Object<P, U>
-    where
+where
     P: Clone,
     U: Clone,
 {
@@ -268,9 +276,6 @@ impl<P, U> HasStatus for Object<P, U>
         &mut self.status
     }
 }
-
-
-
 
 /// Empty struct for when data should be discarded
 ///
