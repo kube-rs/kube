@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
     plural = "fooz",
     struct = "FooCrd",
     namespaced,
-    status = "FooStatus",
     derive = "PartialEq",
     derive = "Default",
     shortname = "f",
@@ -45,9 +44,8 @@ fn main() {
         is_bad: true,
         conditions: vec![],
     });
-    println!("Spec: {:?}", foo.spec);
-    let crd = serde_json::to_string_pretty(&FooCrd::crd()).unwrap();
-    println!("Foo CRD: \n{}", crd);
+    println!("{:?}", foo.spec());
+    println!("{:?}", foo.status());
 }
 
 fn conditions(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {

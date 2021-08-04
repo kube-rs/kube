@@ -97,18 +97,37 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let rootident = Ident::new(&struct_name, Span::call_site());
 
     // if status set, also add that
-    let (statusq, statusdef) = if let Some(status_name) = &status {
+    let (statusq, statusdef, statusimpl, statustype) = if let Some(status_name) = &status {
         let ident = format_ident!("{}", status_name);
         let fst = quote! {
             #[serde(skip_serializing_if = "Option::is_none")]
             #visibility status: Option<#ident>,
         };
         let snd = quote! { status: None, };
-        (fst, snd)
+
+        let statusimpl = quote! {
+            fn status(&self) -> Option<&#ident> {
+                self.status.as_ref()
+            }
+        };
+
+        let statustype = quote! {
+            type Status = #ident;
+        };
+
+        (fst, snd, statusimpl, statustype)
     } else {
         let fst = quote! {};
         let snd = quote! {};
-        (fst, snd)
+        let statusimpl = quote! {
+            fn status(&self) -> Option<&Self::Status> {
+                None
+            }
+        };
+        let statustype = quote! {
+            type Status = ();
+        };
+        (fst, snd, statusimpl, statustype)
     };
     let has_status = status.is_some();
     let mut has_default = false;
@@ -341,6 +360,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // Implement the CustomResourcExt trait to allow users writing generic logic on top of them
     let impl_crd = quote! {
         impl #extver::CustomResourceExt for #rootident {
+
+            type Spec = #ident;
+
+            #statustype
+
             fn crd() -> #apiext::CustomResourceDefinition {
                 let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
                 let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
@@ -375,6 +399,13 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             fn api_resource() -> kube::core::ApiResource {
                 kube::core::ApiResource::erase::<Self>(&())
             }
+
+            fn spec(&self) -> &#ident {
+                &self.spec
+            }
+
+            #statusimpl
+
         }
     };
 

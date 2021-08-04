@@ -8,6 +8,13 @@ pub mod v1 {
     ///
     /// This trait variant is implemented by default (or when `#[kube(apiextensions = "v1")]`)
     pub trait CustomResourceExt {
+
+        /// TODO: Docs
+        type Spec;
+
+        /// TODO: Docs
+        type Status;
+
         /// Helper to generate the CRD including the JsonSchema
         ///
         /// This is using the stable v1::CustomResourceDefinitions (present in kubernetes >= 1.16)
@@ -18,6 +25,12 @@ pub mod v1 {
         fn crd_name() -> &'static str;
         /// Helper to generate the api information type for use with the dynamic `Api`
         fn api_resource() -> crate::discovery::ApiResource;
+
+        /// TODO: Docs
+        fn spec(&self) -> &Self::Spec;
+
+        /// TODO: Docs
+        fn status(&self) -> Option<&Self::Status>;
     }
 }
 
@@ -27,6 +40,13 @@ pub mod v1beta1 {
     ///
     /// This trait variant is only implemented with `#[kube(apiextensions = "v1beta1")]`
     pub trait CustomResourceExt {
+
+        /// TODO: Docs
+        type Spec;
+
+        /// TODO: Docs
+        type Status;
+
         /// Helper to generate the legacy CRD without a JsonSchema
         ///
         /// This is using v1beta1::CustomResourceDefinitions (which will be removed in kubernetes 1.22)
@@ -37,6 +57,12 @@ pub mod v1beta1 {
         fn crd_name() -> &'static str;
         /// Helper to generate the api information type for use with the dynamic `Api`
         fn api_resource() -> crate::discovery::ApiResource;
+
+        /// TODO: Docs
+        fn spec(&self) -> &Self::Spec;
+
+        /// TODO: Docs
+        fn status(&self) -> Option<&Self::Status>;
     }
 }
 
