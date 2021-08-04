@@ -5,6 +5,7 @@ UNRELEASED
  * `kube` client connects to kubernetes via cluster dns when using `rustls` - #587 via #597
  * `kube` client now works with `rustls` feature in cluster - #153 via #597
  * `kube-core` added `CrdExtensions::crd_name` method (implemented by `kube-derive`) - #583
+ * TODO
 
 0.58.1 / 2021-07-06
 ===================
