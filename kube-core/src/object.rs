@@ -115,10 +115,10 @@ pub trait HasSpec {
     /// The type of the `spec` of this resource
     type Spec;
 
-    /// Returns a reference to the `spec` object
+    /// Returns a reference to the `spec` of the object
     fn spec(&self) -> &Self::Spec;
 
-    /// Returns a mutable reference to the `spec` object
+    /// Returns a mutable reference to the `spec` of the object
     fn spec_mut(&mut self) -> &mut Self::Spec;
 }
 

@@ -417,17 +417,21 @@ fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
 /// * `status`: The optional name of the `status` struct to use
 /// * `visibility`: Desired visibility of the generated field
 ///
-/// returns: (TokenStream, TokenStream, TokenStream)
+/// returns: A tuple of (status_field, status_default, status_impl)
+/// * `status_field` is the code to be used for the field in the main struct
+/// * `status_default` is the initialization code to use in a `Default` implementation
+/// * `status_impl` is the implementation code for the `HasStatus` trait
 fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visibility) -> (TokenStream, TokenStream, TokenStream) {
-    let (status_q, status_def, status_impl) = if let Some(status_name) = &status {
+    if let Some(status_name) = &status {
         let ident = format_ident!("{}", status_name);
+
         let status_field = quote! {
             #[serde(skip_serializing_if = "Option::is_none")]
             #visibility status: Option<#ident>,
         };
         let status_default = quote! { status: None, };
 
-        let statusimpl = quote! {
+        let status_impl = quote! {
             impl kube::core::object::HasStatus for #root_ident {
 
                 type Status = #ident;
@@ -441,14 +445,13 @@ fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visi
                 }
             }
         };
-        (status_field, status_default, statusimpl)
+        (status_field, status_default, status_impl)
     } else {
-        let fst = quote! {};
-        let snd = quote! {};
-        let statusimpl = quote! {};
-        (fst, snd, statusimpl)
-    };
-    (status_q, status_def, status_impl)
+        let status_field = quote! {};
+        let status_default = quote! {};
+        let status_impl = quote! {};
+        (status_field, status_default, status_impl)
+    }
 }
 
 // Simple pluralizer.
