@@ -96,7 +96,7 @@ impl Client {
         S::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
         B::Error: std::error::Error + Send + Sync + 'static,
-        T: Into<String>
+        T: Into<String>,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
         let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))

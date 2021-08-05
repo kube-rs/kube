@@ -8,8 +8,8 @@ mod core_methods;
 mod subresource;
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub use subresource::{AttachParams, Attach, Execute};
-pub use subresource::{EvictParams, Evict, LogParams, Log, ScaleSpec, ScaleStatus};
+pub use subresource::{Attach, AttachParams, Execute};
+pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
 
 // Re-exports from kube-core
 #[cfg(feature = "admission")]
