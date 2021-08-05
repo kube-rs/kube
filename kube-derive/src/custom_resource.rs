@@ -1,6 +1,6 @@
 use darling::FromDeriveInput;
-use proc_macro2::{Ident, Span};
-use syn::{Data, DeriveInput, Path};
+use proc_macro2::{Ident, Span, TokenStream};
+use syn::{Data, DeriveInput, Path, Visibility};
 
 /// Values we can parse from #[kube(attrs)]
 #[derive(Debug, Default, FromDeriveInput)]
@@ -97,21 +97,12 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let rootident = Ident::new(&struct_name, Span::call_site());
 
     // if status set, also add that
-    let (statusq, statusdef) = if let Some(status_name) = &status {
-        let ident = format_ident!("{}", status_name);
-        let fst = quote! {
-            #[serde(skip_serializing_if = "Option::is_none")]
-            #visibility status: Option<#ident>,
-        };
-        let snd = quote! { status: None, };
-        (fst, snd)
-    } else {
-        let fst = quote! {};
-        let snd = quote! {};
-        (fst, snd)
-    };
+    let StatusInformation {
+        field: status_field,
+        default: status_default,
+        impl_hasstatus,
+    } = process_status(&rootident, &status, &visibility);
     let has_status = status.is_some();
-    let mut has_default = false;
 
     let mut derive_paths: Vec<Path> = vec![];
     for d in ["::serde::Serialize", "::serde::Deserialize", "Clone", "Debug"].iter() {
@@ -120,6 +111,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             Ok(d) => derive_paths.push(d),
         }
     }
+    let mut has_default = false;
     for d in &derives {
         if d == "Default" {
             has_default = true; // overridden manually to avoid confusion
@@ -162,7 +154,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             #schemars_skip
             #visibility metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
             #visibility spec: #ident,
-            #statusq
+            #status_field
         }
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
@@ -174,7 +166,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                         ..Default::default()
                     },
                     spec: spec,
-                    #statusdef
+                    #status_default
                 }
             }
         }
@@ -230,7 +222,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                         kind: <#rootident as kube::Resource>::kind(&()).to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
-                        #statusdef
+                        #status_default
                     }
                 }
             }
@@ -338,9 +330,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    // Implement the CustomResourcExt trait to allow users writing generic logic on top of them
+    // Implement the CustomResourceExt trait to allow users writing generic logic on top of them
     let impl_crd = quote! {
         impl #extver::CustomResourceExt for #rootident {
+
             fn crd() -> #apiext::CustomResourceDefinition {
                 let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
                 let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
@@ -375,8 +368,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             fn api_resource() -> kube::core::ApiResource {
                 kube::core::ApiResource::erase::<Self>(&())
             }
+
         }
     };
+
+    let impl_hasspec = generate_hasspec(&ident, &rootident);
 
     // Concat output
     quote! {
@@ -384,6 +380,86 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #impl_resource
         #impl_default
         #impl_crd
+        #impl_hasspec
+        #impl_hasstatus
+    }
+}
+
+/// This generates the code for the `kube::core::object::HasSpec` trait implementation.
+///
+/// All CRDs have a spec so it is implemented for all of them.
+///
+/// # Arguments
+///
+/// * `ident`: The identity (name) of the spec struct
+/// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
+fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
+    quote! {
+        impl ::kube::core::object::HasSpec for #root_ident {
+            type Spec = #spec_ident;
+
+            fn spec(&self) -> &#spec_ident {
+                &self.spec
+            }
+
+            fn spec_mut(&mut self) -> &mut #spec_ident {
+                &mut self.spec
+            }
+        }
+    }
+}
+
+struct StatusInformation {
+    /// The code to be used for the field in the main struct
+    field: TokenStream,
+    /// The initialization code to use in a `Default` and `::new()` implementation
+    default: TokenStream,
+    /// The implementation code for the `HasStatus` trait
+    impl_hasstatus: TokenStream,
+}
+
+/// This processes the `status` field of a CRD.
+///
+/// As it is optional some features will be turned on or off depending on whether it's available or not.
+///
+/// # Arguments
+///
+/// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
+/// * `status`: The optional name of the `status` struct to use
+/// * `visibility`: Desired visibility of the generated field
+///
+/// returns: A `StatusInformation` struct
+fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visibility) -> StatusInformation {
+    if let Some(status_name) = &status {
+        let ident = format_ident!("{}", status_name);
+        StatusInformation {
+            field: quote! {
+                #[serde(skip_serializing_if = "Option::is_none")]
+                #visibility status: Option<#ident>,
+            },
+            default: quote! { status: None, },
+            impl_hasstatus: quote! {
+                impl ::kube::core::object::HasStatus for #root_ident {
+
+                    type Status = #ident;
+
+                    fn status(&self) -> Option<&#ident> {
+                        self.status.as_ref()
+                    }
+
+                    fn status_mut(&mut self) -> &mut Option<#ident> {
+                        &mut self.status
+                    }
+                }
+            },
+        }
+    } else {
+        let empty_quote = quote! {};
+        StatusInformation {
+            field: empty_quote.clone(),
+            default: empty_quote.clone(),
+            impl_hasstatus: empty_quote,
+        }
     }
 }
 
