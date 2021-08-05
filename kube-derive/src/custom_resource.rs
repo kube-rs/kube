@@ -368,7 +368,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    let impl_hasspec = generate_hasspec(ident, rootident);
+    let impl_hasspec = generate_hasspec(&ident, &rootident);
 
     // Concat output
     quote! {
@@ -390,7 +390,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 ///
 /// * `ident`: The identity (name) of the spec struct
 /// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
-fn generate_hasspec(spec_ident: Ident, root_ident: Ident) -> TokenStream {
+fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
     quote! {
         impl kube::core::object::HasSpec for #root_ident {
             type Spec = #spec_ident;
@@ -406,17 +406,29 @@ fn generate_hasspec(spec_ident: Ident, root_ident: Ident) -> TokenStream {
     }
 }
 
-fn process_status(rootident: &Ident, status: &Option<String>, visibility: &Visibility) -> (TokenStream, TokenStream, TokenStream) {
-    let (statusq, statusdef, statusimpl) = if let Some(status_name) = &status {
+
+/// This processes the `status` field of a CRD.
+///
+/// As it is optional some features will be turned on or off depending on whether it's available or not.
+///
+/// # Arguments
+///
+/// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
+/// * `status`: The optional name of the `status` struct to use
+/// * `visibility`: Desired visibility of the generated field
+///
+/// returns: (TokenStream, TokenStream, TokenStream)
+fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visibility) -> (TokenStream, TokenStream, TokenStream) {
+    let (status_q, status_def, status_impl) = if let Some(status_name) = &status {
         let ident = format_ident!("{}", status_name);
-        let fst = quote! {
+        let status_field = quote! {
             #[serde(skip_serializing_if = "Option::is_none")]
             #visibility status: Option<#ident>,
         };
-        let snd = quote! { status: None, };
+        let status_default = quote! { status: None, };
 
         let statusimpl = quote! {
-            impl kube::core::object::HasStatus for #rootident {
+            impl kube::core::object::HasStatus for #root_ident {
 
                 type Status = #ident;
 
@@ -429,14 +441,14 @@ fn process_status(rootident: &Ident, status: &Option<String>, visibility: &Visib
                 }
             }
         };
-        (fst, snd, statusimpl)
+        (status_field, status_default, statusimpl)
     } else {
         let fst = quote! {};
         let snd = quote! {};
         let statusimpl = quote! {};
         (fst, snd, statusimpl)
     };
-    (statusq, statusdef, statusimpl)
+    (status_q, status_def, status_impl)
 }
 
 // Simple pluralizer.
