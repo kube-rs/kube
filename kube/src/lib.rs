@@ -140,7 +140,7 @@ pub mod core {
     pub use kube_core::admission;
     pub use kube_core::{
   crd::{self, CustomResourceExt},
-        dynamic::{self, ApiResource, DynamicObject},
+  dynamic::{self, ApiResource, DynamicObject},
         gvk::{self, GroupVersionKind, GroupVersionResource},
         metadata::{self, ListMeta, ObjectMeta, TypeMeta},
         object::{self, NotUsed, Object, ObjectList},
