@@ -132,7 +132,4 @@ jobs:
           toolchain: nightly
           components: rustfmt
           override: true
-      - uses: actions-rs/cargo@v1.0.3
-        with:
-          command: fmt
-          args: --all -- --check
+      - run: rustfmt +nightly --edition 2018 --check **/*.rs
