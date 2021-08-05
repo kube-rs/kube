@@ -100,8 +100,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let (statusq, statusdef, impl_hasstatus) = process_status(&rootident, &status, &visibility);
     let has_status = status.is_some();
 
-    // Always add some derives and filter out `Default` if requested because we'll implement that manually
-    // TODO: Move into function
     let mut derive_paths: Vec<Path> = vec![];
     for d in ["::serde::Serialize", "::serde::Deserialize", "Clone", "Debug"].iter() {
         match syn::parse_str(*d) {
@@ -109,7 +107,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             Ok(d) => derive_paths.push(d),
         }
     }
-
     let mut has_default = false;
     for d in &derives {
         if d == "Default" {
@@ -371,20 +368,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    // Implement the kube::core::object::HasSpec trait
-    let impl_hasspec = quote! {
-        impl kube::core::object::HasSpec for #rootident {
-            type Spec = #ident;
-
-            fn spec(&self) -> &#ident {
-                &self.spec
-            }
-
-            fn spec_mut(&mut self) -> &mut #ident {
-                &mut self.spec
-            }
-        }
-    };
+    let impl_hasspec = generate_hasspec(ident, rootident);
 
     // Concat output
     quote! {
@@ -394,6 +378,31 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #impl_crd
         #impl_hasspec
         #impl_hasstatus
+    }
+}
+
+
+/// This generates the code for the `kube::core::object::HasSpec` trait implementation.
+///
+/// All CRDs have a spec so it is implemented for all of them.
+///
+/// # Arguments
+///
+/// * `ident`: The identity (name) of the spec struct
+/// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
+fn generate_hasspec(spec_ident: Ident, root_ident: Ident) -> TokenStream {
+    quote! {
+        impl kube::core::object::HasSpec for #root_ident {
+            type Spec = #spec_ident;
+
+            fn spec(&self) -> &#spec_ident {
+                &self.spec
+            }
+
+            fn spec_mut(&mut self) -> &mut #spec_ident {
+                &mut self.spec
+            }
+        }
     }
 }
 

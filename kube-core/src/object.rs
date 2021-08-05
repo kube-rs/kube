@@ -138,7 +138,7 @@ pub trait HasStatus {
     /// Returns an optional reference to the `status` of the object
     fn status(&self) -> Option<&Self::Status>;
 
-    /// Returns an optional mutable reference to the `status` object
+    /// Returns an optional mutable reference to the `status` of the object
     fn status_mut(&mut self) -> &mut Option<Self::Status>;
 }
 
