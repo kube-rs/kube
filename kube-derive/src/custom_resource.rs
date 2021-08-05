@@ -409,7 +409,6 @@ fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
     }
 }
 
-#[derive(Default)]
 struct StatusInformation {
     /// The code to be used for the field in the main struct
     field: TokenStream,
@@ -433,34 +432,34 @@ struct StatusInformation {
 fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visibility) -> StatusInformation {
     if let Some(status_name) = &status {
         let ident = format_ident!("{}", status_name);
-
-        let field = quote! {
-            #[serde(skip_serializing_if = "Option::is_none")]
-            #visibility status: Option<#ident>,
-        };
-        let default = quote! { status: None, };
-
-        let impl_hasstatus = quote! {
-            impl ::kube::core::object::HasStatus for #root_ident {
-
-                type Status = #ident;
-
-                fn status(&self) -> Option<&#ident> {
-                    self.status.as_ref()
-                }
-
-                fn status_mut(&mut self) -> &mut Option<#ident> {
-                    &mut self.status
-                }
-            }
-        };
         StatusInformation {
-            field,
-            default,
-            impl_hasstatus,
+            field: quote! {
+                #[serde(skip_serializing_if = "Option::is_none")]
+                #visibility status: Option<#ident>,
+            },
+            default: quote! { status: None, },
+            impl_hasstatus: quote! {
+                impl ::kube::core::object::HasStatus for #root_ident {
+
+                    type Status = #ident;
+
+                    fn status(&self) -> Option<&#ident> {
+                        self.status.as_ref()
+                    }
+
+                    fn status_mut(&mut self) -> &mut Option<#ident> {
+                        &mut self.status
+                    }
+                }
+            },
         }
     } else {
-        StatusInformation::default()
+        let empty_quote = quote! {};
+        StatusInformation {
+            field: empty_quote.clone(),
+            default: empty_quote.clone(),
+            impl_hasstatus: empty_quote,
+        }
     }
 }
 
