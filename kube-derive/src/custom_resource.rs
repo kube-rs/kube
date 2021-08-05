@@ -97,7 +97,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let rootident = Ident::new(&struct_name, Span::call_site());
 
     // if status set, also add that
-    let (statusq, statusdef, impl_hasstatus) = process_status(&rootident, &status, &visibility);
+    let StatusInformation {
+        field: status_field,
+        default: status_default,
+        impl_hasstatus,
+    } = process_status(&rootident, &status, &visibility);
     let has_status = status.is_some();
 
     let mut derive_paths: Vec<Path> = vec![];
@@ -150,7 +154,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             #schemars_skip
             #visibility metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
             #visibility spec: #ident,
-            #statusq
+            #status_field
         }
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
@@ -162,7 +166,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                         ..Default::default()
                     },
                     spec: spec,
-                    #statusdef
+                    #status_default
                 }
             }
         }
@@ -218,7 +222,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                         kind: <#rootident as kube::Resource>::kind(&()).to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
-                        #statusdef
+                        #status_default
                     }
                 }
             }
@@ -381,7 +385,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     }
 }
 
-
 /// This generates the code for the `kube::core::object::HasSpec` trait implementation.
 ///
 /// All CRDs have a spec so it is implemented for all of them.
@@ -406,6 +409,15 @@ fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
     }
 }
 
+#[derive(Default)]
+struct StatusInformation {
+    /// The code to be used for the field in the main struct
+    field: TokenStream,
+    /// The initialization code to use in a `Default` and `::new()` implementation
+    default: TokenStream,
+    /// The implementation code for the `HasStatus` trait
+    impl_hasstatus: TokenStream,
+}
 
 /// This processes the `status` field of a CRD.
 ///
@@ -417,21 +429,18 @@ fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
 /// * `status`: The optional name of the `status` struct to use
 /// * `visibility`: Desired visibility of the generated field
 ///
-/// returns: A tuple of (status_field, status_default, status_impl)
-/// * `status_field` is the code to be used for the field in the main struct
-/// * `status_default` is the initialization code to use in a `Default` implementation
-/// * `status_impl` is the implementation code for the `HasStatus` trait
-fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visibility) -> (TokenStream, TokenStream, TokenStream) {
+/// returns: A `StatusInformation` struct
+fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visibility) -> StatusInformation {
     if let Some(status_name) = &status {
         let ident = format_ident!("{}", status_name);
 
-        let status_field = quote! {
+        let field = quote! {
             #[serde(skip_serializing_if = "Option::is_none")]
             #visibility status: Option<#ident>,
         };
-        let status_default = quote! { status: None, };
+        let default = quote! { status: None, };
 
-        let status_impl = quote! {
+        let impl_hasstatus = quote! {
             impl ::kube::core::object::HasStatus for #root_ident {
 
                 type Status = #ident;
@@ -445,12 +454,13 @@ fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visi
                 }
             }
         };
-        (status_field, status_default, status_impl)
+        StatusInformation {
+            field,
+            default,
+            impl_hasstatus,
+        }
     } else {
-        let status_field = quote! {};
-        let status_default = quote! {};
-        let status_impl = quote! {};
-        (status_field, status_default, status_impl)
+        StatusInformation::default()
     }
 }
 
