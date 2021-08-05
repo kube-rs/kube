@@ -392,7 +392,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 /// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
 fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
     quote! {
-        impl kube::core::object::HasSpec for #root_ident {
+        impl ::kube::core::object::HasSpec for #root_ident {
             type Spec = #spec_ident;
 
             fn spec(&self) -> &#spec_ident {
@@ -432,7 +432,7 @@ fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visi
         let status_default = quote! { status: None, };
 
         let status_impl = quote! {
-            impl kube::core::object::HasStatus for #root_ident {
+            impl ::kube::core::object::HasStatus for #root_ident {
 
                 type Status = #ident;
 
