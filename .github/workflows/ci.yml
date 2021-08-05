@@ -12,7 +12,7 @@ jobs:
         # TODO: add windows-latest (see #566)
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - uses: actions-rs/toolchain@v1
         with:
           override: true
@@ -56,7 +56,7 @@ jobs:
     # Integration tests are linux only
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
 
       - uses: actions/cache@v2
         with:
