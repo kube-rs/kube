@@ -188,6 +188,7 @@ where
 {
     /// A constructor that takes Resource values from an `ApiResource`
     pub fn new(name: &str, ar: &ApiResource, spec: P) -> Self {
+        let foo = 3.14;
         Self {
             types: Some(TypeMeta {
                 api_version: ar.api_version.clone(),
