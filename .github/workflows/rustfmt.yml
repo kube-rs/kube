@@ -25,6 +25,7 @@ jobs:
         uses: peter-evans/create-pull-request@v3
         with:
           commit-message: rustfmt
+          signoff: true
           title: rustfmt
           body: |
             Changes from `rustfmt +nightly --edition 2018 **/*.rs`.
