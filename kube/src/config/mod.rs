@@ -91,16 +91,17 @@ impl Config {
     /// and relies on you having the service account's token mounted,
     /// as well as having given the service account rbac access to do what you need.
     pub fn from_cluster_env() -> Result<Self> {
-
         let cluster_url = if cfg!(feature = "rustls-tls") {
             // try rolling out new method for rustls which does not support ip based urls anyway
             // see https://github.com/kube-rs/kube-rs/issues/587
             incluster_config::kube_dns()
         } else {
-            incluster_config::kube_server().ok_or(ConfigError::MissingInClusterVariables {
-                hostenv: incluster_config::SERVICE_HOSTENV,
-                portenv: incluster_config::SERVICE_PORTENV,
-            })?.parse::<http::Uri>()?
+            incluster_config::kube_server()
+                .ok_or(ConfigError::MissingInClusterVariables {
+                    hostenv: incluster_config::SERVICE_HOSTENV,
+                    portenv: incluster_config::SERVICE_PORTENV,
+                })?
+                .parse::<http::Uri>()?
         };
 
         let default_namespace = incluster_config::load_default_ns()
