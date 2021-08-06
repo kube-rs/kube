@@ -134,4 +134,4 @@ jobs:
           override: true
       - name: Run rustfmt
         id: rustfmt
-        run: rustfmt +nightly --edition 2018 --verbose --check $(find -name '*.rs')
+        run: rustfmt +nightly --edition 2018 --check $(find -name '*.rs')
