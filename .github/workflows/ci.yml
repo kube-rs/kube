@@ -133,5 +133,5 @@ jobs:
           components: rustfmt
           override: true
       - run: |
-          rustfmt +nightly --edition 2018 --check **/*.rs
-          echo $?
+          OUTPUT=$(rustfmt +nightly --edition 2018 --check **/*.rs)
+          echo $OUTPUT
