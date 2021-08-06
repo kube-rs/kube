@@ -132,4 +132,6 @@ jobs:
           toolchain: nightly
           components: rustfmt
           override: true
-      - run: foobarrustfmt +nightly --edition 2018 --check **/*.rs
+      - run: |
+          rustfmt +nightly --edition 2018 --check **/*.rs
+          echo $?
