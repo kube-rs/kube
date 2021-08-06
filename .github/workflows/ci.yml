@@ -125,7 +125,7 @@ jobs:
     name: Run rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
@@ -135,4 +135,4 @@ jobs:
       - name: Run rustfmt
         id: rustfmt
         run: rustfmt +nightly --edition 2018 --verbose --check **/*.rs
-      - run: ls -l **/*.rs
+      - run: ls -RA
