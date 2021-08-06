@@ -135,6 +135,4 @@ jobs:
       - name: Run rustfmt
         id: rustfmt
         run: rustfmt +nightly --edition 2018 --verbose --check **/*.rs
-      - run: echo ${{ steps.rustfmt.outputs.stdout }}
-      - run: echo ${{ steps.rustfmt.outputs.stderr }}
-
+      - run: ls -l **/*.rs
