@@ -1,5 +1,8 @@
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
-use kube::{CustomResource, CustomResourceExt, Resource};
+use kube::{
+    core::object::{HasSpec, HasStatus},
+    CustomResource, CustomResourceExt, Resource,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -48,6 +51,9 @@ fn main() {
     println!("Spec: {:?}", foo.spec);
     let crd = serde_json::to_string_pretty(&FooCrd::crd()).unwrap();
     println!("Foo CRD: \n{}", crd);
+
+    println!("Spec (via HasSpec): {:?}", foo.spec());
+    println!("Status (via HasStatus): {:?}", foo.status());
 }
 
 fn conditions(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {

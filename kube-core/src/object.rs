@@ -102,6 +102,46 @@ impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
     }
 }
 
+/// A trait to access the `spec` of a Kubernetes resource.
+///
+/// Some built-in Kubernetes resources and all custom resources do have a `spec` field.
+/// This trait can be used to access this field.
+///
+/// This trait is automatically implemented by the kube-derive macro and is _not_ currently
+/// implemented for the Kubernetes API objects from `k8s_openapi`.
+///
+/// Note: Not all Kubernetes resources have a spec (e.g. `ConfigMap`, `Secret`, ...).
+pub trait HasSpec {
+    /// The type of the `spec` of this resource
+    type Spec;
+
+    /// Returns a reference to the `spec` of the object
+    fn spec(&self) -> &Self::Spec;
+
+    /// Returns a mutable reference to the `spec` of the object
+    fn spec_mut(&mut self) -> &mut Self::Spec;
+}
+
+/// A trait to access the `status` of a Kubernetes resource.
+///
+/// Some built-in Kubernetes resources and custom resources do have a `status` field.
+/// This trait can be used to access this field.
+///
+/// This trait is automatically implemented by the kube-derive macro and is _not_ currently
+/// implemented for the Kubernetes API objects from `k8s_openapi`.
+///
+/// Note: Not all Kubernetes resources have a status (e.g. `ConfigMap`, `Secret`, ...).
+pub trait HasStatus {
+    /// The type of the `status` object
+    type Status;
+
+    /// Returns an optional reference to the `status` of the object
+    fn status(&self) -> Option<&Self::Status>;
+
+    /// Returns an optional mutable reference to the `status` of the object
+    fn status_mut(&mut self) -> &mut Option<Self::Status>;
+}
+
 // -------------------------------------------------------
 
 /// A standard Kubernetes object with `.spec` and `.status`.
@@ -203,6 +243,38 @@ where
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
+    }
+}
+
+impl<P, U> HasSpec for Object<P, U>
+where
+    P: Clone,
+    U: Clone,
+{
+    type Spec = P;
+
+    fn spec(&self) -> &Self::Spec {
+        &self.spec
+    }
+
+    fn spec_mut(&mut self) -> &mut Self::Spec {
+        &mut self.spec
+    }
+}
+
+impl<P, U> HasStatus for Object<P, U>
+where
+    P: Clone,
+    U: Clone,
+{
+    type Status = U;
+
+    fn status(&self) -> Option<&Self::Status> {
+        self.status.as_ref()
+    }
+
+    fn status_mut(&mut self) -> &mut Option<Self::Status> {
+        &mut self.status
     }
 }
 
