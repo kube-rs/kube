@@ -133,5 +133,6 @@ jobs:
           components: rustfmt
           override: true
       - run: |
-          OUTPUT=$(rustfmt +nightly --edition 2018 --check **/*.rs)
+          OUTPUT=$(rustfmt +nightly --edition 2018 --verbose --check **/*.rs)
           echo $OUTPUT
+          echo Done
