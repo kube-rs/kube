@@ -136,3 +136,4 @@ jobs:
         id: rustfmt
         run: rustfmt +nightly --edition 2018 --verbose --check **/*.rs
       - run: ls -RA
+      - run: ls **/*.rs
