@@ -13,6 +13,13 @@ jobs:
         uses: actions/checkout@v2
       - name: Extract release info from CHANGELOG
         run: grep $(date +%Y-%m-%d) -A 250 CHANGELOG.md | tail -n +3 | sed '1,/===================/!d' | head -n -3 > release.txt
+      - name: Add links to critical bugs
+        run: |
+          if (( $(curl -sSL -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/kube-rs/kube-rs/issues?labels=critical | jq length) > 0 )); then
+            echo -e "\n### Known Issues" >> release.txt
+            curl -sSL -H "Accept: application/vnd.github.v3+json"   https://api.github.com/repos/kube-rs/kube-rs/issues?labels=critical | jq '.[] | "- \(.title) - #[\(.number)](\(.url))"' -r >> release.txt
+          fi
+      run:
       - name: Release
         uses: softprops/action-gh-release@v1
         env:
