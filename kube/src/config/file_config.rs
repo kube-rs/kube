@@ -41,7 +41,7 @@ pub struct Kubeconfig {
 }
 
 /// Preferences stores extensions for cli.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Preferences {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub colors: Option<bool>,
@@ -50,21 +50,21 @@ pub struct Preferences {
 }
 
 /// NamedExtention associates name with extension.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedExtension {
     pub name: String,
     pub extension: serde_json::Value,
 }
 
 /// NamedCluster associates name with cluster.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedCluster {
     pub name: String,
     pub cluster: Cluster,
 }
 
 /// Cluster stores information to connect Kubernetes cluster.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
     pub server: String,
@@ -89,7 +89,7 @@ pub struct Cluster {
 }
 
 /// NamedAuthInfo associates name with authentication.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedAuthInfo {
     pub name: String,
     #[serde(rename = "user")]
@@ -152,14 +152,14 @@ pub struct AuthInfo {
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthProviderConfig {
     pub name: String,
     pub config: HashMap<String, String>,
 }
 
 /// ExecConfig stores credential-plugin configuration.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecConfig {
     /// Preferred input version of the ExecInfo.
     ///
@@ -180,14 +180,14 @@ pub struct ExecConfig {
 }
 
 /// NamedContext associates name with context.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedContext {
     pub name: String,
     pub context: Context,
 }
 
 /// Context stores tuple of cluster and user information.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Context {
     /// Name of the cluster for this context
     pub cluster: String,
