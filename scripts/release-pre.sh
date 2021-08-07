@@ -27,7 +27,7 @@ sanity() {
 
 main() {
   # We only want this to run ONCE at workspace level
-  cd "$(dirname "${BASH_SOURCE[0]}")" # aka $WORKSPACE_ROOT
+  cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. # aka $WORKSPACE_ROOT
   local -r CURRENT_VER="$(rg "kube =" README.md | head -n 1 | awk -F"\"" '{print $2}')"
 
   # If the main README has been bumped, assume we are done:
