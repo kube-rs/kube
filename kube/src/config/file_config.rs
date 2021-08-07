@@ -12,7 +12,7 @@ use std::{collections::HashMap, fs, path::Path};
 ///
 /// [`Config`][crate::Config] is the __intended__ developer interface to help create a [`Client`][crate::Client],
 /// and this will handle the difference between in-cluster deployment and local development.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Kubeconfig {
     /// General information to be use for cli interactions
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -41,7 +41,7 @@ pub struct Kubeconfig {
 }
 
 /// Preferences stores extensions for cli.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Preferences {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub colors: Option<bool>,
@@ -50,21 +50,21 @@ pub struct Preferences {
 }
 
 /// NamedExtention associates name with extension.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct NamedExtension {
     pub name: String,
     pub extension: serde_json::Value,
 }
 
 /// NamedCluster associates name with cluster.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct NamedCluster {
     pub name: String,
     pub cluster: Cluster,
 }
 
 /// Cluster stores information to connect Kubernetes cluster.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
     pub server: String,
@@ -89,7 +89,7 @@ pub struct Cluster {
 }
 
 /// NamedAuthInfo associates name with authentication.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct NamedAuthInfo {
     pub name: String,
     #[serde(rename = "user")]
@@ -97,7 +97,7 @@ pub struct NamedAuthInfo {
 }
 
 /// AuthInfo stores information to tell cluster who you are.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct AuthInfo {
     /// The username for basic authentication to the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -152,14 +152,14 @@ pub struct AuthInfo {
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct AuthProviderConfig {
     pub name: String,
     pub config: HashMap<String, String>,
 }
 
 /// ExecConfig stores credential-plugin configuration.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ExecConfig {
     /// Preferred input version of the ExecInfo.
     ///
@@ -180,14 +180,14 @@ pub struct ExecConfig {
 }
 
 /// NamedContext associates name with context.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct NamedContext {
     pub name: String,
     pub context: Context,
 }
 
 /// Context stores tuple of cluster and user information.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Context {
     /// Name of the cluster for this context
     pub cluster: String,
