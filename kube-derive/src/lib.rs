@@ -168,11 +168,13 @@ mod custom_resource;
 /// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
 /// - **customizing [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy)** (e.g. like in the [`crd_derive_schema` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive_schema.rs))
 /// - **customizing [certain kubebuilder like validation rules](https://github.com/kube-rs/kube-rs/issues/129#issuecomment-749463718)** (tail the issue for state of affairs)
-/// - **embedding k8s-openapi types** within your structs (see [k8s-openapi#86](https://github.com/Arnavion/k8s-openapi/issues/86))
 ///
 /// See [kubernetes openapi validation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation) for the format of the OpenAPI v3 schemas.
 ///
 /// If you have to override a lot, [you can opt-out of schema-generation entirely](https://github.com/kube-rs/kube-rs/issues/355#issuecomment-751253657)
+///
+/// ## Advanced Features
+/// - **embedding k8s-openapi types** can be done by enabling the `schemars` feature of `k8s-openapi` from [`0.13.0`](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0130-2021-08-09)
 ///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.
