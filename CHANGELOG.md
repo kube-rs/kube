@@ -1,16 +1,19 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.58.1...master
- * `BREAKING`: bumped `k8s-openapi` to [0.13.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.13.0) - #581 via #616
- * `kube` connects to kubernetes via cluster dns when using `rustls` - #587 via #597
-   - client now works with `rustls` feature __in-cluster__ - #153 via #597
- * `kube` nicer serialization of `Kubeconfig` - #613
- * `kube-core` added serde traits for `ApiResource` - #590
- * `kube-core` added `CrdExtensions::crd_name` method (implemented by `kube-derive`) - #583
- * `kube-core` added the `HasSpec` and `HasStatus` traits - #605
- * `kube-derive` added support to automatically implement the `HasSpec` and `HasStatus` traits - #605
-* `kube-runtime` fix tracing span hierarchy from applier - #600
+ * see https://github.com/kube-rs/kube-rs/compare/0.59.0...master
+
+0.59.0 / 2021-08-09
+===================
+ * `BREAKING`: bumped `k8s-openapi` to [0.13.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.13.0) - [#581](https://github.com/kube-rs/kube-rs/issues/581) via [#616](https://github.com/kube-rs/kube-rs/issues/616)
+ * `kube` connects to kubernetes via cluster dns when using `rustls` - [#587](https://github.com/kube-rs/kube-rs/issues/587) via [#597](https://github.com/kube-rs/kube-rs/issues/597)
+   - client now works with `rustls` feature __in-cluster__ - [#153](https://github.com/kube-rs/kube-rs/issues/153) via [#597](https://github.com/kube-rs/kube-rs/issues/597)
+ * `kube` nicer serialization of `Kubeconfig` - [#613](https://github.com/kube-rs/kube-rs/issues/613)
+ * `kube-core` added serde traits for `ApiResource` - [#590](https://github.com/kube-rs/kube-rs/issues/590)
+ * `kube-core` added `CrdExtensions::crd_name` method (implemented by `kube-derive`) - [#583](https://github.com/kube-rs/kube-rs/issues/583)
+ * `kube-core` added the `HasSpec` and `HasStatus` traits - [#605](https://github.com/kube-rs/kube-rs/issues/605)
+ * `kube-derive` added support to automatically implement the `HasSpec` and `HasStatus` traits - [#605](https://github.com/kube-rs/kube-rs/issues/605)
+* `kube-runtime` fix tracing span hierarchy from applier - [#600](https://github.com/kube-rs/kube-rs/issues/600)
 
 0.58.1 / 2021-07-06
 ===================

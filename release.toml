@@ -1,7 +1,7 @@
 # Release process:
-# 0. (optional) cargo release minor --dry-run ; verify that all crates are bumped and versions in-line before proceeding
+# 0. (optional) cargo release minor --dry-run ; verify readme + changelog bumped
 # 1. (optional) git reset --hard
-# 2. PUBLISH_GRACE_SLEEP=30 cargo release minor
+# 2. PUBLISH_GRACE_SLEEP=20 cargo release minor
 # 3a. await publishing - failures can happen due to https://github.com/sunng87/cargo-release/issues/224 (but should not with sufficient grace-sleep)
 # 3b. if failures from 3a; (resume publishing manually, cd into next dir, cargo publish, wait, continue for next in line)
 # 4. git amend consolidated commit and add the unified version https://github.com/sunng87/cargo-release/issues/222
