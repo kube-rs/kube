@@ -2,11 +2,15 @@
 UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.58.1...master
- * `kube` client connects to kubernetes via cluster dns when using `rustls` - #587 via #597
- * `kube` client now works with `rustls` feature in cluster - #153 via #597
+ * `BREAKING`: bumped `k8s-openapi` to [0.13.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.13.0) - #581 via #616
+ * `kube` connects to kubernetes via cluster dns when using `rustls` - #587 via #597
+   - client now works with `rustls` feature __in-cluster__ - #153 via #597
+ * `kube` nicer serialization of `Kubeconfig` - #613
+ * `kube-core` added serde traits for `ApiResource` - #590
  * `kube-core` added `CrdExtensions::crd_name` method (implemented by `kube-derive`) - #583
  * `kube-core` added the `HasSpec` and `HasStatus` traits - #605
- * `kube-derive` added support to automatically implement the `HasSpec` and `HasStatus` traits - #605 
+ * `kube-derive` added support to automatically implement the `HasSpec` and `HasStatus` traits - #605
+* `kube-runtime` fix tracing span hierarchy from applier - #600
 
 0.58.1 / 2021-07-06
 ===================
