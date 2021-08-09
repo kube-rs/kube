@@ -23,6 +23,7 @@ ws = ["kube/ws"]
 
 [dependencies]
 tokio-util = "0.6.0"
+assert-json-diff = "2.0.1"
 
 [dev-dependencies]
 anyhow = "1.0.37"
