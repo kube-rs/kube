@@ -20,12 +20,13 @@ enum Decoded {
 fn decode(secret: &Secret) -> BTreeMap<String, Decoded> {
     let mut res = BTreeMap::new();
     // Ignoring binary data for now
-    let data = secret.data.clone();
-    for (k, v) in data {
-        if let Ok(b) = std::str::from_utf8(&v.0) {
-            res.insert(k, Decoded::Utf8(b.to_string()));
-        } else {
-            res.insert(k, Decoded::Bytes(v.0));
+    if let Some(data) = secret.data.clone() {
+        for (k, v) in data {
+            if let Ok(b) = std::str::from_utf8(&v.0) {
+                res.insert(k, Decoded::Utf8(b.to_string()));
+            } else {
+                res.insert(k, Decoded::Bytes(v.0));
+            }
         }
     }
     res

@@ -120,6 +120,7 @@ where
         let child_ref = ObjectRef::from_obj_with(&obj, child_type.clone()).erase();
         meta.owner_references
             .into_iter()
+            .flatten()
             .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
             .map(move |owner_ref| ReconcileRequest {
                 obj_ref: owner_ref,

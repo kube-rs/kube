@@ -3,7 +3,7 @@ use futures::{TryFuture, TryFutureExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
 use kube::{
     api::{Patch, PatchParams},
-    Api, Resource,
+    Api, Resource, ResourceExt,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -35,8 +35,7 @@ impl FinalizerState {
     fn for_object<K: Resource>(obj: &K, finalizer_name: &str) -> Self {
         Self {
             finalizer_index: obj
-                .meta()
-                .finalizers
+                .finalizers()
                 .iter()
                 .enumerate()
                 .find(|(_, fin)| *fin == finalizer_name)
@@ -150,7 +149,7 @@ where
             is_deleting: false,
         } => {
             // Finalizer must be added before it's safe to run an `Apply` reconciliation
-            let patch = json_patch::Patch(if obj.meta().finalizers.is_empty() {
+            let patch = json_patch::Patch(if obj.finalizers().is_empty() {
                 vec![
                     PatchOperation::Test(TestOperation {
                         path: "/metadata/finalizers".to_string(),
