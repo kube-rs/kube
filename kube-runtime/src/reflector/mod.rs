@@ -70,11 +70,11 @@ mod tests {
             ..ConfigMap::default()
         };
         let updated_cm = ConfigMap {
-            data: {
+            data: Some({
                 let mut data = BTreeMap::new();
                 data.insert("data".to_string(), "present!".to_string());
                 data
-            },
+            }),
             ..cm.clone()
         };
         reflector(

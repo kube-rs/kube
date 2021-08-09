@@ -23,6 +23,7 @@ ws = ["kube/ws"]
 
 [dependencies]
 tokio-util = "0.6.0"
+assert-json-diff = "2.0.1"
 
 [dev-dependencies]
 anyhow = "1.0.37"
@@ -32,7 +33,7 @@ kube = { path = "../kube", version = "^0.58.0", default-features = false, featur
 kube-derive = { path = "../kube-derive", version = "^0.58.0", default-features = false } # only needed to opt out of schema
 kube-runtime = { path = "../kube-runtime", version = "^0.58.0"}
 kube-core = { path = "../kube-core", version = "^0.58.0", default-features = false }
-k8s-openapi = { version = "0.12.0", features = ["v1_20"], default-features = false }
+k8s-openapi = { version = "0.13.0", features = ["v1_20"], default-features = false }
 log = "0.4.11"
 serde = { version = "1.0.118", features = ["derive"] }
 serde_json = "1.0.61"
@@ -44,7 +45,7 @@ snafu = { version = "0.6.10", features = ["futures"] }
 either = "1.6.1"
 schemars = "0.8.0"
 static_assertions = "1.1.0"
-tar = "0.4.32"
+tar = "0.4.35"
 tracing = "0.1"
 tracing-subscriber = "0.2"
 warp = { version = "0.3", features = ["tls"] }

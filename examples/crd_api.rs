@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
             info!(
                 "Deleting {}: ({:?})",
                 o.name(),
-                o.status.unwrap().conditions.last()
+                o.status.unwrap().conditions.unwrap().last()
             );
         })
         .map_right(|s| {
@@ -213,7 +213,7 @@ async fn main() -> anyhow::Result<()> {
             info!(
                 "Deleting {} CRD definition: {:?}",
                 o.name(),
-                o.status.unwrap().conditions.last()
+                o.status.unwrap().conditions.unwrap().last()
             );
         }
         Right(status) => {

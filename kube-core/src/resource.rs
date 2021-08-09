@@ -143,6 +143,11 @@ pub trait ResourceExt: Resource {
     fn finalizers_mut(&mut self) -> &mut Vec<String>;
 }
 
+// TODO: replace with ordinary static when BTreeMap::new() is no longer
+// const-unstable.
+use once_cell::sync::Lazy;
+static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(BTreeMap::new);
+
 impl<K: Resource> ResourceExt for K {
     fn name(&self) -> String {
         self.meta().name.clone().expect(".metadata.name missing")
@@ -161,34 +166,34 @@ impl<K: Resource> ResourceExt for K {
     }
 
     fn labels(&self) -> &BTreeMap<String, String> {
-        &self.meta().labels
+        self.meta().labels.as_ref().unwrap_or_else(|| &*EMPTY_MAP)
     }
 
     fn labels_mut(&mut self) -> &mut BTreeMap<String, String> {
-        &mut self.meta_mut().labels
+        self.meta_mut().labels.get_or_insert_with(BTreeMap::new)
     }
 
     fn annotations(&self) -> &BTreeMap<String, String> {
-        &self.meta().annotations
+        self.meta().annotations.as_ref().unwrap_or_else(|| &*EMPTY_MAP)
     }
 
     fn annotations_mut(&mut self) -> &mut BTreeMap<String, String> {
-        &mut self.meta_mut().annotations
+        self.meta_mut().annotations.get_or_insert_with(BTreeMap::new)
     }
 
     fn owner_references(&self) -> &[OwnerReference] {
-        self.meta().owner_references.as_slice()
+        self.meta().owner_references.as_deref().unwrap_or_default()
     }
 
     fn owner_references_mut(&mut self) -> &mut Vec<OwnerReference> {
-        &mut self.meta_mut().owner_references
+        self.meta_mut().owner_references.get_or_insert_with(Vec::new)
     }
 
     fn finalizers(&self) -> &[String] {
-        self.meta().finalizers.as_slice()
+        self.meta().finalizers.as_deref().unwrap_or_default()
     }
 
     fn finalizers_mut(&mut self) -> &mut Vec<String> {
-        &mut self.meta_mut().finalizers
+        self.meta_mut().finalizers.get_or_insert_with(Vec::new)
     }
 }

@@ -99,7 +99,8 @@ fn verify_crd() {
           "kind": "Foo",
           "plural": "fooz",
           "shortNames": ["f"],
-          "singular": "foo"
+          "singular": "foo",
+          "categories": []
         },
         "scope": "Namespaced",
         "versions": [
@@ -191,7 +192,8 @@ fn verify_crd() {
     });
     let crd = serde_json::to_value(FooCrd::crd()).unwrap();
     println!("got crd: {}", serde_yaml::to_string(&FooCrd::crd()).unwrap());
-    assert_eq!(crd, output);
+    use assert_json_diff::assert_json_include;
+    assert_json_include!(actual: output, expected: crd);
 }
 
 #[test]
