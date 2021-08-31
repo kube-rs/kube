@@ -6,19 +6,26 @@ use serde_json::json;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use apiexts::CustomResourceDefinition;
+// Using the old v1beta1 extension requires the deprecated-crd-v1beta1 feature on kube
+#[cfg(feature = "deprecated")]
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
+#[cfg(feature = "deprecated")] use kube::core::crd::v1beta1::CustomResourceExt;
 
+// Recommended: not deprecated features (defaults with latest v1 crd)
+#[cfg(not(feature = "deprecated"))]
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
+#[cfg(not(feature = "deprecated"))] use kube::core::crd::v1::CustomResourceExt;
+
+use apiexts::CustomResourceDefinition;
 use kube::{
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
-    core::crd::v1beta1::CustomResourceExt,
     Client, CustomResource,
 };
 
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-#[kube(apiextensions = "v1beta1")]
+#[cfg_attr(feature = "deprecated", kube(apiextensions = "v1beta1"))]
 #[kube(status = "FooStatus")]
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 #[kube(printcolumn = r#"{"name":"Team", "jsonPath": ".spec.metadata.team", "type": "string"}"#)]

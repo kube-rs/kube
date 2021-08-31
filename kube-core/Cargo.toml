@@ -34,7 +34,7 @@ features = []
 [dev-dependencies.k8s-openapi]
 version = "0.13.0"
 default-features = false
-features = ["v1_21"]
+features = ["v1_22"]
 
 [dev-dependencies]
 kube = { path = "../kube", version = "<1.0.0, >=0.53.0" }

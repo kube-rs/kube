@@ -14,13 +14,14 @@ license = "Apache-2.0"
 disable-release = true
 
 [features]
-default = ["native-tls", "schema", "kubederive", "ws", "deprecated"]
+default = ["native-tls", "schema", "kubederive", "ws", "latest"]
 kubederive = ["kube/derive"] # by default import kube-derive with its default features
 schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
 native-tls = ["kube/client", "kube/native-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
 ws = ["kube/ws"]
-deprecated = ["kube/deprecated-crd-v1beta1"]
+latest = ["k8s-openapi/v1_22"]
+deprecated = ["kube/deprecated-crd-v1beta1", "k8s-openapi/v1_21"]
 
 [dependencies]
 tokio-util = "0.6.0"
@@ -34,7 +35,7 @@ kube = { path = "../kube", version = "^0.59.0", default-features = false, featur
 kube-derive = { path = "../kube-derive", version = "^0.59.0", default-features = false } # only needed to opt out of schema
 kube-runtime = { path = "../kube-runtime", version = "^0.59.0"}
 kube-core = { path = "../kube-core", version = "^0.59.0", default-features = false }
-k8s-openapi = { version = "0.13.0", features = ["v1_21"], default-features = false }
+k8s-openapi = { version = "0.13.0", default-features = false }
 log = "0.4.11"
 serde = { version = "1.0.118", features = ["derive"] }
 serde_json = "1.0.61"
