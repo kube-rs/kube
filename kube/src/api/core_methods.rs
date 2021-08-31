@@ -90,7 +90,7 @@ where
     ///
     /// ```no_run
     /// use kube::{api::{Api, DeleteParams}, Client};
-    /// use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
+    /// use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
     /// use apiexts::CustomResourceDefinition;
     /// #[tokio::main]
     /// async fn main() -> Result<(), kube::Error> {

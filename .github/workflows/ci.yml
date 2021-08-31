@@ -52,7 +52,7 @@ jobs:
         run: cargo test -p examples --example crd_derive_no_schema --no-default-features --features=native-tls
         if: matrix.os == 'ubuntu-latest'
       - name: Test crd_api example with deprecated crd
-        run: cargo test -p examples --example crd_api--no-default-features --features=deprecated,kubederive,native-tls
+        run: cargo test -p examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
         if: matrix.os == 'ubuntu-latest'
 
   integration:

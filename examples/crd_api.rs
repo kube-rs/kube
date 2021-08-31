@@ -11,7 +11,7 @@ use tokio::time::sleep;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
 #[cfg(feature = "deprecated")] use kube::core::crd::v1beta1::CustomResourceExt;
 
-// Recommended: not deprecated features (defaults with latest v1 crd)
+// Recommended: no deprecated features (v1 crd)
 #[cfg(not(feature = "deprecated"))]
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
 #[cfg(not(feature = "deprecated"))] use kube::core::crd::v1::CustomResourceExt;
