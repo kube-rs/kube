@@ -22,6 +22,7 @@ pub mod v1 {
 }
 
 /// Types for legacy v1beta1 CustomResourceDefinitions
+#[cfg(feature = "deprecated-crd-v1beta1")]
 pub mod v1beta1 {
     /// Extension trait that will be implemented by kube-derive for legacy v1beta1::CustomResourceDefinitions
     ///

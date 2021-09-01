@@ -15,6 +15,7 @@ readme = "../README.md"
 ws = []
 admission = ["json-patch"]
 jsonpatch = ["json-patch"]
+deprecated-crd-v1beta1 = []
 
 [dependencies]
 serde = { version = "1.0.118", features = ["derive"] }
@@ -33,7 +34,7 @@ features = []
 [dev-dependencies.k8s-openapi]
 version = "0.13.0"
 default-features = false
-features = ["v1_20"]
+features = ["v1_22"]
 
 [dev-dependencies]
 kube = { path = "../kube", version = "<1.0.0, >=0.53.0" }

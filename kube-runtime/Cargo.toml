@@ -42,4 +42,4 @@ schemars = "0.8.0"
 [dev-dependencies.k8s-openapi]
 version = "0.13.0"
 default-features = false
-features = ["v1_20"]
+features = ["v1_22"]

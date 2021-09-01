@@ -27,6 +27,7 @@ jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 derive = ["kube-derive"]
 config = ["__non_core", "pem", "dirs"]
+deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
@@ -87,4 +88,4 @@ tower-test = "0.4.0"
 [dev-dependencies.k8s-openapi]
 version = "0.13.0"
 default-features = false
-features = ["v1_20"]
+features = ["v1_22"]

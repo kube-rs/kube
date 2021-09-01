@@ -226,16 +226,9 @@ impl Request {
 mod test {
     use crate::{params::PostParams, request::Request, resource::Resource};
     use k8s::{
-        admissionregistration::v1beta1 as adregv1beta1,
-        apps::v1 as appsv1,
-        authorization::v1 as authv1,
-        autoscaling::v1 as autoscalingv1,
-        batch::v1beta1 as batchv1beta1,
-        core::v1 as corev1,
-        extensions::v1beta1 as extsv1beta1,
-        networking::{v1 as networkingv1, v1beta1 as networkingv1beta1},
-        rbac::v1 as rbacv1,
-        storage::v1 as storagev1,
+        admissionregistration::v1 as adregv1, apps::v1 as appsv1, authorization::v1 as authv1,
+        autoscaling::v1 as autoscalingv1, batch::v1beta1 as batchv1beta1, core::v1 as corev1,
+        networking::v1 as networkingv1, rbac::v1 as rbacv1, storage::v1 as storagev1,
     };
     use k8s_openapi::api as k8s;
     // use k8s::batch::v1 as batchv1;
@@ -294,9 +287,9 @@ mod test {
     }
     #[test]
     fn api_url_ingress() {
-        let url = extsv1beta1::Ingress::url_path(&(), Some("ns"));
+        let url = networkingv1::Ingress::url_path(&(), Some("ns"));
         let req = Request::new(url).create(&PostParams::default(), vec![]).unwrap();
-        assert_eq!(req.uri(), "/apis/extensions/v1beta1/namespaces/ns/ingresses?");
+        assert_eq!(req.uri(), "/apis/networking.k8s.io/v1/namespaces/ns/ingresses?");
     }
 
     #[test]
@@ -308,11 +301,11 @@ mod test {
 
     #[test]
     fn api_url_admission() {
-        let url = adregv1beta1::ValidatingWebhookConfiguration::url_path(&(), None);
+        let url = adregv1::ValidatingWebhookConfiguration::url_path(&(), None);
         let req = Request::new(url).create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(
             req.uri(),
-            "/apis/admissionregistration.k8s.io/v1beta1/validatingwebhookconfigurations?"
+            "/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations?"
         );
     }
 
@@ -341,7 +334,6 @@ mod test {
     /// -----------------------------------------------------------------
     /// Tests that the misc mappings are also sensible
     use crate::params::{DeleteParams, ListParams, Patch, PatchParams};
-    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiextsv1beta1;
 
     #[test]
     fn list_path() {
@@ -430,35 +422,32 @@ mod test {
     #[test]
     fn create_ingress() {
         // NB: Ingress exists in extensions AND networking
-        let url = networkingv1beta1::Ingress::url_path(&(), Some("ns"));
+        let url = networkingv1::Ingress::url_path(&(), Some("ns"));
         let pp = PostParams::default();
         let req = Request::new(&url).create(&pp, vec![]).unwrap();
 
-        assert_eq!(
-            req.uri(),
-            "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses?"
-        );
+        assert_eq!(req.uri(), "/apis/networking.k8s.io/v1/namespaces/ns/ingresses?");
         let patch_params = PatchParams::default();
         let req = Request::new(url)
             .patch("baz", &patch_params, &Patch::Merge(()))
             .unwrap();
         assert_eq!(
             req.uri(),
-            "/apis/networking.k8s.io/v1beta1/namespaces/ns/ingresses/baz?"
+            "/apis/networking.k8s.io/v1/namespaces/ns/ingresses/baz?"
         );
         assert_eq!(req.method(), "PATCH");
     }
 
     #[test]
     fn replace_status() {
-        let url = apiextsv1beta1::CustomResourceDefinition::url_path(&(), None);
+        let url = apiextsv1::CustomResourceDefinition::url_path(&(), None);
         let pp = PostParams::default();
         let req = Request::new(url)
             .replace_subresource("status", "mycrd.domain.io", &pp, vec![])
             .unwrap();
         assert_eq!(
             req.uri(),
-            "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/mycrd.domain.io/status?"
+            "/apis/apiextensions.k8s.io/v1/customresourcedefinitions/mycrd.domain.io/status?"
         );
     }
     #[test]
