@@ -15,7 +15,6 @@ Examples in general show a common flows. These all have logging of this library 
 For a basic overview of how to use the `Api` try:
 
 ```sh
-cargo run --example crd_api
 cargo run --example job_api
 cargo run --example log_stream
 cargo run --example pod_api
@@ -38,6 +37,7 @@ kubectl apply -f admission_reject.yaml # should fail
 How deriving `CustomResource` works in practice, and how it interacts with the [schemars](https://github.com/GREsau/schemars/) dependency.
 
 ```sh
+cargo run --example crd_api
 cargo run --example crd_derive
 cargo run --example crd_derive_schema
 cargo run --example crd_derive_no_schema --no-default-features --features=native-tls
@@ -46,6 +46,12 @@ cargo run --example crd_derive_no_schema --no-default-features --features=native
 The last one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
 
 **However**: without the `schema` feature, it's left **up to you to fill in a valid openapi v3 schema**, as schemas are **required** for [v1::CustomResourceDefinitions](https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinition.html), and the generated crd will be rejected by the apiserver if it's missing. As the last example shows, you can do this directly without `schemars`.
+
+It is also possible to run the `crd_api` example against the legacy `v1beta1` CustomResourceDefinition endpoint. To do this you need to run the example with the `deprecated` feature and opt out of defaults:
+
+```sh
+cargo run --example crd_api --no-default-features --features=deprecated,native-tls,kubederive
+```
 
 Note that these examples also contain tests for CI, and are invoked with the same parameters, but using `cargo test` rather than `cargo run`.
 
@@ -79,7 +85,7 @@ kubectl apply -f configmapgen_controller_object.yaml
 ```
 
 ### reflectors
-These examples watch resources as well as give a store access point:
+These examples watch resources as well as ive a store access point:
 
 ```sh
 # Watch namespace pods and print the current pod count every event
@@ -96,14 +102,7 @@ cargo run --example configmap_reflector
 cargo run --example crd_reflector
 ```
 
-For the [`crd_reflector`](crd_reflector.rs) you need to create the `Foo` CRD first:
-
-```sh
-kubectl apply -f foo.yaml
-cargo run --example crd_reflector
-```
-
-then you can `kubectl apply -f crd-baz.yaml`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
+The `crd_reflector` will just await changes. You can run `kubectl apply -f crd-baz.yaml`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
 
 ## rustls
 Disable default features and enable `rustls-tls`:
