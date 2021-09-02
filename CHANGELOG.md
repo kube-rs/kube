@@ -3,6 +3,8 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.59.0...master
  * `kube`: support `k8s-openapi` with `v1_22` features - #621 via #622
+ * `kube`: `BREAKING`: support for `CustomResourceDefinition` at `v1beta1` now requires an opt-in `deprecated-crd-v1beta1` feature - #622
+ * `kube-core`: add content-type header to requests with body - #626 via #627
 
 0.59.0 / 2021-08-09
 ===================
