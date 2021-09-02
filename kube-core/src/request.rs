@@ -1,6 +1,9 @@
 //! Request builder type for arbitrary api types
 use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use crate::{Error, Result};
+
+pub(crate) const JSON_MIME: &str = "application/json";
+
 /// A Kubernetes request builder
 ///
 /// Takes a base_path and supplies constructors for common operations
@@ -101,7 +104,7 @@ impl Request {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let req = http::Request::post(urlstr);
+        let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::HttpError)
     }
 
@@ -111,7 +114,7 @@ impl Request {
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let body = serde_json::to_vec(&dp)?;
-        let req = http::Request::delete(urlstr);
+        let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(body).map_err(Error::HttpError)
     }
 
@@ -127,7 +130,7 @@ impl Request {
         }
         let urlstr = qp.finish();
         let body = serde_json::to_vec(&dp)?;
-        let req = http::Request::delete(urlstr);
+        let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(body).map_err(Error::HttpError)
     }
 
@@ -147,8 +150,8 @@ impl Request {
         let urlstr = qp.finish();
 
         http::Request::patch(urlstr)
-            .header("Accept", "application/json")
-            .header("Content-Type", patch.content_type())
+            .header(http::header::ACCEPT, JSON_MIME)
+            .header(http::header::CONTENT_TYPE, patch.content_type())
             .body(patch.serialize()?)
             .map_err(Error::HttpError)
     }
@@ -163,7 +166,7 @@ impl Request {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let req = http::Request::put(urlstr);
+        let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::HttpError)
     }
 }
@@ -194,8 +197,8 @@ impl Request {
         let urlstr = qp.finish();
 
         http::Request::patch(urlstr)
-            .header("Accept", "application/json")
-            .header("Content-Type", patch.content_type())
+            .header(http::header::ACCEPT, JSON_MIME)
+            .header(http::header::CONTENT_TYPE, patch.content_type())
             .body(patch.serialize()?)
             .map_err(Error::HttpError)
     }
@@ -214,7 +217,7 @@ impl Request {
             qp.append_pair("dryRun", "All");
         }
         let urlstr = qp.finish();
-        let req = http::Request::put(urlstr);
+        let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::HttpError)
     }
 }
@@ -242,6 +245,10 @@ mod test {
         let url = corev1::Secret::url_path(&(), Some("ns"));
         let req = Request::new(url).create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces/ns/secrets?");
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            super::JSON_MIME
+        );
     }
 
     #[test]
@@ -361,6 +368,10 @@ mod test {
         };
         let req = Request::new(url).replace("myds", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            super::JSON_MIME
+        );
     }
 
     #[test]
@@ -369,7 +380,11 @@ mod test {
         let dp = DeleteParams::default();
         let req = Request::new(url).delete("myrs", &dp).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets/myrs");
-        assert_eq!(req.method(), "DELETE")
+        assert_eq!(req.method(), "DELETE");
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            super::JSON_MIME
+        );
     }
 
     #[test]
@@ -382,7 +397,11 @@ mod test {
             req.uri(),
             "/apis/apps/v1/namespaces/ns/replicasets?&labelSelector=app%3Dmyapp"
         );
-        assert_eq!(req.method(), "DELETE")
+        assert_eq!(req.method(), "DELETE");
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            super::JSON_MIME
+        );
     }
 
     #[test]
@@ -417,6 +436,10 @@ mod test {
             .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
         assert_eq!(req.method(), "PUT");
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            super::JSON_MIME
+        );
     }
 
     #[test]
