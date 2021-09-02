@@ -4,7 +4,7 @@
 # 2. PUBLISH_GRACE_SLEEP=20 cargo release minor --execute
 # 3a. await publishing - failures can happen due to https://github.com/sunng87/cargo-release/issues/224 (but should not with sufficient grace-sleep)
 # 3b. if failures from 3a; (resume publishing manually, cd into next dir, cargo publish, wait, continue for next in line)
-# 4. git amend consolidated commit and add the unified version https://github.com/sunng87/cargo-release/issues/222
+# 4. check consolidated commit - shared version https://github.com/crate-ci/cargo-release/issues/222 fix is pretty new
 # 5. ./scripts/release-post.sh
 
 # Reference
