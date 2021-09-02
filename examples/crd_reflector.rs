@@ -3,8 +3,8 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 
 use kube::{
-    api::{Api, ListParams, ResourceExt, PatchParams, Patch},
-    Client, CustomResource, CustomResourceExt
+    api::{Api, ListParams, Patch, PatchParams, ResourceExt},
+    Client, CustomResource, CustomResourceExt,
 };
 use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
 use schemars::JsonSchema;
