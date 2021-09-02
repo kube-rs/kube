@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     params::{DeleteParams, PostParams},
-    request::Request,
+    request::{Request, JSON_MIME},
     Error, Result,
 };
 
@@ -112,7 +112,7 @@ impl Request {
             "delete_options": ep.delete_options,
             "metadata": { "name": name }
         }))?;
-        let req = http::Request::post(urlstr);
+        let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::HttpError)
     }
 }
