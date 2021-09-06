@@ -11,6 +11,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         # TODO: add windows-latest (see #566)
     runs-on: ${{ matrix.os }}
+    env:
+      CARGO_INCREMENTAL: 0
+      RUST_BACKTRACE: short
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -58,6 +61,9 @@ jobs:
   integration:
     # Integration tests are linux only
     runs-on: ubuntu-latest
+    env:
+      CARGO_INCREMENTAL: 0
+      RUST_BACKTRACE: short
     steps:
       - uses: actions/checkout@v2
 
