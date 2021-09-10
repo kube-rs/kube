@@ -50,11 +50,11 @@ where
         match event {
             watcher::Event::Applied(obj) => {
                 self.store
-                    .insert(ObjectRef::from_obj_with(&obj, self.dyntype.clone()), obj.clone());
+                    .insert(ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj.clone());
             }
             watcher::Event::Deleted(obj) => {
                 self.store
-                    .remove(&ObjectRef::from_obj_with(&obj, self.dyntype.clone()));
+                    .remove(&ObjectRef::from_obj_with(obj, self.dyntype.clone()));
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
