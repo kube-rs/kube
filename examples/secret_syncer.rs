@@ -1,4 +1,4 @@
-// Demonstrates a controller some outside resource that it needs to clean up when the owner is deleted
+// Demonstrates a controller managing some outside resource that it needs to clean up when the owner is deleted
 
 // NOTE: This is designed to demonstrate how to use finalizers, but is not in itself a good use case for them.
 // If you actually want to clean up other Kubernetes objects then you should use `ownerReferences` instead and let

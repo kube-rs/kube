@@ -1,8 +1,9 @@
-use crate::controller::ReconcilerAction;
-use futures::{TryFuture, TryFutureExt};
+use crate::{controller::ReconcilerAction, watcher};
+use futures::{pin_mut, TryFuture, TryFutureExt, TryStreamExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
+use k8s_openapi::Metadata;
 use kube::{
-    api::{Patch, PatchParams},
+    api::{DeleteParams, ListParams, Patch, PatchParams},
     Api, Resource, ResourceExt,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -206,4 +207,51 @@ pub enum Event<K> {
     /// - Another finalizer was removed in the meantime
     /// - The grinch's heart grows a size or two
     Cleanup(K),
+}
+
+#[derive(Debug, Snafu)]
+pub enum DeleteError {
+    #[snafu(display("failed to delete object: {}", source))]
+    DeleteFailed { source: kube::Error },
+    #[snafu(display("failed to probe for whether the object is deleted yet: {}", source))]
+    DeleteProbeFailed { source: watcher::Error },
+}
+
+/// Try to delete an object, and wait for it to disappear from the Kubernetes API.
+/// If you do not wish to wait for the object to be deleted then you should use
+/// [`Api::delete`] instead.
+///
+/// This means that this function will not complete until all finalizers are done.
+///
+/// # Errors
+///
+/// This function fails if the deletion or status probe failed. In particular, it requires
+/// permission to use the following Kubernetes verbs:
+///
+/// - delete
+/// - list
+/// - watch
+///
+/// Note that the deletion will continue in the background if the probe fails.
+pub async fn finalize_and_delete<K>(api: &Api<K>, name: &str, dp: &DeleteParams) -> Result<(), DeleteError>
+where
+    K: Clone + DeserializeOwned + Debug + Send + Resource + 'static,
+{
+    api.delete(name, dp).await.context(DeleteFailed)?;
+    let watcher = watcher(api.clone(), ListParams {
+        field_selector: Some(format!("metadata.name={}", name)),
+        ..Default::default()
+    });
+    pin_mut!(watcher);
+    while let Some(event) = watcher.try_next().await.context(DeleteProbeFailed)? {
+        match event {
+            // Object was deleted, we're done
+            watcher::Event::Deleted(_) => break,
+            // Object was deleted during desync, we're still done
+            watcher::Event::Restarted(objs) if objs.is_empty() => break,
+            // Object is still around, wait for a while longer :(
+            watcher::Event::Restarted(_) | watcher::Event::Applied(_) => (),
+        }
+    }
+    Ok(())
 }

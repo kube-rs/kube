@@ -189,3 +189,7 @@ path = "custom_client_trace.rs"
 [[example]]
 name = "secret_syncer"
 path = "secret_syncer.rs"
+
+[[example]]
+name = "secret_deleter"
+path = "secret_deleter.rs"
