@@ -71,7 +71,7 @@
 //! ```
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 #![deny(unsafe_code)]
 
 macro_rules! cfg_client {

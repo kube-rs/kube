@@ -29,7 +29,10 @@ pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
 };
 
-use crate::Client;
+use crate::{
+    client::scope::{ClusterScope, DynamicScope, NamespaceScope},
+    Client,
+};
 /// The generic Api abstraction
 ///
 /// This abstracts over a [`Request`] and a type `K` so that
@@ -37,9 +40,11 @@ use crate::Client;
 /// implemented by the dynamic [`Resource`].
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 #[derive(Clone)]
-pub struct Api<K> {
+pub struct Api<K: Resource> {
     /// The request builder object with its resource dependent url
     pub(crate) request: Request,
+    pub(crate) scope: DynamicScope,
+    pub(crate) dyn_type: K::DynamicType,
     /// The client to use (from this library)
     pub(crate) client: Client,
     /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
@@ -55,10 +60,12 @@ impl<K: Resource> Api<K> {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
-        let url = K::url_path(dyntype, None);
+    pub fn all_with(client: Client, dyn_type: &K::DynamicType) -> Self {
+        let url = K::url_path(dyn_type, None);
         Self {
             client,
+            scope: DynamicScope::Cluster(ClusterScope),
+            dyn_type: dyn_type.clone(),
             request: Request::new(url),
             phantom: std::iter::empty(),
         }
@@ -67,10 +74,14 @@ impl<K: Resource> Api<K> {
     /// Namespaced resource within a given namespace
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
-        let url = K::url_path(dyntype, Some(ns));
+    pub fn namespaced_with(client: Client, ns: &str, dyn_type: &K::DynamicType) -> Self {
+        let url = K::url_path(dyn_type, Some(ns));
         Self {
             client,
+            scope: DynamicScope::Namespace(NamespaceScope {
+                namespace: ns.to_string(),
+            }),
+            dyn_type: dyn_type.clone(),
             request: Request::new(url),
             phantom: std::iter::empty(),
         }
@@ -82,13 +93,9 @@ impl<K: Resource> Api<K> {
     ///
     /// Unless configured explicitly, the default namespace is either "default"
     /// out of cluster, or the service account's namespace in cluster.
-    pub fn default_namespaced_with(client: Client, dyntype: &K::DynamicType) -> Self {
-        let url = K::url_path(dyntype, Some(client.default_ns()));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: std::iter::empty(),
-        }
+    pub fn default_namespaced_with(client: Client, dyn_type: &K::DynamicType) -> Self {
+        let ns = client.default_ns().to_string();
+        Self::namespaced_with(client, &ns, dyn_type)
     }
 
     /// Consume self and return the [`Client`]
@@ -112,22 +119,12 @@ where
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
-        let url = K::url_path(&Default::default(), None);
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: std::iter::empty(),
-        }
+        Self::all_with(client, &K::DynamicType::default())
     }
 
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self {
-        let url = K::url_path(&Default::default(), Some(ns));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: std::iter::empty(),
-        }
+        Self::namespaced_with(client, ns, &K::DynamicType::default())
     }
 
     /// Namespaced resource within the default namespace
@@ -135,16 +132,11 @@ where
     /// Unless configured explicitly, the default namespace is either "default"
     /// out of cluster, or the service account's namespace in cluster.
     pub fn default_namespaced(client: Client) -> Self {
-        let url = K::url_path(&Default::default(), Some(client.default_ns()));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: std::iter::empty(),
-        }
+        Self::default_namespaced_with(client, &K::DynamicType::default())
     }
 }
 
-impl<K> From<Api<K>> for Client {
+impl<K: Resource> From<Api<K>> for Client {
     fn from(api: Api<K>) -> Self {
         api.client
     }

@@ -16,6 +16,8 @@
 // Triggered by many derive macros (kube-derive, derivative)
 #![allow(clippy::default_trait_access)]
 #![allow(clippy::type_repetition_in_bounds)]
+// Triggered by tokio::test macros
+#![allow(clippy::semicolon_if_nothing_returned)]
 
 pub mod controller;
 pub mod finalizer;

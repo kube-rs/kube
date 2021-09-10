@@ -1,15 +1,21 @@
 use either::Either;
-use futures::Stream;
+use futures::{Stream, TryStreamExt};
 use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
-use crate::{api::Api, Result};
-use kube_core::{object::ObjectList, params::*, response::Status, WatchEvent};
+use crate::{
+    api::Api,
+    client::verb::{
+        self, Create, Delete, DeleteCollection, DeleteMode, Get, List, Query, Replace, Watch, WriteMode,
+    },
+    Result,
+};
+use kube_core::{object::ObjectList, params::*, response::Status, Resource, WatchEvent};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Debug,
+    K: Clone + DeserializeOwned + Debug + Resource,
 {
     /// Get a named resource
     ///
@@ -25,9 +31,14 @@ where
     /// }
     /// ```
     pub async fn get(&self, name: &str) -> Result<K> {
-        let mut req = self.request.get(name)?;
-        req.extensions_mut().insert("get");
-        self.client.request::<K>(req).await
+        Ok(self
+            .client
+            .call(Get {
+                name,
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+            })
+            .await?)
     }
 
     /// Get a list of resources
@@ -49,9 +60,16 @@ where
     /// }
     /// ```
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let mut req = self.request.list(lp)?;
-        req.extensions_mut().insert("list");
-        self.client.request::<ObjectList<K>>(req).await
+        Ok(self
+            .client
+            .call(List {
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+                query: &Query::from_list_params(lp),
+                limit: lp.limit,
+                continue_token: lp.continue_token.as_deref(),
+            })
+            .await?)
     }
 
     /// Create a resource
@@ -74,10 +92,14 @@ where
     where
         K: Serialize,
     {
-        let bytes = serde_json::to_vec(&data)?;
-        let mut req = self.request.create(pp, bytes)?;
-        req.extensions_mut().insert("create");
-        self.client.request::<K>(req).await
+        Ok(self
+            .client
+            .call(Create::<K> {
+                object: data,
+                dyn_type: &self.dyn_type,
+                write_mode: &WriteMode::from_post_params(pp),
+            })
+            .await?)
     }
 
     /// Delete a named resource
@@ -103,9 +125,16 @@ where
     /// }
     /// ```
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let mut req = self.request.delete(name, dp)?;
-        req.extensions_mut().insert("delete");
-        self.client.request_status::<K>(req).await
+        Ok(self
+            .client
+            .call(Delete::<K, _> {
+                name,
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+                delete_mode: &DeleteMode::from_delete_params(dp),
+            })
+            .await?)
+        .map(Either::Left)
     }
 
     /// Delete a collection of resources
@@ -140,9 +169,16 @@ where
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let mut req = self.request.delete_collection(dp, lp)?;
-        req.extensions_mut().insert("delete_collection");
-        self.client.request_status::<ObjectList<K>>(req).await
+        Ok(self
+            .client
+            .call(DeleteCollection::<K, _> {
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+                query: &Query::from_list_params(lp),
+                delete_mode: &DeleteMode::from_delete_params(dp),
+            })
+            .await?)
+        .map(Either::Left)
     }
 
     /// Patch a subset of a resource's properties
@@ -167,22 +203,31 @@ where
     ///         }
     ///     });
     ///     let params = PatchParams::apply("myapp");
-    ///     let patch = Patch::Apply(&patch);
+    ///     let patch = Patch::<Pod>::Apply(serde_json::from_value(patch)?);
     ///     let o_patched = pods.patch("blog", &params, &patch).await?;
     ///     Ok(())
     /// }
     /// ```
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
-    pub async fn patch<P: Serialize + Debug>(
-        &self,
-        name: &str,
-        pp: &PatchParams,
-        patch: &Patch<P>,
-    ) -> Result<K> {
-        let mut req = self.request.patch(name, pp, patch)?;
-        req.extensions_mut().insert("patch");
-        self.client.request::<K>(req).await
+    pub async fn patch(&self, name: &str, pp: &PatchParams, patch: &Patch<K>) -> Result<K>
+    where
+        K: Serialize,
+    {
+        Ok(self
+            .client
+            .call(verb::Patch::<K, _> {
+                name,
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+                force: pp.force,
+                patch,
+                write_mode: &WriteMode {
+                    dry_run: pp.dry_run,
+                    field_manager: pp.field_manager.as_deref(),
+                },
+            })
+            .await?)
     }
 
     /// Replace a resource entirely with a new one
@@ -233,10 +278,15 @@ where
     where
         K: Serialize,
     {
-        let bytes = serde_json::to_vec(&data)?;
-        let mut req = self.request.replace(name, pp, bytes)?;
-        req.extensions_mut().insert("replace");
-        self.client.request::<K>(req).await
+        Ok(self
+            .client
+            .call(Replace::<K, _> {
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+                object: data,
+                write_mode: &WriteMode::from_post_params(pp),
+            })
+            .await?)
     }
 
     /// Watch a list of resources
@@ -281,8 +331,16 @@ where
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let mut req = self.request.watch(lp, version)?;
-        req.extensions_mut().insert("watch");
-        self.client.request_events::<K>(req).await
+        Ok(self
+            .client
+            .call(Watch::<K, _> {
+                scope: &self.scope,
+                dyn_type: &self.dyn_type,
+                query: &Query::from_list_params(lp),
+                version,
+                timeout: lp.timeout.map(|timeout| Duration::from_secs(timeout.into())),
+            })
+            .await?
+            .err_into())
     }
 }
