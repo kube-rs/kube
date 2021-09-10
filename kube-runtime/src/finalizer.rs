@@ -1,13 +1,12 @@
 use crate::{controller::ReconcilerAction, watcher};
 use futures::{pin_mut, TryFuture, TryFutureExt, TryStreamExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
-use k8s_openapi::Metadata;
 use kube::{
     api::{DeleteParams, ListParams, Patch, PatchParams},
     Api, Resource, ResourceExt,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
 use std::{error::Error as StdError, fmt::Debug};
 
 #[derive(Debug, Snafu)]
@@ -215,6 +214,8 @@ pub enum DeleteError {
     DeleteFailed { source: kube::Error },
     #[snafu(display("failed to probe for whether the object is deleted yet: {}", source))]
     DeleteProbeFailed { source: watcher::Error },
+    #[snafu(display("delete probe returned invalid response: more than one object matched filter"))]
+    DeleteProbeTooManyObjects { backtrace: Backtrace },
 }
 
 /// Try to delete an object, and wait for it to disappear from the Kubernetes API.
@@ -237,7 +238,10 @@ pub async fn finalize_and_delete<K>(api: &Api<K>, name: &str, dp: &DeleteParams)
 where
     K: Clone + DeserializeOwned + Debug + Send + Resource + 'static,
 {
-    api.delete(name, dp).await.context(DeleteFailed)?;
+    let deleted_obj_uid = api.delete(name, dp).await.context(DeleteFailed)?.either(
+        |mut obj| obj.meta_mut().uid.take(),
+        |status| status.details.map(|details| details.uid),
+    );
     let watcher = watcher(api.clone(), ListParams {
         field_selector: Some(format!("metadata.name={}", name)),
         ..Default::default()
@@ -247,8 +251,16 @@ where
         match event {
             // Object was deleted, we're done
             watcher::Event::Deleted(_) => break,
+            // The query should never match more than one object
+            watcher::Event::Restarted(objs) if objs.len() > 1 => DeleteProbeTooManyObjects.fail()?,
             // Object was deleted during desync, we're still done
-            watcher::Event::Restarted(objs) if objs.is_empty() => break,
+            watcher::Event::Restarted(objs)
+                if objs.first().and_then(|obj| obj.meta().uid.as_ref()) != deleted_obj_uid.as_ref() =>
+            {
+                // objs.first() = None: No object matched query
+                // uid mismatch: Object was deleted and replaced
+                break;
+            }
             // Object is still around, wait for a while longer :(
             watcher::Event::Restarted(_) | watcher::Event::Applied(_) => (),
         }
