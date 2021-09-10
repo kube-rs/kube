@@ -114,13 +114,13 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
     state: State<K>,
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
-        State::Empty => match api.list(&list_params).await {
+        State::Empty => match api.list(list_params).await {
             Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
                 resource_version: list.metadata.resource_version.unwrap(),
             }),
             Err(err) => (Some(Err(err).context(InitialListFailed)), State::Empty),
         },
-        State::InitListed { resource_version } => match api.watch(&list_params, &resource_version).await {
+        State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
             Ok(stream) => (None, State::Watching {
                 resource_version,
                 stream: stream.boxed(),
@@ -179,7 +179,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     mut state: State<K>,
 ) -> (Result<Event<K>>, State<K>) {
     loop {
-        match step_trampolined(&api, &list_params, state).await {
+        match step_trampolined(api, list_params, state).await {
             (Some(result), new_state) => return (result, new_state),
             (None, new_state) => state = new_state,
         }
