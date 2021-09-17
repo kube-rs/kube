@@ -1,10 +1,10 @@
 use futures::TryStreamExt;
-use kube::{api::ListParams, Api, Resource};
+use kube::{Api, Resource};
 use serde::de::DeserializeOwned;
-use snafu::{futures::TryStreamExt as _, Backtrace, Snafu};
+use snafu::{futures::TryStreamExt as _, Snafu};
 use std::fmt::Debug;
 
-use crate::watcher;
+use crate::watcher::{self, watch_object};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -13,8 +13,6 @@ pub enum Error {
         #[snafu(backtrace)]
         source: watcher::Error,
     },
-    #[snafu(display("probe returned invalid response: more than one object matched filter"))]
-    ProbeTooManyObjects { backtrace: Backtrace },
 }
 
 /// Watch an object, and Wait for some condition `cond` to return `true`.
@@ -35,23 +33,14 @@ pub async fn await_condition<K>(
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
-    watcher(api, ListParams {
-        field_selector: Some(format!("metadata.name={}", name)),
-        ..Default::default()
-    })
-    .context(ProbeFailed)
-    .try_take_while(|event| {
-        let obj = match event {
-            watcher::Event::Deleted(_) => Ok(None),
-            watcher::Event::Restarted(objs) if objs.len() > 1 => ProbeTooManyObjects.fail(),
-            watcher::Event::Restarted(objs) => Ok(objs.first()),
-            watcher::Event::Applied(_) => Ok(None),
-        };
-        let result = obj.map(|obj| !cond(obj));
-        async move { result }
-    })
-    .try_for_each(|_| async { Ok(()) })
-    .await
+    watch_object(api, name)
+        .context(ProbeFailed)
+        .try_take_while(|obj| {
+            let result = !cond(obj.as_ref());
+            async move { Ok(result) }
+        })
+        .try_for_each(|_| async { Ok(()) })
+        .await
 }
 
 pub mod conditions {

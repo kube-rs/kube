@@ -33,6 +33,8 @@ pub enum Error {
         source: kube::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("too many objects matched search criteria"))]
+    TooManyObjects { backtrace: Backtrace },
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -243,4 +245,26 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
             Some((event, (api, list_params, state)))
         },
     )
+}
+
+/// Watch a single named object for updates
+///
+/// Emits `None` if the object is deleted (or not found), and `Some` if an object is updated (or created/found).
+///
+/// Compared to [`watcher`], `watch_object` does not return return [`Event`], since there is no need for an atomic
+/// [`Event::Restarted`] when only one object is covered anyway.
+pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+    api: Api<K>,
+    name: &str,
+) -> impl Stream<Item = Result<Option<K>>> + Send {
+    watcher(api, ListParams {
+        field_selector: Some(format!("metadata.name={}", name)),
+        ..Default::default()
+    })
+    .map(|event| match event? {
+        Event::Deleted(_) => Ok(None),
+        Event::Restarted(objs) if objs.len() > 1 => TooManyObjects.fail(),
+        Event::Restarted(mut objs) => Ok(objs.pop()),
+        Event::Applied(obj) => Ok(Some(obj)),
+    })
 }
