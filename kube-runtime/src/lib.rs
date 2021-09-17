@@ -22,6 +22,7 @@ pub mod finalizer;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;
+pub mod wait;
 pub mod watcher;
 
 pub use controller::{applier, Controller};
