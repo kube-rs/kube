@@ -263,6 +263,11 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     })
     .map(|event| match event? {
         Event::Deleted(_) => Ok(None),
+        // We're filtering by object name, so getting more than one object means that either:
+        // 1. The apiserver is accepting multiple objects with the same name, or
+        // 2. The apiserver is ignoring our query
+        // In either case, the K8s apiserver is broken and our API will return invalid data, so
+        // we had better bail out ASAP.
         Event::Restarted(objs) if objs.len() > 1 => TooManyObjects.fail(),
         Event::Restarted(mut objs) => Ok(objs.pop()),
         Event::Applied(obj) => Ok(Some(obj)),
