@@ -11,6 +11,8 @@ mod subresource;
 pub use subresource::{Attach, AttachParams, Execute};
 pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
 
+mod util;
+
 // Re-exports from kube-core
 #[cfg(feature = "admission")]
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
