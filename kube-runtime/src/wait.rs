@@ -19,6 +19,11 @@ pub enum Error {
 ///
 /// `cond` is passed `Some` if the object is found, otherwise `None`.
 ///
+/// # Caveats
+///
+/// Keep in mind that the condition is typically fulfilled by an external service, which might not even be available. `await_condition`
+/// does *not* automatically add a timeout. If this is desired, wrap it in [`tokio::time::timeout`].
+///
 /// # Errors
 ///
 /// Fails if the type is not known to the Kubernetes API, or if the [`Api`] does not have
@@ -43,9 +48,15 @@ where
         .await
 }
 
+/// Common conditions to wait for
 pub mod conditions {
     use kube::Resource;
 
+    /// An await condition that returns `true` once the object has been deleted.
+    ///
+    /// An object is considered to be deleted if the object can no longer be found, or if its
+    /// [`uid`] changes. This means that an object is considered to be deleted even if we miss
+    /// the deletion event and the object is recreated in the meantime.
     pub fn is_deleted<K: Resource>(uid: &str) -> impl Fn(Option<&K>) -> bool + '_ {
         move |obj: Option<&K>| {
             obj.map_or(
@@ -58,22 +69,30 @@ pub mod conditions {
     }
 }
 
+/// Utilities for deleting objects
 pub mod delete {
+    use super::{await_condition, conditions};
     use kube::{api::DeleteParams, Api, Resource};
     use serde::de::DeserializeOwned;
     use snafu::{OptionExt, ResultExt, Snafu};
     use std::fmt::Debug;
 
-    use super::{await_condition, conditions};
-
     #[derive(Snafu, Debug)]
     pub enum Error {
+        #[snafu(display("deleted object has no UID to wait for"))]
         NoUid,
+        #[snafu(display("failed to delete object: {}", source))]
         Delete { source: kube::Error },
+        #[snafu(display("failed to wait for object to be deleted: {}", source))]
         Await { source: super::Error },
     }
 
-    #[allow(clippy::module_name_repetitions, clippy::missing_errors_doc)]
+    /// Delete an object, and wait for it to be removed from the Kubernetes API (including waiting for all finalizers to unregister themselves).
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the object was unable to be deleted, or if the wait was interrupted.
+    #[allow(clippy::module_name_repetitions)]
     pub async fn delete_and_finalize<K: Clone + Debug + Send + DeserializeOwned + Resource + 'static>(
         api: Api<K>,
         name: &str,
