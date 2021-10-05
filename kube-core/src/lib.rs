@@ -41,6 +41,8 @@ pub mod response;
 
 pub mod subresource;
 
+pub mod util;
+
 pub mod watch;
 pub use watch::WatchEvent;
 
