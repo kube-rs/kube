@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
     kind = "Foo",
     category = "clux",
     namespaced,
-    derive = "PartialEq"
+    derive = "PartialEq",
+    shortname = "fo",
+    shortname = "f"
 )]
 #[kube(apiextensions = "v1")]
 struct FooSpec {
@@ -50,6 +52,12 @@ fn test_crd_name() {
 }
 
 #[test]
+fn test_shortnames() {
+    use kube::core::CustomResourceExt;
+    assert_eq!(&["fo", "f"], Foo::shortnames());
+}
+
+#[test]
 fn test_crd_schema_matches_expected() {
     use kube::core::CustomResourceExt;
     assert_eq!(
@@ -66,7 +74,7 @@ fn test_crd_schema_matches_expected() {
                     "categories": ["clux"],
                     "kind": "Foo",
                     "plural": "foos",
-                    "shortNames": [],
+                    "shortNames": ["fo", "f"],
                     "singular": "foo"
                 },
                 "scope": "Namespaced",
