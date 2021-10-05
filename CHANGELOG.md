@@ -2,6 +2,7 @@
 UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.60.0...master
+ * `kube-core`: added `CrdExtensions::shortnames` method (implemented by `kube-derive`) - [#641](https://github.com/kube-rs/kube-rs/pull/641)
 
 0.60.0 / 2021-09-02
 ===================
