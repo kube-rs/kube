@@ -250,6 +250,14 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         kube::core::crd::#v1ident
     };
 
+    let shortnames_slice = {
+        let names = shortnames
+            .iter()
+            .map(|name| quote! { #name, })
+            .collect::<TokenStream>();
+        quote! { &[#names] }
+    };
+
     let categories_json = serde_json::to_string(&categories).unwrap();
     let short_json = serde_json::to_string(&shortnames).unwrap();
     let crd_meta_name = format!("{}.{}", plural, group);
@@ -369,6 +377,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 kube::core::ApiResource::erase::<Self>(&())
             }
 
+            fn shortnames() -> &'static [&'static str] {
+                #shortnames_slice
+            }
         }
     };
 

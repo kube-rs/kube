@@ -18,6 +18,15 @@ pub mod v1 {
         fn crd_name() -> &'static str;
         /// Helper to generate the api information type for use with the dynamic `Api`
         fn api_resource() -> crate::discovery::ApiResource;
+        /// Shortnames of this resource type.
+        ///
+        /// For example: [`Pod`] has the shortname alias `po`.
+        ///
+        /// NOTE: This function returns *declared* short names (at compile-time, using the `#[kube(shortname = "foo")]`), not the
+        /// shortnames registered with the Kubernetes API (which is what tools such as `kubectl` look at).
+        ///
+        /// [`Pod`]: `k8s_openapi::api::core::v1::Pod`
+        fn shortnames() -> &'static [&'static str];
     }
 }
 
@@ -38,6 +47,15 @@ pub mod v1beta1 {
         fn crd_name() -> &'static str;
         /// Helper to generate the api information type for use with the dynamic `Api`
         fn api_resource() -> crate::discovery::ApiResource;
+        /// Shortnames of this resource type.
+        ///
+        /// For example: [`Pod`] has the shortname alias `po`.
+        ///
+        /// NOTE: This function returns *declared* short names (at compile-time, using the `#[kube(shortname = "foo")]`), not the
+        /// shortnames registered with the Kubernetes API (which is what tools such as `kubectl` look at).
+        ///
+        /// [`Pod`]: `k8s_openapi::api::core::v1::Pod`
+        fn shortnames() -> &'static [&'static str];
     }
 }
 
