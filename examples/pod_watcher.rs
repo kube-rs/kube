@@ -31,7 +31,7 @@ fn pod_unready(p: &Pod) -> Option<String> {
     let status = p.status.as_ref().unwrap();
     if let Some(conds) = &status.conditions {
         let failed = conds
-            .into_iter()
+            .iter()
             .filter(|c| c.type_ == "Ready" && c.status == "False")
             .map(|c| c.message.clone().unwrap_or_default())
             .collect::<Vec<_>>()

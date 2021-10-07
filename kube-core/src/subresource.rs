@@ -279,7 +279,7 @@ impl AttachParams {
             qp.append_pair("tty", "true");
         }
         if let Some(container) = &self.container {
-            qp.append_pair("container", &container);
+            qp.append_pair("container", container);
         }
     }
 }

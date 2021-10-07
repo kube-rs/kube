@@ -33,6 +33,8 @@ pub enum Error {
         source: kube::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("too many objects matched search criteria"))]
+    TooManyObjects { backtrace: Backtrace },
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -114,13 +116,13 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
     state: State<K>,
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
-        State::Empty => match api.list(&list_params).await {
+        State::Empty => match api.list(list_params).await {
             Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
                 resource_version: list.metadata.resource_version.unwrap(),
             }),
             Err(err) => (Some(Err(err).context(InitialListFailed)), State::Empty),
         },
-        State::InitListed { resource_version } => match api.watch(&list_params, &resource_version).await {
+        State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
             Ok(stream) => (None, State::Watching {
                 resource_version,
                 stream: stream.boxed(),
@@ -179,7 +181,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     mut state: State<K>,
 ) -> (Result<Event<K>>, State<K>) {
     loop {
-        match step_trampolined(&api, &list_params, state).await {
+        match step_trampolined(api, list_params, state).await {
             (Some(result), new_state) => return (result, new_state),
             (None, new_state) => state = new_state,
         }
@@ -243,4 +245,31 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
             Some((event, (api, list_params, state)))
         },
     )
+}
+
+/// Watch a single named object for updates
+///
+/// Emits `None` if the object is deleted (or not found), and `Some` if an object is updated (or created/found).
+///
+/// Compared to [`watcher`], `watch_object` does not return return [`Event`], since there is no need for an atomic
+/// [`Event::Restarted`] when only one object is covered anyway.
+pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+    api: Api<K>,
+    name: &str,
+) -> impl Stream<Item = Result<Option<K>>> + Send {
+    watcher(api, ListParams {
+        field_selector: Some(format!("metadata.name={}", name)),
+        ..Default::default()
+    })
+    .map(|event| match event? {
+        Event::Deleted(_) => Ok(None),
+        // We're filtering by object name, so getting more than one object means that either:
+        // 1. The apiserver is accepting multiple objects with the same name, or
+        // 2. The apiserver is ignoring our query
+        // In either case, the K8s apiserver is broken and our API will return invalid data, so
+        // we had better bail out ASAP.
+        Event::Restarted(objs) if objs.len() > 1 => TooManyObjects.fail(),
+        Event::Restarted(mut objs) => Ok(objs.pop()),
+        Event::Applied(obj) => Ok(Some(obj)),
+    })
 }
