@@ -178,7 +178,25 @@ mod custom_resource;
 ///
 /// ## Advanced Features
 /// - **embedding k8s-openapi types** can be done by enabling the `schemars` feature of `k8s-openapi` from [`0.13.0`](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0130-2021-08-09)
-/// - **adding validation** via [validator crate](https://github.com/Keats/validator) is supported from `schemars` >= [`0.8.5`](https://github.com/GREsau/schemars/blob/master/CHANGELOG.md#085---2021-09-20) - you must derive `Validate`
+/// - **adding validation** via [validator crate](https://github.com/Keats/validator) is supported from `schemars` >= [`0.8.5`](https://github.com/GREsau/schemars/blob/master/CHANGELOG.md#085---2021-09-20)
+///
+/// ### Validation Caveats
+/// The supported **`#[validate]` attrs also exist as `#[schemars]` attrs** so you can use those directly if you do not require the validation to run client-side (in your code).
+/// Otherwise, you should `#[derive(Validate)]` on your struct to have both server-side (kubernetes) and client-side validation.
+///
+/// When using `validator` directly, you must add it to your dependencies (with the `derive` feature).
+///
+/// Make sure your validation rules are static and handled by `schemars`:
+/// - validations from `#[validate(custom = "some_fn")]` will not show up in the schema.
+/// - similarly; [nested / must_match / credit_card were unhandled by schemars at time of writing](https://github.com/GREsau/schemars/pull/78)
+///
+/// For sanity, you should review the generated schema before sending it to kubernetes.
+///
+/// ## Versioning
+/// Note that any changes to your struct / validation rules / serialization attributes will require you to re-apply the generated
+/// schema to kubernetes, so that the apiserver can validate against the right version of your structs.
+///
+/// How to best deal with version changes has not been fully sketched out. See [#569](https://github.com/kube-rs/kube-rs/issues/569).
 ///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.
