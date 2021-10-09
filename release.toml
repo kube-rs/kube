@@ -15,6 +15,6 @@ consolidate-commits = true
 shared-version = true
 pre-release-hook = ["../scripts/release-pre.sh"]
 pre-release-commit-message = "release {{version}}"
-# leave tagging + pushing to postrelease script (due to potential failures in 2 and 3)
+# leave tagging + pushing to postrelease script (due to potential failures in 1 and 2)
 push = false
 tag = false

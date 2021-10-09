@@ -1,11 +1,14 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.60.0...master
- * `kube-core`: BREAKING: extend `CustomResourceExt` trait with `::shortnames` method (impl in `kube-derive`) - #641
- * `kube-runtime`: add `wait` module to `await_condition`, and added `watch_object` to watcher - #632 via #633
- * `kube`: add `Restart` marker trait to allow `Api::restart` on core workloads - #630 via #635
- * bump dependencies: `tokio-tungstenite`, `k8s-openapi`, `schemars`, `tokio` in particular - #643 + #645
+ * see https://github.com/kube-rs/kube-rs/compare/0.61.0...master
+
+0.61.0 / 2021-10-09
+===================
+ * `kube-core`: BREAKING: extend `CustomResourceExt` trait with `::shortnames` method (impl in `kube-derive`) - [#641](https://github.com/kube-rs/kube-rs/issues/641)
+ * `kube-runtime`: add `wait` module to `await_condition`, and added `watch_object` to watcher - [#632](https://github.com/kube-rs/kube-rs/issues/632) via [#633](https://github.com/kube-rs/kube-rs/issues/633)
+ * `kube`: add `Restart` marker trait to allow `Api::restart` on core workloads - [#630](https://github.com/kube-rs/kube-rs/issues/630) via [#635](https://github.com/kube-rs/kube-rs/issues/635)
+ * bump dependencies: `tokio-tungstenite`, `k8s-openapi`, `schemars`, `tokio` in particular - [#643](https://github.com/kube-rs/kube-rs/issues/643) + [#645](https://github.com/kube-rs/kube-rs/issues/645)
 
 0.60.0 / 2021-09-02
 ===================
