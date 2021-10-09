@@ -110,8 +110,9 @@ mod custom_resource;
 /// use serde::{Serialize, Deserialize};
 /// use kube_derive::CustomResource;
 /// use schemars::JsonSchema;
+/// use validator::Validate;
 ///
-/// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, Validate, JsonSchema)]
 /// #[kube(
 ///     group = "clux.dev",
 ///     version = "v1",
@@ -126,9 +127,11 @@ mod custom_resource;
 ///     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
 ///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
 /// )]
+/// #[serde(rename_all = "camelCase")]
 /// struct FooSpec {
+///     #[validate(length(min = 3))]
 ///     data: String,
-///     replicas: i32
+///     replicas_count: i32
 /// }
 ///
 /// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -163,11 +166,11 @@ mod custom_resource;
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
 /// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive.rs))
 /// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/kube-rs/kube-rs/issues/129#issuecomment-750852916)
+/// - [`#[validate(...)]` field attributes with validator](https://github.com/Keats/validator) for kubebuilder style validation rules (see [`crd_api` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_api.rs)))
 ///
-/// In general, you will need to override parts of the schemas (for fields in question) when you are:
+/// You might need to override parts of the schemas (for fields in question) when you are:
 /// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
 /// - **customizing [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy)** (e.g. like in the [`crd_derive_schema` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive_schema.rs))
-/// - **customizing [certain kubebuilder like validation rules](https://github.com/kube-rs/kube-rs/issues/129#issuecomment-749463718)** (tail the issue for state of affairs)
 ///
 /// See [kubernetes openapi validation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation) for the format of the OpenAPI v3 schemas.
 ///
@@ -175,6 +178,7 @@ mod custom_resource;
 ///
 /// ## Advanced Features
 /// - **embedding k8s-openapi types** can be done by enabling the `schemars` feature of `k8s-openapi` from [`0.13.0`](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0130-2021-08-09)
+/// - **adding validation** via [validator crate](https://github.com/Keats/validator) is supported from `schemars` >= [`0.8.5`](https://github.com/GREsau/schemars/blob/master/CHANGELOG.md#085---2021-09-20) - you must derive `Validate`
 ///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.

@@ -1,9 +1,11 @@
 #[macro_use] extern crate log;
 use either::Either::{Left, Right};
+use anyhow::{Result, bail};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
+use validator::Validate;
 use tokio::time::sleep;
 
 // Using the old v1beta1 extension requires the deprecated-crd-v1beta1 feature on kube
@@ -23,13 +25,14 @@ use kube::{
 };
 
 // Own custom resource
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, Validate, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[cfg_attr(feature = "deprecated", kube(apiextensions = "v1beta1"))]
 #[kube(status = "FooStatus")]
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 #[kube(printcolumn = r#"{"name":"Team", "jsonPath": ".spec.metadata.team", "type": "string"}"#)]
 pub struct FooSpec {
+    #[validate(length(min = 3))]
     name: String,
     info: String,
     replicas: i32,
@@ -42,7 +45,7 @@ pub struct FooStatus {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
@@ -202,6 +205,23 @@ async fn main() -> anyhow::Result<()> {
 
     // Delete the last - expect a status back (instant delete)
     assert!(foos.delete("qux", &dp).await?.is_right());
+
+    // Check that validation is being obeyed
+    info!("Verifying validation rules");
+    let fx = Foo::new("x", FooSpec {
+        name: "x".into(),
+        info: "failing validation obj".into(),
+        replicas: 1,
+    });
+    match foos.create(&pp, &fx).await {
+        Err(kube::Error::Api(ae)) => {
+            assert_eq!(ae.code, 422);
+            assert!(ae.message.contains("spec.name in body should be at least 3 chars long"));
+        },
+        Err(e) => bail!("somehow got unexpected error from validation: {:?}", e),
+        Ok(o) => bail!("somehow created {:?} despite validation", o),
+    }
+    info!("Rejected fx for invalid name {}", fx.name());
 
     // Cleanup the full collection - expect a wait
     match foos.delete_collection(&dp, &lp).await? {
