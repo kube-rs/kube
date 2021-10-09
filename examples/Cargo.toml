@@ -11,7 +11,7 @@ edition = "2018"
 license = "Apache-2.0"
 
 [package.metadata.release]
-disable-release = true
+release = false
 
 [features]
 default = ["native-tls", "schema", "kubederive", "ws", "latest"]

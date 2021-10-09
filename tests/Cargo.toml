@@ -7,7 +7,7 @@ edition = "2018"
 license = "Apache-2.0"
 
 [package.metadata.release]
-disable-release = true
+release = false
 
 [[bin]]
 name = "dapp"

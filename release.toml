@@ -1,11 +1,11 @@
-# Release process:
-# 0. (optional) cargo release minor ; verify readme + changelog bumped
-# 1. (optional) git reset --hard
-# 2. PUBLISH_GRACE_SLEEP=20 cargo release minor --execute
-# 3a. await publishing - failures can happen due to https://github.com/sunng87/cargo-release/issues/224 (but should not with sufficient grace-sleep)
-# 3b. if failures from 3a; (resume publishing manually, cd into next dir, cargo publish, wait, continue for next in line)
-# 4. check consolidated commit - shared version https://github.com/crate-ci/cargo-release/issues/222 fix is pretty new
-# 5. ./scripts/release-post.sh
+# Release process :: cargo-release @ 0.18.0
+#
+# 0. (optional) cargo release minor ; verify readme + changelog bumped; then git reset --hard
+# 1. PUBLISH_GRACE_SLEEP=20 cargo release minor --execute
+# 1X.  - on failure: follow plan manually, cd into next dir to publish and run cargo publish
+# 2. check consolidated commit
+# 2X.  - on failure: git commit --amend and insert version
+# 3. ./scripts/release-post.sh
 
 # Reference
 # https://github.com/sunng87/cargo-release/blob/master/docs/reference.md
@@ -13,9 +13,8 @@
 
 consolidate-commits = true
 shared-version = true
-no-dev-version = true # bumps happen right before release
 pre-release-hook = ["../scripts/release-pre.sh"]
 pre-release-commit-message = "release {{version}}"
-# leave tagging to postrelease script (due to potential failures in 3 and 4)
-disable-push = true
-disable-tag = true
+# leave tagging + pushing to postrelease script (due to potential failures in 2 and 3)
+push = false
+tag = false
