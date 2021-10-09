@@ -18,7 +18,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 [dependencies]
 kube = "0.60.0"
 kube-runtime = "0.60.0"
-k8s-openapi = { version = "0.13.0", default-features = false, features = ["v1_22"] }
+k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 ```
 
 [Features are available](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
@@ -169,7 +169,7 @@ Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues
 [dependencies]
 kube = { version = "0.60.0", default-features = false, features = ["client", "rustls-tls"] }
 kube-runtime = { version = "0.60.0" }
-k8s-openapi = { version = "0.13.0", default-features = false, features = ["v1_22"] }
+k8s-openapi = { version = "1.13.1", default-features = false, features = ["v1_22"] }
 ```
 
 This will pull in `rustls` and `hyper-rustls`.
