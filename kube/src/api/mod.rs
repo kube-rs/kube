@@ -47,6 +47,7 @@ pub struct Api<K> {
     /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
     /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
     /// is `Send`, even if `K` may not be).
+    #[allow(dead_code)]
     pub(crate) phantom: std::iter::Empty<K>,
 }
 

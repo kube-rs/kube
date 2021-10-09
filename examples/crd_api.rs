@@ -1,12 +1,12 @@
 #[macro_use] extern crate log;
+use anyhow::{bail, Result};
 use either::Either::{Left, Right};
-use anyhow::{Result, bail};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
-use validator::Validate;
 use tokio::time::sleep;
+use validator::Validate;
 
 // Using the old v1beta1 extension requires the deprecated-crd-v1beta1 feature on kube
 #[cfg(feature = "deprecated")]
@@ -216,8 +216,10 @@ async fn main() -> Result<()> {
     match foos.create(&pp, &fx).await {
         Err(kube::Error::Api(ae)) => {
             assert_eq!(ae.code, 422);
-            assert!(ae.message.contains("spec.name in body should be at least 3 chars long"));
-        },
+            assert!(ae
+                .message
+                .contains("spec.name in body should be at least 3 chars long"));
+        }
         Err(e) => bail!("somehow got unexpected error from validation: {:?}", e),
         Ok(o) => bail!("somehow created {:?} despite validation", o),
     }
