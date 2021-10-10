@@ -213,6 +213,9 @@ async fn main() -> Result<()> {
         info: "failing validation obj".into(),
         replicas: 1,
     });
+    // using derived Validate rules locally:
+    assert!(fx.spec.validate().is_err());
+    // check rejection from apiserver (validation rules embedded in JsonSchema)
     match foos.create(&pp, &fx).await {
         Err(kube::Error::Api(ae)) => {
             assert_eq!(ae.code, 422);
