@@ -327,6 +327,7 @@ impl Kubeconfig {
     }
 }
 
+#[allow(clippy::redundant_closure)]
 fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
 where
     F: Fn(&T) -> &String,

@@ -398,13 +398,13 @@ where
 {
     // NB: Need to Unpin for stream::select_all
     trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
-    /// [`run`] starts a graceful shutdown when any of these [`Future`]s complete,
+    /// [`run`](crate::Controller::run) starts a graceful shutdown when any of these [`Future`]s complete,
     /// refusing to start any new reconciliations but letting any existing ones finish.
     graceful_shutdown_selector: Vec<BoxFuture<'static, ()>>,
-    /// [`run`] terminates immediately when any of these [`Future`]s complete,
+    /// [`run`](crate::Controller::run) terminates immediately when any of these [`Future`]s complete,
     /// requesting that all running reconciliations be aborted.
     /// However, note that they *will* keep running until their next yield point (`.await`),
-    /// blocking [`tokio::runtime::Runtime`] destruction (unless you follow up by calling [`std::process:exit`] after `run`).
+    /// blocking [`tokio::runtime::Runtime`] destruction (unless you follow up by calling [`std::process::exit`] after `run`).
     forceful_shutdown_selector: Vec<BoxFuture<'static, ()>>,
     dyntype: K::DynamicType,
     reader: Store<K>,

@@ -50,7 +50,7 @@ impl FinalizerState {
 /// cleanup is done.
 ///
 /// In typical usage, if you use `finalizer` then it should be the only top-level "action"
-/// in your [`applier`]/[`Controller`]'s `reconcile` function.
+/// in your [`applier`](crate::applier)/[`Controller`](crate::Controller)'s `reconcile` function.
 ///
 /// # Expected Flow
 ///
@@ -94,6 +94,8 @@ impl FinalizerState {
 ///
 /// In addition, adding and removing the finalizer itself may fail. In particular, this may be because of
 /// network errors, lacking permissions, or because another `finalizer` was updated in the meantime on the same object.
+///
+/// [`ObjectMeta::finalizers`]: kube::api::ObjectMeta#structfield.finalizers
 pub async fn finalizer<K, ReconcileFut>(
     api: &Api<K>,
     finalizer_name: &str,

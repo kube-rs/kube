@@ -55,7 +55,7 @@ pub mod conditions {
     /// An await condition that returns `true` once the object has been deleted.
     ///
     /// An object is considered to be deleted if the object can no longer be found, or if its
-    /// [`uid`] changes. This means that an object is considered to be deleted even if we miss
+    /// [`uid`](kube::api::ObjectMeta#structfield.uid) changes. This means that an object is considered to be deleted even if we miss
     /// the deletion event and the object is recreated in the meantime.
     pub fn is_deleted<K: Resource>(uid: &str) -> impl Fn(Option<&K>) -> bool + '_ {
         move |obj: Option<&K>| {
