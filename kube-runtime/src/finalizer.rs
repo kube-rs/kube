@@ -1,7 +1,7 @@
 use crate::controller::ReconcilerAction;
 use futures::{TryFuture, TryFutureExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
-use kube::{
+use kube_client::{
     api::{Patch, PatchParams},
     Api, Resource, ResourceExt,
 };
@@ -19,9 +19,9 @@ where
     #[snafu(display("failed to clean up object: {}", source))]
     CleanupFailed { source: ReconcileErr },
     #[snafu(display("failed to add finalizer: {}", source))]
-    AddFinalizer { source: kube::Error },
+    AddFinalizer { source: kube_client::Error },
     #[snafu(display("failed to remove finalizer: {}", source))]
-    RemoveFinalizer { source: kube::Error },
+    RemoveFinalizer { source: kube_client::Error },
     #[snafu(display("object has no name"))]
     UnnamedObject,
 }
@@ -95,7 +95,7 @@ impl FinalizerState {
 /// In addition, adding and removing the finalizer itself may fail. In particular, this may be because of
 /// network errors, lacking permissions, or because another `finalizer` was updated in the meantime on the same object.
 ///
-/// [`ObjectMeta::finalizers`]: kube::api::ObjectMeta#structfield.finalizers
+/// [`ObjectMeta::finalizers`]: kube_client::api::ObjectMeta#structfield.finalizers
 pub async fn finalizer<K, ReconcileFut>(
     api: &Api<K>,
     finalizer_name: &str,

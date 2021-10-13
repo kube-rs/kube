@@ -2,7 +2,7 @@ use super::ObjectRef;
 use crate::watcher;
 use dashmap::DashMap;
 use derivative::Derivative;
-use kube::Resource;
+use kube_client::Resource;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 
 /// A writable Store handle
@@ -127,7 +127,7 @@ mod tests {
     use super::Writer;
     use crate::{reflector::ObjectRef, watcher};
     use k8s_openapi::api::core::v1::ConfigMap;
-    use kube::api::ObjectMeta;
+    use kube_client::api::ObjectMeta;
 
     #[test]
     fn should_allow_getting_namespaced_object_by_namespaced_ref() {

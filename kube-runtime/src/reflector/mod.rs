@@ -6,7 +6,7 @@ pub mod store;
 pub use self::object_ref::ObjectRef;
 use crate::watcher;
 use futures::{Stream, TryStreamExt};
-use kube::Resource;
+use kube_client::Resource;
 use std::hash::Hash;
 pub use store::Store;
 
