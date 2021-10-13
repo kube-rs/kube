@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3.17"
-kube = { path = "../kube", version = "^0.61.0", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "^0.61.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative = "2.1.1"
 serde = "1.0.130"
 smallvec = "1.7.0"
