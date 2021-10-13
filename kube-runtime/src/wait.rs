@@ -1,5 +1,5 @@
 use futures::TryStreamExt;
-use kube::{Api, Resource};
+use kube_client::{Api, Resource};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as _, Snafu};
 use std::fmt::Debug;
@@ -50,12 +50,12 @@ where
 
 /// Common conditions to wait for
 pub mod conditions {
-    use kube::Resource;
+    use kube_client::Resource;
 
     /// An await condition that returns `true` once the object has been deleted.
     ///
     /// An object is considered to be deleted if the object can no longer be found, or if its
-    /// [`uid`](kube::api::ObjectMeta#structfield.uid) changes. This means that an object is considered to be deleted even if we miss
+    /// [`uid`](kube_client::api::ObjectMeta#structfield.uid) changes. This means that an object is considered to be deleted even if we miss
     /// the deletion event and the object is recreated in the meantime.
     pub fn is_deleted<K: Resource>(uid: &str) -> impl Fn(Option<&K>) -> bool + '_ {
         move |obj: Option<&K>| {
@@ -72,7 +72,7 @@ pub mod conditions {
 /// Utilities for deleting objects
 pub mod delete {
     use super::{await_condition, conditions};
-    use kube::{api::DeleteParams, Api, Resource};
+    use kube_client::{api::DeleteParams, Api, Resource};
     use serde::de::DeserializeOwned;
     use snafu::{OptionExt, ResultExt, Snafu};
     use std::fmt::Debug;
@@ -82,7 +82,7 @@ pub mod delete {
         #[snafu(display("deleted object has no UID to wait for"))]
         NoUid,
         #[snafu(display("failed to delete object: {}", source))]
-        Delete { source: kube::Error },
+        Delete { source: kube_client::Error },
         #[snafu(display("failed to wait for object to be deleted: {}", source))]
         Await { source: super::Error },
     }

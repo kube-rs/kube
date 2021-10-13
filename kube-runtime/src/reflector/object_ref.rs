@@ -1,6 +1,6 @@
 use derivative::Derivative;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
-use kube::api::{DynamicObject, Resource, ResourceExt};
+use kube_client::api::{DynamicObject, Resource, ResourceExt};
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
@@ -130,7 +130,7 @@ impl<K: Resource> ObjectRef<K> {
 
     pub fn erase(self) -> ObjectRef<DynamicObject> {
         ObjectRef {
-            dyntype: kube::api::ApiResource::erase::<K>(&self.dyntype),
+            dyntype: kube_client::api::ApiResource::erase::<K>(&self.dyntype),
             name: self.name,
             namespace: self.namespace,
         }
