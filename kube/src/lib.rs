@@ -66,7 +66,7 @@ pub use kube_derive::CustomResource;
 /// Re-exports from kube-runtime
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
-pub use kube_runtime;
+pub use kube_runtime as runtime;
 
 /// Re-exports from kube_core crate.
 pub mod core {
