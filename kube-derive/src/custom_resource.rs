@@ -159,8 +159,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
-                    api_version: <#rootident as kube::Resource>::api_version(&()).to_string(),
-                    kind: <#rootident as kube::Resource>::kind(&()).to_string(),
+                    api_version: <#rootident as kube_core::Resource>::api_version(&()).to_string(),
+                    kind: <#rootident as kube_core::Resource>::kind(&()).to_string(),
                     metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         name: Some(name.to_string()),
                         ..Default::default()
@@ -179,7 +179,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     let api_ver = format!("{}/{}", group, version);
     let impl_resource = quote! {
-        impl kube::Resource for #rootident {
+        impl kube_core::Resource for #rootident {
             type DynamicType = ();
 
             fn group(_: &()) -> std::borrow::Cow<'_, str> {
@@ -218,8 +218,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             impl Default for #rootident {
                 fn default() -> Self {
                     Self {
-                        api_version: <#rootident as kube::Resource>::api_version(&()).to_string(),
-                        kind: <#rootident as kube::Resource>::kind(&()).to_string(),
+                        api_version: <#rootident as kube_core::Resource>::api_version(&()).to_string(),
+                        kind: <#rootident as kube_core::Resource>::kind(&()).to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
                         #status_default
@@ -247,7 +247,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident
     };
     let extver = quote! {
-        kube::core::crd::#v1ident
+        kube_core::crd::#v1ident
     };
 
     let shortnames_slice = {
@@ -373,8 +373,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 #crd_meta_name
             }
 
-            fn api_resource() -> kube::core::ApiResource {
-                kube::core::ApiResource::erase::<Self>(&())
+            fn api_resource() -> kube_core::dynamic::ApiResource {
+                kube_core::dynamic::ApiResource::erase::<Self>(&())
             }
 
             fn shortnames() -> &'static [&'static str] {
@@ -396,7 +396,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     }
 }
 
-/// This generates the code for the `kube::core::object::HasSpec` trait implementation.
+/// This generates the code for the `kube_core::object::HasSpec` trait implementation.
 ///
 /// All CRDs have a spec so it is implemented for all of them.
 ///
@@ -406,7 +406,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 /// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
 fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
     quote! {
-        impl ::kube::core::object::HasSpec for #root_ident {
+        impl ::kube_core::object::HasSpec for #root_ident {
             type Spec = #spec_ident;
 
             fn spec(&self) -> &#spec_ident {
@@ -450,7 +450,7 @@ fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visi
             },
             default: quote! { status: None, },
             impl_hasstatus: quote! {
-                impl ::kube::core::object::HasStatus for #root_ident {
+                impl ::kube_core::object::HasStatus for #root_ident {
 
                     type Status = #ident;
 
