@@ -20,7 +20,7 @@ mod custom_resource;
 ///
 /// ```rust
 /// use serde::{Serialize, Deserialize};
-/// use kube::{Resource, CustomResourceExt};
+/// use kube_core::{Resource, CustomResourceExt};
 /// use kube_derive::CustomResource;
 /// use schemars::JsonSchema;
 ///
