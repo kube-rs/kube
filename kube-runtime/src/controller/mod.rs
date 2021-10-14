@@ -337,8 +337,8 @@ where
 ///
 /// Pieces:
 /// ```no_run
-/// use kube_client::{Client, api::{Api, ListParams}};
 /// use kube_derive::CustomResource;
+/// use kube_client::{Client, api::{Api, ListParams}};
 /// use serde::{Deserialize, Serialize};
 /// use tokio::time::Duration;
 /// use futures::StreamExt;

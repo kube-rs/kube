@@ -129,10 +129,6 @@ cfg_error! {
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
-#[cfg(feature = "derive")]
-#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
-pub use kube_derive::CustomResource;
-
 /// Re-exports from kube_core crate.
 pub mod core {
     #[cfg(feature = "admission")]
