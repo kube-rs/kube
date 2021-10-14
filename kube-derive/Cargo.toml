@@ -28,7 +28,7 @@ schema = []
 [dev-dependencies]
 serde = { version = "1.0.130", features = ["derive"] }
 serde_yaml = "0.8.21"
-kube = { path = "../kube", default-features = false }
+kube-core = { path = "../kube-core", default-features = false }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 schemars = { version = "0.8.6", features = ["chrono"] }
 validator = { version = "0.14.0", features = ["derive"] }
