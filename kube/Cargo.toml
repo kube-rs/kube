@@ -10,7 +10,7 @@ authors = [
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube-rs"
 readme = "../README.md"
-keywords = ["kubernetes", "client", "runtime", "reflector", "informer"]
+keywords = ["kubernetes", "client", "runtime"]
 categories = ["web-programming::http-client"]
 edition = "2018"
 
@@ -21,7 +21,7 @@ rustls-tls = ["kube-client/rustls-tls"]
 ws = ["kube-client/ws", "kube-core/ws"]
 oauth = ["kube-client/oauth"]
 gzip = ["kube-client/gzip"]
-client = ["kube-client/client"]
+client = ["kube-client/client", "config"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 derive = ["kube-derive"]
