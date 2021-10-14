@@ -16,9 +16,9 @@ use kube_core::gvk::{GroupVersion, GroupVersionKind};
 ///
 /// If you know the version of the discovered group, you can fetch it directly:
 /// ```no_run
-/// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
+/// use kube_client::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), kube_client::Error> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///      for (apiresource, caps) in apigroup.versioned_resources("v1") {
@@ -40,9 +40,9 @@ use kube_core::gvk::{GroupVersion, GroupVersionKind};
 /// as well as the [`ApiResource`] for the `DynamicType` for the [`Resource`] trait.
 ///
 /// ```no_run
-/// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
+/// use kube_client::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), kube_client::Error> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
@@ -215,9 +215,9 @@ impl ApiGroup {
     /// Returns the recommended (preferred or latest) versioned resources in the group
     ///
     /// ```no_run
-    /// use kube::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
+    /// use kube_client::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), kube_client::Error> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for (ar, caps) in apigroup.recommended_resources() {
@@ -242,9 +242,9 @@ impl ApiGroup {
     /// Returns the recommended version of the `kind` in the recommended resources (if found)
     ///
     /// ```no_run
-    /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
+    /// use kube_client::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), kube_client::Error> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();

@@ -87,9 +87,9 @@ impl Discovery {
     /// causing `N+2` queries to the api server (where `N` is number of api groups).
     ///
     /// ```no_run
-    /// use kube::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs, Scope}, ResourceExt};
+    /// use kube_client::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs, Scope}, ResourceExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), kube_client::Error> {
     ///     let client = Client::try_default().await?;
     ///     let discovery = Discovery::new(client.clone()).run().await?;
     ///     for group in discovery.groups() {

@@ -10,12 +10,12 @@
 //!
 //! ```rust,no_run
 //! use futures::{StreamExt, TryStreamExt};
-//! use kube::api::{Api, ResourceExt, ListParams, PostParams, WatchEvent};
-//! use kube::Client;
+//! use kube_client::api::{Api, ResourceExt, ListParams, PostParams, WatchEvent};
+//! use kube_client::Client;
 //! use k8s_openapi::api::core::v1::Pod;
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<(), kube::Error> {
+//! async fn main() -> Result<(), kube_client::Error> {
 //!     // Read the environment to find config for kube client.
 //!     // Note that this tries an in-cluster configuration first,
 //!     // then falls back on a kubeconfig file.
