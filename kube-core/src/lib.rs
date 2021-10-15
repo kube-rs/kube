@@ -17,7 +17,7 @@ pub mod admission;
 pub mod discovery;
 
 pub mod dynamic;
-pub use dynamic::DynamicObject;
+pub use dynamic::{DynamicObject, ApiResource};
 
 pub mod crd;
 pub use crd::CustomResourceExt;
@@ -26,8 +26,10 @@ pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 
 pub mod metadata;
+pub use metadata::{ListMeta, ObjectMeta, TypeMeta};
 
 pub mod object;
+pub use object::{NotUsed, Object, ObjectList};
 
 pub mod params;
 
@@ -38,6 +40,7 @@ mod resource;
 pub use resource::{Resource, ResourceExt};
 
 pub mod response;
+pub use response::Status;
 
 pub mod subresource;
 
