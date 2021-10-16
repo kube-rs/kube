@@ -34,7 +34,7 @@ struct KubeAttrs {
     #[darling(default)]
     scale: Option<String>,
     #[darling(default = "default_crate")]
-    kube_crate: String,
+    kube: String,
 }
 
 fn default_apiext() -> String {
@@ -80,7 +80,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         printcolums,
         apiextensions,
         scale,
-        kube_crate,
+        kube,
     } = kube_attrs;
 
     let struct_name = kind_struct.unwrap_or_else(|| kind.clone());
@@ -103,8 +103,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let rootident = Ident::new(&struct_name, Span::call_site());
 
     // Imports of core module must work even on the most basic dependency setup:
-    let kube_crate_ident = format_ident!("{}", kube_crate);
-    let crate_path = match kube_crate.as_ref() {
+    let kube_crate_ident = format_ident!("{}", kube);
+    let crate_path = match kube.as_ref() {
         // support generating links to light-weight "kube-core" directly
         "kube_core" => quote! { #kube_crate_ident },
         // otherwise link to the `core` module re-exported from `kube` or `kube_client`
