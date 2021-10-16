@@ -1,11 +1,10 @@
-use k8s_openapi::chrono::Utc;
-use k8s_openapi::api::core::v1::ObjectReference;
-use k8s_openapi::api::events::v1::Event;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta};
-use kube::api::PostParams;
-use kube::{Api, Client};
-use crate::event_recorder::{EventSource, EventType};
-use crate::event_recorder::event::NewEvent;
+use crate::event_recorder::{event::NewEvent, EventSource, EventType};
+use k8s_openapi::{
+    api::{core::v1::ObjectReference, events::v1::Event},
+    apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
+    chrono::Utc,
+};
+use kube::{api::PostParams, Api, Client};
 
 #[derive(Clone)]
 /// A publisher abstraction to emit Kubernetes' events.
@@ -54,11 +53,7 @@ pub struct EventRecorder {
 impl EventRecorder {
     /// Build a new [`EventRecorder`] instance to emit events attached to the
     /// specified [`ObjectReference`].
-    pub fn new(
-        k8s_client: Client,
-        event_source: EventSource,
-        object_reference: ObjectReference,
-    ) -> Self {
+    pub fn new(k8s_client: Client, event_source: EventSource, object_reference: ObjectReference) -> Self {
         let event_client = match object_reference.namespace.as_ref() {
             None => Api::all(k8s_client),
             Some(namespace) => Api::namespaced(k8s_client, namespace),
@@ -78,39 +73,32 @@ impl EventRecorder {
     /// you specified in [`EventRecorder::new`].
     /// Make sure that your controller has `create` permissions in the required namespaces
     /// for the `event` resource in the API group `events.k8s.io`.
-    pub async fn publish(
-        &self,
-        new_event: NewEvent,
-    ) -> Result<(), kube::Error> {
-        self
-            .event_client
-            .create(
-                &PostParams::default(),
-                &Event {
-                    action: Some(new_event.action),
-                    reason: Some(new_event.reason),
-                    deprecated_count: None,
-                    deprecated_first_timestamp: None,
-                    deprecated_last_timestamp: None,
-                    deprecated_source: None,
-                    event_time: MicroTime(Utc::now()),
-                    regarding: Some(self.object_reference.clone()),
-                    note: new_event.note,
-                    metadata: ObjectMeta {
-                        namespace: Some(self.object_reference.namespace.clone().unwrap()),
-                        generate_name: Some(format!("{}-", self.event_source.controller_name)),
-                        ..Default::default()
-                    },
-                    reporting_controller: Some(self.event_source.controller_name.clone()),
-                    reporting_instance: Some(self.event_source.instance_name.clone().into()),
-                    series: None,
-                    type_: match new_event.event_type {
-                        EventType::Normal => Some("Normal".into()),
-                        EventType::Warning => Some("Warning".into()),
-                    },
-                    related: None,
+    pub async fn publish(&self, new_event: NewEvent) -> Result<(), kube::Error> {
+        self.event_client
+            .create(&PostParams::default(), &Event {
+                action: Some(new_event.action),
+                reason: Some(new_event.reason),
+                deprecated_count: None,
+                deprecated_first_timestamp: None,
+                deprecated_last_timestamp: None,
+                deprecated_source: None,
+                event_time: MicroTime(Utc::now()),
+                regarding: Some(self.object_reference.clone()),
+                note: new_event.note,
+                metadata: ObjectMeta {
+                    namespace: Some(self.object_reference.namespace.clone().unwrap()),
+                    generate_name: Some(format!("{}-", self.event_source.controller_name)),
+                    ..Default::default()
                 },
-            )
+                reporting_controller: Some(self.event_source.controller_name.clone()),
+                reporting_instance: Some(self.event_source.instance_name.clone().into()),
+                series: None,
+                type_: match new_event.event_type {
+                    EventType::Normal => Some("Normal".into()),
+                    EventType::Warning => Some("Warning".into()),
+                },
+                related: None,
+            })
             .await?;
         Ok(())
     }
