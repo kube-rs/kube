@@ -105,10 +105,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // Imports of core module must work even on the most basic dependency setup:
     let kube_crate_ident = format_ident!("{}", kube_crate);
     let crate_path = match kube_crate.as_ref() {
-        // by default we generate code that links into `kube::core::*`
-        "kube" => quote! { #kube_crate_ident::core },
-        // but using "kube-core" or "kube-client" directly also works (both re-export kube_core as core)
-        "kube_core" | "kube_client" => quote! { #kube_crate_ident },
+        // support generating links to light-weight "kube-core" directly
+        "kube_core" => quote! { #kube_crate_ident },
+        // otherwise link to the `core` module re-exported from `kube` or `kube_client`
+        "kube" | "kube_client" => quote! { #kube_crate_ident::core },
         _ => {
             return syn::Error::new_spanned(
                 kube_crate_ident,
