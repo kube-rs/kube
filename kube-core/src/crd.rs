@@ -4,7 +4,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions as apiexts;
 
 /// Types for v1 CustomResourceDefinitions
 pub mod v1 {
-    /// Extension trait that will be implemented by kube-derive
+    /// Extension trait that is implemented by kube-derive
     ///
     /// This trait variant is implemented by default (or when `#[kube(apiextensions = "v1")]`)
     pub trait CustomResourceExt {
@@ -33,7 +33,7 @@ pub mod v1 {
 /// Types for legacy v1beta1 CustomResourceDefinitions
 #[cfg(feature = "deprecated-crd-v1beta1")]
 pub mod v1beta1 {
-    /// Extension trait that will be implemented by kube-derive for legacy v1beta1::CustomResourceDefinitions
+    /// Extension trait that is implemented by kube-derive for legacy v1beta1::CustomResourceDefinitions
     ///
     /// This trait variant is only implemented with `#[kube(apiextensions = "v1beta1")]`
     pub trait CustomResourceExt {

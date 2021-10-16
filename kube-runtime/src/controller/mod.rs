@@ -337,12 +337,14 @@ where
 ///
 /// Pieces:
 /// ```no_run
-/// use kube_derive::CustomResource;
-/// use kube_client::{Client, api::{Api, ListParams}};
+/// use kube::{
+///   Client, CustomResource,
+///   api::{Api, ListParams},
+///   runtime::controller::{Context, Controller, ReconcilerAction}
+/// };
 /// use serde::{Deserialize, Serialize};
 /// use tokio::time::Duration;
 /// use futures::StreamExt;
-/// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 /// use k8s_openapi::api::core::v1::ConfigMap;
 /// use schemars::JsonSchema;
 ///
@@ -373,7 +375,7 @@ where
 ///
 /// /// something to drive the controller
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube_client::Error> {
+/// async fn main() -> Result<(), kube::Error> {
 ///     let client = Client::try_default().await?;
 ///     let context = Context::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
@@ -585,8 +587,11 @@ where
     /// # async {
     /// use futures::stream::StreamExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
-    /// use kube_client::{api::ListParams, Api, Client, ResourceExt};
-    /// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+    /// use kube::{
+    ///     Client,
+    ///     api::{ListParams, Api, ResourceExt},
+    ///     runtime::{controller::{Context, Controller, ReconcilerAction}},
+    /// };
     /// use std::{convert::Infallible, io::BufRead};
     /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
     /// // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
@@ -647,7 +652,7 @@ where
     /// # async {
     /// use futures::future::FutureExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
-    /// use kube_client::{api::ListParams, Api, Client, ResourceExt};
+    /// use kube::{api::ListParams, Api, Client, ResourceExt};
     /// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
     /// use std::convert::Infallible;
     /// Controller::new(

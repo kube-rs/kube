@@ -32,8 +32,7 @@ version = "0.13.1"
 default-features = false
 
 [dev-dependencies]
-kube-core = { path = "../kube-core", version = "^0.61.0"}
-kube-derive = { path = "../kube-derive", version = "^0.61.0"}
+kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "^0.61.0"}
 serde_json = "1.0.68"
 tokio = { version = "1.12.0", features = ["full", "test-util"] }
 rand = "0.8.0"

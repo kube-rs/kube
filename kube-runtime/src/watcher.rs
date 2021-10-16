@@ -202,12 +202,14 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// direct users may want to flatten composite events with [`try_flatten_applied`]:
 ///
 /// ```no_run
-/// use kube_client::{api::{Api, ListParams, ResourceExt}, Client};
-/// use kube_runtime::{utils::try_flatten_applied, watcher};
+/// use kube::{
+///   api::{Api, ListParams, ResourceExt}, Client,
+///   runtime::{utils::try_flatten_applied, watcher}
+/// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::{StreamExt, TryStreamExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube_runtime::watcher::Error> {
+/// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///     let watcher = watcher(pods, ListParams::default());
