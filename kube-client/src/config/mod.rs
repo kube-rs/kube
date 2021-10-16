@@ -142,7 +142,6 @@ impl Config {
     /// Create configuration from a [`Kubeconfig`] struct
     ///
     /// This bypasses kube's normal config parsing to obtain custom functionality.
-    /// Like if you need stacked kubeconfigs for instance - see #132
     pub async fn from_custom_kubeconfig(kubeconfig: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
         let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
         Self::new_from_loader(loader).await

@@ -58,16 +58,18 @@ cfg_error! {
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
-/// Re-exports from kube-derive
+/// Re-exports from [`kube-derive`](kube_derive)
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-/// Re-exports from kube-runtime
+/// Re-exports from [`kube-runtime`](kube_runtime)
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
+#[doc(inline)]
 pub use kube_runtime as runtime;
 
 pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
-/// Re-exports from kube_core
+/// Re-exports from [`kube_core`](kube_core)
+#[doc(inline)]
 pub use kube_core as core;
