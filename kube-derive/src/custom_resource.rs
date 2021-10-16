@@ -33,10 +33,15 @@ struct KubeAttrs {
     printcolums: Vec<String>,
     #[darling(default)]
     scale: Option<String>,
+    #[darling(default = "default_crate")]
+    kube_crate: String,
 }
 
 fn default_apiext() -> String {
     "v1".to_owned()
+}
+fn default_crate() -> String {
+    "kube".to_owned() // by default must work well with people using facade crate
 }
 
 pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
@@ -75,6 +80,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         printcolums,
         apiextensions,
         scale,
+        kube_crate,
     } = kube_attrs;
 
     let struct_name = kind_struct.unwrap_or_else(|| kind.clone());
@@ -96,12 +102,28 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // => No default impl
     let rootident = Ident::new(&struct_name, Span::call_site());
 
+    // Imports of core module must work even on the most basic dependency setup:
+    let kube_crate_ident = format_ident!("{}", kube_crate);
+    let crate_path = match kube_crate.as_ref() {
+        // by default we generate code that links into `kube::core::*`
+        "kube" => quote! { #kube_crate_ident::core },
+        // but using "kube-core" or "kube-client" directly also works (both re-export kube_core as core)
+        "kube_core" | "kube_client" => quote! { #kube_crate_ident },
+        _ => {
+            return syn::Error::new_spanned(
+                kube_crate_ident,
+                r#"#[derive(CustomResource)] `kube_crate = "..."` must be equal to "kube", "kube_core" or "kube_client" when set"#,
+            )
+            .to_compile_error();
+        }
+    };
+
     // if status set, also add that
     let StatusInformation {
         field: status_field,
         default: status_default,
         impl_hasstatus,
-    } = process_status(&rootident, &status, &visibility);
+    } = process_status(&rootident, &status, &visibility, &crate_path);
     let has_status = status.is_some();
 
     let mut derive_paths: Vec<Path> = vec![];
@@ -159,8 +181,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
-                    api_version: <#rootident as kube_core::Resource>::api_version(&()).to_string(),
-                    kind: <#rootident as kube_core::Resource>::kind(&()).to_string(),
+                    api_version: <#rootident as #crate_path::Resource>::api_version(&()).to_string(),
+                    kind: <#rootident as #crate_path::Resource>::kind(&()).to_string(),
                     metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         name: Some(name.to_string()),
                         ..Default::default()
@@ -179,7 +201,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     let api_ver = format!("{}/{}", group, version);
     let impl_resource = quote! {
-        impl kube_core::Resource for #rootident {
+        impl #crate_path::Resource for #rootident {
             type DynamicType = ();
 
             fn group(_: &()) -> std::borrow::Cow<'_, str> {
@@ -218,8 +240,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             impl Default for #rootident {
                 fn default() -> Self {
                     Self {
-                        api_version: <#rootident as kube_core::Resource>::api_version(&()).to_string(),
-                        kind: <#rootident as kube_core::Resource>::kind(&()).to_string(),
+                        api_version: <#rootident as #crate_path::Resource>::api_version(&()).to_string(),
+                        kind: <#rootident as #crate_path::Resource>::kind(&()).to_string(),
                         metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
                         #status_default
@@ -247,7 +269,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident
     };
     let extver = quote! {
-        kube_core::crd::#v1ident
+        #crate_path::crd::#v1ident
     };
 
     let shortnames_slice = {
@@ -373,8 +395,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 #crd_meta_name
             }
 
-            fn api_resource() -> kube_core::dynamic::ApiResource {
-                kube_core::dynamic::ApiResource::erase::<Self>(&())
+            fn api_resource() -> #crate_path::dynamic::ApiResource {
+                #crate_path::dynamic::ApiResource::erase::<Self>(&())
             }
 
             fn shortnames() -> &'static [&'static str] {
@@ -383,7 +405,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    let impl_hasspec = generate_hasspec(&ident, &rootident);
+    let impl_hasspec = generate_hasspec(&ident, &rootident, &crate_path);
 
     // Concat output
     quote! {
@@ -396,7 +418,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     }
 }
 
-/// This generates the code for the `kube_core::object::HasSpec` trait implementation.
+/// This generates the code for the `#crate_path::object::HasSpec` trait implementation.
 ///
 /// All CRDs have a spec so it is implemented for all of them.
 ///
@@ -404,9 +426,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 ///
 /// * `ident`: The identity (name) of the spec struct
 /// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
-fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident) -> TokenStream {
+/// * `crate_path`: The path stream for the analagous kube::core import location from users POV
+fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident, crate_path: &TokenStream) -> TokenStream {
     quote! {
-        impl ::kube_core::object::HasSpec for #root_ident {
+        impl #crate_path::object::HasSpec for #root_ident {
             type Spec = #spec_ident;
 
             fn spec(&self) -> &#spec_ident {
@@ -438,9 +461,15 @@ struct StatusInformation {
 /// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
 /// * `status`: The optional name of the `status` struct to use
 /// * `visibility`: Desired visibility of the generated field
+/// * `crate_path`: The path stream for the analagous kube::core import location from users POV
 ///
 /// returns: A `StatusInformation` struct
-fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visibility) -> StatusInformation {
+fn process_status(
+    root_ident: &Ident,
+    status: &Option<String>,
+    visibility: &Visibility,
+    crate_path: &TokenStream,
+) -> StatusInformation {
     if let Some(status_name) = &status {
         let ident = format_ident!("{}", status_name);
         StatusInformation {
@@ -450,7 +479,7 @@ fn process_status(root_ident: &Ident, status: &Option<String>, visibility: &Visi
             },
             default: quote! { status: None, },
             impl_hasstatus: quote! {
-                impl ::kube_core::object::HasStatus for #root_ident {
+                impl #crate_path::object::HasStatus for #root_ident {
 
                     type Status = #ident;
 

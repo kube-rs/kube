@@ -68,6 +68,6 @@ pub use kube_derive::CustomResource;
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 pub use kube_runtime as runtime;
 
+pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from kube_core
 pub use kube_core as core;
-pub use crate::core::{CustomResourceExt, Resource, ResourceExt};

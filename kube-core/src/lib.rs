@@ -17,7 +17,7 @@ pub mod admission;
 pub mod discovery;
 
 pub mod dynamic;
-pub use dynamic::{DynamicObject, ApiResource};
+pub use dynamic::{ApiResource, DynamicObject};
 
 pub mod crd;
 pub use crd::CustomResourceExt;

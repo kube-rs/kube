@@ -129,6 +129,6 @@ cfg_error! {
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
+pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from kube_core
 pub use kube_core as core;
-pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
