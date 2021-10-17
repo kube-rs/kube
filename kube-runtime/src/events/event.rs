@@ -77,7 +77,7 @@ pub struct EventSource {
     /// E.g. `my-awesome-controller-abcdef`.
     ///
     /// The name of the controller pod can be retrieved using Kubernetes' API or
-    /// it can injected as an environment variable using
+    /// it can be injected as an environment variable using
     ///
     /// ```yaml
     /// env:
