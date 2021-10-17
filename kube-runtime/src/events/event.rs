@@ -32,6 +32,11 @@ pub struct NewEvent {
     /// affects only the object whose reference you passed
     /// to [`EventRecorder::new`].
     ///
+    /// # Naming note
+    ///
+    /// `secondary_object` is mapped to `related` in
+    /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
+    ///
     /// [`EventRecorder::new`]: crate::events::EventRecorder::new
     pub secondary_object: Option<ObjectReference>
 }

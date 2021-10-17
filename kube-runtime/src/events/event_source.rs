@@ -16,9 +16,19 @@ pub struct EventSource {
     /// The name of the controller publishing the event.
     ///
     /// E.g. `my-awesome-controller`.
+    ///
+    /// # Naming note
+    ///
+    /// `controller_name` is mapped to `reportingController` in
+    /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
     pub controller_name: String,
     /// The name of the controller pod publishing the event.
     ///
     /// E.g. `my-awesome-controller-abcdef`.
+    ///
+    /// # Naming note
+    ///
+    /// `controller_pod_name` is mapped to `reportingInstance` in
+    /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
     pub controller_pod_name: ControllerPodName,
 }
