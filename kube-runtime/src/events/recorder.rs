@@ -35,7 +35,7 @@ use kube::{api::PostParams, Api, Client};
 /// event_recorder.publish(NewEvent {
 ///     action: "Scheduling".try_into()?,
 ///     reason: "Pulling".try_into()?,
-///     note: Some("Pulling image `nginx`".into()),
+///     note: Some("Pulling image `nginx`".try_into()?),
 ///     event_type: EventType::Normal,
 ///     secondary_object: None,
 /// }).await?;
@@ -85,7 +85,7 @@ impl EventRecorder {
                 deprecated_source: None,
                 event_time: MicroTime(Utc::now()),
                 regarding: Some(self.object_reference.clone()),
-                note: new_event.note,
+                note: new_event.note.map(Into::into),
                 metadata: ObjectMeta {
                     namespace: Some(self.object_reference.namespace.clone().unwrap()),
                     generate_name: Some(format!("{}-", self.event_source.controller_name)),

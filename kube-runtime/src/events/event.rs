@@ -17,7 +17,7 @@ pub struct NewEvent {
     /// A optional description of the status of the `action`.
     ///
     /// `note` must be human-readable.
-    pub note: Option<String>,
+    pub note: Option<EventNote>,
     /// The event severity.
     pub event_type: EventType,
     /// Some events are emitted for actions that affect multiple objects.
@@ -287,3 +287,66 @@ impl std::fmt::Display for EventActionParsingError {
 }
 
 impl std::error::Error for EventActionParsingError {}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+/// The human-readable message attached to a published event.
+///
+/// ```rust
+/// use std::convert::TryInto;
+/// use kube_runtime::events::EventNote;
+///
+/// let reason: EventNote = "Pulling".try_into().unwrap();
+/// ```
+///
+/// It must be:
+///
+/// - smaller than 1 kilobyte.
+pub struct EventNote(String);
+
+impl TryFrom<&str> for EventNote {
+    type Error = EventNoteParsingError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_string())
+    }
+}
+
+impl TryFrom<String> for EventNote {
+    type Error = EventNoteParsingError;
+
+    fn try_from(v: String) -> Result<Self, Self::Error> {
+        // Limit imposed by Kubernetes' API
+        if v.len() > 1024 {
+            Err(Self::Error {
+                note: v,
+            })
+        } else {
+            Ok(Self(v))
+        }
+    }
+}
+
+impl AsRef<str> for EventNote {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Into<String> for EventNote {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct EventNoteParsingError {
+    note: String,
+}
+
+impl std::fmt::Display for EventNoteParsingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "The note for an event must be smaller than 1 kilobyte.")
+    }
+}
+
+impl std::error::Error for EventNoteParsingError {}
