@@ -74,10 +74,10 @@ where
     /// NB: Requires that the resource has a status subresource.
     ///
     /// ```no_run
-    /// use kube_client::{api::{Api, PatchParams, Patch}, Client};
+    /// use kube::{api::{Api, PatchParams, Patch}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut j = jobs.get("baz").await?;
@@ -109,10 +109,10 @@ where
     /// You can leave out the `.spec` entirely from the serialized output.
     ///
     /// ```no_run
-    /// use kube_client::{api::{Api, PostParams}, Client};
+    /// use kube::{api::{Api, PostParams}, Client};
     /// use k8s_openapi::api::batch::v1::{Job, JobStatus};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut o = jobs.get_status("baz").await?; // retrieve partial object

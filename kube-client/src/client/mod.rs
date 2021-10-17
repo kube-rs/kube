@@ -77,7 +77,7 @@ impl Client {
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// use kube_client::{client::ConfigExt, Client, Config};
+    /// use kube::{client::ConfigExt, Client, Config};
     /// use tower::ServiceBuilder;
     ///
     /// let config = Config::infer().await?;
@@ -348,7 +348,7 @@ impl Client {
     ///
     /// ### Example usage:
     /// ```rust
-    /// # async fn scope(client: kube_client::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// let apigroups = client.list_api_groups().await?;
     /// for g in apigroups.groups {
     ///     let ver = g

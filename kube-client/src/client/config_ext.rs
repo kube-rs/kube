@@ -27,7 +27,7 @@ pub trait ConfigExt: private::Sealed {
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use kube_client::{client::ConfigExt, Config};
+    /// # use kube::{client::ConfigExt, Config};
     /// let config = Config::infer().await?;
     /// let https = config.native_tls_https_connector()?;
     /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
@@ -44,7 +44,7 @@ pub trait ConfigExt: private::Sealed {
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use kube_client::{client::ConfigExt, Config};
+    /// # use kube::{client::ConfigExt, Config};
     /// let config = Config::infer().await?;
     /// let https = config.rustls_https_connector()?;
     /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
@@ -61,7 +61,7 @@ pub trait ConfigExt: private::Sealed {
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
     /// # use hyper::client::HttpConnector;
-    /// # use kube_client::{client::ConfigExt, Client, Config};
+    /// # use kube::{client::ConfigExt, Client, Config};
     /// let config = Config::infer().await?;
     /// let https = {
     ///     let tls = tokio_native_tls::TlsConnector::from(
@@ -84,7 +84,7 @@ pub trait ConfigExt: private::Sealed {
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
     /// # use hyper::client::HttpConnector;
-    /// # use kube_client::{client::ConfigExt, Config};
+    /// # use kube::{client::ConfigExt, Config};
     /// let config = Config::infer().await?;
     /// let https = {
     ///     let rustls_config = std::sync::Arc::new(config.rustls_client_config()?);
