@@ -1,6 +1,8 @@
 # Architecture
 This document describes the high-level architecture of kube-rs.
 
+This is intended for contributors or people interested in architecture.
+
 ## Overview
 The kube-rs repository contains 5 main crates, examples and tests.
 
@@ -26,29 +28,22 @@ When working on features/issues with `kube-rs` you will __generally__ work insid
 ## Kubernetes Ecosystem Considerations
 The rust ecosystem does not exist in a vaccum as we take heavy inspirations from the popular `go` ecosystem. In particular;
 
+- `client::Client` is a re-envisioning of a generic [client-go](https://github.com/kubernetes/client-go)
 - `runtime::Controller` abstraction follows conventions in [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
 - `derive::CustomResource` derive macro for [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/) is loosely inspired by [kubebuilder's annotations](https://book.kubebuilder.io/reference/generating-crd.html)
 - `core` module contains invariants from [apimachinery](https://github.com/kubernetes/apimachinery) that is preseved across individual apis
-- `client::Client` is a re-envisioning of a generic [client-go](https://github.com/kubernetes/client-go)
 
-When it comes to choosing names, and finding out where some modules / functionality should reside, a precedent in `client-go`, `apimachinery`, `controller-runtime` and `kubebuilder` can go a long way.
+We do occasionally diverge on matters where following the go side is worse for the rust language, but when it comes to choosing names and finding out where some modules / functionality should reside; a precedent in `client-go`, `apimachinery`, `controller-runtime` and `kubebuilder` goes a long way.
 
-That said, we do diverge on matters where following the go side is worse for the rust language. As a particular example, [client-go's tools modules](https://github.com/kubernetes/client-go/tree/master/tools) are split across several crates and modules where they are needed:
-
-  * `discovery` module replaces `client-go`'s [discovery](https://github.com/kubernetes/client-go/tree/master/discovery) sits inside `kube_client`
-  * `runtime::events` module replaces `client-go`'s [events](https://github.com/kubernetes/client-go/tree/master/tools/events) and sits inside `kube_runtime`
-  * our `config` module is top level and replaces their `clientmd`
-  * more of [client-go]'s [tools modules](https://github.com/kubernetes/client-go/tree/master/tools) are split in more generic ways
-
-## Unmanaged Parts
-We do not maintain the kubernetes types generated from the swagger.json or the protos at present moment, and we do not handle client-side validation of fields relating to these types (that's left to the api-server).
+## Generated Structs
+We do not maintain the kubernetes types generated from the `swagger.json` or the protos at present moment, and we do not handle client-side validation of fields relating to these types (that's left to the api-server).
 
 For information and documentation of the kubernetes types in rust world see:
 
 - [github.com:k8s-openapi](https://github.com/Arnavion/k8s-openapi/)
 - [docs.rs:k8s-openapi](https://docs.rs/k8s-openapi/*/k8s_openapi/)
 
-For the protobuf supporting (__WORK IN PROJECT__) see [k8s-pb](https://github.com/kazk/k8s-pb).
+For the protobuf (__WORK IN PROGRESS__) repo see [k8s-pb](https://github.com/kazk/k8s-pb).
 
 ## Crate Overviews
 ### kube-core
@@ -77,35 +72,125 @@ Finally, there are two modules used by the higher level `discovery` module (in `
 The main type here from these two modules is `ApiResource` because it can also be used to construct a `kube-client::Api` instance without compile-time type information (both `DynamicObject` and `Object` has `Resource` impls where `DynamicType = ApiResource`).
 
 ### kube-client
-In order of complexity:
+
 #### config
 Contains logic for determining the runtime environment (local [kubeconfigs](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/) or [in-cluster](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod)) so that we can construct our `Config` from either source.
 
 - `Config` is the source-agnostic type (with all the information needed by our `Client`)
 - `Kubeconfig` is for loading from `~/.kube/config` or from any number of kubeconfig like files set by `KUBECONFIG` evar.
-- `Config::from_cluster_env` ports [client-go/clientcmd/client_config]()
+- `Config::from_cluster_env` reads environment variables that are injected when running inside a pod
 
 In general this module has similar functionality to the upstream [client-go/clientcmd](https://github.com/kubernetes/client-go/tree/7697067af71046b18e03dbda04e01a5bb17f9809/tools/clientcmd) module.
 
 #### client
-- TODO: tower / layers ...
+The `Client` is one of the most complicated parts of `kube-rs`, because it has the most generic interface. People can mock the `Client`, people can replace individual components and force inject headers, people can choose their own tls stack, and - in theory - use whatever http clients they want.
+
+Generally, the `Client` is created from the properties of a `Config` to create a particular `hyper::Client` with a pre-configured amount of [tower::Layer](https://docs.rs/tower/*/tower/layer/trait.Layer.html)s (see `TryFrom<Config> for Client`), but users can also pass in an arbitrary `tower::Service` (to fully customise or to mock). The signature restrictions on `Client::new` is commensurately large.
+
+The `tls` module contains the `openssl` or `rustls` interfaces to let users pick their tls stacks. The connectors created in that module is passed to `hyper::Client` based on feature selection.
+
+The `Client` can be created from a particular type of using the properties in the `Config` to configure its layers. Some of our layers come straight from [tower-http](https://docs.rs/tower-http):
+
+- `tower_http::DecompressionLayer` to deal with gzip compression
+- `tower_http::TraceLayer` to propagate http request information onto [tracing](https://docs.rs/tracing) spans.
+- `tower_http::AddAuthorizationLayer` to set bearer tokens / basic auth (when needed)
+
+but we also have our own layers in the `middleware` module:
+
+- `BaseUriLayer` prefixes `Config::base_url` to requests
+- `RefreshTokenLayer` will refresh auth tokens in the kubeconfig periodically when they expire (by invoking the `client::auth` module)
+- `AuthLayer` configures either `AddAuthorizationLayer` or our own `RefreshTokenLayer` depending on authentication method in the kubeconfig
+
+(The `middleware` module is kept small to avoid mixing the business logic (`client::auth` openid connect oauth provider logic) with the tower layering glue.)
+
+The exported layers and tls connectors are mainly exposed through the `config_ext` module's `ConfigExt` trait which is only implemented by `Config` (because the config has all the properties needed for this in general, and it helps minimise our api surface).
+
+Finally, the `Client` manages other key aspects of IO the protocol such as:
+
+- `Client::connect` performs an [HTTP Upgrade](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Upgrade) for specialised verbs
+- `Client::request` handles 90% of all requests
+- `Client::request_events` handles streaming `watch` eventss using `tokio_utils`'s `FramedRead` codec
+- `Client::request_status` handles `Either<T, Status>` responses from kubernetes
 
 #### api
 The generic `Api` type and its methods.
 
 Builds on top of the `Request` / `Response` interface in `kube_core` by parametrising over a generic type `K` that implement `Resource` (plus whatever else is needed).
 
-Absorbs a `Client` on construction and is then configured with its `Scope` (through its `::namespaced` / `::default_namespaced` or `::all` constructors).
+The `Api` absorbs a `Client` on construction and is then configured with its `Scope` (through its `::namespaced` / `::default_namespaced` or `::all` constructors).
 
-It has slightly more complicated interfaces for the dynamic types `Object` and `DynamicObject` which end in `_with`.
+For dynamic types (`Object` and `DynamicObject`) it has slightly more complicated constructors which have the `_with` suffix.
 
+The `core_methods` and most `subresource` methods generally follow this recipe:
 
-This type was the focus of the first half of our KubeCon2020 talk [The Hidden Generics in Kubernetes' API](https://www.youtube.com/watch?v=JmwnRcc2m2A).
+- create `Request`
+- store the kubernetes verb in the [`http::Extensions`] object
+- call the request with the `Client` and tell it what type(s) to deserialize into
+
+Some subresource methods (behind the `ws` feature) use the `remote_command` module's `AttachedProcess` interface expecting a duplex stream to deal with specialised websocket verbs (`exec` and `attach`) and is calling `Client::connect` first to get that stream.
 
 #### discovery
-https://github.com/kubernetes/client-go/blob/master/discovery/discovery_client.go
+Deals with dynamic discovery of what apis are available on the api-server.
+Normally this can be used to discover custom resources, but also certain standard resources that vary between providers.
 
+The `Discovery` client can be used to do a full recursive sweep of api-groups into all api resources (through `filter`/`exclude` -> `run`) and then the users can periodically re-`run` to keep the cache up to date (as kubernetes is being upgraded behind the scenes).
 
+The `discovery` module also contains a way to run smaller queries through the `oneshot` module; e.g. resolving resource name when having group version kind, resolving every resource within one specific group, or even one group at a pinned version.
 
-## Overlapping Concerns
-TODO
+In equivalent go logic is found in [client-go/discovery](https://github.com/kubernetes/client-go/blob/master/discovery/discovery_client.go)
+
+### kube-derive
+The smallest crate. A simple [derive proc_macro](https://doc.rust-lang.org/reference/procedural-macros.html) to generate kubernetes wrapper structs and trait impls around a data struct.
+
+Uses `darling` to parse `#[kube(attrs...)]` then uses `syn` and `quote` to produce a suitable syntax tree based on the attributes requested.
+
+It ultimately contains a lot of ugly json coercing from attributes into serialization code, but this is code that everyone working with custom resources need.
+
+It has hooks into `schemars` when using `JsonSchema` to ensure the correct type of [crd schema](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema) is attached to the right part of the generated custom resource definition.
+
+### kube-runtime
+The highest level crate that deals with the highest level abstractions (such as controllers/watchers/reflectors) and specific kubernetes apis that need common care (finalisers, waiting for conditions, event publishing).
+
+#### watcher
+The `watcher` module contains state machine wrappers around `Api::watch` that will watch and auto-recover on allowable failures.
+The `watcher` fn is the general purpose one that is similar to informers in go land, and will watch a collection of objects. The `watch_object` is a specialised version of this that limits this collection to a single object.
+
+#### reflector
+The `reflector` module contains wrappers around `watcher` that will cache objects in memory.
+The `reflector` fn wraps a `watcher` and a state `Store` that is updated on every event emitted by the `watcher`.
+
+The reason for the difference between `watcher::Event` (created by `watcher`) and `kube::api::WatchEvent` (created by `Api::watch`) is that `watcher` will deals with desync errors and do a full relist whose result is then propagated as a single event, ensuring the `reflector` can do a single, atomic update to its state `Store`.
+
+#### controller
+The `controller` module contains the `Controller` type and its associated definitions.
+
+The `Controller` is configured to watch one root object (configured via `::new`), and several owned objects (via `::owns`), and - once `::run` - it will hit a users `reconcile` function for every change to the root object or any of its child objects (and internally it will traverse up the object tree - usually through owner references - to find the affected root object).
+
+The user is then meant to provide an idempotent `reconcile` fn, that does not know what underlying object was changed, to ensure the state configured in its crd, is what can be seen in the world.
+
+To manage this, a vector of watchers is converted into a [set of streams](https://docs.rs/futures/0.3.17/futures/stream/struct.SelectAll.html) of the same type by mapping the watchers so they have the same output type. This is why `watches` and `owns` differ: `owns` looks up `OwnerReferences`, but `watches` need you to define the relation yourself with a `mapper`. The mappers we support are `trigger_owners`, `trigger_self`, and the custom `trigger_with`.
+
+Once we have combined the stream of streams we essentially have a flattened super stream with events from multiple watchers that will act as our input events. With this, the `applier` can start running its fairly complex machinery:
+
+1. new input events get sent to the `scheduler`
+2. scheduled events are then passed them through a `Runner` preventing duplicate parallel requests for the same object
+3. when running, we send the affected object to the users `reconciler` fn and await that future
+4. a) on success, prepare the users `ReconcilerAction` (generally a slow requeue several minutes from now)
+4. b) on failure, prepare a `ReconcilerAction` based on the users error policy (generally a backoff'd requeue with shorter initial delay)
+5. Map resulting `ReconcilerAction`s through an ad-hoc `scheduler` channel
+6. Resulting requeue requests through the channel are picked up at the top of `applier` and merged with input events in step 1.
+
+Ideally, the process runs forever, and it minimises unnecessary reconcile calls (like users changing more than one related object while one reconcile is already happening).
+
+#### finalizer
+Contains a helper wrapper `finalizer` for a `reconcile` fn used by a `Controller` when a user is using [finalizers](https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/) to handle garbage collection.
+
+This lets the user focus on simply selecting the type of behaviour they would like to exhibit based on whether the object is being deleted or it's just being regularly reconciled (through enum matching on `finalizer::Event`). This lets the user elide checking for potential deletion timestamps and manage the state machinery of `metadata.finalizers` through jsonpatching.
+
+#### wait
+Contains helpers for waiting for `conditions`, and for an object to `delete`.
+
+These build upon `watch_object` with specific mappers.
+
+#### events
+Contains an `EventRecorder` ala [client-go/events](https://github.com/kubernetes/client-go/tree/master/tools/events) that controllers can hook into, to publish events related to their reconciliations.
