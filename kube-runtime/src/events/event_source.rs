@@ -1,10 +1,10 @@
-use crate::event_recorder::InstanceName;
+use crate::events::InstanceName;
 
 /// Details about the event emitter.
 ///
 /// ```rust
 /// use std::convert::TryInto;
-/// use kube_runtime::event_recorder::EventSource;
+/// use kube_runtime::events::EventSource;
 ///
 /// let event_source = EventSource {
 ///     instance_name: "my-awesome-controller-abcdef".try_into().unwrap(),

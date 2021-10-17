@@ -5,7 +5,7 @@ use std::{convert::TryFrom, fmt::Formatter};
 ///
 /// ```rust
 /// use std::convert::TryInto;
-/// use kube_runtime::event_recorder::InstanceName;
+/// use kube_runtime::events::InstanceName;
 ///
 /// let instance_name: InstanceName = "my-awesome-controller-abcdef".try_into().unwrap();
 /// ```

@@ -1,8 +1,8 @@
-use crate::event_recorder::EventType;
+use crate::events::EventType;
 
 /// Required information to publish a new event via [`EventRecorder::publish`].
 ///
-/// [`EventRecorder::publish`]: crate::event_recorder::EventRecorder::publish
+/// [`EventRecorder::publish`]: crate::events::EventRecorder::publish
 pub struct NewEvent {
     /// The action that was taken (either successfully or unsuccessfully) against
     /// the references object.

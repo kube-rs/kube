@@ -18,7 +18,7 @@
 #![allow(clippy::semicolon_if_nothing_returned)]
 
 pub mod controller;
-pub mod event_recorder;
+pub mod events;
 pub mod finalizer;
 pub mod reflector;
 pub mod scheduler;

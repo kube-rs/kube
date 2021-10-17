@@ -1,4 +1,4 @@
-use crate::event_recorder::{event::NewEvent, EventSource, EventType};
+use crate::events::{event::NewEvent, EventSource, EventType};
 use k8s_openapi::{
     api::{core::v1::ObjectReference, events::v1::Event},
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
@@ -14,7 +14,7 @@ use kube::{api::PostParams, Api, Client};
 ///
 /// ```rust
 /// use std::convert::TryInto;
-/// use kube_runtime::event_recorder::{EventSource, EventRecorder, NewEvent, EventType};
+/// use kube_runtime::events::{EventSource, EventRecorder, NewEvent, EventType};
 /// use k8s_openapi::api::core::v1::ObjectReference;
 ///
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
