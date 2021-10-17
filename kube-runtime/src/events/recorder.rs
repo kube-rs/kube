@@ -4,7 +4,10 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
     chrono::Utc,
 };
-use kube_client::{api::{PostParams, Api}, Client};
+use kube_client::{
+    api::{Api, PostParams},
+    Client,
+};
 
 #[derive(Clone)]
 /// A publisher abstraction to emit Kubernetes' events.
