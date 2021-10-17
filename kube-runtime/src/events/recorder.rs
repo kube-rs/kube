@@ -20,7 +20,7 @@ use kube::{api::PostParams, Api, Client};
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let k8s_client: kube::Client = todo!();
 /// let event_source = EventSource {
-///     instance_name: "my-awesome-controller-abcdef".try_into().unwrap(),
+///     controller_pod_name: "my-awesome-controller-abcdef".try_into().unwrap(),
 ///     controller_name: "my-awesome-controller".into(),
 /// };
 ///
@@ -36,7 +36,8 @@ use kube::{api::PostParams, Api, Client};
 ///     action: "Scheduling".into(),
 ///     reason: "Pulling".into(),
 ///     note: Some("Pulling image `nginx`".into()),
-///     event_type: EventType::Normal
+///     event_type: EventType::Normal,
+///     secondary_object: None,
 /// }).await?;
 /// # Ok(())
 /// # }
@@ -91,7 +92,7 @@ impl EventRecorder {
                     ..Default::default()
                 },
                 reporting_controller: Some(self.event_source.controller_name.clone()),
-                reporting_instance: Some(self.event_source.instance_name.clone().into()),
+                reporting_instance: Some(self.event_source.controller_pod_name.clone().into()),
                 series: None,
                 type_: match new_event.event_type {
                     EventType::Normal => Some("Normal".into()),

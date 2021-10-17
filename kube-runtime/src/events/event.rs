@@ -1,4 +1,5 @@
 use crate::events::EventType;
+use k8s_openapi::api::core::v1::ObjectReference;
 
 /// Required information to publish a new event via [`EventRecorder::publish`].
 ///
@@ -19,4 +20,18 @@ pub struct NewEvent {
     pub note: Option<String>,
     /// The event severity.
     pub event_type: EventType,
+    /// Some events are emitted for actions that affect multiple objects.
+    /// `secondary_object` can be populated to capture this detail.
+    ///
+    /// For example: the event concerns a `Deployment` and it
+    /// affects the current `ReplicaSet` underneath it.
+    /// You would therefore populate `secondary_object` using the object
+    /// reference of the `ReplicaSet`.
+    ///
+    /// Set `secondary_object` to `None`, instead, if the event
+    /// affects only the object whose reference you passed
+    /// to [`EventRecorder::new`].
+    ///
+    /// [`EventRecorder::new`]: crate::events::EventRecorder::new
+    pub secondary_object: Option<ObjectReference>
 }
