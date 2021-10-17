@@ -20,8 +20,8 @@ use kube::{api::PostParams, Api, Client};
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let k8s_client: kube::Client = todo!();
 /// let event_source = EventSource {
-///     controller_pod_name: "my-awesome-controller-abcdef".try_into().unwrap(),
-///     controller_name: "my-awesome-controller".into(),
+///     controller_pod: "my-awesome-controller-abcdef".try_into().unwrap(),
+///     controller: "my-awesome-controller".into(),
 /// };
 ///
 /// // You can populate this using `ObjectMeta` and `ApiResource` information
@@ -88,11 +88,11 @@ impl EventRecorder {
                 note: new_event.note.map(Into::into),
                 metadata: ObjectMeta {
                     namespace: Some(self.object_reference.namespace.clone().unwrap()),
-                    generate_name: Some(format!("{}-", self.event_source.controller_name)),
+                    generate_name: Some(format!("{}-", self.event_source.controller)),
                     ..Default::default()
                 },
-                reporting_controller: Some(self.event_source.controller_name.clone()),
-                reporting_instance: Some(self.event_source.controller_pod_name.clone().into()),
+                reporting_controller: Some(self.event_source.controller.clone()),
+                reporting_instance: Some(self.event_source.controller_pod.clone().into()),
                 series: None,
                 type_: match new_event.event_type {
                     EventType::Normal => Some("Normal".into()),

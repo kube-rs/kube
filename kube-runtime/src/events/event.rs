@@ -57,8 +57,8 @@ pub enum EventType {
 /// use kube_runtime::events::EventSource;
 ///
 /// let event_source = EventSource {
-///     controller_pod_name: "my-awesome-controller-abcdef".try_into().unwrap(),
-///     controller_name: "my-awesome-controller".into(),
+///     controller_pod: "my-awesome-controller-abcdef".try_into().unwrap(),
+///     controller: "my-awesome-controller".into(),
 /// };
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -71,7 +71,7 @@ pub struct EventSource {
     ///
     /// `controller_name` is mapped to `reportingController` in
     /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
-    pub controller_name: String,
+    pub controller: String,
     /// The name of the controller pod publishing the event.
     ///
     /// E.g. `my-awesome-controller-abcdef`.
@@ -93,7 +93,7 @@ pub struct EventSource {
     ///
     /// `controller_pod_name` is mapped to `reportingInstance` in
     /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
-    pub controller_pod_name: ControllerPodName,
+    pub controller_pod: ControllerPodName,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
