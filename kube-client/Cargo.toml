@@ -76,6 +76,7 @@ default-features = false
 features = []
 
 [dev-dependencies]
+kube = { path = "../kube", features = ["derive", "client", "ws"], version = "^0.61.0"}
 tempfile = "3.1.0"
 tokio = { version = "1.12.0", features = ["full"] }
 schemars = "0.8.6"

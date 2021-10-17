@@ -24,9 +24,9 @@ use kube_core::{
 /// of the apigroup. You can instead work with a recommended version (preferred or latest).
 ///
 /// ```no_run
-/// use kube_client::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
+/// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube_client::Error> {
+/// async fn main() -> Result<(), kube::Error> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
@@ -58,9 +58,9 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
 /// This is a cheaper variant of [`oneshot::group`](crate::discovery::oneshot::group) when you know what version you want.
 ///
 /// ```no_run
-/// use kube_client::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
+/// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube_client::Error> {
+/// async fn main() -> Result<(), kube::Error> {
 ///     let client = Client::try_default().await?;
 ///     let gv = "apiregistration.k8s.io/v1".parse()?;
 ///     let apigroup = discovery::pinned_group(&client, &gv).await?;
@@ -86,9 +86,9 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 /// It merely requests the api group resources for the specified apigroup, and then resolves the kind.
 ///
 /// ```no_run
-/// use kube_client::{Client, api::{Api, DynamicObject, GroupVersionKind}, discovery, ResourceExt};
+/// use kube::{Client, api::{Api, DynamicObject, GroupVersionKind}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube_client::Error> {
+/// async fn main() -> Result<(), kube::Error> {
 ///     let client = Client::try_default().await?;
 ///     let gvk = GroupVersionKind::gvk("apiregistration.k8s.io", "v1", "APIService");
 ///     let (ar, caps) = discovery::pinned_kind(&client, &gvk).await?;

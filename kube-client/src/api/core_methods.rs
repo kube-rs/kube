@@ -14,10 +14,10 @@ where
     /// Get a named resource
     ///
     /// ```no_run
-    /// use kube_client::{Api, Client};
+    /// use kube::{Api, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let p: Pod = pods.get("blog").await?;
@@ -35,10 +35,10 @@ where
     /// You get use this to get everything, or a subset matching fields/labels, say:
     ///
     /// ```no_run
-    /// use kube_client::{api::{Api, ListParams, ResourceExt}, Client};
+    /// use kube::{api::{Api, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
@@ -89,11 +89,11 @@ where
     /// 4XX and 5XX status types are returned as an [`Err(kube_client::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
-    /// use kube_client::{api::{Api, DeleteParams}, Client};
+    /// use kube::{api::{Api, DeleteParams}, Client};
     /// use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
     /// use apiexts::CustomResourceDefinition;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let crds: Api<CustomResourceDefinition> = Api::all(client);
     ///     crds.delete("foos.clux.dev", &DeleteParams::default()).await?
@@ -117,10 +117,10 @@ where
     /// 4XX and 5XX status types are returned as an [`Err(kube_client::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
-    /// use kube_client::{api::{Api, DeleteParams, ListParams, ResourceExt}, Client};
+    /// use kube::{api::{Api, DeleteParams, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
@@ -150,10 +150,10 @@ where
     /// Takes a [`Patch`] along with [`PatchParams`] for the call.
     ///
     /// ```no_run
-    /// use kube_client::{api::{Api, PatchParams, Patch, Resource}, Client};
+    /// use kube::{api::{Api, PatchParams, Patch, Resource}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let patch = serde_json::json!({
@@ -194,10 +194,10 @@ where
     /// Thus, to use this function, you need to do a `get` then a `replace` with its result.
     ///
     /// ```no_run
-    /// use kube_client::{api::{Api, PostParams, ResourceExt}, Client};
+    /// use kube::{api::{Api, PostParams, ResourceExt}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let j = jobs.get("baz").await?;
@@ -251,11 +251,11 @@ where
     /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
-    /// use kube_client::{api::{Api, ListParams, ResourceExt, WatchEvent}, Client};
+    /// use kube::{api::{Api, ListParams, ResourceExt, WatchEvent}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube_client::Error> {
+    /// async fn main() -> Result<(), kube::Error> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default()
