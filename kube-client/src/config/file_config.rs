@@ -6,7 +6,7 @@ use std::{collections::HashMap, fs, path::Path};
 /// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
 ///
 /// Stored in `~/.kube/config` by default, but can be distributed across multiple paths in passed through `KUBECONFIG`.
-/// An analogue of the [config type from client-go](https://github.com/kubernetes/kubernetes/blob/cea1d4e20b4a7886d8ff65f34c6d4f95efcb4742/staging/src/k8s.io/client-go/tools/clientcmd/api/types.go#L28-L55).
+/// An analogue of the [config type from client-go](https://github.com/kubernetes/client-go/blob/7697067af71046b18e03dbda04e01a5bb17f9809/tools/clientcmd/api/types.go).
 ///
 /// This type (and its children) are exposed primarily for convenience.
 ///
