@@ -34,7 +34,7 @@ use kube::{api::PostParams, Api, Client};
 /// let event_recorder = EventRecorder::new(k8s_client, event_source, object_reference);
 /// event_recorder.publish(NewEvent {
 ///     action: "Scheduling".into(),
-///     reason: "Pulling".into(),
+///     reason: "Pulling".try_into()?,
 ///     note: Some("Pulling image `nginx`".into()),
 ///     event_type: EventType::Normal,
 ///     secondary_object: None,
@@ -78,7 +78,7 @@ impl EventRecorder {
         self.event_client
             .create(&PostParams::default(), &Event {
                 action: Some(new_event.action),
-                reason: Some(new_event.reason),
+                reason: Some(new_event.reason.into()),
                 deprecated_count: None,
                 deprecated_first_timestamp: None,
                 deprecated_last_timestamp: None,

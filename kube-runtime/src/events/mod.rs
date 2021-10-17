@@ -1,4 +1,4 @@
-pub use event::{ControllerPodName, EventSource, EventType, NewEvent};
+pub use event::{ControllerPodName, EventSource, EventType, EventReason, NewEvent};
 pub use recorder::EventRecorder;
 
 mod event;

@@ -13,7 +13,7 @@ pub struct NewEvent {
     /// The reason explaining why the `action` was taken.
     ///
     /// `reason` must be human-readable.
-    pub reason: String,
+    pub reason: EventReason,
     /// A optional description of the status of the `action`.
     ///
     /// `note` must be human-readable.
@@ -159,3 +159,67 @@ impl std::fmt::Display for ControllerPodNameParsingError {
 }
 
 impl std::error::Error for ControllerPodNameParsingError {}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+/// The reason for an action that led to a published event.
+///
+/// ```rust
+/// use std::convert::TryInto;
+/// use kube_runtime::events::EventReason;
+///
+/// let reason: EventReason = "Scheduling".try_into().unwrap();
+/// ```
+///
+/// It must be:
+///
+/// - shorter than 128 characters.
+pub struct EventReason(String);
+
+impl TryFrom<&str> for EventReason {
+    type Error = EventReasonParsingError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_string())
+    }
+}
+
+impl TryFrom<String> for EventReason {
+    type Error = EventReasonParsingError;
+
+    fn try_from(v: String) -> Result<Self, Self::Error> {
+        // Limit imposed by Kubernetes' API
+        let n_chars = v.chars().count();
+        if n_chars > 128 {
+            Err(EventReasonParsingError {
+                reason: v,
+            })
+        } else {
+            Ok(Self(v))
+        }
+    }
+}
+
+impl AsRef<str> for EventReason {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Into<String> for EventReason {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct EventReasonParsingError {
+    reason: String,
+}
+
+impl std::fmt::Display for EventReasonParsingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "The reason for an event must be shorter than 128 characters.")
+    }
+}
+
+impl std::error::Error for EventReasonParsingError {}
