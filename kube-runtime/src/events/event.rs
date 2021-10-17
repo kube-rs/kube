@@ -1,5 +1,5 @@
-use std::{convert::TryFrom, fmt::Formatter};
 use k8s_openapi::api::core::v1::ObjectReference;
+use std::{convert::TryFrom, fmt::Formatter};
 
 /// Required information to publish a new event via [`EventRecorder::publish`].
 ///
@@ -38,7 +38,7 @@ pub struct NewEvent {
     /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
     ///
     /// [`EventRecorder::new`]: crate::events::EventRecorder::new
-    pub secondary_object: Option<ObjectReference>
+    pub secondary_object: Option<ObjectReference>,
 }
 
 /// The event severity or type.
@@ -126,7 +126,9 @@ impl TryFrom<String> for ControllerPodName {
         // Limit imposed by Kubernetes' API
         let n_chars = v.chars().count();
         if n_chars > 128 {
-            Err(ControllerPodNameParsingError { controller_pod_name: v })
+            Err(ControllerPodNameParsingError {
+                controller_pod_name: v,
+            })
         } else {
             Ok(Self(v))
         }
