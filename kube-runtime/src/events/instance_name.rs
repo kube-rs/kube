@@ -56,12 +56,7 @@ pub struct ControllerPodNameParsingError {
 
 impl std::fmt::Display for ControllerPodNameParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let n_chars = self.controller_pod_name.chars().count();
-        write!(
-            f,
-            "The controller pod name must be shorter than 128 characters.\n{} is {} characters long.",
-            self.controller_pod_name, n_chars
-        )
+        write!(f, "The controller pod name must be shorter than 128 characters.")
     }
 }
 
