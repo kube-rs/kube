@@ -1,4 +1,4 @@
-use crate::events::{event::NewEvent, EventSource, EventType};
+use crate::events::{NewEvent, EventSource, EventType};
 use k8s_openapi::{
     api::{core::v1::ObjectReference, events::v1::Event},
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
