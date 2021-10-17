@@ -4,7 +4,7 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
     chrono::Utc,
 };
-use kube::{api::PostParams, Api, Client};
+use kube_client::{api::{PostParams, Api}, Client};
 
 #[derive(Clone)]
 /// A publisher abstraction to emit Kubernetes' events.
@@ -14,11 +14,11 @@ use kube::{api::PostParams, Api, Client};
 ///
 /// ```rust
 /// use std::convert::TryInto;
-/// use kube_runtime::events::{EventSource, EventRecorder, NewEvent, EventType};
+/// use kube::runtime::events::{EventSource, EventRecorder, NewEvent, EventType};
 /// use k8s_openapi::api::core::v1::ObjectReference;
 ///
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-/// # let k8s_client: kube::Client = todo!();
+/// # let client: kube::Client = todo!();
 /// let event_source = EventSource {
 ///     controller_pod: "my-awesome-controller-abcdef".try_into().unwrap(),
 ///     controller: "my-awesome-controller".into(),
@@ -31,8 +31,8 @@ use kube::{api::PostParams, Api, Client};
 ///     # ..Default::default()
 /// };
 ///
-/// let event_recorder = EventRecorder::new(k8s_client, event_source, object_reference);
-/// event_recorder.publish(NewEvent {
+/// let recorder = EventRecorder::new(client, event_source, object_reference);
+/// recorder.publish(NewEvent {
 ///     action: "Scheduling".try_into()?,
 ///     reason: "Pulling".try_into()?,
 ///     note: Some("Pulling image `nginx`".try_into()?),
@@ -55,10 +55,10 @@ impl EventRecorder {
     /// Build a new [`EventRecorder`] instance to emit events attached to the
     /// specified [`ObjectReference`].
     #[must_use]
-    pub fn new(k8s_client: Client, event_source: EventSource, object_reference: ObjectReference) -> Self {
+    pub fn new(client: Client, event_source: EventSource, object_reference: ObjectReference) -> Self {
         let event_client = match object_reference.namespace.as_ref() {
-            None => Api::all(k8s_client),
-            Some(namespace) => Api::namespaced(k8s_client, namespace),
+            None => Api::all(client),
+            Some(namespace) => Api::namespaced(client, namespace),
         };
         Self {
             event_client,
@@ -79,7 +79,7 @@ impl EventRecorder {
     /// # Errors
     ///
     /// Returns an [`Error`](`kube::Error`) if the event is rejected by Kubernetes.
-    pub async fn publish(&self, new_event: NewEvent) -> Result<(), kube::Error> {
+    pub async fn publish(&self, new_event: NewEvent) -> Result<(), kube_client::Error> {
         self.event_client
             .create(&PostParams::default(), &Event {
                 action: Some(new_event.action.into()),
