@@ -190,9 +190,7 @@ impl TryFrom<String> for EventReason {
         // Limit imposed by Kubernetes' API
         let n_chars = v.chars().count();
         if n_chars > 128 {
-            Err(EventReasonParsingError {
-                reason: v,
-            })
+            Err(EventReasonParsingError { reason: v })
         } else {
             Ok(Self(v))
         }
@@ -254,9 +252,7 @@ impl TryFrom<String> for EventAction {
         // Limit imposed by Kubernetes' API
         let n_chars = v.chars().count();
         if n_chars > 128 {
-            Err(EventActionParsingError {
-                action: v,
-            })
+            Err(EventActionParsingError { action: v })
         } else {
             Ok(Self(v))
         }
@@ -317,9 +313,7 @@ impl TryFrom<String> for EventNote {
     fn try_from(v: String) -> Result<Self, Self::Error> {
         // Limit imposed by Kubernetes' API
         if v.len() > 1024 {
-            Err(Self::Error {
-                note: v,
-            })
+            Err(Self::Error { note: v })
         } else {
             Ok(Self(v))
         }
