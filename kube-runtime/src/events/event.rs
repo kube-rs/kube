@@ -291,7 +291,7 @@ impl std::error::Error for EventActionParsingError {}
 /// use std::convert::TryInto;
 /// use kube_runtime::events::EventNote;
 ///
-/// let reason: EventNote = "Pulling".try_into().unwrap();
+/// let note: EventNote = "Pulling `nginx` Docker image from DockerHub.".try_into().unwrap();
 /// ```
 ///
 /// It must be:
