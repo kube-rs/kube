@@ -9,7 +9,7 @@ pub struct NewEvent {
     /// the references object.
     ///
     /// `action` must be machine-readable.
-    pub action: String,
+    pub action: EventAction,
     /// The reason explaining why the `action` was taken.
     ///
     /// `reason` must be human-readable.
@@ -223,3 +223,67 @@ impl std::fmt::Display for EventReasonParsingError {
 }
 
 impl std::error::Error for EventReasonParsingError {}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+/// The action taken by the controller that led to a published event.
+///
+/// ```rust
+/// use std::convert::TryInto;
+/// use kube_runtime::events::EventAction;
+///
+/// let reason: EventAction = "Pulling".try_into().unwrap();
+/// ```
+///
+/// It must be:
+///
+/// - shorter than 128 characters.
+pub struct EventAction(String);
+
+impl TryFrom<&str> for EventAction {
+    type Error = EventActionParsingError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_string())
+    }
+}
+
+impl TryFrom<String> for EventAction {
+    type Error = EventActionParsingError;
+
+    fn try_from(v: String) -> Result<Self, Self::Error> {
+        // Limit imposed by Kubernetes' API
+        let n_chars = v.chars().count();
+        if n_chars > 128 {
+            Err(EventActionParsingError {
+                action: v,
+            })
+        } else {
+            Ok(Self(v))
+        }
+    }
+}
+
+impl AsRef<str> for EventAction {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Into<String> for EventAction {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct EventActionParsingError {
+    action: String,
+}
+
+impl std::fmt::Display for EventActionParsingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "The action for an event must be shorter than 128 characters.")
+    }
+}
+
+impl std::error::Error for EventActionParsingError {}
