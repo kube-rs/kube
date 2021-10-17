@@ -98,7 +98,7 @@ impl EventRecorder {
                     EventType::Normal => Some("Normal".into()),
                     EventType::Warning => Some("Warning".into()),
                 },
-                related: None,
+                related: new_event.secondary_object,
             })
             .await?;
         Ok(())
