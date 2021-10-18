@@ -7,6 +7,7 @@ use kube::{
         PostParams, WatchEvent,
     },
     Client, CustomResource, CustomResourceExt,
+    runtime::wait::{await_condition, conditions},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -224,30 +225,9 @@ async fn create_crd(client: Client) -> Result<CustomResourceDefinition> {
     let api = Api::<CustomResourceDefinition>::all(client);
     api.create(&PostParams::default(), &Foo::crd()).await?;
 
-    // Wait until ready
-    let timeout_secs = 15;
-    let lp = ListParams::default()
-        .fields("metadata.name=foos.clux.dev")
-        .timeout(timeout_secs);
-    let mut stream = api.watch(&lp, "0").await?.boxed_local();
-    while let Some(status) = stream.try_next().await? {
-        if let WatchEvent::Modified(crd) = status {
-            let accepted = crd
-                .status
-                .as_ref()
-                .and_then(|s| s.conditions.as_ref())
-                .map(|sc| {
-                    sc.iter()
-                        .any(|c| c.type_ == "NamesAccepted" && c.status == "True")
-                })
-                .unwrap_or(false);
-            if accepted {
-                return Ok(crd);
-            }
-        }
-    }
-
-    Err(anyhow!(format!("CRD not ready after {} seconds", timeout_secs)))
+    // Wait until it's accepted
+    await_condition(crds, "foos.clux.dev", conditions::is_accepted()).await?;
+    let crd = api.get("foos.clux.dev").await?;
 }
 
 // Delete the CRD if it exists and wait until it's deleted.

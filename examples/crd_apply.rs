@@ -1,5 +1,4 @@
 #[macro_use] extern crate log;
-use futures::{StreamExt, TryStreamExt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -7,8 +6,9 @@ use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
 
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, ResourceExt, WatchEvent},
+    api::{Api, Patch, PatchParams, ResourceExt},
     Client, CustomResource, CustomResourceExt,
+    runtime::wait::{await_condition, conditions},
 };
 
 // NB: This example uses server side apply and beta1 customresources
@@ -46,7 +46,8 @@ async fn main() -> anyhow::Result<()> {
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
     crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
         .await?;
-    wait_for_crd_ready(&crds).await?; // wait for k8s to deal with it
+    info!("Waiting for the api-server to accept the CRD");
+    await_condition(crds, "foos.clux.dev", conditions::is_accepted()).await?;
 
     // Start applying foos
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
@@ -77,33 +78,4 @@ async fn main() -> anyhow::Result<()> {
     info!("Applied 2 {}: {:?}", o2.name(), o2.spec);
 
     Ok(())
-}
-
-// manual way to check that a CRD has been installed
-async fn wait_for_crd_ready(crds: &Api<CustomResourceDefinition>) -> anyhow::Result<()> {
-    if crds.get("foos.clux.dev").await.is_ok() {
-        return Ok(());
-    }
-    // Wait for the apply to take place (takes a sec or two during first install)
-    let lp = ListParams::default()
-        .fields(&format!("metadata.name={}", "foos.clux.dev")) // our crd only
-        .timeout(5); // should not take long
-    let mut stream = crds.watch(&lp, "0").await?.boxed();
-
-    while let Some(status) = stream.try_next().await? {
-        if let WatchEvent::Modified(s) = status {
-            info!("Modify event for {}", s.name());
-            if let Some(s) = s.status {
-                if let Some(conds) = s.conditions {
-                    if let Some(pcond) = conds.iter().find(|c| c.type_ == "NamesAccepted") {
-                        if pcond.status == "True" {
-                            info!("crd was accepted: {:?}", pcond);
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Err(anyhow::anyhow!("Timed out waiting for crd to become accepted"))
 }
