@@ -7,8 +7,8 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiext
 
 use kube::{
     api::{Api, Patch, PatchParams, ResourceExt},
-    Client, CustomResource, CustomResourceExt,
     runtime::wait::{await_condition, conditions},
+    Client, CustomResource, CustomResourceExt,
 };
 
 // NB: This example uses server side apply and beta1 customresources
@@ -46,8 +46,10 @@ async fn main() -> anyhow::Result<()> {
     info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
     crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
         .await?;
+
     info!("Waiting for the api-server to accept the CRD");
-    await_condition(crds, "foos.clux.dev", conditions::is_accepted()).await?;
+    let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
 
     // Start applying foos
     let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);

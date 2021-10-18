@@ -50,8 +50,8 @@ where
 
 /// Common conditions to wait for
 pub mod conditions {
-    use kube_client::Resource;
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+    use kube_client::Resource;
 
     /// An await condition that returns `true` once the object has been deleted.
     ///
@@ -69,8 +69,8 @@ pub mod conditions {
         }
     }
 
-    /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted
-    pub fn is_accepted() -> impl Fn(Option<&CustomResourceDefinition>) -> bool {
+    /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
+    pub fn is_crd_established() -> impl Fn(Option<&CustomResourceDefinition>) -> bool {
         move |obj: Option<&CustomResourceDefinition>| {
             obj.map_or(
                 // Object missing, failure!
@@ -78,9 +78,9 @@ pub mod conditions {
                 |o| {
                     if let Some(s) = &o.status {
                         if let Some(conds) = &s.conditions {
-                            if let Some(pcond) = conds.iter().find(|c| c.type_ == "NamesAccepted") {
+                            if let Some(pcond) = conds.iter().find(|c| c.type_ == "Established") {
                                 if pcond.status == "True" {
-                                    return true
+                                    return true;
                                 }
                             }
                         }

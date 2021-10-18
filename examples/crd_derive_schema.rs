@@ -6,8 +6,8 @@ use kube::{
         Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, ListParams, Patch, PatchParams,
         PostParams, WatchEvent,
     },
-    Client, CustomResource, CustomResourceExt,
     runtime::wait::{await_condition, conditions},
+    Client, CustomResource, CustomResourceExt,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -225,9 +225,14 @@ async fn create_crd(client: Client) -> Result<CustomResourceDefinition> {
     let api = Api::<CustomResourceDefinition>::all(client);
     api.create(&PostParams::default(), &Foo::crd()).await?;
 
-    // Wait until it's accepted
-    await_condition(crds, "foos.clux.dev", conditions::is_accepted()).await?;
+    // Wait until it's accepted and established by the api-server
+    println!("Waiting for the api-server to accept the CRD");
+    let establish = await_condition(api.clone(), "foos.clux.dev", conditions::is_crd_established());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+
+    // It's served by the api - get it and return it
     let crd = api.get("foos.clux.dev").await?;
+    Ok(crd)
 }
 
 // Delete the CRD if it exists and wait until it's deleted.
