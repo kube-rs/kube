@@ -141,9 +141,9 @@ impl AsRef<str> for ControllerPodName {
     }
 }
 
-impl Into<String> for ControllerPodName {
-    fn into(self) -> String {
-        self.0
+impl From<ControllerPodName> for String {
+    fn from(val: ControllerPodName) -> Self {
+        val.0
     }
 }
 
@@ -203,9 +203,9 @@ impl AsRef<str> for EventReason {
     }
 }
 
-impl Into<String> for EventReason {
-    fn into(self) -> String {
-        self.0
+impl From<EventReason> for String {
+    fn from(val: EventReason) -> Self {
+        val.0
     }
 }
 
@@ -265,9 +265,9 @@ impl AsRef<str> for EventAction {
     }
 }
 
-impl Into<String> for EventAction {
-    fn into(self) -> String {
-        self.0
+impl From<EventAction> for String {
+    fn from(val: EventAction) -> Self {
+        val.0
     }
 }
 
@@ -326,9 +326,9 @@ impl AsRef<str> for EventNote {
     }
 }
 
-impl Into<String> for EventNote {
-    fn into(self) -> String {
-        self.0
+impl From<EventNote> for String {
+    fn from(val: EventNote) -> Self {
+        val.0
     }
 }
 
