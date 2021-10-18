@@ -54,6 +54,7 @@ pub struct EventRecorder {
 impl EventRecorder {
     /// Build a new [`EventRecorder`] instance to emit events attached to the
     /// specified [`ObjectReference`].
+    #[must_use]
     pub fn new(k8s_client: Client, event_source: EventSource, object_reference: ObjectReference) -> Self {
         let event_client = match object_reference.namespace.as_ref() {
             None => Api::all(k8s_client),
@@ -74,6 +75,10 @@ impl EventRecorder {
     /// you specified in [`EventRecorder::new`].
     /// Make sure that your controller has `create` permissions in the required namespaces
     /// for the `event` resource in the API group `events.k8s.io`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`](`kube::Error`) if the event is rejected by Kubernetes.
     pub async fn publish(&self, new_event: NewEvent) -> Result<(), kube::Error> {
         self.event_client
             .create(&PostParams::default(), &Event {
@@ -87,7 +92,7 @@ impl EventRecorder {
                 regarding: Some(self.object_reference.clone()),
                 note: new_event.note.map(Into::into),
                 metadata: ObjectMeta {
-                    namespace: Some(self.object_reference.namespace.clone().unwrap()),
+                    namespace: self.object_reference.namespace.clone(),
                     generate_name: Some(format!("{}-", self.event_source.controller)),
                     ..Default::default()
                 },
