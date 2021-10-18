@@ -87,9 +87,9 @@ mod custom_resource;
 /// ### `#[kube(struct = "StructName")]`
 /// Customize the name of the generated root struct (defaults to `kind`).
 ///
-/// ### `#[kube(kube = "kube_core")]`
+/// ### `#[kube(kube_core = "::kube_core")]`
 /// Customize the crate name the generated code will reach into (defaults to `kube`).
-/// Must be one of `kube`, `kube_client` or `kube_core`.
+/// Should be one of `kube::core`, `kube_client::core` or `kube_core`.
 ///
 /// ### `#[kube(status = "StatusStructName")]`
 /// Adds a status struct to the top level generated type and enables the status
