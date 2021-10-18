@@ -3,9 +3,9 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Event;
 use kube::{
     api::{Api, ListParams},
+    runtime::{utils::try_flatten_applied, watcher},
     Client,
 };
-use kube_runtime::{utils::try_flatten_applied, watcher};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

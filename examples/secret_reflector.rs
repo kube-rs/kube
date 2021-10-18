@@ -3,9 +3,9 @@ use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{Api, ListParams, ResourceExt},
+    runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher},
     Client,
 };
-use kube_runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher};
 use std::collections::BTreeMap;
 
 /// Example way to read secrets

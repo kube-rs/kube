@@ -3,9 +3,9 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ListParams},
+    runtime::watcher,
     Client,
 };
-use kube_runtime::watcher;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
