@@ -6,10 +6,10 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
 };
 use kube::{
-    api::{ListParams, Patch, PatchParams, Resource},
-    Api, Client, CustomResource,
+    api::{Api, ListParams, Patch, PatchParams, Resource},
+    runtime::controller::{Context, Controller, ReconcilerAction},
+    Client, CustomResource,
 };
-use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use snafu::{Backtrace, OptionExt, ResultExt, Snafu};

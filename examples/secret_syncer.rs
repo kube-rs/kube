@@ -7,14 +7,12 @@
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 use kube::{
-    api::{DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
+    api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
     error::ErrorResponse,
-    Api,
-};
-use kube_runtime::{
-    controller::{Context, ReconcilerAction},
-    finalizer::{finalizer, Event},
-    Controller,
+    runtime::{
+        controller::{Context, Controller, ReconcilerAction},
+        finalizer::{finalizer, Event},
+    },
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use std::time::Duration;

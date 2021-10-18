@@ -14,11 +14,12 @@ license = "Apache-2.0"
 release = false
 
 [features]
-default = ["native-tls", "schema", "kubederive", "ws", "latest"]
+default = ["native-tls", "schema", "kubederive", "ws", "latest", "runtime"]
 kubederive = ["kube/derive"] # by default import kube-derive with its default features
 schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
 native-tls = ["kube/client", "kube/native-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
+runtime = ["kube/runtime"]
 ws = ["kube/ws"]
 latest = ["k8s-openapi/v1_22"]
 deprecated = ["kube/deprecated-crd-v1beta1", "k8s-openapi/v1_21"]
@@ -32,8 +33,6 @@ env_logger = "0.9.0"
 futures = "0.3.17"
 kube = { path = "../kube", version = "^0.61.0", default-features = false, features = ["admission"] }
 kube-derive = { path = "../kube-derive", version = "^0.61.0", default-features = false } # only needed to opt out of schema
-kube-runtime = { path = "../kube-runtime", version = "^0.61.0"}
-kube-core = { path = "../kube-core", version = "^0.61.0", default-features = false }
 k8s-openapi = { version = "0.13.1", default-features = false }
 log = "0.4.11"
 serde = { version = "1.0.130", features = ["derive"] }

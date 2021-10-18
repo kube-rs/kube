@@ -1,8 +1,12 @@
 use color_eyre::Result;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
-use kube::{api::ListParams, Api, Client};
-use kube_runtime::{reflector, watcher};
+use kube::{
+    api::{Api, ListParams},
+    runtime::{reflector, watcher},
+    Client,
+};
+
 
 #[tokio::main]
 async fn main() -> Result<()> {

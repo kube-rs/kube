@@ -1,9 +1,11 @@
 use futures::prelude::*;
 use kube::{
-    api::{DynamicObject, GroupVersionKind, ListParams, ResourceExt},
-    discovery, Api, Client,
+    api::{Api, DynamicObject, GroupVersionKind, ListParams, ResourceExt},
+    discovery,
+    runtime::{utils::try_flatten_applied, watcher},
+    Client,
 };
-use kube_runtime::{utils::try_flatten_applied, watcher};
+
 use std::env;
 
 #[tokio::main]

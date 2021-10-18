@@ -105,7 +105,7 @@ There are a ton of kubebuilder-like instructions that you can annotate with here
 
 ## Runtime
 
-The `kube_runtime` crate contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
+The `runtime` module contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
 
 ### Watchers
 
