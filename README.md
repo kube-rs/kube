@@ -17,7 +17,6 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 ```toml
 [dependencies]
 kube = "0.61.0"
-kube-runtime = "0.61.0"
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 ```
 
@@ -32,10 +31,9 @@ All crates herein are versioned and [released](./release.toml) together to guara
 
 ## Usage
 
-See the [examples directory](./examples) for how to use any of these crates.
+See the **[examples directory](./examples)** for how to use any of these crates.
 
 - **[kube API Docs](https://docs.rs/kube/)**
-- **[kube-runtime API Docs](https://docs.rs/kube-runtime/)**
 
 Official examples:
 
@@ -54,11 +52,11 @@ Real world users:
 
 ## Api
 
-The direct `Api` type takes a client, and is constructed with either the `::all` or `::namespaced` functions:
+The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
-let pods: Api<Pod> = Api::namespaced(client, "default");
+let pods: Api<Pod> = Api::namespaced(client, "apps");
 
 let p = pods.get("blog").await?;
 println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
@@ -66,7 +64,7 @@ println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
 }});
-let pp = PatchParams::apply("my_manager");
+let pp = PatchParams::apply("my_controller");
 let patched = pods.patch("blog", &pp, &Patch::Apply(patch)).await?;
 assert_eq!(patched.spec.active_deadline_seconds, Some(5));
 
@@ -105,7 +103,7 @@ There are a ton of kubebuilder-like instructions that you can annotate with here
 
 ## Runtime
 
-The `runtime` module contains sets of higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
+The `runtime` module exports the `kube_runtime` crate and contains higher level abstractions on top of the `Api` and `Resource` types so that you don't have to do all the `watch`/`resourceVersion`/storage book-keeping yourself.
 
 ### Watchers
 
@@ -168,7 +166,6 @@ Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues
 ```toml
 [dependencies]
 kube = { version = "0.61.0", default-features = false, features = ["client", "rustls-tls"] }
-kube-runtime = { version = "0.61.0" }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 ```
 

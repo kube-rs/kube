@@ -26,7 +26,7 @@ The extra indirection crate `kube` is there to avoid cyclic dependencies between
 When working on features/issues with `kube-rs` you will __generally__ work inside one of these crates at a time, so we will focus on these in isolation, but talk about possible overlaps at the end.
 
 ## Kubernetes Ecosystem Considerations
-The rust ecosystem does not exist in a vaccum as we take heavy inspirations from the popular `go` ecosystem. In particular;
+The Rust ecosystem does not exist in a vaccum as we take heavy inspirations from the popular Go ecosystem. In particular:
 
 - `client::Client` is a re-envisioning of a generic [client-go](https://github.com/kubernetes/client-go)
 - `runtime::Controller` abstraction follows conventions in [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
@@ -47,7 +47,7 @@ For the protobuf (__WORK IN PROGRESS__) repo see [k8s-pb](https://github.com/kaz
 
 ## Crate Overviews
 ### kube-core
-This crate only contains types relevant to the [Kubernetes API](https://kubernetes.io/docs/concepts/overview/kubernetes-api/), abstractions analogous to what you'll find inside [apimachinery](https://github.com/kubernetes/apimachinery/tree/master/pkg), and extra rust traits that help us with generics further down in `kube-client`.
+This crate only contains types relevant to the [Kubernetes API](https://kubernetes.io/docs/concepts/overview/kubernetes-api/), abstractions analogous to what you'll find inside [apimachinery](https://github.com/kubernetes/apimachinery/tree/master/pkg), and extra Rust traits that help us with generics further down in `kube-client`.
 
 Starting out with the basic type modules first:
 
@@ -62,14 +62,14 @@ Then there are traits
 - `object` generic conveniences for iterating over typed lists of objects, and objects following spec/status conventions
 - `resource`: a `Resource` trait for `kube-client`'s `Api` + a convenience `ResourceExt` trait for users
 
-The most important export here is the `Resource` trait and its impls. It a is pretty complex trait, with an associated type called `DynamicType` (that is default empty). Every `ObjectMeta`-using type that comes from `k8s-openapi` gets a blanket impl of `Resource` so we can use them generically (in `kube-client::Api`).
+The most important export here is the `Resource` trait and its impls. It is a pretty complex trait, with an associated type called `DynamicType` (that is default empty). Every `ObjectMeta`-using type that comes from `k8s-openapi` gets a blanket impl of `Resource` so we can use them generically (in `kube_client::Api`).
 
 Finally, there are two modules used by the higher level `discovery` module (in `kube-client`) and they have similar counterparts in [apimachinery/restmapper](https://github.com/kubernetes/apimachinery/blob/master/pkg/api/meta/restmapper.go) + [apimachinery/group_version](https://github.com/kubernetes/apimachinery/blob/master/pkg/runtime/schema/group_version.go):
 
 - `discovery`: types returned by the discovery api; capabilities, verbs, scopes, key info
 - `gvk`: partial type information to infer api types
 
-The main type here from these two modules is `ApiResource` because it can also be used to construct a `kube-client::Api` instance without compile-time type information (both `DynamicObject` and `Object` has `Resource` impls where `DynamicType = ApiResource`).
+The main type here from these two modules is `ApiResource` because it can also be used to construct a `kube_client::Api` instance without compile-time type information (both `DynamicObject` and `Object` has `Resource` impls where `DynamicType = ApiResource`).
 
 ### kube-client
 
@@ -137,23 +137,23 @@ The `Discovery` client can be used to do a full recursive sweep of api-groups in
 
 The `discovery` module also contains a way to run smaller queries through the `oneshot` module; e.g. resolving resource name when having group version kind, resolving every resource within one specific group, or even one group at a pinned version.
 
-In equivalent go logic is found in [client-go/discovery](https://github.com/kubernetes/client-go/blob/master/discovery/discovery_client.go)
+The equivalent Go logic is found in [client-go/discovery](https://github.com/kubernetes/client-go/blob/master/discovery/discovery_client.go)
 
 ### kube-derive
-The smallest crate. A simple [derive proc_macro](https://doc.rust-lang.org/reference/procedural-macros.html) to generate kubernetes wrapper structs and trait impls around a data struct.
+The smallest crate. A simple [derive proc_macro](https://doc.rust-lang.org/reference/procedural-macros.html) to generate Kubernetes wrapper structs and trait impls around a data struct.
 
 Uses `darling` to parse `#[kube(attrs...)]` then uses `syn` and `quote` to produce a suitable syntax tree based on the attributes requested.
 
 It ultimately contains a lot of ugly json coercing from attributes into serialization code, but this is code that everyone working with custom resources need.
 
-It has hooks into `schemars` when using `JsonSchema` to ensure the correct type of [crd schema](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema) is attached to the right part of the generated custom resource definition.
+It has hooks into `schemars` when using `JsonSchema` to ensure the correct type of [CRD schema](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema) is attached to the right part of the generated custom resource definition.
 
 ### kube-runtime
-The highest level crate that deals with the highest level abstractions (such as controllers/watchers/reflectors) and specific kubernetes apis that need common care (finalisers, waiting for conditions, event publishing).
+The highest level crate that deals with the highest level abstractions (such as controllers/watchers/reflectors) and specific Kubernetes apis that need common care (finalisers, waiting for conditions, event publishing).
 
 #### watcher
 The `watcher` module contains state machine wrappers around `Api::watch` that will watch and auto-recover on allowable failures.
-The `watcher` fn is the general purpose one that is similar to informers in go land, and will watch a collection of objects. The `watch_object` is a specialised version of this that limits this collection to a single object.
+The `watcher` fn is the general purpose one that is similar to informers in Go land, and will watch a collection of objects. The `watch_object` is a specialised version of this that limits this collection to a single object.
 
 #### reflector
 The `reflector` module contains wrappers around `watcher` that will cache objects in memory.

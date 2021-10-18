@@ -81,19 +81,19 @@ impl EventRecorder {
     ///
     /// # Errors
     ///
-    /// Returns an [`Error`](`kube::Error`) if the event is rejected by Kubernetes.
-    pub async fn publish(&self, new_event: NewEvent) -> Result<(), kube_client::Error> {
+    /// Returns an [`Error`](`kube_client::Error`) if the event is rejected by Kubernetes.
+    pub async fn publish(&self, ev: NewEvent) -> Result<(), kube_client::Error> {
         self.event_client
             .create(&PostParams::default(), &Event {
-                action: Some(new_event.action.into()),
-                reason: Some(new_event.reason.into()),
+                action: Some(ev.action.into()),
+                reason: Some(ev.reason.into()),
                 deprecated_count: None,
                 deprecated_first_timestamp: None,
                 deprecated_last_timestamp: None,
                 deprecated_source: None,
                 event_time: MicroTime(Utc::now()),
                 regarding: Some(self.object_reference.clone()),
-                note: new_event.note.map(Into::into),
+                note: ev.note.map(Into::into),
                 metadata: ObjectMeta {
                     namespace: self.object_reference.namespace.clone(),
                     generate_name: Some(format!("{}-", self.event_source.controller)),
@@ -102,11 +102,11 @@ impl EventRecorder {
                 reporting_controller: Some(self.event_source.controller.clone()),
                 reporting_instance: Some(self.event_source.controller_pod.clone().into()),
                 series: None,
-                type_: match new_event.event_type {
+                type_: match ev.event_type {
                     EventType::Normal => Some("Normal".into()),
                     EventType::Warning => Some("Warning".into()),
                 },
-                related: new_event.secondary_object,
+                related: ev.secondary_object,
             })
             .await?;
         Ok(())

@@ -1,9 +1,9 @@
-//! Kubernetes configuration objects from `~/.kube/config` or in cluster environment.
+//! Kubernetes configuration objects from `~/.kube/config`, `$KUBECONFIG`, or the [cluster environment](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod).
 //!
-//! Used to populate [`Config`] that is ultimately used to construct a [`Client`][crate::Client].
+//! # Usage
+//! The [`Config`] has several constructors plus logic to infer environment.
 //!
-//! Unless you have issues, prefer using [`Config::infer`] and pass it to a [`Client`][crate::Client].
-
+//! Unless you have issues, prefer using [`Config::infer`], and pass it to a [`Client`][crate::Client].
 mod file_config;
 mod file_loader;
 mod incluster_config;
@@ -17,6 +17,14 @@ pub use file_loader::KubeConfigOptions;
 use std::time::Duration;
 
 /// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
+///
+/// # Usage
+/// Construct a [`Config`] instance by using one of the many constructors.
+///
+/// Prefer [`Config::infer`] unless you have particular issues, and avoid manually managing
+/// the data in this struct unless you have particular needs. It exists to be consumed by the [`Client`][crate::Client].
+///
+/// If you are looking to parse the kubeconfig found in a user's home directory see [`Kubeconfig`](crate::config::Kubeconfig).
 #[cfg_attr(docsrs, doc(cfg(feature = "config")))]
 #[derive(Debug, Clone)]
 pub struct Config {
