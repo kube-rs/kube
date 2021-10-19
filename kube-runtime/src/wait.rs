@@ -30,26 +30,33 @@ pub enum Error {
 /// permission to `watch` and `list` it.
 ///
 /// Does *not* fail if the object is not found.
-pub async fn await_condition<K>(
-    api: Api<K>,
-    name: &str,
-    mut cond: impl FnMut(Option<&K>) -> bool,
-) -> Result<(), Error>
+pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<(), Error>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
     watch_object(api, name)
         .context(ProbeFailed)
         .try_take_while(|obj| {
-            let result = !cond(obj.as_ref());
+            let result = !cond.matches_object(obj.as_ref());
             async move { Ok(result) }
         })
         .try_for_each(|_| async { Ok(()) })
         .await
 }
 
+pub trait Condition<K> {
+    fn matches_object(&self, obj: Option<&K>) -> bool;
+}
+
+impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
+    fn matches_object(&self, obj: Option<&K>) -> bool {
+        (self)(obj)
+    }
+}
+
 /// Common conditions to wait for
 pub mod conditions {
+    use super::Condition;
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
     use kube_client::Resource;
 
@@ -58,7 +65,7 @@ pub mod conditions {
     /// An object is considered to be deleted if the object can no longer be found, or if its
     /// [`uid`](kube_client::api::ObjectMeta#structfield.uid) changes. This means that an object is considered to be deleted even if we miss
     /// the deletion event and the object is recreated in the meantime.
-    pub fn is_deleted<K: Resource>(uid: &str) -> impl Fn(Option<&K>) -> bool + '_ {
+    pub fn is_deleted<K: Resource>(uid: &str) -> impl Condition<K> + '_ {
         move |obj: Option<&K>| {
             obj.map_or(
                 // Object is not found, success!
@@ -70,7 +77,7 @@ pub mod conditions {
     }
 
     /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
-    pub fn is_crd_established() -> impl Fn(Option<&CustomResourceDefinition>) -> bool {
+    pub fn is_crd_established() -> impl Condition<CustomResourceDefinition> {
         |obj: Option<&CustomResourceDefinition>| {
             if let Some(o) = obj {
                 if let Some(s) = &o.status {
