@@ -71,23 +71,17 @@ pub mod conditions {
 
     /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
     pub fn is_crd_established() -> impl Fn(Option<&CustomResourceDefinition>) -> bool {
-        move |obj: Option<&CustomResourceDefinition>| {
-            obj.map_or(
-                // Object missing, failure!
-                false,
-                |o| {
-                    if let Some(s) = &o.status {
-                        if let Some(conds) = &s.conditions {
-                            if let Some(pcond) = conds.iter().find(|c| c.type_ == "Established") {
-                                if pcond.status == "True" {
-                                    return true;
-                                }
-                            }
+        |obj: Option<&CustomResourceDefinition>| {
+            if let Some(o) = obj {
+                if let Some(s) = &o.status {
+                    if let Some(conds) = &s.conditions {
+                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Established") {
+                            return pcond.status == "True";
                         }
                     }
-                    false
-                },
-            )
+                }
+            }
+            false
         }
     }
 }
