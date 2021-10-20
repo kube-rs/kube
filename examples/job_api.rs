@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             WatchEvent::Deleted(s) => info!("Deleted {}", s.name()),
-            WatchEvent::Error(s) => error!("{}", s),
+            WatchEvent::Error(s) => error!("{:?}", s),
             _ => {}
         }
     }
