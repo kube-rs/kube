@@ -1,3 +1,4 @@
+//! Waits for objects to reach desired states
 use futures::TryStreamExt;
 use kube_client::{Api, Resource};
 use serde::de::DeserializeOwned;

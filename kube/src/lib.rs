@@ -52,10 +52,10 @@
 //! use futures::{StreamExt, TryStreamExt};
 //! use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 //! use kube::{
-//!     api::{Api, DeleteParams, ListParams, PostParams, ResourceExt},
+//!     api::{Api, DeleteParams, ListParams, PatchParams, Patch, ResourceExt},
 //!     core::CustomResourceExt,
 //!     Client, CustomResource,
-//!     runtime::{watcher, utils::try_flatten_applied},
+//!     runtime::{watcher, utils::try_flatten_applied, wait::{conditions, await_condition}},
 //! };
 //!
 //! // Our custom resource
@@ -73,17 +73,20 @@
 //!     let client = Client::try_default().await?;
 //!     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
 //!
-//!     // Create the CRD so users can apply Foo instances in Kubernetes
-//!     let foocrd = Foo::crd();
-//!     crds.create(&PostParams::default(), &foocrd).await?;
+//!     // Apply the CRD so users can create Foo instances in Kubernetes
+//!     crds.patch("foos.clux.dev",
+//!         &PatchParams::apply("my_manager"),
+//!         &Patch::Apply(Foo::crd())
+//!     ).await?;
 //!
-//!     // Wait for the api to catch up (can do this more precisely - see #655)
-//!     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+//!     // Wait for the CRD to be ready
+//!     tokio::time::timeout(
+//!         std::time::Duration::from_secs(10),
+//!         await_condition(crds, "foos.clux.dev", conditions::is_crd_established())
+//!     ).await?;
 //!
-//!     // Manage the Foo CR
+//!     // Watch for changes to foos in the configured namespace
 //!     let foos: Api<Foo> = Api::default_namespaced(client.clone());
-//!
-//!     // Watch for apply events to all foos
 //!     let lp = ListParams::default();
 //!     let mut apply_stream = try_flatten_applied(watcher(foos, lp)).boxed();
 //!     while let Some(f) = apply_stream.try_next().await? {

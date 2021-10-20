@@ -1,3 +1,4 @@
+//! Finalizer helper for [`Controller`](crate::Controller) reconcilers
 use crate::controller::ReconcilerAction;
 use futures::{TryFuture, TryFutureExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
@@ -45,9 +46,10 @@ impl FinalizerState {
     }
 }
 
-/// Reconcile an object in a way that requires cleanup before an object can be deleted. It does this by
-/// managing a [`ObjectMeta::finalizers`] entry, which prevents the object from being deleted before the
-/// cleanup is done.
+/// Reconcile an object in a way that requires cleanup before an object can be deleted.
+///
+/// It does this by managing a [`ObjectMeta::finalizers`] entry,
+/// which prevents the object from being deleted before the cleanup is done.
 ///
 /// In typical usage, if you use `finalizer` then it should be the only top-level "action"
 /// in your [`applier`](crate::applier)/[`Controller`](crate::Controller)'s `reconcile` function.
