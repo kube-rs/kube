@@ -30,26 +30,74 @@ pub enum Error {
 /// permission to `watch` and `list` it.
 ///
 /// Does *not* fail if the object is not found.
-pub async fn await_condition<K>(
-    api: Api<K>,
-    name: &str,
-    mut cond: impl FnMut(Option<&K>) -> bool,
-) -> Result<(), Error>
+///
+/// # Usage
+///
+/// ```
+/// use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+/// use kube::{Api, runtime::wait::{await_condition, conditions}};
+/// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+/// # let client: kube::Client = todo!();
+///
+/// let crds: Api<CustomResourceDefinition> = Api::all(client);
+/// // .. create or apply a crd here ..
+/// let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
+/// let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+/// # Ok(())
+/// # }
+/// ```
+pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<(), Error>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
     watch_object(api, name)
         .context(ProbeFailed)
         .try_take_while(|obj| {
-            let result = !cond(obj.as_ref());
+            let result = !cond.matches_object(obj.as_ref());
             async move { Ok(result) }
         })
         .try_for_each(|_| async { Ok(()) })
         .await
 }
 
+/// A trait for condition functions to be used by [`await_condition`]
+///
+/// Note that this is auto-implemented for functions of type `fn(Option<&K>) -> bool`.
+///
+/// # Usage
+///
+/// ```
+/// use kube::runtime::wait::Condition;
+/// use k8s_openapi::api::core::v1::Pod;
+/// fn my_custom_condition(my_cond: &str) -> impl Condition<Pod> + '_ {
+///     move |obj: Option<&Pod>| {
+///         if let Some(pod) = &obj {
+///             if let Some(status) = &pod.status {
+///                 if let Some(conds) = &status.conditions {
+///                     if let Some(pcond) = conds.iter().find(|c| c.type_ == my_cond) {
+///                         return pcond.status == "True";
+///                     }
+///                 }
+///             }
+///         }
+///         false
+///     }
+/// }
+/// ```
+pub trait Condition<K> {
+    fn matches_object(&self, obj: Option<&K>) -> bool;
+}
+
+impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
+    fn matches_object(&self, obj: Option<&K>) -> bool {
+        (self)(obj)
+    }
+}
+
 /// Common conditions to wait for
 pub mod conditions {
+    pub use super::Condition;
+    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
     use kube_client::Resource;
 
     /// An await condition that returns `true` once the object has been deleted.
@@ -57,7 +105,8 @@ pub mod conditions {
     /// An object is considered to be deleted if the object can no longer be found, or if its
     /// [`uid`](kube_client::api::ObjectMeta#structfield.uid) changes. This means that an object is considered to be deleted even if we miss
     /// the deletion event and the object is recreated in the meantime.
-    pub fn is_deleted<K: Resource>(uid: &str) -> impl Fn(Option<&K>) -> bool + '_ {
+    #[must_use]
+    pub fn is_deleted<K: Resource>(uid: &str) -> impl Condition<K> + '_ {
         move |obj: Option<&K>| {
             obj.map_or(
                 // Object is not found, success!
@@ -65,6 +114,23 @@ pub mod conditions {
                 // Object is found, but a changed uid would mean that it was deleted and recreated
                 |obj| obj.meta().uid.as_deref() != Some(uid),
             )
+        }
+    }
+
+    /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
+    #[must_use]
+    pub fn is_crd_established() -> impl Condition<CustomResourceDefinition> {
+        |obj: Option<&CustomResourceDefinition>| {
+            if let Some(o) = obj {
+                if let Some(s) = &o.status {
+                    if let Some(conds) = &s.conditions {
+                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Established") {
+                            return pcond.status == "True";
+                        }
+                    }
+                }
+            }
+            false
         }
     }
 }
