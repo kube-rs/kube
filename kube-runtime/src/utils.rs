@@ -1,3 +1,4 @@
+//! Helpers for manipulating built-in streams
 use crate::watcher;
 use futures::{
     pin_mut,
