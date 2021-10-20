@@ -105,6 +105,7 @@ pub mod conditions {
     /// An object is considered to be deleted if the object can no longer be found, or if its
     /// [`uid`](kube_client::api::ObjectMeta#structfield.uid) changes. This means that an object is considered to be deleted even if we miss
     /// the deletion event and the object is recreated in the meantime.
+    #[must_use]
     pub fn is_deleted<K: Resource>(uid: &str) -> impl Condition<K> + '_ {
         move |obj: Option<&K>| {
             obj.map_or(
@@ -117,6 +118,7 @@ pub mod conditions {
     }
 
     /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
+    #[must_use]
     pub fn is_crd_established() -> impl Condition<CustomResourceDefinition> {
         |obj: Option<&CustomResourceDefinition>| {
             if let Some(o) = obj {
