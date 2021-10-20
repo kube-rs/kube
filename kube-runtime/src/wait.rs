@@ -30,6 +30,22 @@ pub enum Error {
 /// permission to `watch` and `list` it.
 ///
 /// Does *not* fail if the object is not found.
+///
+/// # Usage
+///
+/// ```
+/// use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+/// use kube::{Api, runtime::wait::{await_condition, conditions}};
+/// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+/// # let client: kube::Client = todo!();
+///
+/// let crds: Api<CustomResourceDefinition> = Api::all(client);
+/// // .. create or apply a crd here ..
+/// let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
+/// let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<(), Error>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
