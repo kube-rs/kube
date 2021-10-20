@@ -7,7 +7,6 @@ use kube::{
     Client,
 };
 
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = Client::try_default().await?;

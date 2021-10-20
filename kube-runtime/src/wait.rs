@@ -44,6 +44,30 @@ where
         .await
 }
 
+/// A trait for condition functions to be used by [`await_condition`]
+///
+/// Note that this is auto-implemented for functions of type `fn(Option<&K>) -> bool`.
+///
+/// # Usage
+///
+/// ```
+/// use kube::runtime::wait::Condition;
+/// use k8s_openapi::api::core::v1::Pod;
+/// fn my_custom_condition(my_cond: &str) -> impl Condition<Pod> + '_ {
+///     move |obj: Option<&Pod>| {
+///         if let Some(pod) = &obj {
+///             if let Some(status) = &pod.status {
+///                 if let Some(conds) = &status.conditions {
+///                     if let Some(pcond) = conds.iter().find(|c| c.type_ == my_cond) {
+///                         return pcond.status == "True";
+///                     }
+///                 }
+///             }
+///         }
+///         false
+///     }
+/// }
+/// ```
 pub trait Condition<K> {
     fn matches_object(&self, obj: Option<&K>) -> bool;
 }
@@ -56,7 +80,7 @@ impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
 
 /// Common conditions to wait for
 pub mod conditions {
-    use super::Condition;
+    pub use super::Condition;
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
     use kube_client::Resource;
 
