@@ -28,10 +28,10 @@ When working on features/issues with `kube-rs` you will __generally__ work insid
 ## Kubernetes Ecosystem Considerations
 The Rust ecosystem does not exist in a vaccum as we take heavy inspirations from the popular Go ecosystem. In particular:
 
+- `core` module contains invariants from [apimachinery](https://github.com/kubernetes/apimachinery) that is preseved across individual apis
 - `client::Client` is a re-envisioning of a generic [client-go](https://github.com/kubernetes/client-go)
 - `runtime::Controller` abstraction follows conventions in [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
 - `derive::CustomResource` derive macro for [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/) is loosely inspired by [kubebuilder's annotations](https://book.kubebuilder.io/reference/generating-crd.html)
-- `core` module contains invariants from [apimachinery](https://github.com/kubernetes/apimachinery) that is preseved across individual apis
 
 We do occasionally diverge on matters where following the go side is worse for the rust language, but when it comes to choosing names and finding out where some modules / functionality should reside; a precedent in `client-go`, `apimachinery`, `controller-runtime` and `kubebuilder` goes a long way.
 
@@ -194,3 +194,19 @@ These build upon `watch_object` with specific mappers.
 
 #### events
 Contains an `EventRecorder` ala [client-go/events](https://github.com/kubernetes/client-go/tree/master/tools/events) that controllers can hook into, to publish events related to their reconciliations.
+
+## Crate Delineation and Overlaps
+When working on the the client machinery, it's important to realise that there are effectively 5 layers involved:
+
+1. Sans-IO request builder (in `kube_core::Request`)
+2. IO (in `kube_client::Client`)
+3. Typing (in `kube_client::Api`)
+4. Helpers for using the API correctly (e.g.`kube_runtime::watcher`)
+5. High-level abstractions for specific tasks (e.g. `kube_runtime::controller`)
+
+At level 3, we we essentially have what the K8s team calls a basic client. As a consequence, new methods/subresources typically cross 2 crate boundaries (`kube_core`, `kube_client`), and needs to touch 3 main modules.
+
+Similarly, there are also the traits and types that define what an api means in `kube_core` like `Resource` and `ApiResource`.
+If modifying these, then changes to `kube-derive` are likely necessary, as it needs to directly implement this for users.
+
+These types of cross-crate dependencies are why we expose `kube` as a single versioned facade crate that users can upgrade atomically (without being caught in the middle of a publish cycle). This also gives us better compatibility with `dependabot`.
