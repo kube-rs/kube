@@ -108,7 +108,7 @@ impl From<String> for Reporter {
     fn from(es: String) -> Self {
         Self {
             controller: es,
-            instance: None
+            instance: None,
         }
     }
 }
@@ -116,7 +116,7 @@ impl From<&str> for Reporter {
     fn from(es: &str) -> Self {
         Self {
             controller: es.into(),
-            instance: None
+            instance: None,
         }
     }
 }
@@ -219,7 +219,12 @@ impl Recorder {
                     ..Default::default()
                 },
                 reporting_controller: Some(self.reporter.controller.clone()),
-                reporting_instance: Some(self.reporter.instance.clone().unwrap_or(self.reporter.controller.clone())),
+                reporting_instance: Some(
+                    self.reporter
+                        .instance
+                        .clone()
+                        .unwrap_or(self.reporter.controller.clone()),
+                ),
                 series: None,
                 type_: match ev.type_ {
                     EventType::Normal => Some("Normal".into()),
