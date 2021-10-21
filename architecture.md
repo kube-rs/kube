@@ -38,12 +38,12 @@ We do occasionally diverge on matters where following the go side is worse for t
 ## Generated Structs
 We do not maintain the kubernetes types generated from the `swagger.json` or the protos at present moment, and we do not handle client-side validation of fields relating to these types (that's left to the api-server).
 
-For information and documentation of the kubernetes types in rust world see:
+We generally use k8s-openapi's Rust bindings for Kubernetes' builtin types types, see:
 
 - [github.com:k8s-openapi](https://github.com/Arnavion/k8s-openapi/)
 - [docs.rs:k8s-openapi](https://docs.rs/k8s-openapi/*/k8s_openapi/)
 
-For the protobuf (__WORK IN PROGRESS__) repo see [k8s-pb](https://github.com/kazk/k8s-pb).
+We also maintain an experimental set of Protobuf bindings, see [k8s-pb](https://github.com/kazk/k8s-pb).
 
 ## Crate Overviews
 ### kube-core
@@ -153,7 +153,7 @@ The highest level crate that deals with the highest level abstractions (such as 
 
 #### watcher
 The `watcher` module contains state machine wrappers around `Api::watch` that will watch and auto-recover on allowable failures.
-The `watcher` fn is the general purpose one that is similar to informers in Go land, and will watch a collection of objects. The `watch_object` is a specialised version of this that limits this collection to a single object.
+The `watcher` fn is the general purpose one that is similar to informers in Go land, and will watch a collection of objects. The `watch_object` is a specialised version of this that watches a single object.
 
 #### reflector
 The `reflector` module contains wrappers around `watcher` that will cache objects in memory.
@@ -188,7 +188,7 @@ Contains a helper wrapper `finalizer` for a `reconcile` fn used by a `Controller
 This lets the user focus on simply selecting the type of behaviour they would like to exhibit based on whether the object is being deleted or it's just being regularly reconciled (through enum matching on `finalizer::Event`). This lets the user elide checking for potential deletion timestamps and manage the state machinery of `metadata.finalizers` through jsonpatching.
 
 #### wait
-Contains helpers for waiting for `conditions`, and for an object to `delete`.
+Contains helpers for waiting for `conditions`, or objects to be fully removed (i.e. waiting for finalizers post delete).
 
 These build upon `watch_object` with specific mappers.
 
