@@ -143,7 +143,7 @@ impl From<&str> for Reporter {
 ///     // [...]
 ///     ..Default::default()
 /// };
-/// // or for k8s-openapi / kube-derive types, you can get them automatically:
+/// // or for k8s-openapi / kube-derive types, use Resource::object_ref:
 /// // let reference = myobject.object_ref();
 ///
 /// let recorder = Recorder::new(client, reporter, reference);
