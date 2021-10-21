@@ -193,7 +193,7 @@ Contains helpers for waiting for `conditions`, or objects to be fully removed (i
 These build upon `watch_object` with specific mappers.
 
 #### events
-Contains an `EventRecorder` ala [client-go/events](https://github.com/kubernetes/client-go/tree/master/tools/events) that controllers can hook into, to publish events related to their reconciliations.
+Contains an event `Recorder` ala [client-go/events](https://github.com/kubernetes/client-go/tree/master/tools/events) that controllers can hook into, to publish events related to their reconciliations.
 
 ## Crate Delineation and Overlaps
 When working on the the client machinery, it's important to realise that there are effectively 5 layers involved:

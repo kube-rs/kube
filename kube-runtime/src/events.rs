@@ -1,6 +1,6 @@
 //! Publishes events for objects
 use k8s_openapi::{
-    api::{core::v1::ObjectReference, events::v1::Event},
+    api::{core::v1::ObjectReference, events::v1::Event as CoreEvent},
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
     chrono::Utc,
 };
@@ -9,47 +9,50 @@ use kube_client::{
     Client,
 };
 
-/// Required information to publish a new event via [`EventRecorder::publish`].
+/// Minimal event type for publishing through [`EventRecorder::publish`].
 ///
+/// All string fields must be human readable.
 /// [`EventRecorder::publish`]: crate::events::EventRecorder::publish
-pub struct NewEvent {
-    /// The action that was taken (either successfully or unsuccessfully) against
-    /// the references object.
+/// TODO: RecordingEvent ? it's not really just an Event (because it lacks the From field)
+pub struct Event {
+    /// The event severity.
     ///
-    /// `action` must be machine-readable.
-    pub action: String,
-    /// The reason explaining why the `action` was taken.
+    /// Shows up in `kubectl describe` as `Type`.
+    pub type_: EventType,
+
+    /// The short reason explaining why the `action` was taken.
     ///
-    /// `reason` must be human-readable.
+    /// This must be at most 128 characters, and is often PascalCased. Shows up in `kubectl describe` as `Reason`.
     pub reason: String,
 
     /// A optional description of the status of the `action`.
     ///
-    /// `note` must be human-readable.
+    /// This must be at most 1024 characters. Shows up in `kubectl describe` as `Message`.
     pub note: Option<String>,
 
-    /// The event severity.
-    pub event_type: EventType,
+    /// The action that was taken (either successfully or unsuccessfully) against main object
+    ///
+    /// This must be at most 128 characters. It does not currently show up in `kubectl describe`.
+    pub action: String,
 
+    /// Optional secondary object related to the main object
+    ///
     /// Some events are emitted for actions that affect multiple objects.
-    /// `secondary_object` can be populated to capture this detail.
+    /// `secondary` can be populated to capture this detail.
     ///
-    /// For example: the event concerns a `Deployment` and it
-    /// affects the current `ReplicaSet` underneath it.
-    /// You would therefore populate `secondary_object` using the object
-    /// reference of the `ReplicaSet`.
+    /// For example: the event concerns a `Deployment` and it affects the current `ReplicaSet` underneath it.
+    /// You would therefore populate `events` using the object reference of the `ReplicaSet`.
     ///
-    /// Set `secondary_object` to `None`, instead, if the event
-    /// affects only the object whose reference you passed
-    /// to [`EventRecorder::new`].
+    /// Set `secondary` to `None`, instead, if the event affects only the object whose reference
+    /// you passed to [`Recorder::new`].
     ///
     /// # Naming note
     ///
-    /// `secondary_object` is mapped to `related` in
+    /// `secondary` is mapped to `related` in
     /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
     ///
-    /// [`EventRecorder::new`]: crate::events::EventRecorder::new
-    pub secondary_object: Option<ObjectReference>,
+    /// [`Recorder::new`]: crate::events::Recorder::new
+    pub secondary: Option<ObjectReference>,
 }
 
 /// The event severity or type.
@@ -61,31 +64,27 @@ pub enum EventType {
     Warning,
 }
 
-/// Details about the event emitter.
+/// Details about the event reporter.
 ///
-/// ```rust
-/// use kube_runtime::events::EventSource;
+/// ```
+/// use kube::runtime::events::Reporter;
 ///
-/// let event_source = EventSource {
-///     controller_pod: "my-awesome-controller-abcdef".into(),
+/// let reporter = Reporter {
 ///     controller: "my-awesome-controller".into(),
+///     instance: std::env::var("CONTROLLER_POD_NAME").ok(),
 /// };
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct EventSource {
-    /// The name of the controller publishing the event.
+pub struct Reporter {
+    /// The name of the reporting controller that is publishing the event.
     ///
-    /// E.g. `my-awesome-controller`.
-    ///
-    /// # Naming note
-    ///
-    /// `controller_name` is mapped to `reportingController` in
-    /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
+    /// This is likely your deployment.metadata.name.
     pub controller: String,
 
-    /// The name of the controller pod publishing the event.
+    /// The id of the controller publishing the event. Likely your pod name.
     ///
-    /// E.g. `my-awesome-controller-abcdef`.
+    /// Useful when running more than one replica on your controller and you need to disambiguate what
+    /// where events came from.
     ///
     /// The name of the controller pod can be retrieved using Kubernetes' API or
     /// it can be injected as an environment variable using
@@ -100,44 +99,62 @@ pub struct EventSource {
     ///
     /// in the manifest of your controller.
     ///
-    /// # Naming note
-    ///
-    /// `controller_pod` is mapped to `reportingInstance` in
-    /// [`Events API`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io).
-    pub controller_pod: String,
+    /// NB: If no `instance` is provided, then `reporting_instance == reporting_controller` in the `Event`.
+    pub instance: Option<String>,
 }
 
+// simple conversions for when instance == controller
+impl From<String> for Reporter {
+    fn from(es: String) -> Self {
+        Self {
+            controller: es,
+            instance: None
+        }
+    }
+}
+impl From<&str> for Reporter {
+    fn from(es: &str) -> Self {
+        Self {
+            controller: es.into(),
+            instance: None
+        }
+    }
+}
 
 /// A publisher abstraction to emit Kubernetes' events.
 ///
-/// All events emitted by an `EventRecorder` are attached to the [`ObjectReference`]
-/// specified when building the recorder using [`EventRecorder::new`].
+/// All events emitted by an `Recorder` are attached to the [`ObjectReference`]
+/// specified when building the recorder using [`Recorder::new`].
 ///
-/// ```rust
-/// use kube::runtime::events::{EventSource, EventRecorder, NewEvent, EventType};
+/// ```
+/// use kube::{
+///   core::Resource,
+///   runtime::events::{Reporter, Recorder, Event, EventType}
+/// };
 /// use k8s_openapi::api::core::v1::ObjectReference;
 ///
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();
-/// let source = EventSource {
-///     controller_pod: "my-awesome-controller-abcdef".into(),
+/// let reporter = Reporter {
 ///     controller: "my-awesome-controller".into(),
+///     instance: std::env::var("CONTROLLER_POD_NAME").ok(),
 /// };
 ///
-/// // You can populate this using `ObjectMeta` and `ApiResource` information
-/// // from the object you are working with.
-/// let object_reference = ObjectReference {
+/// // references can be made manually using `ObjectMeta` and `ApiResource`/`Resource` info
+/// let reference = ObjectReference {
 ///     // [...]
-///     # ..Default::default()
+///     ..Default::default()
 /// };
+/// // or for k8s-openapi / kube-derive types, you can get them automatically:
+/// // let reference = myobject.object_ref();
 ///
-/// let recorder = EventRecorder::new(client, source, object_reference);
-/// recorder.publish(NewEvent {
+/// let recorder = Recorder::new(client, reporter, reference);
+/// recorder.publish(Event {
 ///     action: "Scheduling".into(),
 ///     reason: "Pulling".into(),
 ///     note: Some("Pulling image `nginx`".into()),
-///     event_type: EventType::Normal,
-///     secondary_object: None,
+///     type_: EventType::Normal,
+///     secondary: None,
 /// }).await?;
 /// # Ok(())
 /// # }
@@ -146,24 +163,25 @@ pub struct EventSource {
 /// Events attached to an object will be shown in the `Events` section of the output of
 /// of `kubectl describe` for that object.
 #[derive(Clone)]
-pub struct EventRecorder {
-    events: Api<Event>,
-    source: EventSource,
+pub struct Recorder {
+    events: Api<CoreEvent>,
+    reporter: Reporter,
     reference: ObjectReference,
 }
 
-impl EventRecorder {
-    /// Build a new [`EventRecorder`] instance to emit events attached to the
-    /// specified [`ObjectReference`].
+impl Recorder {
+    /// Create a new recorder that can publish events for one specific object
+    ///
+    /// This is intended to be createad at the start of your controller's reconcile fn.
     #[must_use]
-    pub fn new(client: Client, source: EventSource, reference: ObjectReference) -> Self {
+    pub fn new(client: Client, reporter: Reporter, reference: ObjectReference) -> Self {
         let events = match reference.namespace.as_ref() {
             None => Api::all(client),
             Some(namespace) => Api::namespaced(client, namespace),
         };
         Self {
             events,
-            source,
+            reporter,
             reference,
         }
     }
@@ -180,9 +198,12 @@ impl EventRecorder {
     /// # Errors
     ///
     /// Returns an [`Error`](`kube_client::Error`) if the event is rejected by Kubernetes.
-    pub async fn publish(&self, ev: NewEvent) -> Result<(), kube_client::Error> {
+    pub async fn publish(&self, ev: Event) -> Result<(), kube_client::Error> {
+        // See https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io
+        // for more detail on the fields
+        // and what's expected: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#event-v125
         self.events
-            .create(&PostParams::default(), &Event {
+            .create(&PostParams::default(), &CoreEvent {
                 action: Some(ev.action),
                 reason: Some(ev.reason),
                 deprecated_count: None,
@@ -194,17 +215,17 @@ impl EventRecorder {
                 note: ev.note.map(Into::into),
                 metadata: ObjectMeta {
                     namespace: self.reference.namespace.clone(),
-                    generate_name: Some(format!("{}-", self.source.controller)),
+                    generate_name: Some(format!("{}-", self.reporter.controller)),
                     ..Default::default()
                 },
-                reporting_controller: Some(self.source.controller.clone()),
-                reporting_instance: Some(self.source.controller_pod.clone()),
+                reporting_controller: Some(self.reporter.controller.clone()),
+                reporting_instance: Some(self.reporter.instance.clone().unwrap_or(self.reporter.controller.clone())),
                 series: None,
-                type_: match ev.event_type {
+                type_: match ev.type_ {
                     EventType::Normal => Some("Normal".into()),
                     EventType::Warning => Some("Warning".into()),
                 },
-                related: ev.secondary_object,
+                related: ev.secondary,
             })
             .await?;
         Ok(())
