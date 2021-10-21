@@ -10,7 +10,7 @@
 //!
 //! ```rust,no_run
 //! use futures::{StreamExt, TryStreamExt};
-//! use kube_client::api::{Api, ResourceExt, ListParams, PostParams, WatchEvent};
+//! use kube_client::api::{Api, ResourceExt, ListParams, PatchParams, Patch};
 //! use kube_client::Client;
 //! use k8s_openapi::api::core::v1::Pod;
 //!
@@ -21,12 +21,11 @@
 //!     // then falls back on a kubeconfig file.
 //!     let client = Client::try_default().await?;
 //!
-//!     // Get a strongly typed handle to the Kubernetes API for interacting
-//!     // with pods in the "default" namespace.
+//!     // Interact with pods in the configured namespace with the typed interface from k8s-openapi
 //!     let pods: Api<Pod> = Api::default_namespaced(client);
 //!
-//!     // Create a pod from JSON
-//!     let pod = serde_json::from_value(serde_json::json!({
+//!     // Create a Pod (cheating here with json, but it has to validate against the type):
+//!     let patch: Pod = serde_json::from_value(serde_json::json!({
 //!         "apiVersion": "v1",
 //!         "kind": "Pod",
 //!         "metadata": {
@@ -42,34 +41,25 @@
 //!         }
 //!     }))?;
 //!
-//!     // Create the pod
-//!     let pod = pods.create(&PostParams::default(), &pod).await?;
+//!     // Apply the Pod via server-side apply
+//!     let params = PatchParams::apply("myapp");
+//!     let result = pods.patch("my-pod", &params, &Patch::Apply(&patch)).await?;
 //!
-//!     // Start a watch call for pods matching our name
-//!     let lp = ListParams::default()
-//!             .fields(&format!("metadata.name={}", "my-pod"))
-//!             .timeout(10);
-//!     let mut stream = pods.watch(&lp, "0").await?.boxed();
-//!
-//!     // Observe the pods phase for 10 seconds
-//!     while let Some(status) = stream.try_next().await? {
-//!         match status {
-//!             WatchEvent::Added(o) => println!("Added {}", o.name()),
-//!             WatchEvent::Modified(o) => {
-//!                 let s = o.status.as_ref().expect("status exists on pod");
-//!                 let phase = s.phase.clone().unwrap_or_default();
-//!                 println!("Modified: {} with phase: {}", o.name(), phase);
-//!             }
-//!             WatchEvent::Deleted(o) => println!("Deleted {}", o.name()),
-//!             WatchEvent::Error(e) => println!("Error {}", e),
-//!             _ => {}
-//!         }
+//!     // List pods in the configured namespace
+//!     for p in pods.list(&ListParams::default()).await? {
+//!         println!("found pod {}", p.name());
 //!     }
 //!
 //!     Ok(())
 //! }
 //! ```
-
+//!
+//! For more details, see:
+//!
+//! - [`Client`](crate::client) for the extensible Kubernetes client
+//! - [`Config`](crate::config) for the Kubernetes config abstraction
+//! - [`Api`](crate::Api) for the generic api methods available on Kubernetes resources
+//! - [k8s-openapi](https://docs.rs/k8s-openapi/*/k8s_openapi/) for how to create typed kubernetes objects directly
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
