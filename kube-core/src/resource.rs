@@ -72,11 +72,11 @@ pub trait Resource {
 
     /// Generates an object reference for the resource
     fn object_ref(&self, dt: &Self::DynamicType) -> ObjectReference {
-        let meta = self.meta().clone();
+        let meta = self.meta();
         ObjectReference {
-            name: meta.name,
-            namespace: meta.namespace,
-            uid: meta.uid,
+            name: meta.name.clone(),
+            namespace: meta.namespace.clone(),
+            uid: meta.uid.clone(),
             api_version: Some(Self::api_version(dt).to_string()),
             kind: Some(Self::kind(dt).to_string()),
             ..Default::default()
