@@ -1,5 +1,6 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
+use k8s_openapi::api::core::v1::ObjectReference;
 use std::{borrow::Cow, collections::BTreeMap};
 
 /// An accessor trait for a kubernetes Resource.
@@ -69,6 +70,19 @@ pub trait Resource {
     fn meta(&self) -> &ObjectMeta;
     /// Metadata that all persisted resources must have
     fn meta_mut(&mut self) -> &mut ObjectMeta;
+
+    /// Generates an object reference for the resource
+    fn object_ref(&self, dt: &Self::DynamicType) -> ObjectReference {
+        let meta = self.meta().clone();
+        ObjectReference {
+            name: meta.name,
+            namespace: meta.namespace,
+            uid: meta.uid,
+            api_version: Some(Self::api_version(dt).to_string()),
+            kind: Some(Self::kind(dt).to_string()),
+            ..Default::default()
+        }
+    }
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
