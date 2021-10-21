@@ -9,11 +9,9 @@ use kube_client::{
     Client,
 };
 
-/// Minimal event type for publishing through [`EventRecorder::publish`].
+/// Minimal event type for publishing through [`Recorder::publish`].
 ///
 /// All string fields must be human readable.
-/// [`EventRecorder::publish`]: crate::events::EventRecorder::publish
-/// TODO: RecordingEvent ? it's not really just an Event (because it lacks the From field)
 pub struct Event {
     /// The event severity.
     ///
@@ -64,7 +62,7 @@ pub enum EventType {
     Warning,
 }
 
-/// Details about the event reporter.
+/// Information about the reporting controller.
 ///
 /// ```
 /// use kube::runtime::events::Reporter;
@@ -191,7 +189,7 @@ impl Recorder {
     /// # Access control
     ///
     /// The event object is created in the same namespace of the [`ObjectReference`]
-    /// you specified in [`EventRecorder::new`].
+    /// you specified in [`Recorder::new`].
     /// Make sure that your controller has `create` permissions in the required namespaces
     /// for the `event` resource in the API group `events.k8s.io`.
     ///
@@ -223,7 +221,7 @@ impl Recorder {
                     self.reporter
                         .instance
                         .clone()
-                        .unwrap_or(self.reporter.controller.clone()),
+                        .unwrap_or_else(|| self.reporter.controller.clone()),
                 ),
                 series: None,
                 type_: match ev.type_ {
