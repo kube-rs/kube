@@ -16,7 +16,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = "0.61.0"
+kube = "0.62.0"
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 ```
 
@@ -165,7 +165,7 @@ Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues
 
 ```toml
 [dependencies]
-kube = { version = "0.61.0", default-features = false, features = ["client", "rustls-tls"] }
+kube = { version = "0.62.0", default-features = false, features = ["client", "rustls-tls"] }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 ```
 

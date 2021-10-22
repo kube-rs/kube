@@ -1,16 +1,19 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.61.0...master
- * `kube` now re-exports `kube-runtime` under `runtime` feature - #651 via #652
+ * see https://github.com/kube-rs/kube-rs/compare/0.62.0...master
+
+0.62.0 / 2021-10-22
+===================
+ * `kube` now re-exports `kube-runtime` under `runtime` feature - [#651](https://github.com/kube-rs/kube-rs/issues/651) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
   - no need to keep both `kube` and `kube_runtime` in `Cargo.toml` anymore
   - fixes issues with dependabot / lock-step upgrading
   - change `kube_runtime::X` import paths to `kube::runtime::X` when moving to the feature
- * `kube::runtime` added `events` module with an event `Recorder` - #249 via #653 + #662 + #663
- * `kube::runtime::wait::conditions` added `is_crd_established` helper - #659
- * `kube::CustomResource` derive can now take an arbitrary `#[kube_core]` path for `kube::core` - #658
+ * `kube::runtime` added `events` module with an event `Recorder` - [#249](https://github.com/kube-rs/kube-rs/issues/249) via [#653](https://github.com/kube-rs/kube-rs/issues/653) + [#662](https://github.com/kube-rs/kube-rs/issues/662) + [#663](https://github.com/kube-rs/kube-rs/issues/663)
+ * `kube::runtime::wait::conditions` added `is_crd_established` helper - [#659](https://github.com/kube-rs/kube-rs/issues/659)
+ * `kube::CustomResource` derive can now take an arbitrary `#[kube_core]` path for `kube::core` - [#658](https://github.com/kube-rs/kube-rs/issues/658)
  * `kube::core` consistently re-exported across crates
- * docs: major overhaul + [architecture.md](./architecture.md) - #416 via #652
+ * docs: major overhaul + [architecture.md](./architecture.md) - [#416](https://github.com/kube-rs/kube-rs/issues/416) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
 
 0.61.0 / 2021-10-09
 ===================

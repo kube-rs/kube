@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.61.0"
+version = "0.62.0"
 description = "Kubernetes client and async controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -35,10 +35,10 @@ features = ["client", "native-tls", "rustls-tls", "derive", "ws", "oauth", "json
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-kube-derive = { path = "../kube-derive", version = "^0.61.0", optional = true }
-kube-core = { path = "../kube-core", version = "^0.61.0"}
-kube-client = { path = "../kube-client", version = "^0.61.0", optional = true}
-kube-runtime = { path = "../kube-runtime", version = "^0.61.0", optional = true}
+kube-derive = { path = "../kube-derive", version = "^0.62.0", optional = true }
+kube-core = { path = "../kube-core", version = "^0.62.0"}
+kube-client = { path = "../kube-client", version = "^0.62.0", optional = true}
+kube-runtime = { path = "../kube-runtime", version = "^0.62.0", optional = true}
 
 [dev-dependencies.k8s-openapi]
 version = "0.13.1"
