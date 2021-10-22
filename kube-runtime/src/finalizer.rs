@@ -1,7 +1,8 @@
+//! Finalizer helper for [`Controller`](crate::Controller) reconcilers
 use crate::controller::ReconcilerAction;
 use futures::{TryFuture, TryFutureExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
-use kube::{
+use kube_client::{
     api::{Patch, PatchParams},
     Api, Resource, ResourceExt,
 };
@@ -19,9 +20,9 @@ where
     #[snafu(display("failed to clean up object: {}", source))]
     CleanupFailed { source: ReconcileErr },
     #[snafu(display("failed to add finalizer: {}", source))]
-    AddFinalizer { source: kube::Error },
+    AddFinalizer { source: kube_client::Error },
     #[snafu(display("failed to remove finalizer: {}", source))]
-    RemoveFinalizer { source: kube::Error },
+    RemoveFinalizer { source: kube_client::Error },
     #[snafu(display("object has no name"))]
     UnnamedObject,
 }
@@ -45,9 +46,10 @@ impl FinalizerState {
     }
 }
 
-/// Reconcile an object in a way that requires cleanup before an object can be deleted. It does this by
-/// managing a [`ObjectMeta::finalizers`] entry, which prevents the object from being deleted before the
-/// cleanup is done.
+/// Reconcile an object in a way that requires cleanup before an object can be deleted.
+///
+/// It does this by managing a [`ObjectMeta::finalizers`] entry,
+/// which prevents the object from being deleted before the cleanup is done.
 ///
 /// In typical usage, if you use `finalizer` then it should be the only top-level "action"
 /// in your [`applier`](crate::applier)/[`Controller`](crate::Controller)'s `reconcile` function.
@@ -95,7 +97,7 @@ impl FinalizerState {
 /// In addition, adding and removing the finalizer itself may fail. In particular, this may be because of
 /// network errors, lacking permissions, or because another `finalizer` was updated in the meantime on the same object.
 ///
-/// [`ObjectMeta::finalizers`]: kube::api::ObjectMeta#structfield.finalizers
+/// [`ObjectMeta::finalizers`]: kube_client::api::ObjectMeta#structfield.finalizers
 pub async fn finalizer<K, ReconcileFut>(
     api: &Api<K>,
     finalizer_name: &str,

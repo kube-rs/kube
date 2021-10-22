@@ -27,6 +27,10 @@ satisfy the above requirement.
 This project has adopted the [CNCF Code of
 Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 
-## Contact
+## Support
+### Documentation
+The [high-level architecture document](./architecture.md) is written for contributors.
+
+### Contact
 You can ask general questions / share ideas / query the community at the [kube-rs discussions forum](https://github.com/kube-rs/kube-rs/discussions).
 You can reach the maintainers of this project at [#kube](https://discord.gg/tokio) channel on the Tokio discord.

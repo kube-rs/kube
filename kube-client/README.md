@@ -1,0 +1,15 @@
+# kube-client
+The rust counterpart to [kubernetes/client-go](https://github.com/kubernetes/apimachinery).
+Contains the IO layer plus the core Api layer, and also as well as config parsing.
+
+## Usage
+This crate, and all its features, are re-exported from the facade-crate `kube`.
+
+## Docs
+See the **[kube-client API Docs](https://docs.rs/kube-client/)**
+
+## Development
+Help very welcome! To help out on this crate check out these labels:
+- https://github.com/kube-rs/kube-rs/labels/client
+- https://github.com/kube-rs/kube-rs/labels/api
+- https://github.com/kube-rs/kube-rs/labels/config

@@ -20,7 +20,7 @@ use futures::{
     future::{self, BoxFuture},
     stream, Future, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube::api::{Api, DynamicObject, ListParams, Resource};
+use kube_client::api::{Api, DynamicObject, ListParams, Resource};
 use serde::de::DeserializeOwned;
 use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
 use std::{
@@ -337,12 +337,14 @@ where
 ///
 /// Pieces:
 /// ```no_run
-/// use kube::{Client, api::{Api, ListParams}};
-/// use kube_derive::CustomResource;
+/// use kube::{
+///   Client, CustomResource,
+///   api::{Api, ListParams},
+///   runtime::controller::{Context, Controller, ReconcilerAction}
+/// };
 /// use serde::{Deserialize, Serialize};
 /// use tokio::time::Duration;
 /// use futures::StreamExt;
-/// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 /// use k8s_openapi::api::core::v1::ConfigMap;
 /// use schemars::JsonSchema;
 ///
@@ -443,10 +445,10 @@ where
     ///
     /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::new`] for static types.
     ///
-    /// [`ListParams`]: kube::api::ListParams
-    /// [`Api`]: kube::Api
-    /// [`dynamic`]: kube::core::dynamic
-    /// [`ListParams::default`]: kube::api::ListParams::default
+    /// [`ListParams`]: kube_client::api::ListParams
+    /// [`Api`]: kube_client::Api
+    /// [`dynamic`]: kube_client::core::dynamic
+    /// [`ListParams::default`]: kube_client::api::ListParams::default
     pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
@@ -585,8 +587,11 @@ where
     /// # async {
     /// use futures::stream::StreamExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
-    /// use kube::{api::ListParams, Api, Client, ResourceExt};
-    /// use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+    /// use kube::{
+    ///     Client,
+    ///     api::{ListParams, Api, ResourceExt},
+    ///     runtime::{controller::{Context, Controller, ReconcilerAction}},
+    /// };
     /// use std::{convert::Infallible, io::BufRead};
     /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
     /// // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
@@ -766,7 +771,7 @@ mod tests {
     use super::{Context, ReconcilerAction};
     use crate::Controller;
     use k8s_openapi::api::core::v1::ConfigMap;
-    use kube::Api;
+    use kube_client::Api;
 
     fn assert_send<T: Send>(x: T) -> T {
         x

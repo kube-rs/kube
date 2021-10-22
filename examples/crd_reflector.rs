@@ -4,9 +4,10 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
+    runtime::{reflector, utils::try_flatten_applied, watcher},
     Client, CustomResource, CustomResourceExt,
 };
-use kube_runtime::{reflector, utils::try_flatten_applied, watcher};
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

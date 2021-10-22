@@ -2,7 +2,7 @@
 
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
-use kube::{
+use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
 };
@@ -15,22 +15,22 @@ use std::{clone::Clone, fmt::Debug};
 pub enum Error {
     #[snafu(display("failed to perform initial object list: {}", source))]
     InitialListFailed {
-        source: kube::Error,
+        source: kube_client::Error,
         backtrace: Backtrace,
     },
     #[snafu(display("failed to start watching object: {}", source))]
     WatchStartFailed {
-        source: kube::Error,
+        source: kube_client::Error,
         backtrace: Backtrace,
     },
     #[snafu(display("error returned by apiserver during watch: {}", source))]
     WatchError {
-        source: kube::error::ErrorResponse,
+        source: kube_client::error::ErrorResponse,
         backtrace: Backtrace,
     },
     #[snafu(display("watch stream failed: {}", source))]
     WatchFailed {
-        source: kube::Error,
+        source: kube_client::Error,
         backtrace: Backtrace,
     },
     #[snafu(display("too many objects matched search criteria"))]
@@ -102,7 +102,7 @@ enum State<K: Resource + Clone> {
     Watching {
         resource_version: String,
         #[derivative(Debug = "ignore")]
-        stream: BoxStream<'static, kube::Result<WatchEvent<K>>>,
+        stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
 }
 
@@ -202,12 +202,14 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// direct users may want to flatten composite events with [`try_flatten_applied`]:
 ///
 /// ```no_run
-/// use kube::{api::{Api, ListParams, ResourceExt}, Client};
-/// use kube_runtime::{utils::try_flatten_applied, watcher};
+/// use kube::{
+///   api::{Api, ListParams, ResourceExt}, Client,
+///   runtime::{utils::try_flatten_applied, watcher}
+/// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::{StreamExt, TryStreamExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube_runtime::watcher::Error> {
+/// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///     let watcher = watcher(pods, ListParams::default());
@@ -222,7 +224,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// ```
 /// [`try_flatten_applied`]: super::utils::try_flatten_applied
 /// [`reflector`]: super::reflector::reflector
-/// [`Api::watch`]: kube::Api::watch
+/// [`Api::watch`]: kube_client::Api::watch
 ///
 /// # Recovery
 ///

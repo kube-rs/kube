@@ -86,7 +86,7 @@ where
     /// When you get a `Status` via `Right`, this should be a a 2XX style
     /// confirmation that the object being gone.
     ///
-    /// 4XX and 5XX status types are returned as an [`Err(kube::Error::Api)`](crate::Error::Api).
+    /// 4XX and 5XX status types are returned as an [`Err(kube_client::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
     /// use kube::{api::{Api, DeleteParams}, Client};
@@ -114,7 +114,7 @@ where
     /// When you get a `Status` via `Right`, this should be a a 2XX style
     /// confirmation that the object being gone.
     ///
-    /// 4XX and 5XX status types are returned as an [`Err(kube::Error::Api)`](crate::Error::Api).
+    /// 4XX and 5XX status types are returned as an [`Err(kube_client::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
     /// use kube::{api::{Api, DeleteParams, ListParams, ResourceExt}, Client};

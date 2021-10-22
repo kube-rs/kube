@@ -6,9 +6,9 @@ use k8s_openapi::api::{
 };
 use kube::{
     api::{Api, ListParams, ResourceExt},
+    runtime::{utils::try_flatten_applied, watcher},
     Client,
 };
-use kube_runtime::{utils::try_flatten_applied, watcher};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

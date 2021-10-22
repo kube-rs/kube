@@ -7,9 +7,6 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
-
-use std::convert::TryFrom;
-
 use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
@@ -137,7 +134,7 @@ impl Client {
             .map_err(|err| {
                 if err.is::<Error>() {
                     // Error decorating request
-                    *err.downcast::<Error>().expect("kube::Error")
+                    *err.downcast::<Error>().expect("kube_client::Error")
                 } else if err.is::<hyper::Error>() {
                     // Error requesting
                     Error::HyperError(*err.downcast::<hyper::Error>().expect("hyper::Error"))

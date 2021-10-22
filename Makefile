@@ -9,10 +9,10 @@ clippy:
 
 fmt:
 	#rustup component add rustfmt --toolchain nightly
-	rustfmt +nightly --edition 2018 $$(find . -type f -iname *.rs)
+	rustfmt +nightly --edition 2021 $$(find . -type f -iname *.rs)
 
 doc:
-	RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch --open
+	RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission --open
 
 test:
 	cargo test --all
@@ -22,7 +22,7 @@ test:
 	cd kube && cargo test --lib --features=derive
 
 readme:
-	rustdoc README.md --test --edition=2018
+	rustdoc README.md --test --edition=2021
 
 kind-create:
 	kind create cluster

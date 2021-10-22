@@ -20,7 +20,7 @@ mod custom_resource;
 ///
 /// ```rust
 /// use serde::{Serialize, Deserialize};
-/// use kube::{Resource, CustomResourceExt};
+/// use kube::core::{Resource, CustomResourceExt};
 /// use kube_derive::CustomResource;
 /// use schemars::JsonSchema;
 ///
@@ -86,6 +86,10 @@ mod custom_resource;
 ///
 /// ### `#[kube(struct = "StructName")]`
 /// Customize the name of the generated root struct (defaults to `kind`).
+///
+/// ### `#[kube(kube_core = "::kube_core")]`
+/// Customize the crate name the generated code will reach into (defaults to `kube::core`).
+/// Should be one of `kube::core`, `kube_client::core` or `kube_core`.
 ///
 /// ### `#[kube(status = "StatusStructName")]`
 /// Adds a status struct to the top level generated type and enables the status

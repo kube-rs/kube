@@ -3,9 +3,9 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ListParams, ResourceExt},
+    runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher},
     Client,
 };
-use kube_runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher};
 
 fn spawn_periodic_reader(reader: Store<ConfigMap>) {
     tokio::spawn(async move {

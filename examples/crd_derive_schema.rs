@@ -6,6 +6,7 @@ use kube::{
         Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, ListParams, Patch, PatchParams,
         PostParams, WatchEvent,
     },
+    runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt,
 };
 use schemars::JsonSchema;
@@ -224,30 +225,14 @@ async fn create_crd(client: Client) -> Result<CustomResourceDefinition> {
     let api = Api::<CustomResourceDefinition>::all(client);
     api.create(&PostParams::default(), &Foo::crd()).await?;
 
-    // Wait until ready
-    let timeout_secs = 15;
-    let lp = ListParams::default()
-        .fields("metadata.name=foos.clux.dev")
-        .timeout(timeout_secs);
-    let mut stream = api.watch(&lp, "0").await?.boxed_local();
-    while let Some(status) = stream.try_next().await? {
-        if let WatchEvent::Modified(crd) = status {
-            let accepted = crd
-                .status
-                .as_ref()
-                .and_then(|s| s.conditions.as_ref())
-                .map(|sc| {
-                    sc.iter()
-                        .any(|c| c.type_ == "NamesAccepted" && c.status == "True")
-                })
-                .unwrap_or(false);
-            if accepted {
-                return Ok(crd);
-            }
-        }
-    }
+    // Wait until it's accepted and established by the api-server
+    println!("Waiting for the api-server to accept the CRD");
+    let establish = await_condition(api.clone(), "foos.clux.dev", conditions::is_crd_established());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
 
-    Err(anyhow!(format!("CRD not ready after {} seconds", timeout_secs)))
+    // It's served by the api - get it and return it
+    let crd = api.get("foos.clux.dev").await?;
+    Ok(crd)
 }
 
 // Delete the CRD if it exists and wait until it's deleted.

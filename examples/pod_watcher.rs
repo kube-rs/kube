@@ -2,10 +2,10 @@ use color_eyre::Result;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{ListParams, ResourceExt},
-    Api, Client,
+    api::{Api, ListParams, ResourceExt},
+    runtime::{utils::try_flatten_applied, watcher},
+    Client,
 };
-use kube_runtime::{utils::try_flatten_applied, watcher};
 
 #[tokio::main]
 async fn main() -> Result<()> {

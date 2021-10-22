@@ -1,75 +1,109 @@
-//! Crate for interacting with the Kubernetes API
+//! Kube is an umbrella-crate for interacting with [Kubernetes](http://kubernetes.io) in Rust.
 //!
-//! This crate includes the tools for manipulating Kubernetes resources as
-//! well as keeping track of those resources as they change over time
+//! # Overview
 //!
-//! # Example
+//! Kube contains a Kubernetes client, a controller runtime, a custom resource derive, and various tooling
+//! required for building applications or controllers that interact with Kubernetes.
 //!
-//! The following example will create a [`Pod`](k8s_openapi::api::core::v1::Pod)
-//! and then watch for it to become available using a manual [`Api::watch`] call.
+//! The main modules are:
 //!
-//! ```rust,no_run
+//! - [`client`](crate::client) with the Kubernetes [`Client`](crate::Client) and its layers
+//! - [`config`](crate::config) for cluster [`Config`](crate::Config)
+//! - [`api`](crate::api) with the generic Kubernetes [`Api`](crate::Api)
+//! - [`derive`](kube_derive) with the [`CustomResource`](crate::CustomResource) derive for building controllers types
+//! - [`runtime`](crate::runtime) with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
+//! - [`core`](crate::core) with generics from `apimachinery`
+//!
+//! You can use each of these as you need with the help of the [exported features](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
+//!
+//! # Using the Client
+//! ```no_run
 //! use futures::{StreamExt, TryStreamExt};
-//! use kube::api::{Api, ResourceExt, ListParams, PostParams, WatchEvent};
-//! use kube::Client;
+//! use kube::{Client, api::{Api, ResourceExt, ListParams, PostParams}};
 //! use k8s_openapi::api::core::v1::Pod;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), kube::Error> {
-//!     // Read the environment to find config for kube client.
-//!     // Note that this tries an in-cluster configuration first,
-//!     // then falls back on a kubeconfig file.
+//!     // Infer the runtime environment and try to create a Kubernetes Client
 //!     let client = Client::try_default().await?;
 //!
-//!     // Get a strongly typed handle to the Kubernetes API for interacting
-//!     // with pods in the "default" namespace.
-//!     let pods: Api<Pod> = Api::namespaced(client, "default");
-//!
-//!     // Create a pod from JSON
-//!     let pod = serde_json::from_value(serde_json::json!({
-//!         "apiVersion": "v1",
-//!         "kind": "Pod",
-//!         "metadata": {
-//!             "name": "my-pod"
-//!         },
-//!         "spec": {
-//!             "containers": [
-//!                 {
-//!                     "name": "my-container",
-//!                     "image": "myregistry.azurecr.io/hello-world:v1",
-//!                 },
-//!             ],
-//!         }
-//!     }))?;
-//!
-//!     // Create the pod
-//!     let pod = pods.create(&PostParams::default(), &pod).await?;
-//!
-//!     // Start a watch call for pods matching our name
-//!     let lp = ListParams::default()
-//!             .fields(&format!("metadata.name={}", "my-pod"))
-//!             .timeout(10);
-//!     let mut stream = pods.watch(&lp, "0").await?.boxed();
-//!
-//!     // Observe the pods phase for 10 seconds
-//!     while let Some(status) = stream.try_next().await? {
-//!         match status {
-//!             WatchEvent::Added(o) => println!("Added {}", o.name()),
-//!             WatchEvent::Modified(o) => {
-//!                 let s = o.status.as_ref().expect("status exists on pod");
-//!                 let phase = s.phase.clone().unwrap_or_default();
-//!                 println!("Modified: {} with phase: {}", o.name(), phase);
-//!             }
-//!             WatchEvent::Deleted(o) => println!("Deleted {}", o.name()),
-//!             WatchEvent::Error(e) => println!("Error {}", e),
-//!             _ => {}
-//!         }
+//!     // Read pods in the configured namespace into the typed interface from k8s-openapi
+//!     let pods: Api<Pod> = Api::default_namespaced(client);
+//!     for p in pods.list(&ListParams::default()).await? {
+//!         println!("found pod {}", p.name());
 //!     }
-//!
 //!     Ok(())
 //! }
 //! ```
-
+//!
+//! For details, see:
+//!
+//! - [`Client`](crate::client) for the extensible Kubernetes client
+//! - [`Api`](crate::Api) for the generic api methods available on Kubernetes resources
+//! - [k8s-openapi](https://docs.rs/k8s-openapi/*/k8s_openapi/) for documentation about the generated Kubernetes types
+//!
+//! # Using the Runtime with the Derive macro
+//!
+//! ```no_run
+//! use schemars::JsonSchema;
+//! use serde::{Deserialize, Serialize};
+//! use serde_json::json;
+//! use validator::Validate;
+//! use futures::{StreamExt, TryStreamExt};
+//! use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+//! use kube::{
+//!     api::{Api, DeleteParams, ListParams, PatchParams, Patch, ResourceExt},
+//!     core::CustomResourceExt,
+//!     Client, CustomResource,
+//!     runtime::{watcher, utils::try_flatten_applied, wait::{conditions, await_condition}},
+//! };
+//!
+//! // Our custom resource
+//! #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, Validate, JsonSchema)]
+//! #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+//! pub struct FooSpec {
+//!     info: String,
+//!     #[validate(length(min = 3))]
+//!     name: String,
+//!     replicas: i32,
+//! }
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let client = Client::try_default().await?;
+//!     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+//!
+//!     // Apply the CRD so users can create Foo instances in Kubernetes
+//!     crds.patch("foos.clux.dev",
+//!         &PatchParams::apply("my_manager"),
+//!         &Patch::Apply(Foo::crd())
+//!     ).await?;
+//!
+//!     // Wait for the CRD to be ready
+//!     tokio::time::timeout(
+//!         std::time::Duration::from_secs(10),
+//!         await_condition(crds, "foos.clux.dev", conditions::is_crd_established())
+//!     ).await?;
+//!
+//!     // Watch for changes to foos in the configured namespace
+//!     let foos: Api<Foo> = Api::default_namespaced(client.clone());
+//!     let lp = ListParams::default();
+//!     let mut apply_stream = try_flatten_applied(watcher(foos, lp)).boxed();
+//!     while let Some(f) = apply_stream.try_next().await? {
+//!         println!("saw apply to {}", f.name());
+//!     }
+//!     Ok(())
+//! }
+//! ```
+//!
+//! For details, see:
+//!
+//! - [`CustomResource`](crate::CustomResource) for documentation how to configure custom resources
+//! - [`runtime::watcher`](crate::runtime::watcher()) for how to long-running watches work and why you want to use this over [`Api::watch`](crate::Api::watch)
+//! - [`runtime`](crate::runtime) for abstractions that help with more complicated Kubernetes application
+//!
+//! # Examples
+//! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube-rs/tree/master/examples).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
@@ -104,9 +138,9 @@ macro_rules! cfg_error {
 }
 
 cfg_client! {
-    pub mod api;
-    pub mod discovery;
-    pub mod client;
+    pub use kube_client::api;
+    pub use kube_client::discovery;
+    pub use kube_client::client;
 
     #[doc(inline)]
     pub use api::Api;
@@ -117,37 +151,30 @@ cfg_client! {
 }
 
 cfg_config! {
-    pub mod config;
+    pub use kube_client::config;
     #[doc(inline)]
     pub use config::Config;
 }
 
 cfg_error! {
-    pub mod error;
+    pub use kube_client::error;
     #[doc(inline)] pub use error::Error;
     /// Convient alias for `Result<T, Error>`
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
+/// Re-exports from [`kube-derive`](kube_derive)
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-/// Re-exports from kube_core crate.
-pub mod core {
-    #[cfg(feature = "admission")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
-    pub use kube_core::admission;
-    pub use kube_core::{
-        crd::{self, CustomResourceExt},
-        dynamic::{self, ApiResource, DynamicObject},
-        gvk::{self, GroupVersionKind, GroupVersionResource},
-        metadata::{self, ListMeta, ObjectMeta, TypeMeta},
-        object::{self, NotUsed, Object, ObjectList},
-        request::{self, Request},
-        response::{self, Status},
-        watch::{self, WatchEvent},
-        Resource, ResourceExt,
-    };
-}
+/// Re-exports from [`kube-runtime`](kube_runtime)
+#[cfg(feature = "runtime")]
+#[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
+#[doc(inline)]
+pub use kube_runtime as runtime;
+
 pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
+/// Re-exports from [`kube_core`](kube_core)
+#[doc(inline)]
+pub use kube_core as core;

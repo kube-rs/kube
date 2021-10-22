@@ -1,91 +1,54 @@
 [package]
 name = "kube"
 version = "0.61.0"
-description = "Kubernetes client and futures controller runtime"
+description = "Kubernetes client and async controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
   "Teo Klestrup Röijezon <teo@nullable.se>",
   "kazk <kazk.dev@gmail.com>",
-  "ynqa <un.pensiero.vano@gmail.com>",
 ]
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube-rs"
 readme = "../README.md"
-keywords = ["kubernetes", "client", "runtime", "reflector", "informer"]
+keywords = ["kubernetes", "client", "runtime"]
 categories = ["web-programming::http-client"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["client", "native-tls"]
-native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
-rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls", "webpki"]
-ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
-oauth = ["client", "tame-oauth"]
-gzip = ["client", "tower-http/decompression-gzip"]
-client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
+native-tls = ["kube-client/native-tls"]
+rustls-tls = ["kube-client/rustls-tls"]
+ws = ["kube-client/ws", "kube-core/ws"]
+oauth = ["kube-client/oauth"]
+gzip = ["kube-client/gzip"]
+client = ["kube-client/client", "config"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 derive = ["kube-derive"]
-config = ["__non_core", "pem", "dirs"]
+config = ["kube-client/config"]
+runtime = ["kube-runtime"]
 deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 
-# private feature sets; do not use
-__non_core = ["tracing", "serde_yaml", "base64"]
-
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "derive", "ws", "oauth", "jsonpatch", "admission"]
+features = ["client", "native-tls", "rustls-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-base64 = { version = "0.13.0", optional = true }
-chrono = { version = "0.4.19", optional = true }
-dirs = { package = "dirs-next", optional = true, version = "2.0.0" }
-serde = { version = "1.0.130", features = ["derive"] }
-serde_json = "1.0.68"
-serde_yaml = { version = "0.8.21", optional = true }
-http = "0.2.5"
-http-body = { version = "0.4.2", optional = true }
-either = { version = "1.6.1", optional = true }
-thiserror = "1.0.29"
-futures = { version = "0.3.17", optional = true }
-pem = { version = "0.8.2", optional = true }
-openssl = { version = "0.10.36", optional = true }
-tokio-native-tls = { version = "0.3.0", optional = true }
-rustls = { version = "0.19.1", features = ["dangerous_configuration"], optional = true }
-rustls-pemfile = { version = "0.2.1", optional = true }
-webpki = { version = "0.21.4", optional = true }
-bytes = { version = "1.1.0", optional = true }
-tokio = { version = "1.12.0", features = ["time", "signal", "sync"], optional = true }
 kube-derive = { path = "../kube-derive", version = "^0.61.0", optional = true }
 kube-core = { path = "../kube-core", version = "^0.61.0"}
-jsonpath_lib = { version = "0.3.0", optional = true }
-tokio-util = { version = "0.6.8", optional = true, features = ["io", "codec"] }
-hyper = { version = "0.14.13", optional = true, features = ["client", "http1", "stream", "tcp"] }
-hyper-tls = { version = "0.5.0", optional = true }
-hyper-rustls = { version = "0.22.1", optional = true }
-tokio-tungstenite = { version = "0.15.0", optional = true }
-tower = { version = "0.4.6", optional = true, features = ["buffer", "util"] }
-tower-http = { version = "0.1.1", optional = true, features = ["auth", "map-response-body", "trace"] }
-hyper-timeout = {version = "0.4.1", optional = true }
-tame-oauth = { version = "0.4.7", features = ["gcp"], optional = true }
-pin-project = { version = "1.0.4", optional = true }
-rand = { version = "0.8.3", optional = true }
-tracing = { version = "0.1.29", features = ["log"], optional = true }
-
-[dependencies.k8s-openapi]
-version = "0.13.1"
-default-features = false
-features = []
-
-[dev-dependencies]
-tempfile = "3.1.0"
-tokio = { version = "1.12.0", features = ["full"] }
-schemars = "0.8.6"
-tokio-test = "0.4.0"
-tower-test = "0.4.0"
+kube-client = { path = "../kube-client", version = "^0.61.0", optional = true}
+kube-runtime = { path = "../kube-runtime", version = "^0.61.0", optional = true}
 
 [dev-dependencies.k8s-openapi]
 version = "0.13.1"
 default-features = false
 features = ["v1_22"]
+
+[dev-dependencies]
+tokio = { version = "1.12.0", features = ["full"] }
+futures = "0.3.17"
+serde_json = "1.0.68"
+validator = { version = "0.14.0", features = ["derive"] }
+serde = { version = "1.0.130", features = ["derive"] }
+schemars = "0.8.6"
