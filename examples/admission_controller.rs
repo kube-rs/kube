@@ -2,7 +2,10 @@ use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, ResourceExt,
 };
-use std::{convert::Infallible, error::Error};
+use std::{
+    convert::{Infallible, TryInto},
+    error::Error,
+};
 #[macro_use] extern crate log;
 use warp::{reply, Filter, Reply};
 

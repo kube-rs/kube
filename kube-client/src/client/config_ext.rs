@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use tower::util::Either;
 
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] use super::tls;
