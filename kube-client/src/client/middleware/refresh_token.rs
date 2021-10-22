@@ -130,7 +130,7 @@ where
 mod tests {
     use super::*;
 
-    use std::{convert::TryFrom, matches, sync::Arc};
+    use std::{matches, sync::Arc};
 
     use chrono::{Duration, Utc};
     use futures::pin_mut;

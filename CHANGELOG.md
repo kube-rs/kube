@@ -10,6 +10,7 @@ UNRELEASED
  * `kube::runtime::wait::conditions` added `is_crd_established` helper - #659
  * `kube::CustomResource` derive can now take an arbitrary `#[kube_core]` path for `kube::core` - #658
  * `kube::core` consistently re-exported across crates
+ * rust `edition` bumped to `2021` - #664
  * docs: major overhaul + [architecture.md](./architecture.md) - #416 via #652
 
 0.61.0 / 2021-10-09
