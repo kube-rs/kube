@@ -25,7 +25,7 @@ pub struct Event {
 
     /// A optional description of the status of the `action`.
     ///
-    /// This must be at most 1024 characters. Shows up in `kubectl describe` as `Message`.
+    /// This must be at most 1kB in size. Shows up in `kubectl describe` as `Message`.
     pub note: Option<String>,
 
     /// The action that was taken (either successfully or unsuccessfully) against main object
@@ -81,7 +81,7 @@ pub struct Reporter {
 
     /// The id of the controller publishing the event. Likely your pod name.
     ///
-    /// Useful when running more than one replica on your controller and you need to disambiguate what
+    /// Useful when running more than one replica on your controller and you need to disambiguate
     /// where events came from.
     ///
     /// The name of the controller pod can be retrieved using Kubernetes' API or
