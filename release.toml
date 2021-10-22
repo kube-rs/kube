@@ -18,3 +18,6 @@ pre-release-commit-message = "release {{version}}"
 # leave tagging + pushing to postrelease script (due to potential failures in 1 and 2)
 push = false
 tag = false
+# A Kubernetes version is normally supplied by the application consuming the library in the end.
+# Since we don't have that when verifying, supply one ourselves.
+enable-features = ["k8s-openapi/v1_22"]
