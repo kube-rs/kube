@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, process::Command, sync::Arc};
+use std::{process::Command, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use http::HeaderValue;

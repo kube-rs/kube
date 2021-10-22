@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube-rs"
 readme = "../README.md"
 keywords = ["kubernetes", "client",]
 categories = ["web-programming::http-client"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["client", "native-tls"]
@@ -31,7 +31,7 @@ deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "derive", "ws", "oauth", "jsonpatch", "admission"]
+features = ["client", "native-tls", "rustls-tls", "ws", "oauth", "jsonpatch", "admission"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
