@@ -2,6 +2,7 @@
 UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.62.0...master
+ * rust `edition` bumped to `2021` - #664
 
 0.62.0 / 2021-10-22
 ===================

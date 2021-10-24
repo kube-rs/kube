@@ -6,7 +6,7 @@ authors = [
   "clux <sszynrae@gmail.com>",
   "kazk <kazk.dev@gmail.com>",
 ]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube-rs"
 readme = "../README.md"
