@@ -2,11 +2,6 @@
 
 This document defines project governance for Kube-rs.
 
-> The Kube-rs maintainers are 100% committed to open governance and to being
-> hosted by a neutral foundation. We believe that a diverse and active set of
-> maintainers is fundamental to the long-term health of an open source project.
-> And we want YOU to join us.
-
 ## Contributors
 
 Kube-rs is for everyone. Anyone can become a Kube-rs contributor simply by contributing to the project, whether through code, documentation, blog posts, community management, or other means.
