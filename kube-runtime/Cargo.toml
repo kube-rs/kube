@@ -1,6 +1,6 @@
 [package]
 name = "kube-runtime"
-version = "0.61.0"
+version = "0.62.0"
 description = "Kubernetes futures controller runtime"
 authors = [
   "Teo Klestrup Röijezon <teo@nullable.se>",
@@ -14,7 +14,7 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3.17"
-kube-client = { path = "../kube-client", version = "^0.61.0", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "^0.62.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative = "2.1.1"
 serde = "1.0.130"
 smallvec = "1.7.0"
@@ -32,7 +32,7 @@ version = "0.13.1"
 default-features = false
 
 [dev-dependencies]
-kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "^0.61.0"}
+kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "<1.0.0, >=0.60.0" }
 serde_json = "1.0.68"
 tokio = { version = "1.12.0", features = ["full", "test-util"] }
 rand = "0.8.0"
