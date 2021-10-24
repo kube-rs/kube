@@ -22,9 +22,9 @@ Maintainers have the ability to merge code into the project. Anyone can become a
 As such, there are certain expectations for maintainers. Kube-rs maintainers are expected to:
 
 * Review pull requests, triage issues, and fix bugs in their areas of expertise, ensuring that all changes go through the project's code review and integration processes.
-* Monitor the Kube-rs Discord, and help out when possible.
+* Monitor the Kube-rs Discord, and Discussions and help out when possible.
 * Rapidly respond to any time-sensitive security release processes.
-* Attend meetings with the Kube-rs Steering Committee.
+* Participate on discussions on the roadmap.
 
 If a maintainer is no longer interested in or cannot perform the duties listed above, they should move themselves to emeritus status.
 If necessary, this can also occur through the decision-making process outlined below.
@@ -37,7 +37,7 @@ The voting process is a simple majority in which each maintainer receives one vo
 
 ### Becoming a maintainer
 
-Anyone can become a Kube-rs maintainer. Maintainers should be extremely proficient in Rust; have relevant domain expertise; have the time and ability to meet the maintainer expectations above; and demonstrate the ability to work with the existing maintainers and project processes.
+Anyone can become a Kube-rs maintainer. Maintainers should be highly proficient in Rust; have relevant domain expertise; have the time and ability to meet the maintainer expectations above; and demonstrate the ability to work with the existing maintainers and project processes.
 
 To become a maintainer, start by expressing interest to existing maintainers.
 Existing maintainers will then ask you to demonstrate the qualifications above by contributing PRs, doing code reviews, and other such tasks under their guidance.
