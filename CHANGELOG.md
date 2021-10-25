@@ -3,6 +3,7 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.62.0...master
  * rust `edition` bumped to `2021` - #664
+ * `kube::CustomResource` derive can now take arbitrary `#[kube(k8s_openapi)]` style-paths for `k8s_openapi`, `schemars`, `serde`, and `serde_json` - [#675](https://github.com/kube-rs/kube-rs/pull/675)
 
 0.62.0 / 2021-10-22
 ===================
@@ -12,7 +13,7 @@ UNRELEASED
   - change `kube_runtime::X` import paths to `kube::runtime::X` when moving to the feature
  * `kube::runtime` added `events` module with an event `Recorder` - [#249](https://github.com/kube-rs/kube-rs/issues/249) via [#653](https://github.com/kube-rs/kube-rs/issues/653) + [#662](https://github.com/kube-rs/kube-rs/issues/662) + [#663](https://github.com/kube-rs/kube-rs/issues/663)
  * `kube::runtime::wait::conditions` added `is_crd_established` helper - [#659](https://github.com/kube-rs/kube-rs/issues/659)
- * `kube::CustomResource` derive can now take an arbitrary `#[kube_core]` path for `kube::core` - [#658](https://github.com/kube-rs/kube-rs/issues/658)
+ * `kube::CustomResource` derive can now take an arbitrary `#[kube(kube_core)]` path for `kube::core` - [#658](https://github.com/kube-rs/kube-rs/issues/658)
  * `kube::core` consistently re-exported across crates
  * docs: major overhaul + [architecture.md](./architecture.md) - [#416](https://github.com/kube-rs/kube-rs/issues/416) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
 
