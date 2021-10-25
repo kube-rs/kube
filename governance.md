@@ -30,6 +30,19 @@ Ideally, all project decisions are resolved by maintainer consensus.
 If this is not possible, maintainers may call a vote.
 The voting process is a simple majority in which each maintainer receives one vote.
 
+### Special Tasks
+
+In addition to the outlined abilities and responsibilities outlined above, some maintainer take on additional tasks and responsibilities
+
+#### Release Tasks
+
+As a maintainer on the release team, you are expected to:
+
+* Cut releases, and update the [CHANGELOG](./CHANGELOG.md)
+* Pre-verify big releases against example repos
+* Publish and update versions in example repos
+* Verify the release
+
 ### Becoming a maintainer
 
 Anyone can become a Kube-rs maintainer. Maintainers should be highly proficient in Rust; have relevant domain expertise; have the time and ability to meet the maintainer expectations above; and demonstrate the ability to work with the existing maintainers and project processes.
