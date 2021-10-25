@@ -32,7 +32,7 @@ The voting process is a simple majority in which each maintainer receives one vo
 
 ### Special Tasks
 
-In addition to the outlined abilities and responsibilities outlined above, some maintainer take on additional tasks and responsibilities
+In addition to the outlined abilities and responsibilities outlined above, some maintainer take on additional tasks and responsibilities.
 
 #### Release Tasks
 
