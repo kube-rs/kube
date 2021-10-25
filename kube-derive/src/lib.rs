@@ -87,9 +87,21 @@ mod custom_resource;
 /// ### `#[kube(struct = "StructName")]`
 /// Customize the name of the generated root struct (defaults to `kind`).
 ///
-/// ### `#[kube(kube_core = "::kube_core")]`
-/// Customize the crate name the generated code will reach into (defaults to `kube::core`).
+/// ### `#[kube(kube_core = "::kube::core")]`
+/// Customize the crate name the generated code will reach into (defaults to `::kube::core`).
 /// Should be one of `kube::core`, `kube_client::core` or `kube_core`.
+///
+/// ### `#[kube(k8s_openapi = "::k8s_openapi")]`
+/// Customize the crate name the generated code will use for [`k8s_openapi`](https://docs.rs/k8s-openapi/) (defaults to `::k8s_openapi`).
+///
+/// ### `#[kube(schemars = "::schemars")]`
+/// Customize the crate name the generated code will use for [`schemars`](https://docs.rs/schemars/) (defaults to `::schemars`).
+///
+/// ### `#[kube(serde = "::serde")]`
+/// Customize the crate name the generated code will use for [`serde`](https://docs.rs/serde/) (defaults to `::serde`).
+///
+/// ### `#[kube(serde_json = "::serde_json")]`
+/// Customize the crate name the generated code will use for [`serde_json`](https://docs.rs/serde_json/) (defaults to `::serde_json`).
 ///
 /// ### `#[kube(status = "StatusStructName")]`
 /// Adds a status struct to the top level generated type and enables the status

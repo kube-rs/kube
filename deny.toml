@@ -5,6 +5,19 @@ vulnerability = "deny"
 unmaintained = "warn"
 yanked = "warn"
 notice = "warn"
+ignore = [
+    # Ignoring issues related to `localtime_r` for now
+    # See https://github.com/kube-rs/kube-rs/issues/650
+    #
+    # Potential segfault in the `time` crate
+    # Tracking issue: https://github.com/kube-rs/kube-rs/issues/656
+    # PR to update `time`: https://github.com/chronotope/chrono/pull/578
+    "RUSTSEC-2020-0071",
+    # Potential segfault in `localtime_r` invocations
+    # Tracking issue: https://github.com/kube-rs/kube-rs/issues/660
+    # Upstream issue: https://github.com/chronotope/chrono/issues/499
+    "RUSTSEC-2020-0159",
+]
 
 
 [licenses]
