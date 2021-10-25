@@ -33,15 +33,35 @@ struct KubeAttrs {
     printcolums: Vec<String>,
     #[darling(default)]
     scale: Option<String>,
-    #[darling(default = "default_crate")]
+    #[darling(default = "default_kube_core")]
     kube_core: Path,
+    #[darling(default = "default_k8s_openapi")]
+    k8s_openapi: Path,
+    #[darling(default = "default_schemars")]
+    schemars: Path,
+    #[darling(default = "default_serde")]
+    serde: Path,
+    #[darling(default = "default_serde_json")]
+    serde_json: Path,
 }
 
 fn default_apiext() -> String {
     "v1".to_owned()
 }
-fn default_crate() -> Path {
+fn default_kube_core() -> Path {
     parse_quote! { ::kube::core } // by default must work well with people using facade crate
+}
+fn default_k8s_openapi() -> Path {
+    parse_quote! { ::k8s_openapi }
+}
+fn default_schemars() -> Path {
+    parse_quote! { ::schemars }
+}
+fn default_serde() -> Path {
+    parse_quote! { ::serde }
+}
+fn default_serde_json() -> Path {
+    parse_quote! { ::serde_json }
 }
 
 pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
@@ -81,6 +101,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         apiextensions,
         scale,
         kube_core,
+        k8s_openapi,
+        schemars,
+        serde,
+        serde_json,
     } = kube_attrs;
 
     let struct_name = kind_struct.unwrap_or_else(|| kind.clone());
@@ -110,13 +134,12 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     } = process_status(&rootident, &status, &visibility, &kube_core);
     let has_status = status.is_some();
 
-    let mut derive_paths: Vec<Path> = vec![];
-    for d in ["::serde::Serialize", "::serde::Deserialize", "Clone", "Debug"].iter() {
-        match syn::parse_str(*d) {
-            Err(err) => return err.to_compile_error(),
-            Ok(d) => derive_paths.push(d),
-        }
-    }
+    let mut derive_paths: Vec<Path> = vec![
+        syn::parse_quote! { #serde::Serialize },
+        syn::parse_quote! { #serde::Deserialize },
+        syn::parse_quote! { Clone },
+        syn::parse_quote! { Debug },
+    ];
     let mut has_default = false;
     for d in &derives {
         if d == "Default" {
@@ -141,10 +164,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         quote! {}
     };
     if schema_gen_enabled {
-        match syn::parse_str("::schemars::JsonSchema") {
-            Err(err) => return err.to_compile_error(),
-            Ok(path) => derive_paths.push(path),
-        }
+        derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }
 
     let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
@@ -158,7 +178,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             #schemars_skip
             #visibility kind: String,
             #schemars_skip
-            #visibility metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
+            #visibility metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
             #visibility spec: #ident,
             #status_field
         }
@@ -167,7 +187,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 Self {
                     api_version: <#rootident as #kube_core::Resource>::api_version(&()).to_string(),
                     kind: <#rootident as #kube_core::Resource>::kind(&()).to_string(),
-                    metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                    metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         name: Some(name.to_string()),
                         ..Default::default()
                     },
@@ -208,11 +228,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 #plural.into()
             }
 
-            fn meta(&self) -> &k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+            fn meta(&self) -> &#k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                 &self.metadata
             }
 
-            fn meta_mut(&mut self) -> &mut k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+            fn meta_mut(&mut self) -> &mut #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                 &mut self.metadata
             }
         }
@@ -226,7 +246,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     Self {
                         api_version: <#rootident as #kube_core::Resource>::api_version(&()).to_string(),
                         kind: <#rootident as #kube_core::Resource>::kind(&()).to_string(),
-                        metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
+                        metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
                         #status_default
                     }
@@ -250,7 +270,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // Ensure it generates for the correct CRD version
     let v1ident = format_ident!("{}", apiextensions);
     let apiext = quote! {
-        k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident
+        #k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident
     };
     let extver = quote! {
         #kube_core::crd::#v1ident
@@ -272,7 +292,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let schemagen = if schema_gen_enabled {
         quote! {
             // Don't use definitions and don't include `$schema` because these are not allowed.
-            let gen = schemars::gen::SchemaSettings::openapi3().with(|s| {
+            let gen = #schemars::gen::SchemaSettings::openapi3().with(|s| {
                 s.inline_subschemas = true;
                 s.meta_schema = None;
             }).into_generator();
@@ -283,7 +303,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         // eprintln!("warning: kube-derive configured with manual schema generation");
         // users must manually set a valid schema in crd.spec.versions[*].schema - see examples: crd_derive_no_schema
         quote! {
-            let schema: Option<k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::JSONSchemaProps> = None;
+            let schema: Option<#k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::JSONSchemaProps> = None;
         }
     };
 
@@ -291,7 +311,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         quote! {
             #schemagen
 
-            let jsondata = serde_json::json!({
+            let jsondata = #serde_json::json!({
                 "metadata": #crd_meta,
                 "spec": {
                     "group": #group,
@@ -319,7 +339,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     } else {
         // TODO Include schema if enabled
         quote! {
-            let jsondata = serde_json::json!({
+            let jsondata = #serde_json::json!({
                 "metadata": #crd_meta,
                 "spec": {
                     "group": #group,
@@ -349,29 +369,29 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #extver::CustomResourceExt for #rootident {
 
             fn crd() -> #apiext::CustomResourceDefinition {
-                let columns : Vec<#apiext::CustomResourceColumnDefinition> = serde_json::from_str(#printers).expect("valid printer column json");
+                let columns : Vec<#apiext::CustomResourceColumnDefinition> = #serde_json::from_str(#printers).expect("valid printer column json");
                 let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                     None
                 } else {
-                    serde_json::from_str(#scale_code).expect("valid scale subresource json")
+                    #serde_json::from_str(#scale_code).expect("valid scale subresource json")
                 };
-                let categories: Vec<String> = serde_json::from_str(#categories_json).expect("valid categories");
-                let shorts : Vec<String> = serde_json::from_str(#short_json).expect("valid shortnames");
+                let categories: Vec<String> = #serde_json::from_str(#categories_json).expect("valid categories");
+                let shorts : Vec<String> = #serde_json::from_str(#short_json).expect("valid shortnames");
                 let subres = if #has_status {
                     if let Some(s) = &scale {
-                        serde_json::json!({
+                        #serde_json::json!({
                             "status": {},
                             "scale": scale
                         })
                     } else {
-                        serde_json::json!({"status": {} })
+                        #serde_json::json!({"status": {} })
                     }
                 } else {
-                    serde_json::json!({})
+                    #serde_json::json!({})
                 };
 
                 #jsondata
-                serde_json::from_value(jsondata)
+                #serde_json::from_value(jsondata)
                     .expect("valid custom resource from #[kube(attrs..)]")
             }
 
