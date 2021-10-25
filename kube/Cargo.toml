@@ -38,7 +38,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 kube-derive = { path = "../kube-derive", version = "^0.62.0", optional = true }
 kube-core = { path = "../kube-core", version = "^0.62.0"}
-kube-client = { path = "../kube-client", version = "^0.62.0", optional = true}
+kube-client = { path = "../kube-client", version = "^0.62.0", default-features = false, optional = true }
 kube-runtime = { path = "../kube-runtime", version = "^0.62.0", optional = true}
 
 [dev-dependencies.k8s-openapi]
