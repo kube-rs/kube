@@ -6,6 +6,7 @@ UNRELEASED
 0.63.1 / 2021-10-26
 ===================
  * `kube::runtime::wait::Condition` added boolean combinators (`not`/`and`/`or`) - [#678](https://github.com/kube-rs/kube-rs/issues/678)
+ * `kube`: fix docs.rs build - [#681](https://github.com/kube-rs/kube-rs/issues/681) via [#682](https://github.com/kube-rs/kube-rs/pull/682)
 
 0.63.0 / 2021-10-26
 ===================
