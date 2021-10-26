@@ -87,6 +87,27 @@ where
 /// ```
 pub trait Condition<K> {
     fn matches_object(&self, obj: Option<&K>) -> bool;
+
+    fn not(self) -> conditions::Not<Self>
+    where
+        Self: Sized,
+    {
+        conditions::Not(self)
+    }
+
+    fn and<Other: Condition<K>>(self, other: Other) -> conditions::And<Self, Other>
+    where
+        Self: Sized,
+    {
+        conditions::And(self, other)
+    }
+
+    fn or<Other: Condition<K>>(self, other: Other) -> conditions::Or<Self, Other>
+    where
+        Self: Sized,
+    {
+        conditions::Or(self, other)
+    }
 }
 
 impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
@@ -132,6 +153,35 @@ pub mod conditions {
                 }
             }
             false
+        }
+    }
+
+    pub struct Not<A>(pub(super) A);
+    impl<A: Condition<K>, K> Condition<K> for Not<A> {
+        fn matches_object(&self, obj: Option<&K>) -> bool {
+            !self.0.matches_object(obj)
+        }
+    }
+
+    pub struct And<A, B>(pub(super) A, pub(super) B);
+    impl<A, B, K> Condition<K> for And<A, B>
+    where
+        A: Condition<K>,
+        B: Condition<K>,
+    {
+        fn matches_object(&self, obj: Option<&K>) -> bool {
+            self.0.matches_object(obj) && self.1.matches_object(obj)
+        }
+    }
+
+    pub struct Or<A, B>(pub(super) A, pub(super) B);
+    impl<A, B, K> Condition<K> for Or<A, B>
+    where
+        A: Condition<K>,
+        B: Condition<K>,
+    {
+        fn matches_object(&self, obj: Option<&K>) -> bool {
+            self.0.matches_object(obj) || self.1.matches_object(obj)
         }
     }
 }
