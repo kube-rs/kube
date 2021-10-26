@@ -1,8 +1,11 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.63.0...master
- * `kube::runtime::wait::Condition` added boolean combinators (`not`/`and`/`or`) - #678
+ * see https://github.com/kube-rs/kube-rs/compare/0.63.1...master
+
+0.63.1 / 2021-10-26
+===================
+ * `kube::runtime::wait::Condition` added boolean combinators (`not`/`and`/`or`) - [#678](https://github.com/kube-rs/kube-rs/issues/678)
 
 0.63.0 / 2021-10-26
 ===================
