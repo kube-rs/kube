@@ -2,7 +2,7 @@
 set -euo pipefail
 
 main() {
-    local -r msrv="$(cargo msrv --output-format=json | tail -n 1 | jq ".msrv" -r)"
+    local -r msrv="$(cargo msrv --output-format=json | jq -r 'select(.reason == "msrv-complete") | .msrv')"
     local -r badge="[![Rust ${msrv::-2}](https://img.shields.io/badge/MSRV-${msrv::-2}-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/${msrv})"
     sd "^.+badge/MSRV.+$" "${badge}" README.md
 }
