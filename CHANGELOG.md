@@ -2,9 +2,9 @@
 UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.62.0...master
- * rust `edition` bumped to `2021` - #664
+ * rust `edition` bumped to `2021` - [#664](https://github.com/kube-rs/kube-rs/pull/664/), [#666](https://github.com/kube-rs/kube-rs/pull/666), [#667](https://github.com/kube-rs/kube-rs/pull/667)
  * `kube::CustomResource` derive can now take arbitrary `#[kube(k8s_openapi)]` style-paths for `k8s_openapi`, `schemars`, `serde`, and `serde_json` - [#675](https://github.com/kube-rs/kube-rs/pull/675)
- * `kube`: fix `native-tls` included when only `rustls-tls` feature is selected - #673 via #674
+ * `kube`: fix `native-tls` included when only `rustls-tls` feature is selected - [#673](https://github.com/kube-rs/kube-rs/issues/673) via [#674](https://github.com/kube-rs/kube-rs/pull/674)
 
 0.62.0 / 2021-10-22
 ===================
