@@ -2,6 +2,7 @@
 UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.63.0...master
+ * `kube::runtime::wait::Condition` added boolean combinators (`not`/`and`/`or`) - #678
 
 0.63.0 / 2021-10-26
 ===================
