@@ -88,6 +88,16 @@ where
 pub trait Condition<K> {
     fn matches_object(&self, obj: Option<&K>) -> bool;
 
+    /// Returns a `Condition` that holds if `self` does not
+    ///
+    /// # Usage
+    ///
+    /// ```rust
+    /// # use kube_runtime::wait::Condition;
+    /// let condition: fn(Option<&()>) -> bool = |_| true;
+    /// assert!(condition.matches_object(None));
+    /// assert!(!condition.not().matches_object(None));
+    /// ```
     fn not(self) -> conditions::Not<Self>
     where
         Self: Sized,
@@ -95,6 +105,19 @@ pub trait Condition<K> {
         conditions::Not(self)
     }
 
+    /// Returns a `Condition` that holds if `self` and `other` both do
+    ///
+    /// # Usage
+    ///
+    /// ```rust
+    /// # use kube_runtime::wait::Condition;
+    /// let cond_false: fn(Option<&()>) -> bool = |_| false;
+    /// let cond_true: fn(Option<&()>) -> bool = |_| true;
+    /// assert!(!cond_false.and(cond_false).matches_object(None));
+    /// assert!(!cond_false.and(cond_true).matches_object(None));
+    /// assert!(!cond_true.and(cond_false).matches_object(None));
+    /// assert!(cond_true.and(cond_true).matches_object(None));
+    /// ```
     fn and<Other: Condition<K>>(self, other: Other) -> conditions::And<Self, Other>
     where
         Self: Sized,
@@ -102,6 +125,19 @@ pub trait Condition<K> {
         conditions::And(self, other)
     }
 
+    /// Returns a `Condition` that holds if either `self` or `other` does
+    ///
+    /// # Usage
+    ///
+    /// ```rust
+    /// # use kube_runtime::wait::Condition;
+    /// let cond_false: fn(Option<&()>) -> bool = |_| false;
+    /// let cond_true: fn(Option<&()>) -> bool = |_| true;
+    /// assert!(!cond_false.or(cond_false).matches_object(None));
+    /// assert!(cond_false.or(cond_true).matches_object(None));
+    /// assert!(cond_true.or(cond_false).matches_object(None));
+    /// assert!(cond_true.or(cond_true).matches_object(None));
+    /// ```
     fn or<Other: Condition<K>>(self, other: Other) -> conditions::Or<Self, Other>
     where
         Self: Sized,
@@ -156,6 +192,8 @@ pub mod conditions {
         }
     }
 
+    /// See [`Condition::not`]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct Not<A>(pub(super) A);
     impl<A: Condition<K>, K> Condition<K> for Not<A> {
         fn matches_object(&self, obj: Option<&K>) -> bool {
@@ -163,6 +201,8 @@ pub mod conditions {
         }
     }
 
+    /// See [`Condition::and`]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct And<A, B>(pub(super) A, pub(super) B);
     impl<A, B, K> Condition<K> for And<A, B>
     where
@@ -174,6 +214,8 @@ pub mod conditions {
         }
     }
 
+    /// See [`Condition::or`]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct Or<A, B>(pub(super) A, pub(super) B);
     impl<A, B, K> Condition<K> for Or<A, B>
     where
