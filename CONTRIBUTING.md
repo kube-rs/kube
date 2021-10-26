@@ -16,9 +16,9 @@ process. To contribute a PR, fork this project, create a new branch, make
 changes on that branch, and then use GitHub to open a pull request with your
 changes.
 
-Every PR must be reviewed by at least one [Core Maintainer](https://github.com/orgs/kube-rs/teams/core-maintainers) of the project. Once
-a PR has been marked "Approved" by a Core Maintainer (and no other core
-maintainer has an open "Rejected" vote), the PR may be merged. While it is fine
+Every PR must be reviewed by at least one [Maintainer](./maintainers.md) of the project. Once
+a PR has been marked "Approved" by a Maintainer (and no other
+Maintainer has an open "Rejected" vote), the PR may be merged. While it is fine
 for non-maintainers to contribute their own code reviews, those reviews do not
 satisfy the above requirement.
 
