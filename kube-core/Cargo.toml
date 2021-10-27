@@ -12,6 +12,10 @@ license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube-rs"
 readme = "../README.md"
 
+[package.metadata.docs.rs]
+features = ["ws", "admission", "jsonpatch", "k8s-openapi/v1_22"]
+rustdoc-args = ["--cfg", "docsrs"]
+
 [features]
 ws = []
 admission = ["json-patch"]
