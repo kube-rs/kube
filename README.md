@@ -17,7 +17,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = "0.63.1"
+kube = { version = "0.63.1", features = ["runtime","derive"] }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 ```
 

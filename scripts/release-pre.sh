@@ -23,6 +23,7 @@ sanity() {
     echo "prerelease: abort: recommending k8s-openapi pinned to a different version to what we use"
     exit 1
   fi
+  # TODO: verify versions of tools for release?
 }
 
 main() {
