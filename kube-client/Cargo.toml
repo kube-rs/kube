@@ -32,7 +32,7 @@ deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "ws", "oauth", "jsonpatch", "admission"]
+features = ["client", "native-tls", "rustls-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_22"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 

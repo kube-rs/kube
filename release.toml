@@ -1,4 +1,6 @@
-# Release process :: cargo-release @ 0.18.0
+# Release process :: cargo-release >= 0.18.3
+#
+# Dependencies: cargo-release, cargo-tree, sd, ripgrep
 #
 # 0. (optional) cargo release minor ; verify readme + changelog bumped; then git reset --hard
 # 1. PUBLISH_GRACE_SLEEP=20 cargo release minor --execute
@@ -9,7 +11,6 @@
 
 # Reference
 # https://github.com/sunng87/cargo-release/blob/master/docs/reference.md
-# Dependencies in hooks; cargo-release, cargo-tree, sd, ripgrep
 
 consolidate-commits = true
 shared-version = true

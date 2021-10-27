@@ -8,10 +8,16 @@ authors = [
 ]
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube-rs"
+readme = "../README.md"
 keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
 categories = ["web-programming::http-client"]
 rust-version = "1.56"
 edition = "2021"
+
+[package.metadata.docs.rs]
+features = ["k8s-openapi/v1_22"]
+# Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 futures = "0.3.17"
