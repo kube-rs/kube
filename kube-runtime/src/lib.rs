@@ -18,7 +18,9 @@
 #![allow(clippy::semicolon_if_nothing_returned)]
 
 pub mod controller;
-pub mod events;
+k8s_openapi::k8s_if_ge_1_19! {
+    pub mod events;
+}
 pub mod finalizer;
 pub mod reflector;
 pub mod scheduler;

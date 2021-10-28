@@ -1,4 +1,4 @@
-//! Publishes events for objects
+//! Publishes events for objects for kubernetes >= 1.19
 use k8s_openapi::{
     api::{core::v1::ObjectReference, events::v1::Event as CoreEvent},
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
