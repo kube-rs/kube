@@ -19,10 +19,6 @@ features = ["k8s-openapi/v1_22"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
-[features]
-default = []
-deprecated-events-v1beta = []
-
 [dependencies]
 futures = "0.3.17"
 kube-client = { path = "../kube-client", version = "^0.63.0", default-features = false, features = ["jsonpatch", "client"] }
