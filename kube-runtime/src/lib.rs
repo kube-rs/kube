@@ -18,7 +18,7 @@
 #![allow(clippy::semicolon_if_nothing_returned)]
 
 pub mod controller;
-pub mod events;
+#[cfg(not(feature = "deprecated-events-v1beta"))] pub mod events;
 pub mod finalizer;
 pub mod reflector;
 pub mod scheduler;
