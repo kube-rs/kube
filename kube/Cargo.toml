@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.63.1"
+version = "0.63.2"
 description = "Kubernetes client and async controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",

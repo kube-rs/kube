@@ -1,6 +1,6 @@
 [package]
 name = "kube-client"
-version = "0.63.1"
+version = "0.63.2"
 description = "Kubernetes client"
 authors = [
   "clux <sszynrae@gmail.com>",
