@@ -2,6 +2,7 @@
 UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.63.1...master
+* `kube::runtime::events`: fix build and hide module on kubernetes < 1.19 (events/v1 missing there) - #685
 
 0.63.1 / 2021-10-26
 ===================
