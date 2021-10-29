@@ -195,6 +195,10 @@ name = "custom_client"
 path = "custom_client.rs"
 
 [[example]]
+name = "custom_client_proxy"
+path = "custom_client_proxy.rs"
+
+[[example]]
 name = "custom_client_tls"
 path = "custom_client_tls.rs"
 required-features = ["native-tls", "rustls-tls"]

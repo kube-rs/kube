@@ -18,7 +18,7 @@ edition = "2021"
 [features]
 default = ["client", "native-tls"]
 native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
-rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls"]
+rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls", "tokio-rustls", "webpki"]
 openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["client", "tame-oauth"]
@@ -28,6 +28,7 @@ jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "dirs"]
 deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
+socks-proxy = ["tokio-socks"]
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
@@ -72,6 +73,9 @@ rand = { version = "0.8.3", optional = true }
 secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
 tracing = { version = "0.1.29", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.1", optional = true }
+tokio-socks = { version = "0.5.1", optional = true }
+tokio-rustls = { version = "0.23.2", optional = true }
+webpki = { version = "0.22.0", optional = true }
 
 [dependencies.k8s-openapi]
 version = "0.14.0"

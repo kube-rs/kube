@@ -38,6 +38,8 @@ mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
+mod proxy;
+pub use proxy::ProxyConnector;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
 mod tls;
 #[cfg(feature = "native-tls")] pub use tls::native_tls::Error as NativeTlsError;
