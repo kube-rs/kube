@@ -211,8 +211,10 @@ impl Client {
         let res = self.send(request.map(Body::from)).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
-        let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
-        let text = String::from_utf8(body_bytes.to_vec())?;
+        let body_bytes = hyper::body::to_bytes(res.into_body())
+            .await
+            .map_err(Error::HyperError)?;
+        let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
         handle_api_errors(&text, status)?;
 
         Ok(text)
@@ -237,7 +239,7 @@ impl Client {
     {
         let text = self.request_text(request).await?;
         // It needs to be JSON:
-        let v: Value = serde_json::from_str(&text)?;
+        let v: Value = serde_json::from_str(&text).map_err(Error::SerdeError)?;
         if v["kind"] == "Status" {
             tracing::trace!("Status from {}", text);
             Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
@@ -332,13 +334,24 @@ impl Client {
 impl Client {
     /// Returns apiserver version.
     pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
-        self.request(Request::builder().uri("/version").body(vec![])?)
-            .await
+        self.request(
+            Request::builder()
+                .uri("/version")
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 
     /// Lists api groups that apiserver serves.
     pub async fn list_api_groups(&self) -> Result<k8s_meta_v1::APIGroupList> {
-        self.request(Request::builder().uri("/apis").body(vec![])?).await
+        self.request(
+            Request::builder()
+                .uri("/apis")
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 
     /// Lists resources served in given API group.
@@ -361,18 +374,36 @@ impl Client {
     /// ```
     pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/apis/{}", apiversion);
-        self.request(Request::builder().uri(url).body(vec![])?).await
+        self.request(
+            Request::builder()
+                .uri(url)
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 
     /// Lists versions of `core` a.k.a. `""` legacy API group.
     pub async fn list_core_api_versions(&self) -> Result<k8s_meta_v1::APIVersions> {
-        self.request(Request::builder().uri("/api").body(vec![])?).await
+        self.request(
+            Request::builder()
+                .uri("/api")
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 
     /// Lists resources served in particular `core` group version.
     pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/api/{}", version);
-        self.request(Request::builder().uri(url).body(vec![])?).await
+        self.request(
+            Request::builder()
+                .uri(url)
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 }
 

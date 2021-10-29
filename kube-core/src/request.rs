@@ -113,7 +113,7 @@ impl Request {
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
-        let body = serde_json::to_vec(&dp)?;
+        let body = serde_json::to_vec(&dp).map_err(Error::SerdeError)?;
         let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(body).map_err(Error::HttpError)
     }
@@ -129,7 +129,7 @@ impl Request {
             qp.append_pair("labelSelector", labels);
         }
         let urlstr = qp.finish();
-        let body = serde_json::to_vec(&dp)?;
+        let body = serde_json::to_vec(&dp).map_err(Error::SerdeError)?;
         let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(body).map_err(Error::HttpError)
     }

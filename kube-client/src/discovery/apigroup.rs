@@ -2,7 +2,7 @@ use super::{
     parse::{self, GroupVersionData},
     version::Version,
 };
-use crate::{error::DiscoveryError, Client, Result};
+use crate::{error::DiscoveryError, Client, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
 use kube_core::gvk::{GroupVersion, GroupVersionKind};
@@ -80,7 +80,7 @@ impl ApiGroup {
         tracing::debug!(name = g.name.as_str(), "Listing group versions");
         let key = g.name;
         if g.versions.is_empty() {
-            return Err(DiscoveryError::EmptyApiGroup(key).into());
+            return Err(Error::Discovery(DiscoveryError::EmptyApiGroup(key)));
         }
         let mut data = vec![];
         for vers in &g.versions {
@@ -100,7 +100,7 @@ impl ApiGroup {
         let mut data = vec![];
         let key = ApiGroup::CORE_GROUP.to_string();
         if coreapis.versions.is_empty() {
-            return Err(DiscoveryError::EmptyApiGroup(key).into());
+            return Err(Error::Discovery(DiscoveryError::EmptyApiGroup(key)));
         }
         for v in coreapis.versions {
             let resources = client.list_core_api_resources(&v).await?;
@@ -138,7 +138,10 @@ impl ApiGroup {
                 return Ok((ar, caps));
             }
         }
-        Err(DiscoveryError::MissingKind(format!("{:?}", gvk)).into())
+        Err(Error::Discovery(DiscoveryError::MissingKind(format!(
+            "{:?}",
+            gvk
+        ))))
     }
 
     // shortcut method to give cheapest return for a pinned group

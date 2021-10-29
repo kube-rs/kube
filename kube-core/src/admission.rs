@@ -304,7 +304,7 @@ impl AdmissionResponse {
 
     /// Add JSON patches to the response, modifying the object from the request.
     pub fn with_patch(mut self, patch: json_patch::Patch) -> Result<Self> {
-        self.patch = Some(serde_json::to_vec(&patch)?);
+        self.patch = Some(serde_json::to_vec(&patch).map_err(Error::SerdeError)?);
         self.patch_type = Some(PatchType::JsonPatch);
 
         Ok(self)
@@ -335,18 +335,19 @@ mod test {
 
     use crate::{
         admission::{AdmissionResponse, AdmissionReview},
-        DynamicObject, Result,
+        DynamicObject, Error, Result,
     };
 
     #[test]
     fn v1_webhook_unmarshals() -> Result<()> {
-        serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY)?;
+        serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY).map_err(Error::SerdeError)?;
         Ok(())
     }
 
     #[test]
     fn version_passes_through() -> Result<()> {
-        let rev = serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY)?;
+        let rev = serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY)
+            .map_err(Error::SerdeError)?;
         let rev_typ = rev.types.clone();
         let res = AdmissionResponse::from(&rev.try_into()?).into_review();
 

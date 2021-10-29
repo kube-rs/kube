@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use crate::{config::utils, error::ConfigError, Result};
+use crate::{config::utils, error::ConfigError, Error, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::Path};
 
@@ -207,15 +207,19 @@ const KUBECONFIG: &str = "KUBECONFIG";
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
     pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig> {
-        let data = fs::read_to_string(&path).map_err(|source| ConfigError::ReadFile {
-            path: path.as_ref().into(),
-            source,
+        let data = fs::read_to_string(&path).map_err(|source| {
+            Error::Kubeconfig(ConfigError::ReadFile {
+                path: path.as_ref().into(),
+                source,
+            })
         })?;
         // support multiple documents
         let mut documents: Vec<Kubeconfig> = vec![];
         for doc in serde_yaml::Deserializer::from_str(&data) {
-            let value = serde_yaml::Value::deserialize(doc).map_err(ConfigError::ParseYaml)?;
-            let kconf = serde_yaml::from_value(value).map_err(ConfigError::ParseYaml)?;
+            let value = serde_yaml::Value::deserialize(doc)
+                .map_err(|err| Error::Kubeconfig(ConfigError::ParseYaml(err)))?;
+            let kconf = serde_yaml::from_value(value)
+                .map_err(|err| Error::Kubeconfig(ConfigError::ParseYaml(err)))?;
             documents.push(kconf)
         }
 
@@ -254,7 +258,8 @@ impl Kubeconfig {
                 merged_docs = Some(config);
             }
         }
-        let config = merged_docs.ok_or_else(|| ConfigError::EmptyKubeconfig(path.as_ref().to_path_buf()))?;
+        let config = merged_docs
+            .ok_or_else(|| Error::Kubeconfig(ConfigError::EmptyKubeconfig(path.as_ref().to_path_buf())))?;
         Ok(config)
     }
 
@@ -263,7 +268,9 @@ impl Kubeconfig {
         match Self::from_env()? {
             Some(config) => Ok(config),
             None => {
-                let path = utils::default_kube_path().ok_or(ConfigError::NoKubeconfigPath)?;
+                let path = utils::default_kube_path()
+                    .ok_or(ConfigError::NoKubeconfigPath)
+                    .map_err(Error::Kubeconfig)?;
                 Self::read_from(path)
             }
         }
@@ -309,10 +316,10 @@ impl Kubeconfig {
     /// >            Even if the second file has non-conflicting entries under `red-user`, discard them.
     fn merge(mut self, next: Kubeconfig) -> Result<Self> {
         if self.kind.is_some() && next.kind.is_some() && self.kind != next.kind {
-            return Err(ConfigError::KindMismatch.into());
+            return Err(Error::Kubeconfig(ConfigError::KindMismatch));
         }
         if self.api_version.is_some() && next.api_version.is_some() && self.api_version != next.api_version {
-            return Err(ConfigError::ApiVersionMismatch.into());
+            return Err(Error::Kubeconfig(ConfigError::ApiVersionMismatch));
         }
 
         self.kind = self.kind.or(next.kind);

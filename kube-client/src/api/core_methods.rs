@@ -3,7 +3,7 @@ use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
-use crate::{api::Api, Result};
+use crate::{api::Api, Error, Result};
 use kube_core::{object::ObjectList, params::*, response::Status, WatchEvent};
 
 /// PUSH/PUT/POST/GET abstractions
@@ -74,7 +74,7 @@ where
     where
         K: Serialize,
     {
-        let bytes = serde_json::to_vec(&data)?;
+        let bytes = serde_json::to_vec(&data).map_err(Error::SerdeError)?;
         let mut req = self.request.create(pp, bytes)?;
         req.extensions_mut().insert("create");
         self.client.request::<K>(req).await
@@ -233,7 +233,7 @@ where
     where
         K: Serialize,
     {
-        let bytes = serde_json::to_vec(&data)?;
+        let bytes = serde_json::to_vec(&data).map_err(Error::SerdeError)?;
         let mut req = self.request.replace(name, pp, bytes)?;
         req.extensions_mut().insert("replace");
         self.client.request::<K>(req).await

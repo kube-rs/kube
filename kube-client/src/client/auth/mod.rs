@@ -46,7 +46,7 @@ impl RefreshableToken {
                 if Utc::now() + Duration::seconds(60) >= locked_data.1 {
                     match Auth::try_from(&locked_data.2)? {
                         Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) => {
-                            return Err(ConfigError::UnrefreshableTokenResponse).map_err(Error::from);
+                            return Err(Error::Kubeconfig(ConfigError::UnrefreshableTokenResponse));
                         }
 
                         Auth::RefreshableToken(RefreshableToken::Exec(d)) => {
@@ -65,7 +65,7 @@ impl RefreshableToken {
                 }
 
                 let mut value = HeaderValue::try_from(format!("Bearer {}", &locked_data.0))
-                    .map_err(ConfigError::InvalidBearerToken)?;
+                    .map_err(|err| Error::Kubeconfig(ConfigError::InvalidBearerToken(err)))?;
                 value.set_sensitive(true);
                 Ok(value)
             }
@@ -75,7 +75,7 @@ impl RefreshableToken {
                 let gcp_oauth = data.lock().await;
                 let token = (*gcp_oauth).token().await?;
                 let mut value = HeaderValue::try_from(format!("Bearer {}", &token.access_token))
-                    .map_err(ConfigError::InvalidBearerToken)?;
+                    .map_err(|err| Error::Kubeconfig(ConfigError::InvalidBearerToken(err)))?;
                 value.set_sensitive(true);
                 Ok(value)
             }
@@ -128,13 +128,16 @@ impl TryFrom<&AuthInfo> for Auth {
             Some(token) => (Some(token.clone()), None),
             None => {
                 if let Some(exec) = &auth_info.exec {
-                    let creds = auth_exec(exec)?;
-                    let status = creds.status.ok_or(ConfigError::ExecPluginFailed)?;
+                    let creds = auth_exec(exec).map_err(Error::Kubeconfig)?;
+                    let status = creds
+                        .status
+                        .ok_or(ConfigError::ExecPluginFailed)
+                        .map_err(Error::Kubeconfig)?;
                     let expiration = status
                         .expiration_timestamp
                         .map(|ts| ts.parse())
                         .transpose()
-                        .map_err(ConfigError::MalformedTokenExpirationDate)?;
+                        .map_err(|err| Error::Kubeconfig(ConfigError::MalformedTokenExpirationDate(err)))?;
                     (status.token, expiration)
                 } else if let Some(file) = &auth_info.token_file {
                     (Some(read_file_to_string(file)?), None)
@@ -169,18 +172,19 @@ fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
     match provider.name.as_ref() {
         "oidc" => token_from_oidc_provider(provider),
         "gcp" => token_from_gcp_provider(provider),
-        _ => Err(ConfigError::AuthExec(format!(
+        _ => Err(Error::Kubeconfig(ConfigError::AuthExec(format!(
             "Authentication with provider {:} not supported",
             provider.name
-        ))
-        .into()),
+        )))),
     }
 }
 
 fn token_from_oidc_provider(provider: &AuthProviderConfig) -> Result<ProviderToken> {
     match provider.config.get("id-token") {
         Some(id_token) => Ok(ProviderToken::Oidc(id_token.clone())),
-        None => Err(ConfigError::AuthExec("No id-token for oidc Authentication provider".into()).into()),
+        None => Err(Error::Kubeconfig(ConfigError::AuthExec(
+            "No id-token for oidc Authentication provider".into(),
+        ))),
     }
 }
 
@@ -194,7 +198,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
         if let Some(expiry) = provider.config.get("expiry") {
             let expiry_date = expiry
                 .parse::<DateTime<Utc>>()
-                .map_err(ConfigError::MalformedTokenExpirationDate)?;
+                .map_err(|err| Error::Kubeconfig(ConfigError::MalformedTokenExpirationDate(err)))?;
             if Utc::now() + Duration::seconds(60) < expiry_date {
                 return Ok(ProviderToken::GcpCommand(access_token.clone(), Some(expiry_date)));
             }
@@ -209,32 +213,39 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
         let output = Command::new(cmd)
             .args(params.trim().split(' '))
             .output()
-            .map_err(|e| ConfigError::AuthExec(format!("Executing {:} failed: {:?}", cmd, e)))?;
+            .map_err(|e| {
+                Error::Kubeconfig(ConfigError::AuthExec(format!(
+                    "Executing {:} failed: {:?}",
+                    cmd, e
+                )))
+            })?;
 
         if !output.status.success() {
-            return Err(ConfigError::AuthExecRun {
+            return Err(Error::Kubeconfig(ConfigError::AuthExecRun {
                 cmd: format!("{} {}", cmd, params),
                 status: output.status,
                 out: output,
-            }
-            .into());
+            }));
         }
 
         if let Some(field) = provider.config.get("token-key") {
-            let json_output: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+            let json_output: serde_json::Value =
+                serde_json::from_slice(&output.stdout).map_err(Error::SerdeError)?;
             let token = extract_value(&json_output, field)?;
             if let Some(field) = provider.config.get("expiry-key") {
                 let expiry = extract_value(&json_output, field)?;
                 let expiry = expiry
                     .parse::<DateTime<Utc>>()
-                    .map_err(ConfigError::MalformedTokenExpirationDate)?;
+                    .map_err(|err| Error::Kubeconfig(ConfigError::MalformedTokenExpirationDate(err)))?;
                 return Ok(ProviderToken::GcpCommand(token, Some(expiry)));
             } else {
                 return Ok(ProviderToken::GcpCommand(token, None));
             }
         } else {
             let token = std::str::from_utf8(&output.stdout)
-                .map_err(|e| ConfigError::AuthExec(format!("Result is not a string {:?} ", e)))?
+                .map_err(|e| {
+                    Error::Kubeconfig(ConfigError::AuthExec(format!("Result is not a string {:?} ", e)))
+                })?
                 .to_owned();
             return Ok(ProviderToken::GcpCommand(token, None));
         }
@@ -249,10 +260,9 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     }
     #[cfg(not(feature = "oauth"))]
     {
-        Err(ConfigError::AuthExec(
+        Err(Error::Kubeconfig(ConfigError::AuthExec(
             "Enable oauth feature to use Google Application Credentials-based token source".into(),
-        )
-        .into())
+        )))
     }
 }
 
@@ -263,13 +273,22 @@ fn extract_value(json: &serde_json::Value, path: &str) -> Result<String> {
             if let serde_json::Value::String(res) = v[0] {
                 Ok(res.clone())
             } else {
-                Err(ConfigError::AuthExec(format!("Target value at {:} is not a string", pure_path)).into())
+                Err(Error::Kubeconfig(ConfigError::AuthExec(format!(
+                    "Target value at {:} is not a string",
+                    pure_path
+                ))))
             }
         }
 
-        Err(e) => Err(ConfigError::AuthExec(format!("Could not extract JSON value: {:}", e)).into()),
+        Err(e) => Err(Error::Kubeconfig(ConfigError::AuthExec(format!(
+            "Could not extract JSON value: {:}",
+            e
+        )))),
 
-        _ => Err(ConfigError::AuthExec(format!("Target value {:} not found", pure_path)).into()),
+        _ => Err(Error::Kubeconfig(ConfigError::AuthExec(format!(
+            "Target value {:} not found",
+            pure_path
+        )))),
     }
 }
 
@@ -366,7 +385,8 @@ mod test {
             expiry = expiry
         );
 
-        let config: Kubeconfig = serde_yaml::from_str(&test_file).map_err(ConfigError::ParseYaml)?;
+        let config: Kubeconfig =
+            serde_yaml::from_str(&test_file).map_err(|err| Error::Kubeconfig(ConfigError::ParseYaml(err)))?;
         let auth_info = &config.auth_infos[0].auth_info;
         match Auth::try_from(auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {

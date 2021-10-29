@@ -10,11 +10,11 @@ pub enum Error {
 
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
-    SerdeError(#[from] serde_json::Error),
+    SerdeError(#[source] serde_json::Error),
 
     /// Http based error
     #[error("HttpError: {0}")]
-    HttpError(#[from] http::Error),
+    HttpError(#[source] http::Error),
 
     /// Invalid GroupVersion
     #[error("Invalid GroupVersion: {0}")]

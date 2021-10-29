@@ -12,7 +12,7 @@
 //! [`oneshot::pinned_kind`]: crate::discovery::pinned_kind
 
 use super::ApiGroup;
-use crate::{error::DiscoveryError, Client, Result};
+use crate::{error::DiscoveryError, Client, Error, Result};
 use kube_core::{
     discovery::{ApiCapabilities, ApiResource},
     gvk::{GroupVersion, GroupVersionKind},
@@ -50,7 +50,9 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
             return ApiGroup::query_apis(client, g).await;
         }
     }
-    Err(DiscoveryError::MissingApiGroup(apigroup.to_string()).into())
+    Err(Error::Discovery(DiscoveryError::MissingApiGroup(
+        apigroup.to_string(),
+    )))
 }
 
 /// Discovers all APIs available under a certain group at a pinned version

@@ -253,7 +253,7 @@ impl<T: Serialize> Patch<T> {
             Self::Strategic(p) => serde_json::to_vec(p),
             Self::Merge(p) => serde_json::to_vec(p),
         }
-        .map_err(Into::into)
+        .map_err(Error::SerdeError)
     }
 }
 

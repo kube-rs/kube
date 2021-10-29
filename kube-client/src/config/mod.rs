@@ -9,7 +9,7 @@ mod file_loader;
 mod incluster_config;
 mod utils;
 
-use crate::{error::ConfigError, Result};
+use crate::{error::ConfigError, Error, Result};
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 #[cfg(feature = "client")] pub(crate) use utils::read_file_to_string;
@@ -82,9 +82,11 @@ impl Config {
                 tracing::trace!("Falling back to local kubeconfig");
                 let config = Self::from_kubeconfig(&KubeConfigOptions::default())
                     .await
-                    .map_err(|kubeconfig_err| ConfigError::ConfigInferenceExhausted {
-                        cluster_env: Box::new(cluster_env_err),
-                        kubeconfig: Box::new(kubeconfig_err),
+                    .map_err(|kubeconfig_err| {
+                        Error::Kubeconfig(ConfigError::ConfigInferenceExhausted {
+                            cluster_env: Box::new(cluster_env_err),
+                            kubeconfig: Box::new(kubeconfig_err),
+                        })
                     })?;
 
                 Ok(config)
@@ -105,22 +107,21 @@ impl Config {
             incluster_config::kube_dns()
         } else {
             incluster_config::kube_server()
-                .ok_or(ConfigError::MissingInClusterVariables {
+                .ok_or(Error::Kubeconfig(ConfigError::MissingInClusterVariables {
                     hostenv: incluster_config::SERVICE_HOSTENV,
                     portenv: incluster_config::SERVICE_PORTENV,
-                })?
-                .parse::<http::Uri>()?
+                }))?
+                .parse::<http::Uri>()
+                .map_err(Error::InvalidUri)?
         };
 
         let default_namespace = incluster_config::load_default_ns()
-            .map_err(Box::new)
-            .map_err(ConfigError::InvalidInClusterNamespace)?;
+            .map_err(|err| Error::Kubeconfig(ConfigError::InvalidInClusterNamespace(Box::new(err))))?;
 
         let root_cert = incluster_config::load_cert()?;
 
         let token = incluster_config::load_token()
-            .map_err(Box::new)
-            .map_err(ConfigError::InvalidInClusterToken)?;
+            .map_err(|err| Error::Kubeconfig(ConfigError::InvalidInClusterToken(Box::new(err))))?;
 
         Ok(Self {
             cluster_url,
@@ -156,7 +157,11 @@ impl Config {
     }
 
     async fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
-        let cluster_url = loader.cluster.server.parse::<http::Uri>()?;
+        let cluster_url = loader
+            .cluster
+            .server
+            .parse::<http::Uri>()
+            .map_err(Error::InvalidUri)?;
 
         let default_namespace = loader
             .current_context

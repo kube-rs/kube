@@ -111,7 +111,8 @@ impl Request {
         let data = serde_json::to_vec(&serde_json::json!({
             "delete_options": ep.delete_options,
             "metadata": { "name": name }
-        }))?;
+        }))
+        .map_err(Error::SerdeError)?;
         let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::HttpError)
     }

@@ -1,5 +1,5 @@
 //! Abstractions on top of k8s_openapi::apimachinery::pkg::apis::meta::v1
-use crate::{error::DiscoveryError, Result};
+use crate::{error::DiscoveryError, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList};
 use kube_core::{
     discovery::{ApiCapabilities, ApiResource, Scope},
@@ -29,7 +29,7 @@ pub(crate) fn parse_apicapabilities(list: &APIResourceList, name: &str) -> Resul
         .resources
         .iter()
         .find(|r| r.name == name)
-        .ok_or_else(|| DiscoveryError::MissingResource(name.into()))?;
+        .ok_or_else(|| Error::Discovery(DiscoveryError::MissingResource(name.into())))?;
     let scope = if ar.namespaced {
         Scope::Namespaced
     } else {

@@ -34,8 +34,9 @@ impl Gcp {
         const DEFAULT_SCOPES: &str =
             "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email";
         // Initialize ServiceAccountAccess so we can request later when needed.
-        let info = gcloud_account_info()?;
-        let access = ServiceAccountAccess::new(info).map_err(OAuthError::InvalidKeyFormat)?;
+        let info = gcloud_account_info().map_err(Error::Kubeconfig)?;
+        let access = ServiceAccountAccess::new(info)
+            .map_err(|err| Error::Kubeconfig(ConfigError::OAuth(OAuthError::InvalidKeyFormat(err))))?;
         let scopes = scopes
             .map(String::to_owned)
             .unwrap_or_else(|| DEFAULT_SCOPES.to_owned())
@@ -65,21 +66,21 @@ impl Gcp {
                 let res = client
                     .request(request.map(hyper::Body::from))
                     .await
-                    .map_err(OAuthError::RequestToken)?;
+                    .map_err(|err| Error::Kubeconfig(ConfigError::OAuth(OAuthError::RequestToken(err))))?;
                 // Convert response body to `Vec<u8>` for parsing.
                 let (parts, body) = res.into_parts();
-                let bytes = hyper::body::to_bytes(body).await?;
+                let bytes = hyper::body::to_bytes(body).await.map_err(Error::HyperError)?;
                 let response = http::Response::from_parts(parts, bytes.to_vec());
                 match self.access.parse_token_response(scope_hash, response) {
                     Ok(token) => Ok(token),
 
-                    Err(err) => match err {
+                    Err(err) => Err(Error::Kubeconfig(ConfigError::OAuth(match err {
                         tame_oauth::Error::AuthError(_) | tame_oauth::Error::HttpStatus(_) => {
-                            Err(OAuthError::RetrieveCredentials(err).into())
+                            OAuthError::RetrieveCredentials(err)
                         }
-                        tame_oauth::Error::Json(e) => Err(OAuthError::ParseToken(e).into()),
-                        err => Err(OAuthError::Unknown(err.to_string()).into()),
-                    },
+                        tame_oauth::Error::Json(e) => OAuthError::ParseToken(e),
+                        err => OAuthError::Unknown(err.to_string()),
+                    }))),
                 }
             }
 
@@ -88,9 +89,15 @@ impl Gcp {
             Err(err) => match err {
                 // Request builder failed.
                 tame_oauth::Error::Http(e) => Err(Error::HttpError(e)),
-                tame_oauth::Error::InvalidRsaKey => Err(OAuthError::InvalidRsaKey(err).into()),
-                tame_oauth::Error::InvalidKeyFormat => Err(OAuthError::InvalidKeyFormat(err).into()),
-                e => Err(OAuthError::Unknown(e.to_string()).into()),
+                tame_oauth::Error::InvalidRsaKey => Err(Error::Kubeconfig(ConfigError::OAuth(
+                    OAuthError::InvalidRsaKey(err),
+                ))),
+                tame_oauth::Error::InvalidKeyFormat => Err(Error::Kubeconfig(ConfigError::OAuth(
+                    OAuthError::InvalidKeyFormat(err),
+                ))),
+                e => Err(Error::Kubeconfig(ConfigError::OAuth(OAuthError::Unknown(
+                    e.to_string(),
+                )))),
             },
         }
     }
@@ -101,10 +108,13 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 pub(crate) fn gcloud_account_info() -> Result<ServiceAccountInfo, ConfigError> {
     let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
         .map(PathBuf::from)
-        .ok_or(OAuthError::MissingGoogleCredentials)?;
-    let data = std::fs::read_to_string(path).map_err(OAuthError::LoadCredentials)?;
-    ServiceAccountInfo::deserialize(data).map_err(|err| match err {
-        tame_oauth::Error::Json(e) => OAuthError::ParseCredentials(e).into(),
-        _ => OAuthError::Unknown(err.to_string()).into(),
+        .ok_or(ConfigError::OAuth(OAuthError::MissingGoogleCredentials))?;
+    let data =
+        std::fs::read_to_string(path).map_err(|err| ConfigError::OAuth(OAuthError::LoadCredentials(err)))?;
+    ServiceAccountInfo::deserialize(data).map_err(|err| {
+        ConfigError::OAuth(match err {
+            tame_oauth::Error::Json(e) => OAuthError::ParseCredentials(e),
+            _ => OAuthError::Unknown(err.to_string()),
+        })
     })
 }
