@@ -89,7 +89,7 @@ where
     /// use kube::{api::{Api, PatchParams, Patch}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut j = jobs.get("baz").await?;
@@ -127,7 +127,7 @@ where
     /// use kube::{api::{Api, PostParams}, Client};
     /// use k8s_openapi::api::batch::v1::{Job, JobStatus};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut o = jobs.get_status("baz").await?; // retrieve partial object

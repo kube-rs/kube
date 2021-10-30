@@ -17,7 +17,7 @@ where
     /// use kube::{Api, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let p: Pod = pods.get("blog").await?;
@@ -38,7 +38,7 @@ where
     /// use kube::{api::{Api, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
@@ -93,7 +93,7 @@ where
     /// use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
     /// use apiexts::CustomResourceDefinition;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let crds: Api<CustomResourceDefinition> = Api::all(client);
     ///     crds.delete("foos.clux.dev", &DeleteParams::default()).await?
@@ -120,7 +120,7 @@ where
     /// use kube::{api::{Api, DeleteParams, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
@@ -156,7 +156,7 @@ where
     /// use kube::{api::{Api, PatchParams, Patch, Resource}, Client};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let patch = serde_json::json!({
@@ -200,7 +200,7 @@ where
     /// use kube::{api::{Api, PostParams, ResourceExt}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let j = jobs.get("baz").await?;
@@ -261,7 +261,7 @@ where
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default()

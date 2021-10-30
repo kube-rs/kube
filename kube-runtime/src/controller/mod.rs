@@ -375,7 +375,7 @@ where
 ///
 /// /// something to drive the controller
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let context = Context::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());

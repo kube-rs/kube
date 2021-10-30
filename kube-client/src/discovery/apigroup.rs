@@ -18,7 +18,7 @@ use kube_core::gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError};
 /// ```no_run
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///      for (apiresource, caps) in apigroup.versioned_resources("v1") {
@@ -42,7 +42,7 @@ use kube_core::gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError};
 /// ```no_run
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
@@ -222,7 +222,7 @@ impl ApiGroup {
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for (ar, caps) in apigroup.recommended_resources() {
@@ -249,7 +249,7 @@ impl ApiGroup {
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();

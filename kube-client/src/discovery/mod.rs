@@ -89,7 +89,7 @@ impl Discovery {
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs, Scope}, ResourceExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let discovery = Discovery::new(client.clone()).run().await?;
     ///     for group in discovery.groups() {
