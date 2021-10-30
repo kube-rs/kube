@@ -56,13 +56,19 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
 
   check-msrv:
-    # Run `cargo check` on our minimum supported Rust version (1.56.0).
+    # Run `cargo check` on our minimum supported Rust version
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@main
+    - name: Find MSRV
+      id: msrv
+      run: |
+        MSRV=$(rg MSRV README.md | rg "\d+\.\d+\.\d+" -o)
+        echo $MSRV
+        echo ::set-output name=msrv::${MSRV}
     - uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.56.0
+        toolchain: ${{ steps.msrv.outputs.msrv }}
         profile: minimal
         override: true
     - name: Check
