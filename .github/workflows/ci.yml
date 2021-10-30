@@ -71,6 +71,7 @@ jobs:
         toolchain: ${{ steps.msrv.outputs.msrv }}
         profile: minimal
         override: true
+    - uses: Swatinem/rust-cache@v1
     - name: Check
       uses: actions-rs/cargo@v1
       with:
