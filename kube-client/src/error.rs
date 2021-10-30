@@ -280,9 +280,6 @@ impl From<kube_core::Error> for Error {
             kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
             kube_core::Error::SerdeError(e) => Error::SerdeError(e),
             kube_core::Error::HttpError(e) => Error::HttpError(e),
-            kube_core::Error::InvalidGroupVersion(s) => {
-                Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
-            }
         }
     }
 }

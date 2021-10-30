@@ -3,13 +3,16 @@ use crate::{error::DiscoveryError, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList};
 use kube_core::{
     discovery::{ApiCapabilities, ApiResource, Scope},
-    gvk::GroupVersion,
+    gvk::{GroupVersion, ParseGroupVersionError},
 };
 
 /// Creates an `ApiResource` from a `meta::v1::APIResource` instance + its groupversion.
 ///
 /// Returns a `DiscoveryError` if the passed group_version cannot be parsed
-pub(crate) fn parse_apiresource(ar: &APIResource, group_version: &str) -> Result<ApiResource> {
+pub(crate) fn parse_apiresource(
+    ar: &APIResource,
+    group_version: &str,
+) -> Result<ApiResource, ParseGroupVersionError> {
     let gv: GroupVersion = group_version.parse()?;
     // NB: not safe to use this with subresources (they don't have api_versions)
     Ok(ApiResource {
@@ -40,7 +43,10 @@ pub(crate) fn parse_apicapabilities(list: &APIResourceList, name: &str) -> Resul
     let mut subresources = vec![];
     for res in &list.resources {
         if let Some(subresource_name) = res.name.strip_prefix(&subresource_name_prefix) {
-            let mut api_resource = parse_apiresource(res, &list.group_version)?;
+            let mut api_resource =
+                parse_apiresource(res, &list.group_version).map_err(|ParseGroupVersionError(s)| {
+                    Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
+                })?;
             api_resource.plural = subresource_name.to_string();
             let caps = parse_apicapabilities(list, &res.name)?; // NB: recursion
             subresources.push((api_resource, caps));
@@ -71,7 +77,9 @@ impl GroupVersionData {
                 continue;
             }
             // NB: these two should be infallible from discovery when k8s api is well-behaved, but..
-            let ar = parse_apiresource(res, &list.group_version)?;
+            let ar = parse_apiresource(res, &list.group_version).map_err(|ParseGroupVersionError(s)| {
+                Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
+            })?;
             let caps = parse_apicapabilities(&list, &res.name)?;
             resources.push((ar, caps));
         }

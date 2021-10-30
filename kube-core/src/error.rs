@@ -15,10 +15,6 @@ pub enum Error {
     /// Http based error
     #[error("HttpError: {0}")]
     HttpError(#[source] http::Error),
-
-    /// Invalid GroupVersion
-    #[error("Invalid GroupVersion: {0}")]
-    InvalidGroupVersion(String),
 }
 
 /// An error response from the API.

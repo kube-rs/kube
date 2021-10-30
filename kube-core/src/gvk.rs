@@ -1,7 +1,13 @@
 //! Type information structs for dynamic resources.
-use crate::Error;
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+#[error("failed to parse group version: {0}")]
+/// Failed to parse group version.
+pub struct ParseGroupVersionError(pub String);
 
 /// Core information about an API Resource.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -44,14 +50,14 @@ impl GroupVersion {
 }
 
 impl FromStr for GroupVersion {
-    type Err = Error;
+    type Err = ParseGroupVersionError;
 
     fn from_str(gv: &str) -> Result<Self, Self::Err> {
         let gvsplit = gv.splitn(2, '/').collect::<Vec<_>>();
         let (group, version) = match *gvsplit.as_slice() {
             [g, v] => (g.to_string(), v.to_string()), // standard case
             [v] => ("".to_string(), v.to_string()),   // core v1 case
-            _ => return Err(Error::InvalidGroupVersion(gv.into())),
+            _ => return Err(ParseGroupVersionError(gv.into())),
         };
         Ok(Self { group, version })
     }

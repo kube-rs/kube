@@ -5,7 +5,7 @@ use super::{
 use crate::{error::DiscoveryError, Client, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
-use kube_core::gvk::{GroupVersion, GroupVersionKind};
+use kube_core::gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError};
 
 
 /// Describes one API groups collected resources and capabilities.
@@ -133,7 +133,9 @@ impl ApiGroup {
         };
         for res in &list.resources {
             if res.kind == gvk.kind && !res.name.contains('/') {
-                let ar = parse::parse_apiresource(res, &list.group_version)?;
+                let ar = parse::parse_apiresource(res, &list.group_version).map_err(
+                    |ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)),
+                )?;
                 let caps = parse::parse_apicapabilities(&list, &res.name)?;
                 return Ok((ar, caps));
             }
