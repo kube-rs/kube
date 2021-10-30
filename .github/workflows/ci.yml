@@ -63,7 +63,7 @@ jobs:
     - name: Find MSRV
       id: msrv
       run: |
-        MSRV=$(rg MSRV README.md | rg "\d+\.\d+\.\d+" -o)
+        MSRV=$(grep MSRV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+")
         echo $MSRV
         echo ::set-output name=msrv::${MSRV}
     - uses: actions-rs/toolchain@v1
