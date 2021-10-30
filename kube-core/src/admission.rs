@@ -10,7 +10,6 @@ use crate::{
     gvk::{GroupVersionKind, GroupVersionResource},
     metadata::TypeMeta,
     resource::Resource,
-    Error, Result,
 };
 
 use std::collections::HashMap;
@@ -20,6 +19,18 @@ use k8s_openapi::{
     apimachinery::pkg::{apis::meta::v1::Status, runtime::RawExtension},
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+#[error("failed to serialize patch")]
+/// Failed to serialize patch.
+pub struct SerializePatchError(#[source] serde_json::Error);
+
+#[derive(Debug, Error)]
+#[error("failed to convert AdmissionReview into AdmissionRequest")]
+/// Failed to convert `AdmissionReview` into `AdmissionRequest`.
+pub struct ConvertAdmissionReviewError;
+
 
 /// The `kind` field in [`TypeMeta`].
 pub const META_KIND: &str = "AdmissionReview";
@@ -46,7 +57,7 @@ pub struct AdmissionReview<T: Resource> {
 }
 
 impl<T: Resource> TryInto<AdmissionRequest<T>> for AdmissionReview<T> {
-    type Error = Error;
+    type Error = ConvertAdmissionReviewError;
 
     fn try_into(self) -> Result<AdmissionRequest<T>, Self::Error> {
         match self.request {
@@ -54,9 +65,7 @@ impl<T: Resource> TryInto<AdmissionRequest<T>> for AdmissionReview<T> {
                 req.types = self.types;
                 Ok(req)
             }
-            None => Err(Error::RequestValidation(
-                "invalid AdmissionRequest. expected Some but got None".to_owned(),
-            )),
+            None => Err(ConvertAdmissionReviewError),
         }
     }
 }
@@ -303,8 +312,8 @@ impl AdmissionResponse {
     }
 
     /// Add JSON patches to the response, modifying the object from the request.
-    pub fn with_patch(mut self, patch: json_patch::Patch) -> Result<Self> {
-        self.patch = Some(serde_json::to_vec(&patch).map_err(Error::SerdeError)?);
+    pub fn with_patch(mut self, patch: json_patch::Patch) -> Result<Self, SerializePatchError> {
+        self.patch = Some(serde_json::to_vec(&patch).map_err(SerializePatchError)?);
         self.patch_type = Some(PatchType::JsonPatch);
 
         Ok(self)
@@ -334,20 +343,18 @@ mod test {
     const WEBHOOK_BODY: &str = r#"{"kind":"AdmissionReview","apiVersion":"admission.k8s.io/v1","request":{"uid":"0c9a8d74-9cb7-44dd-b98e-09fd62def2f4","kind":{"group":"","version":"v1","kind":"Pod"},"resource":{"group":"","version":"v1","resource":"pods"},"requestKind":{"group":"","version":"v1","kind":"Pod"},"requestResource":{"group":"","version":"v1","resource":"pods"},"name":"echo-pod","namespace":"colin-coder","operation":"CREATE","userInfo":{"username":"colin@coder.com","groups":["system:authenticated"],"extra":{"iam.gke.io/user-assertion":["REDACTED"],"user-assertion.cloud.google.com":["REDACTED"]}},"object":{"kind":"Pod","apiVersion":"v1","metadata":{"name":"echo-pod","namespace":"colin-coder","creationTimestamp":null,"labels":{"app":"echo-server"},"annotations":{"kubectl.kubernetes.io/last-applied-configuration":"{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"echo-server\"},\"name\":\"echo-pod\",\"namespace\":\"colin-coder\"},\"spec\":{\"containers\":[{\"image\":\"jmalloc/echo-server\",\"name\":\"echo-server\",\"ports\":[{\"containerPort\":8080,\"name\":\"http-port\"}]}]}}\n"},"managedFields":[{"manager":"kubectl","operation":"Update","apiVersion":"v1","time":"2021-03-29T23:02:16Z","fieldsType":"FieldsV1","fieldsV1":{"f:metadata":{"f:annotations":{".":{},"f:kubectl.kubernetes.io/last-applied-configuration":{}},"f:labels":{".":{},"f:app":{}}},"f:spec":{"f:containers":{"k:{\"name\":\"echo-server\"}":{".":{},"f:image":{},"f:imagePullPolicy":{},"f:name":{},"f:ports":{".":{},"k:{\"containerPort\":8080,\"protocol\":\"TCP\"}":{".":{},"f:containerPort":{},"f:name":{},"f:protocol":{}}},"f:resources":{},"f:terminationMessagePath":{},"f:terminationMessagePolicy":{}}},"f:dnsPolicy":{},"f:enableServiceLinks":{},"f:restartPolicy":{},"f:schedulerName":{},"f:securityContext":{},"f:terminationGracePeriodSeconds":{}}}}]},"spec":{"volumes":[{"name":"default-token-rxbqq","secret":{"secretName":"default-token-rxbqq"}}],"containers":[{"name":"echo-server","image":"jmalloc/echo-server","ports":[{"name":"http-port","containerPort":8080,"protocol":"TCP"}],"resources":{},"volumeMounts":[{"name":"default-token-rxbqq","readOnly":true,"mountPath":"/var/run/secrets/kubernetes.io/serviceaccount"}],"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"Always"}],"restartPolicy":"Always","terminationGracePeriodSeconds":30,"dnsPolicy":"ClusterFirst","serviceAccountName":"default","serviceAccount":"default","securityContext":{},"schedulerName":"default-scheduler","tolerations":[{"key":"node.kubernetes.io/not-ready","operator":"Exists","effect":"NoExecute","tolerationSeconds":300},{"key":"node.kubernetes.io/unreachable","operator":"Exists","effect":"NoExecute","tolerationSeconds":300}],"priority":0,"enableServiceLinks":true},"status":{}},"oldObject":null,"dryRun":false,"options":{"kind":"CreateOptions","apiVersion":"meta.k8s.io/v1"}}}"#;
 
     use crate::{
-        admission::{AdmissionResponse, AdmissionReview},
-        DynamicObject, Error, Result,
+        admission::{AdmissionResponse, AdmissionReview, ConvertAdmissionReviewError},
+        DynamicObject,
     };
 
     #[test]
-    fn v1_webhook_unmarshals() -> Result<()> {
-        serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY).map_err(Error::SerdeError)?;
-        Ok(())
+    fn v1_webhook_unmarshals() {
+        serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY).unwrap();
     }
 
     #[test]
-    fn version_passes_through() -> Result<()> {
-        let rev = serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY)
-            .map_err(Error::SerdeError)?;
+    fn version_passes_through() -> Result<(), ConvertAdmissionReviewError> {
+        let rev = serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY).unwrap();
         let rev_typ = rev.types.clone();
         let res = AdmissionResponse::from(&rev.try_into()?).into_review();
 
