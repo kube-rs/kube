@@ -1,8 +1,10 @@
 //! Error handling in [`kube`][crate]
-use http::header::InvalidHeaderValue;
-pub use kube_core::ErrorResponse;
 use std::path::PathBuf;
+
+use http::header::InvalidHeaderValue;
 use thiserror::Error;
+
+pub use kube_core::ErrorResponse;
 
 /// Possible errors when working with [`kube`][crate]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
@@ -68,9 +70,9 @@ pub enum Error {
     #[error("Error parsing response")]
     RequestParse,
 
-    /// A request validation failed
-    #[error("Request validation failed with {0}")]
-    RequestValidation(String),
+    /// Failed to build request
+    #[error("Failed to build request: {0}")]
+    BuildRequest(#[source] kube_core::request::Error),
 
     /// Configuration error
     #[error("Error loading kubeconfig: {0}")]
@@ -271,15 +273,4 @@ pub enum DiscoveryError {
     MissingResource(String),
     #[error("Empty Api Group: {0}")]
     EmptyApiGroup(String),
-}
-
-// TODO Remove this
-impl From<kube_core::Error> for Error {
-    fn from(error: kube_core::Error) -> Self {
-        match error {
-            kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
-            kube_core::Error::SerdeError(e) => Error::SerdeError(e),
-            kube_core::Error::HttpError(e) => Error::HttpError(e),
-        }
-    }
 }

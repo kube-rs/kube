@@ -25,7 +25,7 @@ where
     /// }
     /// ```
     pub async fn get(&self, name: &str) -> Result<K> {
-        let mut req = self.request.get(name)?;
+        let mut req = self.request.get(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get");
         self.client.request::<K>(req).await
     }
@@ -49,7 +49,7 @@ where
     /// }
     /// ```
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let mut req = self.request.list(lp)?;
+        let mut req = self.request.list(lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("list");
         self.client.request::<ObjectList<K>>(req).await
     }
@@ -75,7 +75,7 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data).map_err(Error::SerdeError)?;
-        let mut req = self.request.create(pp, bytes)?;
+        let mut req = self.request.create(pp, bytes).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("create");
         self.client.request::<K>(req).await
     }
@@ -103,7 +103,7 @@ where
     /// }
     /// ```
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
-        let mut req = self.request.delete(name, dp)?;
+        let mut req = self.request.delete(name, dp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("delete");
         self.client.request_status::<K>(req).await
     }
@@ -140,7 +140,10 @@ where
         dp: &DeleteParams,
         lp: &ListParams,
     ) -> Result<Either<ObjectList<K>, Status>> {
-        let mut req = self.request.delete_collection(dp, lp)?;
+        let mut req = self
+            .request
+            .delete_collection(dp, lp)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("delete_collection");
         self.client.request_status::<ObjectList<K>>(req).await
     }
@@ -180,7 +183,7 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let mut req = self.request.patch(name, pp, patch)?;
+        let mut req = self.request.patch(name, pp, patch).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch");
         self.client.request::<K>(req).await
     }
@@ -234,7 +237,10 @@ where
         K: Serialize,
     {
         let bytes = serde_json::to_vec(&data).map_err(Error::SerdeError)?;
-        let mut req = self.request.replace(name, pp, bytes)?;
+        let mut req = self
+            .request
+            .replace(name, pp, bytes)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace");
         self.client.request::<K>(req).await
     }
@@ -281,7 +287,7 @@ where
         lp: &ListParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let mut req = self.request.watch(lp, version)?;
+        let mut req = self.request.watch(lp, version).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch");
         self.client.request_events::<K>(req).await
     }
