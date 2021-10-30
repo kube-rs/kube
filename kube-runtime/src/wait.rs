@@ -2,18 +2,15 @@
 use futures::TryStreamExt;
 use kube_client::{Api, Resource};
 use serde::de::DeserializeOwned;
-use snafu::{futures::TryStreamExt as _, Snafu};
 use std::fmt::Debug;
+use thiserror::Error;
 
 use crate::watcher::{self, watch_object};
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[snafu(display("failed to probe for whether the condition is fulfilled yet: {}", source))]
-    ProbeFailed {
-        #[snafu(backtrace)]
-        source: watcher::Error,
-    },
+    #[error("failed to probe for whether the condition is fulfilled yet: {0}")]
+    ProbeFailed(#[source] watcher::Error),
 }
 
 /// Watch an object, and Wait for some condition `cond` to return `true`.
@@ -52,7 +49,7 @@ where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
     watch_object(api, name)
-        .context(ProbeFailed)
+        .map_err(Error::ProbeFailed)
         .try_take_while(|obj| {
             let result = !cond.matches_object(obj.as_ref());
             async move { Ok(result) }
@@ -233,17 +230,17 @@ pub mod delete {
     use super::{await_condition, conditions};
     use kube_client::{api::DeleteParams, Api, Resource};
     use serde::de::DeserializeOwned;
-    use snafu::{OptionExt, ResultExt, Snafu};
     use std::fmt::Debug;
+    use thiserror::Error;
 
-    #[derive(Snafu, Debug)]
+    #[derive(Debug, Error)]
     pub enum Error {
-        #[snafu(display("deleted object has no UID to wait for"))]
+        #[error("deleted object has no UID to wait for")]
         NoUid,
-        #[snafu(display("failed to delete object: {}", source))]
-        Delete { source: kube_client::Error },
-        #[snafu(display("failed to wait for object to be deleted: {}", source))]
-        Await { source: super::Error },
+        #[error("failed to delete object: {0}")]
+        Delete(#[source] kube_client::Error),
+        #[error("failed to wait for object to be deleted: {0}")]
+        Await(#[source] super::Error),
     }
 
     /// Delete an object, and wait for it to be removed from the Kubernetes API (including waiting for all finalizers to unregister themselves).
@@ -260,14 +257,14 @@ pub mod delete {
         let deleted_obj_uid = api
             .delete(name, delete_params)
             .await
-            .context(Delete)?
+            .map_err(Error::Delete)?
             .either(
                 |mut obj| obj.meta_mut().uid.take(),
                 |status| status.details.map(|details| details.uid),
             )
-            .context(NoUid)?;
+            .ok_or(Error::NoUid)?;
         await_condition(api, name, conditions::is_deleted(&deleted_obj_uid))
             .await
-            .context(Await)
+            .map_err(Error::Await)
     }
 }
