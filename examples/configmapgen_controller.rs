@@ -20,8 +20,8 @@ use tokio::time::Duration;
 enum Error {
     #[error("Failed to create ConfigMap: {0}")]
     ConfigMapCreationFailed(#[source] kube::Error),
-    #[error("MissingObjectKey: {name}")]
-    MissingObjectKey { name: &'static str },
+    #[error("MissingObjectKey: {0}")]
+    MissingObjectKey(&'static str),
 }
 
 #[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
@@ -37,12 +37,8 @@ fn object_to_owner_reference<K: Resource<DynamicType = ()>>(
     Ok(OwnerReference {
         api_version: K::api_version(&()).to_string(),
         kind: K::kind(&()).to_string(),
-        name: meta.name.ok_or(Error::MissingObjectKey {
-            name: ".metadata.name",
-        })?,
-        uid: meta.uid.ok_or(Error::MissingObjectKey {
-            name: ".metadata.uid",
-        })?,
+        name: meta.name.ok_or(Error::MissingObjectKey(".metadata.name"))?,
+        uid: meta.uid.ok_or(Error::MissingObjectKey(".metadata.uid"))?,
         ..OwnerReference::default()
     })
 }
@@ -75,15 +71,14 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
             .metadata
             .namespace
             .as_ref()
-            .ok_or(Error::MissingObjectKey {
-                name: ".metadata.namespace",
-            })?,
+            .ok_or(Error::MissingObjectKey(".metadata.namespace"))?,
     );
     cm_api
         .patch(
-            cm.metadata.name.as_ref().ok_or(Error::MissingObjectKey {
-                name: ".metadata.name",
-            })?,
+            cm.metadata
+                .name
+                .as_ref()
+                .ok_or(Error::MissingObjectKey(".metadata.name"))?,
             &PatchParams::apply("configmapgenerator.kube-rt.nullable.se"),
             &Patch::Apply(&cm),
         )
