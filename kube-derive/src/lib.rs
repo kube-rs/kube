@@ -206,7 +206,7 @@ mod custom_resource;
 ///
 /// See [kubernetes openapi validation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation) for the format of the OpenAPI v3 schemas.
 ///
-/// If you have to override a lot, [you can opt-out of schema-generation entirely](#kubederive_schema--false)
+/// If you have to override a lot, [you can opt-out of schema-generation entirely](#kubeschema_mode--mode)
 ///
 /// ## Advanced Features
 /// - **embedding k8s-openapi types** can be done by enabling the `schemars` feature of `k8s-openapi` from [`0.13.0`](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0130-2021-08-09)
