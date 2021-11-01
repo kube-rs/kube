@@ -111,11 +111,21 @@ mod custom_resource;
 /// Adding `#[kube(derive = "PartialEq")]` is required if you want your generated
 /// top level type to be able to `#[derive(PartialEq)]`
 ///
-/// ### `#[kube(derive_schema = false)]`
-/// Disables the automatic `#[derive(JsonSchema)]` on the top level generated type.
+/// ### `#[kube(schema_mode = "mode")]`
+/// Defines whether the `JsonSchema` of the top level generated type should be used when generating a `CustomResourceDefinition`.
 ///
-/// This can be used to provide a completely custom schema, or to interact with third-party custom resources,
+/// Legal values:
+/// - `"derived"`: A `JsonSchema` implementation is automatically derived
+/// - `"custom"`: `JsonSchema` is not derived, but used when creating the `CustomResource` object
+/// - `"disabled"`: No `JsonSchema` is used
+///
+/// This can be used to provide a completely custom schema, or to interact with third-party custom resources
 /// where you are not responsible for installing the `CustomResourceDefinition`.
+///
+/// Defaults to `"disabled"` when `apiextensions = "v1beta1"`, otherwise `"derived"`.
+///
+/// NOTE: `apiextensions = "v1"` `CustomResourceDefinition`s require a schema. If `schema_mode = "disabled"` then
+/// `Self::crd()` will not be installable into the cluster as-is.
 ///
 /// ### `#[kube(scale = r#"json"#)]`
 /// Allow customizing the scale struct for the [scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources).

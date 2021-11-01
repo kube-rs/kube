@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
     version = "v1",
     kind = "Bar",
     namespaced,
-    derive_schema = false
+    schema_mode = "disabled"
 )]
 pub struct MyBar {
     bars: u32,

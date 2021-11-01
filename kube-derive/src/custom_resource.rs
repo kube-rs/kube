@@ -1,4 +1,4 @@
-use darling::FromDeriveInput;
+use darling::{FromDeriveInput, FromMeta};
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::{parse_quote, Data, DeriveInput, Path, Visibility};
 
@@ -24,7 +24,7 @@ struct KubeAttrs {
     #[darling(multiple, rename = "derive")]
     derives: Vec<String>,
     #[darling(default)]
-    derive_schema: Option<bool>,
+    schema_mode: Option<SchemaMode>,
     #[darling(default)]
     status: Option<String>,
     #[darling(multiple, rename = "category")]
@@ -66,6 +66,42 @@ fn default_serde_json() -> Path {
     parse_quote! { ::serde_json }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum SchemaMode {
+    Disabled,
+    Custom,
+    Derived,
+}
+
+impl SchemaMode {
+    fn derive(self) -> bool {
+        match self {
+            SchemaMode::Disabled => false,
+            SchemaMode::Custom => false,
+            SchemaMode::Derived => true,
+        }
+    }
+
+    fn use_in_crd(self) -> bool {
+        match self {
+            SchemaMode::Disabled => false,
+            SchemaMode::Custom => true,
+            SchemaMode::Derived => true,
+        }
+    }
+}
+
+impl FromMeta for SchemaMode {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        match value {
+            "disabled" => Ok(SchemaMode::Disabled),
+            "custom" => Ok(SchemaMode::Custom),
+            "derived" => Ok(SchemaMode::Derived),
+            x => Err(darling::Error::unknown_value(x)),
+        }
+    }
+}
+
 pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let derive_input: DeriveInput = match syn::parse2(input) {
         Err(err) => return err.to_compile_error(),
@@ -94,7 +130,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         version,
         namespaced,
         derives,
-        derive_schema,
+        schema_mode,
         status,
         plural,
         singular,
@@ -156,16 +192,20 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     }
 
     // Enable schema generation by default for v1 because it's mandatory.
-    let schema_gen_enabled = derive_schema.unwrap_or(apiextensions == "v1");
+    let schema_mode = schema_mode.unwrap_or(if apiextensions == "v1" {
+        SchemaMode::Derived
+    } else {
+        SchemaMode::Disabled
+    });
     // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
     // these are validated by the API server implicitly. Also, we can't generate the
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
-    let schemars_skip = if schema_gen_enabled {
+    let schemars_skip = if schema_mode.derive() {
         quote! { #[schemars(skip)] }
     } else {
         quote! {}
     };
-    if schema_gen_enabled {
+    if schema_mode.derive() {
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }
 
@@ -291,7 +331,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let crd_meta_name = format!("{}.{}", plural, group);
     let crd_meta = quote! { { "name": #crd_meta_name } };
 
-    let schemagen = if schema_gen_enabled {
+    let schemagen = if schema_mode.use_in_crd() {
         quote! {
             // Don't use definitions and don't include `$schema` because these are not allowed.
             let gen = #schemars::gen::SchemaSettings::openapi3().with(|s| {
