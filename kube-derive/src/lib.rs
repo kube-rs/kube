@@ -87,20 +87,20 @@ mod custom_resource;
 /// ### `#[kube(struct = "StructName")]`
 /// Customize the name of the generated root struct (defaults to `kind`).
 ///
-/// ### `#[kube(kube_core = "::kube::core")]`
+/// ### `#[kube(crates(kube_core = "::kube::core"))]`
 /// Customize the crate name the generated code will reach into (defaults to `::kube::core`).
 /// Should be one of `kube::core`, `kube_client::core` or `kube_core`.
 ///
-/// ### `#[kube(k8s_openapi = "::k8s_openapi")]`
+/// ### `#[kube(crates(k8s_openapi = "::k8s_openapi"))]`
 /// Customize the crate name the generated code will use for [`k8s_openapi`](https://docs.rs/k8s-openapi/) (defaults to `::k8s_openapi`).
 ///
-/// ### `#[kube(schemars = "::schemars")]`
+/// ### `#[kube(crates(schemars = "::schemars"))]`
 /// Customize the crate name the generated code will use for [`schemars`](https://docs.rs/schemars/) (defaults to `::schemars`).
 ///
-/// ### `#[kube(serde = "::serde")]`
+/// ### `#[kube(crates(serde = "::serde"))]`
 /// Customize the crate name the generated code will use for [`serde`](https://docs.rs/serde/) (defaults to `::serde`).
 ///
-/// ### `#[kube(serde_json = "::serde_json")]`
+/// ### `#[kube(crates(serde_json = "::serde_json"))]`
 /// Customize the crate name the generated code will use for [`serde_json`](https://docs.rs/serde_json/) (defaults to `::serde_json`).
 ///
 /// ### `#[kube(status = "StatusStructName")]`
@@ -111,7 +111,7 @@ mod custom_resource;
 /// Adding `#[kube(derive = "PartialEq")]` is required if you want your generated
 /// top level type to be able to `#[derive(PartialEq)]`
 ///
-/// ### `#[kube(schema_mode = "mode")]`
+/// ### `#[kube(schema = "mode")]`
 /// Defines whether the `JsonSchema` of the top level generated type should be used when generating a `CustomResourceDefinition`.
 ///
 /// Legal values:
@@ -124,7 +124,7 @@ mod custom_resource;
 ///
 /// Defaults to `"disabled"` when `apiextensions = "v1beta1"`, otherwise `"derived"`.
 ///
-/// NOTE: `apiextensions = "v1"` `CustomResourceDefinition`s require a schema. If `schema_mode = "disabled"` then
+/// NOTE: `apiextensions = "v1"` `CustomResourceDefinition`s require a schema. If `schema = "disabled"` then
 /// `Self::crd()` will not be installable into the cluster as-is.
 ///
 /// ### `#[kube(scale = r#"json"#)]`
@@ -206,7 +206,7 @@ mod custom_resource;
 ///
 /// See [kubernetes openapi validation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation) for the format of the OpenAPI v3 schemas.
 ///
-/// If you have to override a lot, [you can opt-out of schema-generation entirely](#kubeschema_mode--mode)
+/// If you have to override a lot, [you can opt-out of schema-generation entirely](#kubeschema--mode)
 ///
 /// ## Advanced Features
 /// - **embedding k8s-openapi types** can be done by enabling the `schemars` feature of `k8s-openapi` from [`0.13.0`](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0130-2021-08-09)

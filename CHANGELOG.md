@@ -12,8 +12,10 @@ UNRELEASED
    - Replaced `kube::Error::RequestValidation(String)` variant with `kube::Error::BuildRequest(kube::core::request::Error)`. This variant includes possible errors when building an HTTP request as described above, and contains errors that was previously grouped under `kube::Error::SerdeError` and `kube::Error::HttpError`.
    - Removed `impl From<T> for kube::Error` for the following types: `std::io::Error`, `hyper::Error`, `tower::BoxError`, `std::string::FromUtf8Error`, `http::Error`, `http::uri::InvalidUri`, `serde_json::Error`, `openssl::error::ErrorStack`, `kube::core::Error`, `kube::error::ConfigError`, `kube::error::DisoveryError`, `kube::error::OAuthError`.
    - Changed variants of error enums in `kube::runtime`. Replaced `snafu` with `thiserror`.
- * BREAKING: Replaced feature `kube-derive/schema` with attribute `#[kube(schema_mode)]` - #690
-   - If you currently disable default `kube-derive` default features to avoid automatic schema generation, add `#[kube(schema_mode = "disabled")]` to your spec struct instead
+ * BREAKING: Replaced feature `kube-derive/schema` with attribute `#[kube(schema)]` - #690
+   - If you currently disable default `kube-derive` default features to avoid automatic schema generation, add `#[kube(schema = "disabled")]` to your spec struct instead
+ * BREAKING: Moved `CustomResource` derive crate overrides into subattribute `#[kube(crates(...))]` - #690
+   - Replace `#[kube(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..)]` with `#[kube(crates(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..))]`
 
 0.63.2 / 2021-10-28
 ===================
