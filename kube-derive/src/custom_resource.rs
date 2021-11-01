@@ -24,6 +24,8 @@ struct KubeAttrs {
     #[darling(multiple, rename = "derive")]
     derives: Vec<String>,
     #[darling(default)]
+    derive_schema: Option<bool>,
+    #[darling(default)]
     status: Option<String>,
     #[darling(multiple, rename = "category")]
     categories: Vec<String>,
@@ -92,6 +94,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         version,
         namespaced,
         derives,
+        derive_schema,
         status,
         plural,
         singular,
@@ -152,9 +155,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     }
 
-    // Schema generation is always enabled for v1 because it's mandatory.
-    // TODO Enable schema generation for v1beta1 if the spec derives `JsonSchema`.
-    let schema_gen_enabled = apiextensions == "v1" && cfg!(feature = "schema");
+    // Enable schema generation by default for v1 because it's mandatory.
+    let schema_gen_enabled = derive_schema.unwrap_or(apiextensions == "v1");
     // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
     // these are validated by the API server implicitly. Also, we can't generate the
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.

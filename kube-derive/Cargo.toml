@@ -22,10 +22,6 @@ darling = "0.13.0"
 [lib]
 proc-macro = true
 
-[features]
-default = ["schema"]
-schema = []
-
 [dev-dependencies]
 serde = { version = "1.0.130", features = ["derive"] }
 serde_yaml = "0.8.21"
