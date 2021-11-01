@@ -1,8 +1,10 @@
 //! Error handling in [`kube`][crate]
-use http::header::InvalidHeaderValue;
-pub use kube_core::ErrorResponse;
 use std::path::PathBuf;
+
+use http::header::InvalidHeaderValue;
 use thiserror::Error;
+
+pub use kube_core::ErrorResponse;
 
 /// Possible errors when working with [`kube`][crate]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
@@ -19,20 +21,20 @@ pub enum Error {
 
     /// ConnectionError for when TcpStream fails to connect.
     #[error("ConnectionError: {0}")]
-    Connection(std::io::Error),
+    Connection(#[source] std::io::Error),
 
     /// Hyper error
     #[cfg(feature = "client")]
     #[error("HyperError: {0}")]
-    HyperError(#[from] hyper::Error),
+    HyperError(#[source] hyper::Error),
     /// Service error
     #[cfg(feature = "client")]
     #[error("ServiceError: {0}")]
-    Service(tower::BoxError),
+    Service(#[source] tower::BoxError),
 
     /// UTF-8 Error
     #[error("UTF-8 Error: {0}")]
-    FromUtf8(#[from] std::string::FromUtf8Error),
+    FromUtf8(#[source] std::string::FromUtf8Error),
 
     /// Returned when failed to find a newline character within max length.
     /// Only returned by `Client::request_events` and this should never happen as
@@ -42,19 +44,19 @@ pub enum Error {
 
     /// Returned on `std::io::Error` when reading event stream.
     #[error("Error reading events stream: {0}")]
-    ReadEvents(std::io::Error),
+    ReadEvents(#[source] std::io::Error),
 
     /// Http based error
     #[error("HttpError: {0}")]
-    HttpError(#[from] http::Error),
+    HttpError(#[source] http::Error),
 
     /// Failed to construct a URI.
-    #[error(transparent)]
-    InvalidUri(#[from] http::uri::InvalidUri),
+    #[error("InvalidUri: {0}")]
+    InvalidUri(#[source] http::uri::InvalidUri),
 
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
-    SerdeError(#[from] serde_json::Error),
+    SerdeError(#[source] serde_json::Error),
 
     /// Error building a request
     #[error("Error building request")]
@@ -68,17 +70,17 @@ pub enum Error {
     #[error("Error parsing response")]
     RequestParse,
 
-    /// A request validation failed
-    #[error("Request validation failed with {0}")]
-    RequestValidation(String),
+    /// Failed to build request
+    #[error("Failed to build request: {0}")]
+    BuildRequest(#[source] kube_core::request::Error),
 
     /// Configuration error
     #[error("Error loading kubeconfig: {0}")]
-    Kubeconfig(#[from] ConfigError),
+    Kubeconfig(#[source] ConfigError),
 
     /// Discovery errors
     #[error("Error from discovery: {0}")]
-    Discovery(#[from] DiscoveryError),
+    Discovery(#[source] DiscoveryError),
 
     /// An error with configuring SSL occured
     #[error("SslError: {0}")]
@@ -88,7 +90,7 @@ pub enum Error {
     #[cfg(feature = "native-tls")]
     #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
     #[error("OpensslError: {0}")]
-    OpensslError(#[from] openssl::error::ErrorStack),
+    OpensslError(#[source] openssl::error::ErrorStack),
 
     /// The server did not respond with [`SWITCHING_PROTOCOLS`] status when upgrading the
     /// connection.
@@ -179,7 +181,7 @@ pub enum ConfigError {
     #[cfg(feature = "oauth")]
     #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
     #[error("OAuth Error: {0}")]
-    OAuth(#[from] OAuthError),
+    OAuth(#[source] OAuthError),
 
     #[error("Unable to load config file: {0}")]
     LoadConfigFile(#[source] Box<Error>),
@@ -256,14 +258,6 @@ pub enum OAuthError {
     Unknown(String),
 }
 
-#[cfg(feature = "oauth")]
-#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
-impl From<OAuthError> for Error {
-    fn from(e: OAuthError) -> Self {
-        ConfigError::OAuth(e).into()
-    }
-}
-
 #[derive(Error, Debug)]
 // Redundant with the error messages and machine names
 #[allow(missing_docs)]
@@ -279,17 +273,4 @@ pub enum DiscoveryError {
     MissingResource(String),
     #[error("Empty Api Group: {0}")]
     EmptyApiGroup(String),
-}
-
-impl From<kube_core::Error> for Error {
-    fn from(error: kube_core::Error) -> Self {
-        match error {
-            kube_core::Error::RequestValidation(s) => Error::RequestValidation(s),
-            kube_core::Error::SerdeError(e) => Error::SerdeError(e),
-            kube_core::Error::HttpError(e) => Error::HttpError(e),
-            kube_core::Error::InvalidGroupVersion(s) => {
-                Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
-            }
-        }
-    }
 }

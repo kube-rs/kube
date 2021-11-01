@@ -17,7 +17,7 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Op
             .map_err(ConfigError::Base64Decode)
             .map_err(Error::Kubeconfig),
         (_, Some(f)) => read_file(f),
-        _ => Err(ConfigError::NoBase64FileOrData.into()),
+        _ => Err(Error::Kubeconfig(ConfigError::NoBase64FileOrData)),
     }?;
     //Ensure there is a trailing newline in the blob
     //Don't bother if the blob is empty
@@ -29,21 +29,19 @@ pub fn data_or_file_with_base64<P: AsRef<Path>>(data: &Option<String>, file: &Op
 
 pub fn read_file<P: AsRef<Path>>(file: P) -> Result<Vec<u8>> {
     fs::read(&file).map_err(|source| {
-        ConfigError::ReadFile {
+        Error::Kubeconfig(ConfigError::ReadFile {
             path: file.as_ref().into(),
             source,
-        }
-        .into()
+        })
     })
 }
 
 pub fn read_file_to_string<P: AsRef<Path>>(file: P) -> Result<String> {
     fs::read_to_string(&file).map_err(|source| {
-        ConfigError::ReadFile {
+        Error::Kubeconfig(ConfigError::ReadFile {
             path: file.as_ref().into(),
             source,
-        }
-        .into()
+        })
     })
 }
 

@@ -92,7 +92,6 @@ mod test {
         params::{Patch, PatchParams, PostParams},
         request::Request,
         resource::Resource,
-        Result,
     };
     #[test]
     fn raw_custom_resource() {
@@ -112,14 +111,13 @@ mod test {
     }
 
     #[test]
-    fn raw_resource_in_default_group() -> Result<()> {
+    fn raw_resource_in_default_group() {
         let gvk = GroupVersionKind::gvk("", "v1", "Service");
         let api_resource = ApiResource::from_gvk(&gvk);
         let url = DynamicObject::url_path(&api_resource, None);
         let pp = PostParams::default();
-        let req = Request::new(url).create(&pp, vec![])?;
+        let req = Request::new(url).create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/services?");
-        Ok(())
     }
 
     #[cfg(feature = "derive")]

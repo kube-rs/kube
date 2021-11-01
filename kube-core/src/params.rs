@@ -1,5 +1,5 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
-use crate::{Error, Result};
+use crate::request::Error;
 use serde::Serialize;
 
 /// Common query parameters used in watch/list/delete calls on collections
@@ -63,13 +63,11 @@ impl Default for ListParams {
 }
 
 impl ListParams {
-    pub(crate) fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
         if let Some(to) = &self.timeout {
             // https://github.com/kubernetes/kubernetes/issues/6513
             if *to >= 295 {
-                return Err(Error::RequestValidation(
-                    "ListParams::timeout must be < 295s".into(),
-                ));
+                return Err(Error::Validation("ListParams::timeout must be < 295s".into()));
             }
         }
         Ok(())
@@ -146,12 +144,12 @@ pub struct PostParams {
 }
 
 impl PostParams {
-    pub(crate) fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
         if let Some(field_manager) = &self.field_manager {
             // Implement the easy part of validation, in future this may be extended to provide validation as in go code
             // For now it's fine, because k8s API server will return an error
             if field_manager.len() > 128 {
-                return Err(Error::RequestValidation(
+                return Err(Error::Validation(
                     "Failed to validate PostParams::field_manager!".into(),
                 ));
             }
@@ -244,7 +242,7 @@ impl<T: Serialize> Patch<T> {
 }
 
 impl<T: Serialize> Patch<T> {
-    pub(crate) fn serialize(&self) -> Result<Vec<u8>> {
+    pub(crate) fn serialize(&self) -> Result<Vec<u8>, serde_json::Error> {
         match self {
             Self::Apply(p) => serde_json::to_vec(p),
             #[cfg(feature = "jsonpatch")]
@@ -253,7 +251,6 @@ impl<T: Serialize> Patch<T> {
             Self::Strategic(p) => serde_json::to_vec(p),
             Self::Merge(p) => serde_json::to_vec(p),
         }
-        .map_err(Into::into)
     }
 }
 
@@ -270,18 +267,18 @@ pub struct PatchParams {
 }
 
 impl PatchParams {
-    pub(crate) fn validate<P: Serialize>(&self, patch: &Patch<P>) -> Result<()> {
+    pub(crate) fn validate<P: Serialize>(&self, patch: &Patch<P>) -> Result<(), Error> {
         if let Some(field_manager) = &self.field_manager {
             // Implement the easy part of validation, in future this may be extended to provide validation as in go code
             // For now it's fine, because k8s API server will return an error
             if field_manager.len() > 128 {
-                return Err(Error::RequestValidation(
+                return Err(Error::Validation(
                     "Failed to validate PatchParams::field_manager!".into(),
                 ));
             }
         }
         if self.force && !patch.is_apply() {
-            return Err(Error::RequestValidation(
+            return Err(Error::Validation(
                 "PatchParams::force only works with Patch::Apply".into(),
             ));
         }

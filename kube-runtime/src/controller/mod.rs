@@ -22,7 +22,6 @@ use futures::{
 };
 use kube_client::api::{Api, DynamicObject, ListParams, Resource};
 use serde::de::DeserializeOwned;
-use snafu::{futures::TryStreamExt as SnafuTryStreamExt, Backtrace, ResultExt, Snafu};
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
@@ -30,30 +29,23 @@ use std::{
     time::Duration,
 };
 use stream::BoxStream;
+use thiserror::Error;
 use tokio::{runtime::Handle, time::Instant};
 use tracing::{info_span, Instrument};
 
 mod future_hash_map;
 mod runner;
 
-#[derive(Snafu, Debug)]
+#[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
-    ObjectNotFound {
-        obj_ref: ObjectRef<DynamicObject>,
-        backtrace: Backtrace,
-    },
-    ReconcilerFailed {
-        source: ReconcilerErr,
-        backtrace: Backtrace,
-    },
-    SchedulerDequeueFailed {
-        #[snafu(backtrace)]
-        source: scheduler::Error,
-    },
-    QueueError {
-        source: QueueErr,
-        backtrace: Backtrace,
-    },
+    #[error("ObjectNotFound")]
+    ObjectNotFound(ObjectRef<DynamicObject>),
+    #[error("ReconcilerFailed: {0}")]
+    ReconcilerFailed(#[source] ReconcilerErr),
+    #[error("SchedulerDequeueFailed: {0}")]
+    SchedulerDequeueFailed(#[source] scheduler::Error),
+    #[error("QueueError: {0}")]
+    QueueError(#[source] QueueErr),
 }
 
 /// Results of the reconciliation attempt
@@ -250,7 +242,7 @@ where
         // input: stream combining scheduled tasks and user specified inputs event
         Box::pin(stream::select(
             // 1. inputs from users queue stream
-            queue.context(QueueError).map_ok(|request| ScheduleRequest {
+            queue.map_err(Error::QueueError).map_ok(|request| ScheduleRequest {
                 message: request.into(),
                 run_at: Instant::now() + Duration::from_millis(1),
             })
@@ -281,15 +273,12 @@ where
                         .left_future()
                     },
                     None => future::err(
-                        ObjectNotFound {
-                            obj_ref: request.obj_ref.erase(),
-                        }
-                        .build(),
+                        Error::ObjectNotFound(request.obj_ref.erase())
                     )
                     .right_future(),
                 }
             })
-            .context(SchedulerDequeueFailed)
+            .map_err(Error::SchedulerDequeueFailed)
             .map(|res| res.and_then(|x| x))
             .on_complete(async { tracing::debug!("applier runner terminated") })
         },
@@ -319,7 +308,7 @@ where
             }
             reconciler_result
                 .map(|action| (obj_ref, action))
-                .context(ReconcilerFailed)
+                .map_err(Error::ReconcilerFailed)
         }
     })
     .on_complete(async { tracing::debug!("applier terminated") })
@@ -347,10 +336,11 @@ where
 /// use futures::StreamExt;
 /// use k8s_openapi::api::core::v1::ConfigMap;
 /// use schemars::JsonSchema;
+/// use thiserror::Error;
 ///
-/// use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
-/// #[derive(Debug, Snafu)]
+/// #[derive(Debug, Error)]
 /// enum Error {}
+///
 /// /// A custom resource
 /// #[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
 /// #[kube(group = "nullable.se", version = "v1", kind = "ConfigMapGenerator", namespaced)]
@@ -375,7 +365,7 @@ where
 ///
 /// /// something to drive the controller
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let context = Context::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());

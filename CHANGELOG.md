@@ -3,6 +3,16 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.63.2...master
 
+ * BREAKING: The following breaking changes were made as a part of an effort to refine errors (#688).
+   - Removed `kube::core::Error` and `kube::core::Result`. `kube::core::Error` was replaced by more specific errors as described below.
+   - Replaced `kube::core::Error::InvalidGroupVersion` with `kube::core::gvk::ParseGroupVersionError`.
+   - Changed the error returned from `kube::core::admission::AdmissionRequest::with_patch` to `kube::core::admission::SerializePatchError` (was `kube::core::Error::SerdeError`).
+   - Changed the error associated with `TryInto<AdmissionRequest<T>` to `kube::core::admission::ConvertAdmissionReviewError` (was `kube::core::Error::RequestValidation`).
+   - Changed the error returned from methods of `kube::core::Request` to `kube::core::request::Error` (was `kube::core::Error`). `kube::core::request::Error` represents possible errors when building an HTTP request. The removed `kube::core::Error` had `RequestValidation(String)`, `SerdeError(serde_json::Error)`, and `HttpError(http::Error)` variants. They are now `Validation(String)`, `SerializeBody(serde_json::Error)`, and  `BuildRequest(http::Error)` respectively in `kube::core::request::Error`.
+   - Replaced `kube::Error::RequestValidation(String)` variant with `kube::Error::BuildRequest(kube::core::request::Error)`. This variant includes possible errors when building an HTTP request as described above, and contains errors that was previously grouped under `kube::Error::SerdeError` and `kube::Error::HttpError`.
+   - Removed `impl From<T> for kube::Error` for the following types: `std::io::Error`, `hyper::Error`, `tower::BoxError`, `std::string::FromUtf8Error`, `http::Error`, `http::uri::InvalidUri`, `serde_json::Error`, `openssl::error::ErrorStack`, `kube::core::Error`, `kube::error::ConfigError`, `kube::error::DisoveryError`, `kube::error::OAuthError`.
+   - Changed variants of error enums in `kube::runtime`. Replaced `snafu` with `thiserror`.
+
 0.63.2 / 2021-10-28
 ===================
 * `kube::runtime::events`: fix build and hide module on kubernetes < 1.19 (events/v1 missing there) - [#685](https://github.com/kube-rs/kube-rs/issues/685)

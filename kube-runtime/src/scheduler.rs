@@ -2,23 +2,20 @@
 
 use futures::{stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
-use snafu::{Backtrace, ResultExt, Snafu};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
 };
+use thiserror::Error;
 use tokio::time::{self, Instant};
 use tokio_util::time::delay_queue::{self, DelayQueue};
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[snafu(display("timer failure: {}", source))]
-    TimerError {
-        source: time::error::Error,
-        backtrace: Backtrace,
-    },
+    #[error("timer failure: {0}")]
+    TimerError(#[source] time::error::Error),
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -150,7 +147,7 @@ where
         }
 
         match scheduler.poll_pop_queue_message(cx, &can_take_message) {
-            Poll::Ready(expired) => Poll::Ready(Some(expired.context(TimerError))),
+            Poll::Ready(expired) => Poll::Ready(Some(expired.map_err(Error::TimerError))),
             Poll::Pending => Poll::Pending,
         }
     }

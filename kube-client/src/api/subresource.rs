@@ -5,7 +5,7 @@ use std::fmt::Debug;
 
 use crate::{
     api::{Api, Patch, PatchParams, PostParams},
-    Result,
+    Error, Result,
 };
 
 use kube_core::response::Status;
@@ -26,7 +26,10 @@ where
 {
     /// Fetch the scale subresource
     pub async fn get_scale(&self, name: &str) -> Result<Scale> {
-        let mut req = self.request.get_subresource("scale", name)?;
+        let mut req = self
+            .request
+            .get_subresource("scale", name)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get_scale");
         self.client.request::<Scale>(req).await
     }
@@ -38,14 +41,20 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<Scale> {
-        let mut req = self.request.patch_subresource("scale", name, pp, patch)?;
+        let mut req = self
+            .request
+            .patch_subresource("scale", name, pp, patch)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch_scale");
         self.client.request::<Scale>(req).await
     }
 
     /// Replace the scale subresource
     pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
-        let mut req = self.request.replace_subresource("scale", name, pp, data)?;
+        let mut req = self
+            .request
+            .replace_subresource("scale", name, pp, data)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_scale");
         self.client.request::<Scale>(req).await
     }
@@ -64,7 +73,10 @@ where
     ///
     /// This actually returns the whole K, with metadata, and spec.
     pub async fn get_status(&self, name: &str) -> Result<K> {
-        let mut req = self.request.get_subresource("status", name)?;
+        let mut req = self
+            .request
+            .get_subresource("status", name)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get_status");
         self.client.request::<K>(req).await
     }
@@ -77,7 +89,7 @@ where
     /// use kube::{api::{Api, PatchParams, Patch}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut j = jobs.get("baz").await?;
@@ -98,7 +110,10 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let mut req = self.request.patch_subresource("status", name, pp, patch)?;
+        let mut req = self
+            .request
+            .patch_subresource("status", name, pp, patch)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch_status");
         self.client.request::<K>(req).await
     }
@@ -112,7 +127,7 @@ where
     /// use kube::{api::{Api, PostParams}, Client};
     /// use k8s_openapi::api::batch::v1::{Job, JobStatus};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let mut o = jobs.get_status("baz").await?; // retrieve partial object
@@ -123,7 +138,10 @@ where
     /// }
     /// ```
     pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
-        let mut req = self.request.replace_subresource("status", name, pp, data)?;
+        let mut req = self
+            .request
+            .replace_subresource("status", name, pp, data)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_status");
         self.client.request::<K>(req).await
     }
@@ -157,14 +175,14 @@ where
 {
     /// Fetch logs as a string
     pub async fn logs(&self, name: &str, lp: &LogParams) -> Result<String> {
-        let mut req = self.request.logs(name, lp)?;
+        let mut req = self.request.logs(name, lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("logs");
         self.client.request_text(req).await
     }
 
     /// Fetch logs as a stream of bytes
     pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
-        let mut req = self.request.logs(name, lp)?;
+        let mut req = self.request.logs(name, lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("log_stream");
         self.client.request_text_stream(req).await
     }
@@ -195,7 +213,7 @@ where
 {
     /// Create an eviction
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
-        let mut req = self.request.evict(name, ep)?;
+        let mut req = self.request.evict(name, ep).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("evict");
         self.client.request::<Status>(req).await
     }
@@ -239,7 +257,7 @@ where
 {
     /// Attach to pod
     pub async fn attach(&self, name: &str, ap: &AttachParams) -> Result<AttachedProcess> {
-        let mut req = self.request.attach(name, ap)?;
+        let mut req = self.request.attach(name, ap).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("attach");
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
@@ -294,7 +312,10 @@ where
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
-        let mut req = self.request.exec(name, command, ap)?;
+        let mut req = self
+            .request
+            .exec(name, command, ap)
+            .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("exec");
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))

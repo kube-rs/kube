@@ -2,7 +2,7 @@ use super::{
     file_config::{AuthInfo, Cluster, Context, Kubeconfig},
     utils,
 };
-use crate::{error::ConfigError, Result};
+use crate::{error::ConfigError, Error, Result};
 
 /// KubeConfigOptions stores options used when loading kubeconfig file.
 #[derive(Default, Clone)]
@@ -62,15 +62,17 @@ impl ConfigLoader {
         } else if let Some(name) = &config.current_context {
             name
         } else {
-            return Err(ConfigError::CurrentContextNotSet.into());
+            return Err(Error::Kubeconfig(ConfigError::CurrentContextNotSet));
         };
         let current_context = config
             .contexts
             .iter()
             .find(|named_context| &named_context.name == context_name)
             .map(|named_context| &named_context.context)
-            .ok_or_else(|| ConfigError::LoadContext {
-                context_name: context_name.clone(),
+            .ok_or_else(|| {
+                Error::Kubeconfig(ConfigError::LoadContext {
+                    context_name: context_name.clone(),
+                })
             })?;
 
         let cluster_name = cluster.unwrap_or(&current_context.cluster);
@@ -79,8 +81,10 @@ impl ConfigLoader {
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
-            .ok_or_else(|| ConfigError::LoadClusterOfContext {
-                cluster_name: cluster_name.clone(),
+            .ok_or_else(|| {
+                Error::Kubeconfig(ConfigError::LoadClusterOfContext {
+                    cluster_name: cluster_name.clone(),
+                })
             })?;
 
         let user_name = user.unwrap_or(&current_context.user);
@@ -89,8 +93,10 @@ impl ConfigLoader {
             .iter()
             .find(|named_user| &named_user.name == user_name)
             .map(|named_user| &named_user.auth_info)
-            .ok_or_else(|| ConfigError::FindUser {
-                user_name: user_name.clone(),
+            .ok_or_else(|| {
+                Error::Kubeconfig(ConfigError::FindUser {
+                    user_name: user_name.clone(),
+                })
             })?;
 
         Ok(ConfigLoader {
@@ -123,7 +129,7 @@ impl ConfigLoader {
             .or_else(|| nonempty(std::env::var("HTTP_PROXY").ok()))
             .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
         {
-            Ok(Some(proxy.parse::<http::Uri>()?))
+            Ok(Some(proxy.parse::<http::Uri>().map_err(Error::InvalidUri)?))
         } else {
             Ok(None)
         }

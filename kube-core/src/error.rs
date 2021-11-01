@@ -1,26 +1,6 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Core error types.
-#[derive(Error, Debug)]
-pub enum Error {
-    /// A request validation failed
-    #[error("Request validation failed with {0}")]
-    RequestValidation(String),
-
-    /// Common error case when requesting parsing into own structs
-    #[error("Error deserializing response")]
-    SerdeError(#[from] serde_json::Error),
-
-    /// Http based error
-    #[error("HttpError: {0}")]
-    HttpError(#[from] http::Error),
-
-    /// Invalid GroupVersion
-    #[error("Invalid GroupVersion: {0}")]
-    InvalidGroupVersion(String),
-}
-
 /// An error response from the API.
 #[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[error("{message}: {reason}")]

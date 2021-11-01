@@ -14,20 +14,27 @@ use kube::{
         finalizer::{finalizer, Event},
     },
 };
-use snafu::{OptionExt, ResultExt, Snafu};
 use std::time::Duration;
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 enum Error {
+    #[error("NoName")]
     NoName,
+    #[error("NoNamespace")]
     NoNamespace,
-    UpdateSecret { source: kube::Error },
-    DeleteSecret { source: kube::Error },
+    #[error("UpdateSecret: {0}")]
+    UpdateSecret(#[source] kube::Error),
+    #[error("DeleteSecret: {0}")]
+    DeleteSecret(#[source] kube::Error),
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
-    Ok(format!("cm---{}", cm.metadata.name.as_deref().context(NoName)?))
+    Ok(format!(
+        "cm---{}",
+        cm.metadata.name.as_deref().ok_or(Error::NoName)?
+    ))
 }
 
 async fn apply(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
@@ -48,7 +55,7 @@ async fn apply(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerA
             }),
         )
         .await
-        .context(UpdateSecret)?;
+        .map_err(Error::UpdateSecret)?;
     Ok(ReconcilerAction { requeue_after: None })
 }
 
@@ -63,7 +70,7 @@ async fn cleanup(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<Reconcile
             kube::Error::Api(ErrorResponse { code: 404, .. }) => Ok(()),
             err => Err(err),
         })
-        .context(DeleteSecret)?;
+        .map_err(Error::DeleteSecret)?;
     Ok(ReconcilerAction { requeue_after: None })
 }
 
@@ -78,7 +85,7 @@ async fn main() -> color_eyre::Result<()> {
     )
     .run(
         |cm, _| {
-            let ns = cm.meta().namespace.as_deref().context(NoNamespace).unwrap();
+            let ns = cm.meta().namespace.as_deref().ok_or(Error::NoNamespace).unwrap();
             let cms: Api<ConfigMap> = Api::namespaced(kube.clone(), ns);
             let secrets: Api<Secret> = Api::namespaced(kube.clone(), ns);
             async move {

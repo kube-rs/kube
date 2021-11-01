@@ -3,8 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     params::{DeleteParams, PostParams},
-    request::{Request, JSON_MIME},
-    Error, Result,
+    request::{Error, Request, JSON_MIME},
 };
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
@@ -40,7 +39,7 @@ pub struct LogParams {
 
 impl Request {
     /// Get a pod logs
-    pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}/log?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
 
@@ -78,7 +77,7 @@ impl Request {
 
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::BuildRequest)
     }
 }
 
@@ -97,7 +96,7 @@ pub struct EvictParams {
 
 impl Request {
     /// Create an eviction
-    pub fn evict(&self, name: &str, ep: &EvictParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn evict(&self, name: &str, ep: &EvictParams) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}/eviction?", self.url_path, name);
         // This is technically identical to Request::create, but different url
         let pp = &ep.post_options;
@@ -111,9 +110,10 @@ impl Request {
         let data = serde_json::to_vec(&serde_json::json!({
             "delete_options": ep.delete_options,
             "metadata": { "name": name }
-        }))?;
+        }))
+        .map_err(Error::SerializeBody)?;
         let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
-        req.body(data).map_err(Error::HttpError)
+        req.body(data).map_err(Error::BuildRequest)
     }
 }
 
@@ -248,16 +248,16 @@ impl AttachParams {
         self
     }
 
-    fn validate(&self) -> Result<()> {
+    fn validate(&self) -> Result<(), Error> {
         if !self.stdin && !self.stdout && !self.stderr {
-            return Err(Error::RequestValidation(
+            return Err(Error::Validation(
                 "AttachParams: one of stdin, stdout, or stderr must be true".into(),
             ));
         }
 
         if self.stderr && self.tty {
             // Multiplexing is not supported with TTY
-            return Err(Error::RequestValidation(
+            return Err(Error::Validation(
                 "AttachParams: tty and stderr cannot both be true".into(),
             ));
         }
@@ -288,7 +288,7 @@ impl AttachParams {
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Request {
     /// Attach to a pod
-    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<Vec<u8>>, Error> {
         ap.validate()?;
 
         let target = format!("{}/{}/attach?", self.url_path, name);
@@ -296,7 +296,7 @@ impl Request {
         ap.append_to_url_serializer(&mut qp);
 
         let req = http::Request::get(qp.finish());
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::BuildRequest)
     }
 }
 
@@ -307,7 +307,12 @@ impl Request {
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Request {
     /// Execute command in a pod
-    pub fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<http::Request<Vec<u8>>>
+    pub fn exec<I, T>(
+        &self,
+        name: &str,
+        command: I,
+        ap: &AttachParams,
+    ) -> Result<http::Request<Vec<u8>>, Error>
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,
@@ -323,6 +328,6 @@ impl Request {
         }
 
         let req = http::Request::get(qp.finish());
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::BuildRequest)
     }
 }

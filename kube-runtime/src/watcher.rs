@@ -8,33 +8,21 @@ use kube_client::{
 };
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
-use snafu::{Backtrace, ResultExt, Snafu};
 use std::{clone::Clone, fmt::Debug};
+use thiserror::Error;
 
-#[derive(Snafu, Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[snafu(display("failed to perform initial object list: {}", source))]
-    InitialListFailed {
-        source: kube_client::Error,
-        backtrace: Backtrace,
-    },
-    #[snafu(display("failed to start watching object: {}", source))]
-    WatchStartFailed {
-        source: kube_client::Error,
-        backtrace: Backtrace,
-    },
-    #[snafu(display("error returned by apiserver during watch: {}", source))]
-    WatchError {
-        source: kube_client::error::ErrorResponse,
-        backtrace: Backtrace,
-    },
-    #[snafu(display("watch stream failed: {}", source))]
-    WatchFailed {
-        source: kube_client::Error,
-        backtrace: Backtrace,
-    },
-    #[snafu(display("too many objects matched search criteria"))]
-    TooManyObjects { backtrace: Backtrace },
+    #[error("failed to perform initial object list: {0}")]
+    InitialListFailed(#[source] kube_client::Error),
+    #[error("failed to start watching object: {0}")]
+    WatchStartFailed(#[source] kube_client::Error),
+    #[error("error returned by apiserver during watch: {0}")]
+    WatchError(#[source] kube_client::error::ErrorResponse),
+    #[error("watch stream failed: {0}")]
+    WatchFailed(#[source] kube_client::Error),
+    #[error("too many objects matched search criteria")]
+    TooManyObjects,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -120,16 +108,17 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
             Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
                 resource_version: list.metadata.resource_version.unwrap(),
             }),
-            Err(err) => (Some(Err(err).context(InitialListFailed)), State::Empty),
+            Err(err) => (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty),
         },
         State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
             Ok(stream) => (None, State::Watching {
                 resource_version,
                 stream: stream.boxed(),
             }),
-            Err(err) => (Some(Err(err).context(WatchStartFailed)), State::InitListed {
-                resource_version,
-            }),
+            Err(err) => (
+                Some(Err(err).map_err(Error::WatchStartFailed)),
+                State::InitListed { resource_version },
+            ),
         },
         State::Watching {
             resource_version,
@@ -163,9 +152,9 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
                         stream,
                     }
                 };
-                (Some(Err(err).context(WatchError)), new_state)
+                (Some(Err(err).map_err(Error::WatchError)), new_state)
             }
-            Some(Err(err)) => (Some(Err(err).context(WatchFailed)), State::Watching {
+            Some(Err(err)) => (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
                 resource_version,
                 stream,
             }),
@@ -270,7 +259,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         // 2. The apiserver is ignoring our query
         // In either case, the K8s apiserver is broken and our API will return invalid data, so
         // we had better bail out ASAP.
-        Event::Restarted(objs) if objs.len() > 1 => TooManyObjects.fail(),
+        Event::Restarted(objs) if objs.len() > 1 => Err(Error::TooManyObjects),
         Event::Restarted(mut objs) => Ok(objs.pop()),
         Event::Applied(obj) => Ok(Some(obj)),
     })

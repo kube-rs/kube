@@ -2,10 +2,10 @@ use super::{
     parse::{self, GroupVersionData},
     version::Version,
 };
-use crate::{error::DiscoveryError, Client, Result};
+use crate::{error::DiscoveryError, Client, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
-use kube_core::gvk::{GroupVersion, GroupVersionKind};
+use kube_core::gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError};
 
 
 /// Describes one API groups collected resources and capabilities.
@@ -18,7 +18,7 @@ use kube_core::gvk::{GroupVersion, GroupVersionKind};
 /// ```no_run
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///      for (apiresource, caps) in apigroup.versioned_resources("v1") {
@@ -42,7 +42,7 @@ use kube_core::gvk::{GroupVersion, GroupVersionKind};
 /// ```no_run
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
@@ -80,7 +80,7 @@ impl ApiGroup {
         tracing::debug!(name = g.name.as_str(), "Listing group versions");
         let key = g.name;
         if g.versions.is_empty() {
-            return Err(DiscoveryError::EmptyApiGroup(key).into());
+            return Err(Error::Discovery(DiscoveryError::EmptyApiGroup(key)));
         }
         let mut data = vec![];
         for vers in &g.versions {
@@ -100,7 +100,7 @@ impl ApiGroup {
         let mut data = vec![];
         let key = ApiGroup::CORE_GROUP.to_string();
         if coreapis.versions.is_empty() {
-            return Err(DiscoveryError::EmptyApiGroup(key).into());
+            return Err(Error::Discovery(DiscoveryError::EmptyApiGroup(key)));
         }
         for v in coreapis.versions {
             let resources = client.list_core_api_resources(&v).await?;
@@ -133,12 +133,17 @@ impl ApiGroup {
         };
         for res in &list.resources {
             if res.kind == gvk.kind && !res.name.contains('/') {
-                let ar = parse::parse_apiresource(res, &list.group_version)?;
+                let ar = parse::parse_apiresource(res, &list.group_version).map_err(
+                    |ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)),
+                )?;
                 let caps = parse::parse_apicapabilities(&list, &res.name)?;
                 return Ok((ar, caps));
             }
         }
-        Err(DiscoveryError::MissingKind(format!("{:?}", gvk)).into())
+        Err(Error::Discovery(DiscoveryError::MissingKind(format!(
+            "{:?}",
+            gvk
+        ))))
     }
 
     // shortcut method to give cheapest return for a pinned group
@@ -217,7 +222,7 @@ impl ApiGroup {
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for (ar, caps) in apigroup.recommended_resources() {
@@ -244,7 +249,7 @@ impl ApiGroup {
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
     /// #[tokio::main]
-    /// async fn main() -> Result<(), kube::Error> {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();

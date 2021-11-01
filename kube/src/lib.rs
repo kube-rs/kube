@@ -23,7 +23,7 @@
 //! use k8s_openapi::api::core::v1::Pod;
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<(), kube::Error> {
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Infer the runtime environment and try to create a Kubernetes Client
 //!     let client = Client::try_default().await?;
 //!
