@@ -19,10 +19,6 @@ pub enum Error {
     #[error("ApiError: {0} ({0:?})")]
     Api(#[source] ErrorResponse),
 
-    /// ConnectionError for when TcpStream fails to connect.
-    #[error("ConnectionError: {0}")]
-    Connection(#[source] std::io::Error),
-
     /// Hyper error
     #[cfg(feature = "client")]
     #[error("HyperError: {0}")]
@@ -57,18 +53,6 @@ pub enum Error {
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
     SerdeError(#[source] serde_json::Error),
-
-    /// Error building a request
-    #[error("Error building request")]
-    RequestBuild,
-
-    /// Error sending a request
-    #[error("Error executing request")]
-    RequestSend,
-
-    /// Error parsing a response
-    #[error("Error parsing response")]
-    RequestParse,
 
     /// Failed to build request
     #[error("Failed to build request: {0}")]
@@ -183,8 +167,6 @@ pub enum ConfigError {
     #[error("OAuth Error: {0}")]
     OAuth(#[source] OAuthError),
 
-    #[error("Unable to load config file: {0}")]
-    LoadConfigFile(#[source] Box<Error>),
     #[error("Unable to load current context: {context_name}")]
     LoadContext { context_name: String },
     #[error("Unable to load cluster of context: {cluster_name}")]
