@@ -82,7 +82,11 @@ path = "crd_derive.rs"
 name = "crd_derive_schema"
 path = "crd_derive_schema.rs"
 
-[[example]] # run this without --no-default-features --features="native-tls"
+[[example]]
+name = "crd_derive_custom_schema"
+path = "crd_derive_custom_schema.rs"
+
+[[example]]
 name = "crd_derive_no_schema"
 path = "crd_derive_no_schema.rs"
 
