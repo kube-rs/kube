@@ -12,6 +12,8 @@ UNRELEASED
    - Replaced `kube::Error::RequestValidation(String)` variant with `kube::Error::BuildRequest(kube::core::request::Error)`. This variant includes possible errors when building an HTTP request as described above, and contains errors that was previously grouped under `kube::Error::SerdeError` and `kube::Error::HttpError`.
    - Removed `impl From<T> for kube::Error` for the following types: `std::io::Error`, `hyper::Error`, `tower::BoxError`, `std::string::FromUtf8Error`, `http::Error`, `http::uri::InvalidUri`, `serde_json::Error`, `openssl::error::ErrorStack`, `kube::core::Error`, `kube::error::ConfigError`, `kube::error::DisoveryError`, `kube::error::OAuthError`.
    - Changed variants of error enums in `kube::runtime`. Replaced `snafu` with `thiserror`.
+ * BREAKING: Replaced feature `kube-runtime/schema` with attribute `#[kube(derive_schema)]` - #690
+   - If you currently disable default `kube-runtime` default features to avoid this issue, add `#[kube(derive_schema = false)]` to your spec struct instead
 
 0.63.2 / 2021-10-28
 ===================
