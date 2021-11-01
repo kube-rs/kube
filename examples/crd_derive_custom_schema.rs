@@ -64,7 +64,6 @@ fn main() {
 #[test]
 fn verify_bar_is_a_custom_resource() {
     use kube::Resource;
-    use schemars::JsonSchema; // only for ensuring it's not implemented
     use static_assertions::assert_impl_all;
 
     println!("Kind {}", Bar::kind(&()));
@@ -72,7 +71,7 @@ fn verify_bar_is_a_custom_resource() {
     println!("Spec: {:?}", bar.spec);
     assert_impl_all!(Bar: kube::Resource, JsonSchema);
 
-    let crd = Bar::crd_with_manual_schema();
+    let crd = Bar::crd();
     for v in crd.spec.versions {
         assert!(v.schema.unwrap().open_api_v3_schema.is_some());
     }
