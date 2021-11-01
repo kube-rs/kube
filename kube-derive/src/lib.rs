@@ -111,6 +111,12 @@ mod custom_resource;
 /// Adding `#[kube(derive = "PartialEq")]` is required if you want your generated
 /// top level type to be able to `#[derive(PartialEq)]`
 ///
+/// ### `#[kube(derive_schema = false)]`
+/// Disables the automatic `#[derive(JsonSchema)]` on the top level generated type.
+///
+/// This can be used to provide a completely custom schema, or to interact with third-party custom resources,
+/// where you are not responsible for installing the `CustomResourceDefinition`.
+///
 /// ### `#[kube(scale = r#"json"#)]`
 /// Allow customizing the scale struct for the [scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources).
 ///
@@ -190,7 +196,7 @@ mod custom_resource;
 ///
 /// See [kubernetes openapi validation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation) for the format of the OpenAPI v3 schemas.
 ///
-/// If you have to override a lot, [you can opt-out of schema-generation entirely](https://github.com/kube-rs/kube-rs/issues/355#issuecomment-751253657)
+/// If you have to override a lot, [you can opt-out of schema-generation entirely](#kubederive_schema--false)
 ///
 /// ## Advanced Features
 /// - **embedding k8s-openapi types** can be done by enabling the `schemars` feature of `k8s-openapi` from [`0.13.0`](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0130-2021-08-09)
