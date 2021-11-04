@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
     version = "v1",
     kind = "Bar",
     namespaced,
-    schema = "custom"
+    schema = "manual"
 )]
 pub struct MyBar {
     bars: u32,
