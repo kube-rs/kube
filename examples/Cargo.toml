@@ -14,9 +14,8 @@ license = "Apache-2.0"
 release = false
 
 [features]
-default = ["native-tls", "schema", "kubederive", "ws", "latest", "runtime"]
-kubederive = ["kube/derive"] # by default import kube-derive with its default features
-schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
+default = ["native-tls", "kubederive", "ws", "latest", "runtime"]
+kubederive = ["kube/derive"]
 native-tls = ["kube/client", "kube/native-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
 runtime = ["kube/runtime"]
@@ -83,7 +82,11 @@ path = "crd_derive.rs"
 name = "crd_derive_schema"
 path = "crd_derive_schema.rs"
 
-[[example]] # run this without --no-default-features --features="native-tls"
+[[example]]
+name = "crd_derive_custom_schema"
+path = "crd_derive_custom_schema.rs"
+
+[[example]]
 name = "crd_derive_no_schema"
 path = "crd_derive_no_schema.rs"
 

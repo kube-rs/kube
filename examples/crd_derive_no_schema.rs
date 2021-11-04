@@ -1,25 +1,26 @@
-#[cfg(not(feature = "schema"))]
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
     CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps,
 };
-#[cfg(not(feature = "schema"))] use kube_derive::CustomResource;
-#[cfg(not(feature = "schema"))] use serde::{Deserialize, Serialize};
+use kube_derive::CustomResource;
+use serde::{Deserialize, Serialize};
 
 /// CustomResource with manually implemented schema
 ///
-/// NB: Everything here is gated on the example's `schema` feature not being set
-///
 /// Normally you would do this by deriving JsonSchema or manually implementing it / parts of it.
 /// But here, we simply drop in a valid schema from a string and avoid schemars from the dependency tree entirely.
-#[cfg(not(feature = "schema"))]
 #[derive(CustomResource, Serialize, Deserialize, Debug, Clone)]
-#[kube(group = "clux.dev", version = "v1", kind = "Bar", namespaced)]
+#[kube(
+    group = "clux.dev",
+    version = "v1",
+    kind = "Bar",
+    namespaced,
+    schema = "disabled"
+)]
 pub struct MyBar {
     bars: u32,
 }
 
-#[cfg(not(feature = "schema"))]
-const MANUAL_SCHEMA: &'static str = r#"
+const MANUAL_SCHEMA: &str = r#"
 type: object
 properties:
   spec:
@@ -31,7 +32,6 @@ properties:
     - bars
 "#;
 
-#[cfg(not(feature = "schema"))]
 impl Bar {
     fn crd_with_manual_schema() -> CustomResourceDefinition {
         use kube::CustomResourceExt;
@@ -47,18 +47,12 @@ impl Bar {
     }
 }
 
-#[cfg(not(feature = "schema"))]
 fn main() {
     let crd = Bar::crd_with_manual_schema();
     println!("{}", serde_yaml::to_string(&crd).unwrap());
 }
-#[cfg(feature = "schema")]
-fn main() {
-    eprintln!("This example it disabled when using the schema feature");
-}
 
 // Verify CustomResource derivable still
-#[cfg(not(feature = "schema"))]
 #[test]
 fn verify_bar_is_a_custom_resource() {
     use kube::Resource;

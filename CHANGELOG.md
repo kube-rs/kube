@@ -14,6 +14,10 @@ UNRELEASED
    - Changed variants of error enums in `kube::runtime`. Replaced `snafu` with `thiserror`.
  * BREAKING: Removed unused error variants in `kube::Error`: `Connection`, `RequestBuild`, `RequestSend`, `RequestParse`.
  * BREAKING: Removed unused error variant `kube::error::ConfigError::LoadConfigFile`
+ * BREAKING: Replaced feature `kube-derive/schema` with attribute `#[kube(schema)]` - #690
+   - If you currently disable default `kube-derive` default features to avoid automatic schema generation, add `#[kube(schema = "disabled")]` to your spec struct instead
+ * BREAKING: Moved `CustomResource` derive crate overrides into subattribute `#[kube(crates(...))]` - #690
+   - Replace `#[kube(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..)]` with `#[kube(crates(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..))]`
 
 0.63.2 / 2021-10-28
 ===================
