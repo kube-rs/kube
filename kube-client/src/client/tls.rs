@@ -80,24 +80,43 @@ pub mod native_tls {
 
 #[cfg(feature = "rustls-tls")]
 pub mod rustls_tls {
-    use std::sync::Arc;
-
-    use rustls::{self, Certificate, ClientConfig, ServerCertVerified, ServerCertVerifier};
-    use webpki::DNSNameRef;
+    use rustls::{
+        self,
+        client::{ServerCertVerified, ServerCertVerifier},
+        Certificate, ClientConfig,
+    };
 
     use crate::{Error, Result};
 
     /// Create `rustls::ClientConfig`.
     pub fn rustls_client_config(
         identity_pem: Option<&Vec<u8>>,
-        root_cert: Option<&Vec<Vec<u8>>>,
+        root_certs: Option<&Vec<Vec<u8>>>,
         accept_invalid: bool,
     ) -> Result<ClientConfig> {
         use std::io::Cursor;
 
-        // Based on code from `reqwest`
-        let mut client_config = ClientConfig::new();
-        if let Some(buf) = identity_pem {
+        // Create a `rustls::RootCertStore`
+        let mut roots = rustls::RootCertStore::empty();
+        if let Some(ders) = root_certs {
+            for der in ders {
+                // NB: might have to use RootCertStore::add_parsable_certificates instead
+                roots
+                    .add(&Certificate(der.to_owned()))
+                    .map_err(|e| Error::SslError(format!("{}", e)))?;
+            }
+        }
+        let has_roots = !roots.is_empty();
+
+        // rustls client config require a complicated series of steps through an ordered builder
+        // See https://docs.rs/rustls/0.20.0/rustls/struct.ConfigBuilder.html
+
+        let cfgbld = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(roots);
+
+        // Convert the certs into a single cert_chain for rustls
+        let client_config = if let Some(buf) = identity_pem {
             let (key, certs) = {
                 let mut pem = Cursor::new(buf);
                 let certs = rustls_pemfile::certs(&mut pem)
@@ -149,26 +168,18 @@ pub mod rustls_tls {
                     return Err(Error::SslError("private key or certificate not found".into()));
                 }
             };
-
-            client_config
-                .set_single_client_cert(certs, key)
-                .map_err(|e| Error::SslError(format!("{}", e)))?;
-        }
-
-        if let Some(ders) = root_cert {
-            for der in ders {
-                client_config
-                    .root_store
-                    .add(&Certificate(der.to_owned()))
-                    .map_err(|e| Error::SslError(format!("{}", e)))?;
-            }
-        }
-
-        if accept_invalid {
-            client_config
+            cfgbld
+                .with_single_cert(certs, key)
+                .map_err(|e| Error::SslError(format!("{}", e)))?
+        } else if accept_invalid || !has_roots {
+            let mut cfgbld = cfgbld.with_no_client_auth();
+            cfgbld
                 .dangerous()
-                .set_certificate_verifier(Arc::new(NoCertificateVerification {}));
-        }
+                .set_certificate_verifier(std::sync::Arc::new(NoCertificateVerification {}));
+            cfgbld
+        } else {
+            cfgbld.with_no_client_auth()
+        };
 
         Ok(client_config)
     }
@@ -178,11 +189,13 @@ pub mod rustls_tls {
     impl ServerCertVerifier for NoCertificateVerification {
         fn verify_server_cert(
             &self,
-            _roots: &rustls::RootCertStore,
-            _presented_certs: &[rustls::Certificate],
-            _dns_name: DNSNameRef<'_>,
-            _ocsp: &[u8],
-        ) -> Result<ServerCertVerified, rustls::TLSError> {
+            _end_entity: &Certificate,
+            _intermediates: &[Certificate],
+            _server_name: &rustls::client::ServerName,
+            _scts: &mut dyn Iterator<Item = &[u8]>,
+            _ocsp_response: &[u8],
+            _now: std::time::SystemTime,
+        ) -> Result<ServerCertVerified, rustls::Error> {
             Ok(ServerCertVerified::assertion())
         }
     }

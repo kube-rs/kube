@@ -40,7 +40,7 @@ How deriving `CustomResource` works in practice, and how it interacts with the [
 cargo run --example crd_api
 cargo run --example crd_derive
 cargo run --example crd_derive_schema
-cargo run --example crd_derive_no_schema --no-default-features --features=native-tls
+cargo run --example crd_derive_no_schema --no-default-features --features=native-tls,latest
 ```
 
 The last one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
@@ -108,5 +108,5 @@ The `crd_reflector` will just await changes. You can run `kubectl apply -f crd-b
 Disable default features and enable `rustls-tls`:
 
 ```sh
-cargo run --example pod_watcher --no-default-features --features=rustls-tls
+cargo run --example pod_watcher --no-default-features --features=rustls-tls,latest,runtime
 ```

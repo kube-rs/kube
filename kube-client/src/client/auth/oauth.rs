@@ -120,7 +120,11 @@ impl Gcp {
                     not(any(feature = "openssl-tls", feature = "native-tls")),
                     feature = "rustls-tls"
                 ))]
-                let https = hyper_rustls::HttpsConnector::with_native_roots();
+                let https = hyper_rustls::HttpsConnectorBuilder::new()
+                    .with_native_roots()
+                    .https_only()
+                    .enable_http1()
+                    .build();
 
                 let client = hyper::Client::builder().build::<_, hyper::Body>(https);
 
