@@ -53,24 +53,33 @@ pub mod native_tls {
 
 #[cfg(feature = "rustls-tls")]
 pub mod rustls_tls {
-    use std::sync::Arc;
-
-    use rustls::{self, Certificate, ClientConfig, ServerCertVerified, ServerCertVerifier};
-    use webpki::DNSNameRef;
+    use rustls::{self, Certificate, ClientConfig};
 
     use crate::{Error, Result};
 
     /// Create `rustls::ClientConfig`.
     pub fn rustls_client_config(
         identity_pem: Option<&Vec<u8>>,
-        root_cert: Option<&Vec<Vec<u8>>>,
+        root_certs: Option<&Vec<Vec<u8>>>,
         accept_invalid: bool,
     ) -> Result<ClientConfig> {
         use std::io::Cursor;
 
-        // Based on code from `reqwest`
-        let mut client_config = ClientConfig::new();
-        if let Some(buf) = identity_pem {
+        // Create a `rustls::RootCertStore`
+        let mut roots = rustls::RootCertStore::empty();
+        if let Some(ders) = root_certs {
+            for der in ders {
+                // NB: might have to use RootCertStore::add_parsable_certificates instead
+                roots
+                    .add(&Certificate(der.to_owned()))
+                    .map_err(|e| Error::SslError(format!("{}", e)))?;
+            }
+        }
+        // rustls client config require a complicated series of steps through an ordered builder
+        // See https://docs.rs/rustls/0.20.0/rustls/struct.ConfigBuilder.html
+
+        // Convert the certs into a single cert_chain for rustls
+        let client_config = if let Some(buf) = identity_pem {
             let (key, certs) = {
                 let mut pem = Cursor::new(buf);
                 let certs = rustls_pemfile::certs(&mut pem)
@@ -122,41 +131,22 @@ pub mod rustls_tls {
                     return Err(Error::SslError("private key or certificate not found".into()));
                 }
             };
-
-            client_config
-                .set_single_client_cert(certs, key)
-                .map_err(|e| Error::SslError(format!("{}", e)))?;
-        }
-
-        if let Some(ders) = root_cert {
-            for der in ders {
-                client_config
-                    .root_store
-                    .add(&Certificate(der.to_owned()))
-                    .map_err(|e| Error::SslError(format!("{}", e)))?;
-            }
-        }
-
-        if accept_invalid {
-            client_config
-                .dangerous()
-                .set_certificate_verifier(Arc::new(NoCertificateVerification {}));
-        }
+            // Sane case; identity
+            ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(roots)
+                .with_single_cert(certs, key)
+                .map_err(|e| Error::SslError(format!("{}", e)))?
+        } else if accept_invalid {
+            ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(roots)
+                .with_no_client_auth()
+        } else {
+            // is this the most sensible thing?
+            return Err(Error::SslError("no identity_pem found but not bypassing certs".into()));
+        };
 
         Ok(client_config)
-    }
-
-    struct NoCertificateVerification {}
-
-    impl ServerCertVerifier for NoCertificateVerification {
-        fn verify_server_cert(
-            &self,
-            _roots: &rustls::RootCertStore,
-            _presented_certs: &[rustls::Certificate],
-            _dns_name: DNSNameRef<'_>,
-            _ocsp: &[u8],
-        ) -> Result<ServerCertVerified, rustls::TLSError> {
-            Ok(ServerCertVerified::assertion())
-        }
     }
 }

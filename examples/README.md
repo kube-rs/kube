@@ -108,5 +108,5 @@ The `crd_reflector` will just await changes. You can run `kubectl apply -f crd-b
 Disable default features and enable `rustls-tls`:
 
 ```sh
-cargo run --example pod_watcher --no-default-features --features=rustls-tls
+cargo run --example pod_watcher --no-default-features --features=rustls-tls,latest
 ```
