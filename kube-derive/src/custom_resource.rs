@@ -90,7 +90,7 @@ fn default_apiext() -> String {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum SchemaMode {
     Disabled,
-    Custom,
+    Manual,
     Derived,
 }
 
@@ -98,7 +98,7 @@ impl SchemaMode {
     fn derive(self) -> bool {
         match self {
             SchemaMode::Disabled => false,
-            SchemaMode::Custom => false,
+            SchemaMode::Manual => false,
             SchemaMode::Derived => true,
         }
     }
@@ -106,7 +106,7 @@ impl SchemaMode {
     fn use_in_crd(self) -> bool {
         match self {
             SchemaMode::Disabled => false,
-            SchemaMode::Custom => true,
+            SchemaMode::Manual => true,
             SchemaMode::Derived => true,
         }
     }
@@ -116,7 +116,7 @@ impl FromMeta for SchemaMode {
     fn from_string(value: &str) -> darling::Result<Self> {
         match value {
             "disabled" => Ok(SchemaMode::Disabled),
-            "custom" => Ok(SchemaMode::Custom),
+            "manual" => Ok(SchemaMode::Manual),
             "derived" => Ok(SchemaMode::Derived),
             x => Err(darling::Error::unknown_value(x)),
         }

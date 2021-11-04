@@ -116,7 +116,7 @@ mod custom_resource;
 ///
 /// Legal values:
 /// - `"derived"`: A `JsonSchema` implementation is automatically derived
-/// - `"custom"`: `JsonSchema` is not derived, but used when creating the `CustomResourceDefinition` object
+/// - `"manual"`: `JsonSchema` is not derived, but used when creating the `CustomResourceDefinition` object
 /// - `"disabled"`: No `JsonSchema` is used
 ///
 /// This can be used to provide a completely custom schema, or to interact with third-party custom resources
