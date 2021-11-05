@@ -43,7 +43,23 @@ pub mod native_tls {
         // TODO These are all treated as the same error. Add specific errors.
         let x509 = X509::from_pem(pem).map_err(Error::OpensslError)?;
         let pkey = PKey::private_key_from_pem(pem).map_err(Error::OpensslError)?;
-        let p12 = Pkcs12::builder()
+        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+        let p12_builder = Pkcs12::builder();
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        let p12_builder = {
+            use openssl::nid::Nid;
+            // OpenSSL 3 uses `Nid::AES_256_CBC` by default, but Security Framework used by
+            // `native_tls` on macOS/iOS fails to import it.
+            // Work around by using the legacy algorithm.
+            // https://openradar.appspot.com/FB8988319
+            // https://github.com/kube-rs/kube-rs/issues/691
+            let mut builder = Pkcs12::builder();
+            builder
+                .key_algorithm(Nid::PBE_WITHSHA1AND3_KEY_TRIPLEDES_CBC)
+                .cert_algorithm(Nid::PBE_WITHSHA1AND40BITRC2_CBC);
+            builder
+        };
+        let p12 = p12_builder
             .build(password, "kubeconfig", &pkey, &x509)
             .map_err(Error::OpensslError)?;
         let der = p12.to_der().map_err(Error::OpensslError)?;
