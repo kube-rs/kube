@@ -121,7 +121,7 @@ impl Client {
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead.
     pub async fn try_default() -> Result<Self> {
-        Self::try_from(Config::infer().await?)
+        Self::try_from(Config::infer().await.map_err(Error::InferConfig)?)
     }
 
     pub(crate) fn default_ns(&self) -> &str {

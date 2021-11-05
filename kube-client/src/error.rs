@@ -1,6 +1,4 @@
 //! Error handling in [`kube`][crate]
-use std::path::PathBuf;
-
 use thiserror::Error;
 
 pub use kube_core::ErrorResponse;
@@ -45,10 +43,6 @@ pub enum Error {
     #[error("HttpError: {0}")]
     HttpError(#[source] http::Error),
 
-    /// Failed to construct a URI.
-    #[error("InvalidUri: {0}")]
-    InvalidUri(#[source] http::uri::InvalidUri),
-
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
     SerdeError(#[source] serde_json::Error),
@@ -57,9 +51,9 @@ pub enum Error {
     #[error("Failed to build request: {0}")]
     BuildRequest(#[source] kube_core::request::Error),
 
-    /// Configuration error
-    #[error("Error loading kubeconfig: {0}")]
-    Kubeconfig(#[source] ConfigError),
+    /// Failed to infer config
+    #[error("Failed to infer configuration: {0}")]
+    InferConfig(#[source] crate::config::InferConfigError),
 
     /// Discovery errors
     #[error("Error from discovery: {0}")]
@@ -113,72 +107,6 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
     #[error("auth error: {0}")]
     Auth(#[source] crate::client::AuthError),
-}
-
-#[derive(Error, Debug)]
-// Redundant with the error messages and machine names
-#[allow(missing_docs)]
-/// Possible errors when loading config
-pub enum ConfigError {
-    #[error("Failed to infer config.. cluster env: ({cluster_env}), kubeconfig: ({kubeconfig})")]
-    ConfigInferenceExhausted {
-        cluster_env: Box<Error>,
-        // We can only pick one source, but the kubeconfig failure is more likely to be a user error
-        #[source]
-        kubeconfig: Box<Error>,
-    },
-
-    #[error("Failed to determine current context")]
-    CurrentContextNotSet,
-
-    #[error("Merging kubeconfig with mismatching kind")]
-    KindMismatch,
-    #[error("Merging kubeconfig with mismatching apiVersion")]
-    ApiVersionMismatch,
-
-    #[error("Unable to load in cluster config, {hostenv} and {portenv} must be defined")]
-    /// One or more required in-cluster config options are missing
-    MissingInClusterVariables {
-        hostenv: &'static str,
-        portenv: &'static str,
-    },
-
-    #[error("Unable to load incluster default namespace: {0}")]
-    InvalidInClusterNamespace(#[source] Box<Error>),
-
-    #[error("Unable to load in cluster token: {0}")]
-    InvalidInClusterToken(#[source] Box<Error>),
-
-    #[error("Unable to load current context: {context_name}")]
-    LoadContext { context_name: String },
-    #[error("Unable to load cluster of context: {cluster_name}")]
-    LoadClusterOfContext { cluster_name: String },
-    #[error("Unable to find named user: {user_name}")]
-    FindUser { user_name: String },
-
-    #[error("Unable to find path of kubeconfig")]
-    NoKubeconfigPath,
-
-    #[error("Failed to decode base64: {0}")]
-    Base64Decode(#[source] base64::DecodeError),
-    #[error("Failed to compute the absolute path of '{path:?}'")]
-    NoAbsolutePath { path: PathBuf },
-    #[error("Failed to read '{path:?}': {source}")]
-    ReadFile {
-        path: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-    #[error("Failed to get data/file with base64 format")]
-    NoBase64FileOrData,
-    #[error("Failed to get data/file")]
-    NoFileOrData,
-
-    #[error("Failed to parse Kubeconfig YAML: {0}")]
-    ParseYaml(#[source] serde_yaml::Error),
-
-    #[error("Failed to find a single YAML document in Kubeconfig: {0}")]
-    EmptyKubeconfig(PathBuf),
 }
 
 #[derive(Error, Debug)]

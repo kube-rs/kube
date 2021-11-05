@@ -1,7 +1,13 @@
 #![allow(missing_docs)]
-use crate::{config::utils, error::ConfigError, Error, Result};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
+
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::Path};
+
+use super::{KubeconfigError, LoadDataError};
 
 /// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
 ///
@@ -206,20 +212,14 @@ const KUBECONFIG: &str = "KUBECONFIG";
 /// Some helpers on the raw Config object are exposed for people needing to parse it
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
-    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig> {
-        let data = fs::read_to_string(&path).map_err(|source| {
-            Error::Kubeconfig(ConfigError::ReadFile {
-                path: path.as_ref().into(),
-                source,
-            })
-        })?;
+    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig, KubeconfigError> {
+        let data = fs::read_to_string(&path)
+            .map_err(|source| KubeconfigError::ReadConfig(source, path.as_ref().into()))?;
         // support multiple documents
         let mut documents: Vec<Kubeconfig> = vec![];
         for doc in serde_yaml::Deserializer::from_str(&data) {
-            let value = serde_yaml::Value::deserialize(doc)
-                .map_err(|err| Error::Kubeconfig(ConfigError::ParseYaml(err)))?;
-            let kconf = serde_yaml::from_value(value)
-                .map_err(|err| Error::Kubeconfig(ConfigError::ParseYaml(err)))?;
+            let value = serde_yaml::Value::deserialize(doc).map_err(KubeconfigError::Parse)?;
+            let kconf = serde_yaml::from_value(value).map_err(KubeconfigError::InvalidStructure)?;
             documents.push(kconf)
         }
 
@@ -258,21 +258,15 @@ impl Kubeconfig {
                 merged_docs = Some(config);
             }
         }
-        let config = merged_docs
-            .ok_or_else(|| Error::Kubeconfig(ConfigError::EmptyKubeconfig(path.as_ref().to_path_buf())))?;
+        let config = merged_docs.ok_or_else(|| KubeconfigError::EmptyConfig(path.as_ref().to_path_buf()))?;
         Ok(config)
     }
 
     /// Read a Config from `KUBECONFIG` or the the default location.
-    pub fn read() -> Result<Kubeconfig> {
+    pub fn read() -> Result<Kubeconfig, KubeconfigError> {
         match Self::from_env()? {
             Some(config) => Ok(config),
-            None => {
-                let path = utils::default_kube_path()
-                    .ok_or(ConfigError::NoKubeconfigPath)
-                    .map_err(Error::Kubeconfig)?;
-                Self::read_from(path)
-            }
+            None => Self::read_from(default_kube_path().ok_or(KubeconfigError::FindPath)?),
         }
     }
 
@@ -282,7 +276,7 @@ impl Kubeconfig {
     /// # Panics
     ///
     /// Panics if `KUBECONFIG` value contains the NUL character.
-    pub fn from_env() -> Result<Option<Self>> {
+    pub fn from_env() -> Result<Option<Self>, KubeconfigError> {
         match std::env::var_os(KUBECONFIG) {
             Some(value) => {
                 let paths = std::env::split_paths(&value)
@@ -314,12 +308,12 @@ impl Kubeconfig {
     /// >   Example: Preserve the context of the first file to set `current-context`.
     /// >   Example: If two files specify a `red-user`, use only values from the first file's `red-user`.
     /// >            Even if the second file has non-conflicting entries under `red-user`, discard them.
-    fn merge(mut self, next: Kubeconfig) -> Result<Self> {
+    fn merge(mut self, next: Kubeconfig) -> Result<Self, KubeconfigError> {
         if self.kind.is_some() && next.kind.is_some() && self.kind != next.kind {
-            return Err(Error::Kubeconfig(ConfigError::KindMismatch));
+            return Err(KubeconfigError::KindMismatch);
         }
         if self.api_version.is_some() && next.api_version.is_some() && self.api_version != next.api_version {
-            return Err(Error::Kubeconfig(ConfigError::ApiVersionMismatch));
+            return Err(KubeconfigError::ApiVersionMismatch);
         }
 
         self.kind = self.kind.or(next.kind);
@@ -358,24 +352,62 @@ fn to_absolute(dir: &Path, file: &str) -> Option<String> {
 }
 
 impl Cluster {
-    pub(crate) fn load_certificate_authority(&self) -> Result<Option<Vec<u8>>> {
+    pub(crate) fn load_certificate_authority(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
         if self.certificate_authority.is_none() && self.certificate_authority_data.is_none() {
             return Ok(None);
         }
-        let res =
-            utils::data_or_file_with_base64(&self.certificate_authority_data, &self.certificate_authority)?;
-        Ok(Some(res))
+
+        let ca = load_from_base64_or_file(&self.certificate_authority_data, &self.certificate_authority)
+            .map_err(KubeconfigError::LoadCertificateAuthority)?;
+        Ok(Some(ca))
     }
 }
 
 impl AuthInfo {
-    pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>> {
-        utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
+    pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>, KubeconfigError> {
+        load_from_base64_or_file(&self.client_certificate_data, &self.client_certificate)
+            .map_err(KubeconfigError::LoadClientCertificate)
     }
 
-    pub(crate) fn load_client_key(&self) -> Result<Vec<u8>> {
-        utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
+    pub(crate) fn load_client_key(&self) -> Result<Vec<u8>, KubeconfigError> {
+        load_from_base64_or_file(&self.client_key_data, &self.client_key)
+            .map_err(KubeconfigError::LoadClientKey)
     }
+}
+
+fn load_from_base64_or_file<P: AsRef<Path>>(
+    value: &Option<String>,
+    file: &Option<P>,
+) -> Result<Vec<u8>, LoadDataError> {
+    let data = value
+        .as_deref()
+        .map(load_from_base64)
+        .or_else(|| file.as_ref().map(load_from_file))
+        .unwrap_or(Err(LoadDataError::NoBase64DataOrFile))?;
+    Ok(ensure_trailing_newline(data))
+}
+
+fn load_from_base64(value: &str) -> Result<Vec<u8>, LoadDataError> {
+    base64::decode(&value).map_err(LoadDataError::DecodeBase64)
+}
+
+fn load_from_file<P: AsRef<Path>>(file: &P) -> Result<Vec<u8>, LoadDataError> {
+    fs::read(&file).map_err(|source| LoadDataError::ReadFile(source, file.as_ref().into()))
+}
+
+// Ensure there is a trailing newline in the blob
+// Don't bother if the blob is empty
+fn ensure_trailing_newline(mut data: Vec<u8>) -> Vec<u8> {
+    if data.last().map(|end| *end != b'\n').unwrap_or(false) {
+        data.push(b'\n');
+    }
+    data
+}
+
+/// Returns kubeconfig path from `$HOME/.kube/config`.
+fn default_kube_path() -> Option<PathBuf> {
+    use dirs::home_dir;
+    home_dir().map(|h| h.join(".kube").join("config"))
 }
 
 #[cfg(test)]
@@ -487,9 +519,7 @@ users:
     client-certificate: /home/kevin/.minikube/profiles/minikube/client.crt
     client-key: /home/kevin/.minikube/profiles/minikube/client.key";
 
-        let config: Kubeconfig = serde_yaml::from_str(config_yaml)
-            .map_err(ConfigError::ParseYaml)
-            .unwrap();
+        let config: Kubeconfig = serde_yaml::from_str(config_yaml).unwrap();
 
         assert_eq!(config.clusters[0].name, "eks");
         assert_eq!(config.clusters[1].name, "minikube");
@@ -502,7 +532,7 @@ users:
     }
 
     #[test]
-    fn kubeconfig_multi_document_merge() -> Result<()> {
+    fn kubeconfig_multi_document_merge() -> Result<(), KubeconfigError> {
         let config_yaml = r#"---
 apiVersion: v1
 clusters:
