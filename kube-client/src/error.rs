@@ -1,7 +1,6 @@
 //! Error handling in [`kube`][crate]
 use std::path::PathBuf;
 
-use http::header::InvalidHeaderValue;
 use thiserror::Error;
 
 pub use kube_core::ErrorResponse;
@@ -108,6 +107,12 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
     #[error("Sec-WebSocket-Protocol mismatched")]
     SecWebSocketProtocolMismatch,
+
+    /// Errors related to client auth
+    #[cfg(feature = "client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+    #[error("auth error: {0}")]
+    Auth(#[source] crate::client::AuthError),
 }
 
 #[derive(Error, Debug)]
@@ -115,16 +120,6 @@ pub enum Error {
 #[allow(missing_docs)]
 /// Possible errors when loading config
 pub enum ConfigError {
-    #[error("Invalid basic auth: {0}")]
-    InvalidBasicAuth(#[source] InvalidHeaderValue),
-
-    #[error("Invalid bearer token: {0}")]
-    InvalidBearerToken(#[source] InvalidHeaderValue),
-
-    #[error("Tried to refresh a token and got a non-refreshable token response")]
-    /// Tried to refresh a token and got a non-refreshable token response
-    UnrefreshableTokenResponse,
-
     #[error("Failed to infer config.. cluster env: ({cluster_env}), kubeconfig: ({kubeconfig})")]
     ConfigInferenceExhausted {
         cluster_env: Box<Error>,
@@ -153,19 +148,6 @@ pub enum ConfigError {
 
     #[error("Unable to load in cluster token: {0}")]
     InvalidInClusterToken(#[source] Box<Error>),
-
-    #[error("exec-plugin response did not contain a status")]
-    ExecPluginFailed,
-
-    #[cfg(feature = "client")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-    #[error("Malformed token expiration date: {0}")]
-    MalformedTokenExpirationDate(#[source] chrono::ParseError),
-
-    #[cfg(feature = "oauth")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
-    #[error("OAuth Error: {0}")]
-    OAuth(#[source] OAuthError),
 
     #[error("Unable to load current context: {context_name}")]
     LoadContext { context_name: String },
@@ -197,47 +179,6 @@ pub enum ConfigError {
 
     #[error("Failed to find a single YAML document in Kubeconfig: {0}")]
     EmptyKubeconfig(PathBuf),
-
-    #[error("Unable to run auth exec: {0}")]
-    AuthExecStart(#[source] std::io::Error),
-    #[error("Auth exec command '{cmd}' failed with status {status}: {out:?}")]
-    AuthExecRun {
-        cmd: String,
-        status: std::process::ExitStatus,
-        out: std::process::Output,
-    },
-    #[error("Failed to parse auth exec output: {0}")]
-    AuthExecParse(#[source] serde_json::Error),
-    #[error("Failed exec auth: {0}")]
-    AuthExec(String),
-}
-
-#[cfg(feature = "oauth")]
-#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
-#[derive(Error, Debug)]
-// Redundant with the error messages and machine names
-#[allow(missing_docs)]
-/// Possible errors when requesting token with OAuth
-pub enum OAuthError {
-    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
-    /// Missing GOOGLE_APPLICATION_CREDENTIALS env
-    MissingGoogleCredentials,
-    #[error("Unable to load OAuth credentials file: {0}")]
-    LoadCredentials(#[source] std::io::Error),
-    #[error("Unable to parse OAuth credentials file: {0}")]
-    ParseCredentials(#[source] serde_json::Error),
-    #[error("Credentials file had invalid key format: {0}")]
-    InvalidKeyFormat(#[source] tame_oauth::Error),
-    #[error("Credentials file had invalid RSA key: {0}")]
-    InvalidRsaKey(#[source] tame_oauth::Error),
-    #[error("Unable to request token: {0}")]
-    RequestToken(#[source] hyper::Error),
-    #[error("Fail to retrieve new credential {0:?}")]
-    RetrieveCredentials(#[source] tame_oauth::Error),
-    #[error("Unable to parse token: {0}")]
-    ParseToken(#[source] serde_json::Error),
-    #[error("Unknown OAuth error: {0}")]
-    Unknown(String),
 }
 
 #[derive(Error, Debug)]

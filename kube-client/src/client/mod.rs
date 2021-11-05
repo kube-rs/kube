@@ -35,9 +35,14 @@ mod body;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
 mod config_ext;
+pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
+
+#[cfg(feature = "oauth")]
+#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
+pub use auth::OAuthError;
 
 // Binary subprotocol v4. See `Client::connect`.
 #[cfg(feature = "ws")]

@@ -140,7 +140,7 @@ mod tests {
     use tokio_test::assert_ready_ok;
     use tower_test::{mock, mock::Handle};
 
-    use crate::{config::AuthInfo, error::ConfigError, Error};
+    use crate::{client::AuthError, config::AuthInfo};
 
     #[tokio::test(flavor = "current_thread")]
     async fn valid_token() {
@@ -179,10 +179,10 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(err.is::<Error>());
+        assert!(err.is::<AuthError>());
         assert!(matches!(
-            *err.downcast::<Error>().unwrap(),
-            Error::Kubeconfig(ConfigError::InvalidBearerToken(_))
+            *err.downcast::<AuthError>().unwrap(),
+            AuthError::InvalidBearerToken(_)
         ));
     }
 
