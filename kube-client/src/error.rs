@@ -69,38 +69,11 @@ pub enum Error {
     #[error("OpensslError: {0}")]
     OpensslError(#[source] openssl::error::ErrorStack),
 
-    /// The server did not respond with [`SWITCHING_PROTOCOLS`] status when upgrading the
-    /// connection.
-    ///
-    /// [`SWITCHING_PROTOCOLS`]: http::status::StatusCode::SWITCHING_PROTOCOLS
+    /// Failed to upgrade to a WebSocket connection
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Failed to switch protocol. Status code: {0}")]
-    ProtocolSwitch(http::status::StatusCode),
-
-    /// `Upgrade` header was not set to `websocket` (case insensitive)
-    #[cfg(feature = "ws")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Upgrade header was not set to websocket")]
-    MissingUpgradeWebSocketHeader,
-
-    /// `Connection` header was not set to `Upgrade` (case insensitive)
-    #[cfg(feature = "ws")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Connection header was not set to Upgrade")]
-    MissingConnectionUpgradeHeader,
-
-    /// `Sec-WebSocket-Accept` key mismatched.
-    #[cfg(feature = "ws")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Sec-WebSocket-Accept key mismatched")]
-    SecWebSocketAcceptKeyMismatch,
-
-    /// `Sec-WebSocket-Protocol` mismatched.
-    #[cfg(feature = "ws")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Sec-WebSocket-Protocol mismatched")]
-    SecWebSocketProtocolMismatch,
+    #[error("failed to upgrade to a WebSocket connection: {0}")]
+    UpgradeConnection(#[source] crate::client::UpgradeConnectionError),
 
     /// Errors related to client auth
     #[cfg(feature = "client")]

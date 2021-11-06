@@ -39,14 +39,13 @@ pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
+#[cfg(feature = "ws")] mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
 pub use auth::OAuthError;
 
-// Binary subprotocol v4. See `Client::connect`.
-#[cfg(feature = "ws")]
-const WS_PROTOCOL: &str = "v4.channel.k8s.io";
+#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
 
 /// Client for connecting with a Kubernetes cluster.
 ///
@@ -170,7 +169,7 @@ impl Client {
             http::header::SEC_WEBSOCKET_VERSION,
             HeaderValue::from_static("13"),
         );
-        let key = sec_websocket_key();
+        let key = upgrade::sec_websocket_key();
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_KEY,
             key.parse().expect("valid header value"),
@@ -182,17 +181,19 @@ impl Client {
         // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_PROTOCOL,
-            HeaderValue::from_static(WS_PROTOCOL),
+            HeaderValue::from_static(upgrade::WS_PROTOCOL),
         );
 
         let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
-        verify_upgrade_response(&res, &key)?;
+        upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => {
                 Ok(WebSocketStream::from_raw_socket(upgraded, ws::protocol::Role::Client, None).await)
             }
 
-            Err(e) => Err(Error::HyperError(e)),
+            Err(e) => Err(Error::UpgradeConnection(
+                UpgradeConnectionError::GetPendingUpgrade(e),
+            )),
         }
     }
 
@@ -541,62 +542,6 @@ impl TryFrom<Config> for Client {
             .service(client);
         Ok(Self::new(service, default_ns))
     }
-}
-
-#[cfg(feature = "ws")]
-// Verify upgrade response according to RFC6455.
-// Based on `tungstenite` and added subprotocol verification.
-fn verify_upgrade_response(res: &Response<Body>, key: &str) -> Result<()> {
-    if res.status() != StatusCode::SWITCHING_PROTOCOLS {
-        return Err(Error::ProtocolSwitch(res.status()));
-    }
-
-    let headers = res.headers();
-    if !headers
-        .get(http::header::UPGRADE)
-        .and_then(|h| h.to_str().ok())
-        .map(|h| h.eq_ignore_ascii_case("websocket"))
-        .unwrap_or(false)
-    {
-        return Err(Error::MissingUpgradeWebSocketHeader);
-    }
-
-    if !headers
-        .get(http::header::CONNECTION)
-        .and_then(|h| h.to_str().ok())
-        .map(|h| h.eq_ignore_ascii_case("Upgrade"))
-        .unwrap_or(false)
-    {
-        return Err(Error::MissingConnectionUpgradeHeader);
-    }
-
-    let accept_key = ws::handshake::derive_accept_key(key.as_ref());
-    if !headers
-        .get(http::header::SEC_WEBSOCKET_ACCEPT)
-        .map(|h| h == &accept_key)
-        .unwrap_or(false)
-    {
-        return Err(Error::SecWebSocketAcceptKeyMismatch);
-    }
-
-    // Make sure that the server returned the correct subprotocol.
-    if !headers
-        .get(http::header::SEC_WEBSOCKET_PROTOCOL)
-        .map(|h| h == WS_PROTOCOL)
-        .unwrap_or(false)
-    {
-        return Err(Error::SecWebSocketProtocolMismatch);
-    }
-
-    Ok(())
-}
-
-/// Generate a random key for the `Sec-WebSocket-Key` header.
-/// This must be nonce consisting of a randomly selected 16-byte value in base64.
-#[cfg(feature = "ws")]
-fn sec_websocket_key() -> String {
-    let r: [u8; 16] = rand::random();
-    base64::encode(&r)
 }
 
 #[cfg(test)]
