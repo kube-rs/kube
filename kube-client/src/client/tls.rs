@@ -53,7 +53,11 @@ pub mod native_tls {
 
 #[cfg(feature = "rustls-tls")]
 pub mod rustls_tls {
-    use rustls::{self, Certificate, ClientConfig};
+    use rustls::{
+        self,
+        client::{ServerCertVerified, ServerCertVerifier},
+        Certificate, ClientConfig,
+    };
 
     use crate::{Error, Result};
 
@@ -75,8 +79,13 @@ pub mod rustls_tls {
                     .map_err(|e| Error::SslError(format!("{}", e)))?;
             }
         }
+
         // rustls client config require a complicated series of steps through an ordered builder
         // See https://docs.rs/rustls/0.20.0/rustls/struct.ConfigBuilder.html
+
+        let cfgbld = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(roots);
 
         // Convert the certs into a single cert_chain for rustls
         let client_config = if let Some(buf) = identity_pem {
@@ -131,22 +140,35 @@ pub mod rustls_tls {
                     return Err(Error::SslError("private key or certificate not found".into()));
                 }
             };
-            // Sane case; identity
-            ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(roots)
+            cfgbld
                 .with_single_cert(certs, key)
                 .map_err(|e| Error::SslError(format!("{}", e)))?
-        } else if accept_invalid {
-            ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(roots)
-                .with_no_client_auth()
+        } else if accept_invalid || true {
+            let mut cfgbld = cfgbld.with_no_client_auth();
+            cfgbld
+                .dangerous()
+                .set_certificate_verifier(std::sync::Arc::new(NoCertificateVerification {}));
+            cfgbld
         } else {
-            // is this the most sensible thing?
-            return Err(Error::SslError("no identity_pem found but not bypassing certs".into()));
+            cfgbld.with_no_client_auth()
         };
 
         Ok(client_config)
+    }
+
+    struct NoCertificateVerification {}
+
+    impl ServerCertVerifier for NoCertificateVerification {
+        fn verify_server_cert(
+            &self,
+            _end_entity: &Certificate,
+            _intermediates: &[Certificate],
+            _server_name: &rustls::client::ServerName,
+            _scts: &mut dyn Iterator<Item = &[u8]>,
+            _ocsp_response: &[u8],
+            _now: std::time::SystemTime,
+        ) -> Result<ServerCertVerified, rustls::Error> {
+            Ok(ServerCertVerified::assertion())
+        }
     }
 }

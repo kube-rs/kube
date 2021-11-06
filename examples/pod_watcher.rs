@@ -4,14 +4,16 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, ListParams, ResourceExt},
     runtime::{utils::try_flatten_applied, watcher},
-    Client,
+    Client, Config,
 };
 
 #[tokio::main]
 async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
-    let client = Client::try_default().await?;
+    let config = Config::infer().await?;
+    tracing::info!("config is: {:?}", config);
+    let client = Client::try_from(config)?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let api = Api::<Pod>::namespaced(client, &namespace);
     let watcher = watcher(api, ListParams::default());
