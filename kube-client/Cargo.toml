@@ -62,7 +62,7 @@ tokio-util = { version = "0.6.8", optional = true, features = ["io", "codec"] }
 hyper = { version = "0.14.13", optional = true, features = ["client", "http1", "stream", "tcp"] }
 hyper-tls = { version = "0.5.0", optional = true }
 #hyper-rustls = { version = "0.22.1", optional = true }
-hyper-rustls = { git = "https://github.com/g2p/hyper-rustls.git", rev = "30c6f4756c7140e5f374fcfd7ea2f12b580d4679", optional = true }
+hyper-rustls = { git = "https://github.com/g2p/hyper-rustls.git", rev = "05f5a0bd384451f21dd72e7ca3e2467688b78c84", optional = true }
 tokio-tungstenite = { version = "0.15.0", optional = true }
 tower = { version = "0.4.6", optional = true, features = ["buffer", "util"] }
 tower-http = { version = "0.1.1", optional = true, features = ["auth", "map-response-body", "trace"] }
