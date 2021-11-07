@@ -5,7 +5,7 @@ use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, RefreshTokenLayer},
 };
-use crate::{Config, Result};
+use crate::{Config, Error, Result};
 
 /// Extensions to [`Config`](crate::Config) for custom [`Client`](crate::Client).
 ///
@@ -109,7 +109,7 @@ impl ConfigExt for Config {
     }
 
     fn auth_layer(&self) -> Result<Option<AuthLayer>> {
-        Ok(match Auth::try_from(&self.auth_info)? {
+        Ok(match Auth::try_from(&self.auth_info).map_err(Error::Auth)? {
             Auth::None => None,
             Auth::Basic(user, pass) => Some(AuthLayer(Either::A(
                 AddAuthorizationLayer::basic(&user, &pass).as_sensitive(true),

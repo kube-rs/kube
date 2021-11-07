@@ -1,7 +1,4 @@
 //! Error handling in [`kube`][crate]
-use std::path::PathBuf;
-
-use http::header::InvalidHeaderValue;
 use thiserror::Error;
 
 pub use kube_core::ErrorResponse;
@@ -46,10 +43,6 @@ pub enum Error {
     #[error("HttpError: {0}")]
     HttpError(#[source] http::Error),
 
-    /// Failed to construct a URI.
-    #[error("InvalidUri: {0}")]
-    InvalidUri(#[source] http::uri::InvalidUri),
-
     /// Common error case when requesting parsing into own structs
     #[error("Error deserializing response")]
     SerdeError(#[source] serde_json::Error),
@@ -58,9 +51,9 @@ pub enum Error {
     #[error("Failed to build request: {0}")]
     BuildRequest(#[source] kube_core::request::Error),
 
-    /// Configuration error
-    #[error("Error loading kubeconfig: {0}")]
-    Kubeconfig(#[source] ConfigError),
+    /// Failed to infer config
+    #[error("Failed to infer configuration: {0}")]
+    InferConfig(#[source] crate::config::InferConfigError),
 
     /// Discovery errors
     #[error("Error from discovery: {0}")]
@@ -76,168 +69,17 @@ pub enum Error {
     #[error("OpensslError: {0}")]
     OpensslError(#[source] openssl::error::ErrorStack),
 
-    /// The server did not respond with [`SWITCHING_PROTOCOLS`] status when upgrading the
-    /// connection.
-    ///
-    /// [`SWITCHING_PROTOCOLS`]: http::status::StatusCode::SWITCHING_PROTOCOLS
+    /// Failed to upgrade to a WebSocket connection
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Failed to switch protocol. Status code: {0}")]
-    ProtocolSwitch(http::status::StatusCode),
+    #[error("failed to upgrade to a WebSocket connection: {0}")]
+    UpgradeConnection(#[source] crate::client::UpgradeConnectionError),
 
-    /// `Upgrade` header was not set to `websocket` (case insensitive)
-    #[cfg(feature = "ws")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Upgrade header was not set to websocket")]
-    MissingUpgradeWebSocketHeader,
-
-    /// `Connection` header was not set to `Upgrade` (case insensitive)
-    #[cfg(feature = "ws")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Connection header was not set to Upgrade")]
-    MissingConnectionUpgradeHeader,
-
-    /// `Sec-WebSocket-Accept` key mismatched.
-    #[cfg(feature = "ws")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Sec-WebSocket-Accept key mismatched")]
-    SecWebSocketAcceptKeyMismatch,
-
-    /// `Sec-WebSocket-Protocol` mismatched.
-    #[cfg(feature = "ws")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    #[error("Sec-WebSocket-Protocol mismatched")]
-    SecWebSocketProtocolMismatch,
-}
-
-#[derive(Error, Debug)]
-// Redundant with the error messages and machine names
-#[allow(missing_docs)]
-/// Possible errors when loading config
-pub enum ConfigError {
-    #[error("Invalid basic auth: {0}")]
-    InvalidBasicAuth(#[source] InvalidHeaderValue),
-
-    #[error("Invalid bearer token: {0}")]
-    InvalidBearerToken(#[source] InvalidHeaderValue),
-
-    #[error("Tried to refresh a token and got a non-refreshable token response")]
-    /// Tried to refresh a token and got a non-refreshable token response
-    UnrefreshableTokenResponse,
-
-    #[error("Failed to infer config.. cluster env: ({cluster_env}), kubeconfig: ({kubeconfig})")]
-    ConfigInferenceExhausted {
-        cluster_env: Box<Error>,
-        // We can only pick one source, but the kubeconfig failure is more likely to be a user error
-        #[source]
-        kubeconfig: Box<Error>,
-    },
-
-    #[error("Failed to determine current context")]
-    CurrentContextNotSet,
-
-    #[error("Merging kubeconfig with mismatching kind")]
-    KindMismatch,
-    #[error("Merging kubeconfig with mismatching apiVersion")]
-    ApiVersionMismatch,
-
-    #[error("Unable to load in cluster config, {hostenv} and {portenv} must be defined")]
-    /// One or more required in-cluster config options are missing
-    MissingInClusterVariables {
-        hostenv: &'static str,
-        portenv: &'static str,
-    },
-
-    #[error("Unable to load incluster default namespace: {0}")]
-    InvalidInClusterNamespace(#[source] Box<Error>),
-
-    #[error("Unable to load in cluster token: {0}")]
-    InvalidInClusterToken(#[source] Box<Error>),
-
-    #[error("exec-plugin response did not contain a status")]
-    ExecPluginFailed,
-
+    /// Errors related to client auth
     #[cfg(feature = "client")]
     #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-    #[error("Malformed token expiration date: {0}")]
-    MalformedTokenExpirationDate(#[source] chrono::ParseError),
-
-    #[cfg(feature = "oauth")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
-    #[error("OAuth Error: {0}")]
-    OAuth(#[source] OAuthError),
-
-    #[error("Unable to load current context: {context_name}")]
-    LoadContext { context_name: String },
-    #[error("Unable to load cluster of context: {cluster_name}")]
-    LoadClusterOfContext { cluster_name: String },
-    #[error("Unable to find named user: {user_name}")]
-    FindUser { user_name: String },
-
-    #[error("Unable to find path of kubeconfig")]
-    NoKubeconfigPath,
-
-    #[error("Failed to decode base64: {0}")]
-    Base64Decode(#[source] base64::DecodeError),
-    #[error("Failed to compute the absolute path of '{path:?}'")]
-    NoAbsolutePath { path: PathBuf },
-    #[error("Failed to read '{path:?}': {source}")]
-    ReadFile {
-        path: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-    #[error("Failed to get data/file with base64 format")]
-    NoBase64FileOrData,
-    #[error("Failed to get data/file")]
-    NoFileOrData,
-
-    #[error("Failed to parse Kubeconfig YAML: {0}")]
-    ParseYaml(#[source] serde_yaml::Error),
-
-    #[error("Failed to find a single YAML document in Kubeconfig: {0}")]
-    EmptyKubeconfig(PathBuf),
-
-    #[error("Unable to run auth exec: {0}")]
-    AuthExecStart(#[source] std::io::Error),
-    #[error("Auth exec command '{cmd}' failed with status {status}: {out:?}")]
-    AuthExecRun {
-        cmd: String,
-        status: std::process::ExitStatus,
-        out: std::process::Output,
-    },
-    #[error("Failed to parse auth exec output: {0}")]
-    AuthExecParse(#[source] serde_json::Error),
-    #[error("Failed exec auth: {0}")]
-    AuthExec(String),
-}
-
-#[cfg(feature = "oauth")]
-#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
-#[derive(Error, Debug)]
-// Redundant with the error messages and machine names
-#[allow(missing_docs)]
-/// Possible errors when requesting token with OAuth
-pub enum OAuthError {
-    #[error("Missing GOOGLE_APPLICATION_CREDENTIALS env")]
-    /// Missing GOOGLE_APPLICATION_CREDENTIALS env
-    MissingGoogleCredentials,
-    #[error("Unable to load OAuth credentials file: {0}")]
-    LoadCredentials(#[source] std::io::Error),
-    #[error("Unable to parse OAuth credentials file: {0}")]
-    ParseCredentials(#[source] serde_json::Error),
-    #[error("Credentials file had invalid key format: {0}")]
-    InvalidKeyFormat(#[source] tame_oauth::Error),
-    #[error("Credentials file had invalid RSA key: {0}")]
-    InvalidRsaKey(#[source] tame_oauth::Error),
-    #[error("Unable to request token: {0}")]
-    RequestToken(#[source] hyper::Error),
-    #[error("Fail to retrieve new credential {0:?}")]
-    RetrieveCredentials(#[source] tame_oauth::Error),
-    #[error("Unable to parse token: {0}")]
-    ParseToken(#[source] serde_json::Error),
-    #[error("Unknown OAuth error: {0}")]
-    Unknown(String),
+    #[error("auth error: {0}")]
+    Auth(#[source] crate::client::AuthError),
 }
 
 #[derive(Error, Debug)]
