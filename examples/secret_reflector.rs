@@ -1,9 +1,9 @@
 #[macro_use] extern crate log;
-use futures::TryStreamExt;
+use futures::StreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher},
+    runtime::cache::{Cache, Store},
     Client,
 };
 use std::collections::BTreeMap;
@@ -52,21 +52,17 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
-    let secrets: Api<Secret> = Api::namespaced(client, &namespace);
-    let lp = ListParams::default().timeout(10); // short watch timeout in this example
+    let secrets: Api<Secret> = Api::default_namespaced(client);
 
-    let store = reflector::store::Writer::<Secret>::default();
-    let reader = store.as_reader();
-    let rf = reflector(store, watcher(secrets, lp));
-    spawn_periodic_reader(reader); // read from a reader in the background
+    let cache = Cache::new(secrets, ListParams::default());
+    spawn_periodic_reader(cache.store()); // read from a reader in the background
 
-    try_flatten_applied(rf)
-        .try_for_each(|s| async move {
-            log::info!("Applied: {}", s.name());
-            Ok(())
+    let stream = cache.applies();
+    stream
+        .for_each(|s| async move {
+            log::info!("Saw: {}", s.name());
         })
-        .await?;
+        .await;
     Ok(())
 }

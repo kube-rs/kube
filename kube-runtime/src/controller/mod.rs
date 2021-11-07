@@ -2,11 +2,7 @@
 
 use self::runner::Runner;
 use crate::{
-    reflector::{
-        reflector,
-        store::{Store, Writer},
-        ObjectRef,
-    },
+    cache::{reflector, ObjectRef, Store, Writer},
     scheduler::{self, scheduler, ScheduleRequest},
     utils::{
         try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle,
@@ -18,7 +14,8 @@ use derivative::Derivative;
 use futures::{
     channel,
     future::{self, BoxFuture},
-    stream, Future, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
+    stream::{self, BoxStream},
+    Future, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
 use kube_client::api::{Api, DynamicObject, ListParams, Resource};
 use serde::de::DeserializeOwned;
@@ -28,7 +25,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use stream::BoxStream;
 use thiserror::Error;
 use tokio::{runtime::Handle, time::Instant};
 use tracing::{info_span, Instrument};

@@ -1,27 +1,24 @@
 use color_eyre::Result;
-use futures::prelude::*;
+use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, ListParams},
-    runtime::{reflector, watcher},
+    api::{Api, ListParams, ResourceExt},
+    runtime::cache::Cache,
     Client,
 };
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
+    let api: Api<Pod> = Api::default_namespaced(client);
+    let cache = Cache::new(api, ListParams::default());
+    let store = cache.store();
 
-    let api: Api<Pod> = Api::namespaced(client, &namespace);
-    let store_w = reflector::store::Writer::default();
-    let store = store_w.as_reader();
-    let reflector = reflector(store_w, watcher(api, ListParams::default()));
-    // Use try_for_each to fail on first error, use for_each to keep retrying
-    reflector
-        .try_for_each(|_event| async {
-            println!("Current pod count: {}", store.state().len());
-            Ok(())
-        })
-        .await?;
+    // Observe kubernetes watch events while driving the cache:
+    let mut applies = cache.applies().boxed();
+    while let Some(p) = applies.next().await {
+        println!("Got pod: {} (total={})", p.name(), store.state().len());
+    }
+
     Ok(())
 }

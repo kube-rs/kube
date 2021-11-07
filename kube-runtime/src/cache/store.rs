@@ -125,7 +125,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::Writer;
-    use crate::{reflector::ObjectRef, watcher};
+    use crate::{cache::ObjectRef, watcher};
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::api::ObjectMeta;
 

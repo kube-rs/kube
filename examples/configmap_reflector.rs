@@ -1,9 +1,9 @@
 #[macro_use] extern crate log;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
-    runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher},
+    api::{Api, ResourceExt},
+    runtime::cache::{Cache, Store},
     Client,
 };
 
@@ -23,20 +23,17 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
-    let cms: Api<ConfigMap> = Api::namespaced(client, &namespace);
-    let lp = ListParams::default().timeout(10); // short watch timeout in this example
+    let cms: Api<ConfigMap> = Api::default_namespaced(client);
+    let cache = Cache::new(cms, Default::default());
+    let store = cache.store();
 
-    let store = reflector::store::Writer::<ConfigMap>::default();
-    let reader = store.as_reader();
-    let rf = reflector(store, watcher(cms, lp));
+    spawn_periodic_reader(store.clone()); // read from a reader in the background
 
-    spawn_periodic_reader(reader); // read from a reader in the background
-
-    let mut applied_events = try_flatten_applied(rf).boxed_local();
-    while let Some(event) = applied_events.try_next().await? {
-        info!("Applied {}", event.name())
+    // Observe kubernetes watch events while driving the cache:
+    let mut applies = cache.applies().boxed();
+    while let Some(cm) = applies.next().await {
+        println!("Saw cm: {} (total={})", cm.name(), store.state().len());
     }
     Ok(())
 }
