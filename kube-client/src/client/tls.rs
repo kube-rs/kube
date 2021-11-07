@@ -79,6 +79,7 @@ pub mod rustls_tls {
                     .map_err(|e| Error::SslError(format!("{}", e)))?;
             }
         }
+        let has_roots = !roots.is_empty();
 
         // rustls client config require a complicated series of steps through an ordered builder
         // See https://docs.rs/rustls/0.20.0/rustls/struct.ConfigBuilder.html
@@ -143,7 +144,7 @@ pub mod rustls_tls {
             cfgbld
                 .with_single_cert(certs, key)
                 .map_err(|e| Error::SslError(format!("{}", e)))?
-        } else if accept_invalid || true {
+        } else if accept_invalid || !has_roots {
             let mut cfgbld = cfgbld.with_no_client_auth();
             cfgbld
                 .dangerous()
