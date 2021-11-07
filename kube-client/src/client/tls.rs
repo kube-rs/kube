@@ -56,7 +56,7 @@ pub mod native_tls {
             let mut builder = Pkcs12::builder();
             builder
                 .key_algorithm(Nid::PBE_WITHSHA1AND3_KEY_TRIPLEDES_CBC)
-                .cert_algorithm(Nid::PBE_WITHSHA1AND40BITRC2_CBC);
+                .cert_algorithm(Nid::PBE_WITHSHA1AND3_KEY_TRIPLEDES_CBC);
             builder
         };
         let p12 = p12_builder
