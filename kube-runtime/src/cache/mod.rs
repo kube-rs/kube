@@ -78,6 +78,7 @@ where
     }
 
     /// Retrieve a reading copy of the store before starting the cache
+    #[must_use]
     pub fn store(&self) -> Store<K> {
         self.reader.clone()
     }
@@ -95,7 +96,6 @@ where
     ///
     /// Note that the returned stream is always reflected in the [`reader`](Cache::reader).
     /// If you do not require a reader, prefer using a [`watcher`] directly.
-    #[must_use]
     pub fn applies(self) -> impl Stream<Item = K> + Send {
         utils::try_flatten_applied(self.cache).filter_map(|x| async move { x.ok() })
     }
@@ -104,7 +104,6 @@ where
     ///
     /// Note that the returned stream is always reflected in the [`reader`](Cache::reader).
     /// If you do not require a reader, prefer using a [`watcher`] directly.
-    #[must_use]
     pub fn touches(self) -> impl Stream<Item = K> + Send {
         utils::try_flatten_touched(self.cache).filter_map(|x| async move { x.ok() })
     }
