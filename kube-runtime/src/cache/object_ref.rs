@@ -21,7 +21,7 @@ use std::{
 /// are still considered different.
 ///
 /// ```
-/// use kube_runtime::reflector::ObjectRef;
+/// use kube_runtime::cache::ObjectRef;
 /// use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 /// assert_ne!(
 ///     ObjectRef::<ConfigMap>::new("a").erase(),
@@ -39,7 +39,7 @@ pub struct ObjectRef<K: Resource> {
     /// have a namespace. These are, however, not considered equal:
     ///
     /// ```
-    /// # use kube_runtime::reflector::ObjectRef;
+    /// # use kube_runtime::cache::ObjectRef;
     /// # use k8s_openapi::api::core::v1::ConfigMap;
     /// assert_ne!(ObjectRef::<ConfigMap>::new("foo"), ObjectRef::new("foo").within("bar"));
     /// ```
