@@ -5,25 +5,6 @@ metadata:
   name: apps
 
 ---
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: foos.clux.dev
-spec:
-  group: clux.dev
-  names:
-    kind: Foo
-    listKind: FooList
-    plural: foos
-    singular: foo
-  scope: Namespaced
-  version: v1
-  versions:
-  - name: v1
-    served: true
-    storage: true
-
----
 # Scoped service account
 apiVersion: v1
 kind: ServiceAccount
@@ -40,14 +21,6 @@ metadata:
   namespace: apps
   name: dapp-role
 rules:
-  - apiGroups:
-    - clux.dev
-    resources:
-    - foos
-    verbs:
-    - get
-    - watch
-    - list
   - apiGroups:
     - batch
     resources:

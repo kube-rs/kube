@@ -27,6 +27,26 @@ satisfy the above requirement.
 This project has adopted the [CNCF Code of
 Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 
+## Rust Guidelines
+
+- **Channel**: Code is built and tested using the **stable** channel of Rust, but documented and formatted with **nightly**
+- **Formatting**: To format the codebase, run `make fmt`
+- **Documentation** To check documentation, run `make doc`
+- **Testing**: To run tests, run `make test`.
+
+## Testing
+
+Most tests can be run with `cargo test --all`, but because of features, some tests must be run a little more precisely.
+For the complete variations see the `make test` target in the `Makefile`.
+
+Some tests and examples require an accessible kubernetes cluster via a `KUBECONFIG` environment variable.
+
+- unit tests marked as `#[ignore]` run via `cargo test --all --lib -- --ignored`
+- examples run with `cargo run --example=...`
+- [integration tests](https://github.com/kube-rs/kube-rs/tree/master/integration)
+
+The easiest way set up a minimal kubernetes cluster for these is with [k3d](https://k3d.io/) or `[k3s](https://k3s.io/).
+
 ## Support
 ### Documentation
 The [high-level architecture document](./architecture.md) is written for contributors.

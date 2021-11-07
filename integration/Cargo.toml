@@ -1,5 +1,5 @@
 [package]
-name = "tests"
+name = "integration"
 version = "0.1.0"
 authors = ["clux <sszynrae@gmail.com>"]
 publish = false

@@ -122,7 +122,7 @@ mod test {
 
     #[cfg(feature = "derive")]
     #[tokio::test]
-    #[ignore] // circle has no kubeconfig
+    #[ignore] // needs kubeconfig
     async fn convenient_custom_resource() {
         use crate as kube_core; // derive macro needs kube in scope
         use crate::{Api, Client, CustomResource};
