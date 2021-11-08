@@ -5,7 +5,7 @@ mod store;
 
 pub use self::object_ref::ObjectRef;
 use crate::{utils, watcher};
-use futures::{future::BoxFuture, stream::BoxStream, FutureExt, Stream, StreamExt, TryStreamExt};
+use futures::{future::Future, stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use kube_client::{
     api::{Api, ListParams},
     Resource,
@@ -87,9 +87,9 @@ where
     ///
     /// This should be awaited forever.
     #[must_use]
-    pub fn run(self) -> BoxFuture<'static, ()> {
+    pub async fn run(self) -> impl Future {
         let stream = self.applies();
-        stream.for_each(|_| futures::future::ready(())).boxed()
+        stream.for_each(|_| futures::future::ready(()))
     }
 
     /// Consumes the cache, runs the reflector, and returns an information stream of watch events (modified/added)
