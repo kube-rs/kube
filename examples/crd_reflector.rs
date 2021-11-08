@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::StreamExt;
+use futures::TryStreamExt;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 
 use kube::{
@@ -39,8 +39,8 @@ async fn main() -> anyhow::Result<()> {
     let store = cache.store();
 
     // Observe kubernetes watch events while driving the cache:
-    let mut applies = cache.applies().boxed();
-    while let Some(foo) = applies.next().await {
+    let mut applies = cache.applies();
+    while let Some(foo) = applies.try_next().await? {
         info!("Saw Foo: {} (total={})", foo.name(), store.state().len());
     }
     Ok(())

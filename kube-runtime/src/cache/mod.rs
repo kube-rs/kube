@@ -5,7 +5,7 @@ mod store;
 
 pub use self::object_ref::ObjectRef;
 use crate::{utils, watcher};
-use futures::{future::Future, stream::BoxStream, Stream, StreamExt, TryStreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use kube_client::{
     api::{Api, ListParams},
     Resource,
@@ -86,26 +86,26 @@ where
     /// Consume the stream and return a future that will run the duration of the program
     ///
     /// This should be awaited forever.
-    #[must_use]
-    pub async fn run(self) -> impl Future {
-        let stream = self.applies();
-        stream.for_each(|_| futures::future::ready(()))
+    pub async fn run(self) -> Result<(), watcher::Error> {
+        let mut stream = self.applies();
+        while let Some(_) = stream.try_next().await? {}
+        Ok(())
     }
 
     /// Consumes the cache, runs the reflector, and returns an information stream of watch events (modified/added)
     ///
     /// Note that the returned stream is always reflected in the [`reader`](Cache::reader).
     /// If you do not require a reader, prefer using a [`watcher`] directly.
-    pub fn applies(self) -> impl Stream<Item = K> + Send {
-        utils::try_flatten_applied(self.cache).filter_map(|x| async move { x.ok() })
+    pub fn applies(self) -> impl Stream<Item = Result<K, watcher::Error>> + Send {
+        utils::try_flatten_applied(self.cache)
     }
 
     /// Consumes the cache, runs the reflector, and returns an informational stream of watch events (modified/added/deleted)
     ///
     /// Note that the returned stream is always reflected in the [`reader`](Cache::reader).
     /// If you do not require a reader, prefer using a [`watcher`] directly.
-    pub fn touches(self) -> impl Stream<Item = K> + Send {
-        utils::try_flatten_touched(self.cache).filter_map(|x| async move { x.ok() })
+    pub fn touches(self) -> impl Stream<Item = Result<K, watcher::Error>> + Send {
+        utils::try_flatten_touched(self.cache)
     }
 }
 

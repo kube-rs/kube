@@ -28,6 +28,6 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Run the reflector and discard informational watch events
-    cache.run().await;
+    cache.run().await?;
     Ok(())
 }

@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use futures::StreamExt;
+use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, ListParams, ResourceExt},
@@ -15,8 +15,8 @@ async fn main() -> Result<()> {
     let store = cache.store();
 
     // Observe kubernetes watch events while driving the cache:
-    let mut applies = cache.applies().boxed();
-    while let Some(p) = applies.next().await {
+    let mut applies = cache.applies();
+    while let Some(p) = applies.try_next().await? {
         println!("Got pod: {} (total={})", p.name(), store.state().len());
     }
 

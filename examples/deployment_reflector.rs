@@ -27,6 +27,6 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Drive the cache indefinitely
-    cache.run().await;
+    cache.run().await?;
     Ok(())
 }

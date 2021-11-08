@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::StreamExt;
+use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{Api, ListParams, ResourceExt},
@@ -58,11 +58,9 @@ async fn main() -> anyhow::Result<()> {
     let cache = Cache::new(secrets, ListParams::default());
     spawn_periodic_reader(cache.store()); // read from a reader in the background
 
-    let stream = cache.applies();
-    stream
-        .for_each(|s| async move {
-            log::info!("Saw: {}", s.name());
-        })
-        .await;
+    let mut stream = cache.applies();
+    while let Some(s) = stream.try_next().await? {
+        log::info!("Saw: {}", s.name());
+    }
     Ok(())
 }
