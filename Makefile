@@ -53,8 +53,8 @@ dapp:
 	chmod +x integration/dapp
 
 k3d:
-  k3d cluster create --servers 1 --agents 1 main \
-    --k3s-agent-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%' \
-    --k3s-agent-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%'
+	k3d cluster create --servers 1 --agents 1 main \
+		--k3s-agent-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%' \
+		--k3s-agent-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%'
 
 .PHONY: doc build fmt clippy test readme k3d integration
