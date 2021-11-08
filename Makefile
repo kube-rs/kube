@@ -38,11 +38,12 @@ integration: dapp
 	k3d image import clux/kube-dapp:$(VERSION) --cluster main
 	sed -i 's/latest/$(VERSION)/g' integration/deployment.yaml
 	kubectl apply -f integration/deployment.yaml
-	kubectl rollout status deploy/dapp -n apps
-	kubectl status deploy/dapp -n apps
-	kubectl logs -f -n apps deploy/dapp
-	kubectl get pods -n apps | grep dapp | grep Completed
-	kubectl get pods -n apps | grep empty-job | grep Completed
+	sed -i 's/$(VERSION)/latest/g' integration/deployment.yaml
+	kubectl get all -n apps
+	kubectl describe jobs/dapp -n apps
+	kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
+	kubectl get all -n apps
+	kubectl wait --for=condition=complete job/dapp -n apps --timeout=10s || kubectl get pods -n apps | grep dapp | grep Completed
 
 dapp:
 	docker run \
