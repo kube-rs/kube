@@ -29,7 +29,7 @@ Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 
 ## Rust Guidelines
 
-- **Channel**: Code is built and tested using the **stable** channel of Rust, but documented and formatted with **nightly**
+- **Channel**: Code is built and tested using the **stable** channel of Rust, but documented and formatted with **nightly** <sup><a href="#footnotes">1</a></sup>
 - **Formatting**: To format the codebase, run `make fmt`
 - **Documentation** To check documentation, run `make doc`
 - **Testing**: To run tests, run `make test`.
@@ -54,3 +54,12 @@ The [high-level architecture document](./architecture.md) is written for contrib
 ### Contact
 You can ask general questions / share ideas / query the community at the [kube-rs discussions forum](https://github.com/kube-rs/kube-rs/discussions).
 You can reach the maintainers of this project at [#kube](https://discord.gg/tokio) channel on the Tokio discord.
+
+### Footnotes
+<details><summary></summary>
+
+<ol id="footnotes">
+  <li>We are hoping to slowly migrate to stable tooling as it becomes available.
+</ol>
+
+</details>
