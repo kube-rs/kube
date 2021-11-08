@@ -16,7 +16,7 @@ Please fill in as much of the template below as you're able.
 <!--
 List the versions and features of any `kube` and `k8s-openapi` crates you are using.
 Output of `grep kube Cargo.toml`
-Output of `grep k8s-openapi Cargo.toml`
+Output of `grep k8s-openapi Cargo.toml` or `cargo tree -i k8s-openapi`
 -->
 
 ### Cluster

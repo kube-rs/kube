@@ -21,7 +21,6 @@ test:
 	cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
 	cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
 	cargo test -p kube --lib --no-default-features
-	cargo test -p examples --example crd_derive_no_schema --no-default-features --features=native-tls,latest
 	cargo test -p examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
 
 test-kubernetes:
