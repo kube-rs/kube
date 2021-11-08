@@ -24,6 +24,7 @@ Output of `grep k8s-openapi Cargo.toml`
 <!---
 What type of kubernetes cluster you are running aginst (k3s/eks/aks/gke/other) plus:
 Output of `kubectl version --short`
+Target OS in `Dockerfile` if applicable
 -->
 
 

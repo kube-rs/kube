@@ -45,7 +45,7 @@ Some tests and examples require an accessible kubernetes cluster via a `KUBECONF
 - examples run with `cargo run --example=...`
 - [integration tests](https://github.com/kube-rs/kube-rs/tree/master/integration)
 
-The easiest way set up a minimal kubernetes cluster for these is with [k3d](https://k3d.io/) or `[k3s](https://k3s.io/).
+The easiest way set up a minimal kubernetes cluster for these is with [`k3d`](https://k3d.io/).
 
 ## Support
 ### Documentation
