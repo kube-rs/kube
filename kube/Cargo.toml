@@ -19,6 +19,7 @@ edition = "2021"
 default = ["client", "native-tls"]
 native-tls = ["kube-client/native-tls"]
 rustls-tls = ["kube-client/rustls-tls"]
+openssl-tls = ["kube-client/openssl-tls"]
 ws = ["kube-client/ws", "kube-core/ws"]
 oauth = ["kube-client/oauth"]
 gzip = ["kube-client/gzip"]
@@ -31,7 +32,7 @@ runtime = ["kube-runtime"]
 deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/v1_22"]
+features = ["client", "native-tls", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/v1_22"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 

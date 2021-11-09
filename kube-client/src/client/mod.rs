@@ -38,7 +38,10 @@ mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
-#[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
+mod tls;
+#[cfg(feature = "openssl-tls")]
+pub use tls::openssl_tls::Error as OpensslTlsError;
 #[cfg(feature = "ws")] mod upgrade;
 
 #[cfg(feature = "oauth")]
@@ -460,15 +463,23 @@ impl TryFrom<Config> for Client {
             let mut connector = HttpConnector::new();
             connector.enforce_http(false);
 
-            // Note that if both `native_tls` and `rustls` is enabled, `native_tls` is used by default.
-            // To use `rustls`, disable `native_tls` or create custom client.
-            // If tls features are not enabled, http connector will be used.
-            #[cfg(feature = "native-tls")]
+            // Current TLS feature precedence when more than one are set:
+            // 1. openssl-tls
+            // 2. native-tls
+            // 3. rustls-tls
+            // Create a custom client to use something else.
+            // If TLS features are not enabled, http connector will be used.
+            #[cfg(feature = "openssl-tls")]
+            let connector = config.openssl_https_connector_with_connector(connector)?;
+            #[cfg(all(not(feature = "openssl-tls"), feature = "native-tls"))]
             let connector = hyper_tls::HttpsConnector::from((
                 connector,
                 tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
             ));
-            #[cfg(all(not(feature = "native-tls"), feature = "rustls-tls"))]
+            #[cfg(all(
+                not(any(feature = "openssl-tls", feature = "native-tls")),
+                feature = "rustls-tls"
+            ))]
             let connector = hyper_rustls::HttpsConnector::from((
                 connector,
                 std::sync::Arc::new(config.rustls_client_config()?),

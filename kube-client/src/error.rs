@@ -69,6 +69,12 @@ pub enum Error {
     #[error("OpensslError: {0}")]
     OpensslError(#[source] openssl::error::ErrorStack),
 
+    /// Errors from OpenSSL TLS
+    #[cfg(feature = "openssl-tls")]
+    #[cfg_attr(docsrs, doc(feature = "openssl-tls"))]
+    #[error("openssl tls error: {0}")]
+    OpensslTls(#[source] crate::client::OpensslTlsError),
+
     /// Failed to upgrade to a WebSocket connection
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
