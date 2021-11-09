@@ -30,6 +30,8 @@ where
 }
 
 /// A simple reflector cache around a store and an owned watcher
+///
+/// Requires `list` and `watch` access of the resource `K`.
 pub struct Cache<K>
 where
     K: Clone + Resource + Send + Sync + 'static,
@@ -86,9 +88,16 @@ where
     /// Consume the stream and return a future that will run the duration of the program
     ///
     /// This should be awaited forever.
+    ///
+    /// # Errors
+    ///
+    /// If an irrecoverable [`watcher::Error`] was encountered, the first is returned:
+    ///
+    /// - 404 `ErrorResponse`(watching invalid / missing api kind/group for `K`)
+    /// - 403 `ErrorResponse` (missing list + watch rbac verbs for `K`)
     pub async fn run(self) -> Result<(), watcher::Error> {
         let mut stream = self.applies();
-        while let Some(_) = stream.try_next().await? {}
+        while stream.try_next().await?.is_some() {}
         Ok(())
     }
 
