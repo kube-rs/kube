@@ -1,9 +1,9 @@
 #[macro_use] extern crate log;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ResourceExt},
-    runtime::cache::{Cache, Store},
+    runtime::cache::{Reflector, Store},
     Client,
 };
 
@@ -25,13 +25,12 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let cms: Api<ConfigMap> = Api::default_namespaced(client);
-    let cache = Cache::new(cms, Default::default());
-    let store = cache.store();
+    let (cache, store) = Reflector::new(cms, Default::default());
 
     spawn_periodic_reader(store.clone()); // read from a reader in the background
 
     // Observe kubernetes watch events while driving the cache:
-    let mut applies = cache.applies();
+    let mut applies = cache.watch_applies().boxed();
     while let Some(cm) = applies.try_next().await? {
         println!("Saw cm: {} (total={})", cm.name(), store.state().len());
     }

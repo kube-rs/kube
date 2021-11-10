@@ -1,9 +1,9 @@
 #[macro_use] extern crate log;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::cache::{Cache, Store},
+    runtime::cache::{Reflector, Store},
     Client,
 };
 use std::collections::BTreeMap;
@@ -55,10 +55,10 @@ async fn main() -> anyhow::Result<()> {
 
     let secrets: Api<Secret> = Api::default_namespaced(client);
 
-    let cache = Cache::new(secrets, ListParams::default());
-    spawn_periodic_reader(cache.store()); // read from a reader in the background
+    let (cache, store) = Reflector::new(secrets, ListParams::default());
+    spawn_periodic_reader(store); // read from a reader in the background
 
-    let mut stream = cache.applies();
+    let mut stream = cache.watch_applies().boxed();
     while let Some(s) = stream.try_next().await? {
         log::info!("Saw: {}", s.name());
     }

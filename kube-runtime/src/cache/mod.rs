@@ -5,7 +5,7 @@ mod store;
 
 pub use self::object_ref::ObjectRef;
 use crate::{utils, watcher};
-use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use kube_client::{
     api::{Api, ListParams},
     Resource,
@@ -32,57 +32,56 @@ where
 /// A simple reflector cache around a store and an owned watcher
 ///
 /// Requires `list` and `watch` access of the resource `K`.
-pub struct Cache<K>
+pub struct Reflector<K>
 where
     K: Clone + Resource + Send + Sync + 'static,
     K::DynamicType: Eq + Hash,
 {
-    reader: Store<K>,
-    cache: BoxStream<'static, std::result::Result<watcher::Event<K>, watcher::Error>>,
+    // temporary builder params
+    api: Api<K>,
+    lp: ListParams,
+    writer: Writer<K>,
 }
 
-impl<K> Cache<K>
+impl<K> Reflector<K>
 where
     K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
     K::DynamicType: Eq + Hash + Clone + Default,
 {
-    /// Create a Cache on a reflector on a type `K`
+    /// Create a Reflector on a reflector on a type `K`
     ///
-    /// Takes an [`Api`] object that determines how the `Cache` listens for changes to the `K`.
+    /// Takes an [`Api`] object that determines how the `Reflector` listens for changes to the `K`.
     ///
     /// The [`ListParams`] controls to the possible subset of objects of `K` that you want to cache.
     /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
     #[must_use]
-    pub fn new(api: Api<K>, lp: ListParams) -> Self {
+    pub fn new(api: Api<K>, lp: ListParams) -> (Self, Store<K>) {
         Self::new_with(api, lp, Default::default())
     }
 }
 
-impl<K> Cache<K>
+impl<K> Reflector<K>
 where
     K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
     K::DynamicType: Eq + Hash + Clone,
 {
-    /// Create a Cache on a reflector on a type `K`
+    /// Create a Reflector on a reflector on a type `K`
     ///
-    /// Takes an [`Api`] object that determines how the `Cache` listens for changes to the `K`.
+    /// Takes an [`Api`] object that determines how the `Reflector` listens for changes to the `K`.
     ///
     /// The [`ListParams`] controls to the possible subset of objects of `K` that you want to cache.
     /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
     ///
-    /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Cache::new`] for static types.
+    /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Reflector::new`] for static types.
     #[must_use]
-    pub fn new_with(api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
+    pub fn new_with(api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> (Self, Store<K>) {
         let writer = Writer::<K>::new(dyntype);
         let reader = writer.as_reader();
-        let cache = reflector(writer, watcher(api, lp)).boxed();
-        Self { reader, cache }
+        (Self { api, lp, writer }, reader)
     }
 
-    /// Retrieve a reading copy of the store before starting the cache
-    #[must_use]
-    pub fn store(&self) -> Store<K> {
-        self.reader.clone()
+    fn start(self) -> impl Stream<Item = watcher::Result<watcher::Event<K>>> {
+        reflector(self.writer, watcher(self.api, self.lp))
     }
 
     /// Consume the stream and return a future that will run the duration of the program
@@ -96,25 +95,27 @@ where
     /// - 404 `ErrorResponse`(watching invalid / missing api kind/group for `K`)
     /// - 403 `ErrorResponse` (missing list + watch rbac verbs for `K`)
     pub async fn run(self) -> Result<(), watcher::Error> {
-        let mut stream = self.applies();
-        while stream.try_next().await?.is_some() {}
+        let mut applies = utils::try_flatten_applied(self.start().boxed());
+        while applies.try_next().await?.is_some() {}
         Ok(())
     }
 
     /// Consumes the cache, runs the reflector, and returns an information stream of watch events (modified/added)
     ///
-    /// Note that the returned stream is always reflected in the [`reader`](Cache::reader).
+    /// Note that the returned stream is always reflected in the [`reader`](Reflector::reader).
     /// If you do not require a reader, prefer using a [`watcher`] directly.
-    pub fn applies(self) -> impl Stream<Item = Result<K, watcher::Error>> + Send {
-        utils::try_flatten_applied(self.cache)
+    pub fn watch_applies(self) -> impl Stream<Item = Result<K, watcher::Error>> {
+        let stream = self.start();
+        utils::try_flatten_applied(stream)
     }
 
     /// Consumes the cache, runs the reflector, and returns an informational stream of watch events (modified/added/deleted)
     ///
-    /// Note that the returned stream is always reflected in the [`reader`](Cache::reader).
+    /// Note that the returned stream is always reflected in the [`reader`](Reflector::reader).
     /// If you do not require a reader, prefer using a [`watcher`] directly.
-    pub fn touches(self) -> impl Stream<Item = Result<K, watcher::Error>> + Send {
-        utils::try_flatten_touched(self.cache)
+    pub fn watch_touches(self) -> impl Stream<Item = Result<K, watcher::Error>> {
+        let stream = self.start();
+        utils::try_flatten_touched(stream)
     }
 }
 

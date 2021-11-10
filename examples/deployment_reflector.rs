@@ -2,7 +2,7 @@
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
     api::{Api, ResourceExt},
-    runtime::cache::Cache,
+    runtime::cache::Reflector,
     Client,
 };
 
@@ -13,8 +13,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let api: Api<Deployment> = Api::default_namespaced(client);
 
-    let cache = Cache::new(api, Default::default());
-    let store = cache.store();
+    let (cache, store) = Reflector::new(api, Default::default());
 
     // We can interact with state in another thread
     tokio::spawn(async move {

@@ -2,7 +2,7 @@
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::cache::Cache,
+    runtime::cache::Reflector,
     Client,
 };
 
@@ -15,8 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let nodes: Api<Node> = Api::all(client.clone());
     let lp = ListParams::default().labels("kubernetes.io/arch=amd64");
 
-    let cache = Cache::new(nodes, lp);
-    let store = cache.store();
+    let (cache, store) = Reflector::new(nodes, lp);
 
     // Periodically read our state in the background
     tokio::spawn(async move {
