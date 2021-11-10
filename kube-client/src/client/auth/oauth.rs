@@ -52,6 +52,12 @@ pub enum Error {
     /// OAuth failed with unknown reason
     #[error("unknown OAuth error: {0}")]
     Unknown(String),
+
+    /// Failed to create OpenSSL HTTPS connector
+    #[cfg(feature = "openssl-tls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
+    #[error("failed to create OpenSSL HTTPS connector: {0}")]
+    CreateOpensslHttpsConnector(#[source] openssl::error::ErrorStack),
 }
 
 pub(crate) struct Gcp {
@@ -94,16 +100,25 @@ impl Gcp {
             Ok(TokenOrRequest::Request {
                 request, scope_hash, ..
             }) => {
-                #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+                #[cfg(not(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls")))]
                 compile_error!(
-                    "At least one of native-tls or rustls-tls feature must be enabled to use oauth feature"
+                    "At least one of native-tls or rustls-tls or openssl-tls feature must be enabled to use oauth feature"
                 );
-                // If both are enabled, we use rustls unlike `Client` because there's no need to support ip v4/6 subject matching.
-                // TODO Allow users to choose when both are enabled.
-                #[cfg(feature = "rustls-tls")]
-                let https = hyper_rustls::HttpsConnector::with_native_roots();
-                #[cfg(all(not(feature = "rustls-tls"), feature = "native-tls"))]
+                // Current TLS feature precedence when more than one are set:
+                // 1. openssl-tls
+                // 2. native-tls
+                // 3. rustls-tls
+                #[cfg(feature = "openssl-tls")]
+                let https =
+                    hyper_openssl::HttpsConnector::new().map_err(Error::CreateOpensslHttpsConnector)?;
+                #[cfg(all(not(feature = "openssl-tls"), feature = "native-tls"))]
                 let https = hyper_tls::HttpsConnector::new();
+                #[cfg(all(
+                    not(any(feature = "openssl-tls", feature = "native-tls")),
+                    feature = "rustls-tls"
+                ))]
+                let https = hyper_rustls::HttpsConnector::with_native_roots();
+
                 let client = hyper::Client::builder().build::<_, hyper::Body>(https);
 
                 let res = client
