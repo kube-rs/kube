@@ -2,7 +2,7 @@
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
-use futures::{stream::BoxStream, Stream, StreamExt};
+use futures::{future::ready, stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
@@ -24,6 +24,8 @@ pub enum Error {
     WatchFailed(#[source] kube_client::Error),
     #[error("too many objects matched search criteria")]
     TooManyObjects,
+    #[error("retriable watch error")]
+    BackoffRetriable,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -202,7 +204,12 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-///     let watcher = watcher(pods, ListParams::default());
+///     let backoff = backoff::ExponentialBackoff {
+///         max_elapsed_time: Some(std::time::Duration::from_secs(60*10)),
+///         ..ExponentialBackoff::default()
+///     };
+///
+///     let watcher = watcher(pods, ListParams::default(), backoff);
 ///     try_flatten_applied(watcher)
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name());
@@ -226,31 +233,28 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
 /// an [`Event::Restarted`].
-pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static, B: Backoff + Send>(
     api: Api<K>,
     list_params: ListParams,
+    backoff: B,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
-    let back = ExponentialBackoff {
-        // TODO: set this default elsewhere
-        max_elapsed_time: Some(std::time::Duration::from_secs(20)),
-        ..ExponentialBackoff::default()
-    };
     futures::stream::unfold(
-        (api, list_params, back, State::Empty),
-        |(api, list_params, mut back, state)| async {
+        (api, list_params, backoff, State::Empty),
+        |(api, list_params, mut backoff, state)| async {
             let (event, state) = step(&api, &list_params, state).await;
             if event.is_err() {
-                if let Some(wait_time) = back.next_backoff() {
+                if let Some(wait_time) = backoff.next_backoff() {
                     tracing::debug!("watch waiting {}ms until retrying", wait_time.as_millis()); // TODO: kind name here
-                    tokio::time::sleep(wait_time).await
+                    tokio::time::sleep(wait_time).await;
+                    Some((Err(Error::BackoffRetriable), (api, list_params, backoff, state)))
                 } else {
                     tracing::warn!("watch cancelled, strategy returned none");
-                    return None;
+                    None
                 }
             } else {
-                back.reset();
+                backoff.reset();
+                Some((event, (api, list_params, backoff, state)))
             }
-            Some((event, (api, list_params, back, state)))
         },
     )
 }
@@ -265,10 +269,18 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, ListParams {
-        field_selector: Some(format!("metadata.name={}", name)),
-        ..Default::default()
-    })
+    let backoff = backoff::ExponentialBackoff {
+        max_elapsed_time: Some(std::time::Duration::from_secs(60 * 10)),
+        ..ExponentialBackoff::default()
+    };
+    watcher(
+        api,
+        ListParams {
+            field_selector: Some(format!("metadata.name={}", name)),
+            ..Default::default()
+        },
+        backoff,
+    )
     .map(|event| match event? {
         Event::Deleted(_) => Ok(None),
         // We're filtering by object name, so getting more than one object means that either:
@@ -280,4 +292,6 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         Event::Restarted(mut objs) => Ok(objs.pop()),
         Event::Applied(obj) => Ok(Some(obj)),
     })
+    // Drop retriable errors for a while, after which they become hard errors
+    .filter(|r| ready(!std::matches!(r, Err(Error::BackoffRetriable))))
 }
