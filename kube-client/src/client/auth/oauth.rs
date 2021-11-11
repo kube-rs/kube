@@ -1,7 +1,5 @@
-use std::{env, path::PathBuf};
-
 use tame_oauth::{
-    gcp::{ServiceAccountAccess, ServiceAccountInfo, TokenOrRequest},
+    gcp::{TokenOrRequest, TokenProvider, TokenProviderWrapper},
     Token,
 };
 use thiserror::Error;
@@ -9,9 +7,13 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 /// Possible errors when requesting token with OAuth
 pub enum Error {
-    /// Missing `GOOGLE_APPLICATION_CREDENTIALS` env
-    #[error("missing GOOGLE_APPLICATION_CREDENTIALS env")]
-    MissingGoogleCredentials,
+    /// Default provider appears to be configured, but was invalid
+    #[error("default provider is configured but invalid: {0}")]
+    InvalidDefaultProviderConfig(#[source] tame_oauth::Error),
+
+    /// No provider was found
+    #[error("no provider was found")]
+    NoDefaultProvider,
 
     /// Failed to load OAuth credentials file
     #[error("failed to load OAuth credentials file: {0}")]
@@ -61,42 +63,43 @@ pub enum Error {
 }
 
 pub(crate) struct Gcp {
-    access: ServiceAccountAccess,
+    provider: TokenProviderWrapper,
     scopes: Vec<String>,
 }
 
 impl std::fmt::Debug for Gcp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Gcp")
-            .field("access", &"{}".to_owned())
+            .field("provider", &"{}".to_owned())
             .field("scopes", &self.scopes)
             .finish()
     }
 }
 
 impl Gcp {
-    pub(crate) fn new(access: ServiceAccountAccess, scopes: Vec<String>) -> Self {
-        Self { access, scopes }
-    }
-
-    // Initialize ServiceAccountAccess so we can request later when needed.
-    pub(crate) fn from_env_and_scopes(scopes: Option<&String>) -> Result<Self, Error> {
+    // Initialize `TokenProvider` following the "Google Default Credentials" flow.
+    // `tame-oauth` supports the same default credentials flow as the Go oauth2:
+    // - `GOOGLE_APPLICATION_CREDENTIALS` environmment variable
+    // - gcloud's application default credentials
+    // - local metadata server if running on GCP
+    pub(crate) fn default_credentials_with_scopes(scopes: Option<&String>) -> Result<Self, Error> {
         const DEFAULT_SCOPES: &str =
             "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email";
-        // Initialize ServiceAccountAccess so we can request later when needed.
-        let info = gcloud_account_info()?;
-        let access = ServiceAccountAccess::new(info).map_err(Error::InvalidKeyFormat)?;
+
+        let provider = TokenProviderWrapper::get_default_provider()
+            .map_err(Error::InvalidDefaultProviderConfig)?
+            .ok_or(Error::NoDefaultProvider)?;
         let scopes = scopes
             .map(String::to_owned)
             .unwrap_or_else(|| DEFAULT_SCOPES.to_owned())
             .split(',')
             .map(str::to_owned)
             .collect::<Vec<_>>();
-        Ok(Self::new(access, scopes))
+        Ok(Self { provider, scopes })
     }
 
     pub async fn token(&self) -> Result<Token, Error> {
-        match self.access.get_token(&self.scopes) {
+        match self.provider.get_token(&self.scopes) {
             Ok(TokenOrRequest::Request {
                 request, scope_hash, ..
             }) => {
@@ -129,11 +132,11 @@ impl Gcp {
                 let (parts, body) = res.into_parts();
                 let bytes = hyper::body::to_bytes(body).await.map_err(Error::ConcatBuffers)?;
                 let response = http::Response::from_parts(parts, bytes.to_vec());
-                match self.access.parse_token_response(scope_hash, response) {
+                match self.provider.parse_token_response(scope_hash, response) {
                     Ok(token) => Ok(token),
 
                     Err(err) => Err(match err {
-                        tame_oauth::Error::AuthError(_) | tame_oauth::Error::HttpStatus(_) => {
+                        tame_oauth::Error::Auth(_) | tame_oauth::Error::HttpStatus(_) => {
                             Error::RetrieveCredentials(err)
                         }
                         tame_oauth::Error::Json(e) => Error::ParseToken(e),
@@ -145,25 +148,11 @@ impl Gcp {
             Ok(TokenOrRequest::Token(token)) => Ok(token),
 
             Err(err) => match err {
-                // Request builder failed.
                 tame_oauth::Error::Http(e) => Err(Error::BuildRequest(e)),
-                tame_oauth::Error::InvalidRsaKey => Err(Error::InvalidRsaKey(err)),
+                tame_oauth::Error::InvalidRsaKey(_) => Err(Error::InvalidRsaKey(err)),
                 tame_oauth::Error::InvalidKeyFormat => Err(Error::InvalidKeyFormat(err)),
                 e => Err(Error::Unknown(e.to_string())),
             },
         }
     }
-}
-
-const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
-
-pub(crate) fn gcloud_account_info() -> Result<ServiceAccountInfo, Error> {
-    let path = env::var_os(GOOGLE_APPLICATION_CREDENTIALS)
-        .map(PathBuf::from)
-        .ok_or(Error::MissingGoogleCredentials)?;
-    let data = std::fs::read_to_string(path).map_err(Error::LoadCredentials)?;
-    ServiceAccountInfo::deserialize(data).map_err(|err| match err {
-        tame_oauth::Error::Json(e) => Error::ParseCredentials(e),
-        _ => Error::Unknown(err.to_string()),
-    })
 }

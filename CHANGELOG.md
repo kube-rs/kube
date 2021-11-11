@@ -8,7 +8,8 @@ UNRELEASED
  * BREAKING: Moved `CustomResource` derive crate overrides into subattribute `#[kube(crates(...))]` - #690
    - Replace `#[kube(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..)]` with `#[kube(crates(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..))]`
  * Added `openssl-tls` feature to use `openssl` for TLS on all platforms. Note that, even though `native-tls` uses a platform specific TLS, `kube` requires `openssl` on all platforms because `native-tls` only allows PKCS12 input to load certificates and private key at the moment, and creating PKCS12 requires `openssl`. - #700
- * BREAKING: Changed to fail loading configurations with PEM-encoded certificates containing invalid sections instead of ignoring them. Updated `pem` to 1.0.1.
+ * BREAKING: Changed to fail loading configurations with PEM-encoded certificates containing invalid sections instead of ignoring them. Updated `pem` to 1.0.1. - #702
+ * `oauth`: Updated `tame-oauth` to [0.6.0](https://github.com/EmbarkStudios/tame-oauth/blob/main/CHANGELOG.md#060---2021-08-07) which supports the same default credentials flow as the Go `oauth2` for Google OAuth. In addition to reading the service account information from JSON file specified with `GOOGLE_APPLICATION_CREDENTIALS` environment variable, [Application Default Credentials](https://cloud.google.com/sdk/gcloud/reference/auth/application-default) from `gcloud`, and obtaining OAuth tokens from local metadata server when running inside GCP are now supported. - #701
 
 ### Refining Errors
 
