@@ -38,6 +38,10 @@ pub enum Error {
     /// Failed to parse cluster url
     #[error("failed to parse cluster url: {0}")]
     ParseClusterUrl(#[source] http::uri::InvalidUri),
+
+    /// Failed to parse PEM-encoded certificates
+    #[error("failed to parse PEM-encoded certificates: {0}")]
+    ParseCertificates(#[source] pem::PemError),
 }
 
 /// Returns Kubernetes address from specified environment variables.
@@ -79,7 +83,7 @@ pub fn load_token() -> Result<String, Error> {
 /// Returns certification from specified path in cluster.
 pub fn load_cert() -> Result<Vec<Vec<u8>>, Error> {
     let certs = std::fs::read(&SERVICE_CERTFILE).map_err(Error::ReadCertificateBundle)?;
-    Ok(super::certs(&certs))
+    super::certs(&certs).map_err(Error::ParseCertificates)
 }
 
 /// Returns the default namespace from specified path in cluster.

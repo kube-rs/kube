@@ -92,6 +92,10 @@ pub enum KubeconfigError {
     /// Failed to load client key
     #[error("failed to load client key")]
     LoadClientKey(#[source] LoadDataError),
+
+    /// Failed to parse PEM-encoded certificates
+    #[error("failed to parse PEM-encoded certificates: {0}")]
+    ParseCertificates(#[source] pem::PemError),
 }
 
 /// Errors from loading data from a base64 string or a file
@@ -290,8 +294,8 @@ impl Config {
     }
 }
 
-fn certs(data: &[u8]) -> Vec<Vec<u8>> {
-    pem::parse_many(data)
+fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
+    Ok(pem::parse_many(data)?
         .into_iter()
         .filter_map(|p| {
             if p.tag == "CERTIFICATE" {
@@ -300,7 +304,7 @@ fn certs(data: &[u8]) -> Vec<Vec<u8>> {
                 None
             }
         })
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>())
 }
 
 // https://github.com/kube-rs/kube-rs/issues/146#issuecomment-590924397
