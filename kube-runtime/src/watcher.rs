@@ -230,20 +230,19 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
-    let back = ExponentialBackoff::default();
+    let back = ExponentialBackoff {
+        // TODO: set this default elsewhere
+        max_elapsed_time: Some(std::time::Duration::from_secs(20)),
+        ..ExponentialBackoff::default()
+    };
     futures::stream::unfold(
         (api, list_params, back, State::Empty),
         |(api, list_params, mut back, state)| async {
             let (event, state) = step(&api, &list_params, state).await;
             if event.is_err() {
                 if let Some(wait_time) = back.next_backoff() {
-                    if wait_time.as_secs() > 8 {
-                        tracing::warn!("watch cancelled, reached max backoff interval");
-                        return None;
-                    } else {
-                        tracing::debug!("watch waiting {}ms until retrying", wait_time.as_millis()); // TODO: kind name here
-                        tokio::time::sleep(wait_time).await
-                    }
+                    tracing::debug!("watch waiting {}ms until retrying", wait_time.as_millis()); // TODO: kind name here
+                    tokio::time::sleep(wait_time).await
                 } else {
                     tracing::warn!("watch cancelled, strategy returned none");
                     return None;
