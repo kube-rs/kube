@@ -204,6 +204,7 @@ impl ConfigExt for Config {
             self.root_cert.as_deref(),
             self.accept_invalid_certs,
         )
+        .map_err(Error::RustlsTls)
     }
 
     #[cfg(feature = "rustls-tls")]

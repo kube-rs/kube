@@ -85,15 +85,39 @@ pub mod rustls_tls {
         client::{ServerCertVerified, ServerCertVerifier},
         Certificate, ClientConfig, PrivateKey,
     };
+    use thiserror::Error;
 
-    use crate::{Error, Result};
+    /// Errors from Rustls
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// Identity PEM is invalid
+        #[error("identity PEM is invalid: {0}")]
+        InvalidIdentityPem(#[source] std::io::Error),
+
+        /// Identity PEM is missing a private key: the key must be PKCS8 or RSA/PKCS1
+        #[error("identity PEM is missing a private key: the key must be PKCS8 or RSA/PKCS1")]
+        MissingPrivateKey,
+
+        /// Identity PEM is missing certificate
+        #[error("identity PEM is missing certificate")]
+        MissingCertificate,
+
+        /// Invalid private key
+        #[error("invalid private key: {0}")]
+        InvalidPrivateKey(#[source] rustls::Error),
+
+        // Using type-erased error to avoid depending on webpki
+        /// Failed to add a root certificate
+        #[error("failed to add a root certificate: {0}")]
+        AddRootCertificate(#[source] Box<dyn std::error::Error + Send + Sync>),
+    }
 
     /// Create `rustls::ClientConfig`.
     pub fn rustls_client_config(
         identity_pem: Option<&[u8]>,
         root_certs: Option<&[Vec<u8>]>,
         accept_invalid: bool,
-    ) -> Result<ClientConfig> {
+    ) -> Result<ClientConfig, Error> {
         let config_builder = ClientConfig::builder()
             .with_safe_defaults()
             .with_root_certificates(root_store(root_certs)?);
@@ -101,7 +125,7 @@ pub mod rustls_tls {
         let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {
             config_builder
                 .with_single_cert(chain, pkey)
-                .map_err(|e| Error::SslError(format!("{}", e)))?
+                .map_err(Error::InvalidPrivateKey)?
         } else {
             config_builder.with_no_client_auth()
         };
@@ -114,13 +138,13 @@ pub mod rustls_tls {
         Ok(client_config)
     }
 
-    fn root_store(root_certs: Option<&[Vec<u8>]>) -> Result<rustls::RootCertStore> {
+    fn root_store(root_certs: Option<&[Vec<u8>]>) -> Result<rustls::RootCertStore, Error> {
         let mut root_store = rustls::RootCertStore::empty();
         if let Some(ders) = root_certs {
             for der in ders {
                 root_store
                     .add(&Certificate(der.clone()))
-                    .map_err(|e| Error::SslError(format!("{}", e)))?;
+                    .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
             }
         }
         Ok(root_store)
@@ -129,16 +153,14 @@ pub mod rustls_tls {
     // TODO Support EC Private Key to support k3d. Need to convert to PKCS#8 or RSA (PKCS#1).
     // `openssl pkcs8 -topk8 -nocrypt -in ec.pem -out pkcs8.pem`
     // https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations#EC_Private_Key_File_Formats
-    fn client_auth(data: &[u8]) -> Result<(Vec<Certificate>, PrivateKey)> {
+    fn client_auth(data: &[u8]) -> Result<(Vec<Certificate>, PrivateKey), Error> {
         use rustls_pemfile::Item;
 
         let mut cert_chain = Vec::new();
         let mut pkcs8_key = None;
         let mut rsa_key = None;
         let mut reader = std::io::Cursor::new(data);
-        for item in rustls_pemfile::read_all(&mut reader)
-            .map_err(|e| Error::SslError(format!("failed to read identity PEM: {}", e)))?
-        {
+        for item in rustls_pemfile::read_all(&mut reader).map_err(Error::InvalidIdentityPem)? {
             match item {
                 Item::X509Certificate(cert) => cert_chain.push(Certificate(cert)),
                 Item::PKCS8Key(key) => pkcs8_key = Some(PrivateKey(key)),
@@ -146,11 +168,9 @@ pub mod rustls_tls {
             }
         }
 
-        let private_key = pkcs8_key
-            .or(rsa_key)
-            .ok_or_else(|| Error::SslError("private key not found".to_owned()))?;
+        let private_key = pkcs8_key.or(rsa_key).ok_or(Error::MissingPrivateKey)?;
         if cert_chain.is_empty() {
-            return Err(Error::SslError("certificate chain not found".to_owned()));
+            return Err(Error::MissingCertificate);
         }
         Ok((cert_chain, private_key))
     }
