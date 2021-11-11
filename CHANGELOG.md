@@ -8,6 +8,7 @@ UNRELEASED
  * BREAKING: Moved `CustomResource` derive crate overrides into subattribute `#[kube(crates(...))]` - #690
    - Replace `#[kube(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..)]` with `#[kube(crates(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..))]`
  * Added `openssl-tls` feature to use `openssl` for TLS on all platforms. Note that, even though `native-tls` uses a platform specific TLS, `kube` requires `openssl` on all platforms because `native-tls` only allows PKCS12 input to load certificates and private key at the moment, and creating PKCS12 requires `openssl`. - #700
+ * BREAKING: Changed to fail loading configurations with PEM-encoded certificates containing invalid sections instead of ignoring them. Updated `pem` to 1.0.1.
 
 ### Refining Errors
 

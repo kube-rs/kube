@@ -106,7 +106,9 @@ impl ConfigLoader {
 
     pub fn ca_bundle(&self) -> Result<Option<Vec<Vec<u8>>>, KubeconfigError> {
         if let Some(bundle) = self.cluster.load_certificate_authority()? {
-            Ok(Some(super::certs(&bundle)))
+            Ok(Some(
+                super::certs(&bundle).map_err(KubeconfigError::ParseCertificates)?,
+            ))
         } else {
             Ok(None)
         }
