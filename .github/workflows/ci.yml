@@ -47,6 +47,9 @@ jobs:
       - name: Test kube with features rustls-tls,ws,oauth
         run: cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
         if: matrix.os == 'ubuntu-latest'
+      - name: Test kube with features openssl-tls,ws,oauth
+        run: cargo test -p kube --lib --no-default-features --features=openssl-tls,ws,oauth
+        if: matrix.os == 'ubuntu-latest'
       # Feature tests in examples
       - name: Test crd_derive_no_schema example
         run: cargo test -p examples --example crd_derive_no_schema --no-default-features --features=native-tls,latest

@@ -19,6 +19,7 @@ edition = "2021"
 default = ["client", "native-tls"]
 native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
 rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls", "webpki"]
+openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["client", "tame-oauth"]
 gzip = ["client", "tower-http/decompression-gzip"]
@@ -32,7 +33,7 @@ deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_22"]
+features = ["client", "native-tls", "rustls-tls", "openssl-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_22"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -70,6 +71,7 @@ tame-oauth = { version = "0.4.7", features = ["gcp"], optional = true }
 pin-project = { version = "1.0.4", optional = true }
 rand = { version = "0.8.3", optional = true }
 tracing = { version = "0.1.29", features = ["log"], optional = true }
+hyper-openssl = { version = "0.9.1", optional = true }
 
 [dependencies.k8s-openapi]
 version = "0.13.1"

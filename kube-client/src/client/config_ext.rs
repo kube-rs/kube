@@ -1,6 +1,7 @@
 use tower::util::Either;
 
-#[cfg(any(feature = "native-tls", feature = "rustls-tls"))] use super::tls;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
+use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, RefreshTokenLayer},
@@ -96,6 +97,63 @@ pub trait ConfigExt: private::Sealed {
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig>;
+
+    /// Create [`hyper_openssl::HttpsConnector`] based on config.
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use kube::{client::ConfigExt, Config};
+    /// let config = Config::infer().await?;
+    /// let https = config.openssl_https_connector()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
+    #[cfg(feature = "openssl-tls")]
+    fn openssl_https_connector(&self) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>>;
+
+    /// Create [`hyper_openssl::HttpsConnector`] based on config and `connector`.
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use hyper::client::HttpConnector;
+    /// # use kube::{client::ConfigExt, Config};
+    /// let mut http = HttpConnector::new();
+    /// http.enforce_http(false);
+    /// let config = Config::infer().await?;
+    /// let https = config.openssl_https_connector_with_connector(http)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
+    #[cfg(feature = "openssl-tls")]
+    fn openssl_https_connector_with_connector(
+        &self,
+        connector: hyper::client::HttpConnector,
+    ) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>>;
+
+    /// Create [`openssl::ssl::SslConnectorBuilder`] based on config.
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use hyper::client::HttpConnector;
+    /// # use kube::{client::ConfigExt, Client, Config};
+    /// let config = Config::infer().await?;
+    /// let https = {
+    ///     let mut http = HttpConnector::new();
+    ///     http.enforce_http(false);
+    ///     let ssl = config.openssl_ssl_connector_builder()?;
+    ///     hyper_openssl::HttpsConnector::with_connector(http, ssl)?
+    /// };
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
+    #[cfg(feature = "openssl-tls")]
+    fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder>;
 }
 
 mod private {
@@ -153,5 +211,35 @@ impl ConfigExt for Config {
         let mut http = hyper::client::HttpConnector::new();
         http.enforce_http(false);
         Ok(hyper_rustls::HttpsConnector::from((http, rustls_config)))
+    }
+
+    #[cfg(feature = "openssl-tls")]
+    fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
+        tls::openssl_tls::ssl_connector_builder(self.identity_pem.as_ref(), self.root_cert.as_ref())
+            .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
+    }
+
+    #[cfg(feature = "openssl-tls")]
+    fn openssl_https_connector(&self) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>> {
+        let mut connector = hyper::client::HttpConnector::new();
+        connector.enforce_http(false);
+        self.openssl_https_connector_with_connector(connector)
+    }
+
+    #[cfg(feature = "openssl-tls")]
+    fn openssl_https_connector_with_connector(
+        &self,
+        connector: hyper::client::HttpConnector,
+    ) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>> {
+        let mut https =
+            hyper_openssl::HttpsConnector::with_connector(connector, self.openssl_ssl_connector_builder()?)
+                .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateHttpsConnector(e)))?;
+        if self.accept_invalid_certs {
+            https.set_callback(|ssl, _uri| {
+                ssl.set_verify(openssl::ssl::SslVerifyMode::NONE);
+                Ok(())
+            });
+        }
+        Ok(https)
     }
 }
