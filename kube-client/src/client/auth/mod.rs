@@ -304,7 +304,8 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     #[cfg(feature = "oauth")]
     {
         Ok(ProviderToken::GcpOauth(
-            oauth::Gcp::from_env_and_scopes(provider.config.get("scopes")).map_err(Error::OAuth)?,
+            oauth::Gcp::default_credentials_with_scopes(provider.config.get("scopes"))
+                .map_err(Error::OAuth)?,
         ))
     }
     #[cfg(not(feature = "oauth"))]
