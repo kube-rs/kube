@@ -2,7 +2,7 @@ use color_eyre::Result;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
+    api::{Api, ResourceExt},
     runtime::Observer,
     Client,
 };
@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let api = Api::<Pod>::namespaced(client, &namespace);
 
-    Observer::new(api, ListParams::default())
+    Observer::new(api)
         .watch_applies()
         .try_for_each(|p| async move {
             log::debug!("Applied: {}", p.name());

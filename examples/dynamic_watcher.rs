@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
     let api = Api::<DynamicObject>::all_with(client, &ar);
 
     // Fully compatible with kube-runtime
-    Observer::new(api, ListParams::default())
+    Observer::new(api)
         .watch_applies()
         .try_for_each(|p| async move {
             log::info!("Applied: {}", p.name());

@@ -16,9 +16,11 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 
-    let lp = ListParams::default().labels("beta.kubernetes.io/os=linux");
-    let backoff = ExponentialBackoff::default(); // infinite backoff
-    let mut obs = Observer::new(nodes, lp).backoff(backoff).watch_applies().boxed();
+    let obs = Observer::from(nodes)
+        .params(ListParams::default().labels("beta.kubernetes.io/os=linux"))
+        .backoff(ExponentialBackoff::default()) // infinite backoff
+        .watch_applies()
+        .boxed();
 
     while let Some(n) = obs.try_next().await? {
         check_for_node_failures(&events, n).await?;

@@ -122,6 +122,13 @@ async fn main() -> Result<()> {
         }
     });
 
+    //let w = kube::runtime::watcher(cmgs, Default::default());
+    //let mut ap = kube::runtime::utils::try_flatten_applied(w).boxed();
+    //use futures::TryStreamExt;
+    //while let Some(x) = ap.try_next().await? {
+    //    println!("success {}", x.meta().clone().name.unwrap_or_default());
+    //}
+
     Controller::new(cmgs, ListParams::default())
         .owns(cms, ListParams::default())
         .reconcile_all_on(reload_rx.map(|_| ()))
