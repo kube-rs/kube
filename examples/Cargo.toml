@@ -23,6 +23,7 @@ ws = ["kube/ws"]
 latest = ["k8s-openapi/v1_22"]
 deprecated = ["kube/deprecated-crd-v1beta1", "k8s-openapi/v1_21"]
 
+
 [dev-dependencies]
 tokio-util = "0.6.8"
 assert-json-diff = "2.0.1"
@@ -53,6 +54,7 @@ tower = { version = "0.4.6" }
 tower-http = { version = "0.1.0", features = ["trace", "decompression-gzip"] }
 hyper = { version = "0.14.13", features = ["client", "http1", "stream", "tcp"] }
 thiserror = "1.0.29"
+backoff = "0.3.0"
 
 [[example]]
 name = "configmapgen_controller"

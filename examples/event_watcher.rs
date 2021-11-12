@@ -3,7 +3,7 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Event;
 use kube::{
     api::{Api, ListParams},
-    runtime::{utils::try_flatten_applied, watcher},
+    runtime::Observer,
     Client,
 };
 
@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client);
     let lp = ListParams::default();
 
-    let mut ew = try_flatten_applied(watcher(events, lp)).boxed();
+    let mut ew = Observer::new(events, lp).watch_applies().boxed();
 
     while let Some(event) = ew.try_next().await? {
         handle_event(event)?;

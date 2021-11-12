@@ -3,7 +3,7 @@ use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{utils::try_flatten_applied, watcher},
+    runtime::Observer,
     Client,
 };
 
@@ -14,8 +14,9 @@ async fn main() -> Result<()> {
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let api = Api::<Pod>::namespaced(client, &namespace);
-    let watcher = watcher(api, ListParams::default());
-    try_flatten_applied(watcher)
+
+    Observer::new(api, ListParams::default())
+        .watch_applies()
         .try_for_each(|p| async move {
             log::debug!("Applied: {}", p.name());
             if let Some(unready_reason) = pod_unready(&p) {
