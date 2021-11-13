@@ -15,54 +15,47 @@ doc:
 	RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_22 --open
 
 test:
-	cargo test --all
-	cargo test --lib --all -- --ignored # also run tests that fail on circleci
-	cd kube && cargo test --lib --features=rustls-tls,client --no-default-features
-	cd kube && cargo test --lib --no-default-features
-	cd kube && cargo test --lib --features=derive
+	cargo test --lib --all
+	cargo test --doc --all
+	cargo test -p examples --examples
+	cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
+	cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
+	cargo test -p kube --lib --no-default-features
+	cargo test -p examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
+
+test-kubernetes:
+	cargo test --lib --all -- --ignored # also run tests that fail on github actions
+	cargo test -p kube --features=derive -- --ignored
+	cargo run -p examples --example crd_derive
+	cargo run -p examples --example crd_api
 
 readme:
 	rustdoc README.md --test --edition=2021
 
-kind-create:
-	kind create cluster
+integration: dapp
+	ls -lah integration/
+	docker build -t clux/kube-dapp:$(VERSION) integration/
+	k3d image import clux/kube-dapp:$(VERSION) --cluster main
+	sed -i 's/latest/$(VERSION)/g' integration/deployment.yaml
+	kubectl apply -f integration/deployment.yaml
+	sed -i 's/$(VERSION)/latest/g' integration/deployment.yaml
+	kubectl get all -n apps
+	kubectl describe jobs/dapp -n apps
+	kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
+	kubectl get all -n apps
+	kubectl wait --for=condition=complete job/dapp -n apps --timeout=10s || kubectl get pods -n apps | grep dapp | grep Completed
 
-kind:
-	kubectl config set-context --cluster=kind-kind --user=kind-kind --namespace=apps kind-kind
-	kubectl config use-context kind-kind
-
-kind-delete:
-	kind delete clusters kind-kind
-
-# local integration tests:
 dapp:
 	docker run \
 		-v cargo-cache:/root/.cargo/registry \
 		-v "$$PWD:/volume" -w /volume \
-		--rm -it clux/muslrust:stable cargo build --release -p tests
-	cp target/x86_64-unknown-linux-musl/release/dapp tests/dapp
-	chmod +x tests/dapp
-integration-test: dapp
-	docker build -t clux/kube-dapp:latest tests/
-	kubectl apply -f tests/deployment.yaml
-	kubectl rollout status deploy/dapp -n apps
-	kubectl status deploy/dapp -n apps
-	kubectl logs -f -n apps deploy/dapp
-	kubectl get pods -n apps | grep dapp | grep Completed
-	kubectl get pods -n apps | grep empty-job | grep Completed
+		--rm -it clux/muslrust:stable cargo build --release -p integration
+	cp target/x86_64-unknown-linux-musl/release/dapp integration/dapp
+	chmod +x integration/dapp
 
-# for ci (has dapp built)
-integration-ci:
-	ls -lah tests/
-	docker build -t clux/kube-dapp:$(VERSION) tests/
-	docker push clux/kube-dapp:$(VERSION) || true
-	./kind load docker-image clux/kube-dapp:$(VERSION)
-	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
+k3d:
+	k3d cluster create --servers 1 --agents 1 main \
+		--k3s-agent-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%' \
+		--k3s-agent-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%'
 
-# to debug ci...
-integration-pull:
-	docker pull clux/kube-dapp:$(VERSION)
-	sed -i 's/latest/$(VERSION)/g' tests/deployment.yaml
-	kubectl apply -f tests/deployment.yaml
-
-.PHONY: doc build fmt clippy test readme minikube kind
+.PHONY: doc build fmt clippy test readme k3d integration

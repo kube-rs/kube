@@ -90,17 +90,17 @@ jobs:
               --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
               --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
               clux/muslrust:stable \
-              cargo build -p tests --release -v
-          cp target/x86_64-unknown-linux-musl/release/dapp tests/
+              cargo build -p integration --release -v
+          cp target/x86_64-unknown-linux-musl/release/dapp integration/
 
       - name: Build image
-        run: "docker build -t clux/kube-dapp:${{ github.sha }} tests/"
+        run: "docker build -t clux/kube-dapp:${{ github.sha }} integration/"
       - name: Import image
         run: "k3d image import clux/kube-dapp:${{ github.sha }} --cluster kube"
-      - run: sed -i 's/latest/${{ github.sha }}/g' tests/deployment.yaml
+      - run: sed -i 's/latest/${{ github.sha }}/g' integration/deployment.yaml
 
       - name: Create resource
-        run: kubectl apply -f tests/deployment.yaml -n apps
+        run: kubectl apply -f integration/deployment.yaml -n apps
       - run: kubectl get all -n apps
       - run: kubectl describe jobs/dapp -n apps
       - name: Wait for job to complete

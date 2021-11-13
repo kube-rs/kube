@@ -1,0 +1,69 @@
+name: "🐛 Bug Report"
+description: "If something isn't working as expected 🤔."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug report! Please fill out this form as completely as possible.
+
+  - type: textarea
+    attributes:
+      label: Current and expected behavior
+      description: A clear and concise description of what kube is doing and what you would expect.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Possible solution
+      description: "If you have suggestions on a fix for the bug."
+
+  - type: textarea
+    attributes:
+      label: Additional context
+      description: "Add any other context about the problem here. Or a screenshot if applicable."
+
+  - type: textarea
+    attributes:
+      label: Environment
+      description: |
+        What type of kubernetes cluster you are running aginst (k3s/eks/aks/gke/other) and what is OS in your `Dockerfile`?
+      placeholder: |
+        Output of `kubectl version --short`
+        Dockerfile OS
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Configuration and features
+      description: |
+        **Tip:** You can extract the version of kube + k8s-openapi from your `Cargo.toml`.
+        You can also use `cargo tree -i k8s-openapi` and `cargo tree | grep kube`.
+      placeholder: |
+        ```toml
+        kube = { version = "0.63.1", features = ["runtime"] }
+        k8s-openapi = { version = "0.13.0", features = ["v1_21"], default-features = false }
+        ```
+
+  - type: dropdown
+    attributes:
+      label: Affected crates
+      description: |
+        **NOTE**: Select all crates you think are affected.
+      multiple: true
+      options:
+        - kube-core
+        - kube-client
+        - kube-derive
+        - kube-runtime
+
+  - type: dropdown
+    attributes:
+      label: Would you like to work on fixing this bug?
+      description: |
+        **NOTE**: Let us know if you would like to submit a PR for this. We are more than happy to help you through the process.
+      options:
+        - "yes"
+        - "no"
+        - "maybe"
