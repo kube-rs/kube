@@ -196,7 +196,7 @@ impl PostParams {
 /// let patch = Patch::Apply(&r);
 /// ```
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Patch<T: Serialize> {
     /// [Server side apply](https://kubernetes.io/docs/reference/using-api/api-concepts/#server-side-apply)
     ///
