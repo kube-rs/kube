@@ -62,3 +62,6 @@ allow-git = []
 
 [sources.allow-org]
 github = ["kube-rs"]
+
+[bans]
+multiple-versions = "deny"
