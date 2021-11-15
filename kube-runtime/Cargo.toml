@@ -33,7 +33,6 @@ tracing = "0.1.29"
 json-patch = "0.2.6"
 serde_json = "1.0.68"
 thiserror = "1.0.29"
-tokio-tungstenite = "0.14.*"
 
 [dependencies.k8s-openapi]
 version = "0.13.1"
