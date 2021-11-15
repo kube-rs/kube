@@ -80,6 +80,7 @@ pub mod native_tls {
 
 #[cfg(feature = "rustls-tls")]
 pub mod rustls_tls {
+    use hyper_rustls::ConfigBuilderExt;
     use rustls::{
         self,
         client::{ServerCertVerified, ServerCertVerifier},
@@ -118,9 +119,13 @@ pub mod rustls_tls {
         root_certs: Option<&[Vec<u8>]>,
         accept_invalid: bool,
     ) -> Result<ClientConfig, Error> {
-        let config_builder = ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(root_store(root_certs)?);
+        let config_builder = if let Some(certs) = root_certs {
+            ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(root_store(certs)?)
+        } else {
+            ClientConfig::builder().with_safe_defaults().with_native_roots()
+        };
 
         let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {
             config_builder
@@ -138,14 +143,12 @@ pub mod rustls_tls {
         Ok(client_config)
     }
 
-    fn root_store(root_certs: Option<&[Vec<u8>]>) -> Result<rustls::RootCertStore, Error> {
+    fn root_store(root_certs: &[Vec<u8>]) -> Result<rustls::RootCertStore, Error> {
         let mut root_store = rustls::RootCertStore::empty();
-        if let Some(ders) = root_certs {
-            for der in ders {
-                root_store
-                    .add(&Certificate(der.clone()))
-                    .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
-            }
+        for der in root_certs {
+            root_store
+                .add(&Certificate(der.clone()))
+                .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
         }
         Ok(root_store)
     }
