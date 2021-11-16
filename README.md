@@ -27,12 +27,12 @@ We recommend turning off `default-features` for `k8s-openapi` to speed up your c
 
 ## Upgrading
 
-Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
-All crates herein are versioned and [released](./release.toml) together to guarantee [compatibility before 1.0](https://github.com/kube-rs/kube-rs/issues/508).
+Please check the [CHANGELOG](https://github.com/kube-rs/kube-rs/blob/master/CHANGELOG.md) when upgrading.
+All crates herein are versioned and [released](https://github.com/kube-rs/kube-rs/blob/master/release.toml) together to guarantee [compatibility before 1.0](https://github.com/kube-rs/kube-rs/issues/508).
 
 ## Usage
 
-See the **[examples directory](./examples)** for how to use any of these crates.
+See the **[examples directory](https://github.com/kube-rs/kube-rs/blob/master/examples)** for how to use any of these crates.
 
 - **[kube API Docs](https://docs.rs/kube/)**
 
@@ -98,7 +98,7 @@ println!("foo: {:?}", f);
 println!("crd: {:?}", serde_yaml::to_string(&Foo::crd()));
 ```
 
-There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](./examples) for more.
+There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples) for more.
 
 **NB:** `#[derive(CustomResource)]` requires the `derive` feature enabled on `kube`.
 
