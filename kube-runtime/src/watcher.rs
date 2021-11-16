@@ -244,11 +244,11 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static, 
             let (event, state) = step(&api, &list_params, state).await;
             if event.is_err() {
                 if let Some(wait_time) = backoff.next_backoff() {
-                    tracing::debug!("watch waiting {}ms until retrying", wait_time.as_millis()); // TODO: kind name here
+                    tracing::debug!("watcher waiting {}ms until retrying", wait_time.as_millis()); // TODO: kind name here
                     tokio::time::sleep(wait_time).await;
                     Some((Err(Error::BackoffRetriable), (api, list_params, backoff, state)))
                 } else {
-                    tracing::warn!("watch cancelled, strategy returned none");
+                    tracing::warn!("watcher cancelled, strategy returned none");
                     None
                 }
             } else {

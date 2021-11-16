@@ -36,15 +36,6 @@ where
     backoff: Option<ExponentialBackoff>,
 }
 
-impl<K> From<Api<K>> for Observer<K>
-where
-    K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
-{
-    fn from(api: Api<K>) -> Observer<K> {
-        Observer::new(api)
-    }
-}
-
 impl<K> Observer<K>
 where
     K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
