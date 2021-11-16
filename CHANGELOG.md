@@ -21,7 +21,6 @@ The following is the summary of changes to `kube::Error` included in this releas
 * Added `Error::BuildRequest(kube::core::request::Error)` (errors building request from `kube::core`)
 * Added `Error::InferConfig(kube::config::InferConfigError)` (for `Client::try_default`)
 * Added `Error::OpensslTls(kube::client::OpensslTlsError)` (new `openssl-tls` feature) - #700
-* Added `Error::RustlsTls(kube::client::RustlsTlsError)` (errors from `rustls-tls` feature) - #704
 * Added `Error::UpgradeConnection(kube::client::UpgradeConnectinError)` (`ws` feature, errors from upgrading a connection)
 * Removed `Error::Connection` (was unused)
 * Removed `Error::RequestBuild` (was unused)
