@@ -13,11 +13,32 @@ UNRELEASED
 
 ### Refining Errors
 
-We started working on improving error ergonomics (tracking issue: #688).
+We started working on improving error ergonomics. See the tracking issue #688 for more details.
 
-Background: `kube::Error` has been a huge enum containing all the possible errors in `kube`. Users need to constantly ignore irrelevant variants, and it was difficult to know which are relevant to begin with. Reading the code doesn't help much either because the error propagations often had implicit conversions. `impl From<E> for kube::Error` and `?` makes error propagations concise, but it increases the mental overhead required to understand how the code might fail. It's also too easy to forget about errors and end up using general errors. As a result, many of the variants doesn't add any additional context (e.g., `Error::HttpError(http::Error)`).
+The following is the summary of changes to `kube::Error` included in this release:
 
-We'll address this problem by removing `impl From` to prevent us from forgetting to attach context, and gradually breaking down the errors into smaller and more specific errors (proposed in #686).
+* Added `Error::Auth(kube::client::AuthError)` (errors related to client auth, some of them were previously in `Error::Kubeconfig`)
+* Added `Error::BuildRequest(kube::core::request::Error)` (errors building request from `kube::core`)
+* Added `Error::InferConfig(kube::config::InferConfigError)` (for `Client::try_default`)
+* Added `Error::OpensslTls(kube::client::OpensslTlsError)` (new `openssl-tls` feature) - #700
+* Added `Error::RustlsTls(kube::client::RustlsTlsError)` (errors from `rustls-tls` feature) - #704
+* Added `Error::UpgradeConnection(kube::client::UpgradeConnectinError)` (`ws` feature, errors from upgrading a connection)
+* Removed `Error::Connection` (was unused)
+* Removed `Error::RequestBuild` (was unused)
+* Removed `Error::RequestSend` (was unused)
+* Removed `Error::RequestParse` (was unused)
+* Removed `Error::InvalidUri` (replaced by variants of errors in `kube::config` errors)
+* Removed `Error::RequestValidation` (replaced by a variant of `Error::BuildRequest`)
+* Removed `Error::Kubeconfig` (replaced by `Error::InferConfig`, and `Error::Auth`)
+* Removed `Error::ProtocolSwitch` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `Error::MissingUpgradeWebSocketHeader` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `Error::MissingConnectionUpgradeHeader` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `Error::SecWebSocketAcceptKeyMismatch` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `Error::SecWebSocketProtocolMismatch` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `impl From<T> for Error`
+
+<details>
+<summary>Expand for more details</summary>
 
 The following breaking changes were made as a part of an effort to refine errors (the list is large, but most of them are lower level, and shouldn't require much change in most cases):
 
@@ -44,6 +65,8 @@ The following breaking changes were made as a part of an effort to refine errors
 * Changed methods of `kube::Config` to return these erorrs instead of `kube::Error` - #696
 * Removed `kube::Error::InvalidUri` which was replaced by error variants preserving context, such as `KubeconfigError::ParseProxyUrl` - #696
 * Moved all errors from upgrading to a WebSocket connection into `kube::Error::UpgradeConnection(kube::client::UpgradeConnectionError)` - #696
+
+</details>
 
 0.63.2 / 2021-10-28
 ===================
