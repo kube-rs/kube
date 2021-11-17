@@ -40,6 +40,7 @@ pub use config_ext::ConfigExt;
 pub mod middleware;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
 mod tls;
+#[cfg(feature = "native-tls")] pub use tls::native_tls::Error as NativeTlsError;
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
 #[cfg(feature = "ws")] mod upgrade;
