@@ -202,8 +202,7 @@ pub mod conditions {
         |obj: Option<&K>| obj.is_some()
     }
 
-    /// An await condition for [`Resource`] that returns `true` if the object's condition of the given type holds true
-    /// for the given `value_cond`.
+    /// A condition that returns true if an arbitrary condition matches a condition value
     ///
     /// # Value condition
     ///
