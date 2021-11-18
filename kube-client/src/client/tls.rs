@@ -1,30 +1,60 @@
 #[cfg(feature = "native-tls")]
 pub mod native_tls {
+    use thiserror::Error;
     use tokio_native_tls::native_tls::{Certificate, Identity, TlsConnector};
 
-    use crate::{Error, Result};
-
     const IDENTITY_PASSWORD: &str = " ";
+
+    /// Errors from native TLS
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// Failed to deserialize PEM-encoded X509 certificate
+        #[error("failed to deserialize PEM-encoded X509 certificate: {0}")]
+        DeserializeCertificate(#[source] openssl::error::ErrorStack),
+
+        /// Failed to deserialize PEM-encoded private key
+        #[error("failed to deserialize PEM-encoded private key: {0}")]
+        DeserializePrivateKey(#[source] openssl::error::ErrorStack),
+
+        /// Failed to create PKCS #12 archive
+        #[error("failed to create PKCS #12 archive: {0}")]
+        CreatePkcs12(#[source] openssl::error::ErrorStack),
+
+        /// Failed to serialize PKCS #12 archive to DER
+        #[error("failed to serialize PKCS #12 archive to DER encoding: {0}")]
+        SerializePkcs12(#[source] openssl::error::ErrorStack),
+
+        /// Failed to deserialize DER-encoded PKCS #12 archive
+        #[error("failed to deserialize DER-encoded PKCS #12 archive: {0}")]
+        DeserializePkcs12(#[source] tokio_native_tls::native_tls::Error),
+
+        /// Failed to deserialize DER-encoded X509 certificate
+        #[error("failed to deserialize DER-encoded X509 certificate: {0}")]
+        DeserializeRootCertificate(#[source] tokio_native_tls::native_tls::Error),
+
+        /// Failed to create `TlsConnector`
+        #[error("failed to create `TlsConnector`: {0}")]
+        CreateTlsConnector(#[source] tokio_native_tls::native_tls::Error),
+    }
 
     /// Create `native_tls::TlsConnector`.
     pub fn native_tls_connector(
         identity_pem: Option<&Vec<u8>>,
         root_cert: Option<&Vec<Vec<u8>>>,
         accept_invalid: bool,
-    ) -> Result<TlsConnector> {
+    ) -> Result<TlsConnector, Error> {
         let mut builder = TlsConnector::builder();
         if let Some(pem) = identity_pem {
             let identity = pkcs12_from_pem(pem, IDENTITY_PASSWORD)?;
             builder.identity(
-                Identity::from_pkcs12(&identity, IDENTITY_PASSWORD)
-                    .map_err(|e| Error::SslError(format!("{}", e)))?,
+                Identity::from_pkcs12(&identity, IDENTITY_PASSWORD).map_err(Error::DeserializePkcs12)?,
             );
         }
 
         if let Some(ders) = root_cert {
             for der in ders {
                 builder.add_root_certificate(
-                    Certificate::from_der(der).map_err(|e| Error::SslError(format!("{}", e)))?,
+                    Certificate::from_der(der).map_err(Error::DeserializeRootCertificate)?,
                 );
             }
         }
@@ -33,21 +63,18 @@ pub mod native_tls {
             builder.danger_accept_invalid_certs(true);
         }
 
-        let connector = builder.build().map_err(|e| Error::SslError(format!("{}", e)))?;
-        Ok(connector)
+        builder.build().map_err(Error::CreateTlsConnector)
     }
 
-    // TODO Replace this with pure Rust implementation to avoid depending on openssl on macOS and Win
-    fn pkcs12_from_pem(pem: &[u8], password: &str) -> Result<Vec<u8>> {
+    // TODO Switch to PKCS8 support when https://github.com/sfackler/rust-native-tls/pull/209 is merged
+    fn pkcs12_from_pem(pem: &[u8], password: &str) -> Result<Vec<u8>, Error> {
         use openssl::{pkcs12::Pkcs12, pkey::PKey, x509::X509};
-        // TODO These are all treated as the same error. Add specific errors.
-        let x509 = X509::from_pem(pem).map_err(Error::OpensslError)?;
-        let pkey = PKey::private_key_from_pem(pem).map_err(Error::OpensslError)?;
+        let x509 = X509::from_pem(pem).map_err(Error::DeserializeCertificate)?;
+        let pkey = PKey::private_key_from_pem(pem).map_err(Error::DeserializePrivateKey)?;
         let p12 = Pkcs12::builder()
             .build(password, "kubeconfig", &pkey, &x509)
-            .map_err(Error::OpensslError)?;
-        let der = p12.to_der().map_err(Error::OpensslError)?;
-        Ok(der)
+            .map_err(Error::CreatePkcs12)?;
+        p12.to_der().map_err(Error::SerializePkcs12)
     }
 }
 
