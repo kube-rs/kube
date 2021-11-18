@@ -3,8 +3,11 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.64.0...master
 
- * BREAKING: Removed `kube::Error::OpenSslError`
- * BREAKING: Added `kube::Error::NativeTls(kube::client::NativeTlsError)` for errors from native TLS
+ * BREAKING: Removed `kube::Error::OpenSslError` - #716
+ * BREAKING: Removed `kube::Error::SslError` - #704 and #716
+ * BREAKING: Added `kube::Error::NativeTls(kube::client::NativeTlsError)` for errors from Native TLS - #716
+ * BREAKING: Added `kube::Error::RustlsTls(kube::client::RustlsTlsError)` for errors from Rustls TLS - #704
+ * Updated `rustls` to 0.20.1 - #704
 
 0.64.0 / 2021-11-16
 ===================
