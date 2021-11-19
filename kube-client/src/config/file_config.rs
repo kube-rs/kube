@@ -258,8 +258,8 @@ impl Kubeconfig {
                 merged_docs = Some(config);
             }
         }
-        let config = merged_docs.ok_or_else(|| KubeconfigError::EmptyConfig(path.as_ref().to_path_buf()))?;
-        Ok(config)
+        // Empty file defaults to an empty Kubeconfig
+        Ok(merged_docs.unwrap_or_default())
     }
 
     /// Read a Config from `KUBECONFIG` or the the default location.
