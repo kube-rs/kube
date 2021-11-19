@@ -23,7 +23,6 @@ ws = ["kube/ws"]
 latest = ["k8s-openapi/v1_22"]
 deprecated = ["kube/deprecated-crd-v1beta1", "k8s-openapi/v1_21"]
 
-
 [dev-dependencies]
 tokio-util = "0.6.8"
 assert-json-diff = "2.0.1"
