@@ -186,6 +186,7 @@ impl ConfigExt for Config {
             self.root_cert.as_ref(),
             self.accept_invalid_certs,
         )
+        .map_err(Error::NativeTls)
     }
 
     #[cfg(feature = "native-tls")]

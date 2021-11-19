@@ -63,11 +63,11 @@ pub enum Error {
     #[error("SslError: {0}")]
     SslError(String),
 
-    /// An error from openssl when handling configuration
+    /// Errors from Native TLS
     #[cfg(feature = "native-tls")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
-    #[error("OpensslError: {0}")]
-    OpensslError(#[source] openssl::error::ErrorStack),
+    #[cfg_attr(docsrs, doc(feature = "native-tls"))]
+    #[error("native tls error: {0}")]
+    NativeTls(#[source] crate::client::NativeTlsError),
 
     /// Errors from OpenSSL TLS
     #[cfg(feature = "openssl-tls")]
