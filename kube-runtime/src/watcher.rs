@@ -1,17 +1,16 @@
 //! Watches a Kubernetes Resource for changes, with error recovery
 
-use backoff::{backoff::Backoff, ExponentialBackoff};
+use backoff::backoff::Backoff;
 use derivative::Derivative;
-use futures::{future::ready, stream::BoxStream, FutureExt, Stream, StreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
 };
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
-use std::{clone::Clone, fmt::Debug, future::Future, pin::Pin, sync::Arc};
+use std::{clone::Clone, fmt::Debug};
 use thiserror::Error;
-use tokio::sync::Mutex;
 
 #[derive(Debug, Error)]
 pub enum Error {

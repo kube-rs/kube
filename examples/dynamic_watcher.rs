@@ -1,6 +1,6 @@
 use futures::prelude::*;
 use kube::{
-    api::{Api, DynamicObject, GroupVersionKind, ListParams, ResourceExt},
+    api::{Api, DynamicObject, GroupVersionKind, ResourceExt},
     discovery,
     runtime::Observer,
     Client,

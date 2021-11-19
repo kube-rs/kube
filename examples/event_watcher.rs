@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client);
     let lp = ListParams::default();
 
-    let mut ew = Observer::new(events, lp).watch_applies().boxed();
+    let mut ew = Observer::new(events).params(lp).watch_applies().boxed();
 
     while let Some(event) = ew.try_next().await? {
         handle_event(event)?;

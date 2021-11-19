@@ -1,5 +1,5 @@
 use backoff::ExponentialBackoff;
-use futures::{future::ready, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use kube_client::{
     api::{Api, ListParams},
     core::Resource,
@@ -61,18 +61,20 @@ where
             max_elapsed_time: Some(std::time::Duration::from_secs(60 * 60)),
             ..ExponentialBackoff::default()
         });
-        let lp = self.listparams.unwrap_or_else(|| ListParams::default());
+        let lp = self.listparams.unwrap_or_default();
         let input = watcher(self.api, lp).boxed();
         backoff_watch(input, backoff)
     }
 
     /// Set the backoff policy
+    #[must_use]
     pub fn backoff(mut self, backoff: ExponentialBackoff) -> Self {
         self.backoff = Some(backoff);
         self
     }
 
     /// Set the parameters for the watch
+    #[must_use]
     pub fn params(mut self, lp: ListParams) -> Self {
         self.listparams = Some(lp);
         self
