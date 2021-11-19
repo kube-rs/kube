@@ -286,6 +286,9 @@ struct StreamBackoff<S, B> {
 
 #[pin_project(project = StreamBackoffStateProj)]
 enum StreamBackoffState {
+    // It's expected to have relatively few but long-lived `StreamBackoff`s in a project, so we would rather have
+    // cheaper sleeps than a smaller `StreamBackoff`.
+    #[allow(clippy::large_enum_variant)]
     BackingOff(#[pin] Sleep),
     GivenUp,
     Awake,
