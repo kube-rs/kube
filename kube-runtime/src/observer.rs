@@ -1,5 +1,5 @@
 use backoff::ExponentialBackoff;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use kube_client::{
     api::{Api, ListParams},
     core::Resource,
@@ -62,7 +62,7 @@ where
             ..ExponentialBackoff::default()
         });
         let lp = self.listparams.unwrap_or_default();
-        let input = watcher(self.api, lp).boxed();
+        let input = watcher(self.api, lp);
         backoff_watch(input, backoff)
     }
 
