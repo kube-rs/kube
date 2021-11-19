@@ -56,9 +56,9 @@ where
     }
 
     // start the watcher and filter out backoff errors from the stream for a while
-    fn start(self) -> impl Stream<Item = Result<Event<K>>> {
+    fn watch_events(self) -> impl Stream<Item = Result<Event<K>>> {
         let backoff = self.backoff.unwrap_or_else(|| backoff::ExponentialBackoff {
-            max_elapsed_time: Some(std::time::Duration::from_secs(60 * 10)),
+            max_elapsed_time: Some(std::time::Duration::from_secs(60 * 60)),
             ..ExponentialBackoff::default()
         });
         let lp = self.listparams.unwrap_or_else(|| ListParams::default());
@@ -88,7 +88,7 @@ where
     /// [`ExponentialBackoff`](backoff::ExponentialBackoff) policy allows, then
     /// that error is considered irrecoverable and propagated in a stream item here.
     pub fn watch_applies(self) -> impl Stream<Item = Result<K, Error>> {
-        utils::try_flatten_applied(self.start())
+        utils::try_flatten_applied(self.watch_events())
     }
 
     /// Run the watcher, and produce an informational stream of watch events (modified/added/deleted)
@@ -101,6 +101,6 @@ where
     /// [`ExponentialBackoff`](backoff::ExponentialBackoff) policy allows, then
     /// that error is considered irrecoverable and propagated in a stream item here.
     pub fn watch_touches(self) -> impl Stream<Item = Result<K, Error>> {
-        utils::try_flatten_touched(self.start())
+        utils::try_flatten_touched(self.watch_events())
     }
 }
