@@ -69,10 +69,6 @@ pub enum KubeconfigError {
     #[error("the structure of the parsed kubeconfig is invalid: {0}")]
     InvalidStructure(#[source] serde_yaml::Error),
 
-    /// Failed to find a single YAML document in kubeconfig
-    #[error("failed to find a single YAML document in kubeconfig: {0}")]
-    EmptyConfig(PathBuf),
-
     /// Failed to parse cluster url
     #[error("failed to parse cluster url: {0}")]
     ParseClusterUrl(#[source] http::uri::InvalidUri),
