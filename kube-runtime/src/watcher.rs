@@ -1,17 +1,17 @@
 //! Watches a Kubernetes Resource for changes, with error recovery
 
-use backoff::{backoff::Backoff, ExponentialBackoff};
+use crate::utils::stream_backoff::StreamBackoff;
+use backoff::backoff::Backoff;
 use derivative::Derivative;
-use futures::{future::ready, stream::BoxStream, FutureExt, Stream, StreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
 };
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
-use std::{clone::Clone, fmt::Debug, future::Future, pin::Pin, sync::Arc};
+use std::{clone::Clone, fmt::Debug};
 use thiserror::Error;
-use tokio::sync::Mutex;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -274,109 +274,13 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     //.filter(|r| ready(!std::matches!(r, Err(Error::BackoffRetriable))))
 }
 
-/*
-fn backoff_trampoline<'a, K>(bo: &'a mut ExponentialBackoff, w: Result<Event<K>, Error>) -> impl Future<Output = Option<Result<Event<K>, Error>>> + 'a
-where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'a
-{
-    bo.reset();
-    ready(Some(w))
-}
-
-// could not get ANY of these lifetime ideas to work... closure lifetimes not matching what was needed
-// thus to keep me sane, just PoCing this with async-stream atm...
-pub fn backoff_watch_stream<K, B>(ws: BoxStream<'static, Result<Event<K>>>, bo: B) -> impl Stream<Item = Result<Event<K>>> + 'static
-where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-    B: Backoff + Send + 'static
-{
-    //let backoff = backoff::ExponentialBackoff {
-    //    max_elapsed_time: Some(std::time::Duration::from_secs(60 * 10)),
-    //    ..ExponentialBackoff::default()
-    //};
-    let boshared = Arc::new(Mutex::new(bo));
-
-    //let cycle = [std::sync::Arc::new(backoff)];
-    //let mut bostream = futures::stream::iter(cycle.iter()).cycle();
-    //ws.zip(bostream).filter_map(|(w, bo)| async {
-    //    if w.is_err() {
-    //        None
-    //    } else {
-    //        Some(w)
-    //    }
-    //})
-    //let f: for<'a> Fn(&'a mut ExponentialBackoff, Result<Event<K>, Error>) -> Pin<Box<dyn Future<Option<Result<Event<K>, Error>>>>> + 'a = |bo, w| async {
-    //    bo.reset();
-    //    Some(w)
-    //}.boxed();
-    //ws.scan(backoff, |bo, w| async move {
-    //    backoff_trampoline(bo, w)
-    //})
-    //ws.scan(backoff, backoff_trampoline)
-   //ws.scan(boshared, |bo, w| async move {
-        //let mut bo = bo.lock().await;
-        //if w.is_err() {
-        //    if let Some(wait_time) = bo.next_backoff() {
-        //        //TODO: kind name here
-        //        tracing::debug!("watcher waiting {}ms until retrying", wait_time.as_millis());
-        //        tokio::time::sleep(wait_time).await;
-        //        None
-        //    } else {
-        //        tracing::warn!("watcher backoff reached threshold, bubbling up error");
-        //        Some(w)
-        //    }
-        //} else {
-        //    bo.reset();
-        //    Some(w)
-        //}
-        //return Some(w)
-    //})
-
-    //ws.filter_map(move |w| async move {
-        //let mut bo = boshared.lock().await;
-    //    if w.is_err() {
-    //        if let Some(wait_time) = bo.next_backoff() {
-    //            // TODO: kind name here
-    //            tracing::debug!("watcher waiting {}ms until retrying", wait_time.as_millis());
-    //            tokio::time::sleep(wait_time).await;
-    //            None
-    //        } else {
-    //            tracing::warn!("watcher backoff reached threshold, bubbling up error");
-    //            Some(w)
-    //        }
-    //    } else {
-    //        bo.reset();
-    //        Some(w)
-    //    }
-        //return Some(w)
-    //})
-    ws
-}
-*/
-
 pub fn backoff_watch<K, B>(
-    ws: BoxStream<'static, Result<Event<K>>>,
-    mut bo: B,
-) -> impl Stream<Item = Result<Event<K>>> + 'static
+    stream: impl Stream<Item = Result<Event<K>>> + Send,
+    backoff: B,
+) -> impl Stream<Item = Result<Event<K>>> + Send
 where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-    B: Backoff + Send + 'static,
+    K: Resource + Send,
+    B: Backoff + Send,
 {
-    async_stream::stream! {
-        for await w in ws {
-            if w.is_err() {
-                if let Some(wait_time) = bo.next_backoff() {
-                    // TODO: kind name here
-                    tracing::debug!("watcher waiting {}ms until retrying", wait_time.as_millis());
-                    tokio::time::sleep(wait_time).await;
-                } else {
-                    tracing::warn!("watcher backoff reached threshold, bubbling up error");
-                    yield w;
-                }
-            } else {
-                bo.reset();
-                yield w;
-            }
-        }
-    }
+    StreamBackoff::new(stream, backoff)
 }

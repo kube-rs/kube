@@ -204,7 +204,7 @@ mod test {
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
         let api_resource = ApiResource::from_gvk(&gvk);
         let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", &api_resource);
-        let a2: Api<Foo> = Api::namespaced(client.clone(), "myns");
+        let a2: Api<Foo> = Api::namespaced(client, "myns");
 
         // make sure they return the same url_path through their impls
         assert_eq!(a1.resource_url(), a2.resource_url());

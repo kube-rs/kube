@@ -34,7 +34,6 @@ json-patch = "0.2.6"
 serde_json = "1.0.68"
 thiserror = "1.0.29"
 backoff = { git = "https://github.com/ihrwein/backoff.git", rev = "472e9bd56ea79cea1d79c49673b2871f089ca312" }
-async-stream = "0.3.2"
 
 [dependencies.k8s-openapi]
 version = "0.13.1"
