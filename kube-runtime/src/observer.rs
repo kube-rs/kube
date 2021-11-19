@@ -13,16 +13,19 @@ use crate::{
 };
 
 
-/// A simple observer around a watcher with error handling and retry backoff
+/// An observer around a watcher with error handling and retry backoff
 ///
 /// # Error handling
 ///
 /// An `Observer` sets a sensible default backoff policy for all watch events and will retry
 /// (with expotential backoff) from transient `watcher` failures until the retry policy is breached.
+/// The `watcher::Error`s are still returned in the resulting stream, but they __can__ be ignored.
+/// If the retry policy is breached, then the stream ends.
 ///
 /// To configure the retry policy use `Observer::backoff`.
 ///
-/// Note that while all errors will be retried, some represent the need for user action to recover:
+/// Note that t is possible to create a backoff policy that retries infinitely, but this might be undesirable.
+/// Several watch errors represent a need for external user action to recover:
 ///
 /// - 404 `ErrorResponse`(watching invalid / missing api kind/group for `K`)
 /// - 403 `ErrorResponse` (missing list + watch rbac verbs for `K`)
@@ -69,6 +72,7 @@ where
     /// Set the backoff policy
     #[must_use]
     pub fn backoff(mut self, backoff: ExponentialBackoff) -> Self {
+        // TODO: allow backoff: B where B: Backoff here - needs box_into_inner
         self.backoff = Some(backoff);
         self
     }

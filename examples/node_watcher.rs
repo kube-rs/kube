@@ -1,4 +1,5 @@
 #[macro_use] extern crate log;
+use backoff::ExponentialBackoff;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
@@ -17,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut obs = Observer::new(nodes)
         .params(ListParams::default().labels("beta.kubernetes.io/os=linux"))
-        //.backoff(ExponentialBackoff::default()) // infinite backoff
+        .backoff(ExponentialBackoff::default()) // infinite backoff
         .watch_applies()
         .boxed();
 

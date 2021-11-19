@@ -203,12 +203,8 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-///     let backoff = backoff::ExponentialBackoff {
-///         max_elapsed_time: Some(std::time::Duration::from_secs(60*10)),
-///         ..ExponentialBackoff::default()
-///     };
 ///
-///     let watcher = watcher(pods, ListParams::default(), backoff);
+///     let watcher = watcher(pods, ListParams::default());
 ///     try_flatten_applied(watcher)
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name());
@@ -270,8 +266,6 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         Event::Restarted(mut objs) => Ok(objs.pop()),
         Event::Applied(obj) => Ok(Some(obj)),
     })
-    // Drop retriable errors for a while, after which they become hard errors
-    //.filter(|r| ready(!std::matches!(r, Err(Error::BackoffRetriable))))
 }
 
 pub fn backoff_watch<K, B>(
