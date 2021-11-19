@@ -148,6 +148,19 @@ mod tests {
         assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
+    #[tokio::test]
+    async fn backoff_should_close_when_requested() {
+        assert_eq!(
+            StreamBackoff::new(
+                stream::iter([Ok(0), Ok(1), Err(2), Ok(3)]),
+                backoff::backoff::Stop {}
+            )
+            .collect::<Vec<_>>()
+            .await,
+            vec![Ok(0), Ok(1), Err(2)]
+        );
+    }
+
     /// Dynamic backoff policy that is still deterministic and testable
     struct LinearBackoff {
         interval: Duration,
