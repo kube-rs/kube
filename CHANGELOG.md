@@ -1,49 +1,74 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.63.2...master
+ * see https://github.com/kube-rs/kube-rs/compare/0.64.0...master
 
- * BREAKING: Replaced feature `kube-derive/schema` with attribute `#[kube(schema)]` - #690
+0.64.0 / 2021-11-16
+===================
+
+ * BREAKING: Replaced feature `kube-derive/schema` with attribute `#[kube(schema)]` - [#690](https://github.com/kube-rs/kube-rs/issues/690)
    - If you currently disable default `kube-derive` default features to avoid automatic schema generation, add `#[kube(schema = "disabled")]` to your spec struct instead
- * BREAKING: Moved `CustomResource` derive crate overrides into subattribute `#[kube(crates(...))]` - #690
+ * BREAKING: Moved `CustomResource` derive crate overrides into subattribute `#[kube(crates(...))]` - [#690](https://github.com/kube-rs/kube-rs/issues/690)
    - Replace `#[kube(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..)]` with `#[kube(crates(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..))]`
- * Added `openssl-tls` feature to use `openssl` for TLS on all platforms. Note that, even though `native-tls` uses a platform specific TLS, `kube` requires `openssl` on all platforms because `native-tls` only allows PKCS12 input to load certificates and private key at the moment, and creating PKCS12 requires `openssl`. - #700
- * BREAKING: Changed to fail loading configurations with PEM-encoded certificates containing invalid sections instead of ignoring them. Updated `pem` to 1.0.1. - #702
- * `oauth`: Updated `tame-oauth` to [0.6.0](https://github.com/EmbarkStudios/tame-oauth/blob/main/CHANGELOG.md#060---2021-08-07) which supports the same default credentials flow as the Go `oauth2` for Google OAuth. In addition to reading the service account information from JSON file specified with `GOOGLE_APPLICATION_CREDENTIALS` environment variable, [Application Default Credentials](https://cloud.google.com/sdk/gcloud/reference/auth/application-default) from `gcloud`, and obtaining OAuth tokens from local metadata server when running inside GCP are now supported. - #701
+ * Added `openssl-tls` feature to use `openssl` for TLS on all platforms. Note that, even though `native-tls` uses a platform specific TLS, `kube` requires `openssl` on all platforms because `native-tls` only allows PKCS12 input to load certificates and private key at the moment, and creating PKCS12 requires `openssl`. - [#700](https://github.com/kube-rs/kube-rs/issues/700)
+ * BREAKING: Changed to fail loading configurations with PEM-encoded certificates containing invalid sections instead of ignoring them. Updated `pem` to 1.0.1. - [#702](https://github.com/kube-rs/kube-rs/issues/702)
+ * `oauth`: Updated `tame-oauth` to [0.6.0](https://github.com/EmbarkStudios/tame-oauth/blob/main/CHANGELOG.md#060---2021-08-07) which supports the same default credentials flow as the Go `oauth2` for Google OAuth. In addition to reading the service account information from JSON file specified with `GOOGLE_APPLICATION_CREDENTIALS` environment variable, [Application Default Credentials](https://cloud.google.com/sdk/gcloud/reference/auth/application-default) from `gcloud`, and obtaining OAuth tokens from local metadata server when running inside GCP are now supported. - [#701](https://github.com/kube-rs/kube-rs/issues/701)
 
 ### Refining Errors
 
-We started working on improving error ergonomics (tracking issue: #688).
+We started working on improving error ergonomics. See the tracking issue [#688](https://github.com/kube-rs/kube-rs/issues/688) for more details.
 
-Background: `kube::Error` has been a huge enum containing all the possible errors in `kube`. Users need to constantly ignore irrelevant variants, and it was difficult to know which are relevant to begin with. Reading the code doesn't help much either because the error propagations often had implicit conversions. `impl From<E> for kube::Error` and `?` makes error propagations concise, but it increases the mental overhead required to understand how the code might fail. It's also too easy to forget about errors and end up using general errors. As a result, many of the variants doesn't add any additional context (e.g., `Error::HttpError(http::Error)`).
+The following is the summary of changes to `kube::Error` included in this release:
 
-We'll address this problem by removing `impl From` to prevent us from forgetting to attach context, and gradually breaking down the errors into smaller and more specific errors (proposed in #686).
+* Added `Error::Auth(kube::client::AuthError)` (errors related to client auth, some of them were previously in `Error::Kubeconfig`)
+* Added `Error::BuildRequest(kube::core::request::Error)` (errors building request from `kube::core`)
+* Added `Error::InferConfig(kube::config::InferConfigError)` (for `Client::try_default`)
+* Added `Error::OpensslTls(kube::client::OpensslTlsError)` (new `openssl-tls` feature) - [#700](https://github.com/kube-rs/kube-rs/issues/700)
+* Added `Error::UpgradeConnection(kube::client::UpgradeConnectinError)` (`ws` feature, errors from upgrading a connection)
+* Removed `Error::Connection` (was unused)
+* Removed `Error::RequestBuild` (was unused)
+* Removed `Error::RequestSend` (was unused)
+* Removed `Error::RequestParse` (was unused)
+* Removed `Error::InvalidUri` (replaced by variants of errors in `kube::config` errors)
+* Removed `Error::RequestValidation` (replaced by a variant of `Error::BuildRequest`)
+* Removed `Error::Kubeconfig` (replaced by `Error::InferConfig`, and `Error::Auth`)
+* Removed `Error::ProtocolSwitch` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `Error::MissingUpgradeWebSocketHeader` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `Error::MissingConnectionUpgradeHeader` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `Error::SecWebSocketAcceptKeyMismatch` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `Error::SecWebSocketProtocolMismatch` (`ws` only, replaced by `Error::UpgradeConnection`)
+* Removed `impl From<T> for Error`
+
+<details>
+<summary>Expand for more details</summary>
 
 The following breaking changes were made as a part of an effort to refine errors (the list is large, but most of them are lower level, and shouldn't require much change in most cases):
 
-* Removed `impl From<E> for kube::Error` - #686
-* Removed unused error variants in `kube::Error`: `Connection`, `RequestBuild`, `RequestSend`, `RequestParse` - #689
-* Removed unused error variant `kube::error::ConfigError::LoadConfigFile` - #689
-* Changed `kube::Error::RequestValidation(String)` to `kube::Error::BuildRequest(kube::core::request::Error)`. Includes possible errors from building an HTTP request, and contains some errors from `kube::core` that was previously grouped under `kube::Error::SerdeError` and `kube::Error::HttpError`. `kube::core::request::Error` is described below. - #686
-* Removed `kube::core::Error` and `kube::core::Result`. `kube::core::Error` was replaced by more specific errors. - #686
+* Removed `impl From<E> for kube::Error` - [#686](https://github.com/kube-rs/kube-rs/issues/686)
+* Removed unused error variants in `kube::Error`: `Connection`, `RequestBuild`, `RequestSend`, `RequestParse` - [#689](https://github.com/kube-rs/kube-rs/issues/689)
+* Removed unused error variant `kube::error::ConfigError::LoadConfigFile` - [#689](https://github.com/kube-rs/kube-rs/issues/689)
+* Changed `kube::Error::RequestValidation(String)` to `kube::Error::BuildRequest(kube::core::request::Error)`. Includes possible errors from building an HTTP request, and contains some errors from `kube::core` that was previously grouped under `kube::Error::SerdeError` and `kube::Error::HttpError`. `kube::core::request::Error` is described below. - [#686](https://github.com/kube-rs/kube-rs/issues/686)
+* Removed `kube::core::Error` and `kube::core::Result`. `kube::core::Error` was replaced by more specific errors. - [#686](https://github.com/kube-rs/kube-rs/issues/686)
   - Replaced `kube::core::Error::InvalidGroupVersion` with `kube::core::gvk::ParseGroupVersionError`
   - Changed the error returned from `kube::core::admission::AdmissionRequest::with_patch` to `kube::core::admission::SerializePatchError` (was `kube::core::Error::SerdeError`)
   - Changed the error associated with `TryInto<AdmissionRequest<T>>` to `kube::core::admission::ConvertAdmissionReviewError` (was `kube::core::Error::RequestValidation`)
   - Changed the error returned from methods of `kube::core::Request` to `kube::core::request::Error` (was `kube::core::Error`). `kube::core::request::Error` represents possible errors when building an HTTP request. The removed `kube::core::Error` had `RequestValidation(String)`, `SerdeError(serde_json::Error)`, and `HttpError(http::Error)` variants. They are now `Validation(String)`, `SerializeBody(serde_json::Error)`, and  `BuildRequest(http::Error)` respectively in `kube::core::request::Error`.
-* Changed variants of error enums in `kube::runtime` to tuples. Replaced `snafu` with `thiserror`. - #686
-* Removed `kube::error::ConfigError` and `kube::Error::Kubeconfig(ConfigError)` - #696
+* Changed variants of error enums in `kube::runtime` to tuples. Replaced `snafu` with `thiserror`. - [#686](https://github.com/kube-rs/kube-rs/issues/686)
+* Removed `kube::error::ConfigError` and `kube::Error::Kubeconfig(ConfigError)` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
   - Error variants related to client auth were moved to a new error `kube::client::AuthError` as described below
   - Remaining variants were split into `kube::config::{InferConfigError, InClusterError, KubeconfigError}` as described below
-* Added `kube::client::AuthError` by extracting error variants related to client auth from `kube::ConfigError` and adding more variants to preserve context - #696
-* Moved `kube::error::OAuthError` to `kube::client::OAuthError` - #696
-* Changed all errors in `kube::client::auth` to `kube::client::AuthError` - #696
-* Added `kube::Error::Auth(kube::client::AuthError)` - #696
-* Added `kube::config::InferConfigError` which is an error from `Config::infer()` and `kube::Error::InferConfig(kube::config::InferConfigError)` - #696
-* Added `kube::config::InClusterError` for errors related to loading in-cluster configuration by splitting `kube::ConfigError` and adding more variants to preserve context. - #696
-* Added `kube::config::KubeconfigError` for errors related to loading kubeconfig by splitting `kube::ConfigError` and adding more variants to preserve context. - #696
-* Changed methods of `kube::Config` to return these erorrs instead of `kube::Error` - #696
-* Removed `kube::Error::InvalidUri` which was replaced by error variants preserving context, such as `KubeconfigError::ParseProxyUrl` - #696
-* Moved all errors from upgrading to a WebSocket connection into `kube::Error::UpgradeConnection(kube::client::UpgradeConnectionError)` - #696
+* Added `kube::client::AuthError` by extracting error variants related to client auth from `kube::ConfigError` and adding more variants to preserve context - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Moved `kube::error::OAuthError` to `kube::client::OAuthError` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Changed all errors in `kube::client::auth` to `kube::client::AuthError` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Added `kube::Error::Auth(kube::client::AuthError)` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Added `kube::config::InferConfigError` which is an error from `Config::infer()` and `kube::Error::InferConfig(kube::config::InferConfigError)` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Added `kube::config::InClusterError` for errors related to loading in-cluster configuration by splitting `kube::ConfigError` and adding more variants to preserve context. - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Added `kube::config::KubeconfigError` for errors related to loading kubeconfig by splitting `kube::ConfigError` and adding more variants to preserve context. - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Changed methods of `kube::Config` to return these erorrs instead of `kube::Error` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Removed `kube::Error::InvalidUri` which was replaced by error variants preserving context, such as `KubeconfigError::ParseProxyUrl` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Moved all errors from upgrading to a WebSocket connection into `kube::Error::UpgradeConnection(kube::client::UpgradeConnectionError)` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+
+</details>
 
 0.63.2 / 2021-10-28
 ===================

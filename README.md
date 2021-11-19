@@ -17,7 +17,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.63.2", features = ["runtime","derive"] }
+kube = { version = "0.64.0", features = ["runtime","derive"] }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 ```
 
@@ -27,12 +27,12 @@ We recommend turning off `default-features` for `k8s-openapi` to speed up your c
 
 ## Upgrading
 
-Please check the [CHANGELOG](./CHANGELOG.md) when upgrading.
-All crates herein are versioned and [released](./release.toml) together to guarantee [compatibility before 1.0](https://github.com/kube-rs/kube-rs/issues/508).
+Please check the [CHANGELOG](https://github.com/kube-rs/kube-rs/blob/master/CHANGELOG.md) when upgrading.
+All crates herein are versioned and [released](https://github.com/kube-rs/kube-rs/blob/master/release.toml) together to guarantee [compatibility before 1.0](https://github.com/kube-rs/kube-rs/issues/508).
 
 ## Usage
 
-See the **[examples directory](./examples)** for how to use any of these crates.
+See the **[examples directory](https://github.com/kube-rs/kube-rs/blob/master/examples)** for how to use any of these crates.
 
 - **[kube API Docs](https://docs.rs/kube/)**
 
@@ -98,7 +98,7 @@ println!("foo: {:?}", f);
 println!("crd: {:?}", serde_yaml::to_string(&Foo::crd()));
 ```
 
-There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](./examples) for more.
+There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples) for more.
 
 **NB:** `#[derive(CustomResource)]` requires the `derive` feature enabled on `kube`.
 
@@ -166,7 +166,7 @@ Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues
 
 ```toml
 [dependencies]
-kube = { version = "0.63.2", default-features = false, features = ["client", "rustls-tls"] }
+kube = { version = "0.64.0", default-features = false, features = ["client", "rustls-tls"] }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
 ```
 
