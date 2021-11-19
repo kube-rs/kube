@@ -346,8 +346,8 @@ pub fn backoff_watch<K, B>(
     backoff: B,
 ) -> impl Stream<Item = Result<Event<K>>> + Send
 where
-    K: Resource + Send + 'static,
-    B: Backoff + Send + 'static,
+    K: Resource + Send,
+    B: Backoff + Send,
 {
     StreamBackoff {
         stream,
