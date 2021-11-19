@@ -14,7 +14,6 @@ use crate::{
     },
     watcher::{self, watcher},
 };
-use backoff::ExponentialBackoff;
 use derivative::Derivative;
 use futures::{
     channel,
@@ -443,10 +442,9 @@ where
     pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
-        let b = ExponentialBackoff::default();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
-            try_flatten_applied(reflector(writer, watcher(owned_api, lp, b))),
+            try_flatten_applied(reflector(writer, watcher(owned_api, lp))),
             dyntype.clone(),
         )
         .boxed();
@@ -502,7 +500,7 @@ where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
         let child_watcher = trigger_owners(
-            try_flatten_touched(watcher(api, lp, ExponentialBackoff::default())),
+            try_flatten_touched(watcher(api, lp)),
             self.dyntype.clone(),
             dyntype,
         );
@@ -554,8 +552,7 @@ where
         I::IntoIter: Send,
         Other::DynamicType: Clone,
     {
-        let backoff = ExponentialBackoff::default();
-        let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp, backoff)), move |obj| {
+        let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), move |obj| {
             let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
             mapper(obj)
                 .into_iter()

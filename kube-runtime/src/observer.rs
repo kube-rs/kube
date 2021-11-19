@@ -9,7 +9,7 @@ use std::fmt::Debug;
 
 use crate::{
     utils,
-    watcher::{watcher, Error, Event, Result},
+    watcher::{backoff_watch, watcher, Error, Event, Result},
 };
 
 
@@ -62,7 +62,8 @@ where
             ..ExponentialBackoff::default()
         });
         let lp = self.listparams.unwrap_or_else(|| ListParams::default());
-        watcher(self.api, lp, backoff).filter(|r| ready(!std::matches!(r, Err(Error::BackoffRetriable))))
+        let input = watcher(self.api, lp).boxed();
+        backoff_watch(input, backoff)
     }
 
     /// Set the backoff policy
