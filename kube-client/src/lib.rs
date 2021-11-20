@@ -15,7 +15,7 @@
 //! use k8s_openapi::api::core::v1::Pod;
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<(), kube_client::Error> {
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Read the environment to find config for kube client.
 //!     // Note that this tries an in-cluster configuration first,
 //!     // then falls back on a kubeconfig file.

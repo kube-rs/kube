@@ -4,17 +4,111 @@
 //! The [`Config`] has several constructors plus logic to infer environment.
 //!
 //! Unless you have issues, prefer using [`Config::infer`], and pass it to a [`Client`][crate::Client].
+use std::{path::PathBuf, time::Duration};
+
+use thiserror::Error;
+
 mod file_config;
 mod file_loader;
 mod incluster_config;
-mod utils;
 
-use crate::{error::ConfigError, Result};
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
-#[cfg(feature = "client")] pub(crate) use utils::read_file_to_string;
+pub use incluster_config::Error as InClusterError;
 
-use std::time::Duration;
+/// Failed to infer config
+#[derive(Error, Debug)]
+#[error("failed to infer config: in-cluster: ({in_cluster}), kubeconfig: ({kubeconfig})")]
+pub struct InferConfigError {
+    in_cluster: InClusterError,
+    // We can only pick one source, but the kubeconfig failure is more likely to be a user error
+    #[source]
+    kubeconfig: KubeconfigError,
+}
+
+/// Possible errors when loading kubeconfig
+#[derive(Error, Debug)]
+pub enum KubeconfigError {
+    /// Failed to determine current context
+    #[error("failed to determine current context")]
+    CurrentContextNotSet,
+
+    /// Kubeconfigs with mismatching kind cannot be merged
+    #[error("kubeconfigs with mismatching kind cannot be merged")]
+    KindMismatch,
+
+    /// Kubeconfigs with mismatching api version cannot be merged
+    #[error("kubeconfigs with mismatching api version cannot be merged")]
+    ApiVersionMismatch,
+
+    /// Failed to load current context
+    #[error("failed to load current context: {0}")]
+    LoadContext(String),
+
+    /// Failed to load the cluster of context
+    #[error("failed to load the cluster of context: {0}")]
+    LoadClusterOfContext(String),
+
+    /// Failed to find named user
+    #[error("failed to find named user: {0}")]
+    FindUser(String),
+
+    /// Failed to find the path of kubeconfig
+    #[error("failed to find the path of kubeconfig")]
+    FindPath,
+
+    /// Failed to read kubeconfig
+    #[error("failed to read kubeconfig from '{1:?}': {0}")]
+    ReadConfig(#[source] std::io::Error, PathBuf),
+
+    /// Failed to parse kubeconfig YAML
+    #[error("failed to parse kubeconfig YAML: {0}")]
+    Parse(#[source] serde_yaml::Error),
+
+    /// The structure of the parsed kubeconfig is invalid
+    #[error("the structure of the parsed kubeconfig is invalid: {0}")]
+    InvalidStructure(#[source] serde_yaml::Error),
+
+    /// Failed to parse cluster url
+    #[error("failed to parse cluster url: {0}")]
+    ParseClusterUrl(#[source] http::uri::InvalidUri),
+
+    /// Failed to parse proxy url
+    #[error("failed to parse proxy url: {0}")]
+    ParseProxyUrl(#[source] http::uri::InvalidUri),
+
+    /// Failed to load certificate authority
+    #[error("failed to load certificate authority")]
+    LoadCertificateAuthority(#[source] LoadDataError),
+
+    /// Failed to load client certificate
+    #[error("failed to load client certificate")]
+    LoadClientCertificate(#[source] LoadDataError),
+
+    /// Failed to load client key
+    #[error("failed to load client key")]
+    LoadClientKey(#[source] LoadDataError),
+
+    /// Failed to parse PEM-encoded certificates
+    #[error("failed to parse PEM-encoded certificates: {0}")]
+    ParseCertificates(#[source] pem::PemError),
+}
+
+/// Errors from loading data from a base64 string or a file
+#[derive(Debug, Error)]
+pub enum LoadDataError {
+    /// Failed to decode base64 data
+    #[error("failed to decode base64 data: {0}")]
+    DecodeBase64(#[source] base64::DecodeError),
+
+    /// Failed to read file
+    #[error("failed to read file '{1:?}': {0}")]
+    ReadFile(#[source] std::io::Error, PathBuf),
+
+    /// No base64 data or file path was provided
+    #[error("no base64 data or file")]
+    NoBase64DataOrFile,
+}
 
 /// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
 ///
@@ -75,21 +169,21 @@ impl Config {
     /// then if that fails, trying the local kubeconfig.
     ///
     /// Fails if inference from both sources fails
-    pub async fn infer() -> Result<Self> {
+    pub async fn infer() -> Result<Self, InferConfigError> {
         match Self::from_cluster_env() {
-            Err(cluster_env_err) => {
-                tracing::trace!("No in-cluster config found: {}", cluster_env_err);
+            Err(in_cluster_err) => {
+                tracing::trace!("No in-cluster config found: {}", in_cluster_err);
                 tracing::trace!("Falling back to local kubeconfig");
                 let config = Self::from_kubeconfig(&KubeConfigOptions::default())
                     .await
-                    .map_err(|kubeconfig_err| ConfigError::ConfigInferenceExhausted {
-                        cluster_env: Box::new(cluster_env_err),
-                        kubeconfig: Box::new(kubeconfig_err),
+                    .map_err(|kubeconfig_err| InferConfigError {
+                        in_cluster: in_cluster_err,
+                        kubeconfig: kubeconfig_err,
                     })?;
 
                 Ok(config)
             }
-            success => success,
+            Ok(success) => Ok(success),
         }
     }
 
@@ -98,29 +192,18 @@ impl Config {
     /// This follows the standard [API Access from a Pod](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod)
     /// and relies on you having the service account's token mounted,
     /// as well as having given the service account rbac access to do what you need.
-    pub fn from_cluster_env() -> Result<Self> {
+    pub fn from_cluster_env() -> Result<Self, InClusterError> {
         let cluster_url = if cfg!(feature = "rustls-tls") {
             // try rolling out new method for rustls which does not support ip based urls anyway
             // see https://github.com/kube-rs/kube-rs/issues/587
             incluster_config::kube_dns()
         } else {
-            incluster_config::kube_server()
-                .ok_or(ConfigError::MissingInClusterVariables {
-                    hostenv: incluster_config::SERVICE_HOSTENV,
-                    portenv: incluster_config::SERVICE_PORTENV,
-                })?
-                .parse::<http::Uri>()?
+            incluster_config::kube_server()?
         };
 
-        let default_namespace = incluster_config::load_default_ns()
-            .map_err(Box::new)
-            .map_err(ConfigError::InvalidInClusterNamespace)?;
-
+        let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
-
-        let token = incluster_config::load_token()
-            .map_err(Box::new)
-            .map_err(ConfigError::InvalidInClusterToken)?;
+        let token = incluster_config::load_token()?;
 
         Ok(Self {
             cluster_url,
@@ -142,7 +225,7 @@ impl Config {
     /// This will respect the `$KUBECONFIG` evar, but otherwise default to `~/.kube/config`.
     /// You can also customize what context/cluster/user you want to use here,
     /// but it will default to the current-context.
-    pub async fn from_kubeconfig(options: &KubeConfigOptions) -> Result<Self> {
+    pub async fn from_kubeconfig(options: &KubeConfigOptions) -> Result<Self, KubeconfigError> {
         let loader = ConfigLoader::new_from_options(options).await?;
         Self::new_from_loader(loader).await
     }
@@ -150,13 +233,20 @@ impl Config {
     /// Create configuration from a [`Kubeconfig`] struct
     ///
     /// This bypasses kube's normal config parsing to obtain custom functionality.
-    pub async fn from_custom_kubeconfig(kubeconfig: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
+    pub async fn from_custom_kubeconfig(
+        kubeconfig: Kubeconfig,
+        options: &KubeConfigOptions,
+    ) -> Result<Self, KubeconfigError> {
         let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
         Self::new_from_loader(loader).await
     }
 
-    async fn new_from_loader(loader: ConfigLoader) -> Result<Self> {
-        let cluster_url = loader.cluster.server.parse::<http::Uri>()?;
+    async fn new_from_loader(loader: ConfigLoader) -> Result<Self, KubeconfigError> {
+        let cluster_url = loader
+            .cluster
+            .server
+            .parse::<http::Uri>()
+            .map_err(KubeconfigError::ParseClusterUrl)?;
 
         let default_namespace = loader
             .current_context
@@ -198,6 +288,19 @@ impl Config {
             auth_info: loader.user,
         })
     }
+}
+
+fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
+    Ok(pem::parse_many(data)?
+        .into_iter()
+        .filter_map(|p| {
+            if p.tag == "CERTIFICATE" {
+                Some(p.contents)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>())
 }
 
 // https://github.com/kube-rs/kube-rs/issues/146#issuecomment-590924397

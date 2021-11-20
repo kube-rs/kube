@@ -1,8 +1,23 @@
 //! Request builder type for arbitrary api types
+use thiserror::Error;
+
 use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
-use crate::{Error, Result};
 
 pub(crate) const JSON_MIME: &str = "application/json";
+
+/// Possible errors when building a request.
+#[derive(Debug, Error)]
+pub enum Error {
+    /// Failed to build a request.
+    #[error("failed to build request: {0}")]
+    BuildRequest(#[source] http::Error),
+    /// Failed to serialize body.
+    #[error("failed to serialize body: {0}")]
+    SerializeBody(#[source] serde_json::Error),
+    /// Failed to validate request.
+    #[error("failed to validate request")]
+    Validation(String),
+}
 
 /// A Kubernetes request builder
 ///
@@ -28,7 +43,7 @@ impl Request {
 /// Convenience methods found from API conventions
 impl Request {
     /// List a collection of a resource
-    pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
 
@@ -47,21 +62,21 @@ impl Request {
 
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::BuildRequest)
     }
 
     /// Watch a resource at a given version
-    pub fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
         lp.validate()?;
         if lp.limit.is_some() {
-            return Err(Error::RequestValidation(
+            return Err(Error::Validation(
                 "ListParams::limit cannot be used with a watch.".into(),
             ));
         }
         if lp.continue_token.is_some() {
-            return Err(Error::RequestValidation(
+            return Err(Error::Validation(
                 "ListParams::continue_token cannot be used with a watch.".into(),
             ));
         }
@@ -83,20 +98,20 @@ impl Request {
 
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::BuildRequest)
     }
 
     /// Get a single instance
-    pub fn get(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn get(&self, name: &str) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::BuildRequest)
     }
 
     /// Create an instance of a resource
-    pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn create(&self, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>, Error> {
         pp.validate()?;
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
@@ -105,21 +120,25 @@ impl Request {
         }
         let urlstr = qp.finish();
         let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
-        req.body(data).map_err(Error::HttpError)
+        req.body(data).map_err(Error::BuildRequest)
     }
 
     /// Delete an instance of a resource
-    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
-        let body = serde_json::to_vec(&dp)?;
+        let body = serde_json::to_vec(&dp).map_err(Error::SerializeBody)?;
         let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
-        req.body(body).map_err(Error::HttpError)
+        req.body(body).map_err(Error::BuildRequest)
     }
 
     /// Delete a collection of a resource
-    pub fn delete_collection(&self, dp: &DeleteParams, lp: &ListParams) -> Result<http::Request<Vec<u8>>> {
+    pub fn delete_collection(
+        &self,
+        dp: &DeleteParams,
+        lp: &ListParams,
+    ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
         if let Some(fields) = &lp.field_selector {
@@ -129,9 +148,9 @@ impl Request {
             qp.append_pair("labelSelector", labels);
         }
         let urlstr = qp.finish();
-        let body = serde_json::to_vec(&dp)?;
+        let body = serde_json::to_vec(&dp).map_err(Error::SerializeBody)?;
         let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
-        req.body(body).map_err(Error::HttpError)
+        req.body(body).map_err(Error::BuildRequest)
     }
 
     /// Patch an instance of a resource
@@ -142,7 +161,7 @@ impl Request {
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
-    ) -> Result<http::Request<Vec<u8>>> {
+    ) -> Result<http::Request<Vec<u8>>, Error> {
         pp.validate(patch)?;
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
@@ -152,14 +171,19 @@ impl Request {
         http::Request::patch(urlstr)
             .header(http::header::ACCEPT, JSON_MIME)
             .header(http::header::CONTENT_TYPE, patch.content_type())
-            .body(patch.serialize()?)
-            .map_err(Error::HttpError)
+            .body(patch.serialize().map_err(Error::SerializeBody)?)
+            .map_err(Error::BuildRequest)
     }
 
     /// Replace an instance of a resource
     ///
     /// Requires `metadata.resourceVersion` set in data
-    pub fn replace(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<http::Request<Vec<u8>>> {
+    pub fn replace(
+        &self,
+        name: &str,
+        pp: &PostParams,
+        data: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
         if pp.dry_run {
@@ -167,19 +191,23 @@ impl Request {
         }
         let urlstr = qp.finish();
         let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
-        req.body(data).map_err(Error::HttpError)
+        req.body(data).map_err(Error::BuildRequest)
     }
 }
 
 /// Subresources
 impl Request {
     /// Get an instance of the subresource
-    pub fn get_subresource(&self, subresource_name: &str, name: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn get_subresource(
+        &self,
+        subresource_name: &str,
+        name: &str,
+    ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}/{}", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
-        req.body(vec![]).map_err(Error::HttpError)
+        req.body(vec![]).map_err(Error::BuildRequest)
     }
 
     /// Patch an instance of the subresource
@@ -189,7 +217,7 @@ impl Request {
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
-    ) -> Result<http::Request<Vec<u8>>> {
+    ) -> Result<http::Request<Vec<u8>>, Error> {
         pp.validate(patch)?;
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
@@ -199,8 +227,8 @@ impl Request {
         http::Request::patch(urlstr)
             .header(http::header::ACCEPT, JSON_MIME)
             .header(http::header::CONTENT_TYPE, patch.content_type())
-            .body(patch.serialize()?)
-            .map_err(Error::HttpError)
+            .body(patch.serialize().map_err(Error::SerializeBody)?)
+            .map_err(Error::BuildRequest)
     }
 
     /// Replace an instance of the subresource
@@ -210,7 +238,7 @@ impl Request {
         name: &str,
         pp: &PostParams,
         data: Vec<u8>,
-    ) -> Result<http::Request<Vec<u8>>> {
+    ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
         if pp.dry_run {
@@ -218,7 +246,7 @@ impl Request {
         }
         let urlstr = qp.finish();
         let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
-        req.body(data).map_err(Error::HttpError)
+        req.body(data).map_err(Error::BuildRequest)
     }
 }
 

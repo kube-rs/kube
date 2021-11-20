@@ -8,7 +8,7 @@ use http::{header::AUTHORIZATION, Request, Response};
 use pin_project::pin_project;
 use tower::{layer::Layer, BoxError, Service};
 
-use crate::{client::auth::RefreshableToken, Result};
+use crate::client::auth::RefreshableToken;
 
 /// `Layer` to decorate the request with `Authorization` header with refreshable token.
 /// Token is refreshed automatically when necessary.
@@ -140,7 +140,7 @@ mod tests {
     use tokio_test::assert_ready_ok;
     use tower_test::{mock, mock::Handle};
 
-    use crate::{config::AuthInfo, error::ConfigError, Error};
+    use crate::{client::AuthError, config::AuthInfo};
 
     #[tokio::test(flavor = "current_thread")]
     async fn valid_token() {
@@ -179,10 +179,10 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(err.is::<Error>());
+        assert!(err.is::<AuthError>());
         assert!(matches!(
-            *err.downcast::<Error>().unwrap(),
-            Error::Kubeconfig(ConfigError::InvalidBearerToken(_))
+            *err.downcast::<AuthError>().unwrap(),
+            AuthError::InvalidBearerToken(_)
         ));
     }
 

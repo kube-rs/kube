@@ -14,9 +14,8 @@ license = "Apache-2.0"
 release = false
 
 [features]
-default = ["native-tls", "schema", "kubederive", "ws", "latest", "runtime"]
-kubederive = ["kube/derive"] # by default import kube-derive with its default features
-schema = ["kube-derive/schema"] # crd_derive_no_schema shows how to opt out
+default = ["native-tls", "kubederive", "ws", "latest", "runtime"]
+kubederive = ["kube/derive"]
 native-tls = ["kube/client", "kube/native-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
 runtime = ["kube/runtime"]
@@ -31,8 +30,8 @@ validator = { version = "0.14.0", features = ["derive"] }
 anyhow = "1.0.44"
 env_logger = "0.9.0"
 futures = "0.3.17"
-kube = { path = "../kube", version = "^0.63.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.63.0", default-features = false } # only needed to opt out of schema
+kube = { path = "../kube", version = "^0.64.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.64.0", default-features = false } # only needed to opt out of schema
 k8s-openapi = { version = "0.13.1", default-features = false }
 log = "0.4.11"
 serde = { version = "1.0.130", features = ["derive"] }
@@ -40,7 +39,6 @@ serde_json = "1.0.68"
 serde_yaml = "0.8.21"
 tokio = { version = "1.12.0", features = ["full"] }
 color-eyre = "0.5.10"
-snafu = { version = "0.6.10", features = ["futures"] }
 # Some Api::delete methods use Either
 either = "1.6.1"
 schemars = "0.8.6"
@@ -54,6 +52,7 @@ json-patch = "0.2.6"
 tower = { version = "0.4.6" }
 tower-http = { version = "0.1.0", features = ["trace", "decompression-gzip"] }
 hyper = { version = "0.14.13", features = ["client", "http1", "stream", "tcp"] }
+thiserror = "1.0.29"
 
 [[example]]
 name = "configmapgen_controller"
@@ -83,7 +82,11 @@ path = "crd_derive.rs"
 name = "crd_derive_schema"
 path = "crd_derive_schema.rs"
 
-[[example]] # run this without --no-default-features --features="native-tls"
+[[example]]
+name = "crd_derive_custom_schema"
+path = "crd_derive_custom_schema.rs"
+
+[[example]]
 name = "crd_derive_no_schema"
 path = "crd_derive_no_schema.rs"
 

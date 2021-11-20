@@ -1,7 +1,13 @@
 #![allow(missing_docs)]
-use crate::{config::utils, error::ConfigError, Result};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
+
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::Path};
+
+use super::{KubeconfigError, LoadDataError};
 
 /// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
 ///
@@ -13,6 +19,7 @@ use std::{collections::HashMap, fs, path::Path};
 /// [`Config`][crate::Config] is the __intended__ developer interface to help create a [`Client`][crate::Client],
 /// and this will handle the difference between in-cluster deployment and local development.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Kubeconfig {
     /// General information to be use for cli interactions
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -42,6 +49,7 @@ pub struct Kubeconfig {
 
 /// Preferences stores extensions for cli.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Preferences {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub colors: Option<bool>,
@@ -51,6 +59,7 @@ pub struct Preferences {
 
 /// NamedExtention associates name with extension.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct NamedExtension {
     pub name: String,
     pub extension: serde_json::Value,
@@ -58,6 +67,7 @@ pub struct NamedExtension {
 
 /// NamedCluster associates name with cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct NamedCluster {
     pub name: String,
     pub cluster: Cluster,
@@ -65,6 +75,7 @@ pub struct NamedCluster {
 
 /// Cluster stores information to connect Kubernetes cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
     pub server: String,
@@ -90,6 +101,7 @@ pub struct Cluster {
 
 /// NamedAuthInfo associates name with authentication.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct NamedAuthInfo {
     pub name: String,
     #[serde(rename = "user")]
@@ -98,6 +110,7 @@ pub struct NamedAuthInfo {
 
 /// AuthInfo stores information to tell cluster who you are.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct AuthInfo {
     /// The username for basic authentication to the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -153,6 +166,7 @@ pub struct AuthInfo {
 
 /// AuthProviderConfig stores auth for specified cloud provider.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct AuthProviderConfig {
     pub name: String,
     pub config: HashMap<String, String>,
@@ -160,6 +174,7 @@ pub struct AuthProviderConfig {
 
 /// ExecConfig stores credential-plugin configuration.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct ExecConfig {
     /// Preferred input version of the ExecInfo.
     ///
@@ -181,6 +196,7 @@ pub struct ExecConfig {
 
 /// NamedContext associates name with context.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct NamedContext {
     pub name: String,
     pub context: Context,
@@ -188,6 +204,7 @@ pub struct NamedContext {
 
 /// Context stores tuple of cluster and user information.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Context {
     /// Name of the cluster for this context
     pub cluster: String,
@@ -206,22 +223,13 @@ const KUBECONFIG: &str = "KUBECONFIG";
 /// Some helpers on the raw Config object are exposed for people needing to parse it
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
-    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig> {
-        let data = fs::read_to_string(&path).map_err(|source| ConfigError::ReadFile {
-            path: path.as_ref().into(),
-            source,
-        })?;
-        // support multiple documents
-        let mut documents: Vec<Kubeconfig> = vec![];
-        for doc in serde_yaml::Deserializer::from_str(&data) {
-            let value = serde_yaml::Value::deserialize(doc).map_err(ConfigError::ParseYaml)?;
-            let kconf = serde_yaml::from_value(value).map_err(ConfigError::ParseYaml)?;
-            documents.push(kconf)
-        }
+    pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig, KubeconfigError> {
+        let data = fs::read_to_string(&path)
+            .map_err(|source| KubeconfigError::ReadConfig(source, path.as_ref().into()))?;
 
         // Remap all files we read to absolute paths.
         let mut merged_docs = None;
-        for mut config in documents {
+        for mut config in kubeconfig_from_yaml(&data)? {
             if let Some(dir) = path.as_ref().parent() {
                 for named in config.clusters.iter_mut() {
                     if let Some(path) = &named.cluster.certificate_authority {
@@ -254,18 +262,25 @@ impl Kubeconfig {
                 merged_docs = Some(config);
             }
         }
-        let config = merged_docs.ok_or_else(|| ConfigError::EmptyKubeconfig(path.as_ref().to_path_buf()))?;
-        Ok(config)
+        // Empty file defaults to an empty Kubeconfig
+        Ok(merged_docs.unwrap_or_default())
+    }
+
+    /// Read a Config from an arbitrary YAML string
+    ///
+    /// This is preferable to using serde_yaml::from_str() because it will correctly
+    /// parse multi-document YAML text and merge them into a single `Kubeconfig`
+    pub fn from_yaml(text: &str) -> Result<Kubeconfig, KubeconfigError> {
+        kubeconfig_from_yaml(text)?
+            .into_iter()
+            .try_fold(Kubeconfig::default(), Kubeconfig::merge)
     }
 
     /// Read a Config from `KUBECONFIG` or the the default location.
-    pub fn read() -> Result<Kubeconfig> {
+    pub fn read() -> Result<Kubeconfig, KubeconfigError> {
         match Self::from_env()? {
             Some(config) => Ok(config),
-            None => {
-                let path = utils::default_kube_path().ok_or(ConfigError::NoKubeconfigPath)?;
-                Self::read_from(path)
-            }
+            None => Self::read_from(default_kube_path().ok_or(KubeconfigError::FindPath)?),
         }
     }
 
@@ -275,7 +290,7 @@ impl Kubeconfig {
     /// # Panics
     ///
     /// Panics if `KUBECONFIG` value contains the NUL character.
-    pub fn from_env() -> Result<Option<Self>> {
+    pub fn from_env() -> Result<Option<Self>, KubeconfigError> {
         match std::env::var_os(KUBECONFIG) {
             Some(value) => {
                 let paths = std::env::split_paths(&value)
@@ -307,12 +322,12 @@ impl Kubeconfig {
     /// >   Example: Preserve the context of the first file to set `current-context`.
     /// >   Example: If two files specify a `red-user`, use only values from the first file's `red-user`.
     /// >            Even if the second file has non-conflicting entries under `red-user`, discard them.
-    fn merge(mut self, next: Kubeconfig) -> Result<Self> {
+    fn merge(mut self, next: Kubeconfig) -> Result<Self, KubeconfigError> {
         if self.kind.is_some() && next.kind.is_some() && self.kind != next.kind {
-            return Err(ConfigError::KindMismatch.into());
+            return Err(KubeconfigError::KindMismatch);
         }
         if self.api_version.is_some() && next.api_version.is_some() && self.api_version != next.api_version {
-            return Err(ConfigError::ApiVersionMismatch.into());
+            return Err(KubeconfigError::ApiVersionMismatch);
         }
 
         self.kind = self.kind.or(next.kind);
@@ -325,6 +340,16 @@ impl Kubeconfig {
         self.extensions = self.extensions.or(next.extensions);
         Ok(self)
     }
+}
+
+fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> {
+    let mut documents = vec![];
+    for doc in serde_yaml::Deserializer::from_str(text) {
+        let value = serde_yaml::Value::deserialize(doc).map_err(KubeconfigError::Parse)?;
+        let kubeconfig = serde_yaml::from_value(value).map_err(KubeconfigError::InvalidStructure)?;
+        documents.push(kubeconfig);
+    }
+    Ok(documents)
 }
 
 #[allow(clippy::redundant_closure)]
@@ -351,24 +376,62 @@ fn to_absolute(dir: &Path, file: &str) -> Option<String> {
 }
 
 impl Cluster {
-    pub(crate) fn load_certificate_authority(&self) -> Result<Option<Vec<u8>>> {
+    pub(crate) fn load_certificate_authority(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
         if self.certificate_authority.is_none() && self.certificate_authority_data.is_none() {
             return Ok(None);
         }
-        let res =
-            utils::data_or_file_with_base64(&self.certificate_authority_data, &self.certificate_authority)?;
-        Ok(Some(res))
+
+        let ca = load_from_base64_or_file(&self.certificate_authority_data, &self.certificate_authority)
+            .map_err(KubeconfigError::LoadCertificateAuthority)?;
+        Ok(Some(ca))
     }
 }
 
 impl AuthInfo {
-    pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>> {
-        utils::data_or_file_with_base64(&self.client_certificate_data, &self.client_certificate)
+    pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>, KubeconfigError> {
+        load_from_base64_or_file(&self.client_certificate_data, &self.client_certificate)
+            .map_err(KubeconfigError::LoadClientCertificate)
     }
 
-    pub(crate) fn load_client_key(&self) -> Result<Vec<u8>> {
-        utils::data_or_file_with_base64(&self.client_key_data, &self.client_key)
+    pub(crate) fn load_client_key(&self) -> Result<Vec<u8>, KubeconfigError> {
+        load_from_base64_or_file(&self.client_key_data, &self.client_key)
+            .map_err(KubeconfigError::LoadClientKey)
     }
+}
+
+fn load_from_base64_or_file<P: AsRef<Path>>(
+    value: &Option<String>,
+    file: &Option<P>,
+) -> Result<Vec<u8>, LoadDataError> {
+    let data = value
+        .as_deref()
+        .map(load_from_base64)
+        .or_else(|| file.as_ref().map(load_from_file))
+        .unwrap_or(Err(LoadDataError::NoBase64DataOrFile))?;
+    Ok(ensure_trailing_newline(data))
+}
+
+fn load_from_base64(value: &str) -> Result<Vec<u8>, LoadDataError> {
+    base64::decode(&value).map_err(LoadDataError::DecodeBase64)
+}
+
+fn load_from_file<P: AsRef<Path>>(file: &P) -> Result<Vec<u8>, LoadDataError> {
+    fs::read(&file).map_err(|source| LoadDataError::ReadFile(source, file.as_ref().into()))
+}
+
+// Ensure there is a trailing newline in the blob
+// Don't bother if the blob is empty
+fn ensure_trailing_newline(mut data: Vec<u8>) -> Vec<u8> {
+    if data.last().map(|end| *end != b'\n').unwrap_or(false) {
+        data.push(b'\n');
+    }
+    data
+}
+
+/// Returns kubeconfig path from `$HOME/.kube/config`.
+fn default_kube_path() -> Option<PathBuf> {
+    use dirs::home_dir;
+    home_dir().map(|h| h.join(".kube").join("config"))
 }
 
 #[cfg(test)]
@@ -480,9 +543,7 @@ users:
     client-certificate: /home/kevin/.minikube/profiles/minikube/client.crt
     client-key: /home/kevin/.minikube/profiles/minikube/client.key";
 
-        let config: Kubeconfig = serde_yaml::from_str(config_yaml)
-            .map_err(ConfigError::ParseYaml)
-            .unwrap();
+        let config = Kubeconfig::from_yaml(config_yaml).unwrap();
 
         assert_eq!(config.clusters[0].name, "eks");
         assert_eq!(config.clusters[1].name, "minikube");
@@ -495,7 +556,7 @@ users:
     }
 
     #[test]
-    fn kubeconfig_multi_document_merge() -> Result<()> {
+    fn kubeconfig_multi_document_merge() -> Result<(), KubeconfigError> {
         let config_yaml = r#"---
 apiVersion: v1
 clusters:
@@ -537,14 +598,19 @@ users:
     client-certificate-data: aGVsbG8K
     client-key-data: aGVsbG8K
 "#;
-        let file = tempfile::NamedTempFile::new().expect("create config tempfile");
-        fs::write(file.path(), config_yaml).unwrap();
-        let cfg = Kubeconfig::read_from(file.path())?;
+        let cfg = Kubeconfig::from_yaml(config_yaml)?;
 
         // Ensure we have data from both documents:
         assert_eq!(cfg.clusters[0].name, "k3d-promstack");
         assert_eq!(cfg.clusters[1].name, "k3d-k3s-default");
 
         Ok(())
+    }
+
+    #[test]
+    fn kubeconfig_from_empty_string() {
+        let cfg = Kubeconfig::from_yaml("").unwrap();
+
+        assert_eq!(cfg, Kubeconfig::default());
     }
 }

@@ -35,13 +35,21 @@ mod body;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
 mod config_ext;
+pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
-#[cfg(any(feature = "native-tls", feature = "rustls-tls"))] mod tls;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
+mod tls;
+#[cfg(feature = "native-tls")] pub use tls::native_tls::Error as NativeTlsError;
+#[cfg(feature = "openssl-tls")]
+pub use tls::openssl_tls::Error as OpensslTlsError;
+#[cfg(feature = "ws")] mod upgrade;
 
-// Binary subprotocol v4. See `Client::connect`.
-#[cfg(feature = "ws")]
-const WS_PROTOCOL: &str = "v4.channel.k8s.io";
+#[cfg(feature = "oauth")]
+#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
+pub use auth::OAuthError;
+
+#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
 
 /// Client for connecting with a Kubernetes cluster.
 ///
@@ -116,7 +124,7 @@ impl Client {
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead.
     pub async fn try_default() -> Result<Self> {
-        Self::try_from(Config::infer().await?)
+        Self::try_from(Config::infer().await.map_err(Error::InferConfig)?)
     }
 
     pub(crate) fn default_ns(&self) -> &str {
@@ -165,7 +173,7 @@ impl Client {
             http::header::SEC_WEBSOCKET_VERSION,
             HeaderValue::from_static("13"),
         );
-        let key = sec_websocket_key();
+        let key = upgrade::sec_websocket_key();
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_KEY,
             key.parse().expect("valid header value"),
@@ -177,17 +185,19 @@ impl Client {
         // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_PROTOCOL,
-            HeaderValue::from_static(WS_PROTOCOL),
+            HeaderValue::from_static(upgrade::WS_PROTOCOL),
         );
 
         let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
-        verify_upgrade_response(&res, &key)?;
+        upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => {
                 Ok(WebSocketStream::from_raw_socket(upgraded, ws::protocol::Role::Client, None).await)
             }
 
-            Err(e) => Err(Error::HyperError(e)),
+            Err(e) => Err(Error::UpgradeConnection(
+                UpgradeConnectionError::GetPendingUpgrade(e),
+            )),
         }
     }
 
@@ -211,8 +221,10 @@ impl Client {
         let res = self.send(request.map(Body::from)).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
-        let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
-        let text = String::from_utf8(body_bytes.to_vec())?;
+        let body_bytes = hyper::body::to_bytes(res.into_body())
+            .await
+            .map_err(Error::HyperError)?;
+        let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
         handle_api_errors(&text, status)?;
 
         Ok(text)
@@ -237,7 +249,7 @@ impl Client {
     {
         let text = self.request_text(request).await?;
         // It needs to be JSON:
-        let v: Value = serde_json::from_str(&text)?;
+        let v: Value = serde_json::from_str(&text).map_err(Error::SerdeError)?;
         if v["kind"] == "Status" {
             tracing::trace!("Status from {}", text);
             Ok(Right(serde_json::from_str::<Status>(&text).map_err(|e| {
@@ -332,13 +344,24 @@ impl Client {
 impl Client {
     /// Returns apiserver version.
     pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
-        self.request(Request::builder().uri("/version").body(vec![])?)
-            .await
+        self.request(
+            Request::builder()
+                .uri("/version")
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 
     /// Lists api groups that apiserver serves.
     pub async fn list_api_groups(&self) -> Result<k8s_meta_v1::APIGroupList> {
-        self.request(Request::builder().uri("/apis").body(vec![])?).await
+        self.request(
+            Request::builder()
+                .uri("/apis")
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 
     /// Lists resources served in given API group.
@@ -361,18 +384,36 @@ impl Client {
     /// ```
     pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/apis/{}", apiversion);
-        self.request(Request::builder().uri(url).body(vec![])?).await
+        self.request(
+            Request::builder()
+                .uri(url)
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 
     /// Lists versions of `core` a.k.a. `""` legacy API group.
     pub async fn list_core_api_versions(&self) -> Result<k8s_meta_v1::APIVersions> {
-        self.request(Request::builder().uri("/api").body(vec![])?).await
+        self.request(
+            Request::builder()
+                .uri("/api")
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 
     /// Lists resources served in particular `core` group version.
     pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/api/{}", version);
-        self.request(Request::builder().uri(url).body(vec![])?).await
+        self.request(
+            Request::builder()
+                .uri(url)
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
     }
 }
 
@@ -423,15 +464,23 @@ impl TryFrom<Config> for Client {
             let mut connector = HttpConnector::new();
             connector.enforce_http(false);
 
-            // Note that if both `native_tls` and `rustls` is enabled, `native_tls` is used by default.
-            // To use `rustls`, disable `native_tls` or create custom client.
-            // If tls features are not enabled, http connector will be used.
-            #[cfg(feature = "native-tls")]
+            // Current TLS feature precedence when more than one are set:
+            // 1. openssl-tls
+            // 2. native-tls
+            // 3. rustls-tls
+            // Create a custom client to use something else.
+            // If TLS features are not enabled, http connector will be used.
+            #[cfg(feature = "openssl-tls")]
+            let connector = config.openssl_https_connector_with_connector(connector)?;
+            #[cfg(all(not(feature = "openssl-tls"), feature = "native-tls"))]
             let connector = hyper_tls::HttpsConnector::from((
                 connector,
                 tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
             ));
-            #[cfg(all(not(feature = "native-tls"), feature = "rustls-tls"))]
+            #[cfg(all(
+                not(any(feature = "openssl-tls", feature = "native-tls")),
+                feature = "rustls-tls"
+            ))]
             let connector = hyper_rustls::HttpsConnector::from((
                 connector,
                 std::sync::Arc::new(config.rustls_client_config()?),
@@ -505,62 +554,6 @@ impl TryFrom<Config> for Client {
             .service(client);
         Ok(Self::new(service, default_ns))
     }
-}
-
-#[cfg(feature = "ws")]
-// Verify upgrade response according to RFC6455.
-// Based on `tungstenite` and added subprotocol verification.
-fn verify_upgrade_response(res: &Response<Body>, key: &str) -> Result<()> {
-    if res.status() != StatusCode::SWITCHING_PROTOCOLS {
-        return Err(Error::ProtocolSwitch(res.status()));
-    }
-
-    let headers = res.headers();
-    if !headers
-        .get(http::header::UPGRADE)
-        .and_then(|h| h.to_str().ok())
-        .map(|h| h.eq_ignore_ascii_case("websocket"))
-        .unwrap_or(false)
-    {
-        return Err(Error::MissingUpgradeWebSocketHeader);
-    }
-
-    if !headers
-        .get(http::header::CONNECTION)
-        .and_then(|h| h.to_str().ok())
-        .map(|h| h.eq_ignore_ascii_case("Upgrade"))
-        .unwrap_or(false)
-    {
-        return Err(Error::MissingConnectionUpgradeHeader);
-    }
-
-    let accept_key = ws::handshake::derive_accept_key(key.as_ref());
-    if !headers
-        .get(http::header::SEC_WEBSOCKET_ACCEPT)
-        .map(|h| h == &accept_key)
-        .unwrap_or(false)
-    {
-        return Err(Error::SecWebSocketAcceptKeyMismatch);
-    }
-
-    // Make sure that the server returned the correct subprotocol.
-    if !headers
-        .get(http::header::SEC_WEBSOCKET_PROTOCOL)
-        .map(|h| h == WS_PROTOCOL)
-        .unwrap_or(false)
-    {
-        return Err(Error::SecWebSocketProtocolMismatch);
-    }
-
-    Ok(())
-}
-
-/// Generate a random key for the `Sec-WebSocket-Key` header.
-/// This must be nonce consisting of a randomly selected 16-byte value in base64.
-#[cfg(feature = "ws")]
-fn sec_websocket_key() -> String {
-    let r: [u8; 16] = rand::random();
-    base64::encode(&r)
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@
 //! [`oneshot::pinned_kind`]: crate::discovery::pinned_kind
 
 use super::ApiGroup;
-use crate::{error::DiscoveryError, Client, Result};
+use crate::{error::DiscoveryError, Client, Error, Result};
 use kube_core::{
     discovery::{ApiCapabilities, ApiResource},
     gvk::{GroupVersion, GroupVersionKind},
@@ -26,7 +26,7 @@ use kube_core::{
 /// ```no_run
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
@@ -50,7 +50,9 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
             return ApiGroup::query_apis(client, g).await;
         }
     }
-    Err(DiscoveryError::MissingApiGroup(apigroup.to_string()).into())
+    Err(Error::Discovery(DiscoveryError::MissingApiGroup(
+        apigroup.to_string(),
+    )))
 }
 
 /// Discovers all APIs available under a certain group at a pinned version
@@ -60,7 +62,7 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
 /// ```no_run
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let gv = "apiregistration.k8s.io/v1".parse()?;
 ///     let apigroup = discovery::pinned_group(&client, &gv).await?;
@@ -88,7 +90,7 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 /// ```no_run
 /// use kube::{Client, api::{Api, DynamicObject, GroupVersionKind}, discovery, ResourceExt};
 /// #[tokio::main]
-/// async fn main() -> Result<(), kube::Error> {
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let gvk = GroupVersionKind::gvk("apiregistration.k8s.io", "v1", "APIService");
 ///     let (ar, caps) = discovery::pinned_kind(&client, &gvk).await?;

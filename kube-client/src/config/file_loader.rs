@@ -1,8 +1,7 @@
 use super::{
     file_config::{AuthInfo, Cluster, Context, Kubeconfig},
-    utils,
+    KubeconfigError,
 };
-use crate::{error::ConfigError, Result};
 
 /// KubeConfigOptions stores options used when loading kubeconfig file.
 #[derive(Default, Clone)]
@@ -26,7 +25,7 @@ pub struct ConfigLoader {
 
 impl ConfigLoader {
     /// Returns a config loader based on the cluster information from the kubeconfig file.
-    pub async fn new_from_options(options: &KubeConfigOptions) -> Result<Self> {
+    pub async fn new_from_options(options: &KubeConfigOptions) -> Result<Self, KubeconfigError> {
         let config = Kubeconfig::read()?;
         let loader = Self::load(
             config,
@@ -39,7 +38,10 @@ impl ConfigLoader {
         Ok(loader)
     }
 
-    pub async fn new_from_kubeconfig(config: Kubeconfig, options: &KubeConfigOptions) -> Result<Self> {
+    pub async fn new_from_kubeconfig(
+        config: Kubeconfig,
+        options: &KubeConfigOptions,
+    ) -> Result<Self, KubeconfigError> {
         let loader = Self::load(
             config,
             options.context.as_ref(),
@@ -56,22 +58,20 @@ impl ConfigLoader {
         context: Option<&String>,
         cluster: Option<&String>,
         user: Option<&String>,
-    ) -> Result<Self> {
+    ) -> Result<Self, KubeconfigError> {
         let context_name = if let Some(name) = context {
             name
         } else if let Some(name) = &config.current_context {
             name
         } else {
-            return Err(ConfigError::CurrentContextNotSet.into());
+            return Err(KubeconfigError::CurrentContextNotSet);
         };
         let current_context = config
             .contexts
             .iter()
             .find(|named_context| &named_context.name == context_name)
             .map(|named_context| &named_context.context)
-            .ok_or_else(|| ConfigError::LoadContext {
-                context_name: context_name.clone(),
-            })?;
+            .ok_or_else(|| KubeconfigError::LoadContext(context_name.clone()))?;
 
         let cluster_name = cluster.unwrap_or(&current_context.cluster);
         let cluster = config
@@ -79,9 +79,7 @@ impl ConfigLoader {
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
-            .ok_or_else(|| ConfigError::LoadClusterOfContext {
-                cluster_name: cluster_name.clone(),
-            })?;
+            .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
         let user_name = user.unwrap_or(&current_context.user);
         let user = config
@@ -89,9 +87,7 @@ impl ConfigLoader {
             .iter()
             .find(|named_user| &named_user.name == user_name)
             .map(|named_user| &named_user.auth_info)
-            .ok_or_else(|| ConfigError::FindUser {
-                user_name: user_name.clone(),
-            })?;
+            .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
 
         Ok(ConfigLoader {
             current_context: current_context.clone(),
@@ -100,7 +96,7 @@ impl ConfigLoader {
         })
     }
 
-    pub fn identity_pem(&self) -> Result<Vec<u8>> {
+    pub fn identity_pem(&self) -> Result<Vec<u8>, KubeconfigError> {
         let client_cert = &self.user.load_client_certificate()?;
         let client_key = &self.user.load_client_key()?;
         let mut buffer = client_key.clone();
@@ -108,22 +104,28 @@ impl ConfigLoader {
         Ok(buffer)
     }
 
-    pub fn ca_bundle(&self) -> Result<Option<Vec<Vec<u8>>>> {
+    pub fn ca_bundle(&self) -> Result<Option<Vec<Vec<u8>>>, KubeconfigError> {
         if let Some(bundle) = self.cluster.load_certificate_authority()? {
-            Ok(Some(utils::certs(&bundle)))
+            Ok(Some(
+                super::certs(&bundle).map_err(KubeconfigError::ParseCertificates)?,
+            ))
         } else {
             Ok(None)
         }
     }
 
-    pub fn proxy_url(&self) -> Result<Option<http::Uri>> {
+    pub fn proxy_url(&self) -> Result<Option<http::Uri>, KubeconfigError> {
         let nonempty = |o: Option<String>| o.filter(|s| !s.is_empty());
 
         if let Some(proxy) = nonempty(self.cluster.proxy_url.clone())
             .or_else(|| nonempty(std::env::var("HTTP_PROXY").ok()))
             .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
         {
-            Ok(Some(proxy.parse::<http::Uri>()?))
+            Ok(Some(
+                proxy
+                    .parse::<http::Uri>()
+                    .map_err(KubeconfigError::ParseProxyUrl)?,
+            ))
         } else {
             Ok(None)
         }

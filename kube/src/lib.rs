@@ -23,7 +23,7 @@
 //! use k8s_openapi::api::core::v1::Pod;
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<(), kube::Error> {
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Infer the runtime environment and try to create a Kubernetes Client
 //!     let client = Client::try_default().await?;
 //!
@@ -178,3 +178,35 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from [`kube_core`](kube_core)
 #[doc(inline)]
 pub use kube_core as core;
+
+
+#[cfg(test)]
+mod test {
+    #[cfg(all(feature = "derive", feature = "client"))]
+    #[tokio::test]
+    #[ignore] // needs kubeconfig
+    async fn convenient_custom_resource() {
+        use crate::{
+            core::{ApiResource, DynamicObject, GroupVersionKind},
+            Api, Client, CustomResource,
+        };
+        use schemars::JsonSchema;
+        use serde::{Deserialize, Serialize};
+
+        #[derive(Clone, Debug, CustomResource, Deserialize, Serialize, JsonSchema)]
+        #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+        #[kube(crates(kube_core = "crate::core"))]
+        struct FooSpec {
+            foo: String,
+        }
+        let client = Client::try_default().await.unwrap();
+
+        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
+        let api_resource = ApiResource::from_gvk(&gvk);
+        let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", &api_resource);
+        let a2: Api<Foo> = Api::namespaced(client.clone(), "myns");
+
+        // make sure they return the same url_path through their impls
+        assert_eq!(a1.resource_url(), a2.resource_url());
+    }
+}

@@ -12,21 +12,16 @@ use kube::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use snafu::{Backtrace, OptionExt, ResultExt, Snafu};
 use std::{collections::BTreeMap, io::BufRead};
+use thiserror::Error;
 use tokio::time::Duration;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 enum Error {
-    #[snafu(display("Failed to create ConfigMap: {}", source))]
-    ConfigMapCreationFailed {
-        source: kube::Error,
-        backtrace: Backtrace,
-    },
-    MissingObjectKey {
-        name: &'static str,
-        backtrace: Backtrace,
-    },
+    #[error("Failed to create ConfigMap: {0}")]
+    ConfigMapCreationFailed(#[source] kube::Error),
+    #[error("MissingObjectKey: {0}")]
+    MissingObjectKey(&'static str),
 }
 
 #[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
@@ -42,12 +37,8 @@ fn object_to_owner_reference<K: Resource<DynamicType = ()>>(
     Ok(OwnerReference {
         api_version: K::api_version(&()).to_string(),
         kind: K::kind(&()).to_string(),
-        name: meta.name.context(MissingObjectKey {
-            name: ".metadata.name",
-        })?,
-        uid: meta.uid.context(MissingObjectKey {
-            name: ".metadata.uid",
-        })?,
+        name: meta.name.ok_or(Error::MissingObjectKey(".metadata.name"))?,
+        uid: meta.uid.ok_or(Error::MissingObjectKey(".metadata.uid"))?,
         ..OwnerReference::default()
     })
 }
@@ -76,20 +67,23 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     };
     let cm_api = Api::<ConfigMap>::namespaced(
         client.clone(),
-        generator.metadata.namespace.as_ref().context(MissingObjectKey {
-            name: ".metadata.namespace",
-        })?,
+        generator
+            .metadata
+            .namespace
+            .as_ref()
+            .ok_or(Error::MissingObjectKey(".metadata.namespace"))?,
     );
     cm_api
         .patch(
-            cm.metadata.name.as_ref().context(MissingObjectKey {
-                name: ".metadata.name",
-            })?,
+            cm.metadata
+                .name
+                .as_ref()
+                .ok_or(Error::MissingObjectKey(".metadata.name"))?,
             &PatchParams::apply("configmapgenerator.kube-rt.nullable.se"),
             &Patch::Apply(&cm),
         )
         .await
-        .context(ConfigMapCreationFailed)?;
+        .map_err(Error::ConfigMapCreationFailed)?;
     Ok(ReconcilerAction {
         requeue_after: Some(Duration::from_secs(300)),
     })

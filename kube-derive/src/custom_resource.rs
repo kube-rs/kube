@@ -1,4 +1,4 @@
-use darling::FromDeriveInput;
+use darling::{FromDeriveInput, FromMeta};
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::{parse_quote, Data, DeriveInput, Path, Visibility};
 
@@ -24,6 +24,8 @@ struct KubeAttrs {
     #[darling(multiple, rename = "derive")]
     derives: Vec<String>,
     #[darling(default)]
+    schema: Option<SchemaMode>,
+    #[darling(default)]
     status: Option<String>,
     #[darling(multiple, rename = "category")]
     categories: Vec<String>,
@@ -33,35 +35,92 @@ struct KubeAttrs {
     printcolums: Vec<String>,
     #[darling(default)]
     scale: Option<String>,
-    #[darling(default = "default_kube_core")]
+    #[darling(default)]
+    crates: Crates,
+}
+
+#[derive(Debug, FromMeta)]
+struct Crates {
+    #[darling(default = "Self::default_kube_core")]
     kube_core: Path,
-    #[darling(default = "default_k8s_openapi")]
+    #[darling(default = "Self::default_k8s_openapi")]
     k8s_openapi: Path,
-    #[darling(default = "default_schemars")]
+    #[darling(default = "Self::default_schemars")]
     schemars: Path,
-    #[darling(default = "default_serde")]
+    #[darling(default = "Self::default_serde")]
     serde: Path,
-    #[darling(default = "default_serde_json")]
+    #[darling(default = "Self::default_serde_json")]
     serde_json: Path,
+}
+
+// Default is required when the subattribute isn't mentioned at all
+// Delegate to darling rather than deriving, so that we can piggyback off the `#[darling(default)]` clauses
+impl Default for Crates {
+    fn default() -> Self {
+        Self::from_list(&[]).unwrap()
+    }
+}
+
+impl Crates {
+    fn default_kube_core() -> Path {
+        parse_quote! { ::kube::core } // by default must work well with people using facade crate
+    }
+
+    fn default_k8s_openapi() -> Path {
+        parse_quote! { ::k8s_openapi }
+    }
+
+    fn default_schemars() -> Path {
+        parse_quote! { ::schemars }
+    }
+
+    fn default_serde() -> Path {
+        parse_quote! { ::serde }
+    }
+
+    fn default_serde_json() -> Path {
+        parse_quote! { ::serde_json }
+    }
 }
 
 fn default_apiext() -> String {
     "v1".to_owned()
 }
-fn default_kube_core() -> Path {
-    parse_quote! { ::kube::core } // by default must work well with people using facade crate
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum SchemaMode {
+    Disabled,
+    Manual,
+    Derived,
 }
-fn default_k8s_openapi() -> Path {
-    parse_quote! { ::k8s_openapi }
+
+impl SchemaMode {
+    fn derive(self) -> bool {
+        match self {
+            SchemaMode::Disabled => false,
+            SchemaMode::Manual => false,
+            SchemaMode::Derived => true,
+        }
+    }
+
+    fn use_in_crd(self) -> bool {
+        match self {
+            SchemaMode::Disabled => false,
+            SchemaMode::Manual => true,
+            SchemaMode::Derived => true,
+        }
+    }
 }
-fn default_schemars() -> Path {
-    parse_quote! { ::schemars }
-}
-fn default_serde() -> Path {
-    parse_quote! { ::serde }
-}
-fn default_serde_json() -> Path {
-    parse_quote! { ::serde_json }
+
+impl FromMeta for SchemaMode {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        match value {
+            "disabled" => Ok(SchemaMode::Disabled),
+            "manual" => Ok(SchemaMode::Manual),
+            "derived" => Ok(SchemaMode::Derived),
+            x => Err(darling::Error::unknown_value(x)),
+        }
+    }
 }
 
 pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
@@ -92,6 +151,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         version,
         namespaced,
         derives,
+        schema: schema_mode,
         status,
         plural,
         singular,
@@ -100,11 +160,14 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         printcolums,
         apiextensions,
         scale,
-        kube_core,
-        k8s_openapi,
-        schemars,
-        serde,
-        serde_json,
+        crates:
+            Crates {
+                kube_core,
+                k8s_openapi,
+                schemars,
+                serde,
+                serde_json,
+            },
     } = kube_attrs;
 
     let struct_name = kind_struct.unwrap_or_else(|| kind.clone());
@@ -152,18 +215,21 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     }
 
-    // Schema generation is always enabled for v1 because it's mandatory.
-    // TODO Enable schema generation for v1beta1 if the spec derives `JsonSchema`.
-    let schema_gen_enabled = apiextensions == "v1" && cfg!(feature = "schema");
+    // Enable schema generation by default for v1 because it's mandatory.
+    let schema_mode = schema_mode.unwrap_or(if apiextensions == "v1" {
+        SchemaMode::Derived
+    } else {
+        SchemaMode::Disabled
+    });
     // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
     // these are validated by the API server implicitly. Also, we can't generate the
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
-    let schemars_skip = if schema_gen_enabled {
+    let schemars_skip = if schema_mode.derive() {
         quote! { #[schemars(skip)] }
     } else {
         quote! {}
     };
-    if schema_gen_enabled {
+    if schema_mode.derive() {
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }
 
@@ -289,7 +355,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let crd_meta_name = format!("{}.{}", plural, group);
     let crd_meta = quote! { { "name": #crd_meta_name } };
 
-    let schemagen = if schema_gen_enabled {
+    let schemagen = if schema_mode.use_in_crd() {
         quote! {
             // Don't use definitions and don't include `$schema` because these are not allowed.
             let gen = #schemars::gen::SchemaSettings::openapi3().with(|s| {

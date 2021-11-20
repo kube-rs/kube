@@ -8,6 +8,6 @@ members = [
   "kube-runtime",
 
   # internal
-  "tests",
+  "integration",
   "examples",
 ]

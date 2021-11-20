@@ -92,7 +92,6 @@ mod test {
         params::{Patch, PatchParams, PostParams},
         request::Request,
         resource::Resource,
-        Result,
     };
     #[test]
     fn raw_custom_resource() {
@@ -112,37 +111,12 @@ mod test {
     }
 
     #[test]
-    fn raw_resource_in_default_group() -> Result<()> {
+    fn raw_resource_in_default_group() {
         let gvk = GroupVersionKind::gvk("", "v1", "Service");
         let api_resource = ApiResource::from_gvk(&gvk);
         let url = DynamicObject::url_path(&api_resource, None);
         let pp = PostParams::default();
-        let req = Request::new(url).create(&pp, vec![])?;
+        let req = Request::new(url).create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/services?");
-        Ok(())
-    }
-
-    #[cfg(feature = "derive")]
-    #[tokio::test]
-    #[ignore] // circle has no kubeconfig
-    async fn convenient_custom_resource() {
-        use crate as kube_core; // derive macro needs kube in scope
-        use crate::{Api, Client, CustomResource};
-        use schemars::JsonSchema;
-        use serde::{Deserialize, Serialize};
-        #[derive(Clone, Debug, CustomResource, Deserialize, Serialize, JsonSchema)]
-        #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-        struct FooSpec {
-            foo: String,
-        }
-        let client = Client::try_default().await.unwrap();
-
-        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
-        let api_resource = ApiResource::from_gvk(&gvk);
-        let a1: Api<DynamicObject> = Api::namespaced_with(client.clone(), "myns", &api_resource);
-        let a2: Api<Foo> = Api::namespaced(client.clone(), "myns");
-
-        // make sure they return the same url_path through their impls
-        assert_eq!(a1.request.url_path, a2.request.url_path);
     }
 }

@@ -7,23 +7,23 @@ use kube_client::{
     Api, Resource, ResourceExt,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
 use std::{error::Error as StdError, fmt::Debug};
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum Error<ReconcileErr>
 where
     ReconcileErr: StdError + 'static,
 {
-    #[snafu(display("failed to apply object: {}", source))]
-    ApplyFailed { source: ReconcileErr },
-    #[snafu(display("failed to clean up object: {}", source))]
-    CleanupFailed { source: ReconcileErr },
-    #[snafu(display("failed to add finalizer: {}", source))]
-    AddFinalizer { source: kube_client::Error },
-    #[snafu(display("failed to remove finalizer: {}", source))]
-    RemoveFinalizer { source: kube_client::Error },
-    #[snafu(display("object has no name"))]
+    #[error("failed to apply object: {0}")]
+    ApplyFailed(#[source] ReconcileErr),
+    #[error("failed to clean up object: {0}")]
+    CleanupFailed(#[source] ReconcileErr),
+    #[error("failed to add finalizer: {0}")]
+    AddFinalizer(#[source] kube_client::Error),
+    #[error("failed to remove finalizer: {0}")]
+    RemoveFinalizer(#[source] kube_client::Error),
+    #[error("object has no name")]
     UnnamedObject,
 }
 
@@ -116,18 +116,18 @@ where
         } => reconcile(Event::Apply(obj))
             .into_future()
             .await
-            .context(ApplyFailed),
+            .map_err(Error::ApplyFailed),
         FinalizerState {
             finalizer_index: Some(finalizer_i),
             is_deleting: true,
         } => {
             // Cleanup reconciliation must succeed before it's safe to remove the finalizer
-            let name = obj.meta().name.clone().context(UnnamedObject)?;
+            let name = obj.meta().name.clone().ok_or(Error::UnnamedObject)?;
             let action = reconcile(Event::Cleanup(obj))
                 .into_future()
                 .await
                 // Short-circuit, so that we keep the finalizer if cleanup fails
-                .context(CleanupFailed)?;
+                .map_err(Error::CleanupFailed)?;
             // Cleanup was successful, remove the finalizer so that deletion can continue
             let finalizer_path = format!("/metadata/finalizers/{}", finalizer_i);
             api.patch::<K>(
@@ -145,7 +145,7 @@ where
                 ])),
             )
             .await
-            .context(RemoveFinalizer)?;
+            .map_err(Error::RemoveFinalizer)?;
             Ok(action)
         }
         FinalizerState {
@@ -171,12 +171,12 @@ where
                 })]
             });
             api.patch::<K>(
-                obj.meta().name.as_deref().context(UnnamedObject)?,
+                obj.meta().name.as_deref().ok_or(Error::UnnamedObject)?,
                 &PatchParams::default(),
                 &Patch::Json(patch),
             )
             .await
-            .context(AddFinalizer)?;
+            .map_err(Error::AddFinalizer)?;
             // No point applying here, since the patch will cause a new reconciliation
             Ok(ReconcilerAction { requeue_after: None })
         }

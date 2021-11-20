@@ -50,7 +50,4 @@ pub mod watch;
 pub use watch::WatchEvent;
 
 mod error;
-pub use error::{Error, ErrorResponse};
-
-/// Convient alias for `Result<T, Error>`
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+pub use error::ErrorResponse;

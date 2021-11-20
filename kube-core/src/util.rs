@@ -2,7 +2,7 @@
 
 use crate::{
     params::{Patch, PatchParams},
-    Request, Result,
+    request, Request,
 };
 use chrono::Utc;
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
@@ -17,7 +17,7 @@ impl Restart for ReplicaSet {}
 
 impl Request {
     /// Restart a resource
-    pub fn restart(&self, name: &str) -> Result<http::Request<Vec<u8>>> {
+    pub fn restart(&self, name: &str) -> Result<http::Request<Vec<u8>>, request::Error> {
         let patch = serde_json::json!({
           "spec": {
             "template": {

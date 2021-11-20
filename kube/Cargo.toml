@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.63.2"
+version = "0.64.0"
 description = "Kubernetes client and async controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -19,6 +19,7 @@ edition = "2021"
 default = ["client", "native-tls"]
 native-tls = ["kube-client/native-tls"]
 rustls-tls = ["kube-client/rustls-tls"]
+openssl-tls = ["kube-client/openssl-tls"]
 ws = ["kube-client/ws", "kube-core/ws"]
 oauth = ["kube-client/oauth"]
 gzip = ["kube-client/gzip"]
@@ -31,15 +32,15 @@ runtime = ["kube-runtime"]
 deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/v1_22"]
+features = ["client", "native-tls", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/v1_22"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-kube-derive = { path = "../kube-derive", version = "^0.63.0", optional = true }
-kube-core = { path = "../kube-core", version = "^0.63.0"}
-kube-client = { path = "../kube-client", version = "^0.63.0", default-features = false, optional = true }
-kube-runtime = { path = "../kube-runtime", version = "^0.63.0", optional = true}
+kube-derive = { path = "../kube-derive", version = "^0.64.0", optional = true }
+kube-core = { path = "../kube-core", version = "^0.64.0"}
+kube-client = { path = "../kube-client", version = "^0.64.0", default-features = false, optional = true }
+kube-runtime = { path = "../kube-runtime", version = "^0.64.0", optional = true}
 
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
