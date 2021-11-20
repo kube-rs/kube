@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let service = ServiceBuilder::new()
         .layer(config.base_uri_layer())
         // showcase rate limiting; max 10rps, and 4 concurrent
-        .layer(tower::limit::RateLimitLayer::new(10, std::time::Duration::from_secs(1)))
+        .layer(tower::limit::RateLimitLayer::new(10, Duration::from_secs(1)))
         .layer(tower::limit::ConcurrencyLimitLayer::new(4))
         // Add `DecompressionLayer` to make request headers interesting.
         .layer(DecompressionLayer::new())
