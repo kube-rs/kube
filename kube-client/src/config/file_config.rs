@@ -339,6 +339,16 @@ impl Kubeconfig {
     }
 }
 
+fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> {
+    let mut documents = vec![];
+    for doc in serde_yaml::Deserializer::from_str(text) {
+        let value = serde_yaml::Value::deserialize(doc).map_err(KubeconfigError::Parse)?;
+        let kubeconfig = serde_yaml::from_value(value).map_err(KubeconfigError::InvalidStructure)?;
+        documents.push(kubeconfig);
+    }
+    Ok(documents)
+}
+
 #[allow(clippy::redundant_closure)]
 fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
 where
