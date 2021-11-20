@@ -543,7 +543,7 @@ users:
     client-certificate: /home/kevin/.minikube/profiles/minikube/client.crt
     client-key: /home/kevin/.minikube/profiles/minikube/client.key";
 
-        let config: Kubeconfig = serde_yaml::from_str(config_yaml).unwrap();
+        let config = Kubeconfig::from_yaml(config_yaml).unwrap();
 
         assert_eq!(config.clusters[0].name, "eks");
         assert_eq!(config.clusters[1].name, "minikube");
@@ -598,14 +598,19 @@ users:
     client-certificate-data: aGVsbG8K
     client-key-data: aGVsbG8K
 "#;
-        let file = tempfile::NamedTempFile::new().expect("create config tempfile");
-        fs::write(file.path(), config_yaml).unwrap();
-        let cfg = Kubeconfig::read_from(file.path())?;
+        let cfg = Kubeconfig::from_yaml(config_yaml)?;
 
         // Ensure we have data from both documents:
         assert_eq!(cfg.clusters[0].name, "k3d-promstack");
         assert_eq!(cfg.clusters[1].name, "k3d-k3s-default");
 
         Ok(())
+    }
+
+    #[test]
+    fn kubeconfig_from_empty_string() {
+        let cfg = Kubeconfig::from_yaml("").unwrap();
+
+        assert_eq!(cfg, Kubeconfig::default());
     }
 }
