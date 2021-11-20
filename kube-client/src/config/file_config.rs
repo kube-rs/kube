@@ -273,6 +273,16 @@ impl Kubeconfig {
         Ok(merged_docs.unwrap_or_default())
     }
 
+    /// Read a Config from an arbitrary YAML document
+    ///
+    /// This is preferable to using serde_yaml::from_str() because it will correctly
+    /// parse multi-document YAML text and merge them into a single `Kubeconfig`
+    pub fn from_yaml(text: &str) -> Result<Kubeconfig, KubeconfigError> {
+        kubeconfig_from_yaml(text)?
+            .into_iter()
+            .try_fold(Kubeconfig::default(), Kubeconfig::merge)
+    }
+
     /// Read a Config from `KUBECONFIG` or the the default location.
     pub fn read() -> Result<Kubeconfig, KubeconfigError> {
         match Self::from_env()? {
