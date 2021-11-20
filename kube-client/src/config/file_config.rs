@@ -226,17 +226,10 @@ impl Kubeconfig {
     pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig, KubeconfigError> {
         let data = fs::read_to_string(&path)
             .map_err(|source| KubeconfigError::ReadConfig(source, path.as_ref().into()))?;
-        // support multiple documents
-        let mut documents: Vec<Kubeconfig> = vec![];
-        for doc in serde_yaml::Deserializer::from_str(&data) {
-            let value = serde_yaml::Value::deserialize(doc).map_err(KubeconfigError::Parse)?;
-            let kconf = serde_yaml::from_value(value).map_err(KubeconfigError::InvalidStructure)?;
-            documents.push(kconf)
-        }
 
         // Remap all files we read to absolute paths.
         let mut merged_docs = None;
-        for mut config in documents {
+        for mut config in kubeconfig_from_yaml(&data)? {
             if let Some(dir) = path.as_ref().parent() {
                 for named in config.clusters.iter_mut() {
                     if let Some(path) = &named.cluster.certificate_authority {
