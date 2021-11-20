@@ -266,7 +266,7 @@ impl Kubeconfig {
         Ok(merged_docs.unwrap_or_default())
     }
 
-    /// Read a Config from an arbitrary YAML document
+    /// Read a Config from an arbitrary YAML string
     ///
     /// This is preferable to using serde_yaml::from_str() because it will correctly
     /// parse multi-document YAML text and merge them into a single `Kubeconfig`
