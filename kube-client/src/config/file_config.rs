@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     fs,
@@ -40,8 +39,10 @@ pub struct Kubeconfig {
     pub extensions: Option<Vec<NamedExtension>>,
 
     // legacy fields TODO: remove
+    /// Legacy field from TypeMeta
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
+    /// Legacy field from TypeMeta
     #[serde(rename = "apiVersion")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<String>,
@@ -51,8 +52,10 @@ pub struct Kubeconfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Preferences {
+    /// Enable colors
     #[serde(skip_serializing_if = "Option::is_none")]
     pub colors: Option<bool>,
+    /// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Vec<NamedExtension>>,
 }
@@ -61,7 +64,9 @@ pub struct Preferences {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct NamedExtension {
+    /// Name of extension
     pub name: String,
+    /// Additional information for extenders so that reads and writes don't clobber unknown fields
     pub extension: serde_json::Value,
 }
 
@@ -69,7 +74,9 @@ pub struct NamedExtension {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct NamedCluster {
+    /// Name of cluster
     pub name: String,
+    /// Information about how to communicate with a kubernetes cluster
     pub cluster: Cluster,
 }
 
@@ -79,6 +86,7 @@ pub struct NamedCluster {
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
     pub server: String,
+    /// Skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
     #[serde(rename = "insecure-skip-tls-verify")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub insecure_skip_tls_verify: Option<bool>,
@@ -103,7 +111,9 @@ pub struct Cluster {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct NamedAuthInfo {
+    /// Name of the user
     pub name: String,
+    /// Information that describes identity of the user
     #[serde(rename = "user")]
     pub auth_info: AuthInfo,
 }
@@ -168,7 +178,9 @@ pub struct AuthInfo {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AuthProviderConfig {
+    /// Name of the auth provider
     pub name: String,
+    /// Auth provider configuration
     pub config: HashMap<String, String>,
 }
 
@@ -198,7 +210,9 @@ pub struct ExecConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct NamedContext {
+    /// Name of the context
     pub name: String,
+    /// Associations for the context
     pub context: Context,
 }
 
