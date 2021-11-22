@@ -58,6 +58,29 @@ jobs:
         run: cargo test -p examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
         if: matrix.os == 'ubuntu-latest'
 
+  check-msrv:
+    # Run `cargo check` on our minimum supported Rust version
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@main
+    - name: Find MSRV
+      id: msrv
+      run: |
+        MSRV=$(grep MSRV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+")
+        echo $MSRV
+        echo ::set-output name=msrv::${MSRV}
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ steps.msrv.outputs.msrv }}
+        profile: minimal
+        override: true
+    - uses: Swatinem/rust-cache@v1
+    - name: Check
+      uses: actions-rs/cargo@v1
+      with:
+        command: check
+        args: --all
+
   integration:
     # Integration tests are linux only
     runs-on: ubuntu-latest
