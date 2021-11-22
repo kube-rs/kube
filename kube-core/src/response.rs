@@ -4,7 +4,6 @@ use serde::Deserialize;
 /// A Kubernetes status object
 ///
 /// Equivalent to Status in k8s-openapi except we have have simplified options
-#[allow(missing_docs)]
 #[derive(Deserialize, Debug)]
 pub struct Status {
     /// Suggested HTTP return code (0 if unset)
