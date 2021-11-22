@@ -37,7 +37,7 @@ log = "0.4.11"
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
 serde_yaml = "0.8.21"
-tokio = { version = "1.12.0", features = ["full"] }
+tokio = { version = "1.14.0", features = ["full"] }
 color-eyre = "0.5.10"
 # Some Api::delete methods use Either
 either = "1.6.1"
