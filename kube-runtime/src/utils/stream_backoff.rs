@@ -12,7 +12,7 @@ use tokio::time::{sleep, Instant, Sleep};
 ///
 /// If [`Backoff::next_backoff`] returns [`None`] then the backing stream is given up on, and closed.
 #[pin_project]
-pub(crate) struct StreamBackoff<S, B> {
+pub struct StreamBackoff<S, B> {
     #[pin]
     stream: S,
     backoff: B,

@@ -1,14 +1,14 @@
-use backoff::ExponentialBackoff;
+use backoff::{backoff::Backoff, ExponentialBackoff};
 use futures::Stream;
 use kube_client::{
     api::{Api, ListParams},
     core::Resource,
 };
 use serde::de::DeserializeOwned;
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
 use crate::{
-    utils,
+    utils::{self, ResetTimerBackoff},
     watcher::{backoff_watch, watcher, Error, Event, Result},
 };
 
@@ -18,7 +18,7 @@ use crate::{
 /// # Error handling
 ///
 /// An `Observer` sets a sensible default backoff policy for all watch events and will retry
-/// (with expotential backoff) from transient `watcher` failures until the retry policy is breached.
+/// (with backoff) from transient `watcher` failures until the retry policy is breached.
 /// The `watcher::Error`s are still returned in the resulting stream, but they __can__ be ignored.
 /// If the retry policy is breached, then the stream ends.
 ///
@@ -36,7 +36,7 @@ where
     // temporary builder params
     api: Api<K>,
     listparams: Option<ListParams>,
-    backoff: Option<ExponentialBackoff>,
+    backoff: Option<Box<dyn Backoff + Send>>,
 }
 
 impl<K> Observer<K>
@@ -60,9 +60,16 @@ where
 
     // start the watcher and filter out backoff errors from the stream for a while
     fn watch_events(self) -> impl Stream<Item = Result<Event<K>>> {
-        let backoff = self.backoff.unwrap_or_else(|| backoff::ExponentialBackoff {
-            max_elapsed_time: Some(std::time::Duration::from_secs(60 * 60)),
-            ..ExponentialBackoff::default()
+        let backoff = self.backoff.unwrap_or_else(|| {
+            // The default client-go's reflector backoff strategy to limit strain on the api-server
+            let expo = backoff::ExponentialBackoff {
+                initial_interval: Duration::from_millis(800),
+                max_interval: Duration::from_secs(30),
+                randomization_factor: 1.0,
+                multiplier: 2.0,
+                ..ExponentialBackoff::default()
+            };
+            Box::new(ResetTimerBackoff::new(expo, Duration::from_secs(120)))
         });
         let lp = self.listparams.unwrap_or_default();
         let input = watcher(self.api, lp);
@@ -70,9 +77,11 @@ where
     }
 
     /// Set the backoff policy
+    ///
+    /// By default we follow client-go's [reflector backoff strategy](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
+    /// to limit the strain on the apiserver.
     #[must_use]
-    pub fn backoff(mut self, backoff: ExponentialBackoff) -> Self {
-        // TODO: allow backoff: B where B: Backoff here - needs box_into_inner
+    pub fn backoff(mut self, backoff: Box<dyn Backoff + Send>) -> Self {
         self.backoff = Some(backoff);
         self
     }
@@ -90,7 +99,7 @@ where
     ///
     /// # Errors
     ///
-    /// If a [`watcher::Error`] was encountered for longer than what the
+    /// If a [`watcher::Error`](crate::watcher::Error) was encountered for longer than what the
     /// [`ExponentialBackoff`](backoff::ExponentialBackoff) policy allows, then
     /// that error is considered irrecoverable and propagated in a stream item here.
     pub fn watch_applies(self) -> impl Stream<Item = Result<K, Error>> {
@@ -103,7 +112,7 @@ where
     ///
     /// # Errors
     ///
-    /// If a [`watcher::Error`] was encountered for longer than what the
+    /// If a [`watcher::Error`](crate::watcher::Error) was encountered for longer than what the
     /// [`ExponentialBackoff`](backoff::ExponentialBackoff) policy allows, then
     /// that error is considered irrecoverable and propagated in a stream item here.
     pub fn watch_touches(self) -> impl Stream<Item = Result<K, Error>> {

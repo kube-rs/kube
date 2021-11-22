@@ -1,6 +1,6 @@
 //! Watches a Kubernetes Resource for changes, with error recovery
 
-use crate::utils::stream_backoff::StreamBackoff;
+use crate::utils::StreamBackoff;
 use backoff::backoff::Backoff;
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};

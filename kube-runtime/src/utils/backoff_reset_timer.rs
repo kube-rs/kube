@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use backoff::{backoff::Backoff, Clock, SystemClock};
 
 /// A [`Backoff`] wrapper that resets after a fixed duration has elapsed.
-struct ResetTimerBackoff<B, C = SystemClock> {
+pub struct ResetTimerBackoff<B, C = SystemClock> {
     backoff: B,
     clock: C,
     last_backoff: Option<Instant>,
@@ -11,7 +11,7 @@ struct ResetTimerBackoff<B, C = SystemClock> {
 }
 
 impl<B: Backoff> ResetTimerBackoff<B> {
-    fn new(backoff: B, reset_duration: Duration) -> Self {
+    pub fn new(backoff: B, reset_duration: Duration) -> Self {
         Self::new_with_custom_clock(backoff, reset_duration, SystemClock {})
     }
 }
