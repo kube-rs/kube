@@ -95,7 +95,7 @@ impl<S: TryStream, B: Backoff> Stream for StreamBackoff<S, B> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::{task::Poll, time::Duration};
 
     use super::StreamBackoff;
@@ -162,13 +162,13 @@ mod tests {
     }
 
     /// Dynamic backoff policy that is still deterministic and testable
-    struct LinearBackoff {
+    pub struct LinearBackoff {
         interval: Duration,
         current_duration: Duration,
     }
 
     impl LinearBackoff {
-        fn new(interval: Duration) -> Self {
+        pub fn new(interval: Duration) -> Self {
             Self {
                 interval,
                 current_duration: Duration::ZERO,
