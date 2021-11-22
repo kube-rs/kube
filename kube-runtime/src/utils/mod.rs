@@ -1,5 +1,6 @@
 //! Helpers for manipulating built-in streams
 
+mod backoff_reset_timer;
 pub(crate) mod stream_backoff;
 
 use crate::watcher;
