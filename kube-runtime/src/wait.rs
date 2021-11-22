@@ -247,7 +247,7 @@ pub mod delete {
     ///
     /// # Errors
     ///
-    /// Returns an [`Error`] if the object was unable to be deleted, or if the wait was interrupted.
+    /// Returns an [`Error`](enum@super::Error) if the object was unable to be deleted, or if the wait was interrupted.
     #[allow(clippy::module_name_repetitions)]
     pub async fn delete_and_finalize<K: Clone + Debug + Send + DeserializeOwned + Resource + 'static>(
         api: Api<K>,

@@ -65,7 +65,7 @@ pub enum Error {
 
     /// Errors from Native TLS
     #[cfg(feature = "native-tls")]
-    #[cfg_attr(docsrs, doc(feature = "native-tls"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
     #[error("native tls error: {0}")]
     NativeTls(#[source] crate::client::NativeTlsError),
 
@@ -89,18 +89,25 @@ pub enum Error {
 }
 
 #[derive(Error, Debug)]
-// Redundant with the error messages and machine names
-#[allow(missing_docs)]
 /// Possible errors when using API discovery
 pub enum DiscoveryError {
+    /// Invalid GroupVersion
     #[error("Invalid GroupVersion: {0}")]
     InvalidGroupVersion(String),
+
+    /// Missing Kind
     #[error("Missing Kind: {0}")]
     MissingKind(String),
+
+    /// Missing ApiGroup
     #[error("Missing Api Group: {0}")]
     MissingApiGroup(String),
-    #[error("Missing MissingResource: {0}")]
+
+    /// MissingResource
+    #[error("Missing Resource: {0}")]
     MissingResource(String),
+
+    /// Empty ApiGroup
     #[error("Empty Api Group: {0}")]
     EmptyApiGroup(String),
 }

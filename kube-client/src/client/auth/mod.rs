@@ -41,10 +41,12 @@ pub enum Error {
 
     /// Failed to run auth exec command
     #[error("auth exec command '{cmd}' failed with status {status}: {out:?}")]
-    #[allow(missing_docs)]
     AuthExecRun {
+        /// The failed command
         cmd: String,
+        /// The exit status or exit code of the failed command
         status: std::process::ExitStatus,
+        /// Stdout/Stderr of the failed command
         out: std::process::Output,
     },
 
