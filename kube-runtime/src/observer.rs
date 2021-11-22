@@ -24,7 +24,7 @@ use crate::{
 ///
 /// To configure the retry policy use `Observer::backoff`.
 ///
-/// Note that t is possible to create a backoff policy that retries infinitely, but this might be undesirable.
+/// Note that while most backoff policies will retry indefinitely, this might be undesirable.
 /// Several watch errors represent a need for external user action to recover:
 ///
 /// - 404 `ErrorResponse`(watching invalid / missing api kind/group for `K`)
@@ -81,8 +81,8 @@ where
     /// By default we follow client-go's [reflector backoff strategy](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
     /// to limit the strain on the apiserver.
     #[must_use]
-    pub fn backoff(mut self, backoff: Box<dyn Backoff + Send>) -> Self {
-        self.backoff = Some(backoff);
+    pub fn backoff<B: Backoff + Send + 'static>(mut self, backoff: B) -> Self {
+        self.backoff = Some(Box::new(backoff));
         self
     }
 
