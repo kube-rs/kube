@@ -34,11 +34,11 @@ jobs:
       - name: Run workspace doc tests
         run: cargo test --doc --all -j6
       - name: Test examples
-        run: cargo test -p examples --examples -j6
+        run: cargo test -p kube-examples --examples -j6
       - name: Compile check remaining examples
         # No OS specific code in examples, run this on fastest executor
         if: matrix.os == 'ubuntu-latest'
-        run: cargo build -j4 -p examples
+        run: cargo build -j4 -p kube-examples
 
       # Feature tests
       - name: Test kube with features native-tls,ws,oauth
@@ -52,10 +52,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
       # Feature tests in examples
       - name: Test crd_derive_no_schema example
-        run: cargo test -p examples --example crd_derive_no_schema --no-default-features --features=native-tls,latest
+        run: cargo test -p kube-examples --example crd_derive_no_schema --no-default-features --features=native-tls,latest
         if: matrix.os == 'ubuntu-latest'
       - name: Test crd_api example with deprecated crd
-        run: cargo test -p examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
+        run: cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
         if: matrix.os == 'ubuntu-latest'
 
   check-msrv:

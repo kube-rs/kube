@@ -17,17 +17,17 @@ doc:
 test:
 	cargo test --lib --all
 	cargo test --doc --all
-	cargo test -p examples --examples
+	cargo test -p kube-examples --examples
 	cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
 	cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
 	cargo test -p kube --lib --no-default-features
-	cargo test -p examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
+	cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
 
 test-kubernetes:
 	cargo test --lib --all -- --ignored # also run tests that fail on github actions
 	cargo test -p kube --features=derive -- --ignored
-	cargo run -p examples --example crd_derive
-	cargo run -p examples --example crd_api
+	cargo run -p kube-examples --example crd_derive
+	cargo run -p kube-examples --example crd_api
 
 readme:
 	rustdoc README.md --test --edition=2021
