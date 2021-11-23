@@ -200,10 +200,11 @@ impl ConfigExt for Config {
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
         tls::rustls_tls::rustls_client_config(
-            self.identity_pem.as_ref(),
-            self.root_cert.as_ref(),
+            self.identity_pem.as_deref(),
+            self.root_cert.as_deref(),
             self.accept_invalid_certs,
         )
+        .map_err(Error::RustlsTls)
     }
 
     #[cfg(feature = "rustls-tls")]
