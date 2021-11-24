@@ -8,7 +8,7 @@
 //! (even with zero features) under [`kube::core`]((https://docs.rs/kube/*/kube/core/index.html)).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
 #[cfg(feature = "admission")]

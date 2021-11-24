@@ -8,7 +8,7 @@
 //! opinionated starting point that should be appropriate for simple operators, but all
 //! components are designed to be usable á la carte if your operator doesn't quite fit that mold.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 // Triggered by many derive macros (kube-derive, derivative)
