@@ -38,18 +38,10 @@ See the **[examples directory](https://github.com/kube-rs/kube-rs/blob/master/ex
 
 Official examples:
 
-- [version-rs](https://github.com/kube-rs/version-rs): super lightweight reflector deployment with actix 2 and prometheus metrics
-- [controller-rs](https://github.com/kube-rs/controller-rs): `Controller` owned by a `Manager` inside actix
+- [version-rs](https://github.com/kube-rs/version-rs): lightweight deployment `reflector` using axum
+- [controller-rs](https://github.com/kube-rs/controller-rs): `Controller` of a crd inside actix
 
-Real world users:
-
-- [linkerd-policy-controller](https://github.com/linkerd/linkerd2/tree/main/policy-controller) - the policy controllers for the Linkerd service mesh
-- [krustlet](https://github.com/krustlet/krustlet) - a complete `WASM` running `kubelet`
-- [stackabletech operators](https://github.com/stackabletech) - ([kafka](https://github.com/stackabletech/kafka-operator), [zookeeper](https://github.com/stackabletech/zookeeper-operator), and more)
-- [kdash tui](https://github.com/kdash-rs/kdash) - terminal dashboard for kubernetes
-- [logdna agent](https://github.com/logdna/logdna-agent-v2)
-- [kubeapps pinniped](https://github.com/kubeapps/kubeapps/tree/master/cmd/pinniped-proxy)
-- [kubectl-view-allocations](https://github.com/davidB/kubectl-view-allocations) - kubectl plugin to list resource allocations
+For real world projects see [ADOPTERS](https://github.com/kube-rs/kube-rs/blob/master/ADOPTERS.md).
 
 ## Api
 
