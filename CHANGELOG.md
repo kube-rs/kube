@@ -8,6 +8,7 @@ UNRELEASED
  * BREAKING: Added `kube::Error::NativeTls(kube::client::NativeTlsError)` for errors from Native TLS - #716
  * BREAKING: Added `kube::Error::RustlsTls(kube::client::RustlsTlsError)` for errors from Rustls TLS - #704
  * Updated `rustls` to 0.20.1 - #704
+ * BREAKING: Added `ObjectRef` to the object that failed to be reconciled to `kube_runtime::controller::Error::ReconcileFailed`
 
 0.64.0 / 2021-11-16
 ===================
