@@ -106,7 +106,7 @@
 //! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube-rs/tree/master/examples).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 macro_rules! cfg_client {
     ($($item:item)*) => {

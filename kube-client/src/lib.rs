@@ -62,7 +62,7 @@
 //! - [k8s-openapi](https://docs.rs/k8s-openapi/*/k8s_openapi/) for how to create typed kubernetes objects directly
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 macro_rules! cfg_client {
     ($($item:item)*) => {
