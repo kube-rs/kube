@@ -57,7 +57,7 @@ println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
 }});
-let pp = PatchParams::apply("my_controller");
+let pp = PatchParams::apply("kube");
 let patched = pods.patch("blog", &pp, &Patch::Apply(patch)).await?;
 assert_eq!(patched.spec.active_deadline_seconds, Some(5));
 
