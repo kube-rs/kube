@@ -150,26 +150,6 @@ jobs:
         with:
           command: check ${{ matrix.checks }}
 
-  docs:
-    name: Run rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          override: true
-          toolchain: nightly
-          profile: minimal
-      # Smart caching for Rust projects.
-      # Includes workaround for macos cache corruption.
-      # - https://github.com/rust-lang/cargo/issues/8603
-      # - https://github.com/actions/cache/issues/403
-      - uses: Swatinem/rust-cache@v1
-
-      - name: Ensure markdown targets are valid
-        run: RUSTDOCFLAGS="-Dwarnings" cargo +nightly doc -p integration --lib
-
-
   rustfmt:
     name: Run rustfmt
     runs-on: ubuntu-latest

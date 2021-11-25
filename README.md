@@ -49,19 +49,24 @@ The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with 
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
+# use kube::api::{Api, Patch, PatchParams, DeleteParams};
+# async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+# let client: kube::Client = todo!();
 let pods: Api<Pod> = Api::namespaced(client, "apps");
 
 let p = pods.get("blog").await?;
 println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
 
-let patch = json!({"spec": {
+let patch = serde_json::json!({"spec": {
     "activeDeadlineSeconds": 5
 }});
 let pp = PatchParams::apply("kube");
 let patched = pods.patch("blog", &pp, &Patch::Apply(patch)).await?;
-assert_eq!(patched.spec.active_deadline_seconds, Some(5));
+assert_eq!(patched.spec.unwrap().active_deadline_seconds, Some(5));
 
 pods.delete("blog", &DeleteParams::default()).await?;
+# Ok(())
+# }
 ```
 
 See the examples ending in `_api` examples for more detail.
@@ -73,21 +78,27 @@ Working with custom resources uses automatic code-generation via [proc_macros in
 You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec struct:
 
 ```rust
+# use kube::CustomResource;
+# use serde::{Deserialize, Serialize};
+# use schemars::JsonSchema;
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 pub struct FooSpec {
     name: String,
     info: String,
 }
-```
 
-Then you can use the generated wrapper struct `Foo` as a [`kube::Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
+// Then you can use the generated wrapper struct Foo as a kube::Resource
 
-```rust
+# use kube::{Client, Api, CustomResourceExt};
+# async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+# let client: kube::Client = todo!();
 let foos: Api<Foo> = Api::namespaced(client, "default");
 let f = Foo::new("my-foo", FooSpec::default());
 println!("foo: {:?}", f);
 println!("crd: {:?}", serde_yaml::to_string(&Foo::crd()));
+# Ok(())
+# }
 ```
 
 There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples) for more.
@@ -103,18 +114,22 @@ The `runtime` module exports the `kube_runtime` crate and contains higher level 
 A low level streaming interface (similar to informers) that presents `Applied`, `Deleted` or `Restarted` events.
 
 ```rust
+# use kube::api::{Api, ListParams};
+# use k8s_openapi::api::core::v1::Pod;
+# let client: kube::Client = todo!();
 let api = Api::<Pod>::namespaced(client, "default");
 let watcher = watcher(api, ListParams::default());
 ```
 
 This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
 
-```rust
+
+use kube::runtime::{utils::try_flatten_applied, watcher};
 let mut apply_events = try_flatten_applied(watcher).boxed_local();
 while let Some(event) = apply_events.try_next().await? {
     println!("Applied: {}", event.name());
 }
-```
+
 
 NB: the plain stream items a `watcher` returns are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities like `try_flatten_applied` or `try_flatten_touched`.
 
@@ -123,6 +138,9 @@ NB: the plain stream items a `watcher` returns are different from `WatchEvent`. 
 A `reflector` is a `watcher` with `Store` on `K`. It acts on all the `Event<K>` exposed by `watcher` to ensure that the state in the `Store` is as accurate as possible.
 
 ```rust
+# use kube::api::{Api, ListParams};
+# use k8s_openapi::api::core::v1::Node;
+# let client: kube::Client = todo!();
 let nodes: Api<Node> = Api::namespaced(client, &namespace);
 let lp = ListParams::default()
     .labels("beta.kubernetes.io/instance-type=m4.2xlarge");
@@ -137,17 +155,24 @@ At this point you can listen to the `reflector` as if it was a `watcher`, but yo
 
 A `Controller` is a `reflector` along with an arbitrary number of watchers that schedule events internally to send events through a reconciler:
 
+
 ```rust
+# use kube::api::ListParams;
+# use kube::runtime::Controller;
+# use futures::stream::StreamExt;
+# async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 Controller::new(root_kind_api, ListParams::default())
     .owns(child_kind_api, ListParams::default())
     .run(reconcile, error_policy, context)
     .for_each(|res| async move {
         match res {
-            Ok(o) => info!("reconciled {:?}", o),
-            Err(e) => warn!("reconcile failed: {}", Report::from(e)),
+            Ok(o) => println!("reconciled {:?}", o),
+            Err(e) => println!("reconcile failed: {}", Report::from(e)),
         }
     })
     .await;
+# Ok(())
+# }
 ```
 
 Here `reconcile` and `error_policy` refer to functions you define. The first will be called when the root or child elements change, and the second when the `reconciler` returns an `Err`.
