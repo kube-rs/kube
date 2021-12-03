@@ -199,10 +199,17 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let has_status = status.is_some();
     let serialize_status = if has_status {
         quote! {
-            obj.serialize_field("status", &self.status)?;
+            if let Some(status) = &self.status {
+                obj.serialize_field("status", &status)?;
+            }
         }
     } else {
         quote! {}
+    };
+    let has_status_value = if has_status {
+        quote! { self.status.is_some() }
+    } else {
+        quote! { false }
     };
 
     let mut derive_paths: Vec<Path> = vec![
@@ -266,7 +273,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #serde::Serialize for #rootident {
             fn serialize<S: #serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
                 use #serde::ser::SerializeStruct;
-                let mut obj = ser.serialize_struct(#rootident_str, 4 + usize::from(#has_status))?;
+                let mut obj = ser.serialize_struct(#rootident_str, 4 + usize::from(#has_status_value))?;
                 obj.serialize_field("apiVersion", &<#rootident as #kube_core::Resource>::api_version(&()))?;
                 obj.serialize_field("kind", &<#rootident as #kube_core::Resource>::kind(&()))?;
                 obj.serialize_field("metadata", &self.metadata)?;
