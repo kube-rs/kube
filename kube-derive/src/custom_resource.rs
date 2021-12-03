@@ -188,6 +188,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // We enforce metadata + spec's existence (always there)
     // => No default impl
     let rootident = Ident::new(&struct_name, Span::call_site());
+    let rootident_str = rootident.to_string();
 
     // if status set, also add that
     let StatusInformation {
@@ -196,9 +197,15 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl_hasstatus,
     } = process_status(&rootident, &status, &visibility, &kube_core);
     let has_status = status.is_some();
+    let serialize_status = if has_status {
+        quote! {
+            obj.serialize_field("status", &self.status)?;
+        }
+    } else {
+        quote! {}
+    };
 
     let mut derive_paths: Vec<Path> = vec![
-        syn::parse_quote! { #serde::Serialize },
         syn::parse_quote! { #serde::Deserialize },
         syn::parse_quote! { Clone },
         syn::parse_quote! { Debug },
@@ -240,10 +247,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #[serde(rename_all = "camelCase")]
         #visibility struct #rootident {
             #schemars_skip
-            #visibility api_version: String,
-            #schemars_skip
-            #visibility kind: String,
-            #schemars_skip
             #visibility metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
             #visibility spec: #ident,
             #status_field
@@ -251,8 +254,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #rootident {
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
-                    api_version: <#rootident as #kube_core::Resource>::api_version(&()).to_string(),
-                    kind: <#rootident as #kube_core::Resource>::kind(&()).to_string(),
                     metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         name: Some(name.to_string()),
                         ..Default::default()
@@ -260,6 +261,18 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     spec: spec,
                     #status_default
                 }
+            }
+        }
+        impl #serde::Serialize for #rootident {
+            fn serialize<S: #serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                use #serde::ser::SerializeStruct;
+                let mut obj = ser.serialize_struct(#rootident_str, 4 + usize::from(#has_status))?;
+                obj.serialize_field("apiVersion", &<#rootident as #kube_core::Resource>::api_version(&()))?;
+                obj.serialize_field("kind", &<#rootident as #kube_core::Resource>::kind(&()))?;
+                obj.serialize_field("metadata", &self.metadata)?;
+                obj.serialize_field("spec", &self.spec)?;
+                #serialize_status
+                obj.end()
             }
         }
     };
@@ -310,8 +323,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             impl Default for #rootident {
                 fn default() -> Self {
                     Self {
-                        api_version: <#rootident as #kube_core::Resource>::api_version(&()).to_string(),
-                        kind: <#rootident as #kube_core::Resource>::kind(&()).to_string(),
                         metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
                         spec: Default::default(),
                         #status_default
