@@ -32,5 +32,3 @@ jobs:
           out-type: Xml
           args: ' -- --test-threads 1'
       - uses: codecov/codecov-action@v2
-        with:
-          flags: unittests,rust
