@@ -185,10 +185,10 @@ pub use kube_core as core;
 #[cfg(test)]
 #[cfg(all(feature = "derive", feature = "runtime"))]
 mod test {
-    use schemars::JsonSchema;
-    use serde::{Deserialize, Serialize};
     use crate::{Api, Client, CustomResourceExt};
     use kube_derive::CustomResource;
+    use schemars::JsonSchema;
+    use serde::{Deserialize, Serialize};
 
     #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
     #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
@@ -224,7 +224,7 @@ mod test {
 
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
     #[tokio::test]
-    #[ignore] // needs kubeconfig
+    #[ignore] // needs cluster (creates + patches foo crd)
     async fn derived_resource_queriable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::params::{Patch, PatchParams},
