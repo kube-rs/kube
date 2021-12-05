@@ -34,11 +34,14 @@ jobs:
         uses: actions-rs/tarpaulin@v0.1
         with:
           version: '0.18.5'
-          #out-type: Lcov
+          out-type: Xml
           timeout: 600
           args: '--all -e tests -- --test-threads 1'
-      - name: Coveralls Finished
-        uses: coverallsapp/github-action@master
+      #- name: Coveralls Finished
+      #  uses: coverallsapp/github-action@master
+      #  with:
+      #    github-token: ${{ secrets.GITHUB_TOKEN }}
+      #    path-to-lcov: ./lcov.info
+      - uses: codecov/codecov-action@v2
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ./lcov.info
+          flags: unittests,rust
