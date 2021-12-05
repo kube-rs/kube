@@ -184,7 +184,7 @@ pub use kube_core as core;
 #[cfg(test)]
 #[cfg(all(feature = "derive", feature = "client"))]
 mod test {
-    use crate::{Api, Client, CustomResourceExt};
+    use crate::{Api, Client, CustomResourceExt, ResourceExt};
     use kube_derive::CustomResource;
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
@@ -263,6 +263,39 @@ mod test {
         assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
         assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
         foos.delete("baz", &DeleteParams::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (fetches api resources, and lists all)
+    #[cfg(all(feature = "derive", feature = "runtime"))]
+    async fn dynamic_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            core::DynamicObject,
+            discovery::{verbs, Discovery, Scope},
+        };
+        let client = Client::try_default().await?;
+
+        let discovery = Discovery::new(client.clone()).run().await?;
+        for group in discovery.groups() {
+            for (ar, caps) in group.recommended_resources() {
+                if !caps.supports_operation(verbs::LIST) {
+                    continue;
+                }
+                let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
+                    Api::default_namespaced_with(client.clone(), &ar)
+                } else {
+                    Api::all_with(client.clone(), &ar)
+                };
+                println!("{}/{} : {}", group.name(), ar.version, ar.kind);
+                let list = api.list(&Default::default()).await?;
+                for item in list.items {
+                    let name = item.name();
+                    let ns = item.metadata.namespace.map(|s| s + "/").unwrap_or_default();
+                    println!("\t\t{}{}", ns, name);
+                }
+            }
+        }
         Ok(())
     }
 }
