@@ -208,7 +208,7 @@ mod test {
 
     #[tokio::test]
     #[ignore] // needs kubeconfig
-    #[cfg(feature = "derive")]
+    #[cfg(all(feature = "derive", feature = "client"))]
     async fn custom_resource_generates_correct_core_structs() {
         use crate::core::{ApiResource, DynamicObject, GroupVersionKind};
         let client = Client::try_default().await.unwrap();
