@@ -1,12 +1,12 @@
-[lib_coverage]
-workspace = true
-exclude = ["integration"]
-#exclude_files = ["integration/"]
-run-types = ["Doctests", "Tests"]
+# Usage cargo tarpaulin -- --test-threads 1
 
-[kube_lib_ignored_coverage]
+[one_pass_coverage]
+workspace = true
 features = "kube/derive kube/runtime"
 color = "Always"
-packages = ["kube"]
-workspace = false
 ignored = true
+timeout = "600s"
+exclude = ["integration"]
+# NB: skipping Doctests because they are slow to build and generally marked no_run
+run-types = ["Tests"]
+generate = ["Json"]

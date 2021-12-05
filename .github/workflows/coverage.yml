@@ -11,10 +11,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Install nightly toolchain
+      - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           override: true
       - uses: Swatinem/rust-cache@v1
       - uses: AbsaOSS/k3d-action@v2
@@ -30,8 +30,7 @@ jobs:
         with:
           version: '0.18.5'
           out-type: Xml
-          timeout: 600
-          args: '--config=tarpaulin.toml -- --test-threads 1'
+          args: ' -- --test-threads 1'
       - uses: codecov/codecov-action@v2
         with:
           flags: unittests,rust
