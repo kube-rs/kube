@@ -31,7 +31,7 @@ jobs:
           version: '0.18.5'
           out-type: Xml
           timeout: 600
-          args: '--workspace --ignored -e examples -e integration --features=runtime,derive,ws,oauth,jsonpatch,admission,k8s-openapi/v1_22 -o Stdout -t 600 -- --test-threads 1'
+          args: '--workspace --ignored -e examples -e integration --features=runtime,derive,ws,oauth,jsonpatch,admission,k8s-openapi/v1_22 -- --test-threads 1'
       - uses: codecov/codecov-action@v2
         with:
           flags: unittests,rust
