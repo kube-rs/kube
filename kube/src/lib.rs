@@ -183,6 +183,7 @@ pub use kube_core as core;
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
 #[cfg(test)]
+#[cfg(all(feature = "derive", feature = "client"))]
 mod test {
     use crate::{Api, Client, CustomResourceExt};
     use kube_derive::CustomResource;
@@ -208,7 +209,6 @@ mod test {
 
     #[tokio::test]
     #[ignore] // needs kubeconfig
-    #[cfg(all(feature = "derive", feature = "client"))]
     async fn custom_resource_generates_correct_core_structs() {
         use crate::core::{ApiResource, DynamicObject, GroupVersionKind};
         let client = Client::try_default().await.unwrap();
