@@ -742,10 +742,7 @@ where
     {
         applier(
             move |obj, ctx| {
-                CancelableJoinHandle::spawn(
-                    reconciler(obj, ctx).into_future().in_current_span(),
-                    &Handle::current(),
-                )
+                CancelableJoinHandle::spawn(reconciler(obj, ctx).into_future(), &Handle::current())
             },
             error_policy,
             context,
