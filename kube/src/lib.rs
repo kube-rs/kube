@@ -183,7 +183,6 @@ pub use kube_core as core;
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
 #[cfg(test)]
-#[cfg(all(feature = "derive", feature = "runtime"))]
 mod test {
     use crate::{Api, Client, CustomResourceExt};
     use kube_derive::CustomResource;
@@ -209,6 +208,7 @@ mod test {
 
     #[tokio::test]
     #[ignore] // needs kubeconfig
+    #[cfg(feature = "derive")]
     async fn custom_resource_generates_correct_core_structs() {
         use crate::core::{ApiResource, DynamicObject, GroupVersionKind};
         let client = Client::try_default().await.unwrap();
@@ -225,6 +225,7 @@ mod test {
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
     #[tokio::test]
     #[ignore] // needs cluster (creates + patches foo crd)
+    #[cfg(all(feature = "derive", feature = "runtime"))]
     async fn derived_resource_queriable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::params::{Patch, PatchParams},
