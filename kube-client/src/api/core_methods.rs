@@ -266,7 +266,7 @@ where
     ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default()
     ///         .fields("metadata.name=my_job")
-    ///         .timeout(5); // upper bound of how long we watch for
+    ///         .timeout(20); // upper bound of how long we watch for
     ///     let mut stream = jobs.watch(&lp, "0").await?.boxed();
     ///     while let Some(status) = stream.try_next().await? {
     ///         match status {
