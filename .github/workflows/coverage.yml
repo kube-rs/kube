@@ -31,8 +31,7 @@ jobs:
           version: '0.18.5'
           out-type: Xml
           timeout: 600
-          # NB: feature selection do not work yet
-          args: '--workspace --lib --ignored --doc -e integration -- --test-threads 1'
+          args: '--config=tarpaulin.toml -- --test-threads 1'
       - uses: codecov/codecov-action@v2
         with:
           flags: unittests,rust

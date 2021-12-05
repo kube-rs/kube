@@ -1,0 +1,12 @@
+[lib_coverage]
+workspace = true
+exclude = ["integration"]
+#exclude_files = ["integration/"]
+run-types = ["Doctests", "Tests"]
+
+[kube_lib_ignored_coverage]
+features = "kube/derive kube/runtime"
+color = "Always"
+packages = ["kube"]
+workspace = false
+ignored = true
