@@ -179,7 +179,6 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 #[doc(inline)]
 pub use kube_core as core;
 
-
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
 #[cfg(test)]
@@ -228,7 +227,7 @@ mod test {
     #[cfg(all(feature = "derive", feature = "runtime"))]
     async fn derived_resource_queriable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
-            core::params::{Patch, PatchParams},
+            core::params::{DeleteParams, Patch, PatchParams},
             runtime::wait::{await_condition, conditions},
         };
         let client = Client::try_default().await?;
@@ -261,6 +260,9 @@ mod test {
         });
         let o2 = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
         assert_eq!(o2.spec.replicas, 2);
+        assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
+        assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
+        foos.delete("baz", &DeleteParams::default()).await?;
         Ok(())
     }
 }
