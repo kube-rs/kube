@@ -11,10 +11,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Install stable toolchain
+      - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           override: true
       - uses: Swatinem/rust-cache@v1
       - uses: AbsaOSS/k3d-action@v2
@@ -31,7 +31,8 @@ jobs:
           version: '0.18.5'
           out-type: Xml
           timeout: 600
-          args: '--workspace --bins --lib --doc --ignored -e examples -e integration -- --test-threads 1'
+          # NB: feature selection do not work yet
+          args: '--workspace --lib --ignored --doc -e integration -- --test-threads 1'
       - uses: codecov/codecov-action@v2
         with:
           flags: unittests,rust
