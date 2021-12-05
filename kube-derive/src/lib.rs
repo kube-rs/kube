@@ -209,8 +209,10 @@ mod custom_resource;
 /// If you have to override a lot, [you can opt-out of schema-generation entirely](#kubeschema--mode)
 ///
 /// ## Advanced Features
+///
 /// - **embedding k8s-openapi types** can be done by enabling the `schemars` feature of `k8s-openapi` from [`0.13.0`](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0130-2021-08-09)
 /// - **adding validation** via [validator crate](https://github.com/Keats/validator) is supported from `schemars` >= [`0.8.5`](https://github.com/GREsau/schemars/blob/master/CHANGELOG.md#085---2021-09-20)
+/// - **generating rust code from schemas** can be done via [kopium](https://github.com/kube-rs/kopium) and is supported on stable crds (> 1.16 kubernetes)
 ///
 /// ### Validation Caveats
 /// The supported **`#[validate]` attrs also exist as `#[schemars]` attrs** so you can use those directly if you do not require the validation to run client-side (in your code).
