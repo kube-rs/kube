@@ -17,19 +17,18 @@ jobs:
           toolchain: stable
           override: true
       - uses: Swatinem/rust-cache@v1
-      - uses: AbsaOSS/k3d-action@v1.4.0
+      - uses: AbsaOSS/k3d-action@v2
         name: "Create Single Cluster"
         with:
           cluster-name: "test-cluster-1"
           args: >-
-            -p "8083:80@agent[0]"
-            -p "8443:443@agent[0]"
-            -p "5053:53/udp@agent[0]"
+            -p "8083:80@agent:0:direct"
+            -p "8443:443@agent:0:direct"
+            -p "5053:53/udp@agent:0:direct"
             --agents 1
             --no-lb
             --image docker.io/rancher/k3s:v1.20.4-k3s1
-            --k3s-server-arg "--disable=traefik,servicelb,metrics-server,local-storage"
-            --k3s-server-arg "--disable-cloud-controller"
+            --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
