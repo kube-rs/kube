@@ -294,6 +294,32 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore] // needs cluster (lists pods)
+    async fn custom_objects_are_usable() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::core::{ApiResource, NotUsed, Object};
+        use k8s_openapi::api::core::v1::Pod;
+        #[derive(Clone, Deserialize, Debug)]
+        struct PodSpecSimple {
+            containers: Vec<ContainerSimple>,
+        }
+        #[derive(Clone, Deserialize, Debug)]
+        struct ContainerSimple {
+            image: String,
+        }
+        type PodSimple = Object<PodSpecSimple, NotUsed>;
+        // use known type information from pod (can also use discovery for this)
+        let ar = ApiResource::erase::<Pod>(&());
+
+        let client = Client::try_default().await?;
+        let api: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
+        for _p in api.list(&Default::default()).await? {
+            // can iterate over dynamic objects"
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
     #[ignore] // needs cluster (fetches api resources, and lists cr)
     #[cfg(all(feature = "derive"))]
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {

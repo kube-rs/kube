@@ -286,7 +286,9 @@ pub struct NotUsed {}
 
 #[cfg(test)]
 mod test {
-    use super::{ApiResource, NotUsed, Object};
+    use super::{ApiResource, NotUsed, Object, Resource};
+    use crate::resource::ResourceExt;
+
     #[test]
     fn simplified_k8s_object() {
         use k8s_openapi::api::core::v1::Pod;
@@ -308,9 +310,21 @@ mod test {
             containers: vec![ContainerSimple { image: "blog".into() }],
         };
         let mypod = PodSimple::new("blog", &ar, data).within("dev");
-        assert_eq!(mypod.metadata.namespace.unwrap(), "dev");
-        assert_eq!(mypod.metadata.name.unwrap(), "blog");
+
+        let meta = mypod.meta();
+        assert_eq!(&mypod.metadata, meta);
+        assert_eq!(meta.namespace.as_ref().unwrap(), "dev");
+        assert_eq!(meta.name.as_ref().unwrap(), "blog");
         assert_eq!(mypod.types.as_ref().unwrap().kind, "Pod");
         assert_eq!(mypod.types.as_ref().unwrap().api_version, "v1");
+
+        assert_eq!(mypod.namespace().unwrap(), "dev");
+        assert_eq!(mypod.name(), "blog");
+
+        assert_eq!(PodSimple::api_version(&ar), "v1");
+        assert_eq!(PodSimple::version(&ar), "v1");
+        assert_eq!(PodSimple::plural(&ar), "pods");
+        assert_eq!(PodSimple::kind(&ar), "Pod");
+        assert_eq!(PodSimple::group(&ar), "");
     }
 }

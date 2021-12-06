@@ -127,6 +127,7 @@ pub use kube_core as core;
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube-client --lib features=rustls-tls -- --ignored`
 #[cfg(all(feature = "client", feature = "config"))]
+#[cfg(test)]
 mod test {
     #![allow(unused_imports)]
     use crate::{client::ConfigExt, Api, Client, Config};
