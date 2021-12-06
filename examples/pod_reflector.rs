@@ -1,4 +1,3 @@
-use color_eyre::Result;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
@@ -8,7 +7,7 @@ use kube::{
 };
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
