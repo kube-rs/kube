@@ -75,7 +75,7 @@ async fn cleanup(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<Reconcile
 }
 
 #[tokio::main]
-async fn main() -> color_eyre::Result<()> {
+async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let kube = kube::Client::try_default().await?;
     let all_cms = kube::Api::<ConfigMap>::all(kube.clone());
