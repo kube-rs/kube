@@ -349,12 +349,25 @@ mod test {
     #[ignore] // needs cluster (fetches api resources, and lists all)
     async fn resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
-            core::DynamicObject,
+            core::{DynamicObject, GroupVersionKind},
             discovery::{verbs, Discovery, Scope},
         };
         let client = Client::try_default().await?;
 
-        let discovery = Discovery::new(client.clone()).run().await?;
+        let discovery = Discovery::new(client.clone())
+            .exclude(&[""]) // skip core resources
+            .run()
+            .await?;
+        // check our custom resource first by resolving within groups
+        {
+            assert!(discovery.has_group("clux.dev"));
+            let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
+            let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
+            assert_eq!(ar.group, gvk.group);
+            assert_eq!(ar.version, gvk.version);
+            assert_eq!(ar.kind, gvk.kind);
+        }
+
         for group in discovery.groups() {
             for (ar, caps) in group.recommended_resources() {
                 if !caps.supports_operation(verbs::LIST) {
@@ -365,13 +378,7 @@ mod test {
                 } else {
                     Api::all_with(client.clone(), &ar)
                 };
-                println!("{}/{} : {}", group.name(), ar.version, ar.kind);
-                let list = api.list(&Default::default()).await?;
-                for item in list.items {
-                    let name = item.name();
-                    let ns = item.metadata.namespace.map(|s| s + "/").unwrap_or_default();
-                    println!("\t\t{}{}", ns, name);
-                }
+                api.list(&Default::default()).await?;
             }
         }
         Ok(())
