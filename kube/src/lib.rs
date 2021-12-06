@@ -312,8 +312,9 @@ mod test {
 
         let client = Client::try_default().await?;
         let api: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
-        for _p in api.list(&Default::default()).await? {
-            // can iterate over dynamic objects"
+        for p in api.list(&Default::default()).await? {
+            // run loop to cover ObjectList::iter
+            println!("found pod {} with containers: {:?}", p.name(), p.spec.containers);
         }
 
         Ok(())
