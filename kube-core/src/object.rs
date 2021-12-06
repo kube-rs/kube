@@ -286,7 +286,7 @@ pub struct NotUsed {}
 
 #[cfg(test)]
 mod test {
-    use super::{ApiResource, NotUsed, Object, Resource};
+    use super::{ApiResource, HasSpec, HasStatus, NotUsed, Object, Resource};
     use crate::resource::ResourceExt;
 
     #[test]
@@ -297,7 +297,7 @@ mod test {
         struct PodSpecSimple {
             containers: Vec<ContainerSimple>,
         }
-        #[derive(Clone)]
+        #[derive(Clone, Debug, PartialEq)]
         struct ContainerSimple {
             image: String,
         }
@@ -320,6 +320,10 @@ mod test {
 
         assert_eq!(mypod.namespace().unwrap(), "dev");
         assert_eq!(mypod.name(), "blog");
+        assert!(mypod.status().is_none());
+        assert_eq!(mypod.spec().containers[0], ContainerSimple {
+            image: "blog".into()
+        });
 
         assert_eq!(PodSimple::api_version(&ar), "v1");
         assert_eq!(PodSimple::version(&ar), "v1");

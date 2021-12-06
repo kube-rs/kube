@@ -367,7 +367,7 @@ mod test {
             assert_eq!(ar.version, gvk.version);
             assert_eq!(ar.kind, gvk.kind);
         }
-
+        // check all non-excluded groups that are iterable
         for group in discovery.groups() {
             for (ar, caps) in group.recommended_resources() {
                 if !caps.supports_operation(verbs::LIST) {
