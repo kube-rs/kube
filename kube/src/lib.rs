@@ -355,7 +355,7 @@ mod test {
         let client = Client::try_default().await?;
 
         let discovery = Discovery::new(client.clone())
-            .exclude(&[""]) // skip core resources
+            .exclude(&["rbac.authorization.k8s.io"]) // skip something
             .run()
             .await?;
         // check our custom resource first by resolving within groups
