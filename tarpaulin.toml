@@ -9,5 +9,4 @@ timeout = "600s"
 exclude = ["integration"]
 # NB: skipping Doctests because they are slow to build and generally marked no_run
 run-types = ["Tests"]
-generate = ["Json"]
 ignore_tests = true

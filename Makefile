@@ -26,6 +26,7 @@ test:
 test-kubernetes:
 	cargo test --lib --all -- --ignored # also run tests that fail on github actions
 	cargo test -p kube --lib --features=derive,runtime -- --ignored
+	cargo test -p kube-client --lib --features=rustls-tls -- --ignored
 	cargo run -p kube-examples --example crd_derive
 	cargo run -p kube-examples --example crd_api
 

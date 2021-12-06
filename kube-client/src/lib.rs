@@ -122,3 +122,44 @@ cfg_error! {
 pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from kube_core
 pub use kube_core as core;
+
+
+// Tests that require a cluster and the complete feature set
+// Can be run with `cargo test -p kube-client --lib features=rustls-tls -- --ignored`
+#[cfg(test)]
+#[cfg(all(feature = "client", feature = "config"))]
+mod test {
+    use crate::{Api, Client};
+
+    #[tokio::test]
+    #[ignore] // needs cluster (lists pods)
+    #[cfg(all(feature = "rustls-tls"))]
+    async fn cum_client_runtime_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{client::ConfigExt, Config};
+        use k8s_openapi::api::core::v1::Pod;
+        use tower::ServiceBuilder;
+
+        let config = Config::infer().await?;
+
+        // Pick TLS at runtime
+        let use_rustls = std::env::var("USE_RUSTLS").map(|s| s == "1").unwrap_or(false);
+        let client = if use_rustls {
+            let https = config.rustls_https_connector()?;
+            let service = ServiceBuilder::new()
+                .layer(config.base_uri_layer())
+                .service(hyper::Client::builder().build(https));
+            Client::new(service, config.default_namespace)
+        } else {
+            let https = config.native_tls_https_connector()?;
+            let service = ServiceBuilder::new()
+                .layer(config.base_uri_layer())
+                .service(hyper::Client::builder().build(https));
+            Client::new(service, config.default_namespace)
+        };
+
+        let pods: Api<Pod> = Api::default_namespaced(client);
+        pods.list(&Default::default()).await?;
+
+        Ok(())
+    }
+}
