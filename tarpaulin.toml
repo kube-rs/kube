@@ -1,0 +1,12 @@
+# Usage cargo tarpaulin -- --test-threads 1
+
+[one_pass_coverage]
+workspace = true
+features = "kube/derive kube/runtime"
+color = "Always"
+ignored = true
+timeout = "600s"
+exclude = ["integration"]
+# NB: skipping Doctests because they are slow to build and generally marked no_run
+run-types = ["Tests"]
+generate = ["Json"]

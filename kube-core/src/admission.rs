@@ -31,7 +31,6 @@ pub struct SerializePatchError(#[source] serde_json::Error);
 /// Failed to convert `AdmissionReview` into `AdmissionRequest`.
 pub struct ConvertAdmissionReviewError;
 
-
 /// The `kind` field in [`TypeMeta`].
 pub const META_KIND: &str = "AdmissionReview";
 /// The `api_version` field in [`TypeMeta`] on the v1 version.

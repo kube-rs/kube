@@ -76,13 +76,23 @@ cargo run --example dynamic_watcher
 ```
 
 ### controllers
-Requires you creating the custom resource first:
+Main example requires you creating the custom resource first:
 
 ```sh
 kubectl apply -f configmapgen_controller_crd.yaml
 cargo run --example configmapgen_controller &
 kubectl apply -f configmapgen_controller_object.yaml
 ```
+
+and the finalizer example (reconciles a labelled subset of configmaps):
+
+```sh
+cargo run --example configmapgen_controller
+kubectl apply -f secret_syncer_configmap.yaml
+kubectl delete -f secret_syncer_configmap.yaml
+```
+
+the finalizer is resilient against controller downtime (try stopping the controller before deleting).
 
 ### reflectors
 These examples watch resources as well as ive a store access point:
