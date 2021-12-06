@@ -225,11 +225,12 @@ mod test {
     #[tokio::test]
     #[ignore] // needs cluster (creates + patches foo crd)
     #[cfg(all(feature = "derive", feature = "runtime"))]
-    async fn derived_resource_queriable() -> Result<(), Box<dyn std::error::Error>> {
+    async fn derived_resource_queriable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::params::{DeleteParams, Patch, PatchParams},
             runtime::wait::{await_condition, conditions},
         };
+        use serde_json::json;
         let client = Client::try_default().await?;
         let ssapply = PatchParams::apply("kube").force();
         let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
@@ -242,26 +243,52 @@ mod test {
         // Use it
         let foos: Api<Foo> = Api::default_namespaced(client.clone());
         // Apply from generated struct
-        let foo = Foo::new("baz", FooSpec {
-            name: "baz".into(),
-            info: Some("old baz".into()),
-            replicas: 3,
-        });
-        let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
-        assert_eq!(o.spec.name, "baz");
+        {
+            let foo = Foo::new("baz", FooSpec {
+                name: "baz".into(),
+                info: Some("old baz".into()),
+                replicas: 1,
+            });
+            let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
+            assert_eq!(o.spec.name, "baz");
+        }
         // Apply from partial json!
-        let patch = serde_json::json!({
-            "apiVersion": "clux.dev/v1",
-            "kind": "Foo",
-            "spec": {
-                "name": "foo",
-                "replicas": 2
-            }
-        });
-        let o2 = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
-        assert_eq!(o2.spec.replicas, 2);
-        assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
-        assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
+        {
+            let patch = json!({
+                "apiVersion": "clux.dev/v1",
+                "kind": "Foo",
+                "spec": {
+                    "name": "foo",
+                    "replicas": 2
+                }
+            });
+            let o = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
+            assert_eq!(o.spec.replicas, 2);
+        }
+        // check subresource
+        {
+            assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
+            assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
+        }
+        // set status subresource
+        {
+            let fs = serde_json::json!({"status": FooStatus { is_bad: false, replicas: 1 }});
+            let o = foos
+                .patch_status("baz", &Default::default(), &Patch::Merge(&fs))
+                .await?;
+            assert!(o.status.is_some());
+        }
+        // set scale subresource
+        {
+            let fs = serde_json::json!({"spec": { "replicas": 3 }});
+            let o = foos
+                .patch_scale("baz", &Default::default(), &Patch::Merge(&fs))
+                .await?;
+            assert_eq!(o.status.unwrap().replicas, 1); // something needs to set the status for this
+            assert_eq!(o.spec.unwrap().replicas.unwrap(), 3); // what we asked for got updated
+        }
+
+        // cleanup
         foos.delete("baz", &DeleteParams::default()).await?;
         Ok(())
     }

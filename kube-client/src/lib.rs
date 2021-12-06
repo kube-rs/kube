@@ -128,7 +128,10 @@ pub use kube_core as core;
 // Can be run with `cargo test -p kube-client --lib features=rustls-tls -- --ignored`
 #[cfg(all(feature = "client", feature = "config"))]
 mod test {
-    #[allow(unused_imports)] use crate::{Api, Client};
+    #![allow(unused_imports)]
+    use crate::{client::ConfigExt, Api, Client, Config};
+    use k8s_openapi::api::core::v1::Pod;
+    use tower::ServiceBuilder;
 
     // hard disabled test atm due to k3d rustls issues: https://github.com/kube-rs/kube-rs/issues?q=is%3Aopen+is%3Aissue+label%3Arustls
     #[cfg(feature = "when_rustls_works_with_k3d")]
@@ -136,9 +139,6 @@ mod test {
     #[ignore] // needs cluster (lists pods)
     #[cfg(all(feature = "rustls-tls"))]
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::{client::ConfigExt, Config};
-        use k8s_openapi::api::core::v1::Pod;
-        use tower::ServiceBuilder;
         let config = Config::infer().await?;
         let https = config.rustls_https_connector()?;
         let service = ServiceBuilder::new()
@@ -154,9 +154,6 @@ mod test {
     #[ignore] // needs cluster (lists pods)
     #[cfg(all(feature = "native-tls"))]
     async fn custom_client_native_tlss_configuration() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::{client::ConfigExt, Config};
-        use k8s_openapi::api::core::v1::Pod;
-        use tower::ServiceBuilder;
         let config = Config::infer().await?;
         let https = config.native_tls_https_connector()?;
         let service = ServiceBuilder::new()
