@@ -184,7 +184,7 @@ pub use kube_core as core;
 #[cfg(test)]
 #[cfg(all(feature = "derive", feature = "client"))]
 mod test {
-    use crate::{Api, Client, CustomResourceExt, ResourceExt};
+    use crate::{Api, Client, CustomResourceExt, Resource, ResourceExt};
     use kube_derive::CustomResource;
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
@@ -251,6 +251,9 @@ mod test {
             });
             let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
             assert_eq!(o.spec.name, "baz");
+            let oref = o.object_ref(&());
+            assert_eq!(oref.name.unwrap(), "baz");
+            assert_eq!(oref.uid, o.uid());
         }
         // Apply from partial json!
         {
@@ -338,6 +341,7 @@ mod test {
         let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
         assert_eq!(caps1.operations.len(), caps2.operations.len());
         assert_eq!(ar1, ar2);
+        assert_eq!(DynamicObject::api_version(&ar2), "clux.dev/v1");
 
         let api = Api::<DynamicObject>::all_with(client, &ar2);
         api.list(&Default::default()).await?;

@@ -154,7 +154,7 @@ mod test {
     #[tokio::test]
     #[ignore] // needs cluster (lists pods)
     #[cfg(all(feature = "native-tls"))]
-    async fn custom_client_native_tlss_configuration() -> Result<(), Box<dyn std::error::Error>> {
+    async fn custom_client_native_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
         let https = config.native_tls_https_connector()?;
         let service = ServiceBuilder::new()
