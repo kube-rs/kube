@@ -294,9 +294,33 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore] // needs cluster (fetches api resources, and lists cr)
+    #[cfg(all(feature = "derive"))]
+    async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            core::{DynamicObject, GroupVersion, GroupVersionKind},
+            discovery,
+        };
+        let client = Client::try_default().await?;
+        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
+        let gv = GroupVersion::gv("clux.dev", "v1");
+
+        // discover by both (recommended kind on groupversion) and (pinned gvk) and they should equal
+        let apigroup = discovery::oneshot::pinned_group(&client, &gv).await?;
+        let (ar1, caps1) = apigroup.recommended_kind("Foo").unwrap();
+        let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
+        assert_eq!(caps1.operations.len(), caps2.operations.len());
+        assert_eq!(ar1, ar2);
+
+        let api = Api::<DynamicObject>::all_with(client, &ar2);
+        api.list(&Default::default()).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
     #[ignore] // needs cluster (fetches api resources, and lists all)
-    #[cfg(all(feature = "derive", feature = "runtime"))]
-    async fn dynamic_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
+    async fn resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::DynamicObject,
             discovery::{verbs, Discovery, Scope},

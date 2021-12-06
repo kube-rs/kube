@@ -164,4 +164,17 @@ mod test {
         pods.list(&Default::default()).await?;
         Ok(())
     }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (lists api resources)
+    #[cfg(all(feature = "discovery"))]
+    async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{core::DynamicObject, discovery};
+        let client = Client::try_default().await?;
+        let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
+        let (ar, _caps) = apigroup.recommended_kind("APIService").unwrap();
+        let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+        api.list(&Default::default()).await?;
+        Ok(())
+    }
 }
