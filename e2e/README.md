@@ -2,7 +2,7 @@
 
 Small set of tests to verify differences between local and in-cluster development.
 
-In general, [you do not want to run or develop E2E tests](../CONTRIBUTING.md#test-guidelines).
+**[You probably do not want to make a new E2E test](../CONTRIBUTING.md#test-guidelines)**.
 
 ## dapp
 

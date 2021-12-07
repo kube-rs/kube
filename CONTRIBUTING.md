@@ -44,25 +44,23 @@ We have 3 classes of tests.
 
 The last two will try to access the Kubernetes cluster that is your `current-context`; i.e. via your local `KUBECONFIG` evar or `~/.kube/config` file.
 
-The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](https://k3d.io/).
+The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](https://k3d.io/) (`make k3d`).
 
 ### Unit Tests
 
-**Most** unit tests are run with `cargo test --lib --doc --all`
-
-but because of feature-sets, doc tests, and examples, you will need a couple of extra invocations to replicate our CI.
+**Most** unit tests are run with `cargo test --lib --doc --all`, but because of feature-sets, doc tests, and examples, you will need a couple of extra invocations to replicate our CI.
 
 For the complete variations, run the `make test` target in the `Makefile`.
 
 ### Integration Tests
 
-These are tests within the crates marked with an *`#[ignore]`* decoration.
+Slower set of tests within the crates marked with an **`#[ignore]`** attribute.
 
-These are slower as they will generally :warn: try to create/modify/delete resources on your `current-context` :warn:.
+:warning: These  **WILL** try to modify resources in your current cluster :warning:
 
 Most integration tests are run with `cargo test --all --lib -- --ignored`, but because of feature-sets, you will need a few invocations of these to replicate our CI. See `make test-integration`
 
-#### End to End Tests
+### End to End Tests
 
 We have a small set of [e2e tests](https://github.com/kube-rs/kube-rs/tree/master/e2e) that tests difference between in-cluster and local configuration.
 
