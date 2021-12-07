@@ -262,7 +262,7 @@ mod test {
     #[ignore] // needs cluster (will create and attach to a pod)
     #[cfg(all(feature = "ws"))]
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent};
+        use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
 
         let client = Client::try_default().await?;
         let pods: Api<Pod> = Api::default_namespaced(client);
@@ -368,7 +368,7 @@ mod test {
     #[ignore] // needs cluster (will create and tail logs from a pod)
     async fn can_get_pod_logs_and_evict() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
-            api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent},
+            api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
             core::subresource::LogParams,
         };
 
