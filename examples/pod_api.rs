@@ -1,9 +1,9 @@
-use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt, WatchEvent},
+    api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
+    runtime::wait::{await_condition, conditions::is_pod_running},
     Client,
 };
 
@@ -12,10 +12,9 @@ async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // Manage pods
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods: Api<Pod> = Api::default_namespaced(client);
 
     // Create Pod blog
     tracing::info!("Creating Pod instance blog");
@@ -37,31 +36,14 @@ async fn main() -> anyhow::Result<()> {
             let name = o.name();
             assert_eq!(p.name(), name);
             tracing::info!("Created {}", name);
-            // wait for it..
-            std::thread::sleep(std::time::Duration::from_millis(5_000));
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
         Err(e) => return Err(e.into()),                        // any other case is probably bad
     }
 
     // Watch it phase for a few seconds
-    let lp = ListParams::default()
-        .fields(&format!("metadata.name={}", "blog"))
-        .timeout(10);
-    let mut stream = pods.watch(&lp, "0").await?.boxed();
-    while let Some(status) = stream.try_next().await? {
-        match status {
-            WatchEvent::Added(o) => tracing::info!("Added {}", o.name()),
-            WatchEvent::Modified(o) => {
-                let s = o.status.as_ref().expect("status exists on pod");
-                let phase = s.phase.clone().unwrap_or_default();
-                tracing::info!("Modified: {} with phase: {}", o.name(), phase);
-            }
-            WatchEvent::Deleted(o) => tracing::info!("Deleted {}", o.name()),
-            WatchEvent::Error(e) => tracing::error!("Error {}", e),
-            _ => {}
-        }
-    }
+    let establish = await_condition(pods.clone(), "blog", is_pod_running());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(15), establish).await?;
 
     // Verify we can get it
     tracing::info!("Get Pod blog");

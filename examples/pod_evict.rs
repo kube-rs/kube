@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    // Clean up the old job record..
+    // Evict the pod
     let ep = EvictParams::default();
     let eres = pods.evict(pod_name, &ep).await?;
     println!("{:?}", eres);

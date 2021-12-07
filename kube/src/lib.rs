@@ -184,7 +184,10 @@ pub use kube_core as core;
 #[cfg(test)]
 #[cfg(all(feature = "derive", feature = "client"))]
 mod test {
-    use crate::{Api, Client, CustomResourceExt, Resource, ResourceExt};
+    use crate::{
+        api::{DeleteParams, Patch, PatchParams},
+        Api, Client, CustomResourceExt, Resource, ResourceExt,
+    };
     use kube_derive::CustomResource;
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
@@ -226,20 +229,18 @@ mod test {
     #[ignore] // needs cluster (creates + patches foo crd)
     #[cfg(all(feature = "derive", feature = "runtime"))]
     async fn derived_resource_queriable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::{
-            core::params::{DeleteParams, Patch, PatchParams},
-            runtime::wait::{await_condition, conditions},
-        };
+        use crate::runtime::wait::{await_condition, conditions};
+
         use serde_json::json;
         let client = Client::try_default().await?;
         let ssapply = PatchParams::apply("kube").force();
         let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-        // Server-side apply CRD
+        // Server-side apply CRD and wait for it to get ready
         crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
             .await?;
-        // Wait for it to be ready:
         let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
         let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+
         // Use it
         let foos: Api<Foo> = Api::default_namespaced(client.clone());
         // Apply from generated struct
@@ -292,7 +293,8 @@ mod test {
         }
 
         // cleanup
-        foos.delete("baz", &DeleteParams::default()).await?;
+        foos.delete_collection(&DeleteParams::default(), &Default::default())
+            .await?;
         Ok(())
     }
 
@@ -355,9 +357,20 @@ mod test {
         use crate::{
             core::{DynamicObject, GroupVersionKind},
             discovery::{verbs, Discovery, Scope},
+            runtime::wait::{await_condition, conditions},
         };
+
         let client = Client::try_default().await?;
 
+        // ensure crd is installed
+        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+        let ssapply = PatchParams::apply("kube").force();
+        crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
+            .await?;
+        let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+
+        // run discovery
         let discovery = Discovery::new(client.clone())
             .exclude(&["rbac.authorization.k8s.io"]) // skip something
             .run()

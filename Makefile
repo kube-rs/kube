@@ -23,17 +23,17 @@ test:
 	cargo test -p kube --lib --no-default-features
 	cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
 
-test-kubernetes:
+test-integration:
 	cargo test --lib --all -- --ignored # also run tests that fail on github actions
 	cargo test -p kube --lib --features=derive,runtime -- --ignored
-	cargo test -p kube-client --lib --features=rustls-tls -- --ignored
+	cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
 	cargo run -p kube-examples --example crd_derive
 	cargo run -p kube-examples --example crd_api
 
 readme:
 	rustdoc README.md --test --edition=2021
 
-integration: dapp
+e2e: dapp
 	ls -lah integration/
 	docker build -t clux/kube-dapp:$(VERSION) integration/
 	k3d image import clux/kube-dapp:$(VERSION) --cluster main
