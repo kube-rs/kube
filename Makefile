@@ -34,12 +34,12 @@ readme:
 	rustdoc README.md --test --edition=2021
 
 e2e: dapp
-	ls -lah integration/
-	docker build -t clux/kube-dapp:$(VERSION) integration/
+	ls -lah e2e/
+	docker build -t clux/kube-dapp:$(VERSION) e2e/
 	k3d image import clux/kube-dapp:$(VERSION) --cluster main
-	sed -i 's/latest/$(VERSION)/g' integration/deployment.yaml
-	kubectl apply -f integration/deployment.yaml
-	sed -i 's/$(VERSION)/latest/g' integration/deployment.yaml
+	sed -i 's/latest/$(VERSION)/g' e2e/deployment.yaml
+	kubectl apply -f e2e/deployment.yaml
+	sed -i 's/$(VERSION)/latest/g' e2e/deployment.yaml
 	kubectl get all -n apps
 	kubectl describe jobs/dapp -n apps
 	kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
@@ -50,13 +50,13 @@ dapp:
 	docker run \
 		-v cargo-cache:/root/.cargo/registry \
 		-v "$$PWD:/volume" -w /volume \
-		--rm -it clux/muslrust:stable cargo build --release -p integration
-	cp target/x86_64-unknown-linux-musl/release/dapp integration/dapp
-	chmod +x integration/dapp
+		--rm -it clux/muslrust:stable cargo build --release -p e2e
+	cp target/x86_64-unknown-linux-musl/release/dapp e2e/dapp
+	chmod +x e2e/dapp
 
 k3d:
 	k3d cluster create --servers 1 --agents 1 main \
 		--k3s-agent-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%' \
 		--k3s-agent-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%'
 
-.PHONY: doc build fmt clippy test readme k3d integration
+.PHONY: doc build fmt clippy test readme k3d e2e
