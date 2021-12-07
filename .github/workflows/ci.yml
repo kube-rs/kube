@@ -81,8 +81,8 @@ jobs:
         command: check
         args: --all
 
-  integration:
-    # Integration tests are linux only
+  e2e:
+    # e2e tests are docker on linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -113,17 +113,17 @@ jobs:
               --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
               --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
               clux/muslrust:stable \
-              cargo build -p integration --release -v
-          cp target/x86_64-unknown-linux-musl/release/dapp integration/
+              cargo build -p e2e --release -v
+          cp target/x86_64-unknown-linux-musl/release/dapp e2e/
 
       - name: Build image
-        run: "docker build -t clux/kube-dapp:${{ github.sha }} integration/"
+        run: "docker build -t clux/kube-dapp:${{ github.sha }} e2e/"
       - name: Import image
         run: "k3d image import clux/kube-dapp:${{ github.sha }} --cluster kube"
-      - run: sed -i 's/latest/${{ github.sha }}/g' integration/deployment.yaml
+      - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
 
       - name: Create resource
-        run: kubectl apply -f integration/deployment.yaml -n apps
+        run: kubectl apply -f e2e/deployment.yaml -n apps
       - run: kubectl get all -n apps
       - run: kubectl describe jobs/dapp -n apps
       - name: Wait for job to complete

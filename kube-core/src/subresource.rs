@@ -331,3 +331,34 @@ impl Request {
         req.body(vec![]).map_err(Error::BuildRequest)
     }
 }
+
+// ----------------------------------------------------------------------------
+// tests
+// ----------------------------------------------------------------------------
+
+/// Cheap sanity check to ensure type maps work as expected
+#[cfg(test)]
+mod test {
+    use crate::{request::Request, resource::Resource};
+    use k8s::{apps::v1 as appsv1, core::v1 as corev1};
+    use k8s_openapi::api as k8s;
+
+    use crate::subresource::LogParams;
+
+    #[test]
+    fn logs_all_params() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let lp = LogParams {
+            container: Some("nginx".into()),
+            follow: true,
+            limit_bytes: Some(10 * 1024 * 1024),
+            pretty: true,
+            previous: true,
+            since_seconds: Some(3600),
+            tail_lines: Some(4096),
+            timestamps: true,
+        };
+        let req = Request::new(url).logs("mypod", &lp).unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/mypod/log?&container=nginx&follow=true&limitBytes=10485760&pretty=true&previous=true&sinceSeconds=3600&tailLines=4096&timestamps=true");
+    }
+}

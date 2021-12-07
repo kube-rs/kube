@@ -184,7 +184,10 @@ pub use kube_core as core;
 #[cfg(test)]
 #[cfg(all(feature = "derive", feature = "client"))]
 mod test {
-    use crate::{Api, Client, CustomResourceExt, ResourceExt};
+    use crate::{
+        api::{DeleteParams, Patch, PatchParams},
+        Api, Client, CustomResourceExt, Resource, ResourceExt,
+    };
     use kube_derive::CustomResource;
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
@@ -225,58 +228,163 @@ mod test {
     #[tokio::test]
     #[ignore] // needs cluster (creates + patches foo crd)
     #[cfg(all(feature = "derive", feature = "runtime"))]
-    async fn derived_resource_queriable() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::{
-            core::params::{DeleteParams, Patch, PatchParams},
-            runtime::wait::{await_condition, conditions},
-        };
+    async fn derived_resource_queriable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::runtime::wait::{await_condition, conditions};
+
+        use serde_json::json;
         let client = Client::try_default().await?;
         let ssapply = PatchParams::apply("kube").force();
         let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-        // Server-side apply CRD
+        // Server-side apply CRD and wait for it to get ready
         crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
             .await?;
-        // Wait for it to be ready:
         let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
         let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+
         // Use it
         let foos: Api<Foo> = Api::default_namespaced(client.clone());
         // Apply from generated struct
-        let foo = Foo::new("baz", FooSpec {
-            name: "baz".into(),
-            info: Some("old baz".into()),
-            replicas: 3,
-        });
-        let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
-        assert_eq!(o.spec.name, "baz");
+        {
+            let foo = Foo::new("baz", FooSpec {
+                name: "baz".into(),
+                info: Some("old baz".into()),
+                replicas: 1,
+            });
+            let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
+            assert_eq!(o.spec.name, "baz");
+            let oref = o.object_ref(&());
+            assert_eq!(oref.name.unwrap(), "baz");
+            assert_eq!(oref.uid, o.uid());
+        }
         // Apply from partial json!
-        let patch = serde_json::json!({
-            "apiVersion": "clux.dev/v1",
-            "kind": "Foo",
-            "spec": {
-                "name": "foo",
-                "replicas": 2
-            }
-        });
-        let o2 = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
-        assert_eq!(o2.spec.replicas, 2);
-        assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
-        assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
-        foos.delete("baz", &DeleteParams::default()).await?;
+        {
+            let patch = json!({
+                "apiVersion": "clux.dev/v1",
+                "kind": "Foo",
+                "spec": {
+                    "name": "foo",
+                    "replicas": 2
+                }
+            });
+            let o = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
+            assert_eq!(o.spec.replicas, 2);
+        }
+        // check subresource
+        {
+            assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
+            assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
+        }
+        // set status subresource
+        {
+            let fs = serde_json::json!({"status": FooStatus { is_bad: false, replicas: 1 }});
+            let o = foos
+                .patch_status("baz", &Default::default(), &Patch::Merge(&fs))
+                .await?;
+            assert!(o.status.is_some());
+        }
+        // set scale subresource
+        {
+            let fs = serde_json::json!({"spec": { "replicas": 3 }});
+            let o = foos
+                .patch_scale("baz", &Default::default(), &Patch::Merge(&fs))
+                .await?;
+            assert_eq!(o.status.unwrap().replicas, 1); // something needs to set the status for this
+            assert_eq!(o.spec.unwrap().replicas.unwrap(), 3); // what we asked for got updated
+        }
+
+        // cleanup
+        foos.delete_collection(&DeleteParams::default(), &Default::default())
+            .await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (lists pods)
+    async fn custom_objects_are_usable() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::core::{ApiResource, NotUsed, Object};
+        use k8s_openapi::api::core::v1::Pod;
+        #[derive(Clone, Deserialize, Debug)]
+        struct PodSpecSimple {
+            containers: Vec<ContainerSimple>,
+        }
+        #[derive(Clone, Deserialize, Debug)]
+        struct ContainerSimple {
+            image: String,
+        }
+        type PodSimple = Object<PodSpecSimple, NotUsed>;
+        // use known type information from pod (can also use discovery for this)
+        let ar = ApiResource::erase::<Pod>(&());
+
+        let client = Client::try_default().await?;
+        let api: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
+        for p in api.list(&Default::default()).await? {
+            // run loop to cover ObjectList::iter
+            println!("found pod {} with containers: {:?}", p.name(), p.spec.containers);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (fetches api resources, and lists cr)
+    #[cfg(all(feature = "derive"))]
+    async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            core::{DynamicObject, GroupVersion, GroupVersionKind},
+            discovery,
+        };
+        let client = Client::try_default().await?;
+        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
+        let gv = GroupVersion::gv("clux.dev", "v1");
+
+        // discover by both (recommended kind on groupversion) and (pinned gvk) and they should equal
+        let apigroup = discovery::oneshot::pinned_group(&client, &gv).await?;
+        let (ar1, caps1) = apigroup.recommended_kind("Foo").unwrap();
+        let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
+        assert_eq!(caps1.operations.len(), caps2.operations.len());
+        assert_eq!(ar1, ar2);
+        assert_eq!(DynamicObject::api_version(&ar2), "clux.dev/v1");
+
+        let api = Api::<DynamicObject>::all_with(client, &ar2);
+        api.list(&Default::default()).await?;
+
         Ok(())
     }
 
     #[tokio::test]
     #[ignore] // needs cluster (fetches api resources, and lists all)
-    #[cfg(all(feature = "derive", feature = "runtime"))]
-    async fn dynamic_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
+    async fn resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
-            core::DynamicObject,
+            core::{DynamicObject, GroupVersionKind},
             discovery::{verbs, Discovery, Scope},
+            runtime::wait::{await_condition, conditions},
         };
+
         let client = Client::try_default().await?;
 
-        let discovery = Discovery::new(client.clone()).run().await?;
+        // ensure crd is installed
+        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+        let ssapply = PatchParams::apply("kube").force();
+        crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
+            .await?;
+        let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+
+        // run discovery
+        let discovery = Discovery::new(client.clone())
+            .exclude(&["rbac.authorization.k8s.io"]) // skip something
+            .run()
+            .await?;
+        // check our custom resource first by resolving within groups
+        {
+            assert!(discovery.has_group("clux.dev"));
+            let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
+            let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
+            assert_eq!(ar.group, gvk.group);
+            assert_eq!(ar.version, gvk.version);
+            assert_eq!(ar.kind, gvk.kind);
+        }
+        // check all non-excluded groups that are iterable
         for group in discovery.groups() {
             for (ar, caps) in group.recommended_resources() {
                 if !caps.supports_operation(verbs::LIST) {
@@ -287,13 +395,7 @@ mod test {
                 } else {
                     Api::all_with(client.clone(), &ar)
                 };
-                println!("{}/{} : {}", group.name(), ar.version, ar.kind);
-                let list = api.list(&Default::default()).await?;
-                for item in list.items {
-                    let name = item.name();
-                    let ns = item.metadata.namespace.map(|s| s + "/").unwrap_or_default();
-                    println!("\t\t{}{}", ns, name);
-                }
+                api.list(&Default::default()).await?;
             }
         }
         Ok(())

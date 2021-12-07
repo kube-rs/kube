@@ -32,20 +32,65 @@ Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 - **Channel**: Code is built and tested using the **stable** channel of Rust, but documented and formatted with **nightly** <sup>[*](https://github.com/kube-rs/kube-rs/issues/707)</sup>
 - **Formatting**: To format the codebase, run `make fmt`
 - **Documentation** To check documentation, run `make doc`
-- **Testing**: To run tests, run `make test`.
+- **Testing**: To run tests, run `make test` and see below.
 
 ## Testing
 
-Most tests can be run with `cargo test --all`, but because of features, some tests must be run a little more precisely.
-For the complete variations see the `make test` target in the `Makefile`.
+We have 3 classes of tests.
 
-Some tests and examples require an accessible kubernetes cluster via a `KUBECONFIG` environment variable.
+- Unit tests
+- Integration tests (requires Kubernetes)
+- End to End tests (requires Kubernetes)
 
-- unit tests marked as `#[ignore]` run via `cargo test --all --lib -- --ignored`
-- examples run with `cargo run --example=...`
-- [integration tests](https://github.com/kube-rs/kube-rs/tree/master/integration)
+The last two will try to access the Kubernetes cluster that is your `current-context`; i.e. via your local `KUBECONFIG` evar or `~/.kube/config` file.
 
-The easiest way set up a minimal kubernetes cluster for these is with [`k3d`](https://k3d.io/).
+The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](https://k3d.io/) (`make k3d`).
+
+### Unit Tests
+
+**Most** unit tests are run with `cargo test --lib --doc --all`, but because of feature-sets, doc tests, and examples, you will need a couple of extra invocations to replicate our CI.
+
+For the complete variations, run the `make test` target in the `Makefile`.
+
+### Integration Tests
+
+Slower set of tests within the crates marked with an **`#[ignore]`** attribute.
+
+:warning: These  **WILL** try to modify resources in your current cluster :warning:
+
+Most integration tests are run with `cargo test --all --lib -- --ignored`, but because of feature-sets, you will need a few invocations of these to replicate our CI. See `make test-integration`
+
+### End to End Tests
+
+We have a small set of [e2e tests](https://github.com/kube-rs/kube-rs/tree/master/e2e) that tests difference between in-cluster and local configuration.
+
+These tests are the heaviest tests we have because they require a full `docker build`, image import (or push/pull flow), yaml construction, and `kubectl` usage to verify that the outcome was sufficient.
+
+To run E2E tests, use (or follow) `make e2e` as appropriate.
+
+### Test Guidelines
+
+#### When to add a test
+
+When adding new non-trivial pieces of logic that results in a drop in coverage you should add a test.
+
+Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube-rs/branch/master/graph/badge.svg?token=9FCqEcyDTZ)](https://codecov.io/gh/kube-rs/kube-rs) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](./tarpaulin.toml) config, and **will run both unit and integration** tests.
+
+#### What type of test
+
+- Unit tests **MUST NOT** try to contact a Kubernetes cluster
+- Integration tests **MUST NOT** be used when a unit test is sufficient
+- Integration tests **MUST NOT** assume existence of non-standard objects in the cluster
+- Integration tests **MUST NOT** cross-depend on other unit tests completing (and installing what you need)
+- E2E tests **MUST NOT** be used where an integration test is sufficient
+
+In general: **use the least powerful method** of testing available to you:
+
+- use unit tests in `kube-core`
+- use unit tests in `kube-client` (and in rare cases integration tests)
+- use unit tests in `kube-runtime` (and occassionally integration tests)
+- use e2e tests when testing differences between in-cluster and local configuration
+
 
 ## Support
 ### Documentation

@@ -29,6 +29,7 @@ copyleft = "deny"
 default = "deny"
 unlicensed = "deny"
 
+# We are beholden to https://github.com/cncf/foundation/blob/master/allowed-third-party-license-policy.md#approved-licenses-for-allowlist
 allow = [
     "MIT",
     "Apache-2.0",

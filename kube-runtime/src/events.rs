@@ -234,3 +234,40 @@ impl Recorder {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    #![allow(unused_imports)]
+    use super::{Event, EventType, Recorder};
+    use k8s_openapi::api::core::v1::{Event as CoreEvent, Service};
+    use kube_client::{Api, Client, Resource};
+
+    #[tokio::test]
+    #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
+    async fn event_recorder_attaches_events() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+
+        let svcs: Api<Service> = Api::namespaced(client.clone(), "default");
+        let s = svcs.get("kubernetes").await?; // always a kubernetes service in default
+        let recorder = Recorder::new(client.clone(), "kube".into(), s.object_ref(&()));
+        recorder
+            .publish(Event {
+                type_: EventType::Normal,
+                reason: "VeryCoolService".into(),
+                note: Some("Sending kubernetes to detention".into()),
+                action: "Test event - plz ignore".into(),
+                secondary: None,
+            })
+            .await?;
+        let events: Api<CoreEvent> = Api::namespaced(client, "default");
+
+        let event_list = events.list(&Default::default()).await?;
+        let found_event = event_list
+            .into_iter()
+            .find(|e| std::matches!(e.reason.as_deref(), Some("VeryCoolService")))
+            .unwrap();
+        assert_eq!(found_event.message.unwrap(), "Sending kubernetes to detention");
+
+        Ok(())
+    }
+}
