@@ -187,7 +187,7 @@ mod test {
 
     #[tokio::test]
     #[ignore] // needs cluster (will create and edit a pod)
-    async fn pod_can_use_manual_apis() -> Result<(), Box<dyn std::error::Error>> {
+    async fn pod_can_use_core_apis() -> Result<(), Box<dyn std::error::Error>> {
         use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchEvent};
 
         let client = Client::try_default().await?;
@@ -261,7 +261,7 @@ mod test {
     #[tokio::test]
     #[ignore] // needs cluster (will create and attach to a pod)
     #[cfg(all(feature = "ws"))]
-    async fn pod_can_exec_and_evict() -> Result<(), Box<dyn std::error::Error>> {
+    async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent};
 
         let client = Client::try_default().await?;
@@ -355,24 +355,18 @@ mod test {
             }
         }
 
-        // evict the pod
-        let ep = EvictParams {
-            delete_options: Some(DeleteParams {
-                grace_period_seconds: Some(0),
-                ..DeleteParams::default()
-            }),
-            ..EvictParams::default()
-        };
-        let eres = pods.evict("busybox-kube2", &ep).await?;
-        assert_eq!(eres.code, 201); // created
-        assert_eq!(eres.status, "Success");
+        // Delete it
+        let dp = DeleteParams::default();
+        pods.delete("busybox-kube2", &dp).await?.map_left(|pdel| {
+            assert_eq!(pdel.name(), "busybox-kube2");
+        });
 
         Ok(())
     }
 
     #[tokio::test]
     #[ignore] // needs cluster (will create and tail logs from a pod)
-    async fn can_get_and_stream_pod_logs() -> Result<(), Box<dyn std::error::Error>> {
+    async fn can_get_pod_logs_and_evict() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent},
             core::subresource::LogParams,
@@ -442,11 +436,17 @@ mod test {
         assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 4\n");
         assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 5\n");
 
-        // Delete it
-        let dp = DeleteParams::default();
-        pods.delete("busybox-kube3", &dp).await?.map_left(|pdel| {
-            assert_eq!(pdel.name(), "busybox-kube3");
-        });
+        // evict the pod
+        let ep = EvictParams {
+            delete_options: Some(DeleteParams {
+                grace_period_seconds: Some(0),
+                ..DeleteParams::default()
+            }),
+            ..EvictParams::default()
+        };
+        let eres = pods.evict("busybox-kube3", &ep).await?;
+        assert_eq!(eres.code, 201); // created
+        assert_eq!(eres.status, "Success");
 
         Ok(())
     }
