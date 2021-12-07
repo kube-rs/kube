@@ -64,7 +64,7 @@ Most integration tests are run with `cargo test --all --lib -- --ignored`, but b
 
 #### End to End Tests
 
-We have a small set of [e2e tests](https://github.com/kube-rs/kube-rs/tree/master/integration) that tests difference between in-cluster and local configuration.
+We have a small set of [e2e tests](https://github.com/kube-rs/kube-rs/tree/master/e2e) that tests difference between in-cluster and local configuration.
 
 These tests are the heaviest tests we have because they require a full `docker build`, image import (or push/pull flow), yaml construction, and `kubectl` usage to verify that the outcome was sufficient.
 
