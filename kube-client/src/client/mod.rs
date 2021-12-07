@@ -101,7 +101,7 @@ impl Client {
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
-        B::Error: std::error::Error + Send + Sync + 'static,
+        B::Error: Into<BoxError>,
         T: Into<String>,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
