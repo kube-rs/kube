@@ -220,8 +220,8 @@ mod test {
             .fields(&format!("metadata.name={}", "busybox-kube1"))
             .timeout(15);
         let mut stream = pods.watch(&lp, "0").await?.boxed();
-        while let Some(status) = stream.try_next().await? {
-            match status {
+        while let Some(ev) = stream.try_next().await? {
+            match ev {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
                     let phase = s.phase.clone().unwrap_or_default();
@@ -261,7 +261,7 @@ mod test {
     #[tokio::test]
     #[ignore] // needs cluster (will create and attach to a pod)
     #[cfg(all(feature = "ws"))]
-    async fn pod_can_exec() -> Result<(), Box<dyn std::error::Error>> {
+    async fn pod_can_exec_and_evict() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent};
 
         let client = Client::try_default().await?;
@@ -293,8 +293,8 @@ mod test {
             .fields(&format!("metadata.name={}", "busybox-kube2"))
             .timeout(15);
         let mut stream = pods.watch(&lp, "0").await?.boxed();
-        while let Some(status) = stream.try_next().await? {
-            match status {
+        while let Some(ev) = stream.try_next().await? {
+            match ev {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
                     let phase = s.phase.clone().unwrap_or_default();
@@ -372,8 +372,7 @@ mod test {
 
     #[tokio::test]
     #[ignore] // needs cluster (will create and tail logs from a pod)
-    #[cfg(all(feature = "ws"))]
-    async fn can_get_pod_logs_and_evict_pod() -> Result<(), Box<dyn std::error::Error>> {
+    async fn can_get_and_stream_pod_logs() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent},
             core::subresource::LogParams,
@@ -408,8 +407,8 @@ mod test {
             .fields(&format!("metadata.name={}", "busybox-kube3"))
             .timeout(15);
         let mut stream = pods.watch(&lp, "0").await?.boxed();
-        while let Some(status) = stream.try_next().await? {
-            match status {
+        while let Some(ev) = stream.try_next().await? {
+            match ev {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
                     let phase = s.phase.clone().unwrap_or_default();

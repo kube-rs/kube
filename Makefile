@@ -30,6 +30,9 @@ test-integration:
 	cargo run -p kube-examples --example crd_derive
 	cargo run -p kube-examples --example crd_api
 
+coverage:
+	cargo tarpaulin --out=Html --output-dir=covout
+
 readme:
 	rustdoc README.md --test --edition=2021
 
