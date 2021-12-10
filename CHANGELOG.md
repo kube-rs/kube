@@ -3,6 +3,15 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.64.0...master
 
+ * `kube-client`: replace `RefreshTokenLayer` with `AsyncFilterLayer` in `AuthLayer` - #752
+ * upgrade `tokio-tungstenite` to 0.16 - #750
+ * upgrade `tower-http` to 0.2.0 - #748
+ * `kube_derive` now generates explicit apiVersion/kind rather than flattened TypeMeta - #739
+ * `kube::runtime` include object that failed reconciles in controller::Error::ReconcileFailed - #733
+ * upgrade `rustls` to 0.2.1 - #704
+ * `kube::config`: allow empty kubeconfigs as per kubectl - #721
+ * `kube::config`: added `Kubeconfig::from_yaml` - #718 via #719
+ * fix broken crate.io links - #714
  * BREAKING: Removed `kube::Error::OpenSslError` - #716
  * BREAKING: Removed `kube::Error::SslError` - #704 and #716
  * BREAKING: Added `kube::Error::NativeTls(kube::client::NativeTlsError)` for errors from Native TLS - #716
