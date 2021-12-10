@@ -1,6 +1,6 @@
 [package]
 name = "kube-runtime"
-version = "0.64.0"
+version = "0.65.0"
 description = "Kubernetes futures controller runtime"
 authors = [
   "Teo Klestrup Röijezon <teo@nullable.se>",
@@ -21,7 +21,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 futures = "0.3.17"
-kube-client = { path = "../kube-client", version = "^0.64.0", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "^0.65.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative = "2.1.1"
 serde = "1.0.130"
 smallvec = "1.7.0"
