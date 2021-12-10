@@ -1,10 +1,10 @@
-use tower::util::Either;
+use tower::{filter::AsyncFilterLayer, util::Either};
 
 #[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
 use super::tls;
 use super::{
     auth::Auth,
-    middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, RefreshTokenLayer},
+    middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer},
 };
 use crate::{Config, Error, Result};
 
@@ -175,7 +175,9 @@ impl ConfigExt for Config {
             Auth::Bearer(token) => Some(AuthLayer(Either::A(
                 AddAuthorizationLayer::bearer(&token).as_sensitive(true),
             ))),
-            Auth::RefreshableToken(r) => Some(AuthLayer(Either::B(RefreshTokenLayer::new(r)))),
+            Auth::RefreshableToken(refreshable) => {
+                Some(AuthLayer(Either::B(AsyncFilterLayer::new(refreshable))))
+            }
         })
     }
 
