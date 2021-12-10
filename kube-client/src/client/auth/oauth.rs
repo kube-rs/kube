@@ -62,7 +62,7 @@ pub enum Error {
     CreateOpensslHttpsConnector(#[source] openssl::error::ErrorStack),
 }
 
-pub(crate) struct Gcp {
+pub struct Gcp {
     provider: TokenProviderWrapper,
     scopes: Vec<String>,
 }

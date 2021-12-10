@@ -98,8 +98,7 @@ The `Client` can be created from a particular type of using the properties in th
 but we also have our own layers in the `middleware` module:
 
 - `BaseUriLayer` prefixes `Config::base_url` to requests
-- `RefreshTokenLayer` will refresh auth tokens in the kubeconfig periodically when they expire (by invoking the `client::auth` module)
-- `AuthLayer` configures either `AddAuthorizationLayer` or our own `RefreshTokenLayer` depending on authentication method in the kubeconfig
+- `AuthLayer` configures either `AddAuthorizationLayer` or `AsyncFilterLayer<RefreshableToken>` depending on authentication method in the kubeconfig. `AsyncFilterLayer<RefreshableToken>` is like `AddAuthorizationLayer`, but with a token that's refreshed when necessary.
 
 (The `middleware` module is kept small to avoid mixing the business logic (`client::auth` openid connect oauth provider logic) with the tower layering glue.)
 

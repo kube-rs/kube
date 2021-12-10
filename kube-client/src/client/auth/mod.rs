@@ -1,11 +1,16 @@
 use std::{path::PathBuf, process::Command, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
-use http::{header::InvalidHeaderValue, HeaderValue};
+use futures::future::BoxFuture;
+use http::{
+    header::{InvalidHeaderValue, AUTHORIZATION},
+    HeaderValue, Request,
+};
 use jsonpath_lib::select as jsonpath_select;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
+use tower::{filter::AsyncPredicate, BoxError};
 
 use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
 
@@ -88,15 +93,37 @@ pub(crate) enum Auth {
 // - exec
 // - gcp: command based token source (exec)
 // - gcp: application credential based token source (requires `oauth` feature)
+//
+// Note that the visibility must be `pub` for `impl Layer for AuthLayer`, but this is not exported from the crate.
+// It's not accessible from outside and not shown on docs.
 #[derive(Debug, Clone)]
-pub(crate) enum RefreshableToken {
+pub enum RefreshableToken {
     Exec(Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>),
     #[cfg(feature = "oauth")]
     GcpOauth(Arc<Mutex<oauth::Gcp>>),
 }
 
+// For use with `AsyncFilterLayer` to add `Authorization` header with a refreshed token.
+impl<B> AsyncPredicate<Request<B>> for RefreshableToken
+where
+    B: http_body::Body + Send + 'static,
+{
+    type Future = BoxFuture<'static, Result<Request<B>, BoxError>>;
+    type Request = Request<B>;
+
+    fn check(&mut self, mut request: Self::Request) -> Self::Future {
+        let refreshable = self.clone();
+        Box::pin(async move {
+            refreshable.to_header().await.map_err(Into::into).map(|value| {
+                request.headers_mut().insert(AUTHORIZATION, value);
+                request
+            })
+        })
+    }
+}
+
 impl RefreshableToken {
-    pub(crate) async fn to_header(&self) -> Result<HeaderValue, Error> {
+    async fn to_header(&self) -> Result<HeaderValue, Error> {
         match self {
             RefreshableToken::Exec(data) => {
                 let mut locked_data = data.lock().await;
