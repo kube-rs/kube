@@ -34,10 +34,13 @@ Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 - **Documentation** To check documentation, run `make doc`
 - **Testing**: To run tests, run `make test` and see below.
 
+For a list of tooling that we glue together everything see [TOOLS.md](https://github.com/kube-rs/.github/blob/main/TOOLS.md).
+
 ## Testing
 
-We have 3 classes of tests.
+We have 4 classes of tests.
 
+- Documentation tests
 - Unit tests
 - Integration tests (requires Kubernetes)
 - End to End tests (requires Kubernetes)
@@ -46,9 +49,15 @@ The last two will try to access the Kubernetes cluster that is your `current-con
 
 The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](https://k3d.io/) (`make k3d`).
 
+### Documentation tests
+
+All public interfaces must be documented, and most also have minor examples inside the codebase as markdown comments to show usage. These examples compile through `cargo test --doc --all` and run when possible.
+
+When the tests are not runnable as unit tests (i.e. when they need a Kubernetes), they are marked as `no_run` and compiled only.
+
 ### Unit Tests
 
-**Most** unit tests are run with `cargo test --lib --doc --all`, but because of feature-sets, doc tests, and examples, you will need a couple of extra invocations to replicate our CI.
+**Most** unit tests are run with `cargo test --lib --all`, but because of feature-sets, doc tests, and examples, you will need a couple of extra invocations to replicate our CI.
 
 For the complete variations, run the `make test` target in the `Makefile`.
 
@@ -72,6 +81,8 @@ To run E2E tests, use (or follow) `make e2e` as appropriate.
 
 #### When to add a test
 
+All public interfaces should have doc tests with examples.
+
 When adding new non-trivial pieces of logic that results in a drop in coverage you should add a test.
 
 Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube-rs/branch/master/graph/badge.svg?token=9FCqEcyDTZ)](https://codecov.io/gh/kube-rs/kube-rs) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](./tarpaulin.toml) config, and **will run both unit and integration** tests.
@@ -79,6 +90,7 @@ Cross-reference with the coverage build [![coverage build](https://codecov.io/gh
 #### What type of test
 
 - Unit tests **MUST NOT** try to contact a Kubernetes cluster
+- Doc tests **MUST** be marked as `no_run` when trying to contact a Kubnernetes cluster
 - Integration tests **MUST NOT** be used when a unit test is sufficient
 - Integration tests **MUST NOT** assume existence of non-standard objects in the cluster
 - Integration tests **MUST NOT** cross-depend on other unit tests completing (and installing what you need)
@@ -90,7 +102,6 @@ In general: **use the least powerful method** of testing available to you:
 - use unit tests in `kube-client` (and in rare cases integration tests)
 - use unit tests in `kube-runtime` (and occassionally integration tests)
 - use e2e tests when testing differences between in-cluster and local configuration
-
 
 ## Support
 ### Documentation
