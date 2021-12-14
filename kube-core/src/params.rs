@@ -422,16 +422,16 @@ mod test {
     #[test]
     fn delete_param_constructors() {
         let dp_background = DeleteParams::background();
-        let ser = serde_json::to_string(&dp_background).unwrap();
-        assert_eq!(ser, "{\"propagationPolicy\":\"Background\"}");
+        let ser = serde_json::to_value(&dp_background).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Background"}));
 
         let dp_foreground = DeleteParams::foreground();
-        let ser = serde_json::to_string(&dp_foreground).unwrap();
-        assert_eq!(ser, "{\"propagationPolicy\":\"Foreground\"}");
+        let ser = serde_json::to_value(&dp_foreground).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Foreground"}));
 
         let dp_orphan = DeleteParams::orphan();
-        let ser = serde_json::to_string(&dp_orphan).unwrap();
-        assert_eq!(ser, "{\"propagationPolicy\":\"Orphan\"}");
+        let ser = serde_json::to_value(&dp_orphan).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Orphan"}));
     }
 }
 
@@ -447,8 +447,7 @@ pub struct Preconditions {
     pub uid: Option<String>,
 }
 
-/// Propagation policy when deleting single objects.
-/// The default used by the Kubernetes API Server varies based on resource.
+/// Propagation policy when deleting single objects
 #[derive(Clone, Debug, Serialize)]
 pub enum PropagationPolicy {
     /// Orphan dependents
