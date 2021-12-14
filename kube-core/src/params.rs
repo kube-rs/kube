@@ -353,6 +353,35 @@ pub struct DeleteParams {
     pub preconditions: Option<Preconditions>,
 }
 
+impl DeleteParams {
+    /// Construct `DeleteParams` with `PropagationPolicy::Background`.
+    /// This allows the garbage collector to delete the dependents in the background.
+    pub fn background() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Background),
+            ..Self::default()
+        }
+    }
+
+    /// Construct `DeleteParams` with `PropagationPolicy::Foreground`.
+    /// This is a cascading policy that deletes all dependents in the foreground.
+    pub fn foreground() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Foreground),
+            ..Self::default()
+        }
+    }
+
+    /// Construct `DeleteParams` with `PropagationPolicy::Orphan`.
+    /// This orpans the dependents.
+    pub fn orphan() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Orphan),
+            ..Self::default()
+        }
+    }
+}
+
 // dryRun serialization differ when used as body parameters and query strings:
 // query strings are either true/false
 // body params allow only: missing field, or ["All"]
@@ -389,6 +418,21 @@ mod test {
         //println!("ser is: {}", ser);
         assert_eq!(ser, "{\"dryRun\":[\"All\"]}");
     }
+
+    #[test]
+    fn delete_param_constructors() {
+        let dp_background = DeleteParams::background();
+        let ser = serde_json::to_string(&dp_background).unwrap();
+        assert_eq!(ser, "{\"propagationPolicy\":\"Background\"}");
+
+        let dp_foreground = DeleteParams::foreground();
+        let ser = serde_json::to_string(&dp_foreground).unwrap();
+        assert_eq!(ser, "{\"propagationPolicy\":\"Foreground\"}");
+
+        let dp_orphan = DeleteParams::orphan();
+        let ser = serde_json::to_string(&dp_orphan).unwrap();
+        assert_eq!(ser, "{\"propagationPolicy\":\"Orphan\"}");
+    }
 }
 
 /// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -403,7 +447,8 @@ pub struct Preconditions {
     pub uid: Option<String>,
 }
 
-/// Propagation policy when deleting single objects
+/// Propagation policy when deleting single objects.
+/// The default used by the Kubernetes API Server varies based on resource.
 #[derive(Clone, Debug, Serialize)]
 pub enum PropagationPolicy {
     /// Orphan dependents
