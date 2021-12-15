@@ -380,6 +380,24 @@ impl DeleteParams {
             ..Self::default()
         }
     }
+
+    /// Perform a dryRun only
+    pub fn dry_run(mut self) -> Self {
+        self.dry_run = true;
+        self
+    }
+
+    /// Set the duration in seconds before the object should be deleted.
+    pub fn grace_period_seconds(mut self, secs: u32) -> Self {
+        self.grace_period_seconds = Some(secs);
+        self
+    }
+
+    /// Set the condtions that must be fulfilled before a deletion is carried out.
+    pub fn preconditions(mut self, preconditions: Preconditions) -> Self {
+        self.preconditions = Some(preconditions);
+        self
+    }
 }
 
 // dryRun serialization differ when used as body parameters and query strings:
