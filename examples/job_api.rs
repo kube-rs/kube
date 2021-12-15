@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
@@ -71,13 +72,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Clean up the old job record..
     info!("Deleting the job record.");
-    jobs.delete("empty-job", &DeleteParams {
-        dry_run: true,
-        propagation_policy: Some(PropagationPolicy::Background),
-        ..Default::default()
-    })
+    jobs.delete(
+        "empty-job",
+        &DeleteParams {
+            dry_run: true,
+            propagation_policy: Some(PropagationPolicy::Background),
+            ..Default::default()
+        },
+    )
     .await?;
-    jobs.delete("empty-job", &DeleteParams::background())
-    .await?;
+    jobs.delete("empty-job", &DeleteParams::background()).await?;
     Ok(())
 }
