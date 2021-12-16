@@ -71,7 +71,7 @@ To run E2E tests, use (or follow) `make e2e` as appropriate.
 
 #### When to add a test
 
-All public interfaces should have doc tests with examples.
+All public interfaces should have doc tests with examples for [docs.rs](https://docs.rs/kube).
 
 When adding new non-trivial pieces of logic that results in a drop in coverage you should add a test.
 
@@ -92,8 +92,6 @@ In general: **use the least powerful method** of testing available to you:
 - use unit tests in `kube-client` (and in rare cases integration tests)
 - use unit tests in `kube-runtime` (and occassionally integration tests)
 - use e2e tests when testing differences between in-cluster and local configuration
-
-and always add documentation tests to ensure we have examples that compile linked from the relevant types on [docs.rs](https://docs.rs/kube).
 
 ## Support
 ### Documentation
