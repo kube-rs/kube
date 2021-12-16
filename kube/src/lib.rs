@@ -333,12 +333,14 @@ mod test {
             pod.labels_mut()
                 .entry("kube.rs".to_string())
                 .or_insert_with(|| "hello".to_string());
+            pod.finalizers_mut().push("kube-finalizer".to_string());
             // NB: we are **not** pushing these back upstream - (Api::apply or Api::replace needed for it)
         }
         // check we can iterate over it normally - and that our mutation worked
         for pod in list.iter() {
             assert!(pod.annotations().get("kube-seen").is_some());
             assert!(pod.labels().get("kube.rs").is_some());
+            assert!(pod.finalizers().contains(&"kube-finalizer".to_string()));
         }
         Ok(())
     }
