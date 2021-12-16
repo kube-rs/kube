@@ -69,4 +69,6 @@ skip = [
     { name = "webpki", version = "=0.21.4" },
     { name = "tokio-rustls", version = "=0.22.0" },
     { name = "sct", version = "=0.6.1" },
+    # http has not released a version using itoa v1
+    { name = "itoa", version = "^0.4" },
 ]
