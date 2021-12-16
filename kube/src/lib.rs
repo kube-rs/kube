@@ -300,8 +300,12 @@ mod test {
 
     #[tokio::test]
     #[ignore] // needs cluster (lists pods)
-    async fn custom_serialized_objects_are_usable() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::core::{ApiResource, NotUsed, Object};
+    async fn custom_serialized_objects_are_queryable_and_iterable() -> Result<(), Box<dyn std::error::Error>>
+    {
+        use crate::core::{
+            object::{HasSpec, HasStatus, NotUsed, Object},
+            ApiResource,
+        };
         use k8s_openapi::api::core::v1::Pod;
         #[derive(Clone, Deserialize, Debug)]
         struct PodSpecSimple {
@@ -312,6 +316,7 @@ mod test {
             image: String,
         }
         type PodSimple = Object<PodSpecSimple, NotUsed>;
+
         // use known type information from pod (can also use discovery for this)
         let ar = ApiResource::erase::<Pod>(&());
 
@@ -320,10 +325,20 @@ mod test {
         let mut list = api.list(&Default::default()).await?;
         // check we can mutably iterate over it
         for pod in list.iter_mut() {
+            pod.spec_mut().containers = vec![];
+            *pod.status_mut() = None;
             pod.annotations_mut()
                 .entry("kube-seen".to_string())
                 .or_insert_with(|| "yes".to_string());
-            // NB: we are not pushing this back to the server here - need to use Api::apply or Api::replace to do this
+            pod.labels_mut()
+                .entry("kube.rs".to_string())
+                .or_insert_with(|| "hello".to_string());
+            // NB: we are **not** pushing these back upstream - (Api::apply or Api::replace needed for it)
+        }
+        // check we can iterate over it normally - and that our mutation worked
+        for pod in list.iter() {
+            assert!(pod.annotations().get("kube-seen").is_some());
+            assert!(pod.labels().get("kube.rs").is_some());
         }
         Ok(())
     }

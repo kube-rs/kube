@@ -182,6 +182,7 @@ mod test {
         let (ar, _caps) = apigroup.recommended_kind("APIService").unwrap();
         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
         api.list(&Default::default()).await?;
+
         Ok(())
     }
 
