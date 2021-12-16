@@ -31,7 +31,8 @@ test-integration:
 	cargo run -p kube-examples --example crd_api
 
 coverage:
-	cargo tarpaulin --out=Html --output-dir=covout
+	cargo tarpaulin --out=Html --output-dir=.
+	#xdg-open tarpaulin-report.html
 
 readme:
 	rustdoc README.md --test --edition=2021
