@@ -446,22 +446,26 @@ mod test {
 
         // Wait for a more complicated condition: ContainersReady AND Initialized
         // TODO: remove these once we can write these functions generically
-        //fn is_containers_ready() -> impl Condition<Pod> {
-        //    |obj: Option<&Pod>| {
-        //        if let Some(o) = obj {
-        //            if let Some(s) = &o.status {
-        //                if let Some(conds) = &s.conditions {
-        //                    if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
-        //                        return pcond.status == "True";
-        //                    }
-        //                }
-        //            }
-        //        }
-        //        false
-        //    }
-        //}
-        //let is_fully_ready = conditions::is_pod_running().and(is_containers_ready());
-        //let _ = timeout(Duration::from_secs(15), is_fully_ready).await?;
+        fn is_containers_ready() -> impl Condition<Pod> {
+            |obj: Option<&Pod>| {
+                if let Some(o) = obj {
+                    if let Some(s) = &o.status {
+                        if let Some(conds) = &s.conditions {
+                            if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
+                                return pcond.status == "True";
+                            }
+                        }
+                    }
+                }
+                false
+            }
+        }
+        let is_fully_ready = await_condition(
+            pods.clone(),
+            "busybox-kube4",
+            conditions::is_pod_running().and(is_containers_ready()),
+        );
+        let _ = timeout(Duration::from_secs(15), is_fully_ready).await?;
 
 
         // Delete it - and wait for deletion to complete
