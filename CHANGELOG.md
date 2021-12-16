@@ -2,6 +2,7 @@
 UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.65.0...master
+ * Added `DeleteParams::background()`, `DeleteParams::foreground()`, `DeleteParams::orphan()` constructors - [#747](https://github.com/kube-rs/kube-rs/issues/747)
 
 0.65.0 / 2021-12-10
 ===================
