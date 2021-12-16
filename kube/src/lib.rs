@@ -300,7 +300,7 @@ mod test {
 
     #[tokio::test]
     #[ignore] // needs cluster (lists pods)
-    async fn custom_objects_are_usable() -> Result<(), Box<dyn std::error::Error>> {
+    async fn custom_serialized_objects_are_usable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::core::{ApiResource, NotUsed, Object};
         use k8s_openapi::api::core::v1::Pod;
         #[derive(Clone, Deserialize, Debug)]
@@ -317,10 +317,7 @@ mod test {
 
         let client = Client::try_default().await?;
         let api: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
-        for p in api.list(&Default::default()).await? {
-            // run loop to cover ObjectList::iter
-            println!("found pod {} with containers: {:?}", p.name(), p.spec.containers);
-        }
+        let _ = api.list(&Default::default()).await?.iter().map(ResourceExt::name);
 
         Ok(())
     }
@@ -398,6 +395,82 @@ mod test {
                 api.list(&Default::default()).await?;
             }
         }
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (will create await a pod)
+    #[cfg(all(feature = "runtime"))]
+    async fn pod_can_await_conditions() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            api::{DeleteParams, PostParams},
+            runtime::wait::{await_condition, conditions, delete::delete_and_finalize, Condition},
+            Api, Client,
+        };
+        use k8s_openapi::api::core::v1::Pod;
+        use std::time::Duration;
+        use tokio::time::timeout;
+
+        let client = Client::try_default().await?;
+        let pods: Api<Pod> = Api::default_namespaced(client);
+
+        // create busybox pod that's alive for at most 30s
+        let p: Pod = serde_json::from_value(serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": { "name": "busybox-kube4" },
+            "spec": {
+                "containers": [{
+                  "name": "busybox",
+                  "image": "busybox:1.34.1",
+                  "command": ["sh", "-c", "sleep 30"],
+                }],
+            }
+        }))?;
+
+        let pp = PostParams::default();
+        match pods.create(&pp, &p).await {
+            Ok(o) => assert_eq!(p.name(), o.name()),
+            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(e) => return Err(e.into()),                         // any other case if a failure
+        }
+
+        // Watch it phase for a few seconds
+        let is_running = await_condition(pods.clone(), "busybox-kube4", conditions::is_pod_running());
+        let _ = timeout(Duration::from_secs(15), is_running).await?;
+
+
+        // Verify we can get it
+        let pod = pods.get("busybox-kube4").await?;
+        assert_eq!(p.spec.as_ref().unwrap().containers[0].name, "busybox");
+
+        // Wait for a more complicated condition: ContainersReady AND Initialized
+        // TODO: remove these once we can write these functions generically
+        //fn is_containers_ready() -> impl Condition<Pod> {
+        //    |obj: Option<&Pod>| {
+        //        if let Some(o) = obj {
+        //            if let Some(s) = &o.status {
+        //                if let Some(conds) = &s.conditions {
+        //                    if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
+        //                        return pcond.status == "True";
+        //                    }
+        //                }
+        //            }
+        //        }
+        //        false
+        //    }
+        //}
+        //let is_fully_ready = conditions::is_pod_running().and(is_containers_ready());
+        //let _ = timeout(Duration::from_secs(15), is_fully_ready).await?;
+
+
+        // Delete it - and wait for deletion to complete
+        let dp = DeleteParams::default();
+        delete_and_finalize(pods.clone(), "busybox-kube4", &dp).await?;
+
+        // verify it is properly gone
+        assert!(pods.get("busybox-kube4").await.is_err());
+
         Ok(())
     }
 }
