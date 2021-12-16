@@ -317,8 +317,14 @@ mod test {
 
         let client = Client::try_default().await?;
         let api: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
-        let _ = api.list(&Default::default()).await?.iter().map(ResourceExt::name);
-
+        let mut list = api.list(&Default::default()).await?;
+        // check we can mutably iterate over it
+        for pod in list.iter_mut() {
+            pod.annotations_mut()
+                .entry("kube-seen".to_string())
+                .or_insert_with(|| "yes".to_string());
+            // NB: we are not pushing this back to the server here - need to use Api::apply or Api::replace to do this
+        }
         Ok(())
     }
 
@@ -442,7 +448,7 @@ mod test {
 
         // Verify we can get it
         let pod = pods.get("busybox-kube4").await?;
-        assert_eq!(p.spec.as_ref().unwrap().containers[0].name, "busybox");
+        assert_eq!(pod.spec.as_ref().unwrap().containers[0].name, "busybox");
 
         // Wait for a more complicated condition: ContainersReady AND Initialized
         // TODO: remove these once we can write these functions generically
