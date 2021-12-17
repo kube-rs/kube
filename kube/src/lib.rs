@@ -323,8 +323,8 @@ mod test {
         let client = Client::try_default().await?;
         let api: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
         let mut list = api.list(&Default::default()).await?;
-        // check we can mutably iterate over it
-        for pod in list.iter_mut() {
+        // check we can mutably iterate over ObjectList
+        for pod in &mut list {
             pod.spec_mut().containers = vec![];
             *pod.status_mut() = None;
             pod.annotations_mut()
@@ -336,11 +336,12 @@ mod test {
             pod.finalizers_mut().push("kube-finalizer".to_string());
             // NB: we are **not** pushing these back upstream - (Api::apply or Api::replace needed for it)
         }
-        // check we can iterate over it normally - and that our mutation worked
-        for pod in list.iter() {
+        // check we can iterate over ObjectList normally - and check the mutation worked
+        for pod in list {
             assert!(pod.annotations().get("kube-seen").is_some());
             assert!(pod.labels().get("kube.rs").is_some());
             assert!(pod.finalizers().contains(&"kube-finalizer".to_string()));
+            assert!(pod.spec().containers.is_empty());
         }
         Ok(())
     }
@@ -452,16 +453,11 @@ mod test {
         }))?;
 
         let pp = PostParams::default();
-        match pods.create(&pp, &p).await {
-            Ok(o) => assert_eq!(p.name(), o.name()),
-            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
-            Err(e) => return Err(e.into()),                         // any other case if a failure
-        }
+        assert_eq!(p.name(), pods.create(&pp, &p).await?.name());
 
         // Watch it phase for a few seconds
         let is_running = await_condition(pods.clone(), "busybox-kube4", conditions::is_pod_running());
         let _ = timeout(Duration::from_secs(15), is_running).await?;
-
 
         // Verify we can get it
         let pod = pods.get("busybox-kube4").await?;
@@ -469,7 +465,7 @@ mod test {
 
         // Wait for a more complicated condition: ContainersReady AND Initialized
         // TODO: remove these once we can write these functions generically
-        fn is_containers_ready() -> impl Condition<Pod> {
+        fn is_each_container_ready() -> impl Condition<Pod> {
             |obj: Option<&Pod>| {
                 if let Some(o) = obj {
                     if let Some(s) = &o.status {
@@ -486,7 +482,7 @@ mod test {
         let is_fully_ready = await_condition(
             pods.clone(),
             "busybox-kube4",
-            conditions::is_pod_running().and(is_containers_ready()),
+            conditions::is_pod_running().and(is_each_container_ready()),
         );
         let _ = timeout(Duration::from_secs(15), is_fully_ready).await?;
 
