@@ -60,8 +60,9 @@ dapp:
 	chmod +x e2e/dapp
 
 k3d:
-	k3d cluster create --servers 1 --agents 1 main \
-		--k3s-agent-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%' \
-		--k3s-agent-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%'
+	k3d cluster create main --servers 1 --agents 1 --registry-create main \
+		--k3s-arg "--no-deploy=traefik@server:*" \
+		--k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
+		--k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
 
 .PHONY: doc build fmt clippy test readme k3d e2e
