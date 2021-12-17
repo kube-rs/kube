@@ -17,6 +17,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - uses: Swatinem/rust-cache@v1
       - uses: AbsaOSS/k3d-action@v2
         name: "Create Single Cluster"
         with:
