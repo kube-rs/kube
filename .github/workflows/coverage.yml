@@ -31,5 +31,4 @@ jobs:
         with:
           version: '0.18.5'
           out-type: Xml
-          args: ' -- --test-threads 1'
       - uses: codecov/codecov-action@v2
