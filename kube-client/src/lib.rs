@@ -198,8 +198,13 @@ mod test {
         let p: Pod = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "Pod",
-            "metadata": { "name": "busybox-kube1" },
+            "metadata": {
+                "name": "busybox-kube1",
+                "labels": { "app": "kube-rs-test" },
+            },
             "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
                   "image": "busybox:1.34.1",
@@ -274,8 +279,13 @@ mod test {
         let p: Pod = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "Pod",
-            "metadata": { "name": "busybox-kube2" },
+            "metadata": {
+                "name": "busybox-kube2",
+                "labels": { "app": "kube-rs-test" },
+            },
             "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
                   "image": "busybox:1.34.1",
@@ -382,8 +392,13 @@ mod test {
         let p: Pod = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "Pod",
-            "metadata": { "name": "busybox-kube3" },
+            "metadata": {
+                "name": "busybox-kube3",
+                "labels": { "app": "kube-rs-test" },
+            },
             "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
                   "image": "busybox:1.34.1",
@@ -440,13 +455,7 @@ mod test {
         assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 5\n");
 
         // evict the pod
-        let ep = EvictParams {
-            delete_options: Some(DeleteParams {
-                grace_period_seconds: Some(0),
-                ..DeleteParams::default()
-            }),
-            ..EvictParams::default()
-        };
+        let ep = EvictParams::default();
         let eres = pods.evict("busybox-kube3", &ep).await?;
         assert_eq!(eres.code, 201); // created
         assert_eq!(eres.status, "Success");

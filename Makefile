@@ -24,6 +24,7 @@ test:
 	cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
 
 test-integration:
+	kubectl delete pod -lapp=kube-rs-test
 	cargo test --lib --all -- --ignored # also run tests that fail on github actions
 	cargo test -p kube --lib --features=derive,runtime -- --ignored
 	cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored

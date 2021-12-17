@@ -438,22 +438,27 @@ mod test {
         let client = Client::try_default().await?;
         let pods: Api<Pod> = Api::default_namespaced(client);
 
-        // create busybox pod that's alive for at most 30s
-        let p: Pod = serde_json::from_value(serde_json::json!({
+        // create busybox pod that's alive for at most 20s
+        let data: Pod = serde_json::from_value(serde_json::json!({
             "apiVersion": "v1",
             "kind": "Pod",
-            "metadata": { "name": "busybox-kube4" },
+            "metadata": {
+                "name": "busybox-kube4",
+                "labels": { "app": "kube-rs-test" },
+            },
             "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
                   "image": "busybox:1.34.1",
-                  "command": ["sh", "-c", "sleep 30"],
+                  "command": ["sh", "-c", "sleep 20"],
                 }],
             }
         }))?;
 
         let pp = PostParams::default();
-        assert_eq!(p.name(), pods.create(&pp, &p).await?.name());
+        assert_eq!(data.name(), pods.create(&pp, &data).await?.name());
 
         // Watch it phase for a few seconds
         let is_running = await_condition(pods.clone(), "busybox-kube4", conditions::is_pod_running());
@@ -484,8 +489,7 @@ mod test {
             "busybox-kube4",
             conditions::is_pod_running().and(is_each_container_ready()),
         );
-        let _ = timeout(Duration::from_secs(15), is_fully_ready).await?;
-
+        let _ = timeout(Duration::from_secs(10), is_fully_ready).await?;
 
         // Delete it - and wait for deletion to complete
         let dp = DeleteParams::default();
