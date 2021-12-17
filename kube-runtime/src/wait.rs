@@ -89,7 +89,7 @@ pub trait Condition<K> {
     ///
     /// # Usage
     ///
-    /// ```rust
+    /// ```
     /// # use kube_runtime::wait::Condition;
     /// let condition: fn(Option<&()>) -> bool = |_| true;
     /// assert!(condition.matches_object(None));
@@ -106,7 +106,7 @@ pub trait Condition<K> {
     ///
     /// # Usage
     ///
-    /// ```rust
+    /// ```
     /// # use kube_runtime::wait::Condition;
     /// let cond_false: fn(Option<&()>) -> bool = |_| false;
     /// let cond_true: fn(Option<&()>) -> bool = |_| true;
@@ -126,7 +126,7 @@ pub trait Condition<K> {
     ///
     /// # Usage
     ///
-    /// ```rust
+    /// ```
     /// # use kube_runtime::wait::Condition;
     /// let cond_false: fn(Option<&()>) -> bool = |_| false;
     /// let cond_true: fn(Option<&()>) -> bool = |_| true;

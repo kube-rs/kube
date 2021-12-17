@@ -2,8 +2,9 @@ name: Coverage
 
 on:
   push:
-    #branches:
-    #  - master
+    branches:
+      - master
+  pull_request:
 
 jobs:
   rust:
@@ -30,5 +31,4 @@ jobs:
         with:
           version: '0.18.5'
           out-type: Xml
-          args: ' -- --test-threads 1'
       - uses: codecov/codecov-action@v2
