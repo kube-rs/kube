@@ -238,7 +238,7 @@ mod test {
         // Server-side apply CRD and wait for it to get ready
         crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
             .await?;
-        let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
+        let establish = await_condition(crds.clone(), "foos.clux.dev", conditions::is_crd_established());
         let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
 
         // Use it
@@ -295,6 +295,7 @@ mod test {
         // cleanup
         foos.delete_collection(&DeleteParams::default(), &Default::default())
             .await?;
+        crds.delete("foos.clux.dev", &DeleteParams::default()).await?;
         Ok(())
     }
 
@@ -347,64 +348,56 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (fetches api resources, and lists cr)
+    #[ignore] // needs cluster (fetches api resources, and lists all)
     #[cfg(all(feature = "derive"))]
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
-            discovery,
-        };
-        let client = Client::try_default().await?;
-        let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
-        let gv = GroupVersion::gv("clux.dev", "v1");
-
-        // discover by both (recommended kind on groupversion) and (pinned gvk) and they should equal
-        let apigroup = discovery::oneshot::pinned_group(&client, &gv).await?;
-        let (ar1, caps1) = apigroup.recommended_kind("Foo").unwrap();
-        let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
-        assert_eq!(caps1.operations.len(), caps2.operations.len());
-        assert_eq!(ar1, ar2);
-        assert_eq!(DynamicObject::api_version(&ar2), "clux.dev/v1");
-
-        let api = Api::<DynamicObject>::all_with(client, &ar2);
-        api.list(&Default::default()).await?;
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    #[ignore] // needs cluster (fetches api resources, and lists all)
-    async fn resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::{
-            core::{DynamicObject, GroupVersionKind},
-            discovery::{verbs, Discovery, Scope},
+            discovery::{self, verbs, Discovery, Scope},
             runtime::wait::{await_condition, conditions},
         };
 
+        #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+        #[kube(group = "kube.rs", version = "v1", kind = "TestCr", namespaced)]
+        #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
+        struct TestCrSpec {}
+
         let client = Client::try_default().await?;
 
-        // ensure crd is installed
+        // install crd is installed
         let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
         let ssapply = PatchParams::apply("kube").force();
-        crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
+        crds.patch("testcrs.kube.rs", &ssapply, &Patch::Apply(TestCr::crd()))
             .await?;
-        let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
+        let establish = await_condition(crds.clone(), "testcrs.kube.rs", conditions::is_crd_established());
         let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
 
-        // run discovery
+        // create partial information for it to discover
+        let gvk = GroupVersionKind::gvk("kube.rs", "v1", "TestCr");
+        let gv = GroupVersion::gv("kube.rs", "v1");
+
+        // discover by both (recommended kind on groupversion) and (pinned gvk) and they should equal
+        let apigroup = discovery::oneshot::pinned_group(&client, &gv).await?;
+        let (ar1, caps1) = apigroup.recommended_kind("TestCr").unwrap();
+        let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
+        assert_eq!(caps1.operations.len(), caps2.operations.len());
+        assert_eq!(ar1, ar2);
+        assert_eq!(DynamicObject::api_version(&ar2), "kube.rs/v1");
+
+        // run (almost) full discovery
         let discovery = Discovery::new(client.clone())
-            .exclude(&["rbac.authorization.k8s.io"]) // skip something
+            // skip something in discovery (clux.dev crd being mutated in other tests)
+            .exclude(&["rbac.authorization.k8s.io", "clux.dev"])
             .run()
             .await?;
+
         // check our custom resource first by resolving within groups
-        {
-            assert!(discovery.has_group("clux.dev"));
-            let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
-            let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
-            assert_eq!(ar.group, gvk.group);
-            assert_eq!(ar.version, gvk.version);
-            assert_eq!(ar.kind, gvk.kind);
-        }
+        assert!(discovery.has_group("kube.rs"));
+        let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
+        assert_eq!(ar.group, gvk.group);
+        assert_eq!(ar.version, gvk.version);
+        assert_eq!(ar.kind, gvk.kind);
+
         // check all non-excluded groups that are iterable
         for group in discovery.groups() {
             for (ar, caps) in group.recommended_resources() {
@@ -419,6 +412,9 @@ mod test {
                 api.list(&Default::default()).await?;
             }
         }
+
+        // cleanup
+        crds.delete("testcrs.kube.rs", &DeleteParams::default()).await?;
         Ok(())
     }
 
