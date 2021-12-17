@@ -336,7 +336,7 @@ mod test {
             pod.finalizers_mut().push("kube-finalizer".to_string());
             // NB: we are **not** pushing these back upstream - (Api::apply or Api::replace needed for it)
         }
-        // check we can iterate over ObjectList normally - and check the mutation worked
+        // check we can iterate over ObjectList normally - and check the mutations worked
         for pod in list {
             assert!(pod.annotations().get("kube-seen").is_some());
             assert!(pod.labels().get("kube.rs").is_some());
