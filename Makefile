@@ -2,10 +2,8 @@ VERSION=$(shell git rev-parse HEAD)
 
 clippy:
 	#rustup component add clippy --toolchain nightly
-	touch kube/src/lib.rs
-	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls
-	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls --examples
-	cd kube-derive && cargo +nightly clippy
+	cargo +nightly clippy --workspace
+	cargo +nightly clippy --no-default-features --features=rustls-tls
 
 fmt:
 	#rustup component add rustfmt --toolchain nightly

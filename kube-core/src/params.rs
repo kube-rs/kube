@@ -88,6 +88,7 @@ impl ListParams {
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// Defaults to 290s
+    #[must_use]
     pub fn timeout(mut self, timeout_secs: u32) -> Self {
         self.timeout = Some(timeout_secs);
         self
@@ -98,6 +99,7 @@ impl ListParams {
     /// Defaults to everything.
     /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
     /// The server only supports a limited number of field queries per type.
+    #[must_use]
     pub fn fields(mut self, field_selector: &str) -> Self {
         self.field_selector = Some(field_selector.to_string());
         self
@@ -107,6 +109,7 @@ impl ListParams {
     ///
     /// Defaults to everything.
     /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
+    #[must_use]
     pub fn labels(mut self, label_selector: &str) -> Self {
         self.label_selector = Some(label_selector.to_string());
         self
@@ -116,18 +119,21 @@ impl ListParams {
     ///
     /// This is not recommended to use with production watchers as it can cause desyncs.
     /// See [#219](https://github.com/kube-rs/kube-rs/issues/219) for details.
+    #[must_use]
     pub fn disable_bookmarks(mut self) -> Self {
         self.bookmarks = false;
         self
     }
 
     /// Sets a result limit.
+    #[must_use]
     pub fn limit(mut self, limit: u32) -> Self {
         self.limit = Some(limit);
         self
     }
 
     /// Sets a continue token.
+    #[must_use]
     pub fn continue_token(mut self, token: &str) -> Self {
         self.continue_token = Some(token.to_string());
         self
@@ -308,12 +314,14 @@ impl PatchParams {
     /// Force the result through on conflicts
     ///
     /// NB: Force is a concept restricted to the server-side [`Patch::Apply`].
+    #[must_use]
     pub fn force(mut self) -> Self {
         self.force = true;
         self
     }
 
     /// Perform a dryRun only
+    #[must_use]
     pub fn dry_run(mut self) -> Self {
         self.dry_run = true;
         self
@@ -382,18 +390,21 @@ impl DeleteParams {
     }
 
     /// Perform a dryRun only
+    #[must_use]
     pub fn dry_run(mut self) -> Self {
         self.dry_run = true;
         self
     }
 
     /// Set the duration in seconds before the object should be deleted.
-    pub fn grace_period_seconds(mut self, secs: u32) -> Self {
+    #[must_use]
+    pub fn grace_period(mut self, secs: u32) -> Self {
         self.grace_period_seconds = Some(secs);
         self
     }
 
     /// Set the condtions that must be fulfilled before a deletion is carried out.
+    #[must_use]
     pub fn preconditions(mut self, preconditions: Preconditions) -> Self {
         self.preconditions = Some(preconditions);
         self

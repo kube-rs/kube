@@ -40,12 +40,14 @@ impl DynamicObject {
     }
 
     /// Attach dynamic data to a DynamicObject
+    #[must_use]
     pub fn data(mut self, data: serde_json::Value) -> Self {
         self.data = data;
         self
     }
 
     /// Attach a namespace to a DynamicObject
+    #[must_use]
     pub fn within(mut self, ns: &str) -> Self {
         self.metadata.namespace = Some(ns.into());
         self
