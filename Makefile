@@ -24,6 +24,7 @@ test:
 	cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
 
 test-integration:
+	kubectl delete pod -lapp=kube-rs-test
 	cargo test --lib --all -- --ignored # also run tests that fail on github actions
 	cargo test -p kube --lib --features=derive,runtime -- --ignored
 	cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
@@ -31,7 +32,8 @@ test-integration:
 	cargo run -p kube-examples --example crd_api
 
 coverage:
-	cargo tarpaulin --out=Html --output-dir=covout
+	cargo tarpaulin --out=Html --output-dir=.
+	#xdg-open tarpaulin-report.html
 
 readme:
 	rustdoc README.md --test --edition=2021
@@ -58,8 +60,9 @@ dapp:
 	chmod +x e2e/dapp
 
 k3d:
-	k3d cluster create --servers 1 --agents 1 main \
-		--k3s-agent-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%' \
-		--k3s-agent-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%'
+	k3d cluster create main --servers 1 --agents 1 --registry-create main \
+		--k3s-arg "--no-deploy=traefik@server:*" \
+		--k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
+		--k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
 
 .PHONY: doc build fmt clippy test readme k3d e2e

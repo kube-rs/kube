@@ -7,3 +7,4 @@ integration/dapp
 examples/admission-controller-tls*
 examples/admission_extfile.cnf
 examples/ca.*
+tarpaulin-report.html

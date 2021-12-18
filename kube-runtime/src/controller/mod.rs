@@ -574,7 +574,7 @@ where
     ///
     /// To reconcile all objects when a new line is entered:
     ///
-    /// ```rust
+    /// ```
     /// # async {
     /// use futures::stream::StreamExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;

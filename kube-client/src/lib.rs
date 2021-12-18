@@ -182,6 +182,7 @@ mod test {
         let (ar, _caps) = apigroup.recommended_kind("APIService").unwrap();
         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
         api.list(&Default::default()).await?;
+
         Ok(())
     }
 
@@ -197,8 +198,13 @@ mod test {
         let p: Pod = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "Pod",
-            "metadata": { "name": "busybox-kube1" },
+            "metadata": {
+                "name": "busybox-kube1",
+                "labels": { "app": "kube-rs-test" },
+            },
             "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
                   "image": "busybox:1.34.1",
@@ -221,6 +227,8 @@ mod test {
             .timeout(15);
         let mut stream = pods.watch(&lp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
+            let watch_debug = format!("we: {:?}", ev);
+            assert!(true, "can debug format watch event {}", watch_debug);
             match ev {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
@@ -271,8 +279,13 @@ mod test {
         let p: Pod = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "Pod",
-            "metadata": { "name": "busybox-kube2" },
+            "metadata": {
+                "name": "busybox-kube2",
+                "labels": { "app": "kube-rs-test" },
+            },
             "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
                   "image": "busybox:1.34.1",
@@ -379,8 +392,13 @@ mod test {
         let p: Pod = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "Pod",
-            "metadata": { "name": "busybox-kube3" },
+            "metadata": {
+                "name": "busybox-kube3",
+                "labels": { "app": "kube-rs-test" },
+            },
             "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
                   "image": "busybox:1.34.1",
@@ -437,13 +455,7 @@ mod test {
         assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 5\n");
 
         // evict the pod
-        let ep = EvictParams {
-            delete_options: Some(DeleteParams {
-                grace_period_seconds: Some(0),
-                ..DeleteParams::default()
-            }),
-            ..EvictParams::default()
-        };
+        let ep = EvictParams::default();
         let eres = pods.evict("busybox-kube3", &ep).await?;
         assert_eq!(eres.code, 201); // created
         assert_eq!(eres.status, "Success");
