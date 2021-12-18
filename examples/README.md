@@ -19,6 +19,7 @@ cargo run --example job_api
 cargo run --example log_stream
 cargo run --example pod_api
 cargo run --example dynamic_api
+cargo run --example dynamic_jsonpath
 NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
