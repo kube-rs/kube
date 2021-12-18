@@ -203,6 +203,7 @@ where
     }
 
     /// Attach a namespace to an Object
+    #[must_use]
     pub fn within(mut self, ns: &str) -> Self {
         self.metadata.namespace = Some(ns.into());
         self

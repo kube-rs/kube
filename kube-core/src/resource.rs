@@ -179,7 +179,7 @@ impl<K: Resource> ResourceExt for K {
     }
 
     fn labels(&self) -> &BTreeMap<String, String> {
-        self.meta().labels.as_ref().unwrap_or_else(|| &*EMPTY_MAP)
+        self.meta().labels.as_ref().unwrap_or(&*EMPTY_MAP)
     }
 
     fn labels_mut(&mut self) -> &mut BTreeMap<String, String> {
@@ -187,7 +187,7 @@ impl<K: Resource> ResourceExt for K {
     }
 
     fn annotations(&self) -> &BTreeMap<String, String> {
-        self.meta().annotations.as_ref().unwrap_or_else(|| &*EMPTY_MAP)
+        self.meta().annotations.as_ref().unwrap_or(&*EMPTY_MAP)
     }
 
     fn annotations_mut(&mut self) -> &mut BTreeMap<String, String> {
