@@ -4,7 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{Deserialize, Serialize};
+use secrecy::{ExposeSecret, SecretString};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{KubeconfigError, LoadDataError};
 
@@ -118,16 +119,40 @@ pub struct NamedAuthInfo {
     pub auth_info: AuthInfo,
 }
 
+fn serialize_password<S>(pw: &Option<SecretString>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match pw {
+        Some(pw_string) => serializer.serialize_str(pw_string.expose_secret()),
+        None => serializer.serialize_none(),
+    }
+}
+
+fn deserialize_password<'de, D>(deserializer: D) -> Result<Option<SecretString>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let buffer = String::deserialize(deserializer);
+    match buffer {
+        Ok(pw_string) => Ok(Some(SecretString::new(pw_string))),
+        Err(e) => Err(e),
+    }
+}
+
 /// AuthInfo stores information to tell cluster who you are.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct AuthInfo {
     /// The username for basic authentication to the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     /// The password for basic authentication to the kubernetes cluster.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub password: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        serialize_with = "serialize_password",
+        deserialize_with = "deserialize_password"
+    )]
+    pub password: Option<SecretString>,
 
     /// The bearer token for authentication to the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -172,6 +197,13 @@ pub struct AuthInfo {
     /// Specifies a custom exec-based authentication plugin for the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exec: Option<ExecConfig>,
+}
+
+#[cfg(test)]
+impl PartialEq for AuthInfo {
+    fn eq(&self, other: &Self) -> bool {
+        serde_json::to_value(&self).unwrap() == serde_json::to_value(&other).unwrap()
+    }
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
@@ -626,5 +658,27 @@ users:
         let cfg = Kubeconfig::from_yaml("").unwrap();
 
         assert_eq!(cfg, Kubeconfig::default());
+    }
+
+    #[test]
+    fn authinfo_debug_does_not_output_password() {
+        let authinfo_yaml = r#"
+username: user
+password: kube_rs
+"#;
+        let authinfo: AuthInfo = serde_yaml::from_str(&authinfo_yaml).unwrap();
+        let authinfo_debug_output = format!("{:?}", authinfo);
+        let expected_output = "AuthInfo { \
+        username: Some(\"user\"), \
+        password: Some(Secret([REDACTED alloc::string::String])), \
+        token: None, token_file: None, client_certificate: None, \
+        client_certificate_data: None, client_key: None, \
+        client_key_data: None, impersonate: None, \
+        impersonate_groups: None, \
+        auth_provider: None, \
+        exec: None \
+        }";
+
+        assert_eq!(authinfo_debug_output, expected_output)
     }
 }

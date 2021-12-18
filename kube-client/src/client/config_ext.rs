@@ -1,3 +1,4 @@
+use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
 #[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
@@ -170,7 +171,7 @@ impl ConfigExt for Config {
         Ok(match Auth::try_from(&self.auth_info).map_err(Error::Auth)? {
             Auth::None => None,
             Auth::Basic(user, pass) => Some(AuthLayer(Either::A(
-                AddAuthorizationLayer::basic(&user, &pass).as_sensitive(true),
+                AddAuthorizationLayer::basic(&user, pass.expose_secret()).as_sensitive(true),
             ))),
             Auth::Bearer(token) => Some(AuthLayer(Either::A(
                 AddAuthorizationLayer::bearer(&token).as_sensitive(true),

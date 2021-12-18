@@ -7,6 +7,7 @@ use http::{
     HeaderValue, Request,
 };
 use jsonpath_lib::select as jsonpath_select;
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -82,7 +83,7 @@ pub enum Error {
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Auth {
     None,
-    Basic(String, String),
+    Basic(String, SecretString),
     Bearer(String),
     RefreshableToken(RefreshableToken),
 }
