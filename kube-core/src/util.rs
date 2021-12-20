@@ -33,7 +33,9 @@ impl Request {
         let pparams = PatchParams::default();
         self.patch(name, &pparams, &Patch::Merge(patch))
     }
+}
 
+impl Request {
     /// Cordon a resource
     pub fn cordon(&self, name: &str) -> Result<http::Request<Vec<u8>>, request::Error> {
         self.set_unschedulable(name, true)
@@ -52,7 +54,7 @@ impl Request {
         self.patch(
             node_name,
             &PatchParams::default(),
-            &Patch::Merge(serde_json::json!({ "spec": { "unschedulable": value } })),
+            &Patch::Strategic(serde_json::json!({ "spec": { "unschedulable": value } })),
         )
     }
 }
@@ -86,7 +88,7 @@ mod test {
         assert_eq!(req.method(), "PATCH");
         assert_eq!(
             req.headers().get("Content-Type").unwrap().to_str().unwrap(),
-            Patch::Merge(()).content_type()
+            Patch::Strategic(()).content_type()
         );
     }
 }
