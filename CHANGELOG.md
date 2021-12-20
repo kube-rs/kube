@@ -5,6 +5,7 @@ UNRELEASED
 
  * BREAKING: Removed `kube::Error::OpenSslError`
  * BREAKING: Added `kube::Error::NativeTls(kube::client::NativeTlsError)` for errors from native TLS
+ * BREAKING: Upgraded `backoff` to `0.4.0`
 
 0.64.0 / 2021-11-16
 ===================
