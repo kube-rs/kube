@@ -1,15 +1,15 @@
-use backoff::{backoff::Backoff, ExponentialBackoff};
+use backoff::backoff::Backoff;
 use futures::Stream;
 use kube_client::{
     api::{Api, ListParams},
     core::Resource,
 };
 use serde::de::DeserializeOwned;
-use std::{fmt::Debug, time::Duration};
+use std::fmt::Debug;
 
 use crate::{
-    utils::{self, ResetTimerBackoff},
-    watcher::{backoff_watch, watcher, Error, Event, Result},
+    utils,
+    watcher::{self, backoff_watch, watcher, Error, Event, Result},
 };
 
 
@@ -60,17 +60,9 @@ where
 
     // start the watcher and filter out backoff errors from the stream for a while
     fn watch_events(self) -> impl Stream<Item = Result<Event<K>>> {
-        let backoff = self.backoff.unwrap_or_else(|| {
-            // The default client-go's reflector backoff strategy to limit strain on the api-server
-            let expo = backoff::ExponentialBackoff {
-                initial_interval: Duration::from_millis(800),
-                max_interval: Duration::from_secs(30),
-                randomization_factor: 1.0,
-                multiplier: 2.0,
-                ..ExponentialBackoff::default()
-            };
-            Box::new(ResetTimerBackoff::new(expo, Duration::from_secs(120)))
-        });
+        let backoff = self
+            .backoff
+            .unwrap_or_else(|| Box::new(watcher::default_backoff()));
         let lp = self.listparams.unwrap_or_default();
         let input = watcher(self.api, lp);
         backoff_watch(input, backoff)
