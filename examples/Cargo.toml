@@ -158,6 +158,10 @@ name = "pod_watcher"
 path = "pod_watcher.rs"
 
 [[example]]
+name = "node_cordon"
+path = "node_cordon.rs"
+
+[[example]]
 name = "node_reflector"
 path = "node_reflector.rs"
 

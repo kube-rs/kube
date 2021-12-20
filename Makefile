@@ -28,6 +28,7 @@ test-integration:
 	cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
 	cargo run -p kube-examples --example crd_derive
 	cargo run -p kube-examples --example crd_api
+	cargo run -p kube-examples --example node_cordon
 
 coverage:
 	cargo tarpaulin --out=Html --output-dir=.
