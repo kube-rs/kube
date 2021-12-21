@@ -349,7 +349,7 @@ impl Request {
 #[cfg(test)]
 mod test {
     use crate::{request::Request, resource::Resource};
-    use k8s::{apps::v1 as appsv1, core::v1 as corev1};
+    use k8s::core::v1 as corev1;
     use k8s_openapi::api as k8s;
 
     use crate::subresource::LogParams;
