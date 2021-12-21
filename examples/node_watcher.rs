@@ -1,9 +1,13 @@
 #[macro_use] extern crate log;
-use futures::{StreamExt, TryStreamExt};
+use backoff::ExponentialBackoff;
+use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{utils::try_flatten_applied, watcher},
+    runtime::{
+        utils::{try_flatten_applied, StreamBackoff},
+        watcher,
+    },
     Client,
 };
 
@@ -15,10 +19,13 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 
-    let lp = ListParams::default().labels("beta.kubernetes.io/os=linux");
+    let obs = try_flatten_applied(StreamBackoff::new(
+        watcher(nodes, ListParams::default().labels("beta.kubernetes.io/os=linux")),
+        ExponentialBackoff::default(),
+    ));
 
-    let mut apply_stream = try_flatten_applied(watcher(nodes, lp)).boxed();
-    while let Some(n) = apply_stream.try_next().await? {
+    pin_mut!(obs);
+    while let Some(n) = obs.try_next().await? {
         check_for_node_failures(&events, n).await?;
     }
     Ok(())

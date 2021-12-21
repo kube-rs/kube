@@ -1,4 +1,11 @@
 //! Helpers for manipulating built-in streams
+
+mod backoff_reset_timer;
+mod stream_backoff;
+
+pub use backoff_reset_timer::ResetTimerBackoff;
+pub use stream_backoff::StreamBackoff;
+
 use crate::watcher;
 use futures::{
     pin_mut,

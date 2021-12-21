@@ -4,7 +4,7 @@ use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, PropagationPolicy, ResourceExt, WatchEvent},
+    api::{Api, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
     Client,
 };
 

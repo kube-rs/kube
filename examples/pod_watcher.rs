@@ -13,8 +13,8 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let api = Api::<Pod>::namespaced(client, &namespace);
-    let watcher = watcher(api, ListParams::default());
-    try_flatten_applied(watcher)
+
+    try_flatten_applied(watcher(api, ListParams::default()))
         .try_for_each(|p| async move {
             log::debug!("Applied: {}", p.name());
             if let Some(unready_reason) = pod_unready(&p) {

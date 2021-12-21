@@ -63,6 +63,7 @@ pub struct Discovery {
 /// Builds an internal map of its cache
 impl Discovery {
     /// Construct a caching api discovery client
+    #[must_use]
     pub fn new(client: Client) -> Self {
         let groups = HashMap::new();
         let mode = DiscoveryMode::Block(vec![]);

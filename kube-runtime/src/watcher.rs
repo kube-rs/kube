@@ -1,5 +1,9 @@
 //! Watches a Kubernetes Resource for changes, with error recovery
+//!
+//! See [`watcher`] for the primary entry point.
 
+use crate::utils::ResetTimerBackoff;
+use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
@@ -8,7 +12,7 @@ use kube_client::{
 };
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
-use std::{clone::Clone, fmt::Debug};
+use std::{clone::Clone, fmt::Debug, time::Duration};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -201,6 +205,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
 ///     let watcher = watcher(pods, ListParams::default());
 ///     try_flatten_applied(watcher)
 ///         .try_for_each(|p| async move {
@@ -217,14 +222,15 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// # Recovery
 ///
-/// (The details of recovery are considered an implementation detail and should not be relied on to be stable, but are
-/// documented here for posterity.)
+/// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
+/// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
+/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
 ///
-/// If the watch connection is interrupted then we attempt to restart the watch using the last
-/// [resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
+/// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
+/// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
-/// an [`Event::Restarted`].
+/// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
 pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
@@ -263,4 +269,23 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         Event::Restarted(mut objs) => Ok(objs.pop()),
         Event::Applied(obj) => Ok(Some(obj)),
     })
+}
+
+/// Default watch [`Backoff`] inspired by Kubernetes' client-go.
+///
+/// Note that the exact parameters used herein should not be considered stable.
+/// The parameters currently optimize for being kind to struggling apiservers.
+/// See [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
+/// for more details.
+#[must_use]
+pub fn default_backoff() -> impl Backoff + Send + Sync {
+    let expo = backoff::ExponentialBackoff {
+        initial_interval: Duration::from_millis(800),
+        max_interval: Duration::from_secs(30),
+        randomization_factor: 1.0,
+        multiplier: 2.0,
+        max_elapsed_time: None,
+        ..ExponentialBackoff::default()
+    };
+    ResetTimerBackoff::new(expo, Duration::from_secs(120))
 }
