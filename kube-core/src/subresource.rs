@@ -190,6 +190,7 @@ impl Default for AttachParams {
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl AttachParams {
     /// Default parameters for an tty exec with stdin and stdout
+    #[must_use]
     pub fn interactive_tty() -> Self {
         Self {
             stdin: true,
@@ -201,48 +202,56 @@ impl AttachParams {
     }
 
     /// Specify the container to execute in.
+    #[must_use]
     pub fn container<T: Into<String>>(mut self, container: T) -> Self {
         self.container = Some(container.into());
         self
     }
 
     /// Set `stdin` field.
+    #[must_use]
     pub fn stdin(mut self, enable: bool) -> Self {
         self.stdin = enable;
         self
     }
 
     /// Set `stdout` field.
+    #[must_use]
     pub fn stdout(mut self, enable: bool) -> Self {
         self.stdout = enable;
         self
     }
 
     /// Set `stderr` field.
+    #[must_use]
     pub fn stderr(mut self, enable: bool) -> Self {
         self.stderr = enable;
         self
     }
 
     /// Set `tty` field.
+    #[must_use]
     pub fn tty(mut self, enable: bool) -> Self {
         self.tty = enable;
         self
     }
 
     /// Set `max_stdin_buf_size` field.
+    #[must_use]
     pub fn max_stdin_buf_size(mut self, size: usize) -> Self {
         self.max_stdin_buf_size = Some(size);
         self
     }
 
     /// Set `max_stdout_buf_size` field.
+    #[must_use]
     pub fn max_stdout_buf_size(mut self, size: usize) -> Self {
         self.max_stdout_buf_size = Some(size);
         self
     }
 
     /// Set `max_stderr_buf_size` field.
+    #[must_use]
     pub fn max_stderr_buf_size(mut self, size: usize) -> Self {
         self.max_stderr_buf_size = Some(size);
         self

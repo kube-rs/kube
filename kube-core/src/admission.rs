@@ -304,6 +304,7 @@ impl AdmissionResponse {
 
     /// Deny the request with a reason. The reason will be sent to the original
     /// caller.
+    #[must_use]
     pub fn deny<T: ToString>(mut self, reason: T) -> Self {
         self.allowed = false;
         self.result.message = Some(reason.to_string());

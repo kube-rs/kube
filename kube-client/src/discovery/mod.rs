@@ -63,6 +63,7 @@ pub struct Discovery {
 /// Builds an internal map of its cache
 impl Discovery {
     /// Construct a caching api discovery client
+    #[must_use]
     pub fn new(client: Client) -> Self {
         let groups = HashMap::new();
         let mode = DiscoveryMode::Block(vec![]);
@@ -70,12 +71,14 @@ impl Discovery {
     }
 
     /// Configure the discovery client to only look for the listed apigroups
+    #[must_use]
     pub fn filter(mut self, allow: &[&str]) -> Self {
         self.mode = DiscoveryMode::Allow(allow.iter().map(ToString::to_string).collect());
         self
     }
 
     /// Configure the discovery client to look for all apigroups except the listed ones
+    #[must_use]
     pub fn exclude(mut self, deny: &[&str]) -> Self {
         self.mode = DiscoveryMode::Block(deny.iter().map(ToString::to_string).collect());
         self
