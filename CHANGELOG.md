@@ -4,8 +4,7 @@ UNRELEASED
  * see https://github.com/kube-rs/kube-rs/compare/0.65.0...master
  * Added `DeleteParams::background()`, `DeleteParams::foreground()`, `DeleteParams::orphan()` constructors - [#747](https://github.com/kube-rs/kube-rs/issues/747)
  * Introduced `StreamBackoff` mechanism for backing off watchers - #703
-  * BREAKING: Upgraded `backoff` to `0.4.0`
-  * BREAKING: `Controller` now uses exponential backoff for trigger watches by default, use `Controller::trigger_backoff` to override
+  * BREAKING: `Controller` now uses `backoff` for trigger watches by default, use `Controller::trigger_backoff` to override
 
 0.65.0 / 2021-12-10
 ===================
