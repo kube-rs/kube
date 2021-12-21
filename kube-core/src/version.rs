@@ -7,7 +7,7 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 ///
 /// ```
 /// use kube_core::Version;
-/// use std::cmp::Reverse;
+/// use std::cmp::Reverse; // for DESCENDING sort
 /// let mut versions = vec![
 ///     "v10beta3",
 ///     "v2",
@@ -46,8 +46,6 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 /// assert!(Version::Stable(1) > Version::Alpha(2, Some(2)));
 /// assert!(Version::Beta(1, None) > Version::Nonconformant("ver3".into()));
 /// ```
-///
-/// TODO: change Ord to reflect this
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Version {
     /// A major/GA release
