@@ -2,7 +2,7 @@
 //!
 //! See [`watcher`] for the primary entry point.
 
-use crate::utils::{ResetTimerBackoff, StreamBackoff};
+use crate::utils::ResetTimerBackoff;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
@@ -222,18 +222,15 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// # Recovery
 ///
-/// The stream will attempt to be recovered on the next poll after an [`Err`] is returned. This will normally happen immediately,
-/// but you can use [`StreamBackoff`](`crate::utils::StreamBackoff`) to introduce an artificial delay. [`default_backoff`] returns
-/// a suitable default set of parameters.
+/// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
+/// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
+/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
 ///
-/// (The details of recovery are considered an implementation detail and should not be relied on to be stable, but are
-/// documented here for posterity.)
-///
-/// If the watch connection is interrupted then we attempt to restart the watch using the last
-/// [resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
+/// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
+/// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
-/// an [`Event::Restarted`].
+/// an [`Event::Restarted`]. The mechanics of this should be considered an implementation detail.
 pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
@@ -274,12 +271,14 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     })
 }
 
-/// Reasonable default watch [`Backoff`], inspired by Kubernetes' client-go.
+/// Default watch [`Backoff`] inspired by Kubernetes' client-go.
 ///
-/// NOTE: The exact parameters used here should not be considered stable.
+/// Note that the exact parameters used herein should not be considered stable.
+/// The parameters currently optimize for being kind to struggling apiservers.
+/// See [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
+/// for more details.
 #[must_use]
 pub fn default_backoff() -> impl Backoff + Send + Sync {
-    // Parameters taken from https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181
     let expo = backoff::ExponentialBackoff {
         initial_interval: Duration::from_millis(800),
         max_interval: Duration::from_secs(30),

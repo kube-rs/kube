@@ -469,7 +469,8 @@ where
     ///
     /// This includes the core watch, as well as auxilary watches introduced by [`Self::owns`] and [`Self::watches`].
     ///
-    /// Exponential backoff is used by default, but can be overridden by calling this method.
+    /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
+    /// but can be overridden by calling this method.
     #[must_use]
     pub fn trigger_backoff(mut self, backoff: impl Backoff + Send + 'static) -> Self {
         self.trigger_backoff = Box::new(backoff);
