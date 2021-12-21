@@ -1,11 +1,12 @@
-use super::{
-    parse::{self, GroupVersionData},
-    version::Version,
-};
+use super::parse::{self, GroupVersionData};
 use crate::{error::DiscoveryError, Client, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
-use kube_core::gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError};
+use kube_core::{
+    gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
+    Version,
+};
+use std::cmp::Reverse;
 
 
 /// Describes one API groups collected resources and capabilities.
@@ -117,7 +118,7 @@ impl ApiGroup {
 
     fn sort_versions(&mut self) {
         self.data
-            .sort_by_cached_key(|gvd| Version::parse(gvd.version.as_str()))
+            .sort_by_cached_key(|gvd| Reverse(Version::parse(gvd.version.as_str())))
     }
 
     // shortcut method to give cheapest return for a single GVK
@@ -183,6 +184,7 @@ impl ApiGroup {
     /// - Other versions, alphabetically
     ///
     /// in accordance with [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority).
+    /// For more information, see [`Version`](kube_core::Version)
     pub fn versions(&self) -> impl Iterator<Item = &str> {
         self.data.as_slice().iter().map(|gvd| gvd.version.as_str())
     }

@@ -1,18 +1,64 @@
-//! Version definitions to allow sorting (not exported)
-//!
-//! Follows [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
-//! but only in sort-order at the moment.
-//!
-//! Changes to Ord is needed if this is ever exported outside the crate.
+use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 
-use std::cmp::Reverse;
-
-#[derive(PartialEq, Eq, Debug)]
-pub(crate) enum Version {
+/// Version parser for Kubernetes version patterns
+///
+/// Follows [Kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
+/// to allow getting the correct sort-order:
+///
+/// ```
+/// use kube_core::Version;
+/// use std::cmp::Reverse;
+/// let mut versions = vec![
+///     "v10beta3",
+///     "v2",
+///     "foo10",
+///     "v1",
+///     "v3beta1",
+///     "v11alpha2",
+///     "v11beta2",
+///     "v12alpha1",
+///     "foo1",
+///     "v10",
+/// ];
+/// versions.sort_by_cached_key(|v| Reverse(Version::parse(v)));
+/// assert_eq!(versions, vec![
+///     "v10",
+///     "v2",
+///     "v1",
+///     "v11beta2",
+///     "v10beta3",
+///     "v3beta1",
+///     "v12alpha1",
+///     "v11alpha2",
+///     "foo1",
+///     "foo10",
+/// ]);
+/// ```
+///
+/// and corect direct comparisons after parsing:
+///
+/// ```
+/// use kube_core::Version;
+/// assert!(Version::Stable(2) > Version::Stable(1));
+/// assert!(Version::Stable(1) > Version::Beta(1, None));
+/// assert!(Version::Stable(1) > Version::Beta(2, None));
+/// assert!(Version::Stable(2) > Version::Alpha(1, Some(2)));
+/// assert!(Version::Stable(1) > Version::Alpha(2, Some(2)));
+/// assert!(Version::Beta(1, None) > Version::Nonconformant("ver3".into()));
+/// ```
+///
+/// TODO: change Ord to reflect this
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Version {
+    /// A major/GA release
     Stable(u32),
+    /// A beta release for a specific major version
     Beta(u32, Option<u32>),
+    /// An alpha release for a specific major version
     Alpha(u32, Option<u32>),
-    // CRDs and APIServices can use arbitrary strings as versions.
+    /// An non-conformant api string (sorted lexicographically)
+    ///
+    /// CRDs and APIServices can use arbitrary strings as versions.
     Nonconformant(String),
 }
 
@@ -43,13 +89,29 @@ impl Version {
         None
     }
 
-    pub(crate) fn parse(v: &str) -> Version {
+    /// An infallble parse of a Kubernetes version string
+    ///
+    /// ```
+    /// use kube_core::Version;
+    /// assert_eq!(Version::parse("v10beta12"), Version::Beta(10, Some(12)));
+    /// ```
+    pub fn parse(v: &str) -> Version {
         match Self::try_parse(v) {
             Some(ver) => ver,
             None => Version::Nonconformant(v.to_string()),
         }
     }
 }
+
+/// An infallible FromStr implementation for more generic users
+impl FromStr for Version {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Version::parse(s))
+    }
+}
+
 // A key used to allow sorting Versions
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum VersionSortKey<'a> {
@@ -71,7 +133,7 @@ impl Version {
 
 impl Ord for Version {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.to_sort_key().cmp(&other.to_sort_key())
+        other.to_sort_key().cmp(&self.to_sort_key())
     }
 }
 
@@ -84,6 +146,7 @@ impl PartialOrd for Version {
 #[cfg(test)]
 mod tests {
     use super::Version;
+    use std::{cmp::Reverse, str::FromStr};
 
     #[test]
     fn test_stable() {
@@ -117,18 +180,25 @@ mod tests {
     }
 
     #[test]
-    fn test_version_ord() {
-        // NB: semantically this is exact opposite of what makes sense, but we never export Version.
-        // We can reverse the Ord, but would have to remember to .reverse() again after sorts.
-        assert!(Version::Stable(2) < Version::Stable(1));
-        assert!(Version::Stable(2) < Version::Stable(1));
-        assert!(Version::Stable(1) < Version::Beta(1, None));
-        assert!(Version::Stable(1) < Version::Beta(2, None));
-        assert!(Version::Stable(2) < Version::Alpha(1, Some(2)));
-        assert!(Version::Stable(1) < Version::Alpha(2, Some(2)));
-        assert!(Version::Beta(1, None) < Version::Nonconformant("hi".into()));
+    fn test_version_fromstr() {
+        assert_eq!(
+            Version::from_str("infallible").unwrap(),
+            Version::Nonconformant("infallible".to_string())
+        );
+    }
 
-        // The sorting results is what we export, and this works by default because Ord is reversed:
+    #[test]
+    fn test_version_ord() {
+        // sorting makes sense from a "greater than" semantic perspective:
+        assert!(Version::Stable(2) > Version::Stable(1));
+        assert!(Version::Stable(1) > Version::Beta(1, None));
+        assert!(Version::Stable(1) > Version::Beta(2, None));
+        assert!(Version::Stable(2) > Version::Alpha(1, Some(2)));
+        assert!(Version::Stable(1) > Version::Alpha(2, Some(2)));
+        assert!(Version::Beta(1, None) > Version::Nonconformant("ver3".into()));
+
+        // sort order by default is ascending
+        // sorting with std::cmp::Reverse thus gives you the "most latest stable" first
         let mut vers = vec![
             Version::Beta(2, Some(2)),
             Version::Stable(1),
@@ -137,7 +207,7 @@ mod tests {
             Version::Stable(2),
             Version::Beta(2, Some(3)),
         ];
-        vers.sort();
+        vers.sort_by_cached_key(|x| Reverse(x.clone()));
         assert_eq!(vers, vec![
             Version::Stable(2),
             Version::Stable(1),
