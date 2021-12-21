@@ -274,18 +274,6 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     })
 }
 
-/// Pauses the stream for a while (as defined by `backoff`) after each [`Err`].
-pub fn backoff_watch<K, B>(
-    stream: impl Stream<Item = Result<Event<K>>> + Send,
-    backoff: B,
-) -> impl Stream<Item = Result<Event<K>>> + Send
-where
-    K: Resource + Send,
-    B: Backoff + Send,
-{
-    StreamBackoff::new(stream, backoff)
-}
-
 /// Reasonable default watch [`Backoff`], inspired by Kubernetes' client-go.
 ///
 /// NOTE: The exact parameters used here should not be considered stable.
