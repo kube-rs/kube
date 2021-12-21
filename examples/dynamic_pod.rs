@@ -18,6 +18,7 @@ async fn main() -> anyhow::Result<()> {
     }
     #[derive(Clone, Deserialize, Debug)]
     struct ContainerSimple {
+        #[allow(dead_code)]
         image: String,
     }
     type PodSimple = Object<PodSpecSimple, NotUsed>;

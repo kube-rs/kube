@@ -106,7 +106,7 @@
 //! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube-rs/tree/master/examples).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 macro_rules! cfg_client {
     ($($item:item)*) => {
@@ -179,26 +179,40 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 #[doc(inline)]
 pub use kube_core as core;
 
-
+// Tests that require a cluster and the complete feature set
+// Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
 #[cfg(test)]
+#[cfg(all(feature = "derive", feature = "client"))]
 mod test {
-    #[cfg(all(feature = "derive", feature = "client"))]
+    use crate::{
+        api::{DeleteParams, Patch, PatchParams},
+        Api, Client, CustomResourceExt, Resource, ResourceExt,
+    };
+    use kube_derive::CustomResource;
+    use schemars::JsonSchema;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+    #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+    #[kube(status = "FooStatus")]
+    #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+    #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
+    pub struct FooSpec {
+        name: String,
+        info: Option<String>,
+        replicas: isize,
+    }
+
+    #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+    pub struct FooStatus {
+        is_bad: bool,
+        replicas: isize,
+    }
+
     #[tokio::test]
     #[ignore] // needs kubeconfig
-    async fn convenient_custom_resource() {
-        use crate::{
-            core::{ApiResource, DynamicObject, GroupVersionKind},
-            Api, Client, CustomResource,
-        };
-        use schemars::JsonSchema;
-        use serde::{Deserialize, Serialize};
-
-        #[derive(Clone, Debug, CustomResource, Deserialize, Serialize, JsonSchema)]
-        #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-        #[kube(crates(kube_core = "crate::core"))]
-        struct FooSpec {
-            foo: String,
-        }
+    async fn custom_resource_generates_correct_core_structs() {
+        use crate::core::{ApiResource, DynamicObject, GroupVersionKind};
         let client = Client::try_default().await.unwrap();
 
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
@@ -208,5 +222,279 @@ mod test {
 
         // make sure they return the same url_path through their impls
         assert_eq!(a1.resource_url(), a2.resource_url());
+    }
+
+    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+    #[tokio::test]
+    #[ignore] // needs cluster (creates + patches foo crd)
+    #[cfg(all(feature = "derive", feature = "runtime"))]
+    async fn derived_resource_queriable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::runtime::wait::{await_condition, conditions};
+
+        use serde_json::json;
+        let client = Client::try_default().await?;
+        let ssapply = PatchParams::apply("kube").force();
+        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+        // Server-side apply CRD and wait for it to get ready
+        crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
+            .await?;
+        let establish = await_condition(crds.clone(), "foos.clux.dev", conditions::is_crd_established());
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+
+        // Use it
+        let foos: Api<Foo> = Api::default_namespaced(client.clone());
+        // Apply from generated struct
+        {
+            let foo = Foo::new("baz", FooSpec {
+                name: "baz".into(),
+                info: Some("old baz".into()),
+                replicas: 1,
+            });
+            let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
+            assert_eq!(o.spec.name, "baz");
+            let oref = o.object_ref(&());
+            assert_eq!(oref.name.unwrap(), "baz");
+            assert_eq!(oref.uid, o.uid());
+        }
+        // Apply from partial json!
+        {
+            let patch = json!({
+                "apiVersion": "clux.dev/v1",
+                "kind": "Foo",
+                "spec": {
+                    "name": "foo",
+                    "replicas": 2
+                }
+            });
+            let o = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
+            assert_eq!(o.spec.replicas, 2);
+        }
+        // check subresource
+        {
+            assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
+            assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
+        }
+        // set status subresource
+        {
+            let fs = serde_json::json!({"status": FooStatus { is_bad: false, replicas: 1 }});
+            let o = foos
+                .patch_status("baz", &Default::default(), &Patch::Merge(&fs))
+                .await?;
+            assert!(o.status.is_some());
+        }
+        // set scale subresource
+        {
+            let fs = serde_json::json!({"spec": { "replicas": 3 }});
+            let o = foos
+                .patch_scale("baz", &Default::default(), &Patch::Merge(&fs))
+                .await?;
+            assert_eq!(o.status.unwrap().replicas, 1); // something needs to set the status for this
+            assert_eq!(o.spec.unwrap().replicas.unwrap(), 3); // what we asked for got updated
+        }
+
+        // cleanup
+        foos.delete_collection(&DeleteParams::default(), &Default::default())
+            .await?;
+        crds.delete("foos.clux.dev", &DeleteParams::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (lists pods)
+    async fn custom_serialized_objects_are_queryable_and_iterable() -> Result<(), Box<dyn std::error::Error>>
+    {
+        use crate::core::{
+            object::{HasSpec, HasStatus, NotUsed, Object},
+            ApiResource,
+        };
+        use k8s_openapi::api::core::v1::Pod;
+        #[derive(Clone, Deserialize, Debug)]
+        struct PodSpecSimple {
+            containers: Vec<ContainerSimple>,
+        }
+        #[derive(Clone, Deserialize, Debug)]
+        struct ContainerSimple {
+            #[allow(dead_code)]
+            image: String,
+        }
+        type PodSimple = Object<PodSpecSimple, NotUsed>;
+
+        // use known type information from pod (can also use discovery for this)
+        let ar = ApiResource::erase::<Pod>(&());
+
+        let client = Client::try_default().await?;
+        let api: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
+        let mut list = api.list(&Default::default()).await?;
+        // check we can mutably iterate over ObjectList
+        for pod in &mut list {
+            pod.spec_mut().containers = vec![];
+            *pod.status_mut() = None;
+            pod.annotations_mut()
+                .entry("kube-seen".to_string())
+                .or_insert_with(|| "yes".to_string());
+            pod.labels_mut()
+                .entry("kube.rs".to_string())
+                .or_insert_with(|| "hello".to_string());
+            pod.finalizers_mut().push("kube-finalizer".to_string());
+            // NB: we are **not** pushing these back upstream - (Api::apply or Api::replace needed for it)
+        }
+        // check we can iterate over ObjectList normally - and check the mutations worked
+        for pod in list {
+            assert!(pod.annotations().get("kube-seen").is_some());
+            assert!(pod.labels().get("kube.rs").is_some());
+            assert!(pod.finalizers().contains(&"kube-finalizer".to_string()));
+            assert!(pod.spec().containers.is_empty());
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (fetches api resources, and lists all)
+    #[cfg(all(feature = "derive"))]
+    async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            core::{DynamicObject, GroupVersion, GroupVersionKind},
+            discovery::{self, verbs, Discovery, Scope},
+            runtime::wait::{await_condition, conditions},
+        };
+
+        #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+        #[kube(group = "kube.rs", version = "v1", kind = "TestCr", namespaced)]
+        #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
+        struct TestCrSpec {}
+
+        let client = Client::try_default().await?;
+
+        // install crd is installed
+        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+        let ssapply = PatchParams::apply("kube").force();
+        crds.patch("testcrs.kube.rs", &ssapply, &Patch::Apply(TestCr::crd()))
+            .await?;
+        let establish = await_condition(crds.clone(), "testcrs.kube.rs", conditions::is_crd_established());
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+
+        // create partial information for it to discover
+        let gvk = GroupVersionKind::gvk("kube.rs", "v1", "TestCr");
+        let gv = GroupVersion::gv("kube.rs", "v1");
+
+        // discover by both (recommended kind on groupversion) and (pinned gvk) and they should equal
+        let apigroup = discovery::oneshot::pinned_group(&client, &gv).await?;
+        let (ar1, caps1) = apigroup.recommended_kind("TestCr").unwrap();
+        let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
+        assert_eq!(caps1.operations.len(), caps2.operations.len());
+        assert_eq!(ar1, ar2);
+        assert_eq!(DynamicObject::api_version(&ar2), "kube.rs/v1");
+
+        // run (almost) full discovery
+        let discovery = Discovery::new(client.clone())
+            // skip something in discovery (clux.dev crd being mutated in other tests)
+            .exclude(&["rbac.authorization.k8s.io", "clux.dev"])
+            .run()
+            .await?;
+
+        // check our custom resource first by resolving within groups
+        assert!(discovery.has_group("kube.rs"));
+        let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
+        assert_eq!(ar.group, gvk.group);
+        assert_eq!(ar.version, gvk.version);
+        assert_eq!(ar.kind, gvk.kind);
+
+        // check all non-excluded groups that are iterable
+        for group in discovery.groups() {
+            for (ar, caps) in group.recommended_resources() {
+                if !caps.supports_operation(verbs::LIST) {
+                    continue;
+                }
+                let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
+                    Api::default_namespaced_with(client.clone(), &ar)
+                } else {
+                    Api::all_with(client.clone(), &ar)
+                };
+                api.list(&Default::default()).await?;
+            }
+        }
+
+        // cleanup
+        crds.delete("testcrs.kube.rs", &DeleteParams::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (will create await a pod)
+    #[cfg(all(feature = "runtime"))]
+    async fn pod_can_await_conditions() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            api::{DeleteParams, PostParams},
+            runtime::wait::{await_condition, conditions, delete::delete_and_finalize, Condition},
+            Api, Client,
+        };
+        use k8s_openapi::api::core::v1::Pod;
+        use std::time::Duration;
+        use tokio::time::timeout;
+
+        let client = Client::try_default().await?;
+        let pods: Api<Pod> = Api::default_namespaced(client);
+
+        // create busybox pod that's alive for at most 20s
+        let data: Pod = serde_json::from_value(serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "busybox-kube4",
+                "labels": { "app": "kube-rs-test" },
+            },
+            "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
+                "containers": [{
+                  "name": "busybox",
+                  "image": "busybox:1.34.1",
+                  "command": ["sh", "-c", "sleep 20"],
+                }],
+            }
+        }))?;
+
+        let pp = PostParams::default();
+        assert_eq!(data.name(), pods.create(&pp, &data).await?.name());
+
+        // Watch it phase for a few seconds
+        let is_running = await_condition(pods.clone(), "busybox-kube4", conditions::is_pod_running());
+        let _ = timeout(Duration::from_secs(15), is_running).await?;
+
+        // Verify we can get it
+        let pod = pods.get("busybox-kube4").await?;
+        assert_eq!(pod.spec.as_ref().unwrap().containers[0].name, "busybox");
+
+        // Wait for a more complicated condition: ContainersReady AND Initialized
+        // TODO: remove these once we can write these functions generically
+        fn is_each_container_ready() -> impl Condition<Pod> {
+            |obj: Option<&Pod>| {
+                if let Some(o) = obj {
+                    if let Some(s) = &o.status {
+                        if let Some(conds) = &s.conditions {
+                            if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
+                                return pcond.status == "True";
+                            }
+                        }
+                    }
+                }
+                false
+            }
+        }
+        let is_fully_ready = await_condition(
+            pods.clone(),
+            "busybox-kube4",
+            conditions::is_pod_running().and(is_each_container_ready()),
+        );
+        let _ = timeout(Duration::from_secs(10), is_fully_ready).await?;
+
+        // Delete it - and wait for deletion to complete
+        let dp = DeleteParams::default();
+        delete_and_finalize(pods.clone(), "busybox-kube4", &dp).await?;
+
+        // verify it is properly gone
+        assert!(pods.get("busybox-kube4").await.is_err());
+
+        Ok(())
     }
 }

@@ -8,7 +8,7 @@
 //! opinionated starting point that should be appropriate for simple operators, but all
 //! components are designed to be usable á la carte if your operator doesn't quite fit that mold.
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 // Triggered by many derive macros (kube-derive, derivative)
@@ -22,7 +22,6 @@ k8s_openapi::k8s_if_ge_1_19! {
     pub mod events;
 }
 pub mod finalizer;
-mod observer;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;
@@ -31,7 +30,6 @@ pub mod watcher;
 
 pub use controller::{applier, Controller};
 pub use finalizer::finalizer;
-pub use observer::Observer;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use watcher::watcher;

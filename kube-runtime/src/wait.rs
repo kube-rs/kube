@@ -89,7 +89,7 @@ pub trait Condition<K> {
     ///
     /// # Usage
     ///
-    /// ```rust
+    /// ```
     /// # use kube_runtime::wait::Condition;
     /// let condition: fn(Option<&()>) -> bool = |_| true;
     /// assert!(condition.matches_object(None));
@@ -106,7 +106,7 @@ pub trait Condition<K> {
     ///
     /// # Usage
     ///
-    /// ```rust
+    /// ```
     /// # use kube_runtime::wait::Condition;
     /// let cond_false: fn(Option<&()>) -> bool = |_| false;
     /// let cond_true: fn(Option<&()>) -> bool = |_| true;
@@ -126,7 +126,7 @@ pub trait Condition<K> {
     ///
     /// # Usage
     ///
-    /// ```rust
+    /// ```
     /// # use kube_runtime::wait::Condition;
     /// let cond_false: fn(Option<&()>) -> bool = |_| false;
     /// let cond_true: fn(Option<&()>) -> bool = |_| true;
@@ -152,7 +152,9 @@ impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
 /// Common conditions to wait for
 pub mod conditions {
     pub use super::Condition;
-    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+    use k8s_openapi::{
+        api::core::v1::Pod, apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
+    };
     use kube_client::Resource;
 
     /// An await condition that returns `true` once the object has been deleted.
@@ -182,6 +184,21 @@ pub mod conditions {
                         if let Some(pcond) = conds.iter().find(|c| c.type_ == "Established") {
                             return pcond.status == "True";
                         }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    /// An await condition for `Pod` that returns `true` once it is running
+    #[must_use]
+    pub fn is_pod_running() -> impl Condition<Pod> {
+        |obj: Option<&Pod>| {
+            if let Some(pod) = &obj {
+                if let Some(status) = &pod.status {
+                    if let Some(phase) = &status.phase {
+                        return phase == "Running";
                     }
                 }
             }

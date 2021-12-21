@@ -1,7 +1,9 @@
 //! Watches a Kubernetes Resource for changes, with error recovery
+//!
+//! See [`watcher`] for the primary entry point.
 
-use crate::utils::StreamBackoff;
-use backoff::backoff::Backoff;
+use crate::utils::{ResetTimerBackoff, StreamBackoff};
+use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
@@ -10,7 +12,7 @@ use kube_client::{
 };
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
-use std::{clone::Clone, fmt::Debug};
+use std::{clone::Clone, fmt::Debug, time::Duration};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -220,6 +222,10 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// # Recovery
 ///
+/// The stream will attempt to be recovered on the next poll after an [`Err`] is returned. This will normally happen immediately,
+/// but you can use [`StreamBackoff`](`crate::utils::StreamBackoff`) to introduce an artificial delay. [`default_backoff`] returns
+/// a suitable default set of parameters.
+///
 /// (The details of recovery are considered an implementation detail and should not be relied on to be stable, but are
 /// documented here for posterity.)
 ///
@@ -268,6 +274,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     })
 }
 
+/// Pauses the stream for a while (as defined by `backoff`) after each [`Err`].
 pub fn backoff_watch<K, B>(
     stream: impl Stream<Item = Result<Event<K>>> + Send,
     backoff: B,
@@ -277,4 +284,21 @@ where
     B: Backoff + Send,
 {
     StreamBackoff::new(stream, backoff)
+}
+
+/// Reasonable default watch [`Backoff`], inspired by Kubernetes' client-go.
+///
+/// NOTE: The exact parameters used here should not be considered stable.
+#[must_use]
+pub fn default_backoff() -> impl Backoff + Send + Sync {
+    // Parameters taken from https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181
+    let expo = backoff::ExponentialBackoff {
+        initial_interval: Duration::from_millis(800),
+        max_interval: Duration::from_secs(30),
+        randomization_factor: 1.0,
+        multiplier: 2.0,
+        max_elapsed_time: None,
+        ..ExponentialBackoff::default()
+    };
+    ResetTimerBackoff::new(expo, Duration::from_secs(120))
 }

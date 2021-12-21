@@ -88,6 +88,7 @@ impl ListParams {
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// Defaults to 290s
+    #[must_use]
     pub fn timeout(mut self, timeout_secs: u32) -> Self {
         self.timeout = Some(timeout_secs);
         self
@@ -98,6 +99,7 @@ impl ListParams {
     /// Defaults to everything.
     /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
     /// The server only supports a limited number of field queries per type.
+    #[must_use]
     pub fn fields(mut self, field_selector: &str) -> Self {
         self.field_selector = Some(field_selector.to_string());
         self
@@ -107,6 +109,7 @@ impl ListParams {
     ///
     /// Defaults to everything.
     /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
+    #[must_use]
     pub fn labels(mut self, label_selector: &str) -> Self {
         self.label_selector = Some(label_selector.to_string());
         self
@@ -116,18 +119,21 @@ impl ListParams {
     ///
     /// This is not recommended to use with production watchers as it can cause desyncs.
     /// See [#219](https://github.com/kube-rs/kube-rs/issues/219) for details.
+    #[must_use]
     pub fn disable_bookmarks(mut self) -> Self {
         self.bookmarks = false;
         self
     }
 
     /// Sets a result limit.
+    #[must_use]
     pub fn limit(mut self, limit: u32) -> Self {
         self.limit = Some(limit);
         self
     }
 
     /// Sets a continue token.
+    #[must_use]
     pub fn continue_token(mut self, token: &str) -> Self {
         self.continue_token = Some(token.to_string());
         self
@@ -298,6 +304,7 @@ impl PatchParams {
     }
 
     /// Construct `PatchParams` for server-side apply
+    #[must_use]
     pub fn apply(manager: &str) -> Self {
         Self {
             field_manager: Some(manager.into()),
@@ -308,12 +315,14 @@ impl PatchParams {
     /// Force the result through on conflicts
     ///
     /// NB: Force is a concept restricted to the server-side [`Patch::Apply`].
+    #[must_use]
     pub fn force(mut self) -> Self {
         self.force = true;
         self
     }
 
     /// Perform a dryRun only
+    #[must_use]
     pub fn dry_run(mut self) -> Self {
         self.dry_run = true;
         self
@@ -353,6 +362,56 @@ pub struct DeleteParams {
     pub preconditions: Option<Preconditions>,
 }
 
+impl DeleteParams {
+    /// Construct `DeleteParams` with `PropagationPolicy::Background`.
+    /// This allows the garbage collector to delete the dependents in the background.
+    pub fn background() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Background),
+            ..Self::default()
+        }
+    }
+
+    /// Construct `DeleteParams` with `PropagationPolicy::Foreground`.
+    /// This is a cascading policy that deletes all dependents in the foreground.
+    pub fn foreground() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Foreground),
+            ..Self::default()
+        }
+    }
+
+    /// Construct `DeleteParams` with `PropagationPolicy::Orphan`.
+    /// This orpans the dependents.
+    pub fn orphan() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Orphan),
+            ..Self::default()
+        }
+    }
+
+    /// Perform a dryRun only
+    #[must_use]
+    pub fn dry_run(mut self) -> Self {
+        self.dry_run = true;
+        self
+    }
+
+    /// Set the duration in seconds before the object should be deleted.
+    #[must_use]
+    pub fn grace_period(mut self, secs: u32) -> Self {
+        self.grace_period_seconds = Some(secs);
+        self
+    }
+
+    /// Set the condtions that must be fulfilled before a deletion is carried out.
+    #[must_use]
+    pub fn preconditions(mut self, preconditions: Preconditions) -> Self {
+        self.preconditions = Some(preconditions);
+        self
+    }
+}
+
 // dryRun serialization differ when used as body parameters and query strings:
 // query strings are either true/false
 // body params allow only: missing field, or ["All"]
@@ -388,6 +447,21 @@ mod test {
         let ser = serde_json::to_string(&dp).unwrap();
         //println!("ser is: {}", ser);
         assert_eq!(ser, "{\"dryRun\":[\"All\"]}");
+    }
+
+    #[test]
+    fn delete_param_constructors() {
+        let dp_background = DeleteParams::background();
+        let ser = serde_json::to_value(&dp_background).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Background"}));
+
+        let dp_foreground = DeleteParams::foreground();
+        let ser = serde_json::to_value(&dp_foreground).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Foreground"}));
+
+        let dp_orphan = DeleteParams::orphan();
+        let ser = serde_json::to_value(&dp_orphan).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Orphan"}));
     }
 }
 

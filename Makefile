@@ -2,10 +2,8 @@ VERSION=$(shell git rev-parse HEAD)
 
 clippy:
 	#rustup component add clippy --toolchain nightly
-	touch kube/src/lib.rs
-	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls
-	cd kube && cargo +nightly clippy --no-default-features --features=rustls-tls --examples
-	cd kube-derive && cargo +nightly clippy
+	cargo +nightly clippy --workspace
+	cargo +nightly clippy --no-default-features --features=rustls-tls
 
 fmt:
 	#rustup component add rustfmt --toolchain nightly
@@ -17,28 +15,34 @@ doc:
 test:
 	cargo test --lib --all
 	cargo test --doc --all
-	cargo test -p examples --examples
+	cargo test -p kube-examples --examples
 	cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
 	cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
 	cargo test -p kube --lib --no-default-features
-	cargo test -p examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
+	cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
 
-test-kubernetes:
+test-integration:
+	kubectl delete pod -lapp=kube-rs-test
 	cargo test --lib --all -- --ignored # also run tests that fail on github actions
-	cargo test -p kube --features=derive -- --ignored
-	cargo run -p examples --example crd_derive
-	cargo run -p examples --example crd_api
+	cargo test -p kube --lib --features=derive,runtime -- --ignored
+	cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
+	cargo run -p kube-examples --example crd_derive
+	cargo run -p kube-examples --example crd_api
+
+coverage:
+	cargo tarpaulin --out=Html --output-dir=.
+	#xdg-open tarpaulin-report.html
 
 readme:
 	rustdoc README.md --test --edition=2021
 
-integration: dapp
-	ls -lah integration/
-	docker build -t clux/kube-dapp:$(VERSION) integration/
+e2e: dapp
+	ls -lah e2e/
+	docker build -t clux/kube-dapp:$(VERSION) e2e/
 	k3d image import clux/kube-dapp:$(VERSION) --cluster main
-	sed -i 's/latest/$(VERSION)/g' integration/deployment.yaml
-	kubectl apply -f integration/deployment.yaml
-	sed -i 's/$(VERSION)/latest/g' integration/deployment.yaml
+	sed -i 's/latest/$(VERSION)/g' e2e/deployment.yaml
+	kubectl apply -f e2e/deployment.yaml
+	sed -i 's/$(VERSION)/latest/g' e2e/deployment.yaml
 	kubectl get all -n apps
 	kubectl describe jobs/dapp -n apps
 	kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
@@ -49,13 +53,14 @@ dapp:
 	docker run \
 		-v cargo-cache:/root/.cargo/registry \
 		-v "$$PWD:/volume" -w /volume \
-		--rm -it clux/muslrust:stable cargo build --release -p integration
-	cp target/x86_64-unknown-linux-musl/release/dapp integration/dapp
-	chmod +x integration/dapp
+		--rm -it clux/muslrust:stable cargo build --release -p e2e
+	cp target/x86_64-unknown-linux-musl/release/dapp e2e/dapp
+	chmod +x e2e/dapp
 
 k3d:
-	k3d cluster create --servers 1 --agents 1 main \
-		--k3s-agent-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%' \
-		--k3s-agent-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%'
+	k3d cluster create main --servers 1 --agents 1 --registry-create main \
+		--k3s-arg "--no-deploy=traefik@server:*" \
+		--k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
+		--k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
 
-.PHONY: doc build fmt clippy test readme k3d integration
+.PHONY: doc build fmt clippy test readme k3d e2e

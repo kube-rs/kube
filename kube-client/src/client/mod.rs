@@ -43,6 +43,7 @@ mod tls;
 #[cfg(feature = "native-tls")] pub use tls::native_tls::Error as NativeTlsError;
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
+#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
 #[cfg(feature = "ws")] mod upgrade;
 
 #[cfg(feature = "oauth")]
@@ -100,7 +101,7 @@ impl Client {
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
-        B::Error: std::error::Error + Send + Sync + 'static,
+        B::Error: Into<BoxError>,
         T: Into<String>,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.

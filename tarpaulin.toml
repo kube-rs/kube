@@ -1,0 +1,27 @@
+# Usage: configure your kubernetes context and run cargo tarpaulin
+# Runs integration tests (--ignored) plus --lib tests on main crates
+#
+# NB: cargo tarpaulin -- --test-threads 1 (can help diagnose test interdependencies)
+# NB: Tests should complete in about 30-60s after the compile
+# NB: full recompiles happen every time: https://github.com/xd009642/tarpaulin/issues/777 even with --skip-clean
+
+[one_pass_coverage]
+workspace = true
+features = "kube/derive kube/runtime kube/ws"
+color = "Always"
+ignored = true
+timeout = "600s"
+exclude = ["e2e"]
+# NB: proc macro code is not picked up by tarpaulin - so could maybe skip kube-derive completely
+excluded_files = ["kube-derive/tests"]
+# NB: skipping Doctests because they are slow to build and generally marked no_run
+run-types = ["Tests"]
+ignore_tests = true
+
+# We could potentially pass in examples here
+# but: they don't help in covering kube-derive, and they force a full recompile
+#[example_pass]
+#features = "default"
+#packages = ["kube-examples"]
+#excluded_files = ["examples/"]
+#example = ["crd_derive_schema"]

@@ -59,10 +59,6 @@ pub enum Error {
     #[error("Error from discovery: {0}")]
     Discovery(#[source] DiscoveryError),
 
-    /// An error with configuring SSL occured
-    #[error("SslError: {0}")]
-    SslError(String),
-
     /// Errors from Native TLS
     #[cfg(feature = "native-tls")]
     #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
@@ -74,6 +70,12 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(feature = "openssl-tls"))]
     #[error("openssl tls error: {0}")]
     OpensslTls(#[source] crate::client::OpensslTlsError),
+
+    /// Errors from Rustls TLS
+    #[cfg(feature = "rustls-tls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
+    #[error("rustls tls error: {0}")]
+    RustlsTls(#[source] crate::client::RustlsTlsError),
 
     /// Failed to upgrade to a WebSocket connection
     #[cfg(feature = "ws")]

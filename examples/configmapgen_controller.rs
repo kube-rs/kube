@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use color_eyre::{Report, Result};
+use anyhow::Result;
 use futures::StreamExt;
 use k8s_openapi::{
     api::core::v1::ConfigMap,
@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
         .for_each(|res| async move {
             match res {
                 Ok(o) => info!("reconciled {:?}", o),
-                Err(e) => warn!("reconcile failed: {}", Report::from(e)),
+                Err(e) => warn!("reconcile failed: {}", e),
             }
         })
         .await;

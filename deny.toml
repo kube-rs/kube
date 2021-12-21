@@ -29,6 +29,7 @@ copyleft = "deny"
 default = "deny"
 unlicensed = "deny"
 
+# We are beholden to https://github.com/cncf/foundation/blob/master/allowed-third-party-license-policy.md#approved-licenses-for-allowlist
 allow = [
     "MIT",
     "Apache-2.0",
@@ -62,3 +63,12 @@ allow-git = []
 
 [bans]
 multiple-versions = "deny"
+skip = [
+    # warp uses an older version of rustls (warp is only used in the examples)
+    { name = "rustls", version = "=0.19.1" },
+    { name = "webpki", version = "=0.21.4" },
+    { name = "tokio-rustls", version = "=0.22.0" },
+    { name = "sct", version = "=0.6.1" },
+    # http has not released a version using itoa v1
+    { name = "itoa", version = "^0.4" },
+]

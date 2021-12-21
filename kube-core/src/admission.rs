@@ -31,7 +31,6 @@ pub struct SerializePatchError(#[source] serde_json::Error);
 /// Failed to convert `AdmissionReview` into `AdmissionRequest`.
 pub struct ConvertAdmissionReviewError;
 
-
 /// The `kind` field in [`TypeMeta`].
 pub const META_KIND: &str = "AdmissionReview";
 /// The `api_version` field in [`TypeMeta`] on the v1 version.
@@ -302,12 +301,11 @@ impl AdmissionResponse {
         }
     }
 
-    /// Deny the request with a reason. The reason will be sent to the original
-    /// caller.
+    /// Deny the request with a reason. The reason will be sent to the original caller.
+    #[must_use]
     pub fn deny<T: ToString>(mut self, reason: T) -> Self {
         self.allowed = false;
         self.result.message = Some(reason.to_string());
-
         self
     }
 

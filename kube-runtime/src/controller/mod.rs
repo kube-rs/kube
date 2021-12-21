@@ -10,10 +10,11 @@ use crate::{
     scheduler::{self, scheduler, ScheduleRequest},
     utils::{
         try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle,
-        KubeRuntimeStreamExt,
+        KubeRuntimeStreamExt, StreamBackoff,
     },
     watcher::{self, watcher},
 };
+use backoff::backoff::Backoff;
 use derivative::Derivative;
 use futures::{
     channel,
@@ -38,13 +39,13 @@ mod runner;
 
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
-    #[error("ObjectNotFound")]
+    #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
-    #[error("ReconcilerFailed: {0}")]
-    ReconcilerFailed(#[source] ReconcilerErr),
-    #[error("SchedulerDequeueFailed: {0}")]
+    #[error("reconciler for object {1} failed")]
+    ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
+    #[error("scheduler dequeue failed")]
     SchedulerDequeueFailed(#[source] scheduler::Error),
-    #[error("QueueError: {0}")]
+    #[error("event queue error")]
     QueueError(#[source] QueueErr),
 }
 
@@ -306,9 +307,10 @@ where
                     })
                     .await;
             }
-            reconciler_result
-                .map(|action| (obj_ref, action))
-                .map_err(Error::ReconcilerFailed)
+            match reconciler_result {
+                Ok(action) => Ok((obj_ref, action)),
+                Err(err) => Err(Error::ReconcilerFailed(err, obj_ref.erase()))
+            }
         }
     })
     .on_complete(async { tracing::debug!("applier terminated") })
@@ -390,6 +392,7 @@ where
 {
     // NB: Need to Unpin for stream::select_all
     trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
+    trigger_backoff: Box<dyn Backoff + Send>,
     /// [`run`](crate::Controller::run) starts a graceful shutdown when any of these [`Future`]s complete,
     /// refusing to start any new reconciliations but letting any existing ones finish.
     graceful_shutdown_selector: Vec<BoxFuture<'static, ()>>,
@@ -405,7 +408,7 @@ where
 impl<K> Controller<K>
 where
     K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
-    K::DynamicType: Eq + Hash + Clone + Default,
+    K::DynamicType: Eq + Hash + Clone,
 {
     /// Create a Controller on a type `K`
     ///
@@ -415,16 +418,13 @@ where
     /// and receive reconcile events for.
     /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
     #[must_use]
-    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
+    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self
+    where
+        K::DynamicType: Default,
+    {
         Self::new_with(owned_api, lp, Default::default())
     }
-}
 
-impl<K> Controller<K>
-where
-    K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
-    K::DynamicType: Eq + Hash + Clone,
-{
     /// Create a Controller on a type `K`
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
@@ -451,6 +451,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
+            trigger_backoff: Box::new(watcher::default_backoff()),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -462,6 +463,17 @@ where
             dyntype,
             reader,
         }
+    }
+
+    /// Specify the backoff policy for "trigger" watches
+    ///
+    /// This includes the core watch, as well as auxilary watches introduced by [`Self::owns`] and [`Self::watches`].
+    ///
+    /// Exponential backoff is used by default, but can be overridden by calling this method.
+    #[must_use]
+    pub fn trigger_backoff(mut self, backoff: impl Backoff + Send + 'static) -> Self {
+        self.trigger_backoff = Box::new(backoff);
+        self
     }
 
     /// Retrieve a copy of the reader before starting the controller
@@ -479,6 +491,7 @@ where
     /// To watch the full set of `Child` objects in the given `Api` scope, you can use [`ListParams::default`].
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
+    #[must_use]
     pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
         self,
         api: Api<Child>,
@@ -490,6 +503,7 @@ where
     /// Specify `Child` objects which `K` owns and should be watched
     ///
     /// Same as [`Controller::owns`], but accepts a `DynamicType` so it can be used with dynamic resources.
+    #[must_use]
     pub fn owns_with<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
         mut self,
         api: Api<Child>,
@@ -520,6 +534,7 @@ where
     /// The [`ListParams`] refer to the possible subset of `Watched` objects that you want the [`Api`]
     /// to watch - in the Api's configured scope - and run through the custom mapper.
     /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`ListParams::default`].
+    #[must_use]
     pub fn watches<
         Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
@@ -538,6 +553,7 @@ where
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
     ///
     /// Same as [`Controller::watches`], but accepts a `DynamicType` so it can be used with dynamic resources.
+    #[must_use]
     pub fn watches_with<
         Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
@@ -573,7 +589,7 @@ where
     ///
     /// To reconcile all objects when a new line is entered:
     ///
-    /// ```rust
+    /// ```
     /// # async {
     /// use futures::stream::StreamExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
@@ -610,6 +626,7 @@ where
     /// This can be called multiple times, in which case they are additive; reconciles are scheduled whenever *any* [`Stream`] emits a new item.
     ///
     /// If a [`Stream`] is terminated (by emitting [`None`]) then the [`Controller`] keeps running, but the [`Stream`] stops being polled.
+    #[must_use]
     pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
         let store = self.store();
         let dyntype = self.dyntype.clone();
@@ -663,6 +680,7 @@ where
     ///
     /// This can be called multiple times, in which case they are additive; the [`Controller`] starts to terminate
     /// as soon as *any* [`Future`] resolves.
+    #[must_use]
     pub fn graceful_shutdown_on(mut self, trigger: impl Future<Output = ()> + Send + Sync + 'static) -> Self {
         self.graceful_shutdown_selector.push(trigger.boxed());
         self
@@ -684,6 +702,7 @@ where
     /// NOTE: [`Controller::run`] terminates as soon as a forceful shutdown is requested, but leaves the reconcilers running
     /// in the background while they terminate. This will block [`tokio::runtime::Runtime`] termination until they actually terminate,
     /// unless you run [`std::process::exit`] afterwards.
+    #[must_use]
     pub fn shutdown_on_signal(mut self) -> Self {
         async fn shutdown_signal() {
             futures::future::select(
@@ -749,7 +768,7 @@ where
             error_policy,
             context,
             self.reader,
-            self.trigger_selector
+            StreamBackoff::new(self.trigger_selector, self.trigger_backoff)
                 .take_until(future::select_all(self.graceful_shutdown_selector)),
         )
         .take_until(futures::future::select_all(self.forceful_shutdown_selector))

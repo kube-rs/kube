@@ -1,22 +1,20 @@
-use color_eyre::Result;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, ResourceExt},
-    runtime::Observer,
+    api::{Api, ListParams, ResourceExt},
+    runtime::{utils::try_flatten_applied, watcher},
     Client,
 };
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let api = Api::<Pod>::namespaced(client, &namespace);
 
-    Observer::new(api)
-        .watch_applies()
+    try_flatten_applied(watcher(api, ListParams::default()))
         .try_for_each(|p| async move {
             log::debug!("Applied: {}", p.name());
             if let Some(unready_reason) = pod_unready(&p) {

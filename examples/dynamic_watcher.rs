@@ -1,8 +1,8 @@
 use futures::prelude::*;
 use kube::{
-    api::{Api, DynamicObject, GroupVersionKind, ResourceExt},
+    api::{Api, DynamicObject, GroupVersionKind, ListParams, ResourceExt},
     discovery,
-    runtime::Observer,
+    runtime::{utils::try_flatten_applied, watcher},
     Client,
 };
 
@@ -28,8 +28,7 @@ async fn main() -> anyhow::Result<()> {
     let api = Api::<DynamicObject>::all_with(client, &ar);
 
     // Fully compatible with kube-runtime
-    Observer::new(api)
-        .watch_applies()
+    try_flatten_applied(watcher(api, ListParams::default()))
         .try_for_each(|p| async move {
             log::info!("Applied: {}", p.name());
             Ok(())

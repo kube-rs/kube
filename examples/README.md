@@ -19,6 +19,7 @@ cargo run --example job_api
 cargo run --example log_stream
 cargo run --example pod_api
 cargo run --example dynamic_api
+cargo run --example dynamic_jsonpath
 NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
@@ -40,7 +41,7 @@ How deriving `CustomResource` works in practice, and how it interacts with the [
 cargo run --example crd_api
 cargo run --example crd_derive
 cargo run --example crd_derive_schema
-cargo run --example crd_derive_no_schema --no-default-features --features=native-tls
+cargo run --example crd_derive_no_schema --no-default-features --features=native-tls,latest
 ```
 
 The last one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
@@ -76,13 +77,23 @@ cargo run --example dynamic_watcher
 ```
 
 ### controllers
-Requires you creating the custom resource first:
+Main example requires you creating the custom resource first:
 
 ```sh
 kubectl apply -f configmapgen_controller_crd.yaml
 cargo run --example configmapgen_controller &
 kubectl apply -f configmapgen_controller_object.yaml
 ```
+
+and the finalizer example (reconciles a labelled subset of configmaps):
+
+```sh
+cargo run --example configmapgen_controller
+kubectl apply -f secret_syncer_configmap.yaml
+kubectl delete -f secret_syncer_configmap.yaml
+```
+
+the finalizer is resilient against controller downtime (try stopping the controller before deleting).
 
 ### reflectors
 These examples watch resources as well as ive a store access point:
@@ -108,5 +119,5 @@ The `crd_reflector` will just await changes. You can run `kubectl apply -f crd-b
 Disable default features and enable `rustls-tls`:
 
 ```sh
-cargo run --example pod_watcher --no-default-features --features=rustls-tls
+cargo run --example pod_watcher --no-default-features --features=rustls-tls,latest,runtime
 ```

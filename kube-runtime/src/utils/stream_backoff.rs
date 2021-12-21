@@ -31,7 +31,7 @@ enum State {
 }
 
 impl<S: TryStream, B: Backoff> StreamBackoff<S, B> {
-    pub(crate) fn new(stream: S, backoff: B) -> Self {
+    pub fn new(stream: S, backoff: B) -> Self {
         Self {
             stream,
             backoff,
