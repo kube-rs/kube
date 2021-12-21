@@ -1,10 +1,10 @@
-use tower::util::Either;
+use tower::{filter::AsyncFilterLayer, util::Either};
 
 #[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
 use super::tls;
 use super::{
     auth::Auth,
-    middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, RefreshTokenLayer},
+    middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer},
 };
 use crate::{Config, Error, Result};
 
@@ -175,7 +175,9 @@ impl ConfigExt for Config {
             Auth::Bearer(token) => Some(AuthLayer(Either::A(
                 AddAuthorizationLayer::bearer(&token).as_sensitive(true),
             ))),
-            Auth::RefreshableToken(r) => Some(AuthLayer(Either::B(RefreshTokenLayer::new(r)))),
+            Auth::RefreshableToken(refreshable) => {
+                Some(AuthLayer(Either::B(AsyncFilterLayer::new(refreshable))))
+            }
         })
     }
 
@@ -200,10 +202,11 @@ impl ConfigExt for Config {
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
         tls::rustls_tls::rustls_client_config(
-            self.identity_pem.as_ref(),
-            self.root_cert.as_ref(),
+            self.identity_pem.as_deref(),
+            self.root_cert.as_deref(),
             self.accept_invalid_certs,
         )
+        .map_err(Error::RustlsTls)
     }
 
     #[cfg(feature = "rustls-tls")]

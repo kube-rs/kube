@@ -4,7 +4,7 @@ use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
+    api::{Api, DeleteParams, ListParams, PostParams, PropagationPolicy, ResourceExt, WatchEvent},
     Client,
 };
 
@@ -71,15 +71,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Clean up the old job record..
     info!("Deleting the job record.");
-    jobs.delete("empty-job", &DeleteParams {
-        dry_run: true,
-        ..DeleteParams::default()
-    })
-    .await?;
-    jobs.delete("empty-job", &DeleteParams {
-        dry_run: false,
-        ..DeleteParams::default()
-    })
-    .await?;
+    jobs.delete("empty-job", &DeleteParams::background().dry_run())
+        .await?;
+    jobs.delete("empty-job", &DeleteParams::background()).await?;
     Ok(())
 }

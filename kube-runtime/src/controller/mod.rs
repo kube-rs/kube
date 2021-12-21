@@ -39,13 +39,13 @@ mod runner;
 
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
-    #[error("ObjectNotFound")]
+    #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
-    #[error("ReconcilerFailed: {0}")]
-    ReconcilerFailed(#[source] ReconcilerErr),
-    #[error("SchedulerDequeueFailed: {0}")]
+    #[error("reconciler for object {1} failed")]
+    ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
+    #[error("scheduler dequeue failed")]
     SchedulerDequeueFailed(#[source] scheduler::Error),
-    #[error("QueueError: {0}")]
+    #[error("event queue error")]
     QueueError(#[source] QueueErr),
 }
 
@@ -307,9 +307,10 @@ where
                     })
                     .await;
             }
-            reconciler_result
-                .map(|action| (obj_ref, action))
-                .map_err(Error::ReconcilerFailed)
+            match reconciler_result {
+                Ok(action) => Ok((obj_ref, action)),
+                Err(err) => Err(Error::ReconcilerFailed(err, obj_ref.erase()))
+            }
         }
     })
     .on_complete(async { tracing::debug!("applier terminated") })
@@ -588,7 +589,7 @@ where
     ///
     /// To reconcile all objects when a new line is entered:
     ///
-    /// ```rust
+    /// ```
     /// # async {
     /// use futures::stream::StreamExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;

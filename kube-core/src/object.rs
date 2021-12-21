@@ -16,7 +16,7 @@ use std::borrow::Cow;
 /// and is generally produced from list/watch/delete collection queries on an [`Resource`](super::Resource).
 ///
 /// This is almost equivalent to [`k8s_openapi::List<T>`](k8s_openapi::List), but iterable.
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ObjectList<T>
 where
     T: Clone,
@@ -287,7 +287,9 @@ pub struct NotUsed {}
 
 #[cfg(test)]
 mod test {
-    use super::{ApiResource, NotUsed, Object};
+    use super::{ApiResource, HasSpec, HasStatus, NotUsed, Object, Resource};
+    use crate::resource::ResourceExt;
+
     #[test]
     fn simplified_k8s_object() {
         use k8s_openapi::api::core::v1::Pod;
@@ -297,7 +299,7 @@ mod test {
             #[allow(dead_code)]
             containers: Vec<ContainerSimple>,
         }
-        #[derive(Clone)]
+        #[derive(Clone, Debug, PartialEq)]
         struct ContainerSimple {
             #[allow(dead_code)]
             image: String,
@@ -311,9 +313,25 @@ mod test {
             containers: vec![ContainerSimple { image: "blog".into() }],
         };
         let mypod = PodSimple::new("blog", &ar, data).within("dev");
-        assert_eq!(mypod.metadata.namespace.unwrap(), "dev");
-        assert_eq!(mypod.metadata.name.unwrap(), "blog");
+
+        let meta = mypod.meta();
+        assert_eq!(&mypod.metadata, meta);
+        assert_eq!(meta.namespace.as_ref().unwrap(), "dev");
+        assert_eq!(meta.name.as_ref().unwrap(), "blog");
         assert_eq!(mypod.types.as_ref().unwrap().kind, "Pod");
         assert_eq!(mypod.types.as_ref().unwrap().api_version, "v1");
+
+        assert_eq!(mypod.namespace().unwrap(), "dev");
+        assert_eq!(mypod.name(), "blog");
+        assert!(mypod.status().is_none());
+        assert_eq!(mypod.spec().containers[0], ContainerSimple {
+            image: "blog".into()
+        });
+
+        assert_eq!(PodSimple::api_version(&ar), "v1");
+        assert_eq!(PodSimple::version(&ar), "v1");
+        assert_eq!(PodSimple::plural(&ar), "pods");
+        assert_eq!(PodSimple::kind(&ar), "Pod");
+        assert_eq!(PodSimple::group(&ar), "");
     }
 }

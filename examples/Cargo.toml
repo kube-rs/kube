@@ -1,5 +1,5 @@
 [package]
-name = "examples"
+name = "kube-examples"
 version = "0.1.0"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -30,27 +30,26 @@ validator = { version = "0.14.0", features = ["derive"] }
 anyhow = "1.0.44"
 env_logger = "0.9.0"
 futures = "0.3.17"
-kube = { path = "../kube", version = "^0.64.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.64.0", default-features = false } # only needed to opt out of schema
+jsonpath_lib = "0.3.0"
+kube = { path = "../kube", version = "^0.65.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.65.0", default-features = false } # only needed to opt out of schema
 k8s-openapi = { version = "0.13.1", default-features = false }
 log = "0.4.11"
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
 serde_yaml = "0.8.21"
 tokio = { version = "1.14.0", features = ["full"] }
-color-eyre = "0.5.10"
-# Some Api::delete methods use Either
 either = "1.6.1"
 schemars = "0.8.6"
 static_assertions = "1.1.0"
 tar = "0.4.37"
 tracing = "0.1.29"
-tracing-subscriber = "0.2.25"
-warp = { version = "0.3", features = ["tls"] }
+tracing-subscriber = "0.3.3"
+warp = { version = "0.3", default-features = false, features = ["tls"] }
 http = "0.2.5"
 json-patch = "0.2.6"
 tower = { version = "0.4.6", features = ["limit"] }
-tower-http = { version = "0.1.0", features = ["trace", "decompression-gzip"] }
+tower-http = { version = "0.2.0", features = ["trace", "decompression-gzip"] }
 hyper = { version = "0.14.13", features = ["client", "http1", "stream", "tcp"] }
 thiserror = "1.0.29"
 backoff = "0.4.0"
@@ -102,6 +101,10 @@ path = "deployment_reflector.rs"
 [[example]]
 name = "dynamic_api"
 path = "dynamic_api.rs"
+
+[[example]]
+name = "dynamic_jsonpath"
+path = "dynamic_jsonpath.rs"
 
 [[example]]
 name = "dynamic_pod"

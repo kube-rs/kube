@@ -1,0 +1,34 @@
+name: Coverage
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: AbsaOSS/k3d-action@v2
+        name: "Create Single Cluster"
+        with:
+          cluster-name: "test-cluster-1"
+          args: >-
+            --agents 1
+            --image docker.io/rancher/k3s:v1.22.4-k3s1
+            --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: '0.18.5'
+          out-type: Xml
+      - uses: codecov/codecov-action@v2

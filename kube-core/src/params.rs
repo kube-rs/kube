@@ -362,6 +362,56 @@ pub struct DeleteParams {
     pub preconditions: Option<Preconditions>,
 }
 
+impl DeleteParams {
+    /// Construct `DeleteParams` with `PropagationPolicy::Background`.
+    /// This allows the garbage collector to delete the dependents in the background.
+    pub fn background() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Background),
+            ..Self::default()
+        }
+    }
+
+    /// Construct `DeleteParams` with `PropagationPolicy::Foreground`.
+    /// This is a cascading policy that deletes all dependents in the foreground.
+    pub fn foreground() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Foreground),
+            ..Self::default()
+        }
+    }
+
+    /// Construct `DeleteParams` with `PropagationPolicy::Orphan`.
+    /// This orpans the dependents.
+    pub fn orphan() -> Self {
+        Self {
+            propagation_policy: Some(PropagationPolicy::Orphan),
+            ..Self::default()
+        }
+    }
+
+    /// Perform a dryRun only
+    #[must_use]
+    pub fn dry_run(mut self) -> Self {
+        self.dry_run = true;
+        self
+    }
+
+    /// Set the duration in seconds before the object should be deleted.
+    #[must_use]
+    pub fn grace_period(mut self, secs: u32) -> Self {
+        self.grace_period_seconds = Some(secs);
+        self
+    }
+
+    /// Set the condtions that must be fulfilled before a deletion is carried out.
+    #[must_use]
+    pub fn preconditions(mut self, preconditions: Preconditions) -> Self {
+        self.preconditions = Some(preconditions);
+        self
+    }
+}
+
 // dryRun serialization differ when used as body parameters and query strings:
 // query strings are either true/false
 // body params allow only: missing field, or ["All"]
@@ -397,6 +447,21 @@ mod test {
         let ser = serde_json::to_string(&dp).unwrap();
         //println!("ser is: {}", ser);
         assert_eq!(ser, "{\"dryRun\":[\"All\"]}");
+    }
+
+    #[test]
+    fn delete_param_constructors() {
+        let dp_background = DeleteParams::background();
+        let ser = serde_json::to_value(&dp_background).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Background"}));
+
+        let dp_foreground = DeleteParams::foreground();
+        let ser = serde_json::to_value(&dp_foreground).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Foreground"}));
+
+        let dp_orphan = DeleteParams::orphan();
+        let ser = serde_json::to_value(&dp_orphan).unwrap();
+        assert_eq!(ser, serde_json::json!({"propagationPolicy": "Orphan"}));
     }
 }
 

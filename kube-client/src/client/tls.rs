@@ -80,97 +80,102 @@ pub mod native_tls {
 
 #[cfg(feature = "rustls-tls")]
 pub mod rustls_tls {
-    use std::sync::Arc;
+    use hyper_rustls::ConfigBuilderExt;
+    use rustls::{
+        self,
+        client::{ServerCertVerified, ServerCertVerifier},
+        Certificate, ClientConfig, PrivateKey,
+    };
+    use thiserror::Error;
 
-    use rustls::{self, Certificate, ClientConfig, ServerCertVerified, ServerCertVerifier};
-    use webpki::DNSNameRef;
+    /// Errors from Rustls
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// Identity PEM is invalid
+        #[error("identity PEM is invalid: {0}")]
+        InvalidIdentityPem(#[source] std::io::Error),
 
-    use crate::{Error, Result};
+        /// Identity PEM is missing a private key: the key must be PKCS8 or RSA/PKCS1
+        #[error("identity PEM is missing a private key: the key must be PKCS8 or RSA/PKCS1")]
+        MissingPrivateKey,
+
+        /// Identity PEM is missing certificate
+        #[error("identity PEM is missing certificate")]
+        MissingCertificate,
+
+        /// Invalid private key
+        #[error("invalid private key: {0}")]
+        InvalidPrivateKey(#[source] rustls::Error),
+
+        // Using type-erased error to avoid depending on webpki
+        /// Failed to add a root certificate
+        #[error("failed to add a root certificate: {0}")]
+        AddRootCertificate(#[source] Box<dyn std::error::Error + Send + Sync>),
+    }
 
     /// Create `rustls::ClientConfig`.
     pub fn rustls_client_config(
-        identity_pem: Option<&Vec<u8>>,
-        root_cert: Option<&Vec<Vec<u8>>>,
+        identity_pem: Option<&[u8]>,
+        root_certs: Option<&[Vec<u8>]>,
         accept_invalid: bool,
-    ) -> Result<ClientConfig> {
-        use std::io::Cursor;
+    ) -> Result<ClientConfig, Error> {
+        let config_builder = if let Some(certs) = root_certs {
+            ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(root_store(certs)?)
+        } else {
+            ClientConfig::builder().with_safe_defaults().with_native_roots()
+        };
 
-        // Based on code from `reqwest`
-        let mut client_config = ClientConfig::new();
-        if let Some(buf) = identity_pem {
-            let (key, certs) = {
-                let mut pem = Cursor::new(buf);
-                let certs = rustls_pemfile::certs(&mut pem)
-                    .and_then(|certs| {
-                        if certs.is_empty() {
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::NotFound,
-                                "No X.509 Certificates Found",
-                            ))
-                        } else {
-                            Ok(certs.into_iter().map(rustls::Certificate).collect::<Vec<_>>())
-                        }
-                    })
-                    .map_err(|_| Error::SslError("No valid certificate was found".into()))?;
-                pem.set_position(0);
-
-                // TODO Support EC Private Key to support k3d. Need to convert to PKCS#8 or RSA (PKCS#1).
-                // `openssl pkcs8 -topk8 -nocrypt -in ec.pem -out pkcs8.pem`
-                // https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations#EC_Private_Key_File_Formats
-                let mut sk = rustls_pemfile::pkcs8_private_keys(&mut pem)
-                    .and_then(|keys| {
-                        if keys.is_empty() {
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::NotFound,
-                                "No PKCS8 Key Found",
-                            ))
-                        } else {
-                            Ok(keys.into_iter().map(rustls::PrivateKey).collect::<Vec<_>>())
-                        }
-                    })
-                    .or_else(|_| {
-                        pem.set_position(0);
-                        rustls_pemfile::rsa_private_keys(&mut pem).and_then(|keys| {
-                            if keys.is_empty() {
-                                Err(std::io::Error::new(
-                                    std::io::ErrorKind::NotFound,
-                                    "No RSA Key Found",
-                                ))
-                            } else {
-                                Ok(keys.into_iter().map(rustls::PrivateKey).collect::<Vec<_>>())
-                            }
-                        })
-                    })
-                    .map_err(|_| Error::SslError("No valid private key was found".into()))?;
-
-                if let (Some(sk), false) = (sk.pop(), certs.is_empty()) {
-                    (sk, certs)
-                } else {
-                    return Err(Error::SslError("private key or certificate not found".into()));
-                }
-            };
-
-            client_config
-                .set_single_client_cert(certs, key)
-                .map_err(|e| Error::SslError(format!("{}", e)))?;
-        }
-
-        if let Some(ders) = root_cert {
-            for der in ders {
-                client_config
-                    .root_store
-                    .add(&Certificate(der.to_owned()))
-                    .map_err(|e| Error::SslError(format!("{}", e)))?;
-            }
-        }
+        let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {
+            config_builder
+                .with_single_cert(chain, pkey)
+                .map_err(Error::InvalidPrivateKey)?
+        } else {
+            config_builder.with_no_client_auth()
+        };
 
         if accept_invalid {
             client_config
                 .dangerous()
-                .set_certificate_verifier(Arc::new(NoCertificateVerification {}));
+                .set_certificate_verifier(std::sync::Arc::new(NoCertificateVerification {}));
+        }
+        Ok(client_config)
+    }
+
+    fn root_store(root_certs: &[Vec<u8>]) -> Result<rustls::RootCertStore, Error> {
+        let mut root_store = rustls::RootCertStore::empty();
+        for der in root_certs {
+            root_store
+                .add(&Certificate(der.clone()))
+                .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
+        }
+        Ok(root_store)
+    }
+
+    // TODO Support EC Private Key to support k3d. Need to convert to PKCS#8 or RSA (PKCS#1).
+    // `openssl pkcs8 -topk8 -nocrypt -in ec.pem -out pkcs8.pem`
+    // https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations#EC_Private_Key_File_Formats
+    fn client_auth(data: &[u8]) -> Result<(Vec<Certificate>, PrivateKey), Error> {
+        use rustls_pemfile::Item;
+
+        let mut cert_chain = Vec::new();
+        let mut pkcs8_key = None;
+        let mut rsa_key = None;
+        let mut reader = std::io::Cursor::new(data);
+        for item in rustls_pemfile::read_all(&mut reader).map_err(Error::InvalidIdentityPem)? {
+            match item {
+                Item::X509Certificate(cert) => cert_chain.push(Certificate(cert)),
+                Item::PKCS8Key(key) => pkcs8_key = Some(PrivateKey(key)),
+                Item::RSAKey(key) => rsa_key = Some(PrivateKey(key)),
+            }
         }
 
-        Ok(client_config)
+        let private_key = pkcs8_key.or(rsa_key).ok_or(Error::MissingPrivateKey)?;
+        if cert_chain.is_empty() {
+            return Err(Error::MissingCertificate);
+        }
+        Ok((cert_chain, private_key))
     }
 
     struct NoCertificateVerification {}
@@ -178,11 +183,13 @@ pub mod rustls_tls {
     impl ServerCertVerifier for NoCertificateVerification {
         fn verify_server_cert(
             &self,
-            _roots: &rustls::RootCertStore,
-            _presented_certs: &[rustls::Certificate],
-            _dns_name: DNSNameRef<'_>,
-            _ocsp: &[u8],
-        ) -> Result<ServerCertVerified, rustls::TLSError> {
+            _end_entity: &Certificate,
+            _intermediates: &[Certificate],
+            _server_name: &rustls::client::ServerName,
+            _scts: &mut dyn Iterator<Item = &[u8]>,
+            _ocsp_response: &[u8],
+            _now: std::time::SystemTime,
+        ) -> Result<ServerCertVerified, rustls::Error> {
             Ok(ServerCertVerified::assertion())
         }
     }

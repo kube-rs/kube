@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
     shortname = "f"
 )]
 #[kube(apiextensions = "v1")]
+#[serde(rename_all = "camelCase")]
 struct FooSpec {
     non_nullable: String,
 
@@ -58,6 +59,36 @@ fn test_shortnames() {
 }
 
 #[test]
+fn test_serialized_matches_expected() {
+    assert_eq!(
+        serde_json::to_value(Foo::new("bar", FooSpec {
+            non_nullable: "asdf".to_string(),
+            non_nullable_with_default: "asdf".to_string(),
+            nullable_skipped: None,
+            nullable: None,
+            nullable_skipped_with_default: None,
+            nullable_with_default: None,
+            timestamp: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+        }))
+        .unwrap(),
+        serde_json::json!({
+            "apiVersion": "clux.dev/v1",
+            "kind": "Foo",
+            "metadata": {
+                "name": "bar",
+            },
+            "spec": {
+                "nonNullable": "asdf",
+                "nonNullableWithDefault": "asdf",
+                "nullable": null,
+                "nullableWithDefault": null,
+                "timestamp": "1970-01-01T00:00:00Z",
+            }
+        })
+    )
+}
+
+#[test]
 fn test_crd_schema_matches_expected() {
     use kube::core::CustomResourceExt;
     assert_eq!(
@@ -90,15 +121,15 @@ fn test_crd_schema_matches_expected() {
                                 "properties": {
                                     "spec": {
                                         "properties": {
-                                            "non_nullable": {
+                                            "nonNullable": {
                                                 "type": "string"
                                             },
-                                            "non_nullable_with_default": {
+                                            "nonNullableWithDefault": {
                                                 "default": "default_value",
                                                 "type": "string"
                                             },
 
-                                            "nullable_skipped": {
+                                            "nullableSkipped": {
                                                 "nullable": true,
                                                 "type": "string"
                                             },
@@ -106,12 +137,12 @@ fn test_crd_schema_matches_expected() {
                                                 "nullable": true,
                                                 "type": "string"
                                             },
-                                            "nullable_skipped_with_default": {
+                                            "nullableSkippedWithDefault": {
                                                 "default": "default_nullable",
                                                 "nullable": true,
                                                 "type": "string"
                                             },
-                                            "nullable_with_default": {
+                                            "nullableWithDefault": {
                                                 "default": "default_nullable",
                                                 "nullable": true,
                                                 "type": "string"
@@ -123,7 +154,7 @@ fn test_crd_schema_matches_expected() {
                                             }
                                         },
                                         "required": [
-                                            "non_nullable",
+                                            "nonNullable",
                                             "timestamp"
                                         ],
                                         "type": "object"
