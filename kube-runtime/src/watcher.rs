@@ -1,4 +1,6 @@
 //! Watches a Kubernetes Resource for changes, with error recovery
+//!
+//! See [`watcher`] for the primary entry point.
 
 use crate::utils::{ResetTimerBackoff, StreamBackoff};
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -219,6 +221,10 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [`Api::watch`]: kube_client::Api::watch
 ///
 /// # Recovery
+///
+/// The stream will attempt to be recovered on the next poll after an [`Err`] is returned. This will normally happen immediately,
+/// but you can use [`StreamBackoff`](`crate::utils::StreamBackoff`) to introduce an artificial delay. [`default_backoff`] returns
+/// a suitable default set of parameters.
 ///
 /// (The details of recovery are considered an implementation detail and should not be relied on to be stable, but are
 /// documented here for posterity.)
