@@ -125,25 +125,25 @@ impl FromStr for Version {
 // A key used to allow sorting Versions
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum VersionSortKey<'a> {
-    Stable(Reverse<u32>),
-    Beta(Reverse<u32>, Reverse<Option<u32>>),
-    Alpha(Reverse<u32>, Reverse<Option<u32>>),
-    Nonconformant(&'a str),
+    Nonconformant(Reverse<&'a str>),
+    Alpha(u32, Option<u32>),
+    Beta(u32, Option<u32>),
+    Stable(u32),
 }
 impl Version {
     fn to_sort_key(&self) -> VersionSortKey {
         match self {
-            Version::Stable(v) => VersionSortKey::Stable(Reverse(*v)),
-            Version::Beta(v, beta) => VersionSortKey::Beta(Reverse(*v), Reverse(*beta)),
-            Version::Alpha(v, alpha) => VersionSortKey::Alpha(Reverse(*v), Reverse(*alpha)),
-            Version::Nonconformant(nc) => VersionSortKey::Nonconformant(nc),
+            Version::Stable(v) => VersionSortKey::Stable(*v),
+            Version::Beta(v, beta) => VersionSortKey::Beta(*v, *beta),
+            Version::Alpha(v, alpha) => VersionSortKey::Alpha(*v, *alpha),
+            Version::Nonconformant(nc) => VersionSortKey::Nonconformant(Reverse(nc)),
         }
     }
 }
 
 impl Ord for Version {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.to_sort_key().cmp(&self.to_sort_key())
+        self.to_sort_key().cmp(&other.to_sort_key())
     }
 }
 
