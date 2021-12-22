@@ -24,6 +24,16 @@ jobs:
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v1
 
+      - name: install openssl
+        if: matrix.os == 'windows-latest'
+        run: |
+          curl -Lo "openssl-1.0.2c-win64-mingw.zip" "https://dl.bintray.com/vszakats/generic/openssl-1.0.2c-win64-mingw.zip"
+          unzip "openssl-1.0.2c-win64-mingw.zip" -d "/c/OpenSSL"
+        env:
+          OPENSSL_LIB_DIR: "/c/OpenSSL/openssl-1.0.2c-win64-mingw"
+          OPENSSL_INCLUDE_DIR: "/c/OpenSSL/openssl-1.0.2c-win64-mingw/include"
+          OPENSSL_DIR: "/c/OpenSSL/openssl-1.0.2c-win64-mingw"
+
       # Real CI work starts here
       - name: Build workspace
         run: cargo build
