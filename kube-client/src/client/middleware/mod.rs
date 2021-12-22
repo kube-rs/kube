@@ -31,6 +31,7 @@ mod tests {
     use futures::pin_mut;
     use http::{header::AUTHORIZATION, HeaderValue, Request, Response};
     use hyper::Body;
+    use secrecy::SecretString;
     use tokio::sync::Mutex;
     use tokio_test::assert_ready_ok;
     use tower::filter::AsyncFilterLayer;
@@ -84,10 +85,11 @@ mod tests {
 
     fn test_token(token: String) -> RefreshableToken {
         let expiry = Utc::now() + Duration::seconds(60 * 60);
+        let secret_token = SecretString::from(token);
         let info = AuthInfo {
-            token: Some(token.clone()),
+            token: Some(secret_token.clone()),
             ..Default::default()
         };
-        RefreshableToken::Exec(Arc::new(Mutex::new((token, expiry, info))))
+        RefreshableToken::Exec(Arc::new(Mutex::new((secret_token, expiry, info))))
     }
 }

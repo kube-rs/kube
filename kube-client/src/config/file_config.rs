@@ -133,8 +133,7 @@ fn deserialize_password<'de, D>(deserializer: D) -> Result<Option<SecretString>,
 where
     D: Deserializer<'de>,
 {
-    let buffer = String::deserialize(deserializer);
-    match buffer {
+    match String::deserialize(deserializer) {
         Ok(pw_string) => Ok(Some(SecretString::new(pw_string))),
         Err(e) => Err(e),
     }
@@ -155,8 +154,12 @@ pub struct AuthInfo {
     pub password: Option<SecretString>,
 
     /// The bearer token for authentication to the kubernetes cluster.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        serialize_with = "serialize_password",
+        deserialize_with = "deserialize_password"
+    )]
+    pub token: Option<SecretString>,
     /// Pointer to a file that contains a bearer token (as described above). If both `token` and token_file` are present, `token` takes precedence.
     #[serde(rename = "tokenFile")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -484,6 +487,7 @@ fn default_kube_path() -> Option<PathBuf> {
 mod tests {
     use super::*;
     use serde_json::Value;
+    use std::str::FromStr;
 
     #[test]
     fn kubeconfig_merge() {
@@ -492,7 +496,7 @@ mod tests {
             auth_infos: vec![NamedAuthInfo {
                 name: "red-user".into(),
                 auth_info: AuthInfo {
-                    token: Some("first-token".into()),
+                    token: Some(SecretString::from_str("first-token").unwrap()),
                     ..Default::default()
                 },
             }],
@@ -504,7 +508,7 @@ mod tests {
                 NamedAuthInfo {
                     name: "red-user".into(),
                     auth_info: AuthInfo {
-                        token: Some("second-token".into()),
+                        token: Some(SecretString::from_str("second-token").unwrap()),
                         username: Some("red-user".into()),
                         ..Default::default()
                     },
@@ -512,7 +516,7 @@ mod tests {
                 NamedAuthInfo {
                     name: "green-user".into(),
                     auth_info: AuthInfo {
-                        token: Some("new-token".into()),
+                        token: Some(SecretString::from_str("new-token").unwrap()),
                         ..Default::default()
                     },
                 },
@@ -525,7 +529,14 @@ mod tests {
         assert_eq!(merged.current_context, Some("default".into()));
         // Auth info with the same name does not overwrite
         assert_eq!(merged.auth_infos[0].name, "red-user".to_owned());
-        assert_eq!(merged.auth_infos[0].auth_info.token, Some("first-token".into()));
+        assert_eq!(
+            merged.auth_infos[0]
+                .auth_info
+                .token
+                .as_ref()
+                .map(|t| t.expose_secret().to_string()),
+            Some("first-token".to_string())
+        );
         // Even if it's not conflicting
         assert_eq!(merged.auth_infos[0].auth_info.username, None);
         // New named auth info is appended
@@ -666,7 +677,7 @@ users:
 username: user
 password: kube_rs
 "#;
-        let authinfo: AuthInfo = serde_yaml::from_str(&authinfo_yaml).unwrap();
+        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
         let authinfo_debug_output = format!("{:?}", authinfo);
         let expected_output = "AuthInfo { \
         username: Some(\"user\"), \
