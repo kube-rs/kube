@@ -28,8 +28,7 @@ async fn main() -> anyhow::Result<()> {
     let api = Api::<DynamicObject>::all_with(client, &ar);
 
     // Fully compatible with kube-runtime
-    let watcher = watcher(api, ListParams::default());
-    try_flatten_applied(watcher)
+    try_flatten_applied(watcher(api, ListParams::default()))
         .try_for_each(|p| async move {
             log::info!("Applied: {}", p.name());
             Ok(())

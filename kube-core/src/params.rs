@@ -304,6 +304,7 @@ impl PatchParams {
     }
 
     /// Construct `PatchParams` for server-side apply
+    #[must_use]
     pub fn apply(manager: &str) -> Self {
         Self {
             field_manager: Some(manager.into()),

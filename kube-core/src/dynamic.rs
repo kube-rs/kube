@@ -25,6 +25,7 @@ pub struct DynamicObject {
 
 impl DynamicObject {
     /// Create a DynamicObject with minimal values set from ApiResource.
+    #[must_use]
     pub fn new(name: &str, resource: &ApiResource) -> Self {
         Self {
             types: Some(TypeMeta {

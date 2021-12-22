@@ -296,10 +296,12 @@ mod test {
         // Replacing heavy type k8s_openapi::api::core::v1::PodSpec with:
         #[derive(Clone)]
         struct PodSpecSimple {
+            #[allow(dead_code)]
             containers: Vec<ContainerSimple>,
         }
         #[derive(Clone, Debug, PartialEq)]
         struct ContainerSimple {
+            #[allow(dead_code)]
             image: String,
         }
         type PodSimple = Object<PodSpecSimple, NotUsed>;

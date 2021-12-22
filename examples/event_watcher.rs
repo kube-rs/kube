@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-use futures::{StreamExt, TryStreamExt};
+use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::Event;
 use kube::{
     api::{Api, ListParams},
@@ -16,8 +16,9 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client);
     let lp = ListParams::default();
 
-    let mut ew = try_flatten_applied(watcher(events, lp)).boxed();
+    let ew = try_flatten_applied(watcher(events, lp));
 
+    pin_mut!(ew);
     while let Some(event) = ew.try_next().await? {
         handle_event(event)?;
     }

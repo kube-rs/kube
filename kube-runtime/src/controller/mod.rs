@@ -10,10 +10,11 @@ use crate::{
     scheduler::{self, scheduler, ScheduleRequest},
     utils::{
         try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle,
-        KubeRuntimeStreamExt,
+        KubeRuntimeStreamExt, StreamBackoff,
     },
     watcher::{self, watcher},
 };
+use backoff::backoff::Backoff;
 use derivative::Derivative;
 use futures::{
     channel,
@@ -391,6 +392,7 @@ where
 {
     // NB: Need to Unpin for stream::select_all
     trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
+    trigger_backoff: Box<dyn Backoff + Send>,
     /// [`run`](crate::Controller::run) starts a graceful shutdown when any of these [`Future`]s complete,
     /// refusing to start any new reconciliations but letting any existing ones finish.
     graceful_shutdown_selector: Vec<BoxFuture<'static, ()>>,
@@ -406,7 +408,7 @@ where
 impl<K> Controller<K>
 where
     K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
-    K::DynamicType: Eq + Hash + Clone + Default,
+    K::DynamicType: Eq + Hash + Clone,
 {
     /// Create a Controller on a type `K`
     ///
@@ -416,16 +418,13 @@ where
     /// and receive reconcile events for.
     /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
     #[must_use]
-    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self {
+    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self
+    where
+        K::DynamicType: Default,
+    {
         Self::new_with(owned_api, lp, Default::default())
     }
-}
 
-impl<K> Controller<K>
-where
-    K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
-    K::DynamicType: Eq + Hash + Clone,
-{
     /// Create a Controller on a type `K`
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
@@ -452,6 +451,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
+            trigger_backoff: Box::new(watcher::default_backoff()),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -463,6 +463,18 @@ where
             dyntype,
             reader,
         }
+    }
+
+    /// Specify the backoff policy for "trigger" watches
+    ///
+    /// This includes the core watch, as well as auxilary watches introduced by [`Self::owns`] and [`Self::watches`].
+    ///
+    /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
+    /// but can be overridden by calling this method.
+    #[must_use]
+    pub fn trigger_backoff(mut self, backoff: impl Backoff + Send + 'static) -> Self {
+        self.trigger_backoff = Box::new(backoff);
+        self
     }
 
     /// Retrieve a copy of the reader before starting the controller
@@ -757,7 +769,7 @@ where
             error_policy,
             context,
             self.reader,
-            self.trigger_selector
+            StreamBackoff::new(self.trigger_selector, self.trigger_backoff)
                 .take_until(future::select_all(self.graceful_shutdown_selector)),
         )
         .take_until(futures::future::select_all(self.forceful_shutdown_selector))

@@ -227,8 +227,8 @@ mod test {
             .timeout(15);
         let mut stream = pods.watch(&lp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
-            let watch_debug = format!("we: {:?}", ev);
-            assert!(true, "can debug format watch event {}", watch_debug);
+            // can debug format watch event
+            let _ = format!("we: {:?}", ev);
             match ev {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
@@ -237,7 +237,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => assert!(false, "watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {}", e),
                 _ => {}
             }
         }
@@ -315,7 +315,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => assert!(false, "watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {}", e),
                 _ => {}
             }
         }
@@ -428,7 +428,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => assert!(false, "watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {}", e),
                 _ => {}
             }
         }
