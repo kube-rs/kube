@@ -1,0 +1,21 @@
+# https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+changelog:
+  exclude:
+    labels: [changelog-exclude]
+  categories:
+    # Types from https://keepachangelog.com/en/1.0.0/
+    # `Added` for new features
+    - title: Added
+      labels: [changelog-add]
+    # `Changed` for changes in existing functionality
+    - title: Changed
+      labels: [changelog-change]
+    # `Deprecated` for soon-to-be removed features
+    - title: Deprecated
+      labels: [changelog-deprecate]
+    # `Removed` for now removed features
+    - title: Removed
+      labels: [changelog-remove]
+    # `Fixed` for any bug fixes
+    - title: Fixed
+      labels: [changelog-fix]
