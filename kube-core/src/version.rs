@@ -125,6 +125,15 @@ struct LatestStable {
     nonconformant: Option<Reverse<String>>,
 }
 
+/// See [`Version::latest`]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Latest {
+    major: u32,
+    stability: Stability,
+    minor: Option<u32>,
+    nonconformant: Option<Reverse<String>>,
+}
+
 impl Version {
     /// An [`Ord`] for `Version` that prefers stable versions over later prereleases
     ///
@@ -165,6 +174,48 @@ impl Version {
                 nonconformant: None,
             },
             Self::Nonconformant(nonconformant) => LatestStable {
+                stability: Stability::Nonconformant,
+                major: 0,
+                minor: None,
+                nonconformant: Some(Reverse(nonconformant.clone())),
+            },
+        }
+    }
+
+    /// An [`Ord`] for `Version` that prefers the latest version, even if it is a prerelease
+    ///
+    /// For example:
+    ///
+    /// ```
+    /// # use kube_core::Version;
+    /// assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
+    /// assert!(Version::Stable(1).latest() > Version::Beta(1, None).latest());
+    /// assert!(Version::Beta(2, None).latest() > Version::Stable(1).latest());
+    /// assert!(Version::Stable(2).latest() > Version::Alpha(1, Some(2)).latest());
+    /// assert!(Version::Alpha(2, Some(2)).latest() > Version::Stable(1).latest());
+    /// assert!(Version::Beta(1, None).latest() > Version::Nonconformant("ver3".into()).latest());
+    /// ```
+    pub fn latest(&self) -> impl Ord {
+        match self {
+            &Version::Stable(major) => Latest {
+                stability: Stability::Stable,
+                major,
+                minor: None,
+                nonconformant: None,
+            },
+            &Version::Beta(major, minor) => Latest {
+                stability: Stability::Beta,
+                major,
+                minor,
+                nonconformant: None,
+            },
+            &Self::Alpha(major, minor) => Latest {
+                stability: Stability::Alpha,
+                major,
+                minor,
+                nonconformant: None,
+            },
+            Self::Nonconformant(nonconformant) => Latest {
                 stability: Stability::Nonconformant,
                 major: 0,
                 minor: None,
@@ -286,6 +337,61 @@ mod tests {
             Version::Beta(2, Some(3)),
             Version::Beta(2, Some(2)),
             Version::Alpha(3, Some(2)),
+            Version::Nonconformant("hi".into()),
+        ]);
+    }
+
+    #[test]
+    fn test_version_latest_ord() {
+        assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
+        assert!(Version::Stable(1).latest() > Version::Beta(1, None).latest());
+        assert!(Version::Stable(1).latest() < Version::Beta(2, None).latest());
+        assert!(Version::Stable(2).latest() > Version::Alpha(1, Some(2)).latest());
+        assert!(Version::Stable(1).latest() < Version::Alpha(2, Some(2)).latest());
+        assert!(Version::Beta(1, None).latest() > Version::Nonconformant("ver3".into()).latest());
+
+        assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
+        assert!(Version::Stable(1).latest() < Version::Beta(2, None).latest());
+        assert!(Version::Stable(1).latest() < Version::Beta(2, Some(2)).latest());
+        assert!(Version::Stable(1).latest() < Version::Alpha(2, None).latest());
+        assert!(Version::Stable(1).latest() < Version::Alpha(2, Some(3)).latest());
+        assert!(Version::Stable(1).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Beta(1, Some(1)).latest() > Version::Beta(1, None).latest());
+        assert!(Version::Beta(1, Some(2)).latest() > Version::Beta(1, Some(1)).latest());
+        assert!(Version::Beta(1, None).latest() > Version::Alpha(1, None).latest());
+        assert!(Version::Beta(1, None).latest() > Version::Alpha(1, Some(3)).latest());
+        assert!(Version::Beta(1, None).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Beta(1, Some(2)).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Alpha(1, Some(1)).latest() > Version::Alpha(1, None).latest());
+        assert!(Version::Alpha(1, Some(2)).latest() > Version::Alpha(1, Some(1)).latest());
+        assert!(Version::Alpha(1, None).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Alpha(1, Some(2)).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(
+            Version::Nonconformant("bar".to_string()).latest()
+                > Version::Nonconformant("foo".to_string()).latest()
+        );
+        assert!(
+            Version::Nonconformant("foo1".to_string()).latest()
+                > Version::Nonconformant("foo10".to_string()).latest()
+        );
+
+        // sort order by default is ascending
+        // sorting with std::cmp::Reverse thus gives you the "most latest stable" first
+        let mut vers = vec![
+            Version::Beta(2, Some(2)),
+            Version::Stable(1),
+            Version::Nonconformant("hi".into()),
+            Version::Alpha(3, Some(2)),
+            Version::Stable(2),
+            Version::Beta(2, Some(3)),
+        ];
+        vers.sort_by_cached_key(|x| Reverse(x.latest()));
+        assert_eq!(vers, vec![
+            Version::Alpha(3, Some(2)),
+            Version::Stable(2),
+            Version::Beta(2, Some(3)),
+            Version::Beta(2, Some(2)),
+            Version::Stable(1),
             Version::Nonconformant("hi".into()),
         ]);
     }
