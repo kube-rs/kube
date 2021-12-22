@@ -35,12 +35,37 @@ impl Request {
     }
 }
 
+impl Request {
+    /// Cordon a resource
+    pub fn cordon(&self, name: &str) -> Result<http::Request<Vec<u8>>, request::Error> {
+        self.set_unschedulable(name, true)
+    }
+
+    /// Uncordon a resource
+    pub fn uncordon(&self, name: &str) -> Result<http::Request<Vec<u8>>, request::Error> {
+        self.set_unschedulable(name, false)
+    }
+
+    fn set_unschedulable(
+        &self,
+        node_name: &str,
+        value: bool,
+    ) -> Result<http::Request<Vec<u8>>, request::Error> {
+        self.patch(
+            node_name,
+            &PatchParams::default(),
+            &Patch::Strategic(serde_json::json!({ "spec": { "unschedulable": value } })),
+        )
+    }
+}
+
 
 #[cfg(test)]
 mod test {
+    use crate::{params::Patch, request::Request, resource::Resource};
+
     #[test]
     fn restart_patch_is_correct() {
-        use crate::{params::Patch, request::Request, resource::Resource};
         use k8s_openapi::api::apps::v1 as appsv1;
 
         let url = appsv1::Deployment::url_path(&(), Some("ns"));
@@ -50,6 +75,20 @@ mod test {
         assert_eq!(
             req.headers().get("Content-Type").unwrap().to_str().unwrap(),
             Patch::Merge(()).content_type()
+        );
+    }
+
+    #[test]
+    fn cordon_patch_is_correct() {
+        use k8s_openapi::api::core::v1::Node;
+
+        let url = Node::url_path(&(), Some("ns"));
+        let req = Request::new(url).cordon("mynode").unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/nodes/mynode?");
+        assert_eq!(req.method(), "PATCH");
+        assert_eq!(
+            req.headers().get("Content-Type").unwrap().to_str().unwrap(),
+            Patch::Strategic(()).content_type()
         );
     }
 }
