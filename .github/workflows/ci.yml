@@ -8,7 +8,7 @@ jobs:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [windows-latest]
         # TODO: add windows-latest (see #566)
     runs-on: ${{ matrix.os }}
     steps:
