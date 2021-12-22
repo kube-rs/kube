@@ -119,7 +119,7 @@ pub struct NamedAuthInfo {
     pub auth_info: AuthInfo,
 }
 
-fn serialize_password<S>(pw: &Option<SecretString>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_secretstring<S>(pw: &Option<SecretString>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -129,7 +129,7 @@ where
     }
 }
 
-fn deserialize_password<'de, D>(deserializer: D) -> Result<Option<SecretString>, D::Error>
+fn deserialize_secretstring<'de, D>(deserializer: D) -> Result<Option<SecretString>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -148,16 +148,16 @@ pub struct AuthInfo {
     /// The password for basic authentication to the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     #[serde(
-        serialize_with = "serialize_password",
-        deserialize_with = "deserialize_password"
+        serialize_with = "serialize_secretstring",
+        deserialize_with = "deserialize_secretstring"
     )]
     pub password: Option<SecretString>,
 
     /// The bearer token for authentication to the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     #[serde(
-        serialize_with = "serialize_password",
-        deserialize_with = "deserialize_password"
+        serialize_with = "serialize_secretstring",
+        deserialize_with = "deserialize_secretstring"
     )]
     pub token: Option<SecretString>,
     /// Pointer to a file that contains a bearer token (as described above). If both `token` and token_file` are present, `token` takes precedence.
