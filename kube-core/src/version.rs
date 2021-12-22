@@ -2,8 +2,8 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 
 /// Version parser for Kubernetes version patterns
 ///
-/// Follows [Kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
-/// to allow getting the correct sort-order:
+/// Implements the [Kubernetes version priority order](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
+/// to allow getting the served api versions sorted by `kubectl` priority:
 ///
 /// ```
 /// use kube_core::Version;
@@ -35,7 +35,7 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 /// ]);
 /// ```
 ///
-/// and corect direct comparisons after parsing:
+/// You can also compare versions directly after parsing:
 ///
 /// ```
 /// use kube_core::Version;
@@ -46,19 +46,31 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 /// assert!(Version::Stable(1) > Version::Alpha(2, Some(2)));
 /// assert!(Version::Beta(1, None) > Version::Nonconformant("ver3".into()));
 /// ```
+///
+/// Note that the type of release matters more than the version numbers:
+/// Stable(x) > Beta(y) > Alpha(z) > Nonconformant(w) for all x,y,z,w
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Version {
     /// A major/GA release
+    ///
+    /// Always considered higher priority than a beta release.
     Stable(u32),
+
     /// A beta release for a specific major version
+    ///
+    /// Always considered higher priority than an alpha release.
     Beta(u32, Option<u32>),
+
     /// An alpha release for a specific major version
+    ///
+    /// Always considered higher priority than a nonconformant version
     Alpha(u32, Option<u32>),
-    /// An non-conformant api string (sorted lexicographically)
+    /// An non-conformant api string (sorted alphabetically)
     ///
     /// CRDs and APIServices can use arbitrary strings as versions.
     Nonconformant(String),
 }
+// NB:
 
 impl Version {
     fn try_parse(v: &str) -> Option<Version> {
@@ -195,13 +207,32 @@ mod tests {
         assert!(Version::Stable(1) > Version::Alpha(2, Some(2)));
         assert!(Version::Beta(1, None) > Version::Nonconformant("ver3".into()));
 
+        assert!(Version::Stable(2) > Version::Stable(1));
+        assert!(Version::Stable(1) > Version::Beta(2, None));
+        assert!(Version::Stable(1) > Version::Beta(2, Some(2)));
+        assert!(Version::Stable(1) > Version::Alpha(2, None));
+        assert!(Version::Stable(1) > Version::Alpha(2, Some(3)));
+        assert!(Version::Stable(1) > Version::Nonconformant("foo".to_string()));
+        assert!(Version::Beta(1, Some(1)) > Version::Beta(1, None));
+        assert!(Version::Beta(1, Some(2)) > Version::Beta(1, Some(1)));
+        assert!(Version::Beta(1, None) > Version::Alpha(1, None));
+        assert!(Version::Beta(1, None) > Version::Alpha(1, Some(3)));
+        assert!(Version::Beta(1, None) > Version::Nonconformant("foo".to_string()));
+        assert!(Version::Beta(1, Some(2)) > Version::Nonconformant("foo".to_string()));
+        assert!(Version::Alpha(1, Some(1)) > Version::Alpha(1, None));
+        assert!(Version::Alpha(1, Some(2)) > Version::Alpha(1, Some(1)));
+        assert!(Version::Alpha(1, None) > Version::Nonconformant("foo".to_string()));
+        assert!(Version::Alpha(1, Some(2)) > Version::Nonconformant("foo".to_string()));
+        assert!(Version::Nonconformant("bar".to_string()) > Version::Nonconformant("foo".to_string()));
+        assert!(Version::Nonconformant("foo1".to_string()) > Version::Nonconformant("foo10".to_string()));
+
         // sort order by default is ascending
         // sorting with std::cmp::Reverse thus gives you the "most latest stable" first
         let mut vers = vec![
             Version::Beta(2, Some(2)),
             Version::Stable(1),
             Version::Nonconformant("hi".into()),
-            Version::Alpha(1, Some(2)),
+            Version::Alpha(3, Some(2)),
             Version::Stable(2),
             Version::Beta(2, Some(3)),
         ];
@@ -211,7 +242,7 @@ mod tests {
             Version::Stable(1),
             Version::Beta(2, Some(3)),
             Version::Beta(2, Some(2)),
-            Version::Alpha(1, Some(2)),
+            Version::Alpha(3, Some(2)),
             Version::Nonconformant("hi".into()),
         ]);
     }
