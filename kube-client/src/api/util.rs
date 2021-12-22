@@ -39,11 +39,11 @@ impl Api<Node> {
 #[cfg(test)]
 #[cfg(all(feature = "client"))]
 mod test {
-    use k8s_openapi::api::core::v1::Node;
     use crate::{
         api::{Api, DeleteParams, ListParams, PostParams},
         Client,
     };
+    use k8s_openapi::api::core::v1::Node;
     use serde_json::json;
 
     #[tokio::test]
