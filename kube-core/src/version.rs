@@ -118,7 +118,7 @@ enum Stability {
 
 /// See [`Version::priority`]
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
-struct LatestStable {
+struct Priority {
     stability: Stability,
     major: u32,
     minor: Option<u32>,
@@ -155,25 +155,25 @@ impl Version {
     /// `Stable(x)` > `Beta(y)` > `Alpha(z)` > `Nonconformant(w)` for all `x`,`y`,`z`,`w`
     pub fn priority(&self) -> impl Ord {
         match self {
-            &Version::Stable(major) => LatestStable {
+            &Version::Stable(major) => Priority {
                 stability: Stability::Stable,
                 major,
                 minor: None,
                 nonconformant: None,
             },
-            &Version::Beta(major, minor) => LatestStable {
+            &Version::Beta(major, minor) => Priority {
                 stability: Stability::Beta,
                 major,
                 minor,
                 nonconformant: None,
             },
-            &Self::Alpha(major, minor) => LatestStable {
+            &Self::Alpha(major, minor) => Priority {
                 stability: Stability::Alpha,
                 major,
                 minor,
                 nonconformant: None,
             },
-            Self::Nonconformant(nonconformant) => LatestStable {
+            Self::Nonconformant(nonconformant) => Priority {
                 stability: Stability::Nonconformant,
                 major: 0,
                 minor: None,
