@@ -33,8 +33,8 @@ jobs:
           choco install --verbose openssl
           openssl version
           which openssl
-          echo "OPENSSL_LIB_DIR=${ which openssl }" >> $env:GITHUB_ENV
-          echo "OPENSSL_DIR=${ which openssl }" >> $env:GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$( which openssl )" >> $env:GITHUB_ENV
+          echo "OPENSSL_DIR=$( which openssl )" >> $env:GITHUB_ENV
 
       # Real CI work starts here
       - name: Build workspace
