@@ -1,0 +1,5 @@
+[build.env]
+passthrough = [
+  "OPENSSL_DIR",
+  "OPENSSL"
+]

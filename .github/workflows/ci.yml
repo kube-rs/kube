@@ -12,7 +12,7 @@ jobs:
         # TODO: add windows-latest (see #566)
     runs-on: ${{ matrix.os }}
     env:
-      openssl-dir: ./openssl
+      openssl-dir: "C:/openssl"
 
     steps:
       - uses: actions/checkout@v2
