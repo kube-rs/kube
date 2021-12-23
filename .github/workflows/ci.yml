@@ -12,7 +12,7 @@ jobs:
         # TODO: add windows-latest (see #566)
     runs-on: ${{ matrix.os }}
     env:
-      openssl-dir: "C:/openssl"
+      openssl-dir: "openssl"
 
     steps:
       - uses: actions/checkout@v2
@@ -29,150 +29,23 @@ jobs:
 
       - name: install openssl
         if: matrix.os == 'windows-latest'
-        working-directory: ${{env.openssl-directory}}
         run: |
+          echo $PWD
+          mkdir ${{env.openssl-dir}}
+          cd ${{env.openssl-dir}}
           curl -Lo "openssl-0.9.8h-x64_86-win64.zip" "https://indy.fulgan.com/SSL/Archive/openssl-0.9.8h-x64_86-win64.zip"
           unzip "openssl-0.9.8h-x64_86-win64.zip"
-          echo "OPENSSL_LIB_DIR=${{env.openssl-dir}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
-          echo "OPENSSL_DIR=${{env.openssl-dir}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
+          echo $PWD
+          ls
+          cd openssl-0.9.8h-x64_86-win64
+          ls
+          cd ..
+          cd ..
+          echo $PWD
+          echo "OPENSSL_LIB_DIR=${PWD}/${{env.openssl-dir}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
+          echo "OPENSSL_DIR=${PWD}/${{env.openssl-dir}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
 
       # Real CI work starts here
       - name: Build workspace
-        run: cargo build
-
-      # Workspace tests
-      - name: Run workspace unit tests
-        run: cargo test --lib --all -j6
-      - name: Run workspace doc tests
-        run: cargo test --doc --all -j6
-      - name: Test examples
-        run: cargo test -p kube-examples --examples -j6
-      - name: Compile check remaining examples
-        # No OS specific code in examples, run this on fastest executor
-        if: matrix.os == 'ubuntu-latest'
-        run: cargo build -j4 -p kube-examples
-
-      # Feature tests
-      - name: Test kube with features native-tls,ws,oauth
-        run: cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
-        if: matrix.os == 'ubuntu-latest'
-      - name: Test kube with features rustls-tls,ws,oauth
-        run: cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
-        if: matrix.os == 'ubuntu-latest'
-      - name: Test kube with features openssl-tls,ws,oauth
-        run: cargo test -p kube --lib --no-default-features --features=openssl-tls,ws,oauth
-        if: matrix.os == 'ubuntu-latest'
-      # Feature tests in examples
-      - name: Test crd_derive_no_schema example
-        run: cargo test -p kube-examples --example crd_derive_no_schema --no-default-features --features=native-tls,latest
-        if: matrix.os == 'ubuntu-latest'
-      - name: Test crd_api example with deprecated crd
-        run: cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
-        if: matrix.os == 'ubuntu-latest'
-
-  check-msrv:
-    # Run `cargo check` on our minimum supported Rust version
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@main
-    - name: Find MSRV
-      id: msrv
-      run: |
-        MSRV=$(grep MSRV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+")
-        echo $MSRV
-        echo ::set-output name=msrv::${MSRV}
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ steps.msrv.outputs.msrv }}
-        profile: minimal
-        override: true
-    - uses: Swatinem/rust-cache@v1
-    - name: Check
-      uses: actions-rs/cargo@v1
-      with:
-        command: check
-        args: --all
-
-  e2e:
-    # e2e tests are docker on linux
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git
-            target
-          key: musl-cargo-${{ hashFiles('**/Cargo.toml') }}
-
-      - uses: nolar/setup-k3d-k3s@v1
-        with:
-          version: v1.20
-          # k3d-kube
-          k3d-name: kube
-          # Used to avoid rate limits when fetching the releases from k3s repo.
-          # Anonymous access is limited to 60 requests / hour / worker
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compile dapp
         run: |
-          mkdir -p ~/.cargo/{git,registry}
-          docker run --rm -t \
-              --mount type=bind,source=${{ github.workspace }},target=/volume \
-              --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
-              --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
-              clux/muslrust:stable \
-              cargo build -p e2e --release -v
-          cp target/x86_64-unknown-linux-musl/release/dapp e2e/
-
-      - name: Build image
-        run: "docker build -t clux/kube-dapp:${{ github.sha }} e2e/"
-      - name: Import image
-        run: "k3d image import clux/kube-dapp:${{ github.sha }} --cluster kube"
-      - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
-
-      - name: Create resource
-        run: kubectl apply -f e2e/deployment.yaml -n apps
-      - run: kubectl get all -n apps
-      - run: kubectl describe jobs/dapp -n apps
-      - name: Wait for job to complete
-        run: |
-          kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
-          kubectl get all -n apps
-          kubectl wait --for=condition=complete job/dapp -n apps --timeout=10s || kubectl get pods -n apps | grep dapp | grep Completed
-
-  cargo-deny:
-    name: Run cargo deny
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        checks:
-          - advisories
-          - bans licenses sources
-
-    # Prevent sudden announcement of a new advisory from failing ci:
-    continue-on-error: ${{ matrix.checks == 'advisories' }}
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: EmbarkStudios/cargo-deny-action@v1
-        with:
-          command: check ${{ matrix.checks }}
-
-  rustfmt:
-    name: Run rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1.0.7
-        with:
-          profile: minimal
-          toolchain: nightly
-          components: rustfmt
-          override: true
-      - name: Run rustfmt
-        id: rustfmt
-        run: rustfmt +nightly --edition 2018 --check $(find . -type f -iname *.rs)
+          cargo build
