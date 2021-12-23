@@ -184,7 +184,7 @@ impl ConfigExt for Config {
     #[cfg(feature = "native-tls")]
     fn native_tls_connector(&self) -> Result<tokio_native_tls::native_tls::TlsConnector> {
         tls::native_tls::native_tls_connector(
-            self.identity_pem.as_ref(),
+            self.identity_pem().as_ref(),
             self.root_cert.as_ref(),
             self.accept_invalid_certs,
         )
@@ -202,7 +202,7 @@ impl ConfigExt for Config {
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
         tls::rustls_tls::rustls_client_config(
-            self.identity_pem.as_deref(),
+            self.identity_pem().as_deref(),
             self.root_cert.as_deref(),
             self.accept_invalid_certs,
         )
@@ -219,7 +219,7 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
-        tls::openssl_tls::ssl_connector_builder(self.identity_pem.as_ref(), self.root_cert.as_ref())
+        tls::openssl_tls::ssl_connector_builder(self.identity_pem().as_ref(), self.root_cert.as_ref())
             .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
     }
 
