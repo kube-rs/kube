@@ -33,8 +33,12 @@ jobs:
         run: |
           curl -Lo "openssl-0.9.8h-x64_86-win64.zip" "https://indy.fulgan.com/SSL/Archive/openssl-0.9.8h-x64_86-win64.zip"
           unzip "openssl-0.9.8h-x64_86-win64.zip"
-          echo "OPENSSL_LIB_DIR=${{env.openssl-directory}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
-          echo "OPENSSL_DIR=${{env.openssl-directory}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
+      - name: set openssl lib dir
+        run: |
+          echo ::set:env name=OPENSSL_DIR::${{env.openssl-directory}}/openssl-0.9.8h-x64_86-win64
+          echo $OPENSSL_DIR
+          echo ::set:env name=OPENSSL_LIB_DIR::${{env.openssl-directory}}/openssl-0.9.8h-x64_86-win64
+          echo $OPENSSL_LIB_DIR
 
       # Real CI work starts here
       - name: Build workspace
