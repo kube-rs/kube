@@ -30,20 +30,11 @@ jobs:
       - name: install openssl
         if: matrix.os == 'windows-latest'
         run: |
-          echo $PWD
-          mkdir ${{env.openssl-dir}}
-          cd ${{env.openssl-dir}}
-          curl -Lo "openssl-0.9.8h-x64_86-win64.zip" "https://indy.fulgan.com/SSL/Archive/openssl-0.9.8h-x64_86-win64.zip"
-          unzip "openssl-0.9.8h-x64_86-win64.zip"
-          echo $PWD
-          ls
-          cd openssl-0.9.8h-x64_86-win64
-          ls
-          cd ..
-          cd ..
-          echo $PWD
-          echo "OPENSSL_LIB_DIR=${PWD}/${{env.openssl-dir}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
-          echo "OPENSSL_DIR=${PWD}/${{env.openssl-dir}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
+          choco install --verbose openssl
+          openssl version
+          which openssl
+          echo "OPENSSL_LIB_DIR=${ which openssl }" >> $env:GITHUB_ENV
+          echo "OPENSSL_DIR=${ which openssl }" >> $env:GITHUB_ENV
 
       # Real CI work starts here
       - name: Build workspace
