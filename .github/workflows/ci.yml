@@ -11,6 +11,9 @@ jobs:
         os: [windows-latest]
         # TODO: add windows-latest (see #566)
     runs-on: ${{ matrix.os }}
+    env:
+      openssl-dir: ./openssl
+
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -26,11 +29,12 @@ jobs:
 
       - name: install openssl
         if: matrix.os == 'windows-latest'
+        working-directory: ${{env.openssl-directory}}
         run: |
           curl -Lo "openssl-0.9.8h-x64_86-win64.zip" "https://indy.fulgan.com/SSL/Archive/openssl-0.9.8h-x64_86-win64.zip"
-          unzip "openssl-0.9.8h-x64_86-win64.zip" -d "/c/OpenSSL"
-          echo "OPENSSL_LIB_DIR=/c/OpenSSL/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
-          echo "OPENSSL_DIR=/c/OpenSSL/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
+          unzip "openssl-0.9.8h-x64_86-win64.zip"
+          echo "OPENSSL_LIB_DIR=${{env.openssl-directory}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
+          echo "OPENSSL_DIR=${{env.openssl-directory}}/openssl-0.9.8h-x64_86-win64" >> $env:GITHUB_ENV
 
       # Real CI work starts here
       - name: Build workspace
