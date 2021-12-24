@@ -2,8 +2,11 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 
 /// Version parser for Kubernetes version patterns
 ///
-/// Implements the [Kubernetes version priority order](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
-/// to allow getting the served api versions sorted by `kubectl` priority:
+/// This type implements two orderings for sorting by:
+/// - [`Version::priority`] for [Kubernetes/kubectl version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
+/// - [`Version::semantic`] for traditional semver style ordering
+///
+/// To get the api versions sorted by `kubectl` priority:
 ///
 /// ```
 /// use kube_core::Version;
@@ -125,9 +128,9 @@ struct Priority {
     nonconformant: Option<Reverse<String>>,
 }
 
-/// See [`Version::latest`]
+/// See [`Version::semantic`]
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
-struct Latest {
+struct Semantic {
     major: u32,
     stability: Stability,
     minor: Option<u32>,
@@ -182,40 +185,40 @@ impl Version {
         }
     }
 
-    /// An [`Ord`] for `Version` that prefers the latest version, even if it is a prerelease
+    /// An [`Ord`] for `Version` that prefers the semantically greatest release (even if it's a pre-release)
     ///
     /// For example:
     ///
     /// ```
     /// # use kube_core::Version;
-    /// assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
-    /// assert!(Version::Stable(1).latest() > Version::Beta(1, None).latest());
-    /// assert!(Version::Beta(2, None).latest() > Version::Stable(1).latest());
-    /// assert!(Version::Stable(2).latest() > Version::Alpha(1, Some(2)).latest());
-    /// assert!(Version::Alpha(2, Some(2)).latest() > Version::Stable(1).latest());
-    /// assert!(Version::Beta(1, None).latest() > Version::Nonconformant("ver3".into()).latest());
+    /// assert!(Version::Stable(2).semantic() > Version::Stable(1).semantic());
+    /// assert!(Version::Stable(1).semantic() > Version::Beta(1, None).semantic());
+    /// assert!(Version::Beta(2, None).semantic() > Version::Stable(1).semantic());
+    /// assert!(Version::Stable(2).semantic() > Version::Alpha(1, Some(2)).semantic());
+    /// assert!(Version::Alpha(2, Some(2)).semantic() > Version::Stable(1).semantic());
+    /// assert!(Version::Beta(1, None).semantic() > Version::Nonconformant("ver3".into()).semantic());
     /// ```
-    pub fn latest(&self) -> impl Ord {
+    pub fn semantic(&self) -> impl Ord {
         match self {
-            &Version::Stable(major) => Latest {
+            &Version::Stable(major) => Semantic {
                 stability: Stability::Stable,
                 major,
                 minor: None,
                 nonconformant: None,
             },
-            &Version::Beta(major, minor) => Latest {
+            &Version::Beta(major, minor) => Semantic {
                 stability: Stability::Beta,
                 major,
                 minor,
                 nonconformant: None,
             },
-            &Self::Alpha(major, minor) => Latest {
+            &Self::Alpha(major, minor) => Semantic {
                 stability: Stability::Alpha,
                 major,
                 minor,
                 nonconformant: None,
             },
-            Self::Nonconformant(nonconformant) => Latest {
+            Self::Nonconformant(nonconformant) => Semantic {
                 stability: Stability::Nonconformant,
                 major: 0,
                 minor: None,
@@ -304,8 +307,8 @@ mod tests {
                 > Version::Nonconformant("foo10".to_string()).priority()
         );
 
-        // sort order by default is ascending
-        // sorting with std::cmp::Reverse thus gives you the "most latest stable" first
+        // sort orders by default are ascending
+        // sorting with std::cmp::Reverse on priority gives you the highest priority first
         let mut vers = vec![
             Version::Beta(2, Some(2)),
             Version::Stable(1),
@@ -326,41 +329,41 @@ mod tests {
     }
 
     #[test]
-    fn test_version_latest_ord() {
-        assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
-        assert!(Version::Stable(1).latest() > Version::Beta(1, None).latest());
-        assert!(Version::Stable(1).latest() < Version::Beta(2, None).latest());
-        assert!(Version::Stable(2).latest() > Version::Alpha(1, Some(2)).latest());
-        assert!(Version::Stable(1).latest() < Version::Alpha(2, Some(2)).latest());
-        assert!(Version::Beta(1, None).latest() > Version::Nonconformant("ver3".into()).latest());
+    fn test_version_semantic_ord() {
+        assert!(Version::Stable(2).semantic() > Version::Stable(1).semantic());
+        assert!(Version::Stable(1).semantic() > Version::Beta(1, None).semantic());
+        assert!(Version::Stable(1).semantic() < Version::Beta(2, None).semantic());
+        assert!(Version::Stable(2).semantic() > Version::Alpha(1, Some(2)).semantic());
+        assert!(Version::Stable(1).semantic() < Version::Alpha(2, Some(2)).semantic());
+        assert!(Version::Beta(1, None).semantic() > Version::Nonconformant("ver3".into()).semantic());
 
-        assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
-        assert!(Version::Stable(1).latest() < Version::Beta(2, None).latest());
-        assert!(Version::Stable(1).latest() < Version::Beta(2, Some(2)).latest());
-        assert!(Version::Stable(1).latest() < Version::Alpha(2, None).latest());
-        assert!(Version::Stable(1).latest() < Version::Alpha(2, Some(3)).latest());
-        assert!(Version::Stable(1).latest() > Version::Nonconformant("foo".to_string()).latest());
-        assert!(Version::Beta(1, Some(1)).latest() > Version::Beta(1, None).latest());
-        assert!(Version::Beta(1, Some(2)).latest() > Version::Beta(1, Some(1)).latest());
-        assert!(Version::Beta(1, None).latest() > Version::Alpha(1, None).latest());
-        assert!(Version::Beta(1, None).latest() > Version::Alpha(1, Some(3)).latest());
-        assert!(Version::Beta(1, None).latest() > Version::Nonconformant("foo".to_string()).latest());
-        assert!(Version::Beta(1, Some(2)).latest() > Version::Nonconformant("foo".to_string()).latest());
-        assert!(Version::Alpha(1, Some(1)).latest() > Version::Alpha(1, None).latest());
-        assert!(Version::Alpha(1, Some(2)).latest() > Version::Alpha(1, Some(1)).latest());
-        assert!(Version::Alpha(1, None).latest() > Version::Nonconformant("foo".to_string()).latest());
-        assert!(Version::Alpha(1, Some(2)).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Stable(2).semantic() > Version::Stable(1).semantic());
+        assert!(Version::Stable(1).semantic() < Version::Beta(2, None).semantic());
+        assert!(Version::Stable(1).semantic() < Version::Beta(2, Some(2)).semantic());
+        assert!(Version::Stable(1).semantic() < Version::Alpha(2, None).semantic());
+        assert!(Version::Stable(1).semantic() < Version::Alpha(2, Some(3)).semantic());
+        assert!(Version::Stable(1).semantic() > Version::Nonconformant("foo".to_string()).semantic());
+        assert!(Version::Beta(1, Some(1)).semantic() > Version::Beta(1, None).semantic());
+        assert!(Version::Beta(1, Some(2)).semantic() > Version::Beta(1, Some(1)).semantic());
+        assert!(Version::Beta(1, None).semantic() > Version::Alpha(1, None).semantic());
+        assert!(Version::Beta(1, None).semantic() > Version::Alpha(1, Some(3)).semantic());
+        assert!(Version::Beta(1, None).semantic() > Version::Nonconformant("foo".to_string()).semantic());
+        assert!(Version::Beta(1, Some(2)).semantic() > Version::Nonconformant("foo".to_string()).semantic());
+        assert!(Version::Alpha(1, Some(1)).semantic() > Version::Alpha(1, None).semantic());
+        assert!(Version::Alpha(1, Some(2)).semantic() > Version::Alpha(1, Some(1)).semantic());
+        assert!(Version::Alpha(1, None).semantic() > Version::Nonconformant("foo".to_string()).semantic());
+        assert!(Version::Alpha(1, Some(2)).semantic() > Version::Nonconformant("foo".to_string()).semantic());
         assert!(
-            Version::Nonconformant("bar".to_string()).latest()
-                > Version::Nonconformant("foo".to_string()).latest()
+            Version::Nonconformant("bar".to_string()).semantic()
+                > Version::Nonconformant("foo".to_string()).semantic()
         );
         assert!(
-            Version::Nonconformant("foo1".to_string()).latest()
-                > Version::Nonconformant("foo10".to_string()).latest()
+            Version::Nonconformant("foo1".to_string()).semantic()
+                > Version::Nonconformant("foo10".to_string()).semantic()
         );
 
-        // sort order by default is ascending
-        // sorting with std::cmp::Reverse thus gives you the "most latest stable" first
+        // sort orders by default is ascending
+        // sorting with std::cmp::Reverse on semantic gives you the latest semantic versions first
         let mut vers = vec![
             Version::Beta(2, Some(2)),
             Version::Stable(1),
@@ -369,7 +372,7 @@ mod tests {
             Version::Stable(2),
             Version::Beta(2, Some(3)),
         ];
-        vers.sort_by_cached_key(|x| Reverse(x.latest()));
+        vers.sort_by_cached_key(|x| Reverse(x.semantic()));
         assert_eq!(vers, vec![
             Version::Alpha(3, Some(2)),
             Version::Stable(2),
