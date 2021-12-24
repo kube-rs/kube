@@ -180,8 +180,12 @@ pub struct AuthInfo {
     pub client_key: Option<String>,
     /// PEM-encoded data from a client key file for TLS. Overrides `client_key`
     #[serde(rename = "client-key-data")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_key_data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        serialize_with = "serialize_secretstring",
+        deserialize_with = "deserialize_secretstring"
+    )]
+    pub client_key_data: Option<SecretString>,
 
     /// The username to act-as.
     #[serde(rename = "as")]
@@ -430,8 +434,11 @@ impl Cluster {
             return Ok(None);
         }
 
-        let ca = load_from_base64_or_file(&self.certificate_authority_data, &self.certificate_authority)
-            .map_err(KubeconfigError::LoadCertificateAuthority)?;
+        let ca = load_from_base64_or_file(
+            &self.certificate_authority_data.as_ref().map(|d| d.as_str()),
+            &self.certificate_authority,
+        )
+        .map_err(KubeconfigError::LoadCertificateAuthority)?;
         Ok(Some(ca))
     }
 }
@@ -448,24 +455,32 @@ impl AuthInfo {
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_certificate_data.is_none() && self.client_certificate.is_none()`
 
-        load_from_base64_or_file(&self.client_certificate_data, &self.client_certificate)
-            .map_err(KubeconfigError::LoadClientCertificate)
+        load_from_base64_or_file(
+            &self.client_certificate_data.as_ref().map(|d| d.as_str()),
+            &self.client_certificate,
+        )
+        .map_err(KubeconfigError::LoadClientCertificate)
     }
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_key_data.is_none() && self.client_key.is_none()`
 
-        load_from_base64_or_file(&self.client_key_data, &self.client_key)
-            .map_err(KubeconfigError::LoadClientKey)
+        load_from_base64_or_file(
+            &self
+                .client_key_data
+                .as_ref()
+                .map(|secret| secret.expose_secret().as_str()),
+            &self.client_key,
+        )
+        .map_err(KubeconfigError::LoadClientKey)
     }
 }
 
 fn load_from_base64_or_file<P: AsRef<Path>>(
-    value: &Option<String>,
+    value: &Option<&str>,
     file: &Option<P>,
 ) -> Result<Vec<u8>, LoadDataError> {
     let data = value
-        .as_deref()
         .map(load_from_base64)
         .or_else(|| file.as_ref().map(load_from_file))
         .unwrap_or(Err(LoadDataError::NoBase64DataOrFile))?;
