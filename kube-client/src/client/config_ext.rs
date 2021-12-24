@@ -174,7 +174,7 @@ impl ConfigExt for Config {
                 AddAuthorizationLayer::basic(&user, pass.expose_secret()).as_sensitive(true),
             ))),
             Auth::Bearer(token) => Some(AuthLayer(Either::A(
-                AddAuthorizationLayer::bearer(&token.expose_secret()).as_sensitive(true),
+                AddAuthorizationLayer::bearer(token.expose_secret()).as_sensitive(true),
             ))),
             Auth::RefreshableToken(refreshable) => {
                 Some(AuthLayer(Either::B(AsyncFilterLayer::new(refreshable))))

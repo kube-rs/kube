@@ -435,7 +435,7 @@ impl Cluster {
         }
 
         let ca = load_from_base64_or_file(
-            &self.certificate_authority_data.as_ref().map(|d| d.as_str()),
+            &self.certificate_authority_data.as_deref(),
             &self.certificate_authority,
         )
         .map_err(KubeconfigError::LoadCertificateAuthority)?;
@@ -456,7 +456,7 @@ impl AuthInfo {
         // TODO Shouldn't error when `self.client_certificate_data.is_none() && self.client_certificate.is_none()`
 
         load_from_base64_or_file(
-            &self.client_certificate_data.as_ref().map(|d| d.as_str()),
+            &self.client_certificate_data.as_deref(),
             &self.client_certificate,
         )
         .map_err(KubeconfigError::LoadClientCertificate)

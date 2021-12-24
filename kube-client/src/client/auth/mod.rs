@@ -222,7 +222,7 @@ impl TryFrom<&AuthInfo> for Auth {
                         .map(|ts| ts.parse())
                         .transpose()
                         .map_err(Error::MalformedTokenExpirationDate)?;
-                    (status.token.map(|t| SecretString::from(t)), expiration)
+                    (status.token.map(SecretString::from), expiration)
                 } else if let Some(file) = &auth_info.token_file {
                     let token = std::fs::read_to_string(&file)
                         .map_err(|source| Error::ReadTokenFile(source, file.into()))?;
