@@ -118,7 +118,7 @@ impl ApiGroup {
 
     fn sort_versions(&mut self) {
         self.data
-            .sort_by_cached_key(|gvd| Reverse(Version::parse(gvd.version.as_str())))
+            .sort_by_cached_key(|gvd| Reverse(Version::parse(gvd.version.as_str()).priority()))
     }
 
     // shortcut method to give cheapest return for a single GVK

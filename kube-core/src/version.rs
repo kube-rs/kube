@@ -20,7 +20,7 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 ///     "foo1",
 ///     "v10",
 /// ];
-/// versions.sort_by_cached_key(|v| Reverse(Version::parse(v)));
+/// versions.sort_by_cached_key(|v| Reverse(Version::parse(v).priority()));
 /// assert_eq!(versions, vec![
 ///     "v10",
 ///     "v2",
@@ -35,20 +35,6 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 /// ]);
 /// ```
 ///
-/// You can also compare versions directly after parsing:
-///
-/// ```
-/// use kube_core::Version;
-/// assert!(Version::Stable(2) > Version::Stable(1));
-/// assert!(Version::Stable(1) > Version::Beta(1, None));
-/// assert!(Version::Stable(1) > Version::Beta(2, None));
-/// assert!(Version::Stable(2) > Version::Alpha(1, Some(2)));
-/// assert!(Version::Stable(1) > Version::Alpha(2, Some(2)));
-/// assert!(Version::Beta(1, None) > Version::Nonconformant("ver3".into()));
-/// ```
-///
-/// Note that the type of release matters more than the version numbers:
-/// Stable(x) > Beta(y) > Alpha(z) > Nonconformant(w) for all x,y,z,w
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Version {
     /// A major/GA release
@@ -122,34 +108,120 @@ impl FromStr for Version {
     }
 }
 
-// A key used to allow sorting Versions
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
-enum VersionSortKey<'a> {
-    Nonconformant(Reverse<&'a str>),
-    Alpha(u32, Option<u32>),
-    Beta(u32, Option<u32>),
-    Stable(u32),
+enum Stability {
+    Nonconformant,
+    Alpha,
+    Beta,
+    Stable,
 }
+
+/// See [`Version::priority`]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Priority {
+    stability: Stability,
+    major: u32,
+    minor: Option<u32>,
+    nonconformant: Option<Reverse<String>>,
+}
+
+/// See [`Version::latest`]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Latest {
+    major: u32,
+    stability: Stability,
+    minor: Option<u32>,
+    nonconformant: Option<Reverse<String>>,
+}
+
 impl Version {
-    fn to_sort_key(&self) -> VersionSortKey {
+    /// An [`Ord`] for `Version` that prefers stable versions over later prereleases
+    ///
+    /// Implements the [Kubernetes version priority order](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
+    ///
+    /// For example:
+    ///
+    /// ```
+    /// # use kube_core::Version;
+    /// assert!(Version::Stable(2).priority() > Version::Stable(1).priority());
+    /// assert!(Version::Stable(1).priority() > Version::Beta(1, None).priority());
+    /// assert!(Version::Stable(1).priority() > Version::Beta(2, None).priority());
+    /// assert!(Version::Stable(2).priority() > Version::Alpha(1, Some(2)).priority());
+    /// assert!(Version::Stable(1).priority() > Version::Alpha(2, Some(2)).priority());
+    /// assert!(Version::Beta(1, None).priority() > Version::Nonconformant("ver3".into()).priority());
+    /// ```
+    ///
+    /// Note that the type of release matters more than the version numbers:
+    /// `Stable(x)` > `Beta(y)` > `Alpha(z)` > `Nonconformant(w)` for all `x`,`y`,`z`,`w`
+    pub fn priority(&self) -> impl Ord {
         match self {
-            Version::Stable(v) => VersionSortKey::Stable(*v),
-            Version::Beta(v, beta) => VersionSortKey::Beta(*v, *beta),
-            Version::Alpha(v, alpha) => VersionSortKey::Alpha(*v, *alpha),
-            Version::Nonconformant(nc) => VersionSortKey::Nonconformant(Reverse(nc)),
+            &Version::Stable(major) => Priority {
+                stability: Stability::Stable,
+                major,
+                minor: None,
+                nonconformant: None,
+            },
+            &Version::Beta(major, minor) => Priority {
+                stability: Stability::Beta,
+                major,
+                minor,
+                nonconformant: None,
+            },
+            &Self::Alpha(major, minor) => Priority {
+                stability: Stability::Alpha,
+                major,
+                minor,
+                nonconformant: None,
+            },
+            Self::Nonconformant(nonconformant) => Priority {
+                stability: Stability::Nonconformant,
+                major: 0,
+                minor: None,
+                nonconformant: Some(Reverse(nonconformant.clone())),
+            },
         }
     }
-}
 
-impl Ord for Version {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.to_sort_key().cmp(&other.to_sort_key())
-    }
-}
-
-impl PartialOrd for Version {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+    /// An [`Ord`] for `Version` that prefers the latest version, even if it is a prerelease
+    ///
+    /// For example:
+    ///
+    /// ```
+    /// # use kube_core::Version;
+    /// assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
+    /// assert!(Version::Stable(1).latest() > Version::Beta(1, None).latest());
+    /// assert!(Version::Beta(2, None).latest() > Version::Stable(1).latest());
+    /// assert!(Version::Stable(2).latest() > Version::Alpha(1, Some(2)).latest());
+    /// assert!(Version::Alpha(2, Some(2)).latest() > Version::Stable(1).latest());
+    /// assert!(Version::Beta(1, None).latest() > Version::Nonconformant("ver3".into()).latest());
+    /// ```
+    pub fn latest(&self) -> impl Ord {
+        match self {
+            &Version::Stable(major) => Latest {
+                stability: Stability::Stable,
+                major,
+                minor: None,
+                nonconformant: None,
+            },
+            &Version::Beta(major, minor) => Latest {
+                stability: Stability::Beta,
+                major,
+                minor,
+                nonconformant: None,
+            },
+            &Self::Alpha(major, minor) => Latest {
+                stability: Stability::Alpha,
+                major,
+                minor,
+                nonconformant: None,
+            },
+            Self::Nonconformant(nonconformant) => Latest {
+                stability: Stability::Nonconformant,
+                major: 0,
+                minor: None,
+                nonconformant: Some(Reverse(nonconformant.clone())),
+            },
+        }
     }
 }
 
@@ -198,33 +270,39 @@ mod tests {
     }
 
     #[test]
-    fn test_version_ord() {
+    fn test_version_priority_ord() {
         // sorting makes sense from a "greater than" semantic perspective:
-        assert!(Version::Stable(2) > Version::Stable(1));
-        assert!(Version::Stable(1) > Version::Beta(1, None));
-        assert!(Version::Stable(1) > Version::Beta(2, None));
-        assert!(Version::Stable(2) > Version::Alpha(1, Some(2)));
-        assert!(Version::Stable(1) > Version::Alpha(2, Some(2)));
-        assert!(Version::Beta(1, None) > Version::Nonconformant("ver3".into()));
+        assert!(Version::Stable(2).priority() > Version::Stable(1).priority());
+        assert!(Version::Stable(1).priority() > Version::Beta(1, None).priority());
+        assert!(Version::Stable(1).priority() > Version::Beta(2, None).priority());
+        assert!(Version::Stable(2).priority() > Version::Alpha(1, Some(2)).priority());
+        assert!(Version::Stable(1).priority() > Version::Alpha(2, Some(2)).priority());
+        assert!(Version::Beta(1, None).priority() > Version::Nonconformant("ver3".into()).priority());
 
-        assert!(Version::Stable(2) > Version::Stable(1));
-        assert!(Version::Stable(1) > Version::Beta(2, None));
-        assert!(Version::Stable(1) > Version::Beta(2, Some(2)));
-        assert!(Version::Stable(1) > Version::Alpha(2, None));
-        assert!(Version::Stable(1) > Version::Alpha(2, Some(3)));
-        assert!(Version::Stable(1) > Version::Nonconformant("foo".to_string()));
-        assert!(Version::Beta(1, Some(1)) > Version::Beta(1, None));
-        assert!(Version::Beta(1, Some(2)) > Version::Beta(1, Some(1)));
-        assert!(Version::Beta(1, None) > Version::Alpha(1, None));
-        assert!(Version::Beta(1, None) > Version::Alpha(1, Some(3)));
-        assert!(Version::Beta(1, None) > Version::Nonconformant("foo".to_string()));
-        assert!(Version::Beta(1, Some(2)) > Version::Nonconformant("foo".to_string()));
-        assert!(Version::Alpha(1, Some(1)) > Version::Alpha(1, None));
-        assert!(Version::Alpha(1, Some(2)) > Version::Alpha(1, Some(1)));
-        assert!(Version::Alpha(1, None) > Version::Nonconformant("foo".to_string()));
-        assert!(Version::Alpha(1, Some(2)) > Version::Nonconformant("foo".to_string()));
-        assert!(Version::Nonconformant("bar".to_string()) > Version::Nonconformant("foo".to_string()));
-        assert!(Version::Nonconformant("foo1".to_string()) > Version::Nonconformant("foo10".to_string()));
+        assert!(Version::Stable(2).priority() > Version::Stable(1).priority());
+        assert!(Version::Stable(1).priority() > Version::Beta(2, None).priority());
+        assert!(Version::Stable(1).priority() > Version::Beta(2, Some(2)).priority());
+        assert!(Version::Stable(1).priority() > Version::Alpha(2, None).priority());
+        assert!(Version::Stable(1).priority() > Version::Alpha(2, Some(3)).priority());
+        assert!(Version::Stable(1).priority() > Version::Nonconformant("foo".to_string()).priority());
+        assert!(Version::Beta(1, Some(1)).priority() > Version::Beta(1, None).priority());
+        assert!(Version::Beta(1, Some(2)).priority() > Version::Beta(1, Some(1)).priority());
+        assert!(Version::Beta(1, None).priority() > Version::Alpha(1, None).priority());
+        assert!(Version::Beta(1, None).priority() > Version::Alpha(1, Some(3)).priority());
+        assert!(Version::Beta(1, None).priority() > Version::Nonconformant("foo".to_string()).priority());
+        assert!(Version::Beta(1, Some(2)).priority() > Version::Nonconformant("foo".to_string()).priority());
+        assert!(Version::Alpha(1, Some(1)).priority() > Version::Alpha(1, None).priority());
+        assert!(Version::Alpha(1, Some(2)).priority() > Version::Alpha(1, Some(1)).priority());
+        assert!(Version::Alpha(1, None).priority() > Version::Nonconformant("foo".to_string()).priority());
+        assert!(Version::Alpha(1, Some(2)).priority() > Version::Nonconformant("foo".to_string()).priority());
+        assert!(
+            Version::Nonconformant("bar".to_string()).priority()
+                > Version::Nonconformant("foo".to_string()).priority()
+        );
+        assert!(
+            Version::Nonconformant("foo1".to_string()).priority()
+                > Version::Nonconformant("foo10".to_string()).priority()
+        );
 
         // sort order by default is ascending
         // sorting with std::cmp::Reverse thus gives you the "most latest stable" first
@@ -236,13 +314,68 @@ mod tests {
             Version::Stable(2),
             Version::Beta(2, Some(3)),
         ];
-        vers.sort_by_cached_key(|x| Reverse(x.clone()));
+        vers.sort_by_cached_key(|x| Reverse(x.priority()));
         assert_eq!(vers, vec![
             Version::Stable(2),
             Version::Stable(1),
             Version::Beta(2, Some(3)),
             Version::Beta(2, Some(2)),
             Version::Alpha(3, Some(2)),
+            Version::Nonconformant("hi".into()),
+        ]);
+    }
+
+    #[test]
+    fn test_version_latest_ord() {
+        assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
+        assert!(Version::Stable(1).latest() > Version::Beta(1, None).latest());
+        assert!(Version::Stable(1).latest() < Version::Beta(2, None).latest());
+        assert!(Version::Stable(2).latest() > Version::Alpha(1, Some(2)).latest());
+        assert!(Version::Stable(1).latest() < Version::Alpha(2, Some(2)).latest());
+        assert!(Version::Beta(1, None).latest() > Version::Nonconformant("ver3".into()).latest());
+
+        assert!(Version::Stable(2).latest() > Version::Stable(1).latest());
+        assert!(Version::Stable(1).latest() < Version::Beta(2, None).latest());
+        assert!(Version::Stable(1).latest() < Version::Beta(2, Some(2)).latest());
+        assert!(Version::Stable(1).latest() < Version::Alpha(2, None).latest());
+        assert!(Version::Stable(1).latest() < Version::Alpha(2, Some(3)).latest());
+        assert!(Version::Stable(1).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Beta(1, Some(1)).latest() > Version::Beta(1, None).latest());
+        assert!(Version::Beta(1, Some(2)).latest() > Version::Beta(1, Some(1)).latest());
+        assert!(Version::Beta(1, None).latest() > Version::Alpha(1, None).latest());
+        assert!(Version::Beta(1, None).latest() > Version::Alpha(1, Some(3)).latest());
+        assert!(Version::Beta(1, None).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Beta(1, Some(2)).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Alpha(1, Some(1)).latest() > Version::Alpha(1, None).latest());
+        assert!(Version::Alpha(1, Some(2)).latest() > Version::Alpha(1, Some(1)).latest());
+        assert!(Version::Alpha(1, None).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(Version::Alpha(1, Some(2)).latest() > Version::Nonconformant("foo".to_string()).latest());
+        assert!(
+            Version::Nonconformant("bar".to_string()).latest()
+                > Version::Nonconformant("foo".to_string()).latest()
+        );
+        assert!(
+            Version::Nonconformant("foo1".to_string()).latest()
+                > Version::Nonconformant("foo10".to_string()).latest()
+        );
+
+        // sort order by default is ascending
+        // sorting with std::cmp::Reverse thus gives you the "most latest stable" first
+        let mut vers = vec![
+            Version::Beta(2, Some(2)),
+            Version::Stable(1),
+            Version::Nonconformant("hi".into()),
+            Version::Alpha(3, Some(2)),
+            Version::Stable(2),
+            Version::Beta(2, Some(3)),
+        ];
+        vers.sort_by_cached_key(|x| Reverse(x.latest()));
+        assert_eq!(vers, vec![
+            Version::Alpha(3, Some(2)),
+            Version::Stable(2),
+            Version::Beta(2, Some(3)),
+            Version::Beta(2, Some(2)),
+            Version::Stable(1),
             Version::Nonconformant("hi".into()),
         ]);
     }
