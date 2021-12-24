@@ -437,12 +437,24 @@ impl Cluster {
 }
 
 impl AuthInfo {
+    pub(crate) fn identity_pem(&self) -> Result<Vec<u8>, KubeconfigError> {
+        let client_cert = &self.load_client_certificate()?;
+        let client_key = &self.load_client_key()?;
+        let mut buffer = client_key.clone();
+        buffer.extend_from_slice(client_cert);
+        Ok(buffer)
+    }
+
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>, KubeconfigError> {
+        // TODO Shouldn't error when `self.client_certificate_data.is_none() && self.client_certificate.is_none()`
+
         load_from_base64_or_file(&self.client_certificate_data, &self.client_certificate)
             .map_err(KubeconfigError::LoadClientCertificate)
     }
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>, KubeconfigError> {
+        // TODO Shouldn't error when `self.client_key_data.is_none() && self.client_key.is_none()`
+
         load_from_base64_or_file(&self.client_key_data, &self.client_key)
             .map_err(KubeconfigError::LoadClientKey)
     }

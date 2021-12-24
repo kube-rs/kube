@@ -135,9 +135,6 @@ pub struct Config {
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid ceritifacts
     pub accept_invalid_certs: bool,
-    // TODO should keep client key and certificate separate. It's split later anyway.
-    /// Client certificate and private key in PEM.
-    pub(crate) identity_pem: Option<Vec<u8>>,
     /// Stores information to tell the cluster who you are.
     pub(crate) auth_info: AuthInfo,
     // TODO Actually support proxy or create an example with custom client
@@ -158,7 +155,6 @@ impl Config {
             root_cert: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
-            identity_pem: None,
             auth_info: AuthInfo::default(),
             proxy_url: None,
         }
@@ -212,7 +208,6 @@ impl Config {
             root_cert: Some(root_cert),
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
-            identity_pem: None,
             auth_info: AuthInfo {
                 token: Some(SecretString::from(token)),
                 ..Default::default()
@@ -255,9 +250,8 @@ impl Config {
             .clone()
             .unwrap_or_else(|| String::from("default"));
 
-        let mut accept_invalid_certs = false;
+        let mut accept_invalid_certs = loader.cluster.insecure_skip_tls_verify.unwrap_or(false);
         let mut root_cert = None;
-        let mut identity_pem = None;
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
             for ca in &ca_bundle {
@@ -266,28 +260,20 @@ impl Config {
             root_cert = Some(ca_bundle);
         }
 
-        // REVIEW Changed behavior. This no longer fails with invalid data in PEM.
-        match loader.identity_pem() {
-            Ok(id) => identity_pem = Some(id),
-            Err(e) => {
-                tracing::debug!("failed to load client identity from kubeconfig: {}", e);
-                // last resort only if configs ask for it, and no client certs
-                if let Some(true) = loader.cluster.insecure_skip_tls_verify {
-                    accept_invalid_certs = true;
-                }
-            }
-        }
-
         Ok(Self {
             cluster_url,
             default_namespace,
             root_cert,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
-            identity_pem,
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
         })
+    }
+
+    /// Client certificate and private key in PEM.
+    pub(crate) fn identity_pem(&self) -> Option<Vec<u8>> {
+        self.auth_info.identity_pem().ok()
     }
 }
 
