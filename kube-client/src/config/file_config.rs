@@ -455,11 +455,8 @@ impl AuthInfo {
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_certificate_data.is_none() && self.client_certificate.is_none()`
 
-        load_from_base64_or_file(
-            &self.client_certificate_data.as_deref(),
-            &self.client_certificate,
-        )
-        .map_err(KubeconfigError::LoadClientCertificate)
+        load_from_base64_or_file(&self.client_certificate_data.as_deref(), &self.client_certificate)
+            .map_err(KubeconfigError::LoadClientCertificate)
     }
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>, KubeconfigError> {
