@@ -5,7 +5,7 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 /// This type implements two orderings for sorting by:
 ///
 /// - [`Version::priority`] for [Kubernetes/kubectl version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
-/// - [`Version::distance`] for sorting strictly by version distance in a semver style
+/// - [`Version::generation`] for sorting strictly by version generation in a semver style
 ///
 /// To get the api versions sorted by `kubectl` priority:
 ///
@@ -129,9 +129,9 @@ struct Priority {
     nonconformant: Option<Reverse<String>>,
 }
 
-/// See [`Version::distance`]
+/// See [`Version::generation`]
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
-struct Distance {
+struct Generation {
     major: u32,
     stability: Stability,
     minor: Option<u32>,
@@ -188,7 +188,7 @@ impl Version {
         }
     }
 
-    /// An [`Ord`] for `Version` that orders by semantic version distance
+    /// An [`Ord`] for `Version` that orders by version generation
     ///
     /// This order will favour higher version numbers even if it's a pre-release.
     ///
@@ -196,34 +196,34 @@ impl Version {
     ///
     /// ```
     /// # use kube_core::Version;
-    /// assert!(Version::Stable(2).distance() > Version::Stable(1).distance());
-    /// assert!(Version::Stable(1).distance() > Version::Beta(1, None).distance());
-    /// assert!(Version::Beta(2, None).distance() > Version::Stable(1).distance());
-    /// assert!(Version::Stable(2).distance() > Version::Alpha(1, Some(2)).distance());
-    /// assert!(Version::Alpha(2, Some(2)).distance() > Version::Stable(1).distance());
-    /// assert!(Version::Beta(1, None).distance() > Version::Nonconformant("ver3".into()).distance());
+    /// assert!(Version::Stable(2).generation() > Version::Stable(1).generation());
+    /// assert!(Version::Stable(1).generation() > Version::Beta(1, None).generation());
+    /// assert!(Version::Beta(2, None).generation() > Version::Stable(1).generation());
+    /// assert!(Version::Stable(2).generation() > Version::Alpha(1, Some(2)).generation());
+    /// assert!(Version::Alpha(2, Some(2)).generation() > Version::Stable(1).generation());
+    /// assert!(Version::Beta(1, None).generation() > Version::Nonconformant("ver3".into()).generation());
     /// ```
-    pub fn distance(&self) -> impl Ord {
+    pub fn generation(&self) -> impl Ord {
         match self {
-            &Self::Stable(major) => Distance {
+            &Self::Stable(major) => Generation {
                 stability: Stability::Stable,
                 major,
                 minor: None,
                 nonconformant: None,
             },
-            &Self::Beta(major, minor) => Distance {
+            &Self::Beta(major, minor) => Generation {
                 stability: Stability::Beta,
                 major,
                 minor,
                 nonconformant: None,
             },
-            &Self::Alpha(major, minor) => Distance {
+            &Self::Alpha(major, minor) => Generation {
                 stability: Stability::Alpha,
                 major,
                 minor,
                 nonconformant: None,
             },
-            Self::Nonconformant(nonconformant) => Distance {
+            Self::Nonconformant(nonconformant) => Generation {
                 stability: Stability::Nonconformant,
                 major: 0,
                 minor: None,
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_version_priority_ord() {
-        // sorting makes sense from a "greater than" distance perspective:
+        // sorting makes sense from a "greater than" generation perspective:
         assert!(Version::Stable(2).priority() > Version::Stable(1).priority());
         assert!(Version::Stable(1).priority() > Version::Beta(1, None).priority());
         assert!(Version::Stable(1).priority() > Version::Beta(2, None).priority());
@@ -334,41 +334,47 @@ mod tests {
     }
 
     #[test]
-    fn test_version_distance_ord() {
-        assert!(Version::Stable(2).distance() > Version::Stable(1).distance());
-        assert!(Version::Stable(1).distance() > Version::Beta(1, None).distance());
-        assert!(Version::Stable(1).distance() < Version::Beta(2, None).distance());
-        assert!(Version::Stable(2).distance() > Version::Alpha(1, Some(2)).distance());
-        assert!(Version::Stable(1).distance() < Version::Alpha(2, Some(2)).distance());
-        assert!(Version::Beta(1, None).distance() > Version::Nonconformant("ver3".into()).distance());
+    fn test_version_generation_ord() {
+        assert!(Version::Stable(2).generation() > Version::Stable(1).generation());
+        assert!(Version::Stable(1).generation() > Version::Beta(1, None).generation());
+        assert!(Version::Stable(1).generation() < Version::Beta(2, None).generation());
+        assert!(Version::Stable(2).generation() > Version::Alpha(1, Some(2)).generation());
+        assert!(Version::Stable(1).generation() < Version::Alpha(2, Some(2)).generation());
+        assert!(Version::Beta(1, None).generation() > Version::Nonconformant("ver3".into()).generation());
 
-        assert!(Version::Stable(2).distance() > Version::Stable(1).distance());
-        assert!(Version::Stable(1).distance() < Version::Beta(2, None).distance());
-        assert!(Version::Stable(1).distance() < Version::Beta(2, Some(2)).distance());
-        assert!(Version::Stable(1).distance() < Version::Alpha(2, None).distance());
-        assert!(Version::Stable(1).distance() < Version::Alpha(2, Some(3)).distance());
-        assert!(Version::Stable(1).distance() > Version::Nonconformant("foo".to_string()).distance());
-        assert!(Version::Beta(1, Some(1)).distance() > Version::Beta(1, None).distance());
-        assert!(Version::Beta(1, Some(2)).distance() > Version::Beta(1, Some(1)).distance());
-        assert!(Version::Beta(1, None).distance() > Version::Alpha(1, None).distance());
-        assert!(Version::Beta(1, None).distance() > Version::Alpha(1, Some(3)).distance());
-        assert!(Version::Beta(1, None).distance() > Version::Nonconformant("foo".to_string()).distance());
-        assert!(Version::Beta(1, Some(2)).distance() > Version::Nonconformant("foo".to_string()).distance());
-        assert!(Version::Alpha(1, Some(1)).distance() > Version::Alpha(1, None).distance());
-        assert!(Version::Alpha(1, Some(2)).distance() > Version::Alpha(1, Some(1)).distance());
-        assert!(Version::Alpha(1, None).distance() > Version::Nonconformant("foo".to_string()).distance());
-        assert!(Version::Alpha(1, Some(2)).distance() > Version::Nonconformant("foo".to_string()).distance());
+        assert!(Version::Stable(2).generation() > Version::Stable(1).generation());
+        assert!(Version::Stable(1).generation() < Version::Beta(2, None).generation());
+        assert!(Version::Stable(1).generation() < Version::Beta(2, Some(2)).generation());
+        assert!(Version::Stable(1).generation() < Version::Alpha(2, None).generation());
+        assert!(Version::Stable(1).generation() < Version::Alpha(2, Some(3)).generation());
+        assert!(Version::Stable(1).generation() > Version::Nonconformant("foo".to_string()).generation());
+        assert!(Version::Beta(1, Some(1)).generation() > Version::Beta(1, None).generation());
+        assert!(Version::Beta(1, Some(2)).generation() > Version::Beta(1, Some(1)).generation());
+        assert!(Version::Beta(1, None).generation() > Version::Alpha(1, None).generation());
+        assert!(Version::Beta(1, None).generation() > Version::Alpha(1, Some(3)).generation());
+        assert!(Version::Beta(1, None).generation() > Version::Nonconformant("foo".to_string()).generation());
         assert!(
-            Version::Nonconformant("bar".to_string()).distance()
-                > Version::Nonconformant("foo".to_string()).distance()
+            Version::Beta(1, Some(2)).generation() > Version::Nonconformant("foo".to_string()).generation()
+        );
+        assert!(Version::Alpha(1, Some(1)).generation() > Version::Alpha(1, None).generation());
+        assert!(Version::Alpha(1, Some(2)).generation() > Version::Alpha(1, Some(1)).generation());
+        assert!(
+            Version::Alpha(1, None).generation() > Version::Nonconformant("foo".to_string()).generation()
         );
         assert!(
-            Version::Nonconformant("foo1".to_string()).distance()
-                > Version::Nonconformant("foo10".to_string()).distance()
+            Version::Alpha(1, Some(2)).generation() > Version::Nonconformant("foo".to_string()).generation()
+        );
+        assert!(
+            Version::Nonconformant("bar".to_string()).generation()
+                > Version::Nonconformant("foo".to_string()).generation()
+        );
+        assert!(
+            Version::Nonconformant("foo1".to_string()).generation()
+                > Version::Nonconformant("foo10".to_string()).generation()
         );
 
         // sort orders by default is ascending
-        // sorting with std::cmp::Reverse on distance gives you the latest distance versions first
+        // sorting with std::cmp::Reverse on generation gives you the latest generation versions first
         let mut vers = vec![
             Version::Beta(2, Some(2)),
             Version::Stable(1),
@@ -377,7 +383,7 @@ mod tests {
             Version::Stable(2),
             Version::Beta(2, Some(3)),
         ];
-        vers.sort_by_cached_key(|x| Reverse(x.distance()));
+        vers.sort_by_cached_key(|x| Reverse(x.generation()));
         assert_eq!(vers, vec![
             Version::Alpha(3, Some(2)),
             Version::Stable(2),
