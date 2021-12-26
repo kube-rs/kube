@@ -3,8 +3,9 @@ use std::{cmp::Reverse, convert::Infallible, str::FromStr};
 /// Version parser for Kubernetes version patterns
 ///
 /// This type implements two orderings for sorting by:
+///
 /// - [`Version::priority`] for [Kubernetes/kubectl version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
-/// - [`Version::semantic`] for traditional semver style ordering
+/// - [`Version::distance`] for sorting strictly by version distance in a semver style
 ///
 /// To get the api versions sorted by `kubectl` priority:
 ///
@@ -54,7 +55,7 @@ pub enum Version {
     ///
     /// Always considered higher priority than a nonconformant version
     Alpha(u32, Option<u32>),
-    /// An non-conformant api string (sorted alphabetically)
+    /// An non-conformant api string
     ///
     /// CRDs and APIServices can use arbitrary strings as versions.
     Nonconformant(String),
@@ -128,9 +129,9 @@ struct Priority {
     nonconformant: Option<Reverse<String>>,
 }
 
-/// See [`Version::semantic`]
+/// See [`Version::distance`]
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
-struct Semantic {
+struct Distance {
     major: u32,
     stability: Stability,
     minor: Option<u32>,
@@ -138,9 +139,9 @@ struct Semantic {
 }
 
 impl Version {
-    /// An [`Ord`] for `Version` that prefers stable versions over later prereleases
+    /// An [`Ord`] for `Version` that orders by [Kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
     ///
-    /// Implements the [Kubernetes version priority order](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
+    /// This order will favour stable versions over newer pre-releases and is used by `kubectl`.
     ///
     /// For example:
     ///
@@ -156,15 +157,17 @@ impl Version {
     ///
     /// Note that the type of release matters more than the version numbers:
     /// `Stable(x)` > `Beta(y)` > `Alpha(z)` > `Nonconformant(w)` for all `x`,`y`,`z`,`w`
+    ///
+    /// `Nonconformant` versions are ordered alphabetically.
     pub fn priority(&self) -> impl Ord {
         match self {
-            &Version::Stable(major) => Priority {
+            &Self::Stable(major) => Priority {
                 stability: Stability::Stable,
                 major,
                 minor: None,
                 nonconformant: None,
             },
-            &Version::Beta(major, minor) => Priority {
+            &Self::Beta(major, minor) => Priority {
                 stability: Stability::Beta,
                 major,
                 minor,
@@ -185,40 +188,42 @@ impl Version {
         }
     }
 
-    /// An [`Ord`] for `Version` that prefers the semantically greatest release (even if it's a pre-release)
+    /// An [`Ord`] for `Version` that orders by semantic version distance
+    ///
+    /// This order will favour higher version numbers even if it's a pre-release.
     ///
     /// For example:
     ///
     /// ```
     /// # use kube_core::Version;
-    /// assert!(Version::Stable(2).semantic() > Version::Stable(1).semantic());
-    /// assert!(Version::Stable(1).semantic() > Version::Beta(1, None).semantic());
-    /// assert!(Version::Beta(2, None).semantic() > Version::Stable(1).semantic());
-    /// assert!(Version::Stable(2).semantic() > Version::Alpha(1, Some(2)).semantic());
-    /// assert!(Version::Alpha(2, Some(2)).semantic() > Version::Stable(1).semantic());
-    /// assert!(Version::Beta(1, None).semantic() > Version::Nonconformant("ver3".into()).semantic());
+    /// assert!(Version::Stable(2).distance() > Version::Stable(1).distance());
+    /// assert!(Version::Stable(1).distance() > Version::Beta(1, None).distance());
+    /// assert!(Version::Beta(2, None).distance() > Version::Stable(1).distance());
+    /// assert!(Version::Stable(2).distance() > Version::Alpha(1, Some(2)).distance());
+    /// assert!(Version::Alpha(2, Some(2)).distance() > Version::Stable(1).distance());
+    /// assert!(Version::Beta(1, None).distance() > Version::Nonconformant("ver3".into()).distance());
     /// ```
-    pub fn semantic(&self) -> impl Ord {
+    pub fn distance(&self) -> impl Ord {
         match self {
-            &Version::Stable(major) => Semantic {
+            &Self::Stable(major) => Distance {
                 stability: Stability::Stable,
                 major,
                 minor: None,
                 nonconformant: None,
             },
-            &Version::Beta(major, minor) => Semantic {
+            &Self::Beta(major, minor) => Distance {
                 stability: Stability::Beta,
                 major,
                 minor,
                 nonconformant: None,
             },
-            &Self::Alpha(major, minor) => Semantic {
+            &Self::Alpha(major, minor) => Distance {
                 stability: Stability::Alpha,
                 major,
                 minor,
                 nonconformant: None,
             },
-            Self::Nonconformant(nonconformant) => Semantic {
+            Self::Nonconformant(nonconformant) => Distance {
                 stability: Stability::Nonconformant,
                 major: 0,
                 minor: None,
@@ -274,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_version_priority_ord() {
-        // sorting makes sense from a "greater than" semantic perspective:
+        // sorting makes sense from a "greater than" distance perspective:
         assert!(Version::Stable(2).priority() > Version::Stable(1).priority());
         assert!(Version::Stable(1).priority() > Version::Beta(1, None).priority());
         assert!(Version::Stable(1).priority() > Version::Beta(2, None).priority());
@@ -329,41 +334,41 @@ mod tests {
     }
 
     #[test]
-    fn test_version_semantic_ord() {
-        assert!(Version::Stable(2).semantic() > Version::Stable(1).semantic());
-        assert!(Version::Stable(1).semantic() > Version::Beta(1, None).semantic());
-        assert!(Version::Stable(1).semantic() < Version::Beta(2, None).semantic());
-        assert!(Version::Stable(2).semantic() > Version::Alpha(1, Some(2)).semantic());
-        assert!(Version::Stable(1).semantic() < Version::Alpha(2, Some(2)).semantic());
-        assert!(Version::Beta(1, None).semantic() > Version::Nonconformant("ver3".into()).semantic());
+    fn test_version_distance_ord() {
+        assert!(Version::Stable(2).distance() > Version::Stable(1).distance());
+        assert!(Version::Stable(1).distance() > Version::Beta(1, None).distance());
+        assert!(Version::Stable(1).distance() < Version::Beta(2, None).distance());
+        assert!(Version::Stable(2).distance() > Version::Alpha(1, Some(2)).distance());
+        assert!(Version::Stable(1).distance() < Version::Alpha(2, Some(2)).distance());
+        assert!(Version::Beta(1, None).distance() > Version::Nonconformant("ver3".into()).distance());
 
-        assert!(Version::Stable(2).semantic() > Version::Stable(1).semantic());
-        assert!(Version::Stable(1).semantic() < Version::Beta(2, None).semantic());
-        assert!(Version::Stable(1).semantic() < Version::Beta(2, Some(2)).semantic());
-        assert!(Version::Stable(1).semantic() < Version::Alpha(2, None).semantic());
-        assert!(Version::Stable(1).semantic() < Version::Alpha(2, Some(3)).semantic());
-        assert!(Version::Stable(1).semantic() > Version::Nonconformant("foo".to_string()).semantic());
-        assert!(Version::Beta(1, Some(1)).semantic() > Version::Beta(1, None).semantic());
-        assert!(Version::Beta(1, Some(2)).semantic() > Version::Beta(1, Some(1)).semantic());
-        assert!(Version::Beta(1, None).semantic() > Version::Alpha(1, None).semantic());
-        assert!(Version::Beta(1, None).semantic() > Version::Alpha(1, Some(3)).semantic());
-        assert!(Version::Beta(1, None).semantic() > Version::Nonconformant("foo".to_string()).semantic());
-        assert!(Version::Beta(1, Some(2)).semantic() > Version::Nonconformant("foo".to_string()).semantic());
-        assert!(Version::Alpha(1, Some(1)).semantic() > Version::Alpha(1, None).semantic());
-        assert!(Version::Alpha(1, Some(2)).semantic() > Version::Alpha(1, Some(1)).semantic());
-        assert!(Version::Alpha(1, None).semantic() > Version::Nonconformant("foo".to_string()).semantic());
-        assert!(Version::Alpha(1, Some(2)).semantic() > Version::Nonconformant("foo".to_string()).semantic());
+        assert!(Version::Stable(2).distance() > Version::Stable(1).distance());
+        assert!(Version::Stable(1).distance() < Version::Beta(2, None).distance());
+        assert!(Version::Stable(1).distance() < Version::Beta(2, Some(2)).distance());
+        assert!(Version::Stable(1).distance() < Version::Alpha(2, None).distance());
+        assert!(Version::Stable(1).distance() < Version::Alpha(2, Some(3)).distance());
+        assert!(Version::Stable(1).distance() > Version::Nonconformant("foo".to_string()).distance());
+        assert!(Version::Beta(1, Some(1)).distance() > Version::Beta(1, None).distance());
+        assert!(Version::Beta(1, Some(2)).distance() > Version::Beta(1, Some(1)).distance());
+        assert!(Version::Beta(1, None).distance() > Version::Alpha(1, None).distance());
+        assert!(Version::Beta(1, None).distance() > Version::Alpha(1, Some(3)).distance());
+        assert!(Version::Beta(1, None).distance() > Version::Nonconformant("foo".to_string()).distance());
+        assert!(Version::Beta(1, Some(2)).distance() > Version::Nonconformant("foo".to_string()).distance());
+        assert!(Version::Alpha(1, Some(1)).distance() > Version::Alpha(1, None).distance());
+        assert!(Version::Alpha(1, Some(2)).distance() > Version::Alpha(1, Some(1)).distance());
+        assert!(Version::Alpha(1, None).distance() > Version::Nonconformant("foo".to_string()).distance());
+        assert!(Version::Alpha(1, Some(2)).distance() > Version::Nonconformant("foo".to_string()).distance());
         assert!(
-            Version::Nonconformant("bar".to_string()).semantic()
-                > Version::Nonconformant("foo".to_string()).semantic()
+            Version::Nonconformant("bar".to_string()).distance()
+                > Version::Nonconformant("foo".to_string()).distance()
         );
         assert!(
-            Version::Nonconformant("foo1".to_string()).semantic()
-                > Version::Nonconformant("foo10".to_string()).semantic()
+            Version::Nonconformant("foo1".to_string()).distance()
+                > Version::Nonconformant("foo10".to_string()).distance()
         );
 
         // sort orders by default is ascending
-        // sorting with std::cmp::Reverse on semantic gives you the latest semantic versions first
+        // sorting with std::cmp::Reverse on distance gives you the latest distance versions first
         let mut vers = vec![
             Version::Beta(2, Some(2)),
             Version::Stable(1),
@@ -372,7 +377,7 @@ mod tests {
             Version::Stable(2),
             Version::Beta(2, Some(3)),
         ];
-        vers.sort_by_cached_key(|x| Reverse(x.semantic()));
+        vers.sort_by_cached_key(|x| Reverse(x.distance()));
         assert_eq!(vers, vec![
             Version::Alpha(3, Some(2)),
             Version::Stable(2),
