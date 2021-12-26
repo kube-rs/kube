@@ -65,10 +65,9 @@ pub enum Version {
 impl Version {
     fn try_parse(v: &str) -> Option<Version> {
         let v = v.strip_prefix('v')?;
-        let major_chars = v.chars().take_while(|ch| ch.is_ascii_digit()).count();
-        let major = &v[..major_chars];
+        let major = v.split_terminator(|ch: char| !ch.is_ascii_digit()).next()?;
+        let v = &v[major.len()..];
         let major: u32 = major.parse().ok()?;
-        let v = &v[major_chars..];
         if v.is_empty() {
             return Some(Version::Stable(major));
         }
