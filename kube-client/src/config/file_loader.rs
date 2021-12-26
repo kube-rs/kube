@@ -96,14 +96,6 @@ impl ConfigLoader {
         })
     }
 
-    pub fn identity_pem(&self) -> Result<Vec<u8>, KubeconfigError> {
-        let client_cert = &self.user.load_client_certificate()?;
-        let client_key = &self.user.load_client_key()?;
-        let mut buffer = client_key.clone();
-        buffer.extend_from_slice(client_cert);
-        Ok(buffer)
-    }
-
     pub fn ca_bundle(&self) -> Result<Option<Vec<Vec<u8>>>, KubeconfigError> {
         if let Some(bundle) = self.cluster.load_certificate_authority()? {
             Ok(Some(
