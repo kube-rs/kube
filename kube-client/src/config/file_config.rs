@@ -124,7 +124,7 @@ where
     S: Serializer,
 {
     match pw {
-        Some(pw_string) => serializer.serialize_str(pw_string.expose_secret()),
+        Some(secret) => serializer.serialize_str(secret.expose_secret()),
         None => serializer.serialize_none(),
     }
 }
@@ -134,7 +134,7 @@ where
     D: Deserializer<'de>,
 {
     match String::deserialize(deserializer) {
-        Ok(pw_string) => Ok(Some(SecretString::new(pw_string))),
+        Ok(secret) => Ok(Some(SecretString::new(secret))),
         Err(e) => Err(e),
     }
 }

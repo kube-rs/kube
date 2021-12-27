@@ -59,7 +59,6 @@ impl Request {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::{params::Patch, request::Request, resource::Resource};
