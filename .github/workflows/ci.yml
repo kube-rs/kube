@@ -8,8 +8,7 @@ jobs:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        # TODO: add windows-latest (see #566)
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -23,6 +22,17 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v1
+
+      # Install OpenSSL Libraries for Windows
+      - name: install openssl
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install --verbose openssl
+          openssl version
+          refreshenv
+          echo "OPENSSL_LIB_DIR=C:/Program Files/OpenSSL-Win64/lib" >> $env:GITHUB_ENV
+          echo "OPENSSL_DIR=C:/Program Files/OpenSSL-Win64/" >> $env:GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=C:/Program Files/OpenSSL-Win64/include" >> $env:GITHUB_ENV
 
       # Real CI work starts here
       - name: Build workspace
