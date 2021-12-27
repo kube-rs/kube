@@ -60,7 +60,6 @@ pub enum Version {
     /// CRDs and APIServices can use arbitrary strings as versions.
     Nonconformant(String),
 }
-// NB:
 
 impl Version {
     fn try_parse(v: &str) -> Option<Version> {
