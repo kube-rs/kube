@@ -2,9 +2,18 @@ use crate::{
     api::{Api, Resource},
     Error, Result,
 };
-use k8s_openapi::api::core::v1::Node;
-use kube_core::util::Restart;
-use serde::de::DeserializeOwned;
+use k8s_openapi::api::{
+    certificates::v1::{
+        CertificateSigningRequest, CertificateSigningRequestCondition, CertificateSigningRequestStatus,
+    },
+    core::v1::Node,
+};
+use kube_core::{
+    params::{Patch, PatchParams},
+    util::Restart,
+};
+use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Debug;
 
 impl<K> Api<K>
 where
@@ -31,6 +40,30 @@ impl Api<Node> {
         let mut req = self.request.uncordon(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("cordon");
         self.client.request::<Node>(req).await
+    }
+}
+
+impl Api<CertificateSigningRequest> {
+    /// Partially update approval of the specified CertificateSigningRequest.
+    pub async fn approve(&self, name: &str, pp: &PatchParams) -> Result<CertificateSigningRequest> {
+        let patch = serde_json::json!({"status": CertificateSigningRequestStatus {
+            certificate:None,
+            conditions: Some(vec![CertificateSigningRequestCondition {
+                type_: "Approved".to_string(),
+                last_update_time: None,
+                last_transition_time: None,
+                message: Some("Approved by kube-rs client".to_string()),
+                reason: Some("kube-rsClient".to_string()),
+                status: "True".to_string()
+            }])
+        }});
+
+        let mut req = self
+            .request
+            .patch_subresource("approval", name, pp, &Patch::Strategic(&patch))
+            .map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("approval");
+        self.client.request::<CertificateSigningRequest>(req).await
     }
 }
 
