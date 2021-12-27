@@ -1,11 +1,12 @@
-use super::{
-    parse::{self, GroupVersionData},
-    version::Version,
-};
+use super::parse::{self, GroupVersionData};
 use crate::{error::DiscoveryError, Client, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
-use kube_core::gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError};
+use kube_core::{
+    gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
+    Version,
+};
+use std::cmp::Reverse;
 
 
 /// Describes one API groups collected resources and capabilities.
@@ -117,7 +118,7 @@ impl ApiGroup {
 
     fn sort_versions(&mut self) {
         self.data
-            .sort_by_cached_key(|gvd| Version::parse(gvd.version.as_str()))
+            .sort_by_cached_key(|gvd| Reverse(Version::parse(gvd.version.as_str()).priority()))
     }
 
     // shortcut method to give cheapest return for a single GVK
@@ -176,13 +177,11 @@ impl ApiGroup {
 
     /// Returns served versions (e.g. `["v1", "v2beta1"]`) of this group.
     ///
-    /// This list is always non-empty, and sorted in the following order:
+    /// This [`Iterator`] is never empty, and returns elements in descending order of [`Version`](kube_core::Version):
     /// - Stable versions (with the last being the first)
     /// - Beta versions (with the last being the first)
     /// - Alpha versions (with the last being the first)
     /// - Other versions, alphabetically
-    ///
-    /// in accordance with [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority).
     pub fn versions(&self) -> impl Iterator<Item = &str> {
         self.data.as_slice().iter().map(|gvd| gvd.version.as_str())
     }
@@ -194,8 +193,9 @@ impl ApiGroup {
 
     /// Returns the preferred version or latest version for working with given group.
     ///
-    /// If server does not recommend one, we pick the "most stable and most recent" version
-    /// in accordance with [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority).
+    /// If the server does not recommend a version, we pick the "most stable and most recent" version
+    /// in accordance with [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
+    /// via the descending sort order from [`Version`](kube_core::Version).
     pub fn preferred_version_or_latest(&self) -> &str {
         // NB: self.versions is non-empty by construction in ApiGroup
         self.preferred
