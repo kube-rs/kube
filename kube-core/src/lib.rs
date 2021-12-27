@@ -51,3 +51,6 @@ pub use watch::WatchEvent;
 
 mod error;
 pub use error::ErrorResponse;
+
+mod version;
+pub use version::Version;

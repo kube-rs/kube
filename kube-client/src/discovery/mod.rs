@@ -8,8 +8,6 @@ mod apigroup;
 pub mod oneshot;
 pub use apigroup::ApiGroup;
 mod parse;
-// an implementation of mentioned kubernetes version priority
-mod version;
 
 // re-export one-shots
 pub use oneshot::{group, pinned_group, pinned_kind};
