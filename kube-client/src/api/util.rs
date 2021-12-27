@@ -12,8 +12,7 @@ use kube_core::{
     params::{Patch, PatchParams},
     util::Restart,
 };
-use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
+use serde::{de::DeserializeOwned};
 
 impl<K> Api<K>
 where
@@ -43,16 +42,35 @@ impl Api<Node> {
     }
 }
 
+type CSRStatusType = &'static str;
+static APPROVED: CSRStatusType = "Approved";
+static DENIED: CSRStatusType = "Denied";
+
 impl Api<CertificateSigningRequest> {
-    /// Partially update approval of the specified CertificateSigningRequest.
+    /// Approve the specified CertificateSigningRequest.
     pub async fn approve(&self, name: &str, pp: &PatchParams) -> Result<CertificateSigningRequest> {
+        self.patch_approval(name, pp, &APPROVED).await
+    }
+
+    /// Deny the specified CertificateSigningRequest.
+    pub async fn deny(&self, name: &str, pp: &PatchParams) -> Result<CertificateSigningRequest> {
+        self.patch_approval(name, pp, &DENIED).await
+    }
+
+    /// Partially update approval of the specified CertificateSigningRequest.
+    async fn patch_approval(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        approval_type: &CSRStatusType,
+    ) -> Result<CertificateSigningRequest> {
         let patch = serde_json::json!({"status": CertificateSigningRequestStatus {
             certificate:None,
             conditions: Some(vec![CertificateSigningRequestCondition {
-                type_: "Approved".to_string(),
+                type_: approval_type.to_string(),
                 last_update_time: None,
                 last_transition_time: None,
-                message: Some("Approved by kube-rs client".to_string()),
+                message: Some(format!("{} {}", approval_type, "by kube-rs client")),
                 reason: Some("kube-rsClient".to_string()),
                 status: "True".to_string()
             }])
