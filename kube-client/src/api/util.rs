@@ -12,7 +12,7 @@ use kube_core::{
     params::{Patch, PatchParams},
     util::Restart,
 };
-use serde::{de::DeserializeOwned};
+use serde::de::DeserializeOwned;
 
 impl<K> Api<K>
 where

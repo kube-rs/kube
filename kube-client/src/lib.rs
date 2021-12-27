@@ -467,10 +467,7 @@ mod test {
     #[tokio::test]
     #[ignore] // needs cluster (will create a CertificateSigningRequest)
     async fn csr_can_be_approved() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::{
-            api::{ListParams, PostParams},
-            core::subresource::LogParams,
-        };
+        use crate::api::{ListParams, PostParams};
         use k8s_openapi::api::certificates::v1::CertificateSigningRequest;
 
         let csr_name = "fake";
