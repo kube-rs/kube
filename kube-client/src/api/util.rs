@@ -4,7 +4,7 @@ use crate::{
 };
 use k8s_openapi::api::{
     certificates::v1::{
-        CertificateSigningRequest, CertificateSigningRequestCondition, CertificateSigningRequestStatus,
+        CertificateSigningRequest, CertificateSigningRequestStatus,
     },
     core::v1::Node,
 };
@@ -42,43 +42,19 @@ impl Api<Node> {
     }
 }
 
-type CSRStatusType = &'static str;
-static APPROVED: CSRStatusType = "Approved";
-static DENIED: CSRStatusType = "Denied";
-
 impl Api<CertificateSigningRequest> {
-    /// Approve the specified CertificateSigningRequest.
-    pub async fn approve(&self, name: &str, pp: &PatchParams) -> Result<CertificateSigningRequest> {
-        self.patch_approval(name, pp, &APPROVED).await
-    }
-
-    /// Deny the specified CertificateSigningRequest.
-    pub async fn deny(&self, name: &str, pp: &PatchParams) -> Result<CertificateSigningRequest> {
-        self.patch_approval(name, pp, &DENIED).await
-    }
-
     /// Partially update approval of the specified CertificateSigningRequest.
-    async fn patch_approval(
+    pub async fn patch_approval(
         &self,
         name: &str,
         pp: &PatchParams,
-        approval_type: &CSRStatusType,
+        status: &CertificateSigningRequestStatus,
     ) -> Result<CertificateSigningRequest> {
-        let patch = serde_json::json!({"status": CertificateSigningRequestStatus {
-            certificate:None,
-            conditions: Some(vec![CertificateSigningRequestCondition {
-                type_: approval_type.to_string(),
-                last_update_time: None,
-                last_transition_time: None,
-                message: Some(format!("{} {}", approval_type, "by kube-rs client")),
-                reason: Some("kube-rsClient".to_string()),
-                status: "True".to_string()
-            }])
-        }});
+        let patch = serde_json::json!({ "status": status });
 
         let mut req = self
             .request
-            .patch_subresource("approval", name, pp, &Patch::Strategic(&patch))
+            .patch_subresource("approval", name, pp, &Patch::Merge(&patch))
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("approval");
         self.client.request::<CertificateSigningRequest>(req).await
