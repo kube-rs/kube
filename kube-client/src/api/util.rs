@@ -3,9 +3,7 @@ use crate::{
     Error, Result,
 };
 use k8s_openapi::api::{
-    certificates::v1::{
-        CertificateSigningRequest, CertificateSigningRequestStatus,
-    },
+    certificates::v1::{CertificateSigningRequest, CertificateSigningRequestStatus},
     core::v1::Node,
 };
 use kube_core::{
