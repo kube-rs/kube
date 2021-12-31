@@ -2,10 +2,7 @@ use crate::{
     api::{Api, Resource},
     Error, Result,
 };
-use k8s_openapi::api::{
-    certificates::v1::{CertificateSigningRequest, CertificateSigningRequestStatus},
-    core::v1::Node,
-};
+use k8s_openapi::api::{certificates::v1::CertificateSigningRequest, core::v1::Node};
 use kube_core::{
     params::{Patch, PatchParams},
     util::Restart,
@@ -42,17 +39,15 @@ impl Api<Node> {
 
 impl Api<CertificateSigningRequest> {
     /// Partially update approval of the specified CertificateSigningRequest.
-    pub async fn patch_approval(
+    pub async fn patch_approval<P: serde::Serialize>(
         &self,
         name: &str,
         pp: &PatchParams,
-        status: &CertificateSigningRequestStatus,
+        patch: &Patch<P>,
     ) -> Result<CertificateSigningRequest> {
-        let patch = serde_json::json!({ "status": status });
-
         let mut req = self
             .request
-            .patch_subresource("approval", name, pp, &Patch::Merge(&patch))
+            .patch_subresource("approval", name, pp, patch)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("approval");
         self.client.request::<CertificateSigningRequest>(req).await

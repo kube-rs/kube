@@ -502,8 +502,9 @@ mod test {
                 status: "True".to_string(),
             }]),
         };
+        let csr_status_patch = Patch::Merge(serde_json::json!({ "status": csr_status }));
         let _ = csr
-            .patch_approval(csr_name, &Default::default(), &csr_status)
+            .patch_approval(csr_name, &Default::default(), &csr_status_patch)
             .await?;
         let csr_after_approval = csr.get(csr_name).await?;
 
