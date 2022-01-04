@@ -21,6 +21,7 @@
 - [Materialize](http://materialize.com)
 - [Qualified](https://www.qualified.io)
 - [TrueLayer](https://truelayer.com)
+- [ViacomCBS](https://viacomcbs.com)
 
 If you're using kube-rs and aren't on this list, please [submit a pull
 request](https://github.com/kube-rs/kube-rs/edit/master/ADOPTERS.md)!
