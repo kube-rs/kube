@@ -53,8 +53,9 @@ impl Api<CertificateSigningRequest> {
         self.client.request::<CertificateSigningRequest>(req).await
     }
 
+    /// Get the CertificateSigningRequest. May differ from get(name)
     pub async fn get_approval(&self, name: &str) -> Result<CertificateSigningRequest> {
-        self.get_subresource("approval", name)
+        self.get_subresource("approval", name).await
     }
 }
 
