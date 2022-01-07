@@ -68,6 +68,14 @@ impl AuthClient {
     }
     /// Verifies that token is valid and was issued for at least one of provided audiences.
     /// If `audiences` is empty this function will verify that token can be used with cluster API.
+    /// ```no_run
+    /// # async fn _(client: &AuthClient, token: &str) -> Result<(), Box<dyn std::error::Error>> {
+    /// let res = client.validate_token(token, &["my-server"]).await?;
+    /// if matches!(res, TokenValidity::Valid) {
+    ///     println!("token is valid");
+    /// }
+    /// # }
+    /// ```
     pub async fn validate_token(&self, token: &str, expected_audiences: &[&str]) -> Result<TokenValidity> {
         let token_review_request = TokenReview {
             spec: TokenReviewSpec {
@@ -107,6 +115,24 @@ impl AuthClient {
     }
 
     /// Verifies that user can do operation.
+    /// ```no_run
+    /// # use  k8s_openapi::api::core::v1::Pod;
+    /// # async fn _(client: &AuthClient, user_info: UserInfo) -> Result<(), Box<dyn std::error::Error>> {
+    /// let attrs = ResourceAttributesBuilder::new()
+    ///     .set_from_resource::<Pod>()
+    ///     .all_verbs()
+    ///     .all_objects()
+    ///     .build();
+    /// let spec = SubjectAccessReviewBuilder::new()
+    ///     .set_from_user_info(user_info)
+    ///     .resource(attrs)
+    ///     .build();
+    /// let res = client.check_access(spec).await?;
+    /// if matches!(res, AccessStatus::Allow) {
+    ///     println!("access granted");
+    /// }
+    /// # }
+    /// ```
     pub async fn check_access(&self, spec: SubjectAccessReviewSpec) -> Result<AccessStatus> {
         let review_request = SubjectAccessReview {
             spec,
