@@ -141,6 +141,7 @@ cfg_client! {
     pub use kube_client::api;
     pub use kube_client::discovery;
     pub use kube_client::client;
+    pub use kube_client::util;
 
     #[doc(inline)]
     pub use api::Api;
