@@ -52,6 +52,10 @@ impl Api<CertificateSigningRequest> {
         req.extensions_mut().insert("approval");
         self.client.request::<CertificateSigningRequest>(req).await
     }
+
+    pub async fn get_approval(&self, name: &str) -> Result<CertificateSigningRequest> {
+        self.get_subresource("approval", name)
+    }
 }
 
 // Tests that require a cluster and the complete feature set
