@@ -490,7 +490,7 @@ mod test {
         assert!(csr.create(&PostParams::default(), &dummy_csr).await.is_ok());
 
         // Patch the approval and approve the CSR
-        let approval_type = "Approved";
+        let approval_type = "ApprovedFake";
         let csr_status: CertificateSigningRequestStatus = CertificateSigningRequestStatus {
             certificate: None,
             conditions: Some(vec![CertificateSigningRequestCondition {
@@ -506,7 +506,7 @@ mod test {
         let _ = csr
             .patch_approval(csr_name, &Default::default(), &csr_status_patch)
             .await?;
-        let csr_after_approval = csr.get(csr_name).await?;
+        let csr_after_approval = csr.get_approval(csr_name).await?;
 
         assert_eq!(
             csr_after_approval
@@ -517,7 +517,7 @@ mod test {
                 .as_ref()
                 .unwrap()[0]
                 .type_,
-            "Approved".to_string()
+            approval_type.to_string()
         );
         csr.delete(csr_name, &DeleteParams::default()).await?;
         Ok(())
