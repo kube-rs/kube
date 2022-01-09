@@ -2,8 +2,11 @@ use crate::{
     api::{Api, Resource},
     Error, Result,
 };
-use k8s_openapi::api::core::v1::Node;
-use kube_core::util::Restart;
+use k8s_openapi::api::{certificates::v1::CertificateSigningRequest, core::v1::Node};
+use kube_core::{
+    params::{Patch, PatchParams},
+    util::Restart,
+};
 use serde::de::DeserializeOwned;
 
 impl<K> Api<K>
@@ -31,6 +34,28 @@ impl Api<Node> {
         let mut req = self.request.uncordon(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("cordon");
         self.client.request::<Node>(req).await
+    }
+}
+
+impl Api<CertificateSigningRequest> {
+    /// Partially update approval of the specified CertificateSigningRequest.
+    pub async fn patch_approval<P: serde::Serialize>(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<CertificateSigningRequest> {
+        let mut req = self
+            .request
+            .patch_subresource("approval", name, pp, patch)
+            .map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("approval");
+        self.client.request::<CertificateSigningRequest>(req).await
+    }
+
+    /// Get the CertificateSigningRequest. May differ from get(name)
+    pub async fn get_approval(&self, name: &str) -> Result<CertificateSigningRequest> {
+        self.get_subresource("approval", name).await
     }
 }
 

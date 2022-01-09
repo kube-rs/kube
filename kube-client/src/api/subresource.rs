@@ -60,6 +60,54 @@ where
     }
 }
 
+/// Arbitrary subresources
+impl<K> Api<K>
+where
+    K: Clone + DeserializeOwned + Debug,
+{
+    /// Display one or many sub-resources.
+    pub async fn get_subresource(&self, subresource_name: &str, name: &str) -> Result<K> {
+        let mut req = self
+            .request
+            .get_subresource(subresource_name, name)
+            .map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("get_subresource");
+        self.client.request::<K>(req).await
+    }
+
+    /// Patch an instance of the subresource
+    pub async fn patch_subresource<P: serde::Serialize + Debug>(
+        &self,
+        subresource_name: &str,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<K> {
+        let mut req = self
+            .request
+            .patch_subresource(subresource_name, name, pp, patch)
+            .map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("patch_subresource");
+        self.client.request::<K>(req).await
+    }
+
+    /// Replace an instance of the subresource
+    pub async fn replace_subresource(
+        &self,
+        subresource_name: &str,
+        name: &str,
+        pp: &PostParams,
+        data: Vec<u8>,
+    ) -> Result<K> {
+        let mut req = self
+            .request
+            .replace_subresource(subresource_name, name, pp, data)
+            .map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("replace_subresource");
+        self.client.request::<K>(req).await
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 // TODO: Replace examples with owned custom resources. Bad practice to write to owned objects
