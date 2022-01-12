@@ -4,6 +4,7 @@
 //! The [`Config`] has several constructors plus logic to infer environment.
 //!
 //! Unless you have issues, prefer using [`Config::infer`], and pass it to a [`Client`][crate::Client].
+use secrecy::SecretString;
 use std::{path::PathBuf, time::Duration};
 
 use thiserror::Error;
@@ -208,7 +209,7 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo {
-                token: Some(token),
+                token: Some(SecretString::from(token)),
                 ..Default::default()
             },
             proxy_url: None,

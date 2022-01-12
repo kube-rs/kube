@@ -7,6 +7,7 @@ use http::{
     HeaderValue, Request,
 };
 use jsonpath_lib::select as jsonpath_select;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -82,8 +83,8 @@ pub enum Error {
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Auth {
     None,
-    Basic(String, String),
-    Bearer(String),
+    Basic(String, SecretString),
+    Bearer(SecretString),
     RefreshableToken(RefreshableToken),
 }
 
@@ -98,7 +99,7 @@ pub(crate) enum Auth {
 // It's not accessible from outside and not shown on docs.
 #[derive(Debug, Clone)]
 pub enum RefreshableToken {
-    Exec(Arc<Mutex<(String, DateTime<Utc>, AuthInfo)>>),
+    Exec(Arc<Mutex<(SecretString, DateTime<Utc>, AuthInfo)>>),
     #[cfg(feature = "oauth")]
     GcpOauth(Arc<Mutex<oauth::Gcp>>),
 }
@@ -150,7 +151,7 @@ impl RefreshableToken {
                     }
                 }
 
-                let mut value = HeaderValue::try_from(format!("Bearer {}", &locked_data.0))
+                let mut value = HeaderValue::try_from(format!("Bearer {}", &locked_data.0.expose_secret()))
                     .map_err(Error::InvalidBearerToken)?;
                 value.set_sensitive(true);
                 Ok(value)
@@ -179,7 +180,7 @@ impl TryFrom<&AuthInfo> for Auth {
         if let Some(provider) = &auth_info.auth_provider {
             match token_from_provider(provider)? {
                 ProviderToken::Oidc(token) => {
-                    return Ok(Self::Bearer(token));
+                    return Ok(Self::Bearer(SecretString::from(token)));
                 }
 
                 ProviderToken::GcpCommand(token, Some(expiry)) => {
@@ -189,12 +190,12 @@ impl TryFrom<&AuthInfo> for Auth {
                     provider.config.insert("expiry".into(), expiry.to_rfc3339());
                     info.auth_provider = Some(provider);
                     return Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
-                        Mutex::new((token, expiry, info)),
+                        Mutex::new((SecretString::from(token), expiry, info)),
                     ))));
                 }
 
                 ProviderToken::GcpCommand(token, None) => {
-                    return Ok(Self::Bearer(token));
+                    return Ok(Self::Bearer(SecretString::from(token)));
                 }
 
                 #[cfg(feature = "oauth")]
@@ -221,11 +222,11 @@ impl TryFrom<&AuthInfo> for Auth {
                         .map(|ts| ts.parse())
                         .transpose()
                         .map_err(Error::MalformedTokenExpirationDate)?;
-                    (status.token, expiration)
+                    (status.token.map(SecretString::from), expiration)
                 } else if let Some(file) = &auth_info.token_file {
                     let token = std::fs::read_to_string(&file)
                         .map_err(|source| Error::ReadTokenFile(source, file.into()))?;
-                    (Some(token), None)
+                    (Some(SecretString::from(token)), None)
                 } else {
                     (None, None)
                 }
@@ -463,7 +464,7 @@ mod test {
         match Auth::try_from(auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
-                assert_eq!(token, "my_token".to_owned());
+                assert_eq!(token.expose_secret(), &"my_token".to_owned());
                 let config = info.auth_provider.unwrap().config;
                 assert_eq!(config.get("access-token"), Some(&"my_token".to_owned()));
             }

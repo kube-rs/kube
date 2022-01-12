@@ -4,7 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{Deserialize, Serialize};
+use secrecy::{ExposeSecret, SecretString};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{KubeconfigError, LoadDataError};
 
@@ -118,20 +119,47 @@ pub struct NamedAuthInfo {
     pub auth_info: AuthInfo,
 }
 
+fn serialize_secretstring<S>(pw: &Option<SecretString>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match pw {
+        Some(secret) => serializer.serialize_str(secret.expose_secret()),
+        None => serializer.serialize_none(),
+    }
+}
+
+fn deserialize_secretstring<'de, D>(deserializer: D) -> Result<Option<SecretString>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer) {
+        Ok(secret) => Ok(Some(SecretString::new(secret))),
+        Err(e) => Err(e),
+    }
+}
+
 /// AuthInfo stores information to tell cluster who you are.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct AuthInfo {
     /// The username for basic authentication to the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     /// The password for basic authentication to the kubernetes cluster.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub password: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        serialize_with = "serialize_secretstring",
+        deserialize_with = "deserialize_secretstring"
+    )]
+    pub password: Option<SecretString>,
 
     /// The bearer token for authentication to the kubernetes cluster.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        serialize_with = "serialize_secretstring",
+        deserialize_with = "deserialize_secretstring"
+    )]
+    pub token: Option<SecretString>,
     /// Pointer to a file that contains a bearer token (as described above). If both `token` and token_file` are present, `token` takes precedence.
     #[serde(rename = "tokenFile")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -152,8 +180,12 @@ pub struct AuthInfo {
     pub client_key: Option<String>,
     /// PEM-encoded data from a client key file for TLS. Overrides `client_key`
     #[serde(rename = "client-key-data")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_key_data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        serialize_with = "serialize_secretstring",
+        deserialize_with = "deserialize_secretstring"
+    )]
+    pub client_key_data: Option<SecretString>,
 
     /// The username to act-as.
     #[serde(rename = "as")]
@@ -172,6 +204,13 @@ pub struct AuthInfo {
     /// Specifies a custom exec-based authentication plugin for the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exec: Option<ExecConfig>,
+}
+
+#[cfg(test)]
+impl PartialEq for AuthInfo {
+    fn eq(&self, other: &Self) -> bool {
+        serde_json::to_value(&self).unwrap() == serde_json::to_value(&other).unwrap()
+    }
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
@@ -395,8 +434,11 @@ impl Cluster {
             return Ok(None);
         }
 
-        let ca = load_from_base64_or_file(&self.certificate_authority_data, &self.certificate_authority)
-            .map_err(KubeconfigError::LoadCertificateAuthority)?;
+        let ca = load_from_base64_or_file(
+            &self.certificate_authority_data.as_deref(),
+            &self.certificate_authority,
+        )
+        .map_err(KubeconfigError::LoadCertificateAuthority)?;
         Ok(Some(ca))
     }
 }
@@ -413,24 +455,29 @@ impl AuthInfo {
     pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_certificate_data.is_none() && self.client_certificate.is_none()`
 
-        load_from_base64_or_file(&self.client_certificate_data, &self.client_certificate)
+        load_from_base64_or_file(&self.client_certificate_data.as_deref(), &self.client_certificate)
             .map_err(KubeconfigError::LoadClientCertificate)
     }
 
     pub(crate) fn load_client_key(&self) -> Result<Vec<u8>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_key_data.is_none() && self.client_key.is_none()`
 
-        load_from_base64_or_file(&self.client_key_data, &self.client_key)
-            .map_err(KubeconfigError::LoadClientKey)
+        load_from_base64_or_file(
+            &self
+                .client_key_data
+                .as_ref()
+                .map(|secret| secret.expose_secret().as_str()),
+            &self.client_key,
+        )
+        .map_err(KubeconfigError::LoadClientKey)
     }
 }
 
 fn load_from_base64_or_file<P: AsRef<Path>>(
-    value: &Option<String>,
+    value: &Option<&str>,
     file: &Option<P>,
 ) -> Result<Vec<u8>, LoadDataError> {
     let data = value
-        .as_deref()
         .map(load_from_base64)
         .or_else(|| file.as_ref().map(load_from_file))
         .unwrap_or(Err(LoadDataError::NoBase64DataOrFile))?;
@@ -464,6 +511,7 @@ fn default_kube_path() -> Option<PathBuf> {
 mod tests {
     use super::*;
     use serde_json::Value;
+    use std::str::FromStr;
 
     #[test]
     fn kubeconfig_merge() {
@@ -472,7 +520,7 @@ mod tests {
             auth_infos: vec![NamedAuthInfo {
                 name: "red-user".into(),
                 auth_info: AuthInfo {
-                    token: Some("first-token".into()),
+                    token: Some(SecretString::from_str("first-token").unwrap()),
                     ..Default::default()
                 },
             }],
@@ -484,7 +532,7 @@ mod tests {
                 NamedAuthInfo {
                     name: "red-user".into(),
                     auth_info: AuthInfo {
-                        token: Some("second-token".into()),
+                        token: Some(SecretString::from_str("second-token").unwrap()),
                         username: Some("red-user".into()),
                         ..Default::default()
                     },
@@ -492,7 +540,7 @@ mod tests {
                 NamedAuthInfo {
                     name: "green-user".into(),
                     auth_info: AuthInfo {
-                        token: Some("new-token".into()),
+                        token: Some(SecretString::from_str("new-token").unwrap()),
                         ..Default::default()
                     },
                 },
@@ -505,7 +553,14 @@ mod tests {
         assert_eq!(merged.current_context, Some("default".into()));
         // Auth info with the same name does not overwrite
         assert_eq!(merged.auth_infos[0].name, "red-user".to_owned());
-        assert_eq!(merged.auth_infos[0].auth_info.token, Some("first-token".into()));
+        assert_eq!(
+            merged.auth_infos[0]
+                .auth_info
+                .token
+                .as_ref()
+                .map(|t| t.expose_secret().to_string()),
+            Some("first-token".to_string())
+        );
         // Even if it's not conflicting
         assert_eq!(merged.auth_infos[0].auth_info.username, None);
         // New named auth info is appended
@@ -638,5 +693,27 @@ users:
         let cfg = Kubeconfig::from_yaml("").unwrap();
 
         assert_eq!(cfg, Kubeconfig::default());
+    }
+
+    #[test]
+    fn authinfo_debug_does_not_output_password() {
+        let authinfo_yaml = r#"
+username: user
+password: kube_rs
+"#;
+        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
+        let authinfo_debug_output = format!("{:?}", authinfo);
+        let expected_output = "AuthInfo { \
+        username: Some(\"user\"), \
+        password: Some(Secret([REDACTED alloc::string::String])), \
+        token: None, token_file: None, client_certificate: None, \
+        client_certificate_data: None, client_key: None, \
+        client_key_data: None, impersonate: None, \
+        impersonate_groups: None, \
+        auth_provider: None, \
+        exec: None \
+        }";
+
+        assert_eq!(authinfo_debug_output, expected_output)
     }
 }
