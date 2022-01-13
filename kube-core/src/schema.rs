@@ -23,7 +23,6 @@ impl Visitor for StructuralSchemaRewriter {
             .as_mut()
             .and_then(|subschemas| subschemas.one_of.as_mut())
         {
-            dbg!(&one_of);
             let common_obj = schema
                 .object
                 .get_or_insert_with(|| Box::new(ObjectValidation::default()));

@@ -36,6 +36,8 @@ struct FooSpec {
 
     // Using feature `chrono`
     timestamp: DateTime<Utc>,
+
+    complex_enum: ComplexEnum,
 }
 
 fn default_value() -> String {
@@ -44,6 +46,13 @@ fn default_value() -> String {
 
 fn default_nullable() -> Option<String> {
     Some("default_nullable".into())
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+enum ComplexEnum {
+    VariantOne { int: i32 },
+    VariantTwo { str: String },
 }
 
 #[test]
@@ -69,6 +78,7 @@ fn test_serialized_matches_expected() {
             nullable_skipped_with_default: None,
             nullable_with_default: None,
             timestamp: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+            complex_enum: ComplexEnum::VariantOne { int: 23 },
         }))
         .unwrap(),
         serde_json::json!({
@@ -83,6 +93,11 @@ fn test_serialized_matches_expected() {
                 "nullable": null,
                 "nullableWithDefault": null,
                 "timestamp": "1970-01-01T00:00:00Z",
+                "complexEnum": {
+                    "variantOne": {
+                        "int": 23
+                    }
+                }
             }
         })
     )
@@ -147,13 +162,45 @@ fn test_crd_schema_matches_expected() {
                                                 "nullable": true,
                                                 "type": "string"
                                             },
-
                                             "timestamp": {
                                                 "type": "string",
                                                 "format": "date-time"
+                                            },
+                                            "complexEnum": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "variantOne": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "int": {
+                                                                "type": "integer",
+                                                                "format": "int32"
+                                                            }
+                                                        },
+                                                        "required": ["int"]
+                                                    },
+                                                    "variantTwo": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "str": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": ["str"]
+                                                    }
+                                                },
+                                                "oneOf": [
+                                                    {
+                                                        "required": ["variantOne"]
+                                                    },
+                                                    {
+                                                        "required": ["variantTwo"]
+                                                    }
+                                                ]
                                             }
                                         },
                                         "required": [
+                                            "complexEnum",
                                             "nonNullable",
                                             "timestamp"
                                         ],

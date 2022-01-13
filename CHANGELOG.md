@@ -6,6 +6,7 @@ UNRELEASED
  * Introduced `StreamBackoff` mechanism for backing off watchers - #703
   * BREAKING: `Controller` now uses `backoff` for trigger watches by default, use `Controller::trigger_backoff` to override
  * `#[derive(CustomResource)]` now supports structs containing enums with fields - #779
+  * BREAKING: If you depend on `kube-derive` directly rather than via `kube` then you must now add the `schema` feature to `kube-core`
 
 0.65.0 / 2021-12-10
 ===================
