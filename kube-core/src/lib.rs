@@ -42,6 +42,10 @@ pub use resource::{Resource, ResourceExt};
 pub mod response;
 pub use response::Status;
 
+#[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
+#[cfg(feature = "schema")]
+pub mod schema;
+
 pub mod subresource;
 
 pub mod util;
