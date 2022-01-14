@@ -11,7 +11,8 @@ use schemars::{
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
-/// This is not intended for direct use, but is used by `kube::derive`'s `#[derive(CustomResource)]`.
+/// This is used automatically by `kube::derive`'s `#[derive(CustomResource)]`,
+/// but it can also be used manually with [schemars::with_visitor](https://docs.rs/schemars/latest/schemars/gen/struct.SchemaSettings.html#method.with_visitor) setting.
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;
 
