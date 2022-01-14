@@ -29,6 +29,7 @@ admission = ["kube-core/admission"]
 derive = ["kube-derive"]
 config = ["kube-client/config"]
 runtime = ["kube-runtime"]
+cache = ["kube-runtime/controller"]
 deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 
 [package.metadata.docs.rs]
