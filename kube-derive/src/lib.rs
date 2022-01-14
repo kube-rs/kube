@@ -55,63 +55,63 @@ mod custom_resource;
 /// kube `Api` object. See the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples/)
 /// for details on this.
 ///
-/// ## Required properties
+/// # Required properties
 ///
-/// ### `#[kube(group = "mygroup.tld")]`
+/// ## `#[kube(group = "mygroup.tld")]`
 /// Your cr api group. The part before the slash in the top level `apiVersion` key.
 ///
-/// ### `#[kube(version = "v1")]`
+/// ## `#[kube(version = "v1")]`
 /// Your cr api version. The part after the slash in the top level `apiVersion` key.
 ///
-/// ### `#[kube(kind = "Kind")]`
+/// ## `#[kube(kind = "Kind")]`
 /// Name of your kind and your generated root type.
 ///
-/// ## Optional `#[kube]` attributes
+/// # Optional `#[kube]` attributes
 ///
-/// ### `#[kube(apiextensions = "v1beta1")]`
+/// ## `#[kube(apiextensions = "v1beta1")]`
 /// The version for `CustomResourceDefinition` desired in the `apiextensions.k8s.io` group.
 /// Default is `v1` (for clusters >= 1.17). If using kubernetes <= 1.16 please use `v1beta1`.
 ///
 /// - **NOTE**: Support for `v1` requires deriving the openapi v3 `JsonSchema` via the `schemars` dependency.
 /// - **NOTE**: When using `v1beta` the associated `CustomResourceExt` trait lives in `kube::core::crd::v1beta`
 ///
-/// ### `#[kube(singular = "nonstandard-singular")]`
+/// ## `#[kube(singular = "nonstandard-singular")]`
 /// To specify the singular name. Defaults to lowercased `kind`.
 ///
-/// ### `#[kube(plural = "nonstandard-plural")]`
+/// ## `#[kube(plural = "nonstandard-plural")]`
 /// To specify the plural name. Defaults to inferring from singular.
 ///
-/// ### `#[kube(namespaced)]`
+/// ## `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
 ///
-/// ### `#[kube(struct = "StructName")]`
+/// ## `#[kube(struct = "StructName")]`
 /// Customize the name of the generated root struct (defaults to `kind`).
 ///
-/// ### `#[kube(crates(kube_core = "::kube::core"))]`
+/// ## `#[kube(crates(kube_core = "::kube::core"))]`
 /// Customize the crate name the generated code will reach into (defaults to `::kube::core`).
 /// Should be one of `kube::core`, `kube_client::core` or `kube_core`.
 ///
-/// ### `#[kube(crates(k8s_openapi = "::k8s_openapi"))]`
+/// ## `#[kube(crates(k8s_openapi = "::k8s_openapi"))]`
 /// Customize the crate name the generated code will use for [`k8s_openapi`](https://docs.rs/k8s-openapi/) (defaults to `::k8s_openapi`).
 ///
-/// ### `#[kube(crates(schemars = "::schemars"))]`
+/// ## `#[kube(crates(schemars = "::schemars"))]`
 /// Customize the crate name the generated code will use for [`schemars`](https://docs.rs/schemars/) (defaults to `::schemars`).
 ///
-/// ### `#[kube(crates(serde = "::serde"))]`
+/// ## `#[kube(crates(serde = "::serde"))]`
 /// Customize the crate name the generated code will use for [`serde`](https://docs.rs/serde/) (defaults to `::serde`).
 ///
-/// ### `#[kube(crates(serde_json = "::serde_json"))]`
+/// ## `#[kube(crates(serde_json = "::serde_json"))]`
 /// Customize the crate name the generated code will use for [`serde_json`](https://docs.rs/serde_json/) (defaults to `::serde_json`).
 ///
-/// ### `#[kube(status = "StatusStructName")]`
+/// ## `#[kube(status = "StatusStructName")]`
 /// Adds a status struct to the top level generated type and enables the status
 /// subresource in your crd.
 ///
-/// ### `#[kube(derive = "Trait")]`
+/// ## `#[kube(derive = "Trait")]`
 /// Adding `#[kube(derive = "PartialEq")]` is required if you want your generated
 /// top level type to be able to `#[derive(PartialEq)]`
 ///
-/// ### `#[kube(schema = "mode")]`
+/// ## `#[kube(schema = "mode")]`
 /// Defines whether the `JsonSchema` of the top level generated type should be used when generating a `CustomResourceDefinition`.
 ///
 /// Legal values:
@@ -127,13 +127,13 @@ mod custom_resource;
 /// NOTE: `apiextensions = "v1"` `CustomResourceDefinition`s require a schema. If `schema = "disabled"` then
 /// `Self::crd()` will not be installable into the cluster as-is.
 ///
-/// ### `#[kube(scale = r#"json"#)]`
+/// ## `#[kube(scale = r#"json"#)]`
 /// Allow customizing the scale struct for the [scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources).
 ///
-/// ### `#[kube(printcolumn = r#"json"#)]`
+/// ## `#[kube(printcolumn = r#"json"#)]`
 /// Allows adding straight json to [printcolumns](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns).
 ///
-/// ### `#[kube(shortname = "sn")]`
+/// ## `#[kube(shortname = "sn")]`
 /// Add a single shortname to the generated crd.
 ///
 /// ## Example with all properties
@@ -172,7 +172,17 @@ mod custom_resource;
 /// }
 /// ```
 ///
-/// ## Generated code
+/// # Enums
+///
+/// Kubernetes requires that the generated [schema is "structural"](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema).
+/// This means that the structure of the schema must not depend on the particular values. For enums this imposes a few limitations:
+///
+/// - Only [externally tagged enums](https://serde.rs/enum-representations.html#externally-tagged) are supported
+/// - Unit variants may not be mixed with struct or tuple variants (`enum Foo { Bar, Baz {}, Qux() }` is invalid, for example)
+///
+/// If these restrictions are not followed then `YourCrd::crd()` may panic, or the Kubernetes API may reject the CRD definition.
+///
+/// # Generated code
 ///
 /// The example above will roughly generate:
 /// ```ignore
@@ -193,7 +203,7 @@ mod custom_resource;
 /// }
 /// ```
 ///
-/// ## Customizing Schemas
+/// # Customizing Schemas
 /// Should you need to customize the schemas, you can use:
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
 /// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive.rs))
@@ -208,13 +218,13 @@ mod custom_resource;
 ///
 /// If you have to override a lot, [you can opt-out of schema-generation entirely](#kubeschema--mode)
 ///
-/// ## Advanced Features
+/// # Advanced Features
 ///
 /// - **embedding k8s-openapi types** can be done by enabling the `schemars` feature of `k8s-openapi` from [`0.13.0`](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0130-2021-08-09)
 /// - **adding validation** via [validator crate](https://github.com/Keats/validator) is supported from `schemars` >= [`0.8.5`](https://github.com/GREsau/schemars/blob/master/CHANGELOG.md#085---2021-09-20)
 /// - **generating rust code from schemas** can be done via [kopium](https://github.com/kube-rs/kopium) and is supported on stable crds (> 1.16 kubernetes)
 ///
-/// ### Validation Caveats
+/// ## Validation Caveats
 /// The supported **`#[validate]` attrs also exist as `#[schemars]` attrs** so you can use those directly if you do not require the validation to run client-side (in your code).
 /// Otherwise, you should `#[derive(Validate)]` on your struct to have both server-side (kubernetes) and client-side validation.
 ///
@@ -235,7 +245,7 @@ mod custom_resource;
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.
 ///
-/// ## Installation
+/// # Installation
 /// Enable the `derive` feature on the `kube` crate:
 ///
 /// ```toml

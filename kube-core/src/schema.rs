@@ -16,6 +16,11 @@ use schemars::{
 ///
 /// This is used automatically by `kube::derive`'s `#[derive(CustomResource)]`,
 /// but it can also be used manually with [`SchemaSettings::with_visitor`].
+///
+/// # Panics
+///
+/// The [`Visitor`] functions may panic if the transform could not be applied. For example,
+/// there must not be any overlapping properties between `oneOf` branches.
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;
 
