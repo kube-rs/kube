@@ -4,6 +4,9 @@
 
 use std::collections::btree_map::Entry;
 
+// Used in docs
+#[allow(unused_imports)] use schemars::gen::SchemaSettings;
+
 use schemars::{
     schema::{ObjectValidation, Schema, SchemaObject},
     visit::Visitor,
@@ -12,7 +15,7 @@ use schemars::{
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
 /// This is used automatically by `kube::derive`'s `#[derive(CustomResource)]`,
-/// but it can also be used manually with [schemars::with_visitor](https://docs.rs/schemars/latest/schemars/gen/struct.SchemaSettings.html#method.with_visitor) setting.
+/// but it can also be used manually with [`SchemaSettings::with_visitor`].
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;
 
