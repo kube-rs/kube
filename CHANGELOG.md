@@ -10,30 +10,29 @@ UNRELEASED
 0.66.0 / 2022-01-15
 ===================
 
-## News
+Tons of ergonomics improvements, and 3 new contributors.
+Highlighted first is the 3 **most discussed** changes:
 
-Tons of minor ergonomics features landed this release. Note this release's 3 **most discussed** changes:
+### [Support for auto-generating schemas for enums in `kube-derive`](https://github.com/kube-rs/kube-rs/issues/779)
 
-### Support for auto-generating schemas for enums in `kube-derive`
+It is now possible to **embed complex enums** inside structs that use `#[derive(CustomResource)]`.
 
-It is now possible to embed complex enums inside structs that use `#[derive(CustomResource)]` - [#779](https://github.com/kube-rs/kube-rs/issues/779).
-
-This has been a higly requested feature since the inception of auto-generated schemas. It does not work for all cases, and has certain ergonomics caveats, but represents a huge step forwards.
+This has been a [highly requested feature](https://github.com/kube-rs/kube-rs/issues/648) since the inception of auto-generated schemas. It does [not work for all cases](https://docs.rs/kube/latest/kube/derive.CustomResource.html#enums), and has [certain ergonomics caveats](https://docs.rs/kube/0.66.0/kube/core/schema/struct.StructuralSchemaRewriter.html#method.visit_schema_object), but represents a huge step forwards.
 
 Note that **if** you depend on `kube-derive` directly rather than via `kube` then you **must** now add the `schema` feature to `kube-core`
 
-### New `StreamBackoff` mechanism in `kube-runtime`
+### [New `StreamBackoff` mechanism in `kube-runtime`](https://github.com/kube-rs/kube-rs/issues/703)
 
-To avoid spamming the apiserver when on certain watch errors cases, it's now possible to configure the `watcher` to set backoffs via [#703](https://github.com/kube-rs/kube-rs/issues/703). The new `default_backoff` follows existing `client-go` conentions of being kind to the api-server.
+To avoid spamming the apiserver when on certain watch errors cases, it's now possible to [stream wrap](https://docs.rs/kube/0.66.0/kube/runtime/utils/struct.StreamBackoff.html) the `watcher` to set backoffs. The new [`default_backoff`](https://docs.rs/kube/0.66.0/kube/runtime/watcher/fn.default_backoff.html) follows existing `client-go` conventions of being kind to the apiserver.
 
-Initially, this **default-enabled** in `Controller` watches (configurable via `Controller::trigger_backoff`) and avoids spam errors when crds are not installed.
+Initially, this is **default-enabled** in `Controller` watches (configurable via [`Controller::trigger_backoff`](https://docs.rs/kube/latest/kube/runtime/struct.Controller.html#method.trigger_backoff)) and avoids spam errors when crds are not installed.
 
-### New version priority parser in `kube-core`
+### [New version priority parser in `kube-core`](https://github.com/kube-rs/kube-rs/issues/764)
 
-To aid users picking the most appropriate version of a `kind` from api discovery or through a CRD, two new sort orders have been exposed on the new `kube_core::Version` on [#764](https://github.com/kube-rs/kube-rs/issues/764)
+To aid users picking the most appropriate version of a `kind` from [api discovery](https://docs.rs/kube/0.66.0/kube/discovery/index.html) or [through a CRD](https://github.com/kube-rs/kopium/), two new sort orders have been exposed on the new [`kube_core::Version`](https://docs.rs/kube/latest/kube/core/enum.Version.html)
 
-- `Version::priority` implementing [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
-- `Version::generation` implementing a more traditional; generational sort (favouring semantically higher version numbers - even if they are prereleases)
+- [`Version::priority`](https://docs.rs/kube/0.66.0/kube/core/enum.Version.html#method.priority) implementing [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
+- [`Version::generation`](https://docs.rs/kube/0.66.0/kube/core/enum.Version.html#method.generation) implementing a more traditional; generational sort (highest version)
 
 ## Changes
 Merged PRs from [github release](https://github.com/kube-rs/kube-rs/releases/tag/0.66.0).
