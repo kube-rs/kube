@@ -23,3 +23,4 @@ jobs:
           # github generated notes based on changelog-* tags
           # the format of this is configured in the github native: .github/release.yml
           generate_release_notes: true
+          draft: true
