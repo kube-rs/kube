@@ -5,7 +5,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.65.0...master
+ * see https://github.com/kube-rs/kube-rs/compare/0.66.0...master
+
+0.66.0 / 2022-01-15
+===================
 
 ## News
 
@@ -13,7 +16,7 @@ Tons of minor ergonomics features landed this release. Note this release's 3 **m
 
 ### Support for auto-generating schemas for enums in `kube-derive`
 
-It is now possible to embed complex enums inside structs that use `#[derive(CustomResource)]` - #779.
+It is now possible to embed complex enums inside structs that use `#[derive(CustomResource)]` - [#779](https://github.com/kube-rs/kube-rs/issues/779).
 
 This has been a higly requested feature since the inception of auto-generated schemas. It does not work for all cases, and has certain ergonomics caveats, but represents a huge step forwards.
 
@@ -21,13 +24,13 @@ Note that **if** you depend on `kube-derive` directly rather than via `kube` the
 
 ### New `StreamBackoff` mechanism in `kube-runtime`
 
-To avoid spamming the apiserver when on certain watch errors cases, it's now possible to configure the `watcher` to set backoffs via #703. The new `default_backoff` follows existing `client-go` conentions of being kind to the api-server.
+To avoid spamming the apiserver when on certain watch errors cases, it's now possible to configure the `watcher` to set backoffs via [#703](https://github.com/kube-rs/kube-rs/issues/703). The new `default_backoff` follows existing `client-go` conentions of being kind to the api-server.
 
 Initially, this **default-enabled** in `Controller` watches (configurable via `Controller::trigger_backoff`) and avoids spam errors when crds are not installed.
 
 ### New version priority parser in `kube-core`
 
-To aid users picking the most appropriate version of a `kind` from api discovery or through a CRD, two new sort orders have been exposed on the new `kube_core::Version` on #764
+To aid users picking the most appropriate version of a `kind` from api discovery or through a CRD, two new sort orders have been exposed on the new `kube_core::Version` on [#764](https://github.com/kube-rs/kube-rs/issues/764)
 
 - `Version::priority` implementing [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
 - `Version::generation` implementing a more traditional; generational sort (favouring semantically higher version numbers - even if they are prereleases)
