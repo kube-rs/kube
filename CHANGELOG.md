@@ -35,6 +35,20 @@ To aid users picking the most appropriate version of a `kind` from api discovery
 - `Version::priority` implementing [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
 - `Version::generation` implementing a more traditional; generational sort (favouring semantically higher version numbers - even if they are prereleases)
 
+## Changes
+Merged PRs from [github release](https://github.com/kube-rs/kube-rs/releases/tag/0.66.0).
+### Added
+* Add `DeleteParams` constructors for easily setting `PropagationPolicy` by @kate-goldenring in https://github.com/kube-rs/kube-rs/pull/757
+* Add Serialize to ObjecList and add field-selector and jsonpath example by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/760
+* Implement cordon/uncordon for Node by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/762
+* Export Version priority parser with Ord impls in kube_core by @clux in https://github.com/kube-rs/kube-rs/pull/764
+* Add Api fns for arbitrary subresources and approval subresource for CertificateSigningRequest by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/773
+
+### Changed
+* Add backoff handling for watcher and Controller by @clux in https://github.com/kube-rs/kube-rs/pull/703
+* Remove crate private `identity_pem` field from `Config` by @kazk in https://github.com/kube-rs/kube-rs/pull/771
+* Use SecretString in AuthInfo to avoid credential leaking by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/766
+
 0.65.0 / 2021-12-10
 ===================
 
