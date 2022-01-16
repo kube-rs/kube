@@ -1,11 +1,12 @@
 use super::ObjectRef;
 use crate::watcher;
+use ahash::AHashMap;
 use derivative::Derivative;
 use kube_client::Resource;
 use parking_lot::RwLock;
-use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
-type Cache<K> = Arc<RwLock<HashMap<ObjectRef<K>, K>>>;
+type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, K>>>;
 
 /// A writable Store handle
 ///
@@ -64,7 +65,7 @@ where
                 let new_objs = new_objs
                     .iter()
                     .map(|obj| (ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj))
-                    .collect::<HashMap<_, _>>();
+                    .collect::<AHashMap<_, _>>();
                 // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
                 let mut store = self.store.write();
                 store.retain(|key, _old_value| new_objs.contains_key(key));
