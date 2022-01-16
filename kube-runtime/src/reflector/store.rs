@@ -64,14 +64,9 @@ where
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| (ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj))
+                    .map(|obj| (ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj.clone()))
                     .collect::<AHashMap<_, _>>();
-                // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
-                let mut store = self.store.write();
-                store.retain(|key, _old_value| new_objs.contains_key(key));
-                for (key, obj) in new_objs {
-                    store.insert(key, obj.clone());
-                }
+                *self.store.write() = new_objs;
             }
         }
     }
