@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     // Periodically read our state in the background
     tokio::spawn(async move {
         loop {
-            let nodes = reader.state().iter().map(ResourceExt::name).collect::<Vec<_>>();
+            let nodes = reader.state().iter().map(|r| r.name()).collect::<Vec<_>>();
             info!("Current {} nodes: {:?}", nodes.len(), nodes);
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }

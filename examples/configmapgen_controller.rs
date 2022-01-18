@@ -12,7 +12,7 @@ use kube::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, io::BufRead};
+use std::{collections::BTreeMap, io::BufRead, sync::Arc};
 use thiserror::Error;
 use tokio::time::Duration;
 
@@ -44,7 +44,10 @@ fn object_to_owner_reference<K: Resource<DynamicType = ()>>(
 }
 
 /// Controller triggers this whenever our main object or our children changed
-async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<ReconcilerAction, Error> {
+async fn reconcile(
+    generator: Arc<ConfigMapGenerator>,
+    ctx: Context<Data>,
+) -> Result<ReconcilerAction, Error> {
     log::info!("working hard");
     tokio::time::sleep(Duration::from_secs(2)).await;
     log::info!("hard work is done!");
@@ -52,7 +55,7 @@ async fn reconcile(generator: ConfigMapGenerator, ctx: Context<Data>) -> Result<
     let client = ctx.get_ref().client.clone();
 
     let mut contents = BTreeMap::new();
-    contents.insert("content".to_string(), generator.spec.content);
+    contents.insert("content".to_string(), generator.spec.content.clone());
     let cm = ConfigMap {
         metadata: ObjectMeta {
             name: generator.metadata.name.clone(),

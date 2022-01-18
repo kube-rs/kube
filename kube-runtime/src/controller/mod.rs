@@ -220,7 +220,7 @@ impl Display for ReconcileReason {
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
 pub fn applier<K, QueueStream, ReconcilerFut, T>(
-    mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
+    mut reconciler: impl FnMut(Arc<K>, Context<T>) -> ReconcilerFut,
     mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
     context: Context<T>,
     store: Store<K>,
@@ -338,6 +338,7 @@ where
 /// use futures::StreamExt;
 /// use k8s_openapi::api::core::v1::ConfigMap;
 /// use schemars::JsonSchema;
+/// use std::sync::Arc;
 /// use thiserror::Error;
 ///
 /// #[derive(Debug, Error)]
@@ -351,7 +352,7 @@ where
 /// }
 ///
 /// /// The reconciler that will be called when either object change
-/// async fn reconcile(g: ConfigMapGenerator, _ctx: Context<()>) -> Result<ReconcilerAction, Error> {
+/// async fn reconcile(g: Arc<ConfigMapGenerator>, _ctx: Context<()>) -> Result<ReconcilerAction, Error> {
 ///     // .. use api here to reconcile a child ConfigMap with ownerreferences
 ///     // see configmapgen_controller example for full info
 ///     Ok(ReconcilerAction {
@@ -637,7 +638,7 @@ where
                     let dyntype = dyntype.clone();
                     stream::iter(store.state().into_iter().map(move |obj| {
                         Ok(ReconcileRequest {
-                            obj_ref: ObjectRef::from_obj_with(&obj, dyntype.clone()),
+                            obj_ref: ObjectRef::from_obj_with(&*obj, dyntype.clone()),
                             reason: ReconcileReason::BulkReconcile,
                         })
                     }))
@@ -750,7 +751,7 @@ where
     /// with a configurable [`Context`].
     pub fn run<ReconcilerFut, T>(
         self,
-        mut reconciler: impl FnMut(K, Context<T>) -> ReconcilerFut,
+        mut reconciler: impl FnMut(Arc<K>, Context<T>) -> ReconcilerFut,
         error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> ReconcilerAction,
         context: Context<T>,
     ) -> impl Stream<Item = Result<(ObjectRef<K>, ReconcilerAction), Error<ReconcilerFut::Error, watcher::Error>>>

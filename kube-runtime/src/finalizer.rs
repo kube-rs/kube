@@ -7,7 +7,7 @@ use kube_client::{
     Api, Resource, ResourceExt,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::{error::Error as StdError, fmt::Debug};
+use std::{error::Error as StdError, fmt::Debug, sync::Arc};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -101,7 +101,7 @@ impl FinalizerState {
 pub async fn finalizer<K, ReconcileFut>(
     api: &Api<K>,
     finalizer_name: &str,
-    obj: K,
+    obj: Arc<K>,
     reconcile: impl FnOnce(Event<K>) -> ReconcileFut,
 ) -> Result<ReconcilerAction, Error<ReconcileFut::Error>>
 where
@@ -109,11 +109,11 @@ where
     ReconcileFut: TryFuture<Ok = ReconcilerAction>,
     ReconcileFut::Error: StdError + 'static,
 {
-    match FinalizerState::for_object(&obj, finalizer_name) {
+    match FinalizerState::for_object(&*obj, finalizer_name) {
         FinalizerState {
             finalizer_index: Some(_),
             is_deleting: false,
-        } => reconcile(Event::Apply(obj))
+        } => reconcile(Event::Apply(obj.as_ref().clone()))
             .into_future()
             .await
             .map_err(Error::ApplyFailed),
@@ -123,7 +123,7 @@ where
         } => {
             // Cleanup reconciliation must succeed before it's safe to remove the finalizer
             let name = obj.meta().name.clone().ok_or(Error::UnnamedObject)?;
-            let action = reconcile(Event::Cleanup(obj))
+            let action = reconcile(Event::Cleanup(obj.as_ref().clone()))
                 .into_future()
                 .await
                 // Short-circuit, so that we keep the finalizer if cleanup fails
