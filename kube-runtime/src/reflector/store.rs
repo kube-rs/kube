@@ -1,9 +1,12 @@
 use super::ObjectRef;
 use crate::watcher;
-use dashmap::DashMap;
+use ahash::AHashMap;
 use derivative::Derivative;
 use kube_client::Resource;
-use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
+use parking_lot::RwLock;
+use std::{fmt::Debug, hash::Hash, sync::Arc};
+
+type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, K>>>;
 
 /// A writable Store handle
 ///
@@ -15,7 +18,7 @@ pub struct Writer<K: 'static + Resource>
 where
     K::DynamicType: Eq + Hash,
 {
-    store: Arc<DashMap<ObjectRef<K>, K>>,
+    store: Cache<K>,
     dyntype: K::DynamicType,
 }
 
@@ -50,22 +53,20 @@ where
         match event {
             watcher::Event::Applied(obj) => {
                 self.store
+                    .write()
                     .insert(ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj.clone());
             }
             watcher::Event::Deleted(obj) => {
                 self.store
+                    .write()
                     .remove(&ObjectRef::from_obj_with(obj, self.dyntype.clone()));
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| (ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj))
-                    .collect::<HashMap<_, _>>();
-                // We can't do do the whole replacement atomically, but we should at least not delete objects that still exist
-                self.store.retain(|key, _old_value| new_objs.contains_key(key));
-                for (key, obj) in new_objs {
-                    self.store.insert(key, obj.clone());
-                }
+                    .map(|obj| (ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj.clone()))
+                    .collect::<AHashMap<_, _>>();
+                *self.store.write() = new_objs;
             }
         }
     }
@@ -83,7 +84,7 @@ pub struct Store<K: 'static + Resource>
 where
     K::DynamicType: Hash + Eq,
 {
-    store: Arc<DashMap<ObjectRef<K>, K>>,
+    store: Cache<K>,
 }
 
 impl<K: 'static + Clone + Resource> Store<K>
@@ -101,24 +102,26 @@ where
     /// reasonable `error_policy`.
     #[must_use]
     pub fn get(&self, key: &ObjectRef<K>) -> Option<K> {
-        self.store
+        let store = self.store.read();
+        store
             .get(key)
             // Try to erase the namespace and try again, in case the object is cluster-scoped
             .or_else(|| {
-                self.store.get(&{
+                store.get(&{
                     let mut cluster_key = key.clone();
                     cluster_key.namespace = None;
                     cluster_key
                 })
             })
             // Clone to let go of the entry lock ASAP
-            .map(|entry| entry.value().clone())
+            .cloned()
     }
 
     /// Return a full snapshot of the current values
     #[must_use]
     pub fn state(&self) -> Vec<K> {
-        self.store.iter().map(|eg| eg.value().clone()).collect()
+        let s = self.store.read();
+        s.values().cloned().collect()
     }
 }
 
