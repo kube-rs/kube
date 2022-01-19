@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(15), running).await?;
 
     let mut pf = pods.portforward("example", &[80]).await?;
-    let mut ports = pf.ports().unwrap();
+    let ports = pf.ports();
     let port = ports[0].stream().unwrap();
 
     let (mut sender, connection) = client::conn::handshake(port).await?;

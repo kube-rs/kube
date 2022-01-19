@@ -23,7 +23,6 @@ enum Message {
 struct PortforwarderState {
     waker: Option<Waker>,
     finished: bool,
-    ports: Option<Vec<Port>>,
 }
 
 // Provides `AsyncRead + AsyncWrite` for each port and **does not** bind to local ports.
@@ -31,6 +30,7 @@ struct PortforwarderState {
 // the port cannot be used (didn't initialize or can't be used anymore).
 /// Manage port forwarding.
 pub struct Portforwarder {
+    ports: Vec<Port>,
     state: Arc<Mutex<PortforwarderState>>,
 }
 
@@ -53,7 +53,6 @@ impl Portforwarder {
         let state = Arc::new(Mutex::new(PortforwarderState {
             waker: None,
             finished: false,
-            ports: Some(ports),
         }));
         let shared_state = state.clone();
         let port_nums = port_nums.to_owned();
@@ -66,13 +65,12 @@ impl Portforwarder {
                 waker.wake()
             }
         });
-        Portforwarder { state }
+        Portforwarder { ports, state }
     }
 
     /// Get streams for forwarded ports.
-    pub fn ports(&mut self) -> Option<Vec<Port>> {
-        let mut state = self.state.lock().unwrap();
-        state.ports.take()
+    pub fn ports(&mut self) -> &mut [Port] {
+        self.ports.as_mut_slice()
     }
 }
 
