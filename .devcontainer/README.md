@@ -30,7 +30,7 @@ your VS Code settings:
     ],
 ```
 
-Furthermore, you can configure a [_dotfiles_ epository][df] to perform
+Furthermore, you can configure a [_dotfiles_ repository][df] to perform
 customizations with a VS Code setting like:
 
 ```jsonc
