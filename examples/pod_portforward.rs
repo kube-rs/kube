@@ -1,10 +1,9 @@
-#[macro_use] extern crate log;
-
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, WatchEvent},
+    api::{Api, DeleteParams, PostParams},
+    runtime::wait::{await_condition, conditions::is_pod_running},
     Client, ResourceExt,
 };
 
@@ -34,22 +33,8 @@ async fn main() -> anyhow::Result<()> {
     pods.create(&PostParams::default(), &p).await?;
 
     // Wait until the pod is running, otherwise we get 500 error.
-    let lp = ListParams::default().fields("metadata.name=example").timeout(10);
-    let mut stream = pods.watch(&lp, "0").await?.boxed();
-    while let Some(status) = stream.try_next().await? {
-        match status {
-            WatchEvent::Added(o) => {
-                info!("Added {}", o.name());
-            }
-            WatchEvent::Modified(o) => {
-                let s = o.status.as_ref().expect("status exists on pod");
-                if s.phase.clone().unwrap_or_default() == "Running" {
-                    break;
-                }
-            }
-            _ => {}
-        }
-    }
+    let running = await_condition(pods.clone(), "example", is_pod_running());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(15), running).await?;
 
     let mut pf = pods.portforward("example", &[80]).await?;
     let mut ports = pf.ports().unwrap();
