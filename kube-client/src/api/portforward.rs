@@ -110,12 +110,16 @@ impl Port {
     }
 
     /// Data pipe for sending to and receiving from the forwarded port.
+    ///
+    /// This returns a `Some` on the first call, then a `None` on every subsequent call
     pub fn stream(&mut self) -> Option<impl AsyncRead + AsyncWrite + Unpin> {
         self.stream.take()
     }
 
     /// Future that resolves with any error message or when the error sender is dropped.
-    /// When this resolves, the port should be considered no longer usable.
+    ///
+    /// This returns a `Some` on the first call, then a `None` on every subsequent call
+    /// When the future resolves, the port should be considered no longer usable.
     pub fn error(&mut self) -> Option<impl Future<Output = Option<String>>> {
         // Ignore Cancellation error.
         self.error.take().map(|recv| recv.map(|res| res.ok()))
