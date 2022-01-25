@@ -5,6 +5,7 @@ RUN apt update && apt upgrade -y
 RUN apt install -y \
     clang \
     cmake \
+    jq \
     lldb \
     lsb-release \
     sudo \
