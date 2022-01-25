@@ -17,13 +17,11 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.66.0", features = ["runtime","derive"] }
-k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
+kube = { version = "0.67.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.14.0", features = ["v1_22"] }
 ```
 
 [Features are available](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
-
-We recommend turning off `default-features` for `k8s-openapi` to speed up your compilation.
 
 ## Upgrading
 
@@ -158,8 +156,8 @@ Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues
 
 ```toml
 [dependencies]
-kube = { version = "0.66.0", default-features = false, features = ["client", "rustls-tls"] }
-k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22"] }
+kube = { version = "0.67.0", default-features = false, features = ["client", "rustls-tls"] }
+k8s-openapi = { version = "0.14.0", features = ["v1_22"] }
 ```
 
 This will pull in `rustls` and `hyper-rustls`.

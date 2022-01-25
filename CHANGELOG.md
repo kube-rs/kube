@@ -5,7 +5,14 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.66.0...master
+ * see https://github.com/kube-rs/kube-rs/compare/0.67.0...master
+
+0.67.0 / 2022-01-25
+===================
+### Changed
+
+* runtime: Replace `DashMap` with a locked `AHashMap` by @olix0r in https://github.com/kube-rs/kube-rs/pull/785
+* update k8s-openapi for kubernetes 1.23 support by @clux in https://github.com/kube-rs/kube-rs/pull/789
 
 0.66.0 / 2022-01-15
 ===================
