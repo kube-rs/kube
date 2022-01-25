@@ -6,7 +6,7 @@ use kube_client::Resource;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
-type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, K>>>;
+type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
 /// A writable Store handle
 ///
@@ -52,19 +52,23 @@ where
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
-                self.store
-                    .write()
-                    .insert(ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj.clone());
+                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let obj = Arc::new(obj.clone());
+                self.store.write().insert(key, obj);
             }
             watcher::Event::Deleted(obj) => {
-                self.store
-                    .write()
-                    .remove(&ObjectRef::from_obj_with(obj, self.dyntype.clone()));
+                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                self.store.write().remove(&key);
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| (ObjectRef::from_obj_with(obj, self.dyntype.clone()), obj.clone()))
+                    .map(|obj| {
+                        (
+                            ObjectRef::from_obj_with(obj, self.dyntype.clone()),
+                            Arc::new(obj.clone()),
+                        )
+                    })
                     .collect::<AHashMap<_, _>>();
                 *self.store.write() = new_objs;
             }
@@ -101,7 +105,7 @@ where
     /// If you use `kube_rt::controller` then you can do this by returning an error and specifying a
     /// reasonable `error_policy`.
     #[must_use]
-    pub fn get(&self, key: &ObjectRef<K>) -> Option<K> {
+    pub fn get(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
         let store = self.store.read();
         store
             .get(key)
@@ -119,7 +123,7 @@ where
 
     /// Return a full snapshot of the current values
     #[must_use]
-    pub fn state(&self) -> Vec<K> {
+    pub fn state(&self) -> Vec<Arc<K>> {
         let s = self.store.read();
         s.values().cloned().collect()
     }
@@ -145,7 +149,7 @@ mod tests {
         let mut store_w = Writer::default();
         store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         let store = store_w.as_reader();
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm)), Some(cm));
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
     #[test]
@@ -179,7 +183,7 @@ mod tests {
         let mut store_w = Writer::default();
         store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         let store = store_w.as_reader();
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm)), Some(cm));
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
     #[test]
@@ -197,6 +201,6 @@ mod tests {
         let mut store_w = Writer::default();
         store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         let store = store_w.as_reader();
-        assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)), Some(cm));
+        assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(), Some(&cm));
     }
 }

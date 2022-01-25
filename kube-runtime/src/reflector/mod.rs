@@ -55,7 +55,7 @@ mod tests {
         .map(|_| ())
         .collect::<()>()
         .await;
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm)), Some(cm));
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
     #[tokio::test]
@@ -87,7 +87,7 @@ mod tests {
         .map(|_| ())
         .collect::<()>()
         .await;
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm)), Some(updated_cm));
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&updated_cm));
     }
 
     #[tokio::test]
@@ -143,7 +143,7 @@ mod tests {
         .collect::<()>()
         .await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm_a)), None);
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm_b)), Some(cm_b));
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm_b)).as_deref(), Some(&cm_b));
     }
 
     #[tokio::test]
