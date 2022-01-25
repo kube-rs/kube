@@ -98,7 +98,7 @@ jobs:
         mismatches=$(echo "$versions" | grep -v '^${{ steps.msrv.outputs.msrv }}' || true)
         echo "Mismatches: $mismatches"
         if [ -n "$mismatches" ]; then
-          echo "::error  title=\"MSRV mismatch\"::Devcontainer includes incorrect rust version(s): $mismatches"
+          echo "::error ::Devcontainer includes incorrect rust version(s): $mismatches"
           exit 1
         fi
 
