@@ -1,0 +1,5 @@
+#!/bin/sh
+#
+# Run `curl` with flags to ensure transport security.`
+
+exec curl --proto '=https' --tlsv1.3 -vsSfL $@
