@@ -91,6 +91,17 @@ jobs:
         command: check
         args: --all
 
+    - name: Check devcontainer matches MSRV
+      run: |
+        versions=$(sed -nE 's|^FROM (.*/)?rust:([^ ]+)|\2|p' .devcontainer/Dockerfile)
+        echo "Versions: $versions"
+        mismatches=$(echo "$versions" | grep -v '^${{ steps.msrv.outputs.msrv }}' || true)
+        echo "Mismatches: $mismatches"
+        if [ -n "$mismatches" ]; then
+          echo "::error ::Devcontainer includes incorrect rust version(s): $mismatches"
+          exit 1
+        fi
+
   e2e:
     # e2e tests are docker on linux
     runs-on: ubuntu-latest
