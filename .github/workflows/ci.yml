@@ -95,7 +95,7 @@ jobs:
       run: |
         versions=$(sed -nE 's|^FROM (.*/)?rust:([^ ]+)|\2|p' .devcontainer/Dockerfile)
         echo "Versions: $versions"
-        mismatches=$(echo "$versions" | grep -v '^${{ steps.msrv.outputs.msrv }}')
+        mismatches=$(echo "$versions" | grep -v '^${{ steps.msrv.outputs.msrv }}' || true)
         echo "Mismatches: $mismatches"
         if [ -n "$mismatches" ]; then
           echo "::error  title=\"MSRV mismatch\"::Devcontainer includes incorrect rust version(s): $mismatches"
