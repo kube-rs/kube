@@ -5,6 +5,11 @@ reproducible development environment for this project. This base image should
 contain only the bare necessities to get up and running with `kube-rs`.
 Customizations should be made in per-user configuration.
 
+## Usage
+
+Install the VS Code [Remote Development extension pack][remote-exts] after which
+VS Code should build (first use) then run the container in the background.
+
 ## Docker
 
 This configuration currently uses the parent host's Docker daemon (rather than
@@ -39,3 +44,4 @@ customizations with a VS Code setting like:
 
 [dc]: https://code.visualstudio.com/docs/remote/containers
 [df]: https://dotfiles.github.io/
+[remote-exts]: https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack
