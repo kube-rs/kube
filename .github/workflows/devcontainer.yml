@@ -1,0 +1,21 @@
+name: Devcontainer
+
+# When a pull request is opened that changes the Devcontainer configuration,
+# ensure that the container continues to build properly.
+on:
+  pull_request:
+    paths:
+      - .devcontainer/**
+    paths-ignore:
+      # The devcontainer.json isn't actually tested at the moment.
+      - .devcontainer/devcontainer.json
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker build .devcontainer
