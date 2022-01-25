@@ -6,9 +6,6 @@ on:
   pull_request:
     paths:
       - .devcontainer/**
-    paths-ignore:
-      # The devcontainer.json isn't actually tested at the moment.
-      - .devcontainer/devcontainer.json
 
 permissions:
   contents: read
