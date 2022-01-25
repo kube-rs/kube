@@ -14,7 +14,7 @@ use kube::{
         finalizer::{finalizer, Event},
     },
 };
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -37,7 +37,7 @@ fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
     ))
 }
 
-async fn apply(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
+async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
     println!("Reconciling {:?}", cm);
     let secret_name = secret_name_for_configmap(&cm)?;
     secrets
@@ -49,8 +49,8 @@ async fn apply(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerA
                     name: Some(secret_name.clone()),
                     ..ObjectMeta::default()
                 },
-                string_data: cm.data,
-                data: cm.binary_data,
+                string_data: cm.data.clone(),
+                data: cm.binary_data.clone(),
                 ..Secret::default()
             }),
         )
@@ -59,7 +59,7 @@ async fn apply(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerA
     Ok(ReconcilerAction { requeue_after: None })
 }
 
-async fn cleanup(cm: ConfigMap, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
+async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
     println!("Cleaning up {:?}", cm);
     secrets
         .delete(&secret_name_for_configmap(&cm)?, &DeleteParams::default())

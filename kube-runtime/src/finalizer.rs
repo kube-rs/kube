@@ -113,7 +113,7 @@ where
         FinalizerState {
             finalizer_index: Some(_),
             is_deleting: false,
-        } => reconcile(Event::Apply(obj.as_ref().clone()))
+        } => reconcile(Event::Apply(obj))
             .into_future()
             .await
             .map_err(Error::ApplyFailed),
@@ -123,7 +123,7 @@ where
         } => {
             // Cleanup reconciliation must succeed before it's safe to remove the finalizer
             let name = obj.meta().name.clone().ok_or(Error::UnnamedObject)?;
-            let action = reconcile(Event::Cleanup(obj.as_ref().clone()))
+            let action = reconcile(Event::Cleanup(obj))
                 .into_future()
                 .await
                 // Short-circuit, so that we keep the finalizer if cleanup fails
@@ -200,7 +200,7 @@ pub enum Event<K> {
     /// - The object is updated
     /// - The reconciliation fails
     /// - The grinch attacks
-    Apply(K),
+    Apply(Arc<K>),
     /// The object is being deleted, and the reconciler should remove all resources that it owns.
     ///
     /// This must be idempotent, since it may be recalled if, for example (this list is non-exhaustive):
@@ -209,5 +209,5 @@ pub enum Event<K> {
     /// - The reconciliation fails
     /// - Another finalizer was removed in the meantime
     /// - The grinch's heart grows a size or two
-    Cleanup(K),
+    Cleanup(Arc<K>),
 }
