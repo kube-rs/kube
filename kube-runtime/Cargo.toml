@@ -34,6 +34,7 @@ json-patch = "0.2.6"
 serde_json = "1.0.68"
 thiserror = "1.0.29"
 backoff = "0.4.0"
+chrono = { version = "0.4.19" }
 
 [dependencies.k8s-openapi]
 version = "0.13.1"
