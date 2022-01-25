@@ -7,7 +7,7 @@ use kube_client::{
     Api, Resource, ResourceExt,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::{error::Error as StdError, fmt::Debug};
+use std::{error::Error as StdError, fmt::Debug, sync::Arc};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -101,7 +101,7 @@ impl FinalizerState {
 pub async fn finalizer<K, ReconcileFut>(
     api: &Api<K>,
     finalizer_name: &str,
-    obj: K,
+    obj: Arc<K>,
     reconcile: impl FnOnce(Event<K>) -> ReconcileFut,
 ) -> Result<ReconcilerAction, Error<ReconcileFut::Error>>
 where
@@ -109,7 +109,7 @@ where
     ReconcileFut: TryFuture<Ok = ReconcilerAction>,
     ReconcileFut::Error: StdError + 'static,
 {
-    match FinalizerState::for_object(&obj, finalizer_name) {
+    match FinalizerState::for_object(&*obj, finalizer_name) {
         FinalizerState {
             finalizer_index: Some(_),
             is_deleting: false,
@@ -200,7 +200,7 @@ pub enum Event<K> {
     /// - The object is updated
     /// - The reconciliation fails
     /// - The grinch attacks
-    Apply(K),
+    Apply(Arc<K>),
     /// The object is being deleted, and the reconciler should remove all resources that it owns.
     ///
     /// This must be idempotent, since it may be recalled if, for example (this list is non-exhaustive):
@@ -209,5 +209,5 @@ pub enum Event<K> {
     /// - The reconciliation fails
     /// - Another finalizer was removed in the meantime
     /// - The grinch's heart grows a size or two
-    Cleanup(K),
+    Cleanup(Arc<K>),
 }

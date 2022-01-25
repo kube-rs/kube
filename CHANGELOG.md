@@ -7,6 +7,15 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.67.0...master
 
+## Notices
+
+To reduce the amount of allocation done inside the `runtime` by reflectors and controllers, the following change via #786 is needed on the signature of your `reconcile` functions:
+
+```diff
+-async fn reconcile(myobj: MyK, ctx: Context<Data>) -> Result<ReconcilerAction>
++async fn reconcile(myobj: Arc<MyK>, ctx: Context<Data>) -> Result<ReconcilerAction>
+```
+
 0.67.0 / 2022-01-25
 ===================
 ### Changed
