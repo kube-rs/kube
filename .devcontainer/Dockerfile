@@ -30,27 +30,25 @@ RUN mkdir -p $HOME/bin
 ENV PATH=$HOME/bin:$PATH
 
 # Install `kubectl`
-RUN curl --proto '=https' --tlsv1.3 -vsSfLo $HOME/kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
-    && chmod 755 $HOME/kubectl
+RUN export K8S_VERSION="$(curl  --proto '=https' --tlsv1.3 -vsSfL https://dl.k8s.io/release/stable.txt)" \
+    && curl --proto '=https' --tlsv1.3 -vsSfLo $HOME/bin/kubectl "https://dl.k8s.io/release/${K8S_VERSION}/bin/linux/amd64/kubectl" \
+    && chmod 755 $HOME/bin/kubectl
 
 # Install `k3d`
 RUN curl --proto '=https' --tlsv1.3 -vsSfL https://raw.githubusercontent.com/rancher/k3d/main/install.sh \
     | USE_SUDO=false K3D_INSTALL_DIR=$HOME/bin bash
 
-RUN rustup toolchain add nightly \
-    && rustup default nightly \
-    && rustup component add clippy rls rust-src rustfmt
+RUN rustup component add clippy rls rust-src rustfmt
 
 # Install cargo-deny
-RUN mkdir /tmp/cargo-deny && cd /tmp/cargo-deny && \
-    curl --proto '=https' --tlsv1.3 -vsSfL https://github.com/EmbarkStudios/cargo-deny/releases/download/0.11.0/cargo-deny-0.11.0-x86_64-unknown-linux-musl.tar.gz \
-        | tar zxf - \
-    && mv cargo-deny-0.11.0-x86_64-unknown-linux-musl/cargo-deny $HOME/bin \
-    && cd .. && rm -rf /tmp/cargo-deny
+ARG CARGO_DENY_VERSION=0.11.0
+RUN curl --proto '=https' --tlsv1.3 -vsSfL "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+    | tar zvxf - --strip-components=1 -C $HOME/bin "cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl/cargo-deny"
 
 # Install cargo-tarpaulin
 ARG CARGO_TARPAULIN_VERSION=0.18.5
-RUN cd $HOME/bin && curl --proto '=https' --tlsv1.3 -sSfL "https://github.com/xd009642/tarpaulin/releases/download/${CARGO_TARPAULIN_VERSION}/cargo-tarpaulin-${CARGO_TARPAULIN_VERSION}-travis.tar.gz" | tar xzvf -
+RUN curl --proto '=https' --tlsv1.3 -sSfL "https://github.com/xd009642/tarpaulin/releases/download/${CARGO_TARPAULIN_VERSION}/cargo-tarpaulin-${CARGO_TARPAULIN_VERSION}-travis.tar.gz" \
+    | tar xzvf - -C $HOME/bin
 
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
 CMD ["sleep", "infinity"]
