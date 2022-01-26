@@ -51,6 +51,8 @@ struct Crates {
     serde: Path,
     #[darling(default = "Self::default_serde_json")]
     serde_json: Path,
+    #[darling(default = "Self::default_std")]
+    std: Path,
 }
 
 // Default is required when the subattribute isn't mentioned at all
@@ -80,6 +82,10 @@ impl Crates {
 
     fn default_serde_json() -> Path {
         parse_quote! { ::serde_json }
+    }
+
+    fn default_std() -> Path {
+        parse_quote! { ::std }
     }
 }
 
@@ -167,6 +173,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 schemars,
                 serde,
                 serde_json,
+                std,
             },
     } = kube_attrs;
 
@@ -271,7 +278,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             }
         }
         impl #serde::Serialize for #rootident {
-            fn serialize<S: #serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+            fn serialize<S: #serde::Serializer>(&self, ser: S) -> #std::result::Result<S::Ok, S::Error> {
                 use #serde::ser::SerializeStruct;
                 let mut obj = ser.serialize_struct(#rootident_str, 4 + usize::from(#has_status_value))?;
                 obj.serialize_field("apiVersion", &<#rootident as #kube_core::Resource>::api_version(&()))?;
