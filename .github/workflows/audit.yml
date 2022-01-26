@@ -6,6 +6,7 @@ on:
 
 jobs:
   audit:
+    if: ${{ github.repository_owner == 'kube-rs' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
