@@ -29,11 +29,6 @@ pub enum Error {
     #[error("UTF-8 Error: {0}")]
     FromUtf8(#[source] std::string::FromUtf8Error),
 
-    /// Failed to prepare common headers for config
-    #[cfg(feature = "client")]
-    #[error("Failed to prepare common headers for config")]
-    PrepareCommonHeaders(#[source] http::header::InvalidHeaderValue),
-
     /// Returned when failed to find a newline character within max length.
     /// Only returned by `Client::request_events` and this should never happen as
     /// the max is `usize::MAX`.
