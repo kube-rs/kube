@@ -166,22 +166,24 @@ impl Config {
     /// then if that fails, trying the local kubeconfig.
     ///
     /// Fails if inference from both sources fails
+    ///
+    /// Applies debug overrides, see [`Config::apply_debug_overrides`] for more details
     pub async fn infer() -> Result<Self, InferConfigError> {
-        match Self::from_cluster_env() {
+        let mut config = match Self::from_cluster_env() {
             Err(in_cluster_err) => {
                 tracing::trace!("No in-cluster config found: {}", in_cluster_err);
                 tracing::trace!("Falling back to local kubeconfig");
-                let config = Self::from_kubeconfig(&KubeConfigOptions::default())
+                Self::from_kubeconfig(&KubeConfigOptions::default())
                     .await
                     .map_err(|kubeconfig_err| InferConfigError {
                         in_cluster: in_cluster_err,
                         kubeconfig: kubeconfig_err,
-                    })?;
-
-                Ok(config)
+                    })?
             }
-            Ok(success) => Ok(success),
-        }
+            Ok(success) => success,
+        };
+        config.apply_debug_overrides();
+        Ok(config)
     }
 
     /// Create configuration from the cluster's environment variables
@@ -269,6 +271,45 @@ impl Config {
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
         })
+    }
+
+    /// Override configuration based on environment variables
+    ///
+    /// This is only intended for use as a debugging aid, and the specific variables and their behaviour
+    /// should **not** be considered stable across releases.
+    ///
+    /// Currently, the following overrides are supported:
+    ///
+    /// - `KUBE_RS_DEBUG_IMPERSONATE_USER`: A Kubernetes user to impersonate, for example: `system:serviceaccount:default:foo` will impersonate the `ServiceAccount` `foo` in the `Namespace` `default`
+    /// - `KUBE_RS_DEBUG_IMPERSONATE_GROUP`: A Kubernetes group to impersonate, multiple groups may be specified by separating them with commas
+    /// - `KUBE_RS_DEBUG_OVERRIDE_URL`: A Kubernetes cluster URL to use rather than the one specified in the config, useful for proxying traffic through `kubectl proxy`
+    #[tracing::instrument(level = "warn")]
+    pub fn apply_debug_overrides(&mut self) {
+        // Log these overrides loudly, to emphasize that this is only a debugging aid, and should not be relied upon in production
+        if let Ok(impersonate_user) = std::env::var("KUBE_RS_DEBUG_IMPERSONATE_USER") {
+            tracing::warn!(?impersonate_user, "impersonating user");
+            self.auth_info.impersonate = Some(impersonate_user);
+        }
+        if let Ok(impersonate_groups) = std::env::var("KUBE_RS_DEBUG_IMPERSONATE_GROUP") {
+            let impersonate_groups = impersonate_groups.split(',').map(str::to_string).collect();
+            tracing::warn!(?impersonate_groups, "impersonating groups");
+            self.auth_info.impersonate_groups = Some(impersonate_groups);
+        }
+        if let Ok(url) = std::env::var("KUBE_RS_DEBUG_OVERRIDE_URL") {
+            tracing::warn!(?url, "overriding cluster URL");
+            match url.parse() {
+                Ok(uri) => {
+                    self.cluster_url = uri;
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        ?url,
+                        error = &err as &dyn std::error::Error,
+                        "failed to parse override cluster URL, ignoring"
+                    );
+                }
+            }
+        }
     }
 
     /// Client certificate and private key in PEM.
