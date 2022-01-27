@@ -3,8 +3,10 @@ use tower::{filter::AsyncFilterLayer, util::Either, Layer};
 pub(crate) use tower_http::auth::AddAuthorizationLayer;
 
 mod base_uri;
+mod extra_headers;
 
 pub use base_uri::{BaseUri, BaseUriLayer};
+pub use extra_headers::{ExtraHeaders, ExtraHeadersLayer};
 
 use super::auth::RefreshableToken;
 /// Layer to set up `Authorization` header depending on the config.
@@ -20,6 +22,7 @@ impl<S> Layer<S> for AuthLayer {
         self.0.layer(inner)
     }
 }
+
 
 #[cfg(test)]
 mod tests {
