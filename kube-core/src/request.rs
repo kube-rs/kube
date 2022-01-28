@@ -15,7 +15,7 @@ pub enum Error {
     #[error("failed to serialize body: {0}")]
     SerializeBody(#[source] serde_json::Error),
     /// Failed to validate request.
-    #[error("failed to validate request")]
+    #[error("failed to validate request: {0}")]
     Validation(String),
 }
 
@@ -535,4 +535,12 @@ mod test {
     //fn all_resources_not_namespaceable() {
     //    let _r = Request::<corev1::Node>::new(&(), Some("ns"));
     //}
+
+    #[test]
+    fn watches_cannot_have_limits() {
+        let lp = ListParams::default().limit(5);
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let err = Request::new(url).watch(&lp, "0").unwrap_err();
+        assert!(format!("{}", err).contains("limit cannot be used with a watch"));
+    }
 }
