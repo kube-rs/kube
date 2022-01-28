@@ -504,6 +504,7 @@ impl TryFrom<Config> for Client {
         let service = ServiceBuilder::new()
             .layer(stack)
             .option_layer(config.auth_layer()?)
+            .layer(config.extra_headers_layer()?)
             .layer(
                 // Attribute names follow [Semantic Conventions].
                 // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md

@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use http::{header::HeaderName, HeaderValue};
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
@@ -5,7 +8,7 @@ use tower::{filter::AsyncFilterLayer, util::Either};
 use super::tls;
 use super::{
     auth::Auth,
-    middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer},
+    middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},
 };
 use crate::{Config, Error, Result};
 
@@ -20,6 +23,9 @@ pub trait ConfigExt: private::Sealed {
 
     /// Optional layer to set up `Authorization` header depending on the config.
     fn auth_layer(&self) -> Result<Option<AuthLayer>>;
+
+    /// Layer to add non-authn HTTP headers depending on the config.
+    fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer>;
 
     /// Create [`hyper_tls::HttpsConnector`] based on config.
     ///
@@ -179,6 +185,31 @@ impl ConfigExt for Config {
             Auth::RefreshableToken(refreshable) => {
                 Some(AuthLayer(Either::B(AsyncFilterLayer::new(refreshable))))
             }
+        })
+    }
+
+    fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer> {
+        let mut headers = Vec::new();
+        if let Some(impersonate_user) = &self.auth_info.impersonate {
+            headers.push((
+                HeaderName::from_static("impersonate-user"),
+                HeaderValue::from_str(impersonate_user)
+                    .map_err(http::Error::from)
+                    .map_err(Error::HttpError)?,
+            ));
+        }
+        if let Some(impersonate_groups) = &self.auth_info.impersonate_groups {
+            for group in impersonate_groups {
+                headers.push((
+                    HeaderName::from_static("impersonate-group"),
+                    HeaderValue::from_str(group)
+                        .map_err(http::Error::from)
+                        .map_err(Error::HttpError)?,
+                ));
+            }
+        }
+        Ok(ExtraHeadersLayer {
+            headers: Arc::new(headers),
         })
     }
 
