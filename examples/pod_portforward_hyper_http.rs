@@ -6,7 +6,7 @@ use kube::{
     Client, ResourceExt,
 };
 
-use hyper::{body, client, Body, Request};
+use hyper::{body, Body, Request};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
