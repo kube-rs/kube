@@ -39,9 +39,8 @@ async fn main() -> anyhow::Result<()> {
     let ports = pf.ports();
     let port = ports[0].stream().unwrap();
 
-    let (mut sender, connection) = client::conn::handshake(port).await?;
-
-    // spawn a task to poll the connection and drive the HTTP state
+    // let hyper drive the HTTP state in our DuplexStream via a task
+    let (mut sender, connection) = hyper::client::conn::handshake(port).await?;
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Error in connection: {}", e);
