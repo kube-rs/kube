@@ -4,11 +4,13 @@
 mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
+#[cfg(feature = "ws")] mod portforward;
+#[cfg(feature = "ws")] pub use portforward::Portforwarder;
 
 mod subresource;
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub use subresource::{Attach, AttachParams, Execute};
+pub use subresource::{Attach, AttachParams, Execute, Portforward};
 pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
 
 mod util;

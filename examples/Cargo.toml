@@ -151,6 +151,18 @@ name = "pod_shell"
 path = "pod_shell.rs"
 
 [[example]]
+name = "pod_portforward"
+path = "pod_portforward.rs"
+
+[[example]]
+name = "pod_portforward_hyper_http"
+path = "pod_portforward_hyper_http.rs"
+
+[[example]]
+name = "pod_portforward_bind"
+path = "pod_portforward_bind.rs"
+
+[[example]]
 name = "pod_reflector"
 path = "pod_reflector.rs"
 
