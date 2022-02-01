@@ -23,7 +23,20 @@ This also affects the [finalizer helper](https://github.com/kube-rs/kube-rs/pull
 
 ### [Port-forwarding](https://github.com/kube-rs/kube-rs/pull/446)
 
-As one of the last steps toward [gold level client requirements](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-support-level), port-forwarding landed in [#446](https://github.com/kube-rs/kube-rs/issues/446). There are 3 examples `port_forward*.rs` that showcases how to use this websocket/attach based functionality.
+As one of the last steps toward [gold level client requirements](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-capabilities), port-forwarding landed in [#446](https://github.com/kube-rs/kube-rs/issues/446). There are 3 new [examples](https://github.com/kube-rs/kube-rs/tree/master/examples) (`port_forward*.rs`) that showcases how to use this websocket based functionality.
+
+## [What's Changed](https://github.com/kube-rs/kube-rs/releases/tag/0.68.0)
+### Added
+* Add a VS Code devcontainer configuration by @olix0r in https://github.com/kube-rs/kube-rs/pull/788
+* Add support for user impersonation by @teozkr in https://github.com/kube-rs/kube-rs/pull/797
+* Add port forward by @kazk in https://github.com/kube-rs/kube-rs/pull/446
+### Changed
+* runtime: Store resources in an `Arc` by @olix0r in https://github.com/kube-rs/kube-rs/pull/786
+* Propagate Arc through the finalizer reconciler helper by @teozkr in https://github.com/kube-rs/kube-rs/pull/792
+* Disable unused default features of chrono crate by @dreamer in https://github.com/kube-rs/kube-rs/pull/801
+### Fixed
+* Use absolute path to Result in derives by @teozkr in https://github.com/kube-rs/kube-rs/pull/795
+* core: add missing reason to Display on Error::Validation in Request by @clux in https://github.com/kube-rs/kube-rs/pull/798
 
 0.67.0 / 2022-01-25
 ===================
