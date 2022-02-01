@@ -5,11 +5,14 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.67.0...master
+ * see https://github.com/kube-rs/kube-rs/compare/0.68.0...master
+
+0.68.0 / 2022-02-01
+===================
 
 ### Interface Changes
 
-To reduce the amount of allocation done inside the `runtime` by reflectors and controllers, the following change via #786 is needed on the signature of your `reconcile` functions:
+To reduce the amount of allocation done inside the `runtime` by reflectors and controllers, the following change via [#786](https://github.com/kube-rs/kube-rs/issues/786) is needed on the signature of your `reconcile` functions:
 
 ```diff
 -async fn reconcile(myobj: MyK, ctx: Context<Data>) -> Result<ReconcilerAction>
@@ -20,7 +23,7 @@ This also affects the [finalizer helper](https://github.com/kube-rs/kube-rs/pull
 
 ### [Port-forwarding](https://github.com/kube-rs/kube-rs/pull/446)
 
-As one of the last steps toward [gold level client requirements](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-support-level), port-forwarding landed in #446. There are 3 examples `port_forward*.rs` that showcases how to use this websocket/attach based functionality.
+As one of the last steps toward [gold level client requirements](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-support-level), port-forwarding landed in [#446](https://github.com/kube-rs/kube-rs/issues/446). There are 3 examples `port_forward*.rs` that showcases how to use this websocket/attach based functionality.
 
 0.67.0 / 2022-01-25
 ===================
