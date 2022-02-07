@@ -13,7 +13,7 @@ impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
             Some(object) => Entry::Occupied(OccupiedEntry {
                 api: self,
                 object,
-                new: false,
+                dirtiness: Dirtiness::Clean,
             }),
             None => Entry::Vacant(VacantEntry { api: self, name }),
         })
@@ -61,8 +61,15 @@ impl<'a, K> Entry<'a, K> {
 
 pub struct OccupiedEntry<'a, K> {
     api: &'a Api<K>,
-    new: bool,
+    dirtiness: Dirtiness,
     object: K,
+}
+
+#[derive(Debug)]
+enum Dirtiness {
+    Clean,
+    Dirty,
+    New,
 }
 
 impl<'a, K> OccupiedEntry<'a, K> {
@@ -71,11 +78,16 @@ impl<'a, K> OccupiedEntry<'a, K> {
     }
 
     pub fn get_mut(&mut self) -> &mut K {
+        self.dirtiness = match self.dirtiness {
+            Dirtiness::Clean => Dirtiness::Dirty,
+            Dirtiness::Dirty => Dirtiness::Dirty,
+            Dirtiness::New => Dirtiness::New,
+        };
         &mut self.object
     }
 
     pub fn and_modify(mut self, f: impl FnOnce(&mut K)) -> Self {
-        f(&mut self.object);
+        f(self.get_mut());
         self
     }
 
@@ -87,21 +99,21 @@ impl<'a, K> OccupiedEntry<'a, K> {
     where
         K: Resource + DeserializeOwned + Serialize + Clone + Debug,
     {
-        if self.new {
-            self.new = false;
-            self.object = self.api.create(&PostParams::default(), &self.object).await?;
-            Ok(())
-        } else {
-            self.object = self
-                .api
-                .replace(
-                    self.object.meta().name.as_deref().unwrap(),
-                    &PostParams::default(),
-                    &self.object,
-                )
-                .await?;
-            Ok(())
-        }
+        self.object = match self.dirtiness {
+            Dirtiness::New => self.api.create(&PostParams::default(), &self.object).await?,
+            Dirtiness::Dirty => {
+                self.api
+                    .replace(
+                        self.object.meta().name.as_deref().unwrap(),
+                        &PostParams::default(),
+                        &self.object,
+                    )
+                    .await?
+            }
+            Dirtiness::Clean => self.api.get(self.object.meta().name.as_deref().unwrap()).await?,
+        };
+        self.dirtiness = Dirtiness::Clean;
+        Ok(())
     }
 }
 
@@ -123,7 +135,7 @@ impl<'a, K> VacantEntry<'a, K> {
         OccupiedEntry {
             api: self.api,
             object,
-            new: true,
+            dirtiness: Dirtiness::New,
         }
     }
 }
@@ -132,7 +144,7 @@ impl<'a, K: Debug> Debug for OccupiedEntry<'a, K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OccupiedEntry")
             .field("api", &"...")
-            .field("new", &self.new)
+            .field("dirtiness", &self.dirtiness)
             .field("object", &self.object)
             .finish()
     }
