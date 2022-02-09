@@ -1,4 +1,4 @@
-# kube-rs adopters
+# Adopters
 
 ## Open Source
 
@@ -23,5 +23,4 @@
 - [TrueLayer](https://truelayer.com)
 - [ViacomCBS](https://viacomcbs.com)
 
-If you're using kube-rs and aren't on this list, please [submit a pull
-request](https://github.com/kube-rs/kube-rs/edit/master/ADOPTERS.md)!
+If you're using `kube-rs` in production and are not on this list, please [submit a pull request](https://github.com/kube-rs/kube-rs/edit/master/ADOPTERS.md)!
