@@ -4,6 +4,7 @@ set -euo pipefail
 main() {
   local -r RELNAME="$1"
   local -r RELEASE="$(curl -sSL -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/kube-rs/kube-rs/releases/tags/${RELNAME}")"
+  local -r RELREG="$(echo "${RELNAME}" | sd -s "." "\.")"
   local -r HURL="$(echo "${RELEASE}" | jq '.html_url' -r)"
   # Skipping New Contributors highight from CHANGELOG + across repos for brevity and to avoid pinging them excessively
   local -r BODY="$(echo "${RELEASE}" | jq '.body' -r | sd "## New Contributors[\w\W]*$" "")"
@@ -12,12 +13,11 @@ main() {
 
     # Add in the body first
     sd "(^${RELNAME} / [\d-]+\n===================\n)" "\$1${BODY}" CHANGELOG.md
-    # fix newlines caused by sd (^M)
-    sed -e "s/\r//g" CHANGELOG.md > CHANGELOG.m.md
-    mv CHANGELOG.m.md CHANGELOG.md
+    # fix newlines issues caused last jq/sd combo: (^M at end of lines)
+    sd "\r" "" CHANGELOG.md
 
     # Link the headline
-    sd "^${RELNAME} / " "[${RELNAME}](${HURL}) / " CHANGELOG.md
+    sd "^${RELREG} / " "[${RELNAME}](${HURL}) / " CHANGELOG.md
   fi
 }
 
