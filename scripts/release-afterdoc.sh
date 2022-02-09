@@ -8,7 +8,7 @@ main() {
   local -r HURL="$(echo "${RELEASE}" | jq '.html_url' -r)"
   # Skipping New Contributors highight from CHANGELOG + across repos for brevity and to avoid pinging them excessively
   local -r BODY="$(echo "${RELEASE}" | jq '.body' -r | sd "## New Contributors[\w\W]*$" "")"
-  if grep -E "^${RELNAME} / " CHANGELOG.md; then
+  if grep -E "^${RELREG} / " CHANGELOG.md; then
     # We only run the script if the headline is unchanged (done at the end)
 
     # Add in the body first
