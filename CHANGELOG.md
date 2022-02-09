@@ -7,7 +7,7 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.68.0...master
 
-0.68.0 / 2022-02-01
+[0.68.0](https://github.com/kube-rs/kube-rs/releases/tag/0.68.0) / 2022-02-01
 ===================
 
 ### Interface Changes
@@ -38,14 +38,14 @@ As one of the last steps toward [gold level client requirements](https://github.
 * Use absolute path to Result in derives by @teozkr in https://github.com/kube-rs/kube-rs/pull/795
 * core: add missing reason to Display on Error::Validation in Request by @clux in https://github.com/kube-rs/kube-rs/pull/798
 
-0.67.0 / 2022-01-25
+[0.67.0](https://github.com/kube-rs/kube-rs/releases/tag/0.67.0) / 2022-01-25
 ===================
 ### Changed
 
 * runtime: Replace `DashMap` with a locked `AHashMap` by @olix0r in https://github.com/kube-rs/kube-rs/pull/785
 * update k8s-openapi for kubernetes 1.23 support by @clux in https://github.com/kube-rs/kube-rs/pull/789
 
-0.66.0 / 2022-01-15
+[0.66.0](https://github.com/kube-rs/kube-rs/releases/tag/0.66.0) / 2022-01-15
 ===================
 
 Tons of ergonomics improvements, and 3 new contributors.
@@ -86,7 +86,7 @@ Merged PRs from [github release](https://github.com/kube-rs/kube-rs/releases/tag
 * Remove crate private `identity_pem` field from `Config` by @kazk in https://github.com/kube-rs/kube-rs/pull/771
 * Use SecretString in AuthInfo to avoid credential leaking by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/766
 
-0.65.0 / 2021-12-10
+[0.65.0](https://github.com/kube-rs/kube-rs/releases/tag/0.65.0) / 2021-12-10
 ===================
 
  * BREAKING: Removed `kube::Error::OpenSslError` - [#716](https://github.com/kube-rs/kube-rs/issues/716)
@@ -102,7 +102,7 @@ Merged PRs from [github release](https://github.com/kube-rs/kube-rs/releases/tag
  * Updated `tower-http` to 0.2.0 - [#748](https://github.com/kube-rs/kube-rs/issues/748)
  * BREAKING: `kube-client`: replace `RefreshTokenLayer` with `AsyncFilterLayer` in `AuthLayer` - [#752](https://github.com/kube-rs/kube-rs/issues/752)
 
-0.64.0 / 2021-11-16
+[0.64.0](https://github.com/kube-rs/kube-rs/releases/tag/0.64.0) / 2021-11-16
 ===================
 
  * BREAKING: Replaced feature `kube-derive/schema` with attribute `#[kube(schema)]` - [#690](https://github.com/kube-rs/kube-rs/issues/690)
@@ -169,22 +169,22 @@ The following breaking changes were made as a part of an effort to refine errors
 
 </details>
 
-0.63.2 / 2021-10-28
+[0.63.2](https://github.com/kube-rs/kube-rs/releases/tag/0.63.2) / 2021-10-28
 ===================
 * `kube::runtime::events`: fix build and hide module on kubernetes < 1.19 (events/v1 missing there) - [#685](https://github.com/kube-rs/kube-rs/issues/685)
 
-0.63.1 / 2021-10-26
+[0.63.1](https://github.com/kube-rs/kube-rs/releases/tag/0.63.1) / 2021-10-26
 ===================
  * `kube::runtime::wait::Condition` added boolean combinators (`not`/`and`/`or`) - [#678](https://github.com/kube-rs/kube-rs/issues/678)
  * `kube`: fix docs.rs build - [#681](https://github.com/kube-rs/kube-rs/issues/681) via [#682](https://github.com/kube-rs/kube-rs/pull/682)
 
-0.63.0 / 2021-10-26
+[0.63.0](https://github.com/kube-rs/kube-rs/releases/tag/0.63.0) / 2021-10-26
 ===================
  * rust `edition` bumped to `2021` - [#664](https://github.com/kube-rs/kube-rs/pull/664/), [#666](https://github.com/kube-rs/kube-rs/pull/666), [#667](https://github.com/kube-rs/kube-rs/pull/667)
  * `kube::CustomResource` derive can now take arbitrary `#[kube(k8s_openapi)]` style-paths for `k8s_openapi`, `schemars`, `serde`, and `serde_json` - [#675](https://github.com/kube-rs/kube-rs/pull/675)
  * `kube`: fix `native-tls` included when only `rustls-tls` feature is selected - [#673](https://github.com/kube-rs/kube-rs/issues/673) via [#674](https://github.com/kube-rs/kube-rs/pull/674)
 
-0.62.0 / 2021-10-22
+[0.62.0](https://github.com/kube-rs/kube-rs/releases/tag/0.62.0) / 2021-10-22
 ===================
  * `kube` now re-exports `kube-runtime` under `runtime` feature - [#651](https://github.com/kube-rs/kube-rs/issues/651) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
   - no need to keep both `kube` and `kube_runtime` in `Cargo.toml` anymore
@@ -196,20 +196,20 @@ The following breaking changes were made as a part of an effort to refine errors
  * `kube::core` consistently re-exported across crates
  * docs: major overhaul + [architecture.md](./architecture.md) - [#416](https://github.com/kube-rs/kube-rs/issues/416) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
 
-0.61.0 / 2021-10-09
+[0.61.0](https://github.com/kube-rs/kube-rs/releases/tag/0.61.0) / 2021-10-09
 ===================
  * `kube-core`: BREAKING: extend `CustomResourceExt` trait with `::shortnames` method (impl in `kube-derive`) - [#641](https://github.com/kube-rs/kube-rs/issues/641)
  * `kube-runtime`: add `wait` module to `await_condition`, and added `watch_object` to watcher - [#632](https://github.com/kube-rs/kube-rs/issues/632) via [#633](https://github.com/kube-rs/kube-rs/issues/633)
  * `kube`: add `Restart` marker trait to allow `Api::restart` on core workloads - [#630](https://github.com/kube-rs/kube-rs/issues/630) via [#635](https://github.com/kube-rs/kube-rs/issues/635)
  * bump dependencies: `tokio-tungstenite`, `k8s-openapi`, `schemars`, `tokio` in particular - [#643](https://github.com/kube-rs/kube-rs/issues/643) + [#645](https://github.com/kube-rs/kube-rs/issues/645)
 
-0.60.0 / 2021-09-02
+[0.60.0](https://github.com/kube-rs/kube-rs/releases/tag/0.60.0) / 2021-09-02
 ===================
  * `kube`: support `k8s-openapi` with `v1_22` features - [#621](https://github.com/kube-rs/kube-rs/issues/621) via [#622](https://github.com/kube-rs/kube-rs/issues/622)
  * `kube`: `BREAKING`: support for `CustomResourceDefinition` at `v1beta1` now requires an opt-in `deprecated-crd-v1beta1` feature - [#622](https://github.com/kube-rs/kube-rs/issues/622)
  * `kube-core`: add content-type header to requests with body - [#626](https://github.com/kube-rs/kube-rs/issues/626) via [#627](https://github.com/kube-rs/kube-rs/issues/627)
 
-0.59.0 / 2021-08-09
+[0.59.0](https://github.com/kube-rs/kube-rs/releases/tag/0.59.0) / 2021-08-09
 ===================
  * `BREAKING`: bumped `k8s-openapi` to [0.13.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.13.0) - [#581](https://github.com/kube-rs/kube-rs/issues/581) via [#616](https://github.com/kube-rs/kube-rs/issues/616)
  * `kube` connects to kubernetes via cluster dns when using `rustls` - [#587](https://github.com/kube-rs/kube-rs/issues/587) via [#597](https://github.com/kube-rs/kube-rs/issues/597)
@@ -221,11 +221,11 @@ The following breaking changes were made as a part of an effort to refine errors
  * `kube-derive` added support to automatically implement the `HasSpec` and `HasStatus` traits - [#605](https://github.com/kube-rs/kube-rs/issues/605)
 * `kube-runtime` fix tracing span hierarchy from applier - [#600](https://github.com/kube-rs/kube-rs/issues/600)
 
-0.58.1 / 2021-07-06
+[0.58.1](https://github.com/kube-rs/kube-rs/releases/tag/0.58.1) / 2021-07-06
 ===================
  * `kube-runtime`: fix non-unix builds - [#582](https://github.com/kube-rs/kube-rs/issues/582)
 
-0.58.0 / 2021-07-05
+[0.58.0](https://github.com/kube-rs/kube-rs/releases/tag/0.58.0) / 2021-07-05
 ===================
  * `kube`: `BREAKING`: subresource marker traits renamed conjugation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - [#536](https://github.com/kube-rs/kube-rs/issues/536) via [#560](https://github.com/kube-rs/kube-rs/issues/560)
  * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - [#559](https://github.com/kube-rs/kube-rs/issues/559)
