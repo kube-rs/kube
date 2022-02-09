@@ -142,27 +142,6 @@ impl<K: Resource> ObjectRef<K> {
         }
     }
 
-    pub fn into_object_reference(self) -> ObjectReference {
-        let Self {
-            dyntype: dt,
-            name,
-            namespace,
-            extra: Extra {
-                resource_version,
-                uid,
-            },
-        } = self;
-        ObjectReference {
-            api_version: Some(K::api_version(&dt).into_owned()),
-            kind: Some(K::kind(&dt).into_owned()),
-            field_path: None,
-            name,
-            namespace,
-            resource_version,
-            uid,
-        }
-    }
-
     /// Convert into a reference to `K2`
     ///
     /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
@@ -183,6 +162,29 @@ impl<K: Resource> ObjectRef<K> {
             name: self.name,
             namespace: self.namespace,
             extra: self.extra,
+        }
+    }
+}
+
+impl<K: Resource> From<ObjectRef<K>> for ObjectReference {
+    fn from(val: ObjectRef<K>) -> Self {
+        let ObjectRef {
+            dyntype: dt,
+            name,
+            namespace,
+            extra: Extra {
+                resource_version,
+                uid,
+            },
+        } = val;
+        ObjectReference {
+            api_version: Some(K::api_version(&dt).into_owned()),
+            kind: Some(K::kind(&dt).into_owned()),
+            field_path: None,
+            name,
+            namespace,
+            resource_version,
+            uid,
         }
     }
 }
