@@ -3,6 +3,7 @@ use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta:
 use kube_client::{
     api::{DynamicObject, Resource},
     core::ObjectMeta,
+    ResourceExt,
 };
 use std::{
     fmt::{Debug, Display},
@@ -35,7 +36,7 @@ use std::{
 pub struct ObjectRef<K: Resource> {
     pub dyntype: K::DynamicType,
     /// The name of the object
-    pub name: Option<String>,
+    pub name: String,
     /// The namespace of the object
     ///
     /// May only be `None` if the kind is cluster-scoped (not located in a namespace).
@@ -91,7 +92,7 @@ impl<K: Resource> ObjectRef<K> {
     pub fn new_with(name: &str, dyntype: K::DynamicType) -> Self {
         Self {
             dyntype,
-            name: Some(name.into()),
+            name: name.into(),
             namespace: None,
             extra: Extra::default(),
         }
@@ -112,7 +113,7 @@ impl<K: Resource> ObjectRef<K> {
         let meta = obj.meta();
         Self {
             dyntype,
-            name: meta.name.clone(),
+            name: obj.name(),
             namespace: meta.namespace.clone(),
             extra: Extra::from_obj_meta(meta),
         }
@@ -130,7 +131,7 @@ impl<K: Resource> ObjectRef<K> {
         if owner.api_version == K::api_version(&dyntype) && owner.kind == K::kind(&dyntype) {
             Some(Self {
                 dyntype,
-                name: Some(owner.name.clone()),
+                name: owner.name.clone(),
                 namespace: namespace.map(String::from),
                 extra: Extra {
                     resource_version: None,
@@ -181,7 +182,7 @@ impl<K: Resource> From<ObjectRef<K>> for ObjectReference {
             api_version: Some(K::api_version(&dt).into_owned()),
             kind: Some(K::kind(&dt).into_owned()),
             field_path: None,
-            name,
+            name: Some(name),
             namespace,
             resource_version,
             uid,
@@ -197,7 +198,7 @@ impl<K: Resource> Display for ObjectRef<K> {
             K::kind(&self.dyntype),
             K::version(&self.dyntype),
             K::group(&self.dyntype),
-            self.name.as_deref().unwrap_or("<unnamed>")
+            self.name
         )?;
         if let Some(namespace) = &self.namespace {
             write!(f, ".{}", namespace)?;
