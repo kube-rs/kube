@@ -12,7 +12,7 @@ main() {
     # We only run the script if the headline is unchanged (done at the end)
 
     # Add in the body first
-    sd "(^${RELNAME} / [\d-]+\n===================\n)" "\$1${BODY}" CHANGELOG.md
+    sd "(^${RELREG} / [\d-]+\n===================\n)" "\$1${BODY}" CHANGELOG.md
     # fix newlines issues caused last jq/sd combo: (^M at end of lines)
     sd "\r" "" CHANGELOG.md
 
