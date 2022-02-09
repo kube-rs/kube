@@ -3,7 +3,7 @@
 mod object_ref;
 pub mod store;
 
-pub use self::object_ref::ObjectRef;
+pub use self::object_ref::{Extra as ObjectRefExtra, ObjectRef};
 use crate::watcher;
 use futures::{Stream, TryStreamExt};
 use kube_client::Resource;

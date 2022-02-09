@@ -56,10 +56,15 @@ pub struct ObjectRef<K: Resource> {
     pub extra: Extra,
 }
 
+/// Non-vital information about an object being referred to
+///
+/// See [`ObjectRef::extra`].
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct Extra {
+    /// The version of the resource at the time of reference
     pub resource_version: Option<String>,
+    /// The uid of the object
     pub uid: Option<String>,
 }
 
