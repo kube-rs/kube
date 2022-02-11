@@ -87,6 +87,7 @@ impl<'a, K> Entry<'a, K> {
 ///
 /// The object may exist because it existed at the time of call to [`Api::entry`],
 /// or because it was created by [`Entry::or_insert`].
+#[derive(Debug)]
 pub struct OccupiedEntry<'a, K> {
     api: &'a Api<K>,
     dirtiness: Dirtiness,
@@ -173,6 +174,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
 /// A view of an object that does not yet exist
 ///
 /// Created by [`Api::entry`], as a variant of [`Entry`]
+#[derive(Debug)]
 pub struct VacantEntry<'a, K> {
     api: &'a Api<K>,
     name: &'a str,
@@ -222,25 +224,5 @@ impl<'a, K> VacantEntry<'a, K> {
             object,
             dirtiness: Dirtiness::New,
         }
-    }
-}
-
-impl<'a, K: Debug> Debug for OccupiedEntry<'a, K> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OccupiedEntry")
-            .field("api", &"...")
-            .field("dirtiness", &self.dirtiness)
-            .field("object", &self.object)
-            .finish()
-    }
-}
-
-impl<'a, K> Debug for VacantEntry<'a, K> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("VacantEntry")
-            .field("api", &"...")
-            .field("name", &self.name)
-            .field("namespace", &self.api.namespace)
-            .finish()
     }
 }
