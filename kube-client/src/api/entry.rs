@@ -153,18 +153,19 @@ impl<'a, K> OccupiedEntry<'a, K> {
     where
         K: Resource + DeserializeOwned + Serialize + Clone + Debug,
     {
-        self.object = match self.dirtiness {
-            Dirtiness::New => self.api.create(&PostParams::default(), &self.object).await?,
+        match self.dirtiness {
+            Dirtiness::New => self.object = self.api.create(&PostParams::default(), &self.object).await?,
             Dirtiness::Dirty => {
-                self.api
+                self.object = self
+                    .api
                     .replace(
                         self.object.meta().name.as_deref().unwrap(),
                         &PostParams::default(),
                         &self.object,
                     )
-                    .await?
+                    .await?;
             }
-            Dirtiness::Clean => self.api.get(self.object.meta().name.as_deref().unwrap()).await?,
+            Dirtiness::Clean => (),
         };
         self.dirtiness = Dirtiness::Clean;
         Ok(())
