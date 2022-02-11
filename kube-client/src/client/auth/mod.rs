@@ -1,4 +1,8 @@
-use std::{path::PathBuf, process::Command, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    sync::Arc,
+};
 
 use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
@@ -10,7 +14,7 @@ use jsonpath_lib::select as jsonpath_select;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tower::{filter::AsyncPredicate, BoxError};
 
 use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
@@ -88,10 +92,54 @@ pub(crate) enum Auth {
     RefreshableToken(RefreshableToken),
 }
 
+// Token file reference. Reloads at least once per minute.
+#[derive(Debug)]
+pub struct TokenFile {
+    path: PathBuf,
+    token: SecretString,
+    expires_at: DateTime<Utc>,
+}
+
+impl TokenFile {
+    fn new<P: AsRef<Path>>(path: P) -> Result<TokenFile, Error> {
+        let token = std::fs::read_to_string(&path)
+            .map_err(|source| Error::ReadTokenFile(source, path.as_ref().to_owned()))?;
+        Ok(Self {
+            path: path.as_ref().to_owned(),
+            token: SecretString::from(token),
+            // Try to reload at least once a minute
+            expires_at: Utc::now() + Duration::seconds(60),
+        })
+    }
+
+    fn is_expiring(&self) -> bool {
+        Utc::now() + Duration::seconds(10) > self.expires_at
+    }
+
+    fn cached_token(&self) -> Option<&str> {
+        (!self.is_expiring()).then(|| self.token.expose_secret().as_ref())
+    }
+
+    fn token(&mut self) -> &str {
+        if self.is_expiring() {
+            // > If reload from file fails, the last-read token should be used to avoid breaking
+            // > clients that make token files available on process start and then remove them to
+            // > limit credential exposure.
+            // > https://github.com/kubernetes/kubernetes/issues/68164
+            if let Ok(token) = std::fs::read_to_string(&self.path) {
+                self.token = SecretString::from(token);
+            }
+            self.expires_at = Utc::now() + Duration::seconds(60);
+        }
+        self.token.expose_secret()
+    }
+}
+
 // See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth
 // for the list of auth-plugins supported by client-go.
 // We currently support the following:
 // - exec
+// - token-file refreshed at least once per minute
 // - gcp: command based token source (exec)
 // - gcp: application credential based token source (requires `oauth` feature)
 //
@@ -100,6 +148,7 @@ pub(crate) enum Auth {
 #[derive(Debug, Clone)]
 pub enum RefreshableToken {
     Exec(Arc<Mutex<(SecretString, DateTime<Utc>, AuthInfo)>>),
+    File(Arc<RwLock<TokenFile>>),
     #[cfg(feature = "oauth")]
     GcpOauth(Arc<Mutex<oauth::Gcp>>),
 }
@@ -131,6 +180,7 @@ impl RefreshableToken {
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
                 if Utc::now() + Duration::seconds(60) >= locked_data.1 {
+                    // TODO Improve refreshing exec to avoid `Auth::try_from`
                     match Auth::try_from(&locked_data.2)? {
                         Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) => {
                             return Err(Error::UnrefreshableTokenResponse);
@@ -146,28 +196,37 @@ impl RefreshableToken {
                         }
 
                         // Unreachable because the token source does not change
+                        Auth::RefreshableToken(RefreshableToken::File(_)) => unreachable!(),
                         #[cfg(feature = "oauth")]
                         Auth::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
                     }
                 }
 
-                let mut value = HeaderValue::try_from(format!("Bearer {}", &locked_data.0.expose_secret()))
-                    .map_err(Error::InvalidBearerToken)?;
-                value.set_sensitive(true);
-                Ok(value)
+                bearer_header(locked_data.0.expose_secret())
+            }
+
+            RefreshableToken::File(token_file) => {
+                if let Some(token) = token_file.read().await.cached_token() {
+                    bearer_header(token)
+                } else {
+                    bearer_header(token_file.write().await.token())
+                }
             }
 
             #[cfg(feature = "oauth")]
             RefreshableToken::GcpOauth(data) => {
                 let gcp_oauth = data.lock().await;
                 let token = (*gcp_oauth).token().await.map_err(Error::OAuth)?;
-                let mut value = HeaderValue::try_from(format!("Bearer {}", &token.access_token))
-                    .map_err(Error::InvalidBearerToken)?;
-                value.set_sensitive(true);
-                Ok(value)
+                bearer_header(&token.access_token)
             }
         }
     }
+}
+
+fn bearer_header(token: &str) -> Result<HeaderValue, Error> {
+    let mut value = HeaderValue::try_from(format!("Bearer {}", token)).map_err(Error::InvalidBearerToken)?;
+    value.set_sensitive(true);
+    Ok(value)
 }
 
 impl TryFrom<&AuthInfo> for Auth {
@@ -211,34 +270,35 @@ impl TryFrom<&AuthInfo> for Auth {
             return Ok(Self::Basic(u.to_owned(), p.to_owned()));
         }
 
-        let (raw_token, expiration) = match &auth_info.token {
-            Some(token) => (Some(token.clone()), None),
-            None => {
-                if let Some(exec) = &auth_info.exec {
-                    let creds = auth_exec(exec)?;
-                    let status = creds.status.ok_or(Error::ExecPluginFailed)?;
-                    let expiration = status
-                        .expiration_timestamp
-                        .map(|ts| ts.parse())
-                        .transpose()
-                        .map_err(Error::MalformedTokenExpirationDate)?;
-                    (status.token.map(SecretString::from), expiration)
-                } else if let Some(file) = &auth_info.token_file {
-                    let token = std::fs::read_to_string(&file)
-                        .map_err(|source| Error::ReadTokenFile(source, file.into()))?;
-                    (Some(SecretString::from(token)), None)
-                } else {
-                    (None, None)
-                }
-            }
-        };
+        // Inline token. Has precedence over `token_file`.
+        if let Some(token) = &auth_info.token {
+            return Ok(Self::Bearer(token.clone()));
+        }
 
-        match (raw_token, expiration) {
-            (Some(token), None) => Ok(Self::Bearer(token)),
-            (Some(token), Some(expire)) => Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
-                Mutex::new((token, expire, auth_info.clone())),
-            )))),
-            _ => Ok(Self::None),
+        // Token file reference. Must be reloaded at least once a minute.
+        if let Some(file) = &auth_info.token_file {
+            return Ok(Self::RefreshableToken(RefreshableToken::File(Arc::new(
+                RwLock::new(TokenFile::new(file)?),
+            ))));
+        }
+
+        if let Some(exec) = &auth_info.exec {
+            let creds = auth_exec(exec)?;
+            let status = creds.status.ok_or(Error::ExecPluginFailed)?;
+            let expiration = status
+                .expiration_timestamp
+                .map(|ts| ts.parse())
+                .transpose()
+                .map_err(Error::MalformedTokenExpirationDate)?;
+            match (status.token.map(SecretString::from), expiration) {
+                (Some(token), Some(expire)) => Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
+                    Mutex::new((token, expire, auth_info.clone())),
+                )))),
+                (Some(token), None) => Ok(Self::Bearer(token)),
+                _ => Ok(Self::None),
+            }
+        } else {
+            Ok(Self::None)
         }
     }
 }
@@ -471,5 +531,25 @@ mod test {
             _ => unreachable!(),
         }
         Ok(())
+    }
+
+    #[test]
+    fn token_file() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), "token1").unwrap();
+        let mut token_file = TokenFile::new(file.path()).unwrap();
+        assert_eq!(token_file.cached_token().unwrap(), "token1");
+        assert!(!token_file.is_expiring());
+        assert_eq!(token_file.token(), "token1");
+        // Doesn't reload unless expiring
+        std::fs::write(file.path(), "token2").unwrap();
+        assert_eq!(token_file.token(), "token1");
+
+        token_file.expires_at = Utc::now();
+        assert!(token_file.is_expiring());
+        assert_eq!(token_file.cached_token(), None);
+        assert_eq!(token_file.token(), "token2");
+        assert!(!token_file.is_expiring());
+        assert_eq!(token_file.cached_token().unwrap(), "token2");
     }
 }

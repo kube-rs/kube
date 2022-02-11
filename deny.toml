@@ -1,3 +1,8 @@
+# examples sometimes lag behind as they use higher level dependencies
+# we exclude these from the check because they are not part of our
+# actual dependency tree
+exclude = ["kube-examples"]
+
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
@@ -63,12 +68,4 @@ allow-git = []
 
 [bans]
 multiple-versions = "deny"
-skip = [
-    # warp uses an older version of rustls (warp is only used in the examples)
-    { name = "rustls", version = "=0.19.1" },
-    { name = "webpki", version = "=0.21.4" },
-    { name = "tokio-rustls", version = "=0.22.0" },
-    { name = "sct", version = "=0.6.1" },
-    # http has not released a version using itoa v1
-    { name = "itoa", version = "^0.4" },
-]
+skip = []

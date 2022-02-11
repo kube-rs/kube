@@ -117,7 +117,7 @@ impl Client {
     /// Create and initialize a [`Client`] using the inferred
     /// configuration.
     ///
-    /// Will use [`Config::infer`] to try in-cluster enironment
+    /// Will use [`Config::infer`] to try in-cluster environment
     /// variables first, then fallback to the local kubeconfig.
     ///
     /// Will fail if neither configuration could be loaded.
