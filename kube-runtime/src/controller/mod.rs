@@ -3,7 +3,7 @@
 use self::runner::Runner;
 use crate::{
     reflector::{
-        reflector,
+        self, reflector,
         store::{Store, Writer},
         ObjectRef,
     },
@@ -472,10 +472,8 @@ where
     ///
     /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
     /// but can be overridden by calling this method.
-    #[must_use]
-    pub fn trigger_backoff(mut self, backoff: impl Backoff + Send + 'static) -> Self {
+    pub fn trigger_backoff(&mut self, backoff: impl Backoff + Send + 'static) {
         self.trigger_backoff = Box::new(backoff);
-        self
     }
 
     /// Retrieve a copy of the reader before starting the controller
@@ -493,35 +491,35 @@ where
     /// To watch the full set of `Child` objects in the given `Api` scope, you can use [`ListParams::default`].
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
-    #[must_use]
-    pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
-        self,
-        api: Api<Child>,
-        lp: ListParams,
-    ) -> Self {
+    pub fn owns<Child>(&mut self, api: Api<Child>, lp: ListParams) -> reflector::Store<Child>
+    where
+        Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + Sync + 'static,
+    {
         self.owns_with(api, (), lp)
     }
 
     /// Specify `Child` objects which `K` owns and should be watched
     ///
     /// Same as [`Controller::owns`], but accepts a `DynamicType` so it can be used with dynamic resources.
-    #[must_use]
-    pub fn owns_with<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
-        mut self,
+    pub fn owns_with<Child>(
+        &mut self,
         api: Api<Child>,
         dyntype: Child::DynamicType,
         lp: ListParams,
-    ) -> Self
+    ) -> reflector::Store<Child>
     where
+        Child: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
+        let store_writer = reflector::store::Writer::<Child>::new(dyntype.clone());
+        let store = store_writer.as_reader();
         let child_watcher = trigger_owners(
-            try_flatten_touched(watcher(api, lp)),
+            try_flatten_touched(reflector(store_writer, watcher(api, lp))),
             self.dyntype.clone(),
             dyntype,
         );
         self.trigger_selector.push(child_watcher.boxed());
-        self
+        store
     }
 
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
@@ -536,17 +534,15 @@ where
     /// The [`ListParams`] refer to the possible subset of `Watched` objects that you want the [`Api`]
     /// to watch - in the Api's configured scope - and run through the custom mapper.
     /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`ListParams::default`].
-    #[must_use]
-    pub fn watches<
-        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
-        I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    >(
-        self,
+    pub fn watches<Other, I>(
+        &mut self,
         api: Api<Other>,
         lp: ListParams,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
-    ) -> Self
+    ) -> reflector::Store<Other>
     where
+        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + Sync + 'static,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
         self.watches_with(api, (), lp, mapper)
@@ -555,34 +551,37 @@ where
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
     ///
     /// Same as [`Controller::watches`], but accepts a `DynamicType` so it can be used with dynamic resources.
-    #[must_use]
-    pub fn watches_with<
-        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
-        I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    >(
-        mut self,
+    pub fn watches_with<Other, I>(
+        &mut self,
         api: Api<Other>,
         dyntype: Other::DynamicType,
         lp: ListParams,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
-    ) -> Self
+    ) -> reflector::Store<Other>
     where
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
+        Other::DynamicType: Clone + Hash + Eq,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
-        Other::DynamicType: Clone,
     {
-        let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), move |obj| {
-            let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
-            mapper(obj)
-                .into_iter()
-                .map(move |mapped_obj_ref| ReconcileRequest {
-                    obj_ref: mapped_obj_ref,
-                    reason: ReconcileReason::RelatedObjectUpdated {
-                        obj_ref: Box::new(watched_obj_ref.clone()),
-                    },
-                })
-        });
+        let store_writer = reflector::store::Writer::<Other>::new(dyntype.clone());
+        let store = store_writer.as_reader();
+        let other_watcher = trigger_with(
+            try_flatten_touched(reflector(store_writer, watcher(api, lp))),
+            move |obj| {
+                let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
+                mapper(obj)
+                    .into_iter()
+                    .map(move |mapped_obj_ref| ReconcileRequest {
+                        obj_ref: mapped_obj_ref,
+                        reason: ReconcileReason::RelatedObjectUpdated {
+                            obj_ref: Box::new(watched_obj_ref.clone()),
+                        },
+                    })
+            },
+        );
         self.trigger_selector.push(other_watcher.boxed());
-        self
+        store
     }
 
     /// Trigger a reconciliation for all managed objects whenever `trigger` emits a value
@@ -628,8 +627,7 @@ where
     /// This can be called multiple times, in which case they are additive; reconciles are scheduled whenever *any* [`Stream`] emits a new item.
     ///
     /// If a [`Stream`] is terminated (by emitting [`None`]) then the [`Controller`] keeps running, but the [`Stream`] stops being polled.
-    #[must_use]
-    pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
+    pub fn reconcile_all_on(&mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) {
         let store = self.store();
         let dyntype = self.dyntype.clone();
         self.trigger_selector.push(
@@ -645,7 +643,6 @@ where
                 })
                 .boxed(),
         );
-        self
     }
 
     /// Start a graceful shutdown when `trigger` resolves. Once a graceful shutdown has been initiated:
@@ -682,10 +679,8 @@ where
     ///
     /// This can be called multiple times, in which case they are additive; the [`Controller`] starts to terminate
     /// as soon as *any* [`Future`] resolves.
-    #[must_use]
-    pub fn graceful_shutdown_on(mut self, trigger: impl Future<Output = ()> + Send + Sync + 'static) -> Self {
+    pub fn graceful_shutdown_on(&mut self, trigger: impl Future<Output = ()> + Send + Sync + 'static) {
         self.graceful_shutdown_selector.push(trigger.boxed());
-        self
     }
 
     /// Initiate graceful shutdown on Ctrl+C or SIGTERM (on Unix), waiting for all reconcilers to finish.
@@ -704,8 +699,7 @@ where
     /// NOTE: [`Controller::run`] terminates as soon as a forceful shutdown is requested, but leaves the reconcilers running
     /// in the background while they terminate. This will block [`tokio::runtime::Runtime`] termination until they actually terminate,
     /// unless you run [`std::process::exit`] afterwards.
-    #[must_use]
-    pub fn shutdown_on_signal(mut self) -> Self {
+    pub fn shutdown_on_signal(&mut self) {
         async fn shutdown_signal() {
             futures::future::select(
                 tokio::signal::ctrl_c().map(|_| ()).boxed(),
@@ -741,7 +735,6 @@ where
             }
             .boxed(),
         );
-        self
     }
 
     /// Consume all the parameters of the Controller and start the applier stream

@@ -125,10 +125,11 @@ async fn main() -> Result<()> {
         }
     });
 
-    Controller::new(cmgs, ListParams::default())
-        .owns(cms, ListParams::default())
-        .reconcile_all_on(reload_rx.map(|_| ()))
-        .shutdown_on_signal()
+    let mut controller = Controller::new(cmgs, ListParams::default());
+    controller.owns(cms, ListParams::default());
+    controller.reconcile_all_on(reload_rx.map(|_| ()));
+    controller.shutdown_on_signal();
+    controller
         .run(reconcile, error_policy, Context::new(Data { client }))
         .for_each(|res| async move {
             match res {
