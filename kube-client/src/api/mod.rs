@@ -15,7 +15,7 @@ pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus
 
 mod util;
 
-mod entry;
+pub mod entry;
 
 // Re-exports from kube-core
 #[cfg(feature = "admission")]

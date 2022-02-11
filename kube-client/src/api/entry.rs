@@ -1,5 +1,9 @@
-#![warn(missing_docs)]
+//! API helpers for get-or-create and get-and-modify patterns
+//!
+//! [`Api::entry`] is the primary entry point for this API.
 
+// Import used in docs
+#[allow(unused_imports)] use std::collections::HashMap;
 use std::fmt::Debug;
 
 use kube_core::{params::PostParams, Resource};
@@ -8,6 +12,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{Api, Result};
 
 impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
+    /// Gets a given object's "slot" on the Kubernetes API, designed for "get-or-create" and "get-and-modify" patterns
+    ///
+    /// This is similar to [`HashMap::entry`], but [`Entry`] must be [`Entry::sync`]ed for changes to be persisted.
     pub async fn entry<'a>(&'a self, name: &'a str) -> Result<Entry<'a, K>> {
         Ok(match self.get_opt(name).await? {
             Some(object) => Entry::Occupied(OccupiedEntry {
@@ -21,12 +28,18 @@ impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
 }
 
 #[derive(Debug)]
+/// A view into a single object, with enough context to create or update it
+///
+/// See [`Api::entry`].
 pub enum Entry<'a, K> {
+    /// An object that either exists on the server, or has been created locally (and is awaiting synchronization)
     Occupied(OccupiedEntry<'a, K>),
+    /// An object that does not exist
     Vacant(VacantEntry<'a, K>),
 }
 
 impl<'a, K> Entry<'a, K> {
+    /// Borrow the object, if it exists (on the API, or queued for creation using [`Entry::or_insert`])
     pub fn get(&self) -> Option<&K> {
         match self {
             Entry::Occupied(entry) => Some(entry.get()),
@@ -34,6 +47,9 @@ impl<'a, K> Entry<'a, K> {
         }
     }
 
+    /// Borrow the object mutably, if it exists (on the API, or queued for creation using [`Entry::or_insert`])
+    ///
+    /// [`Entry::sync`] must be called afterwards for any changes to be persisted.
     pub fn get_mut(&mut self) -> Option<&mut K> {
         match self {
             Entry::Occupied(entry) => Some(entry.get_mut()),
@@ -41,6 +57,9 @@ impl<'a, K> Entry<'a, K> {
         }
     }
 
+    /// Let `f` modify the object, if it exists (on the API, or queued for creation using [`Entry::or_insert`])
+    ///
+    /// [`Entry::sync`] must be called afterwards for any changes to be persisted.
     pub fn and_modify(self, f: impl FnOnce(&mut K)) -> Self {
         match self {
             Entry::Occupied(entry) => Entry::Occupied(entry.and_modify(f)),
@@ -48,6 +67,11 @@ impl<'a, K> Entry<'a, K> {
         }
     }
 
+    /// Create a new object if it does not already exist
+    ///
+    /// Just like [`VacantEntry::insert`], `name` and `namespace` are automatically set for the new object.
+    ///
+    /// [`OccupiedEntry::sync`] must be called afterwards for the change to be persisted.
     pub fn or_insert(self, default: impl FnOnce() -> K) -> OccupiedEntry<'a, K>
     where
         K: Resource,
@@ -59,6 +83,10 @@ impl<'a, K> Entry<'a, K> {
     }
 }
 
+/// A view into a single object that exists
+///
+/// The object may exist because it existed at the time of call to [`Api::entry`],
+/// or because it was created by [`Entry::or_insert`].
 pub struct OccupiedEntry<'a, K> {
     api: &'a Api<K>,
     dirtiness: Dirtiness,
@@ -67,16 +95,23 @@ pub struct OccupiedEntry<'a, K> {
 
 #[derive(Debug)]
 enum Dirtiness {
+    /// The object has not been modified (locally) since the last API operation
     Clean,
+    /// The object exists in the API, but has been modified locally
     Dirty,
+    /// The object does not yet exist in the API, but was created locally
     New,
 }
 
 impl<'a, K> OccupiedEntry<'a, K> {
+    /// Borrow the object
     pub fn get(&self) -> &K {
         &self.object
     }
 
+    /// Borrow the object mutably
+    ///
+    /// [`Entry::sync`] must be called afterwards for any changes to be persisted.
     pub fn get_mut(&mut self) -> &mut K {
         self.dirtiness = match self.dirtiness {
             Dirtiness::Clean => Dirtiness::Dirty,
@@ -86,15 +121,32 @@ impl<'a, K> OccupiedEntry<'a, K> {
         &mut self.object
     }
 
+    /// Let `f` modify the object
+    ///
+    /// [`Entry::sync`] must be called afterwards for any changes to be persisted.
     pub fn and_modify(mut self, f: impl FnOnce(&mut K)) -> Self {
         f(self.get_mut());
         self
     }
 
+    /// Take ownership over the object
     pub fn into_object(self) -> K {
         self.object
     }
 
+    /// Save the object to the Kubernetes API, if any changes have been made
+    ///
+    /// The [`OccupiedEntry`] is updated with the new object (including changes made by the API server, such as
+    /// `.metadata.resource_version`).
+    ///
+    /// # Errors
+    ///
+    /// This function can fail due to transient errors, or due to write conflicts (for example: if another client
+    /// created the object between the calls to [`Api::entry`] and [`OccupiedEntry::sync`], or because another
+    /// client modified the object in the meantime).
+    ///
+    /// Any retries should be coarse-grained enough to also include the call to [`Api::entry`], so that the latest
+    /// state can be fetched.
     pub async fn sync(&mut self) -> Result<()>
     where
         K: Resource + DeserializeOwned + Serialize + Clone + Debug,
@@ -117,12 +169,20 @@ impl<'a, K> OccupiedEntry<'a, K> {
     }
 }
 
+/// A view of an object that does not yet exist
+///
+/// Created by [`Api::entry`], as a variant of [`Entry`]
 pub struct VacantEntry<'a, K> {
     api: &'a Api<K>,
     name: &'a str,
 }
 
 impl<'a, K> VacantEntry<'a, K> {
+    /// Create a new object
+    ///
+    /// `name` and `namespace` are automatically set for the new object, according to the parameters passed to [`Api::entry`].
+    ///
+    /// [`OccupiedEntry::sync`] must be called afterwards for the change to be persisted.
     pub fn insert(self, mut object: K) -> OccupiedEntry<'a, K>
     where
         K: Resource,
