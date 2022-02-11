@@ -24,6 +24,11 @@ where
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function assumes that the object is expected to always exist, and returns [`Error`] if it does not.
+    /// Consider using [`Api::get_opt`] if you need to handle missing objects.
     pub async fn get(&self, name: &str) -> Result<K> {
         let mut req = self.request.get(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get");
@@ -39,7 +44,7 @@ where
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     if let Some(pod) = pods.try_get("blog").await? {
+    ///     if let Some(pod) = pods.get_opt("blog").await? {
     ///         // Pod was found
     ///     } else {
     ///         // Pod was not found
@@ -47,7 +52,7 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn try_get(&self, name: &str) -> Result<Option<K>> {
+    pub async fn get_opt(&self, name: &str) -> Result<Option<K>> {
         match self.get(name).await {
             Ok(obj) => Ok(Some(obj)),
             Err(Error::Api(ErrorResponse { reason, .. })) if &reason == "NotFound" => Ok(None),

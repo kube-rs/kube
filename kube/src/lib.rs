@@ -503,11 +503,11 @@ mod test {
 
     #[tokio::test]
     #[ignore] // needs cluster (lists cms)
-    async fn api_try_get_handles_404() -> Result<(), Box<dyn std::error::Error>> {
+    async fn api_get_opt_handles_404() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);
         assert_eq!(
-            api.try_get("this-cm-does-not-exist-ajklisdhfqkljwhreq").await?,
+            api.get_opt("this-cm-does-not-exist-ajklisdhfqkljwhreq").await?,
             None
         );
         Ok(())
