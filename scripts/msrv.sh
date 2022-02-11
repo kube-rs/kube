@@ -1,7 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
+sanity() {
+    # verify all main crates have the same msrv
+    if [[ $(cat ./*/Cargo.toml | grep "rust-version" | uniq | wc -l) -gt 1 ]]; then
+      echo "inconsistent rust-version keys set in various kube-crates:"
+      rg "rust-version" ./*/Cargo.toml
+      exit 1
+    fi
+}
+
 main() {
+    sanity
     local -r msrv="$(cargo msrv --output-format=json | jq -r 'select(.reason == "msrv-complete") | .msrv')"
     local -r badge="[![Rust ${msrv::-2}](https://img.shields.io/badge/MSRV-${msrv::-2}-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/${msrv})"
     sd "^.+badge/MSRV.+$" "${badge}" README.md
