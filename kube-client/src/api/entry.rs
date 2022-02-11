@@ -147,6 +147,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
     ///
     /// Any retries should be coarse-grained enough to also include the call to [`Api::entry`], so that the latest
     /// state can be fetched.
+    #[tracing::instrument(skip(self))]
     pub async fn sync(&mut self) -> Result<()>
     where
         K: Resource + DeserializeOwned + Serialize + Clone + Debug,
@@ -183,14 +184,38 @@ impl<'a, K> VacantEntry<'a, K> {
     /// `name` and `namespace` are automatically set for the new object, according to the parameters passed to [`Api::entry`].
     ///
     /// [`OccupiedEntry::sync`] must be called afterwards for the change to be persisted.
+    #[tracing::instrument(skip(self, object))]
     pub fn insert(self, mut object: K) -> OccupiedEntry<'a, K>
     where
         K: Resource,
     {
         let meta = object.meta_mut();
-        meta.name.get_or_insert_with(|| self.name.to_string());
-        if meta.namespace.is_none() {
-            meta.namespace = self.api.namespace.clone();
+        match &mut meta.name {
+            name @ None => *name = Some(self.name.to_string()),
+            Some(name) if name != self.name => {
+                tracing::warn!(
+                    object.metadata.name = ?name,
+                    expected_name = ?self.name,
+                    "object's .metadata.name does not match name passed to `Api::entry`"
+                )
+            }
+            Some(_) => (),
+        }
+        match &mut meta.namespace {
+            ns @ None => *ns = self.api.namespace.clone(),
+            Some(ns) if Some(ns.as_str()) != self.api.namespace.as_deref() => {
+                tracing::warn!(
+                    object.metadata.namespace = ?ns,
+                    expected_namespace = ?self.api.namespace,
+                    "object's .metadata.namespace does not match namespace of `Api`"
+                )
+            }
+            Some(_) => (),
+        }
+        if meta.generate_name.is_some() {
+            tracing::warn!(
+                ".metadata.generate_name is set, but is not supported by Entry and will be ignored"
+            );
         }
         OccupiedEntry {
             api: self.api,
