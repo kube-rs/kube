@@ -35,7 +35,7 @@ coverage:
 
 deny:
 	# might require rm Cargo.lock first to match CI
-	cargo deny --workspace --all-features check licenses sources
+	cargo deny --workspace --all-features check bans licenses sources
 
 readme:
 	rustdoc README.md --test --edition=2021
