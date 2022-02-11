@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 use crate::{api::Api, Error, Result};
-use kube_core::{object::ObjectList, params::*, response::Status, WatchEvent};
+use kube_core::{object::ObjectList, params::*, response::Status, ErrorResponse, WatchEvent};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
@@ -24,10 +24,40 @@ where
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function assumes that the object is expected to always exist, and returns [`Error`] if it does not.
+    /// Consider using [`Api::get_opt`] if you need to handle missing objects.
     pub async fn get(&self, name: &str) -> Result<K> {
         let mut req = self.request.get(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get");
         self.client.request::<K>(req).await
+    }
+
+    /// [Get](`Api::get`) a named resource if it exists, returns [`None`] if it doesn't exist
+    ///
+    /// ```no_run
+    /// use kube::{Api, Client};
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let client = Client::try_default().await?;
+    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+    ///     if let Some(pod) = pods.get_opt("blog").await? {
+    ///         // Pod was found
+    ///     } else {
+    ///         // Pod was not found
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn get_opt(&self, name: &str) -> Result<Option<K>> {
+        match self.get(name).await {
+            Ok(obj) => Ok(Some(obj)),
+            Err(Error::Api(ErrorResponse { reason, .. })) if &reason == "NotFound" => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 
     /// Get a list of resources

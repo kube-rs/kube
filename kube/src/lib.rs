@@ -224,7 +224,10 @@ mod test {
         assert_eq!(a1.resource_url(), a2.resource_url());
     }
 
-    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+    use k8s_openapi::{
+        api::core::v1::ConfigMap,
+        apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
+    };
     #[tokio::test]
     #[ignore] // needs cluster (creates + patches foo crd)
     #[cfg(all(feature = "derive", feature = "runtime"))]
@@ -495,6 +498,18 @@ mod test {
         // verify it is properly gone
         assert!(pods.get("busybox-kube4").await.is_err());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (lists cms)
+    async fn api_get_opt_handles_404() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+        let api = Api::<ConfigMap>::default_namespaced(client);
+        assert_eq!(
+            api.get_opt("this-cm-does-not-exist-ajklisdhfqkljwhreq").await?,
+            None
+        );
         Ok(())
     }
 }
