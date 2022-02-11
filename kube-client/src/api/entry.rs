@@ -9,7 +9,7 @@ use crate::{Api, Result};
 
 impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     pub async fn entry<'a>(&'a self, name: &'a str) -> Result<Entry<'a, K>> {
-        Ok(match self.try_get(name).await? {
+        Ok(match self.get_opt(name).await? {
             Some(object) => Entry::Occupied(OccupiedEntry {
                 api: self,
                 object,
