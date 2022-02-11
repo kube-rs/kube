@@ -226,3 +226,168 @@ impl<'a, K> VacantEntry<'a, K> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use k8s_openapi::api::core::v1::ConfigMap;
+    use kube_core::{
+        params::{DeleteParams, PostParams},
+        ErrorResponse, ObjectMeta,
+    };
+
+    use crate::{api::entry::Entry, Api, Client, Error};
+
+    #[tokio::test]
+    #[ignore] // needs cluster (gets and writes cms)
+    async fn entry_create_missing_object() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+        let api = Api::<ConfigMap>::default_namespaced(client);
+
+        let object_name = "entry-missing-cm";
+        if api.get_opt(object_name).await?.is_some() {
+            api.delete(object_name, &DeleteParams::default()).await?;
+        }
+
+        let entry = api.entry(object_name).await?;
+        let entry2 = api.entry(object_name).await?;
+        assert_eq!(entry.get(), None);
+        assert_eq!(entry2.get(), None);
+
+        // Create object cleanly
+        let mut entry = entry.or_insert(|| ConfigMap {
+            data: Some([("key".to_string(), "value".to_string())].into()),
+            ..ConfigMap::default()
+        });
+        entry.sync().await?;
+        assert_eq!(
+            entry
+                .get()
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value")
+        );
+        let fetched_obj = api.get(object_name).await?;
+        assert_eq!(
+            fetched_obj
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value")
+        );
+
+        // Update object
+        entry
+            .get_mut()
+            .data
+            .get_or_insert_with(BTreeMap::default)
+            .insert("key".to_string(), "value2".to_string());
+        entry.sync().await?;
+        assert_eq!(
+            entry
+                .get()
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value2")
+        );
+        let fetched_obj = api.get(object_name).await?;
+        assert_eq!(
+            fetched_obj
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value2")
+        );
+
+        // Object was already created in parallel, fail with a conflict error
+        let mut entry2 = entry2.or_insert(|| ConfigMap {
+            data: Some([("key".to_string(), "value3".to_string())].into()),
+            ..ConfigMap::default()
+        });
+        assert!(
+            matches!(dbg!(entry2.sync().await), Err(Error::Api(ErrorResponse{reason,..})) if reason == "AlreadyExists")
+        );
+
+        // Cleanup
+        api.delete(object_name, &DeleteParams::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (gets and writes cms)
+    async fn entry_update_existing_object() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+        let api = Api::<ConfigMap>::default_namespaced(client);
+
+        let object_name = "entry-existing-cm";
+        if api.get_opt(object_name).await?.is_some() {
+            api.delete(object_name, &DeleteParams::default()).await?;
+        }
+        api.create(&PostParams::default(), &ConfigMap {
+            metadata: ObjectMeta {
+                namespace: api.namespace.clone(),
+                name: Some(object_name.to_string()),
+                ..ObjectMeta::default()
+            },
+            data: Some([("key".to_string(), "value".to_string())].into()),
+            ..ConfigMap::default()
+        })
+        .await?;
+
+        let mut entry = match api.entry(object_name).await? {
+            Entry::Occupied(entry) => entry,
+            entry => panic!("entry for existing object must be occupied: {:?}", entry),
+        };
+        let mut entry2 = match api.entry(object_name).await? {
+            Entry::Occupied(entry) => entry,
+            entry => panic!("entry for existing object must be occupied: {:?}", entry),
+        };
+
+        // Entry is up-to-date, modify cleanly
+        entry
+            .get_mut()
+            .data
+            .get_or_insert_with(BTreeMap::default)
+            .insert("key".to_string(), "value2".to_string());
+        entry.sync().await?;
+        assert_eq!(
+            entry
+                .get()
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value2")
+        );
+        let fetched_obj = api.get(object_name).await?;
+        assert_eq!(
+            fetched_obj
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value2")
+        );
+
+        // Object was already updated in parallel, fail with a conflict error
+        entry2
+            .get_mut()
+            .data
+            .get_or_insert_with(BTreeMap::default)
+            .insert("key".to_string(), "value3".to_string());
+        assert!(
+            matches!(entry2.sync().await, Err(Error::Api(ErrorResponse{reason,..})) if reason == "Conflict")
+        );
+
+        // Cleanup
+        api.delete(object_name, &DeleteParams::default()).await?;
+        Ok(())
+    }
+}
