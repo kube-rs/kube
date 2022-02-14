@@ -24,7 +24,7 @@ latest = ["k8s-openapi/v1_22"]
 deprecated = ["kube/deprecated-crd-v1beta1", "k8s-openapi/v1_21"]
 
 [dev-dependencies]
-tokio-util = "0.6.8"
+tokio-util = "0.7.0"
 assert-json-diff = "2.0.1"
 validator = { version = "0.14.0", features = ["derive"] }
 anyhow = "1.0.44"
