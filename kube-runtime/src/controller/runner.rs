@@ -1,5 +1,5 @@
 use super::future_hash_map::FutureHashMap;
-use crate::scheduler::{self, ScheduleRequest, Scheduler};
+use crate::scheduler::{ScheduleRequest, Scheduler};
 use futures::{Future, Stream, StreamExt};
 use pin_project::pin_project;
 use std::{
@@ -43,14 +43,14 @@ where
     F: Future + Unpin,
     MkF: FnMut(&T) -> F,
 {
-    type Item = scheduler::Result<F::Output>;
+    type Item = F::Output;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         let slots = this.slots;
         let scheduler = &mut this.scheduler;
         let has_active_slots = match slots.poll_next_unpin(cx) {
-            Poll::Ready(Some(result)) => return Poll::Ready(Some(Ok(result))),
+            Poll::Ready(Some(result)) => return Poll::Ready(Some(result)),
             Poll::Ready(None) => false,
             Poll::Pending => true,
         };
@@ -63,7 +63,7 @@ where
                 .hold_unless(|msg| !slots.contains_key(msg))
                 .poll_next_unpin(cx);
             match next_msg_poll {
-                Poll::Ready(Some(Ok(msg))) => {
+                Poll::Ready(Some(msg)) => {
                     let msg_fut = (this.run_msg)(&msg);
                     assert!(
                         slots.insert(msg, msg_fut).is_none(),
@@ -71,7 +71,6 @@ where
                     );
                     cx.waker().wake_by_ref();
                 }
-                Poll::Ready(Some(Err(err))) => break Poll::Ready(Some(Err(err))),
                 Poll::Ready(None) => {
                     break if has_active_slots {
                         // We're done listening for new messages, but still have some that
@@ -93,7 +92,7 @@ mod tests {
     use crate::scheduler::{scheduler, ScheduleRequest};
     use futures::{
         channel::{mpsc, oneshot},
-        future, poll, SinkExt, TryStreamExt,
+        future, poll, SinkExt, StreamExt,
     };
     use std::{cell::RefCell, time::Duration};
     use tokio::{
@@ -118,7 +117,7 @@ mod tests {
                     drop(mutex_ref);
                 })
             })
-            .try_for_each(|_| async { Ok(()) }),
+            .for_each(|_| async {}),
         );
         sched_tx
             .send(ScheduleRequest {
@@ -135,7 +134,7 @@ mod tests {
             })
             .await
             .unwrap();
-        let ((), run) = future::join(
+        future::join(
             async {
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 drop(sched_tx);
@@ -143,7 +142,6 @@ mod tests {
             runner,
         )
         .await;
-        run.unwrap();
         // Validate that we actually ran both requests
         assert_eq!(count, 2);
     }
@@ -158,7 +156,7 @@ mod tests {
         let mut runner = Runner::new(scheduler(sched_rx), |msg: &u8| futures::future::ready(*msg));
         // Start a background task that starts listening /before/ we enqueue the message
         // We can't just use Stream::poll_next(), since that bypasses the waker system
-        Handle::current().spawn(async move { result_tx.send(runner.try_next().await.unwrap()).unwrap() });
+        Handle::current().spawn(async move { result_tx.send(runner.next().await).unwrap() });
         // Ensure that the background task actually gets to initiate properly, and starts polling the runner
         yield_now().await;
         sched_tx
