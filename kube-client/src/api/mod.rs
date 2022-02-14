@@ -3,6 +3,8 @@
 
 mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
+use std::fmt::Debug;
+
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
 #[cfg(feature = "ws")] mod portforward;
 #[cfg(feature = "ws")] pub use portforward::Portforwarder;
@@ -14,6 +16,8 @@ pub use subresource::{Attach, AttachParams, Execute, Portforward};
 pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
 
 mod util;
+
+pub mod entry;
 
 // Re-exports from kube-core
 #[cfg(feature = "admission")]
@@ -46,11 +50,11 @@ pub struct Api<K> {
     pub(crate) request: Request,
     /// The client to use (from this library)
     pub(crate) client: Client,
+    namespace: Option<String>,
     /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
     /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
     /// is `Send`, even if `K` may not be).
-    #[allow(dead_code)]
-    pub(crate) phantom: std::iter::Empty<K>,
+    pub(crate) _phantom: std::iter::Empty<K>,
 }
 
 /// Api constructors for Resource implementors with custom DynamicTypes
@@ -65,7 +69,8 @@ impl<K: Resource> Api<K> {
         Self {
             client,
             request: Request::new(url),
-            phantom: std::iter::empty(),
+            namespace: None,
+            _phantom: std::iter::empty(),
         }
     }
 
@@ -77,7 +82,8 @@ impl<K: Resource> Api<K> {
         Self {
             client,
             request: Request::new(url),
-            phantom: std::iter::empty(),
+            namespace: Some(ns.to_string()),
+            _phantom: std::iter::empty(),
         }
     }
 
@@ -88,12 +94,8 @@ impl<K: Resource> Api<K> {
     /// Unless configured explicitly, the default namespace is either "default"
     /// out of cluster, or the service account's namespace in cluster.
     pub fn default_namespaced_with(client: Client, dyntype: &K::DynamicType) -> Self {
-        let url = K::url_path(dyntype, Some(client.default_ns()));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: std::iter::empty(),
-        }
+        let ns = client.default_ns().to_string();
+        Self::namespaced_with(client, &ns, dyntype)
     }
 
     /// Consume self and return the [`Client`]
@@ -117,22 +119,12 @@ where
 {
     /// Cluster level resources, or resources viewed across all namespaces
     pub fn all(client: Client) -> Self {
-        let url = K::url_path(&Default::default(), None);
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: std::iter::empty(),
-        }
+        Self::all_with(client, &K::DynamicType::default())
     }
 
     /// Namespaced resource within a given namespace
     pub fn namespaced(client: Client, ns: &str) -> Self {
-        let url = K::url_path(&Default::default(), Some(ns));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: std::iter::empty(),
-        }
+        Self::namespaced_with(client, ns, &K::DynamicType::default())
     }
 
     /// Namespaced resource within the default namespace
@@ -140,17 +132,29 @@ where
     /// Unless configured explicitly, the default namespace is either "default"
     /// out of cluster, or the service account's namespace in cluster.
     pub fn default_namespaced(client: Client) -> Self {
-        let url = K::url_path(&Default::default(), Some(client.default_ns()));
-        Self {
-            client,
-            request: Request::new(url),
-            phantom: std::iter::empty(),
-        }
+        Self::default_namespaced_with(client, &K::DynamicType::default())
     }
 }
 
 impl<K> From<Api<K>> for Client {
     fn from(api: Api<K>) -> Self {
         api.client
+    }
+}
+
+impl<K> Debug for Api<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Intentionally destructuring, to cause compile errors when new fields are added
+        let Self {
+            request,
+            client: _,
+            namespace,
+            _phantom,
+        } = self;
+        f.debug_struct("Api")
+            .field("request", &request)
+            .field("client", &"...")
+            .field("namespace", &namespace)
+            .finish()
     }
 }

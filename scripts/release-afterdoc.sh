@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 main() {
+  if [ -z "$1" ]; then
+    echo "please use ./release-afterdoc.sh TAG"
+    echo "TAG is probably the result of: git tag -l | tail -n 1"
+    exit 1
+  fi
   local -r RELNAME="$1"
   local -r RELEASE="$(curl -sSL -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/kube-rs/kube-rs/releases/tags/${RELNAME}")"
   local -r RELREG="$(echo "${RELNAME}" | sd -s "." "\.")"
