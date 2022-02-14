@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use kube_core::{params::PostParams, Resource};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{Api, Result};
+use crate::{Api, Error, Result};
 
 impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     /// Gets a given object's "slot" on the Kubernetes API, designed for "get-or-create" and "get-and-modify" patterns
@@ -50,8 +50,9 @@ impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
         Ok(match self.get_opt(name).await? {
             Some(object) => Entry::Occupied(OccupiedEntry {
                 api: self,
-                object,
                 dirtiness: Dirtiness::Clean,
+                name,
+                object,
             }),
             None => Entry::Vacant(VacantEntry { api: self, name }),
         })
@@ -100,8 +101,6 @@ impl<'a, K> Entry<'a, K> {
 
     /// Create a new object if it does not already exist
     ///
-    /// Just like [`VacantEntry::insert`], `name` and `namespace` are automatically set for the new object.
-    ///
     /// [`OccupiedEntry::commit`] must be called afterwards for the change to be persisted.
     pub fn or_insert(self, default: impl FnOnce() -> K) -> OccupiedEntry<'a, K>
     where
@@ -122,6 +121,7 @@ impl<'a, K> Entry<'a, K> {
 pub struct OccupiedEntry<'a, K> {
     api: &'a Api<K>,
     dirtiness: Dirtiness,
+    name: &'a str,
     object: K,
 }
 
@@ -180,12 +180,19 @@ impl<'a, K> OccupiedEntry<'a, K> {
     /// Any retries should be coarse-grained enough to also include the call to [`Api::entry`], so that the latest
     /// state can be fetched.
     #[tracing::instrument(skip(self))]
-    pub async fn commit(&mut self) -> Result<()>
+    pub async fn commit(&mut self) -> Result<(), CommitError>
     where
         K: Resource + DeserializeOwned + Serialize + Clone + Debug,
     {
+        self.prepare_for_commit()?;
         match self.dirtiness {
-            Dirtiness::New => self.object = self.api.create(&PostParams::default(), &self.object).await?,
+            Dirtiness::New => {
+                self.object = self
+                    .api
+                    .create(&PostParams::default(), &self.object)
+                    .await
+                    .map_err(CommitError::Save)?
+            }
             Dirtiness::Dirty => {
                 self.object = self
                     .api
@@ -194,13 +201,89 @@ impl<'a, K> OccupiedEntry<'a, K> {
                         &PostParams::default(),
                         &self.object,
                     )
-                    .await?;
+                    .await
+                    .map_err(CommitError::Save)?;
             }
             Dirtiness::Clean => (),
         };
         self.dirtiness = Dirtiness::Clean;
         Ok(())
     }
+
+    /// Validate that [`Self::object`] is valid, and refers to the same object as the original [`Api::entry`] call
+    ///
+    /// Defaults [`ObjectMeta::name`] and [`ObjectMeta::namespace`] if unset.
+    fn prepare_for_commit(&mut self) -> Result<(), CommitValidationError>
+    where
+        K: Resource,
+    {
+        // Access `Self::object` directly rather than using `Self::get_mut` to avoid flagging the object as dirty
+        let meta = self.object.meta_mut();
+        match &mut meta.name {
+            name @ None => *name = Some(self.name.to_string()),
+            Some(name) if name != self.name => {
+                return Err(CommitValidationError::NameMismatch {
+                    object_name: name.clone(),
+                    expected: self.name.to_string(),
+                });
+            }
+            Some(_) => (),
+        }
+        match &mut meta.namespace {
+            ns @ None => *ns = self.api.namespace.clone(),
+            Some(ns) if Some(ns.as_str()) != self.api.namespace.as_deref() => {
+                return Err(CommitValidationError::NamespaceMismatch {
+                    object_namespace: Some(ns.clone()),
+                    expected: self.api.namespace.clone(),
+                });
+            }
+            Some(_) => (),
+        }
+        if let Some(generate_name) = &meta.generate_name {
+            return Err(CommitValidationError::GenerateName {
+                object_generate_name: generate_name.clone(),
+            });
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+/// Commit errors
+pub enum CommitError {
+    /// Pre-commit validation failed
+    #[error("failed to validate object for saving")]
+    Validate(#[from] CommitValidationError),
+    /// Failed to submit the new object to the Kubernetes API
+    #[error("failed to save object")]
+    Save(#[source] Error),
+}
+
+#[derive(Debug, thiserror::Error)]
+/// Pre-commit validation errors
+pub enum CommitValidationError {
+    /// [`ObjectMeta::name`] does not match the name passed to [`Api::entry`]
+    #[error(".metadata.name does not match the name passed to Api::entry (got: {object_name:?}, expected: {expected:?})")]
+    NameMismatch {
+        /// The name of the object ([`ObjectMeta::name`])
+        object_name: String,
+        /// The name passed to [`Api::entry`]
+        expected: String,
+    },
+    /// [`ObjectMeta::namespace`] does not match the namespace of the [`Api`]
+    #[error(".metadata.namespace does not match the namespace of the Api (got: {object_namespace:?}, expected: {expected:?})")]
+    NamespaceMismatch {
+        /// The name of the object ([`ObjectMeta::namespace`])
+        object_namespace: Option<String>,
+        /// The namespace of the [`Api`]
+        expected: Option<String>,
+    },
+    /// [`ObjectMeta::generate_name`] must not be set
+    #[error(".metadata.generate_name must not be set (got: {object_generate_name:?})")]
+    GenerateName {
+        /// The set name generation template of the object ([`ObjectMeta::generate_name`])
+        object_generate_name: String,
+    },
 }
 
 /// A view of an object that does not yet exist
@@ -215,46 +298,17 @@ pub struct VacantEntry<'a, K> {
 impl<'a, K> VacantEntry<'a, K> {
     /// Create a new object
     ///
-    /// `name` and `namespace` are automatically set for the new object, according to the parameters passed to [`Api::entry`].
-    ///
     /// [`OccupiedEntry::commit`] must be called afterwards for the change to be persisted.
     #[tracing::instrument(skip(self, object))]
-    pub fn insert(self, mut object: K) -> OccupiedEntry<'a, K>
+    pub fn insert(self, object: K) -> OccupiedEntry<'a, K>
     where
         K: Resource,
     {
-        let meta = object.meta_mut();
-        match &mut meta.name {
-            name @ None => *name = Some(self.name.to_string()),
-            Some(name) if name != self.name => {
-                tracing::warn!(
-                    object.metadata.name = ?name,
-                    expected_name = ?self.name,
-                    "object's .metadata.name does not match name passed to `Api::entry`"
-                )
-            }
-            Some(_) => (),
-        }
-        match &mut meta.namespace {
-            ns @ None => *ns = self.api.namespace.clone(),
-            Some(ns) if Some(ns.as_str()) != self.api.namespace.as_deref() => {
-                tracing::warn!(
-                    object.metadata.namespace = ?ns,
-                    expected_namespace = ?self.api.namespace,
-                    "object's .metadata.namespace does not match namespace of `Api`"
-                )
-            }
-            Some(_) => (),
-        }
-        if meta.generate_name.is_some() {
-            tracing::warn!(
-                ".metadata.generate_name is set, but is not supported by Entry and will be ignored"
-            );
-        }
         OccupiedEntry {
             api: self.api,
-            object,
             dirtiness: Dirtiness::New,
+            name: self.name,
+            object,
         }
     }
 }
@@ -269,7 +323,10 @@ mod tests {
         ErrorResponse, ObjectMeta,
     };
 
-    use crate::{api::entry::Entry, Api, Client, Error};
+    use crate::{
+        api::entry::{CommitError, Entry},
+        Api, Client, Error,
+    };
 
     #[tokio::test]
     #[ignore] // needs cluster (gets and writes cms)
@@ -344,7 +401,7 @@ mod tests {
             ..ConfigMap::default()
         });
         assert!(
-            matches!(dbg!(entry2.commit().await), Err(Error::Api(ErrorResponse{reason,..})) if reason == "AlreadyExists")
+            matches!(dbg!(entry2.commit().await), Err(CommitError::Save(Error::Api(ErrorResponse { reason, .. }))) if reason == "AlreadyExists")
         );
 
         // Cleanup
@@ -415,7 +472,7 @@ mod tests {
             .get_or_insert_with(BTreeMap::default)
             .insert("key".to_string(), "value3".to_string());
         assert!(
-            matches!(entry2.commit().await, Err(Error::Api(ErrorResponse{reason,..})) if reason == "Conflict")
+            matches!(entry2.commit().await, Err(CommitError::Save(Error::Api(ErrorResponse { reason, .. }))) if reason == "Conflict")
         );
 
         // Cleanup
