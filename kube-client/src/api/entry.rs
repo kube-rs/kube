@@ -14,7 +14,38 @@ use crate::{Api, Result};
 impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     /// Gets a given object's "slot" on the Kubernetes API, designed for "get-or-create" and "get-and-modify" patterns
     ///
-    /// This is similar to [`HashMap::entry`], but [`Entry`] must be [`Entry::sync`]ed for changes to be persisted.
+    /// This is similar to [`HashMap::entry`], but the [`Entry`] must be [`OccupiedEntry::sync`]ed for changes to be persisted.
+    ///
+    /// # Usage
+    ///
+    /// ```rust,no_run
+    /// # use std::collections::BTreeMap;
+    /// # use k8s_openapi::api::core::v1::ConfigMap;
+    /// # async fn wrapper() -> Result <(), Box<dyn std::error::Error>> {
+    /// let kube = kube::Client::try_default().await?;
+    /// let cms = kube::Api::<ConfigMap>::namespaced(kube, "default");
+    /// cms
+    ///     // Try to get `entry-example` if it exists
+    ///     .entry("entry-example").await?
+    ///     // Modify object if it already exists
+    ///     .and_modify(|cm| {
+    ///         cm.data
+    ///             .get_or_insert_with(BTreeMap::default)
+    ///             .insert("already-exists".to_string(), "true".to_string());
+    ///     })
+    ///     // Provide a default object if it does not exist
+    ///     .or_insert(|| ConfigMap::default())
+    ///     // Modify the object unconditionally now that we have provided a default value
+    ///     .and_modify(|cm| {
+    ///         cm.data
+    ///             .get_or_insert_with(BTreeMap::default)
+    ///             .insert("modified".to_string(), "true".to_string());
+    ///     })
+    ///     // Save changes
+    ///     .sync().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn entry<'a>(&'a self, name: &'a str) -> Result<Entry<'a, K>> {
         Ok(match self.get_opt(name).await? {
             Some(object) => Entry::Occupied(OccupiedEntry {
@@ -30,7 +61,7 @@ impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
 #[derive(Debug)]
 /// A view into a single object, with enough context to create or update it
 ///
-/// See [`Api::entry`].
+/// See [`Api::entry`] for more information.
 pub enum Entry<'a, K> {
     /// An object that either exists on the server, or has been created locally (and is awaiting synchronization)
     Occupied(OccupiedEntry<'a, K>),
@@ -49,7 +80,7 @@ impl<'a, K> Entry<'a, K> {
 
     /// Borrow the object mutably, if it exists (on the API, or queued for creation using [`Entry::or_insert`])
     ///
-    /// [`Entry::sync`] must be called afterwards for any changes to be persisted.
+    /// [`OccupiedEntry::sync`] must be called afterwards for any changes to be persisted.
     pub fn get_mut(&mut self) -> Option<&mut K> {
         match self {
             Entry::Occupied(entry) => Some(entry.get_mut()),
@@ -59,7 +90,7 @@ impl<'a, K> Entry<'a, K> {
 
     /// Let `f` modify the object, if it exists (on the API, or queued for creation using [`Entry::or_insert`])
     ///
-    /// [`Entry::sync`] must be called afterwards for any changes to be persisted.
+    /// [`OccupiedEntry::sync`] must be called afterwards for any changes to be persisted.
     pub fn and_modify(self, f: impl FnOnce(&mut K)) -> Self {
         match self {
             Entry::Occupied(entry) => Entry::Occupied(entry.and_modify(f)),
@@ -112,7 +143,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
 
     /// Borrow the object mutably
     ///
-    /// [`Entry::sync`] must be called afterwards for any changes to be persisted.
+    /// [`OccupiedEntry::sync`] must be called afterwards for any changes to be persisted.
     pub fn get_mut(&mut self) -> &mut K {
         self.dirtiness = match self.dirtiness {
             Dirtiness::Clean => Dirtiness::Dirty,
@@ -124,7 +155,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
 
     /// Let `f` modify the object
     ///
-    /// [`Entry::sync`] must be called afterwards for any changes to be persisted.
+    /// [`OccupiedEntry::sync`] must be called afterwards for any changes to be persisted.
     pub fn and_modify(mut self, f: impl FnOnce(&mut K)) -> Self {
         f(self.get_mut());
         self
