@@ -14,7 +14,7 @@ use crate::{Api, Result};
 impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     /// Gets a given object's "slot" on the Kubernetes API, designed for "get-or-create" and "get-and-modify" patterns
     ///
-    /// This is similar to [`HashMap::entry`], but the [`Entry`] must be [`OccupiedEntry::sync`]ed for changes to be persisted.
+    /// This is similar to [`HashMap::entry`], but the [`Entry`] must be [`OccupiedEntry::commit`]ed for changes to be persisted.
     ///
     /// # Usage
     ///
@@ -42,7 +42,7 @@ impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     ///             .insert("modified".to_string(), "true".to_string());
     ///     })
     ///     // Save changes
-    ///     .sync().await?;
+    ///     .commit().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -80,7 +80,7 @@ impl<'a, K> Entry<'a, K> {
 
     /// Borrow the object mutably, if it exists (on the API, or queued for creation using [`Entry::or_insert`])
     ///
-    /// [`OccupiedEntry::sync`] must be called afterwards for any changes to be persisted.
+    /// [`OccupiedEntry::commit`] must be called afterwards for any changes to be persisted.
     pub fn get_mut(&mut self) -> Option<&mut K> {
         match self {
             Entry::Occupied(entry) => Some(entry.get_mut()),
@@ -90,7 +90,7 @@ impl<'a, K> Entry<'a, K> {
 
     /// Let `f` modify the object, if it exists (on the API, or queued for creation using [`Entry::or_insert`])
     ///
-    /// [`OccupiedEntry::sync`] must be called afterwards for any changes to be persisted.
+    /// [`OccupiedEntry::commit`] must be called afterwards for any changes to be persisted.
     pub fn and_modify(self, f: impl FnOnce(&mut K)) -> Self {
         match self {
             Entry::Occupied(entry) => Entry::Occupied(entry.and_modify(f)),
@@ -102,7 +102,7 @@ impl<'a, K> Entry<'a, K> {
     ///
     /// Just like [`VacantEntry::insert`], `name` and `namespace` are automatically set for the new object.
     ///
-    /// [`OccupiedEntry::sync`] must be called afterwards for the change to be persisted.
+    /// [`OccupiedEntry::commit`] must be called afterwards for the change to be persisted.
     pub fn or_insert(self, default: impl FnOnce() -> K) -> OccupiedEntry<'a, K>
     where
         K: Resource,
@@ -143,7 +143,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
 
     /// Borrow the object mutably
     ///
-    /// [`OccupiedEntry::sync`] must be called afterwards for any changes to be persisted.
+    /// [`OccupiedEntry::commit`] must be called afterwards for any changes to be persisted.
     pub fn get_mut(&mut self) -> &mut K {
         self.dirtiness = match self.dirtiness {
             Dirtiness::Clean => Dirtiness::Dirty,
@@ -155,7 +155,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
 
     /// Let `f` modify the object
     ///
-    /// [`OccupiedEntry::sync`] must be called afterwards for any changes to be persisted.
+    /// [`OccupiedEntry::commit`] must be called afterwards for any changes to be persisted.
     pub fn and_modify(mut self, f: impl FnOnce(&mut K)) -> Self {
         f(self.get_mut());
         self
@@ -174,13 +174,13 @@ impl<'a, K> OccupiedEntry<'a, K> {
     /// # Errors
     ///
     /// This function can fail due to transient errors, or due to write conflicts (for example: if another client
-    /// created the object between the calls to [`Api::entry`] and [`OccupiedEntry::sync`], or because another
+    /// created the object between the calls to [`Api::entry`] and `OccupiedEntry::commit`, or because another
     /// client modified the object in the meantime).
     ///
     /// Any retries should be coarse-grained enough to also include the call to [`Api::entry`], so that the latest
     /// state can be fetched.
     #[tracing::instrument(skip(self))]
-    pub async fn sync(&mut self) -> Result<()>
+    pub async fn commit(&mut self) -> Result<()>
     where
         K: Resource + DeserializeOwned + Serialize + Clone + Debug,
     {
@@ -217,7 +217,7 @@ impl<'a, K> VacantEntry<'a, K> {
     ///
     /// `name` and `namespace` are automatically set for the new object, according to the parameters passed to [`Api::entry`].
     ///
-    /// [`OccupiedEntry::sync`] must be called afterwards for the change to be persisted.
+    /// [`OccupiedEntry::commit`] must be called afterwards for the change to be persisted.
     #[tracing::instrument(skip(self, object))]
     pub fn insert(self, mut object: K) -> OccupiedEntry<'a, K>
     where
@@ -292,7 +292,7 @@ mod tests {
             data: Some([("key".to_string(), "value".to_string())].into()),
             ..ConfigMap::default()
         });
-        entry.sync().await?;
+        entry.commit().await?;
         assert_eq!(
             entry
                 .get()
@@ -318,7 +318,7 @@ mod tests {
             .data
             .get_or_insert_with(BTreeMap::default)
             .insert("key".to_string(), "value2".to_string());
-        entry.sync().await?;
+        entry.commit().await?;
         assert_eq!(
             entry
                 .get()
@@ -344,7 +344,7 @@ mod tests {
             ..ConfigMap::default()
         });
         assert!(
-            matches!(dbg!(entry2.sync().await), Err(Error::Api(ErrorResponse{reason,..})) if reason == "AlreadyExists")
+            matches!(dbg!(entry2.commit().await), Err(Error::Api(ErrorResponse{reason,..})) if reason == "AlreadyExists")
         );
 
         // Cleanup
@@ -388,7 +388,7 @@ mod tests {
             .data
             .get_or_insert_with(BTreeMap::default)
             .insert("key".to_string(), "value2".to_string());
-        entry.sync().await?;
+        entry.commit().await?;
         assert_eq!(
             entry
                 .get()
@@ -415,7 +415,7 @@ mod tests {
             .get_or_insert_with(BTreeMap::default)
             .insert("key".to_string(), "value3".to_string());
         assert!(
-            matches!(entry2.sync().await, Err(Error::Api(ErrorResponse{reason,..})) if reason == "Conflict")
+            matches!(entry2.commit().await, Err(Error::Api(ErrorResponse{reason,..})) if reason == "Conflict")
         );
 
         // Cleanup
