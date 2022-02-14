@@ -118,7 +118,7 @@ where
             .map(move |owner_ref| ReconcileRequest {
                 obj_ref: owner_ref,
                 reason: ReconcileReason::RelatedObjectUpdated {
-                    obj_ref: child_ref.clone(),
+                    obj_ref: Box::new(child_ref.clone()),
                 },
             })
     })
@@ -185,7 +185,7 @@ impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
 pub enum ReconcileReason {
     Unknown,
     ObjectUpdated,
-    RelatedObjectUpdated { obj_ref: ObjectRef<DynamicObject> },
+    RelatedObjectUpdated { obj_ref: Box<ObjectRef<DynamicObject>> },
     ReconcilerRequestedRetry,
     ErrorPolicyRequestedRetry,
     BulkReconcile,
@@ -577,7 +577,7 @@ where
                 .map(move |mapped_obj_ref| ReconcileRequest {
                     obj_ref: mapped_obj_ref,
                     reason: ReconcileReason::RelatedObjectUpdated {
-                        obj_ref: watched_obj_ref.clone(),
+                        obj_ref: Box::new(watched_obj_ref.clone()),
                     },
                 })
         });

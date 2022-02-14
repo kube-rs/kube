@@ -4,7 +4,6 @@
 //! The [`Config`] has several constructors plus logic to infer environment.
 //!
 //! Unless you have issues, prefer using [`Config::infer`], and pass it to a [`Client`][crate::Client].
-use secrecy::SecretString;
 use std::{path::PathBuf, time::Duration};
 
 use thiserror::Error;
@@ -162,23 +161,24 @@ impl Config {
 
     /// Infer the configuration from the environment
     ///
-    /// Done by attempting to load in-cluster environment variables first, and
-    /// then if that fails, trying the local kubeconfig.
+    /// Done by attempting to load the local kubec-config first, and
+    /// then if that fails, trying the in-cluster environment variables .
     ///
     /// Fails if inference from both sources fails
     ///
     /// Applies debug overrides, see [`Config::apply_debug_overrides`] for more details
     pub async fn infer() -> Result<Self, InferConfigError> {
-        let mut config = match Self::from_cluster_env() {
-            Err(in_cluster_err) => {
-                tracing::trace!("No in-cluster config found: {}", in_cluster_err);
-                tracing::trace!("Falling back to local kubeconfig");
-                Self::from_kubeconfig(&KubeConfigOptions::default())
-                    .await
-                    .map_err(|kubeconfig_err| InferConfigError {
-                        in_cluster: in_cluster_err,
-                        kubeconfig: kubeconfig_err,
-                    })?
+        let mut config = match Self::from_kubeconfig(&KubeConfigOptions::default()).await {
+            Err(kubeconfig_err) => {
+                tracing::trace!(
+                    error = &kubeconfig_err as &dyn std::error::Error,
+                    "no local config found, falling back to local in-cluster config"
+                );
+
+                Self::from_cluster_env().map_err(|in_cluster_err| InferConfigError {
+                    in_cluster: in_cluster_err,
+                    kubeconfig: kubeconfig_err,
+                })?
             }
             Ok(success) => success,
         };
@@ -202,7 +202,6 @@ impl Config {
 
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
-        let token = incluster_config::load_token()?;
 
         Ok(Self {
             cluster_url,
@@ -211,7 +210,7 @@ impl Config {
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo {
-                token: Some(SecretString::from(token)),
+                token_file: Some(incluster_config::token_file()),
                 ..Default::default()
             },
             proxy_url: None,

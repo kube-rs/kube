@@ -27,10 +27,6 @@ pub enum Error {
     #[error("failed to read the default namespace: {0}")]
     ReadDefaultNamespace(#[source] std::io::Error),
 
-    /// Failed to read the token for the service account
-    #[error("failed to read the SA token: {0}")]
-    ReadToken(#[source] std::io::Error),
-
     /// Failed to read a certificate bundle
     #[error("failed to read a certificate bundle: {0}")]
     ReadCertificateBundle(#[source] std::io::Error),
@@ -75,9 +71,8 @@ fn kube_port() -> Option<String> {
     env::var(SERVICE_PORTENV).ok()
 }
 
-/// Returns token from specified path in cluster.
-pub fn load_token() -> Result<String, Error> {
-    std::fs::read_to_string(&SERVICE_TOKENFILE).map_err(Error::ReadToken)
+pub fn token_file() -> String {
+    SERVICE_TOKENFILE.to_owned()
 }
 
 /// Returns certification from specified path in cluster.

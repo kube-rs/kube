@@ -1,6 +1,10 @@
 use derivative::Derivative;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
-use kube_client::api::{DynamicObject, Resource, ResourceExt};
+use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
+use kube_client::{
+    api::{DynamicObject, Resource},
+    core::ObjectMeta,
+    ResourceExt,
+};
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
@@ -28,8 +32,9 @@ use std::{
 ///     ObjectRef::<Secret>::new("a").erase(),
 /// );
 /// ```
+#[non_exhaustive]
 pub struct ObjectRef<K: Resource> {
-    dyntype: K::DynamicType,
+    pub dyntype: K::DynamicType,
     /// The name of the object
     pub name: String,
     /// The namespace of the object
@@ -44,6 +49,24 @@ pub struct ObjectRef<K: Resource> {
     /// assert_ne!(ObjectRef::<ConfigMap>::new("foo"), ObjectRef::new("foo").within("bar"));
     /// ```
     pub namespace: Option<String>,
+    /// Extra information about the object being referred to
+    ///
+    /// This is *not* considered when comparing objects, but may be used when converting to and from other representations,
+    /// such as [`OwnerReference`] or [`ObjectReference`].
+    #[derivative(Hash = "ignore", PartialEq = "ignore")]
+    pub extra: Extra,
+}
+
+/// Non-vital information about an object being referred to
+///
+/// See [`ObjectRef::extra`].
+#[derive(Default, Debug, Clone)]
+#[non_exhaustive]
+pub struct Extra {
+    /// The version of the resource at the time of reference
+    pub resource_version: Option<String>,
+    /// The uid of the object
+    pub uid: Option<String>,
 }
 
 impl<K: Resource> ObjectRef<K>
@@ -71,6 +94,7 @@ impl<K: Resource> ObjectRef<K> {
             dyntype,
             name: name.into(),
             namespace: None,
+            extra: Extra::default(),
         }
     }
 
@@ -81,24 +105,24 @@ impl<K: Resource> ObjectRef<K> {
     }
 
     /// Creates `ObjectRef` from the resource and dynamic type.
-    /// Panics if name is missing (name always exists if the object
-    /// was returned from the apiserver)
     #[must_use]
     pub fn from_obj_with(obj: &K, dyntype: K::DynamicType) -> Self
     where
         K: Resource,
     {
+        let meta = obj.meta();
         Self {
             dyntype,
             name: obj.name(),
-            namespace: obj.namespace(),
+            namespace: meta.namespace.clone(),
+            extra: Extra::from_obj_meta(meta),
         }
     }
 
-    #[must_use]
     /// Create an `ObjectRef` from an `OwnerReference`
     ///
     /// Returns `None` if the types do not match.
+    #[must_use]
     pub fn from_owner_ref(
         namespace: Option<&str>,
         owner: &OwnerReference,
@@ -109,6 +133,10 @@ impl<K: Resource> ObjectRef<K> {
                 dyntype,
                 name: owner.name.clone(),
                 namespace: namespace.map(String::from),
+                extra: Extra {
+                    resource_version: None,
+                    uid: Some(owner.uid.clone()),
+                },
             })
         } else {
             None
@@ -125,6 +153,7 @@ impl<K: Resource> ObjectRef<K> {
             dyntype: dt2,
             name: self.name,
             namespace: self.namespace,
+            extra: self.extra,
         }
     }
 
@@ -133,6 +162,30 @@ impl<K: Resource> ObjectRef<K> {
             dyntype: kube_client::api::ApiResource::erase::<K>(&self.dyntype),
             name: self.name,
             namespace: self.namespace,
+            extra: self.extra,
+        }
+    }
+}
+
+impl<K: Resource> From<ObjectRef<K>> for ObjectReference {
+    fn from(val: ObjectRef<K>) -> Self {
+        let ObjectRef {
+            dyntype: dt,
+            name,
+            namespace,
+            extra: Extra {
+                resource_version,
+                uid,
+            },
+        } = val;
+        ObjectReference {
+            api_version: Some(K::api_version(&dt).into_owned()),
+            kind: Some(K::kind(&dt).into_owned()),
+            field_path: None,
+            name: Some(name),
+            namespace,
+            resource_version,
+            uid,
         }
     }
 }
@@ -154,9 +207,23 @@ impl<K: Resource> Display for ObjectRef<K> {
     }
 }
 
+impl Extra {
+    fn from_obj_meta(obj_meta: &ObjectMeta) -> Self {
+        Self {
+            resource_version: obj_meta.resource_version.clone(),
+            uid: obj_meta.uid.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ObjectRef;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
+
+    use super::{Extra, ObjectRef};
     use k8s_openapi::api::{
         apps::v1::Deployment,
         core::v1::{Node, Pod},
@@ -189,5 +256,28 @@ mod tests {
         assert_eq!(format!("{}", deploy_ref), format!("{}", deploy_ref.erase()));
         let node_ref = ObjectRef::<Node>::new("my-node");
         assert_eq!(format!("{}", node_ref), format!("{}", node_ref.erase()));
+    }
+
+    #[test]
+    fn comparison_should_ignore_extra() {
+        let minimal = ObjectRef::<Pod>::new("my-pod").within("my-namespace");
+        let with_extra = ObjectRef {
+            extra: Extra {
+                resource_version: Some("123".to_string()),
+                uid: Some("638ffacd-f666-4402-ba10-7848c66ef576".to_string()),
+            },
+            ..minimal.clone()
+        };
+
+        // Eq and PartialEq should be unaffected by the contents of `extra`
+        assert_eq!(minimal, with_extra);
+
+        // Hash should be unaffected by the contents of `extra`
+        let hash_value = |value: &ObjectRef<Pod>| {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_eq!(hash_value(&minimal), hash_value(&with_extra));
     }
 }
