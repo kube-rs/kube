@@ -8,13 +8,8 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use thiserror::Error;
 use tokio::time::Instant;
 use tokio_util::time::delay_queue::{self, DelayQueue};
-
-#[derive(Debug, Error)]
-pub enum Error {}
-pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// A request to re-emit `message` at a given `Instant` (`run_at`).
 #[derive(Debug)]
@@ -127,7 +122,7 @@ where
     R: Stream<Item = ScheduleRequest<T>>,
     C: Fn(&T) -> bool + Unpin,
 {
-    type Item = Result<T>;
+    type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
@@ -143,7 +138,7 @@ where
         }
 
         match scheduler.poll_pop_queue_message(cx, &can_take_message) {
-            Poll::Ready(expired) => Poll::Ready(Some(Ok(expired))),
+            Poll::Ready(expired) => Poll::Ready(Some(expired)),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -183,7 +178,7 @@ where
     T: Eq + Hash + Clone,
     R: Stream<Item = ScheduleRequest<T>>,
 {
-    type Item = Result<T>;
+    type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.hold_unless(|_| true)).poll_next(cx)
@@ -235,9 +230,7 @@ mod tests {
         assert!(poll!(scheduler.as_mut().hold_unless(|_| false).next()).is_pending());
         assert!(scheduler.contains_pending(&1));
         assert_eq!(
-            unwrap_poll(poll!(scheduler.as_mut().hold_unless(|_| true).next()))
-                .unwrap()
-                .unwrap(),
+            unwrap_poll(poll!(scheduler.as_mut().hold_unless(|_| true).next())).unwrap(),
             1_u8
         );
         assert!(!scheduler.contains_pending(&1));
@@ -268,7 +261,7 @@ mod tests {
                 drop(tx);
             },
             async {
-                assert_eq!(scheduler.next().await.unwrap().unwrap(), 1);
+                assert_eq!(scheduler.next().await.unwrap(), 1);
                 assert!(scheduler.next().await.is_none())
             },
         )
@@ -291,13 +284,7 @@ mod tests {
             .on_complete(sleep(Duration::from_secs(2))),
         ));
         assert_eq!(
-            scheduler
-                .as_mut()
-                .hold_unless(|x| *x != 1)
-                .next()
-                .await
-                .unwrap()
-                .unwrap(),
+            scheduler.as_mut().hold_unless(|x| *x != 1).next().await.unwrap(),
             2
         );
     }
@@ -321,10 +308,10 @@ mod tests {
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), 1);
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap(), 1);
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().unwrap(), 2);
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap(), 2);
         // Stream has terminated
         assert!(scheduler.next().await.is_none());
     }
@@ -348,7 +335,7 @@ mod tests {
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        scheduler.next().now_or_never().unwrap().unwrap().unwrap();
+        scheduler.next().now_or_never().unwrap().unwrap();
         // Stream has terminated
         assert!(scheduler.next().await.is_none());
     }
@@ -372,7 +359,7 @@ mod tests {
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        scheduler.next().now_or_never().unwrap().unwrap().unwrap();
+        scheduler.next().now_or_never().unwrap().unwrap();
         // Stream has terminated
         assert!(scheduler.next().await.is_none());
     }
@@ -391,7 +378,7 @@ mod tests {
             .unwrap();
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        scheduler.next().now_or_never().unwrap().unwrap().unwrap();
+        scheduler.next().now_or_never().unwrap().unwrap();
         assert!(poll!(scheduler.next()).is_pending());
         schedule_tx
             .send(ScheduleRequest {
@@ -402,7 +389,7 @@ mod tests {
             .unwrap();
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
-        scheduler.next().now_or_never().unwrap().unwrap().unwrap();
+        scheduler.next().now_or_never().unwrap().unwrap();
         assert!(poll!(scheduler.next()).is_pending());
     }
 }
