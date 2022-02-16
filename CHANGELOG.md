@@ -7,6 +7,20 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.69.0...master
 
+[0.69.1](https://github.com/kube-rs/kube-rs/releases/tag/0.69.1) / 2022-02-16
+===================
+## Highlights
+
+This is an emergency patch release fixing a bug in 0.69.0 where a `kube::Client` would deadlock after running inside a cluster for about a minute (#829).
+
+All users of 0.69.0 are encouraged to upgrade immediately. 0.68.x and below are not affected.
+
+<!-- Release notes generated using configuration in .github/release.yml at 0.69.1 -->
+
+## What's Changed
+### Fixed
+* [0.69.x] Fix deadlock in token reloading by @clux (backported by @teozkr) in https://github.com/kube-rs/kube-rs/pull/831
+
 [0.69.0](https://github.com/kube-rs/kube-rs/releases/tag/0.69.0) / 2022-02-14
 ===================
 ## Highlights
