@@ -206,10 +206,11 @@ impl RefreshableToken {
             }
 
             RefreshableToken::File(token_file) => {
-                if let Some(token) = token_file.lock().await.cached_token() {
+                let mut locked = token_file.lock().await;
+                if let Some(token) = locked.cached_token() {
                     bearer_header(token)
                 } else {
-                    bearer_header(token_file.lock().await.token())
+                    bearer_header(locked.token())
                 }
             }
 
