@@ -14,7 +14,7 @@ use jsonpath_lib::select as jsonpath_select;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tower::{filter::AsyncPredicate, BoxError};
 
 use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
@@ -148,7 +148,7 @@ impl TokenFile {
 #[derive(Debug, Clone)]
 pub enum RefreshableToken {
     Exec(Arc<Mutex<(SecretString, DateTime<Utc>, AuthInfo)>>),
-    File(Arc<RwLock<TokenFile>>),
+    File(Arc<Mutex<TokenFile>>),
     #[cfg(feature = "oauth")]
     GcpOauth(Arc<Mutex<oauth::Gcp>>),
 }
@@ -206,10 +206,10 @@ impl RefreshableToken {
             }
 
             RefreshableToken::File(token_file) => {
-                if let Some(token) = token_file.read().await.cached_token() {
+                if let Some(token) = token_file.lock().await.cached_token() {
                     bearer_header(token)
                 } else {
-                    bearer_header(token_file.write().await.token())
+                    bearer_header(token_file.lock().await.token())
                 }
             }
 
@@ -278,7 +278,7 @@ impl TryFrom<&AuthInfo> for Auth {
         // Token file reference. Must be reloaded at least once a minute.
         if let Some(file) = &auth_info.token_file {
             return Ok(Self::RefreshableToken(RefreshableToken::File(Arc::new(
-                RwLock::new(TokenFile::new(file)?),
+                Mutex::new(TokenFile::new(file)?),
             ))));
         }
 
