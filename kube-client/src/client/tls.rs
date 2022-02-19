@@ -107,6 +107,10 @@ pub mod rustls_tls {
         #[error("invalid private key: {0}")]
         InvalidPrivateKey(#[source] rustls::Error),
 
+        /// Unknown private key format
+        #[error("unknown private key format")]
+        UnknownPrivateKeyFormat,
+
         // Using type-erased error to avoid depending on webpki
         /// Failed to add a root certificate
         #[error("failed to add a root certificate: {0}")]
@@ -153,25 +157,25 @@ pub mod rustls_tls {
         Ok(root_store)
     }
 
-    // TODO Support EC Private Key to support k3d. Need to convert to PKCS#8 or RSA (PKCS#1).
-    // `openssl pkcs8 -topk8 -nocrypt -in ec.pem -out pkcs8.pem`
-    // https://wiki.openssl.org/index.php/Command_Line_Elliptic_Curve_Operations#EC_Private_Key_File_Formats
     fn client_auth(data: &[u8]) -> Result<(Vec<Certificate>, PrivateKey), Error> {
         use rustls_pemfile::Item;
 
         let mut cert_chain = Vec::new();
         let mut pkcs8_key = None;
         let mut rsa_key = None;
+        let mut ec_key = None;
         let mut reader = std::io::Cursor::new(data);
         for item in rustls_pemfile::read_all(&mut reader).map_err(Error::InvalidIdentityPem)? {
             match item {
                 Item::X509Certificate(cert) => cert_chain.push(Certificate(cert)),
                 Item::PKCS8Key(key) => pkcs8_key = Some(PrivateKey(key)),
                 Item::RSAKey(key) => rsa_key = Some(PrivateKey(key)),
+                Item::ECKey(key) => ec_key = Some(PrivateKey(key)),
+                _ => return Err(Error::UnknownPrivateKeyFormat),
             }
         }
 
-        let private_key = pkcs8_key.or(rsa_key).ok_or(Error::MissingPrivateKey)?;
+        let private_key = pkcs8_key.or(rsa_key).or(ec_key).ok_or(Error::MissingPrivateKey)?;
         if cert_chain.is_empty() {
             return Err(Error::MissingCertificate);
         }
