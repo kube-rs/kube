@@ -24,15 +24,15 @@ latest = ["k8s-openapi/v1_22"]
 deprecated = ["kube/deprecated-crd-v1beta1", "k8s-openapi/v1_21"]
 
 [dev-dependencies]
-tokio-util = "0.6.8"
+tokio-util = "0.7.0"
 assert-json-diff = "2.0.1"
 validator = { version = "0.14.0", features = ["derive"] }
 anyhow = "1.0.44"
 env_logger = "0.9.0"
 futures = "0.3.17"
 jsonpath_lib = "0.3.0"
-kube = { path = "../kube", version = "^0.68.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.68.0", default-features = false } # only needed to opt out of schema
+kube = { path = "../kube", version = "^0.69.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.69.0", default-features = false } # only needed to opt out of schema
 k8s-openapi = { version = "0.14.0", default-features = false }
 log = "0.4.11"
 serde = { version = "1.0.130", features = ["derive"] }

@@ -7,7 +7,7 @@ use crate::{
         store::{Store, Writer},
         ObjectRef,
     },
-    scheduler::{self, scheduler, ScheduleRequest},
+    scheduler::{scheduler, ScheduleRequest},
     utils::{
         try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle,
         KubeRuntimeStreamExt, StreamBackoff,
@@ -43,8 +43,6 @@ pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error:
     ObjectNotFound(ObjectRef<DynamicObject>),
     #[error("reconciler for object {1} failed")]
     ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
-    #[error("scheduler dequeue failed")]
-    SchedulerDequeueFailed(#[source] scheduler::Error),
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
 }
@@ -279,8 +277,6 @@ where
                     .right_future(),
                 }
             })
-            .map_err(Error::SchedulerDequeueFailed)
-            .map(|res| res.and_then(|x| x))
             .on_complete(async { tracing::debug!("applier runner terminated") })
         },
     )

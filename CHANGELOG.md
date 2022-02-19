@@ -5,7 +5,48 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.68.0...master
+ * see https://github.com/kube-rs/kube-rs/compare/0.69.0...master
+
+[0.69.1](https://github.com/kube-rs/kube-rs/releases/tag/0.69.1) / 2022-02-16
+===================
+## Highlights
+
+This is an emergency patch release fixing a bug in 0.69.0 where a `kube::Client` would deadlock after running inside a cluster for about a minute (#829).
+
+All users of 0.69.0 are encouraged to upgrade immediately. 0.68.x and below are not affected.
+
+<!-- Release notes generated using configuration in .github/release.yml at 0.69.1 -->
+
+## What's Changed
+### Fixed
+* [0.69.x] Fix deadlock in token reloading by @clux (backported by @teozkr) in https://github.com/kube-rs/kube-rs/pull/831
+
+[0.69.0](https://github.com/kube-rs/kube-rs/releases/tag/0.69.0) / 2022-02-14
+===================
+## Highlights
+### Ergonomic Additions to Api
+
+Two new methods have been added to the client `Api` this release to reduce the amount of boiler-plate needed for common patterns.
+
+- [`Api::entry`](https://docs.rs/kube/latest/kube/struct.Api.html#method.entry) via [811](https://github.com/kube-rs/kube-rs/pull/811) - to aid idempotent crud operation flows (following the style of [`Map::Entry`](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html#method.entry))
+- [`Api::get_opt`](https://docs.rs/kube/latest/kube/struct.Api.html#method.get_opt) via [809](https://github.com/kube-rs/kube-rs/pull/809) - to aid dealing with the `NotFound` type error via a returned `Option`
+
+### [In-cluster Token reloading](https://github.com/kube-rs/kube-rs/pull/768)
+
+Following a requirement for Kubernetes clients against versions `>= 1.22.0`, our bundled [`AuthLayer`](https://docs.rs/kube/0.69.0/kube/client/middleware/struct.AuthLayer.html) will reload tokens every minute when deployed in-cluster.
+
+<!-- Release notes generated using configuration in .github/release.yml at 0.69.0 -->
+
+## What's Changed
+### Added
+* Add conversion for `ObjectRef<K>` to `ObjectReference` by @teozkr in https://github.com/kube-rs/kube-rs/pull/815
+* Add `Api::get_opt` for better existence handling by @teozkr in https://github.com/kube-rs/kube-rs/pull/809
+* Entry API by @teozkr in https://github.com/kube-rs/kube-rs/pull/811
+### Changed
+* Reload token file at least once a minute by @kazk in https://github.com/kube-rs/kube-rs/pull/768
+* Prefer kubeconfig over in-cluster config by @teozkr in https://github.com/kube-rs/kube-rs/pull/823
+### Fixed
+* Disable CSR utilities on K8s <1.19 by @teozkr in https://github.com/kube-rs/kube-rs/pull/817
 
 [0.68.0](https://github.com/kube-rs/kube-rs/releases/tag/0.68.0) / 2022-02-01
 ===================
