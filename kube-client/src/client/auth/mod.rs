@@ -207,6 +207,7 @@ impl RefreshableToken {
 
             RefreshableToken::File(token_file) => {
                 if let Some(header) = {
+                    // Drop `RwLockReadGuard` before a write lock attempt to prevent deadlock.
                     let guard = token_file.read().await;
                     guard.cached_token().map(bearer_header)
                 } {
