@@ -206,7 +206,10 @@ impl RefreshableToken {
             }
 
             RefreshableToken::File(token_file) => {
-                if let Some(header) = { let guard = token_file.read().await; guard.cached_token().map(bearer_header) } {
+                if let Some(header) = {
+                    let guard = token_file.read().await;
+                    guard.cached_token().map(bearer_header)
+                } {
                     header
                 } else {
                     bearer_header(token_file.write().await.token())
