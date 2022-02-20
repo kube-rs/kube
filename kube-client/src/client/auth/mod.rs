@@ -206,15 +206,13 @@ impl RefreshableToken {
             }
 
             RefreshableToken::File(token_file) => {
-                if let Some(header) = {
-                    // Drop `RwLockReadGuard` before a write lock attempt to prevent deadlock.
-                    let guard = token_file.read().await;
-                    guard.cached_token().map(bearer_header)
-                } {
-                    header
-                } else {
-                    bearer_header(token_file.write().await.token())
+                let guard = token_file.read().await;
+                if let Some(header) = guard.cached_token().map(bearer_header) {
+                    return header;
                 }
+                // Drop the read guard before a write lock attempt to prevent deadlock.
+                drop(guard);
+                bearer_header(token_file.write().await.token())
             }
 
             #[cfg(feature = "oauth")]
