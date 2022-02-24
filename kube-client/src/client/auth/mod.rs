@@ -116,10 +116,12 @@ impl TokenFile {
         Utc::now() + Duration::seconds(10) > self.expires_at
     }
 
+    /// Get the cached token. Returns `None` if it's expiring.
     fn cached_token(&self) -> Option<&str> {
         (!self.is_expiring()).then(|| self.token.expose_secret().as_ref())
     }
 
+    /// Get a token. Reloads from file if the cached token is expiring.
     fn token(&mut self) -> &str {
         if self.is_expiring() {
             // > If reload from file fails, the last-read token should be used to avoid breaking
@@ -212,6 +214,8 @@ impl RefreshableToken {
                 }
                 // Drop the read guard before a write lock attempt to prevent deadlock.
                 drop(guard);
+                // Note that `token()` only reloads if the cached token is expiring.
+                // A separate method to conditionally reload minimizes the need for an exclusive access.
                 bearer_header(token_file.write().await.token())
             }
 
