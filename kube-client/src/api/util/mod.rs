@@ -67,7 +67,7 @@ mod test {
         let nodes: Api<Node> = Api::all(client.clone());
         nodes.create(&PostParams::default(), &fake_node).await?;
 
-        let schedulables = ListParams::default().fields(&"spec.unschedulable==false".to_string());
+        let schedulables = ListParams::default().fields("spec.unschedulable==false");
         let nodes_init = nodes.list(&schedulables).await?;
         let num_nodes_before_cordon = nodes_init.items.len();
 
