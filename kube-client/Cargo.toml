@@ -62,7 +62,7 @@ tokio-util = { version = "0.7.0", optional = true, features = ["io", "codec"] }
 hyper = { version = "0.14.13", optional = true, features = ["client", "http1", "stream", "tcp"] }
 hyper-tls = { version = "0.5.0", optional = true }
 hyper-rustls = { version = "0.23.0", optional = true }
-tokio-tungstenite = { version = "0.16.1", optional = true }
+tokio-tungstenite = { version = "0.17.1", optional = true }
 tower = { version = "0.4.6", optional = true, features = ["buffer", "filter", "util"] }
 tower-http = { version = "0.2.0", optional = true, features = ["auth", "map-response-body", "trace"] }
 hyper-timeout = {version = "0.4.1", optional = true }
@@ -71,7 +71,7 @@ pin-project = { version = "1.0.4", optional = true }
 rand = { version = "0.8.3", optional = true }
 secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
 tracing = { version = "0.1.29", features = ["log"], optional = true }
-hyper-openssl = { version = "0.9.1", optional = true }
+hyper-openssl = { version = "0.9.2", optional = true }
 
 [dependencies.k8s-openapi]
 version = "0.14.0"

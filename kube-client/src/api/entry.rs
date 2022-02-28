@@ -42,7 +42,7 @@ impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     ///             .insert("modified".to_string(), "true".to_string());
     ///     })
     ///     // Save changes
-    ///     .commit().await?;
+    ///     .commit(&kube::api::PostParams::default()).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -180,7 +180,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
     /// Any retries should be coarse-grained enough to also include the call to [`Api::entry`], so that the latest
     /// state can be fetched.
     #[tracing::instrument(skip(self))]
-    pub async fn commit(&mut self) -> Result<(), CommitError>
+    pub async fn commit(&mut self, pp: &PostParams) -> Result<(), CommitError>
     where
         K: Resource + DeserializeOwned + Serialize + Clone + Debug,
     {
@@ -189,24 +189,22 @@ impl<'a, K> OccupiedEntry<'a, K> {
             Dirtiness::New => {
                 self.object = self
                     .api
-                    .create(&PostParams::default(), &self.object)
+                    .create(pp, &self.object)
                     .await
                     .map_err(CommitError::Save)?
             }
             Dirtiness::Dirty => {
                 self.object = self
                     .api
-                    .replace(
-                        self.object.meta().name.as_deref().unwrap(),
-                        &PostParams::default(),
-                        &self.object,
-                    )
+                    .replace(self.name, pp, &self.object)
                     .await
                     .map_err(CommitError::Save)?;
             }
             Dirtiness::Clean => (),
         };
-        self.dirtiness = Dirtiness::Clean;
+        if !pp.dry_run {
+            self.dirtiness = Dirtiness::Clean;
+        }
         Ok(())
     }
 
@@ -349,7 +347,7 @@ mod tests {
             data: Some([("key".to_string(), "value".to_string())].into()),
             ..ConfigMap::default()
         });
-        entry.commit().await?;
+        entry.commit(&PostParams::default()).await?;
         assert_eq!(
             entry
                 .get()
@@ -375,7 +373,7 @@ mod tests {
             .data
             .get_or_insert_with(BTreeMap::default)
             .insert("key".to_string(), "value2".to_string());
-        entry.commit().await?;
+        entry.commit(&PostParams::default()).await?;
         assert_eq!(
             entry
                 .get()
@@ -401,7 +399,7 @@ mod tests {
             ..ConfigMap::default()
         });
         assert!(
-            matches!(dbg!(entry2.commit().await), Err(CommitError::Save(Error::Api(ErrorResponse { reason, .. }))) if reason == "AlreadyExists")
+            matches!(dbg!(entry2.commit(&PostParams::default()).await), Err(CommitError::Save(Error::Api(ErrorResponse { reason, .. }))) if reason == "AlreadyExists")
         );
 
         // Cleanup
@@ -445,7 +443,7 @@ mod tests {
             .data
             .get_or_insert_with(BTreeMap::default)
             .insert("key".to_string(), "value2".to_string());
-        entry.commit().await?;
+        entry.commit(&PostParams::default()).await?;
         assert_eq!(
             entry
                 .get()
@@ -472,7 +470,117 @@ mod tests {
             .get_or_insert_with(BTreeMap::default)
             .insert("key".to_string(), "value3".to_string());
         assert!(
-            matches!(entry2.commit().await, Err(CommitError::Save(Error::Api(ErrorResponse { reason, .. }))) if reason == "Conflict")
+            matches!(entry2.commit(&PostParams::default()).await, Err(CommitError::Save(Error::Api(ErrorResponse { reason, .. }))) if reason == "Conflict")
+        );
+
+        // Cleanup
+        api.delete(object_name, &DeleteParams::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (gets and writes cms)
+    async fn entry_create_dry_run() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+        let api = Api::<ConfigMap>::default_namespaced(client);
+
+        let object_name = "entry-cm-dry";
+        if api.get_opt(object_name).await?.is_some() {
+            api.delete(object_name, &DeleteParams::default()).await?;
+        }
+
+        let pp_dry = PostParams {
+            dry_run: true,
+            ..Default::default()
+        };
+
+        let entry = api.entry(object_name).await?;
+        assert_eq!(entry.get(), None);
+
+        // Create object dry-run
+        let mut entry = entry.or_insert(|| ConfigMap {
+            data: Some([("key".to_string(), "value".to_string())].into()),
+            ..ConfigMap::default()
+        });
+        entry.commit(&pp_dry).await?;
+        assert_eq!(
+            entry
+                .get()
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value")
+        );
+        let fetched_obj = api.get_opt(object_name).await?;
+        assert_eq!(fetched_obj, None);
+
+        // Commit object creation properly
+        entry.commit(&PostParams::default()).await?;
+        assert_eq!(
+            entry
+                .get()
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value")
+        );
+        let fetched_obj = api.get(object_name).await?;
+        assert_eq!(
+            fetched_obj
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value")
+        );
+
+        // Update object dry-run
+        entry
+            .get_mut()
+            .data
+            .get_or_insert_with(BTreeMap::default)
+            .insert("key".to_string(), "value2".to_string());
+        entry.commit(&pp_dry).await?;
+        assert_eq!(
+            entry
+                .get()
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value2")
+        );
+        let fetched_obj = api.get(object_name).await?;
+        assert_eq!(
+            fetched_obj
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value")
+        );
+
+        // Commit object update properly
+        entry.commit(&PostParams::default()).await?;
+        assert_eq!(
+            entry
+                .get()
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value2")
+        );
+        let fetched_obj = api.get(object_name).await?;
+        assert_eq!(
+            fetched_obj
+                .data
+                .as_ref()
+                .and_then(|data| data.get("key"))
+                .map(String::as_str),
+            Some("value2")
         );
 
         // Cleanup

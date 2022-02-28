@@ -82,12 +82,3 @@ version = "0.6"
 # https://github.com/rustls/hyper-rustls/pull/165
 name = "rustls-pemfile"
 version = "0.2"
-
-# The following dependencies are still working on upgrading parking_lot
-# https://github.com/sfackler/hyper-openssl/pull/31
-[[bans.skip]]
-name = "parking_lot"
-version = "0.11"
-[[bans.skip]]
-name = "parking_lot_core"
-version = "0.8"
