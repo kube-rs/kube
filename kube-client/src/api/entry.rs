@@ -42,7 +42,7 @@ impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     ///             .insert("modified".to_string(), "true".to_string());
     ///     })
     ///     // Save changes
-    ///     .commit().await?;
+    ///     .commit(&kube::api::PostParams::default()).await?;
     /// # Ok(())
     /// # }
     /// ```
