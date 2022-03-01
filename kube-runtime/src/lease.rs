@@ -33,7 +33,6 @@ impl Elector {
         }
     }
 
-    #[allow(dead_code)]
     #[tracing::instrument(skip(self, fut))]
     pub async fn run<F: Future>(&self, fut: F) -> Result<F::Output, RunError> {
         self.acquire().await.map_err(RunError::Acquire)?;
