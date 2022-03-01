@@ -2,12 +2,9 @@
 
 mod backoff_reset_timer;
 mod stream_backoff;
-mod stream_then_latest;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use stream_backoff::StreamBackoff;
-
-pub(crate) use stream_then_latest::ThenLatest as StreamThenLatest;
 
 use crate::watcher;
 use futures::{

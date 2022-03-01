@@ -2,7 +2,7 @@
 
 use futures::{
     future::{self, Either},
-    pin_mut, Future, TryStreamExt,
+    pin_mut, Future, StreamExt,
 };
 use k8s_openapi::{
     api::coordination::v1::{Lease, LeaseSpec},
@@ -11,10 +11,7 @@ use k8s_openapi::{
 };
 use kube_client::Api;
 
-use crate::{
-    utils::StreamThenLatest,
-    watcher::{self, watch_object},
-};
+use crate::watcher::{self, watch_object};
 
 pub struct Elector {
     api: Api<Lease>,
@@ -51,25 +48,36 @@ impl Elector {
     #[tracing::instrument(skip(self))]
     async fn keep_renewed(&self) -> RenewError {
         let watcher = watch_object(self.api.clone(), &self.name);
-        let renewer = StreamThenLatest::new(watcher, |lease| async move {
-            let lease = lease.map_err(RenewError::Watch)?.unwrap_or_default();
-            let lease_state = self.state(&lease.spec.unwrap_or_default());
-            let now = Utc::now();
-            if let LeaseState::HeldBySelf {
-                renew_at: Some(renew_at),
-            } = lease_state
-            {
-                tracing::info!(%renew_at, "scheduling next renewal...");
-                if let Ok(duration) = (renew_at - now).to_std() {
-                    tokio::time::sleep(duration).await;
+        let active_renewal = future::Either::Left(future::pending());
+        pin_mut!(watcher, active_renewal);
+        loop {
+            match future::select(watcher.next(), active_renewal.as_mut()).await {
+                Either::Left((None, _)) => panic!("watcher should never terminate"),
+                Either::Left((Some(Err(err)), _)) => return RenewError::Watch(err),
+                Either::Left((Some(Ok(lease)), _)) => active_renewal.set(future::Either::Right(async move {
+                    let now = Utc::now();
+                    let lease_state = self.state(&lease.and_then(|l| l.spec).unwrap_or_default());
+                    if let LeaseState::HeldBySelf {
+                        renew_at: Some(renew_at),
+                    } = lease_state
+                    {
+                        tracing::info!(%renew_at, "scheduling next renewal...");
+                        if let Ok(duration) = (renew_at - now).to_std() {
+                            tokio::time::sleep(duration).await;
+                        }
+                    }
+                    tracing::debug!("renewing");
+                    self.try_acquire(now).await?;
+                    tracing::debug!("renew finished");
+                    // watcher should return the new lease, scheduling a new renewal
+                    future::pending().await
+                })),
+                Either::Right((Err(err), _)) => return RenewError::Acquire(err),
+                Either::Right((Ok(()), _)) => {
+                    // watcher should return the new lease, scheduling a new renewal
+                    active_renewal.set(future::Either::Left(future::pending()));
                 }
             }
-            self.try_acquire(now).await.map_err(RenewError::Acquire)?;
-            Ok(())
-        });
-        match renewer.try_collect().await {
-            Ok(()) => unreachable!("renewer should keep working until cancelled"),
-            Err(err) => err,
         }
     }
 
