@@ -1,5 +1,7 @@
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
+use std::convert::Infallible;
+
 use futures::{
     future::{self, Either},
     pin_mut, Future, StreamExt,
@@ -48,7 +50,7 @@ impl Elector {
     #[tracing::instrument(skip(self))]
     async fn keep_renewed(&self) -> RenewError {
         let watcher = watch_object(self.api.clone(), &self.name);
-        let active_renewal = future::Either::Left(future::pending());
+        let active_renewal = future::Either::Left(future::pending::<Result<Infallible, TryAcquireError>>());
         pin_mut!(watcher, active_renewal);
         loop {
             match future::select(watcher.next(), active_renewal.as_mut()).await {
@@ -69,33 +71,55 @@ impl Elector {
                     tracing::debug!("renewing");
                     self.try_acquire(now).await?;
                     tracing::debug!("renew finished");
-                    // watcher should return the new lease, scheduling a new renewal
+                    // watcher should emit the new lease, scheduling a new renewal
                     future::pending().await
                 })),
                 Either::Right((Err(err), _)) => return RenewError::Acquire(err),
-                Either::Right((Ok(()), _)) => {
-                    // watcher should return the new lease, scheduling a new renewal
-                    active_renewal.set(future::Either::Left(future::pending()));
-                }
+                Either::Right((Ok(x), _)) => match x {},
             }
         }
     }
 
     #[tracing::instrument(skip(self))]
     async fn acquire(&self) -> Result<(), AcquireError> {
+        let watcher = watch_object(self.api.clone(), &self.name);
+        let active_acquisition = future::Either::Left(future::pending());
+        pin_mut!(watcher, active_acquisition);
         loop {
-            let now = Utc::now();
-            break match self.try_acquire(now).await {
-                Err(TryAcquireError::Conflict { expires_at, holder }) => {
-                    tracing::info!(%expires_at, ?holder, "lease already held, sleeping and retrying...");
-                    if let Ok(duration) = (expires_at - now).to_std() {
-                        tokio::time::sleep(duration).await;
+            match future::select(watcher.next(), active_acquisition.as_mut()).await {
+                Either::Left((None, _)) => panic!("watcher should never terminate"),
+                Either::Left((Some(Err(err)), _)) => return Err(AcquireError::Watch(err)),
+                Either::Left((Some(Ok(lease)), _)) => {
+                    let lease_state = self.state(&lease.and_then(|l| l.spec).unwrap_or_default());
+
+                    if let LeaseState::HeldBySelf { .. } = lease_state {
+                        return Ok(());
                     }
-                    continue;
+
+                    active_acquisition.set(future::Either::Right(async move {
+                        let now = Utc::now();
+                        if let LeaseState::HeldByOther {
+                            holder,
+                            expires_at: Some(renew_at),
+                        } = lease_state
+                        {
+                            tracing::info!(?holder, %renew_at, "scheduling next acquisition attempt...");
+                            if let Ok(duration) = (renew_at - now).to_std() {
+                                tokio::time::sleep(duration).await;
+                            }
+                        }
+                        tracing::debug!("renewing");
+                        self.try_acquire(now).await?;
+                        tracing::debug!("renew finished");
+                        Ok(())
+                    }))
                 }
-                Ok(()) => Ok(()),
-                Err(TryAcquireError::Acquire(source)) => Err(source),
-            };
+                Either::Right((Err(TryAcquireError::Acquire(err)), _)) => return Err(err),
+                Either::Right((Ok(()) | Err(TryAcquireError::Conflict { .. }), _)) => {
+                    // watcher should emit the new lease, triggering a successful return or re-check
+                    active_acquisition.set(future::Either::Left(future::pending()));
+                }
+            }
         }
     }
 
