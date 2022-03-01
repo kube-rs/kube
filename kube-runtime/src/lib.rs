@@ -22,6 +22,7 @@ k8s_openapi::k8s_if_ge_1_19! {
     pub mod events;
 }
 pub mod finalizer;
+pub mod lease;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;
@@ -30,6 +31,7 @@ pub mod watcher;
 
 pub use controller::{applier, Controller};
 pub use finalizer::finalizer;
+pub use lease::Elector;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use watcher::watcher;
