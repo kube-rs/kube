@@ -1,5 +1,7 @@
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
+mod sleep;
+
 use std::convert::Infallible;
 
 use futures::{
@@ -49,16 +51,10 @@ impl Elector {
     #[tracing::instrument(skip(self))]
     async fn keep_renewed(&self) -> RenewError {
         let watcher = watch_object(self.api.clone(), &self.name);
-        let active_renewal = future::Either::Left(future::pending::<Result<Infallible, TryAcquireError>>());
-        let expiration_watchdog = future::Either::Left(future::pending::<RenewError>());
-        pin_mut!(watcher, active_renewal, expiration_watchdog);
+        let active_renewal = future::Either::Left(future::pending());
+        pin_mut!(watcher, active_renewal);
         loop {
-            match future::select(
-                watcher.next(),
-                future::select(active_renewal.as_mut(), expiration_watchdog.as_mut()),
-            )
-            .await
-            {
+            match future::select(watcher.next(), active_renewal.as_mut()).await {
                 // Lease watcher
                 Either::Left((None, _)) => panic!("watcher should never terminate"),
                 Either::Left((Some(Err(err)), _)) => return RenewError::Watch(err),
@@ -66,35 +62,27 @@ impl Elector {
                     let now = Utc::now();
                     let lease_state = self.state(&lease.and_then(|l| l.spec).unwrap_or_default());
                     if let LeaseState::HeldBySelf { renew_at, expires_at } = lease_state {
-                        expiration_watchdog.set(future::Either::Right(async move {
-                            tracing::debug!(%expires_at, "scheduling renewal expiration watchdog...");
-                            if let Ok(duration) = (expires_at - now).to_std() {
-                                tokio::time::sleep(duration).await;
-                            }
-                            RenewError::Timeout
-                        }));
-                        active_renewal.set(future::Either::Right(async move {
-                            tracing::info!(%renew_at, "scheduling next renewal...");
-                            if let Ok(duration) = (renew_at - now).to_std() {
-                                tokio::time::sleep(duration).await;
-                            }
-                            tracing::debug!("renewing");
-                            self.try_acquire(now).await?;
-                            tracing::debug!("renew finished");
-                            // watcher should emit the new lease, scheduling a new renewal
-                            future::pending().await
-                        }))
+                        active_renewal.set(future::Either::Right(sleep::with_deadline(
+                            expires_at,
+                            async move {
+                                tracing::info!(%renew_at, "scheduling next renewal...");
+                                sleep::until(renew_at).await;
+                                tracing::debug!("renewing");
+                                self.try_acquire(now).await?;
+                                tracing::debug!("renew finished");
+                                // watcher should emit the new lease, scheduling a new renewal
+                                Ok(future::pending::<Infallible>().await)
+                            },
+                        )))
                     } else {
                         return RenewError::Lost;
                     }
                 }
 
                 // Renewer
-                Either::Right((Either::Left((Err(err), _)), _)) => return RenewError::Acquire(err),
-                Either::Right((Either::Left((Ok(x), _)), _)) => match x {},
-
-                // Watchdog
-                Either::Right((Either::Right((err, _)), _)) => return err,
+                Either::Right((Err(deadline_expired), _)) => return RenewError::Timeout(deadline_expired),
+                Either::Right((Ok(Err(renew_err)), _)) => return RenewError::Acquire(renew_err),
+                Either::Right((Ok(Ok(x)), _)) => match x {},
             }
         }
     }
@@ -121,9 +109,7 @@ impl Elector {
                     active_acquisition.set(future::Either::Right(async move {
                         if let LeaseState::HeldByOther { holder, expires_at } = lease_state {
                             tracing::info!(?holder, %expires_at, "scheduling next acquisition attempt...");
-                            if let Ok(duration) = (expires_at - now).to_std() {
-                                tokio::time::sleep(duration).await;
-                            }
+                            sleep::until(expires_at).await;
                         }
                         tracing::debug!("acquiring");
                         self.try_acquire(now).await?;
@@ -213,7 +199,7 @@ impl Elector {
             None => LeaseState::Unheld,
             Some(holder) if holder == &self.identity => LeaseState::HeldBySelf {
                 expires_at: last_renewal + lease_duration,
-                renew_at: last_renewal + lease_duration * 2,
+                renew_at: last_renewal + lease_duration / 2,
             },
             Some(holder) => LeaseState::HeldByOther {
                 holder: holder.clone(),
@@ -259,11 +245,15 @@ pub enum ReleaseError {
     AlreadyStolen { holder: String },
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum RenewError {
-    Watch(watcher::Error),
+    #[error("failed to watch lease")]
+    Watch(#[source] watcher::Error),
+    #[error("failed to acquire lease")]
     Acquire(TryAcquireError),
-    Timeout,
+    #[error("lease expired before it could be renewed")]
+    Timeout(#[source] sleep::DeadlineExpired),
+    #[error("lease was lost")]
     Lost,
 }
 
