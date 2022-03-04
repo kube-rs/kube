@@ -110,22 +110,24 @@ impl Elector {
                 Either::Left((Some(Err(err)), _)) => return Err(AcquireError::Watch(err)),
                 Either::Left((Some(Ok(lease)), _)) => {
                     let lease_state = self.state(&lease.and_then(|l| l.spec).unwrap_or_default());
+                    let now = Utc::now();
 
-                    if let LeaseState::HeldBySelf { .. } = lease_state {
-                        return Ok(());
+                    if let LeaseState::HeldBySelf { expires_at, .. } = lease_state {
+                        if expires_at > now {
+                            return Ok(());
+                        }
                     }
 
                     active_acquisition.set(future::Either::Right(async move {
-                        let now = Utc::now();
                         if let LeaseState::HeldByOther { holder, expires_at } = lease_state {
                             tracing::info!(?holder, %expires_at, "scheduling next acquisition attempt...");
                             if let Ok(duration) = (expires_at - now).to_std() {
                                 tokio::time::sleep(duration).await;
                             }
                         }
-                        tracing::debug!("renewing");
+                        tracing::debug!("acquiring");
                         self.try_acquire(now).await?;
-                        tracing::debug!("renew finished");
+                        tracing::debug!("acquisition finished");
                         Ok(())
                     }))
                 }
@@ -211,7 +213,7 @@ impl Elector {
             None => LeaseState::Unheld,
             Some(holder) if holder == &self.identity => LeaseState::HeldBySelf {
                 expires_at: last_renewal + lease_duration,
-                renew_at: last_renewal + lease_duration / 2,
+                renew_at: last_renewal + lease_duration * 2,
             },
             Some(holder) => LeaseState::HeldByOther {
                 holder: holder.clone(),
@@ -274,6 +276,3 @@ pub enum RunError {
     #[error("failed to release lease")]
     Release(ReleaseError),
 }
-
-#[cfg(tests)]
-mod tests {}
