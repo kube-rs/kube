@@ -14,6 +14,10 @@ use schemars::{
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
+/// The following two transformations are applied
+///  * Rewrite enums from `oneOf` to `object`s with multiple variants ([schemars#84](https://github.com/GREsau/schemars/issues/84))
+///  * Rewrite `additionalProperties` from `#[serde(flatten)]` to `x-kubernetes-preserve-unknown-fields` ([kube-rs#844](https://github.com/kube-rs/kube-rs/issues/844))
+///
 /// This is used automatically by `kube::derive`'s `#[derive(CustomResource)]`,
 /// but it can also be used manually with [`SchemaSettings::with_visitor`].
 ///
@@ -74,6 +78,16 @@ impl Visitor for StructuralSchemaRewriter {
                             }
                         }
                     }
+                }
+            }
+        }
+        if let Some(object) = &mut schema.object {
+            if !object.properties.is_empty() {
+                if object.additional_properties.as_deref() == Some(&Schema::Bool(true)) {
+                    object.additional_properties = None;
+                    schema
+                        .extensions
+                        .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
                 }
             }
         }

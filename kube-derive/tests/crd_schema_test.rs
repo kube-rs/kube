@@ -2,6 +2,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
 #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -46,6 +47,14 @@ fn default_value() -> String {
 
 fn default_nullable() -> Option<String> {
     Some("default_nullable".into())
+}
+
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "Flattening")]
+pub struct FlatteningSpec {
+    foo: String,
+    #[serde(flatten)]
+    arbitrary: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -221,4 +230,19 @@ fn test_crd_schema_matches_expected() {
         }))
         .unwrap()
     );
+}
+
+#[test]
+fn flattening() {
+    use kube::core::CustomResourceExt;
+    let spec = &Flattening::crd().spec.versions[0]
+        .schema
+        .clone()
+        .unwrap()
+        .open_api_v3_schema
+        .unwrap()
+        .properties
+        .unwrap()["spec"];
+    assert_eq!(spec.x_kubernetes_preserve_unknown_fields, Some(true));
+    assert_eq!(spec.additional_properties, None);
 }
