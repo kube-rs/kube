@@ -175,13 +175,8 @@ impl Recorder {
     ///
     /// Cluster scoped object reference defaults to "default" namespace.
     #[must_use]
-    pub fn new(client: Client, reporter: Reporter, reference: ObjectReference, namespace_override: Option<&str>) -> Self {
-        let namespace = match namespace_override {
-            Some(namespace) => namespace,
-            None => match reference.namespace.as_ref() {
-                Some(namespace) => namespace,
-                None => "default",
-            }
+    pub fn new(client: Client, reporter: Reporter, reference: ObjectReference) -> Self {
+        let events = Api::namespaced(client, reference.namespace.as_ref().unwrap_or_else(|| "default");
         };
         let events = Api::namespaced(client, namespace);
         Self {
