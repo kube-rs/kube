@@ -176,9 +176,9 @@ impl Recorder {
     /// Cluster scoped object reference defaults to "default" namespace.
     #[must_use]
     pub fn new(client: Client, reporter: Reporter, reference: ObjectReference) -> Self {
-        let events = Api::namespaced(client, reference.namespace.as_ref().unwrap_or_else(|| "default");
-        };
-        let events = Api::namespaced(client, namespace);
+        let default_namespace = "default".to_owned();
+        let events = Api::namespaced(client, reference.namespace.as_ref()
+            .unwrap_or_else(|| &default_namespace));
         Self {
             events,
             reporter,
@@ -248,13 +248,13 @@ mod test {
     use super::{Event, EventType, Recorder};
 
     #[tokio::test]
-    #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
+    // #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
     async fn event_recorder_attaches_events() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 
         let svcs: Api<Service> = Api::namespaced(client.clone(), "default");
         let s = svcs.get("kubernetes").await?; // always a kubernetes service in default
-        let recorder = Recorder::new(client.clone(), "kube".into(), s.object_ref(&()), None);
+        let recorder = Recorder::new(client.clone(), "kube".into(), s.object_ref(&()));
         recorder
             .publish(Event {
                 type_: EventType::Normal,
@@ -277,13 +277,13 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
+    // #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
     async fn event_recorder_attaches_events_without_namespace() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 
         let svcs: Api<ClusterRole> = Api::all(client.clone());
         let s = svcs.get("system:basic-user").await?; // always get this default ClusterRole
-        let recorder = Recorder::new(client.clone(), "kube".into(), s.object_ref(&()), None);
+        let recorder = Recorder::new(client.clone(), "kube".into(), s.object_ref(&()));
         recorder
             .publish(Event {
                 type_: EventType::Normal,
