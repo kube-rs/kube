@@ -177,8 +177,7 @@ impl Recorder {
     #[must_use]
     pub fn new(client: Client, reporter: Reporter, reference: ObjectReference) -> Self {
         let default_namespace = "default".to_owned();
-        let events = Api::namespaced(client, reference.namespace.as_ref()
-            .unwrap_or_else(|| &default_namespace));
+        let events = Api::namespaced(client, reference.namespace.as_ref().unwrap_or(&default_namespace));
         Self {
             events,
             reporter,
@@ -241,8 +240,10 @@ impl Recorder {
 mod test {
     #![allow(unused_imports)]
 
-    use k8s_openapi::api::core::v1::{Event as CoreEvent, Service};
-    use k8s_openapi::api::rbac::v1::ClusterRole;
+    use k8s_openapi::api::{
+        core::v1::{Event as CoreEvent, Service},
+        rbac::v1::ClusterRole,
+    };
     use kube_client::{Api, Client, Resource};
 
     use super::{Event, EventType, Recorder};
@@ -300,7 +301,10 @@ mod test {
             .into_iter()
             .find(|e| std::matches!(e.reason.as_deref(), Some("VeryCoolServiceNoNamespace")))
             .unwrap();
-        assert_eq!(found_event.message.unwrap(), "Sending kubernetes to detention without namespace");
+        assert_eq!(
+            found_event.message.unwrap(),
+            "Sending kubernetes to detention without namespace"
+        );
 
         Ok(())
     }
