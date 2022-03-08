@@ -171,7 +171,7 @@ pub struct Recorder {
 impl Recorder {
     /// Create a new recorder that can publish events for one specific object
     ///
-    /// This is intended to be createad at the start of your controller's reconcile fn.
+    /// This is intended to be created at the start of your controller's reconcile fn.
     ///
     /// Cluster scoped object reference defaults to "default" namespace.
     #[must_use]
