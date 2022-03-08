@@ -173,7 +173,7 @@ impl Recorder {
     ///
     /// This is intended to be created at the start of your controller's reconcile fn.
     ///
-    /// Cluster scoped object reference defaults to "default" namespace.
+    /// Cluster scoped objects will publish events in the "default" namespace.
     #[must_use]
     pub fn new(client: Client, reporter: Reporter, reference: ObjectReference) -> Self {
         let default_namespace = "default".to_owned();
