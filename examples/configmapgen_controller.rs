@@ -3,7 +3,7 @@ use anyhow::Result;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, Resource, ObjectMeta},
+    api::{Api, ListParams, ObjectMeta, Patch, PatchParams, Resource},
     runtime::controller::{Context, Controller, ReconcilerAction},
     Client, CustomResource,
 };
