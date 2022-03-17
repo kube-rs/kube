@@ -1,12 +1,9 @@
 #[macro_use] extern crate log;
 use anyhow::Result;
 use futures::StreamExt;
-use k8s_openapi::{
-    api::core::v1::ConfigMap,
-    apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference},
-};
+use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, Resource},
+    api::{Api, ListParams, ObjectMeta, Patch, PatchParams, Resource},
     runtime::controller::{Context, Controller, ReconcilerAction},
     Client, CustomResource,
 };
@@ -31,18 +28,6 @@ struct ConfigMapGeneratorSpec {
     content: String,
 }
 
-fn object_to_owner_reference<K: Resource<DynamicType = ()>>(
-    meta: ObjectMeta,
-) -> Result<OwnerReference, Error> {
-    Ok(OwnerReference {
-        api_version: K::api_version(&()).to_string(),
-        kind: K::kind(&()).to_string(),
-        name: meta.name.ok_or(Error::MissingObjectKey(".metadata.name"))?,
-        uid: meta.uid.ok_or(Error::MissingObjectKey(".metadata.uid"))?,
-        ..OwnerReference::default()
-    })
-}
-
 /// Controller triggers this whenever our main object or our children changed
 async fn reconcile(
     generator: Arc<ConfigMapGenerator>,
@@ -56,13 +41,11 @@ async fn reconcile(
 
     let mut contents = BTreeMap::new();
     contents.insert("content".to_string(), generator.spec.content.clone());
+    let oref = generator.controller_owner_ref(&()).unwrap();
     let cm = ConfigMap {
         metadata: ObjectMeta {
             name: generator.metadata.name.clone(),
-            owner_references: Some(vec![OwnerReference {
-                controller: Some(true),
-                ..object_to_owner_reference::<ConfigMapGenerator>(generator.metadata.clone())?
-            }]),
+            owner_references: Some(vec![oref]),
             ..ObjectMeta::default()
         },
         data: Some(contents),

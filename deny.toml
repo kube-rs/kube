@@ -82,3 +82,9 @@ version = "0.6"
 # https://github.com/rustls/hyper-rustls/pull/165
 name = "rustls-pemfile"
 version = "0.2"
+
+[[bans.skip]]
+# waiting for ahash/getrandom to bump wasi as we have two branches:
+# ahash -> getrandom -> wasi old
+# tokio -> mio -> wasi new
+name = "wasi"
