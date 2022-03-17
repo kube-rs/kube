@@ -6,9 +6,9 @@
 #[allow(unused_imports)] use std::collections::HashMap;
 use std::fmt::Debug;
 
+use crate::{Api, Error, Result};
 use kube_core::{params::PostParams, Resource};
 use serde::{de::DeserializeOwned, Serialize};
-use crate::{Api, Error, Result};
 
 impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     /// Gets a given object's "slot" on the Kubernetes API, designed for "get-or-create" and "get-and-modify" patterns
