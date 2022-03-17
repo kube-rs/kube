@@ -385,15 +385,11 @@ where
 /// async fn reconcile(g: Arc<ConfigMapGenerator>, _ctx: Context<()>) -> Result<Action, Error> {
 ///     // .. use api here to reconcile a child ConfigMap with ownerreferences
 ///     // see configmapgen_controller example for full info
-///     Ok(Action {
-///         requeue: Some(Duration::from_secs(300)),
-///     })
+///     Ok(Action::requeue(Duration::from_secs(300)))
 /// }
 /// /// an error handler that will be called when the reconciler fails
 /// fn error_policy(_error: &Error, _ctx: Context<()>) -> Action {
-///     Action {
-///         requeue: Some(Duration::from_secs(60)),
-///     }
+///     Action::requeue(Duration::from_secs(60))
 /// }
 ///
 /// /// something to drive the controller
@@ -647,7 +643,7 @@ where
     /// .run(
     ///     |o, _| async move {
     ///         println!("Reconciling {}", o.name());
-    ///         Ok(Action { requeue: None })
+    ///         Ok(Action::await_change())
     ///     },
     ///     |err: &Infallible, _| Err(err).unwrap(),
     ///     Context::new(()),
@@ -702,7 +698,7 @@ where
     /// .run(
     ///     |o, _| async move {
     ///         println!("Reconciling {}", o.name());
-    ///         Ok(Action { requeue: None })
+    ///         Ok(Action::await_change())
     ///     },
     ///     |err: &Infallible, _| Err(err).unwrap(),
     ///     Context::new(()),
