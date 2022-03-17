@@ -1,5 +1,5 @@
 //! Finalizer helper for [`Controller`](crate::Controller) reconcilers
-use crate::controller::ReconcilerAction;
+use crate::controller::Action;
 use futures::{TryFuture, TryFutureExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
 use kube_client::{
@@ -103,10 +103,10 @@ pub async fn finalizer<K, ReconcileFut>(
     finalizer_name: &str,
     obj: Arc<K>,
     reconcile: impl FnOnce(Event<K>) -> ReconcileFut,
-) -> Result<ReconcilerAction, Error<ReconcileFut::Error>>
+) -> Result<Action, Error<ReconcileFut::Error>>
 where
     K: Resource + Clone + DeserializeOwned + Serialize + Debug,
-    ReconcileFut: TryFuture<Ok = ReconcilerAction>,
+    ReconcileFut: TryFuture<Ok = Action>,
     ReconcileFut::Error: StdError + 'static,
 {
     match FinalizerState::for_object(&*obj, finalizer_name) {
@@ -178,14 +178,14 @@ where
             .await
             .map_err(Error::AddFinalizer)?;
             // No point applying here, since the patch will cause a new reconciliation
-            Ok(ReconcilerAction { requeue_after: None })
+            Ok(Action::await_change())
         }
         FinalizerState {
             finalizer_index: None,
             is_deleting: true,
         } => {
             // Our work here is done
-            Ok(ReconcilerAction { requeue_after: None })
+            Ok(Action::await_change())
         }
     }
 }

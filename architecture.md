@@ -174,9 +174,9 @@ Once we have combined the stream of streams we essentially have a flattened supe
 1. new input events get sent to the `scheduler`
 2. scheduled events are then passed them through a `Runner` preventing duplicate parallel requests for the same object
 3. when running, we send the affected object to the users `reconciler` fn and await that future
-4. a) on success, prepare the users `ReconcilerAction` (generally a slow requeue several minutes from now)
-4. b) on failure, prepare a `ReconcilerAction` based on the users error policy (generally a backoff'd requeue with shorter initial delay)
-5. Map resulting `ReconcilerAction`s through an ad-hoc `scheduler` channel
+4. a) on success, prepare the users `Action` (generally a slow requeue several minutes from now)
+4. b) on failure, prepare a `Action` based on the users error policy (generally a backoff'd requeue with shorter initial delay)
+5. Map resulting `Action`s through an ad-hoc `scheduler` channel
 6. Resulting requeue requests through the channel are picked up at the top of `applier` and merged with input events in step 1.
 
 Ideally, the process runs forever, and it minimises unnecessary reconcile calls (like users changing more than one related object while one reconcile is already happening).

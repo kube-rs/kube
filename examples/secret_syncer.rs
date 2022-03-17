@@ -10,7 +10,7 @@ use kube::{
     api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
     error::ErrorResponse,
     runtime::{
-        controller::{Context, Controller, ReconcilerAction},
+        controller::{Action, Context, Controller},
         finalizer::{finalizer, Event},
     },
 };
@@ -37,7 +37,7 @@ fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
     ))
 }
 
-async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
+async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
     println!("Reconciling {:?}", cm);
     let secret_name = secret_name_for_configmap(&cm)?;
     secrets
@@ -56,10 +56,10 @@ async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Reconc
         )
         .await
         .map_err(Error::UpdateSecret)?;
-    Ok(ReconcilerAction { requeue_after: None })
+    Ok(Action::await_change())
 }
 
-async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<ReconcilerAction> {
+async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
     println!("Cleaning up {:?}", cm);
     secrets
         .delete(&secret_name_for_configmap(&cm)?, &DeleteParams::default())
@@ -71,7 +71,7 @@ async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Reco
             err => Err(err),
         })
         .map_err(Error::DeleteSecret)?;
-    Ok(ReconcilerAction { requeue_after: None })
+    Ok(Action::await_change())
 }
 
 #[tokio::main]
@@ -103,9 +103,7 @@ async fn main() -> anyhow::Result<()> {
                 .await
             }
         },
-        |_err, _| ReconcilerAction {
-            requeue_after: Some(Duration::from_secs(2)),
-        },
+        |_err, _| Action::requeue(Duration::from_secs(2)),
         Context::new(()),
     )
     .for_each(|msg| async move { println!("Reconciled: {:?}", msg) })
