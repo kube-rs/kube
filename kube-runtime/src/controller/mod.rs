@@ -85,12 +85,6 @@ impl Action {
     }
 }
 
-impl Default for Action {
-    fn default() -> Self {
-        Action::requeue(Duration::from_secs(3600))
-    }
-}
-
 /// Helper for building custom trigger filters, see the implementations of [`trigger_self`] and [`trigger_owners`] for some examples.
 pub fn trigger_with<T, K, I, S>(
     stream: S,
