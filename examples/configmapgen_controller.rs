@@ -4,7 +4,7 @@ use futures::StreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ListParams, ObjectMeta, Patch, PatchParams, Resource},
-    runtime::controller::{Context, Controller, ReconcilerAction},
+    runtime::controller::{Action, Context, Controller},
     Client, CustomResource,
 };
 use schemars::JsonSchema;
@@ -29,10 +29,7 @@ struct ConfigMapGeneratorSpec {
 }
 
 /// Controller triggers this whenever our main object or our children changed
-async fn reconcile(
-    generator: Arc<ConfigMapGenerator>,
-    ctx: Context<Data>,
-) -> Result<ReconcilerAction, Error> {
+async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Context<Data>) -> Result<Action, Error> {
     log::info!("working hard");
     tokio::time::sleep(Duration::from_secs(2)).await;
     log::info!("hard work is done!");
@@ -70,16 +67,12 @@ async fn reconcile(
         )
         .await
         .map_err(Error::ConfigMapCreationFailed)?;
-    Ok(ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(300)),
-    })
+    Ok(Action::requeue(Duration::from_secs(300)))
 }
 
 /// The controller triggers this on reconcile errors
-fn error_policy(_error: &Error, _ctx: Context<Data>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(1)),
-    }
+fn error_policy(_error: &Error, _ctx: Context<Data>) -> Action {
+    Action::requeue(Duration::from_secs(1))
 }
 
 // Data we want access to in error/reconcile calls
