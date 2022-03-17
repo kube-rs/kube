@@ -8,7 +8,6 @@ use std::fmt::Debug;
 
 use kube_core::{params::PostParams, Resource};
 use serde::{de::DeserializeOwned, Serialize};
-
 use crate::{Api, Error, Result};
 
 impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
@@ -210,7 +209,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
 
     /// Validate that [`Self::object`] is valid, and refers to the same object as the original [`Api::entry`] call
     ///
-    /// Defaults [`ObjectMeta::name`] and [`ObjectMeta::namespace`] if unset.
+    /// Defaults `ObjectMeta::name` and `ObjectMeta::namespace` if unset.
     fn prepare_for_commit(&mut self) -> Result<(), CommitValidationError>
     where
         K: Resource,
@@ -260,26 +259,26 @@ pub enum CommitError {
 #[derive(Debug, thiserror::Error)]
 /// Pre-commit validation errors
 pub enum CommitValidationError {
-    /// [`ObjectMeta::name`] does not match the name passed to [`Api::entry`]
+    /// `ObjectMeta::name` does not match the name passed to [`Api::entry`]
     #[error(".metadata.name does not match the name passed to Api::entry (got: {object_name:?}, expected: {expected:?})")]
     NameMismatch {
-        /// The name of the object ([`ObjectMeta::name`])
+        /// The name of the object (`ObjectMeta::name`)
         object_name: String,
         /// The name passed to [`Api::entry`]
         expected: String,
     },
-    /// [`ObjectMeta::namespace`] does not match the namespace of the [`Api`]
+    /// `ObjectMeta::namespace` does not match the namespace of the [`Api`]
     #[error(".metadata.namespace does not match the namespace of the Api (got: {object_namespace:?}, expected: {expected:?})")]
     NamespaceMismatch {
-        /// The name of the object ([`ObjectMeta::namespace`])
+        /// The name of the object (`ObjectMeta::namespace`)
         object_namespace: Option<String>,
         /// The namespace of the [`Api`]
         expected: Option<String>,
     },
-    /// [`ObjectMeta::generate_name`] must not be set
+    /// `ObjectMeta::generate_name` must not be set
     #[error(".metadata.generate_name must not be set (got: {object_generate_name:?})")]
     GenerateName {
-        /// The set name generation template of the object ([`ObjectMeta::generate_name`])
+        /// The set name generation template of the object (`ObjectMeta::generate_name`)
         object_generate_name: String,
     },
 }
