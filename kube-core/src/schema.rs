@@ -118,8 +118,8 @@ impl Visitor for StructuralSchemaRewriter {
                     ..
                 }) = variant
                 {
-                    if variant_obj.properties.len() == 1 {
-                        if let Some(description) = std::mem::take(&mut variant_metadata.description) {
+                    if let Some(description) = std::mem::take(&mut variant_metadata.description) {
+                        if variant_obj.properties.len() == 1 {
                             if let Some(Schema::Object(variant_object)) =
                                 variant_obj.properties.values_mut().next()
                             {
