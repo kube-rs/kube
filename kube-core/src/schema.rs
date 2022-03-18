@@ -123,19 +123,8 @@ impl Visitor for StructuralSchemaRewriter {
                             if let Some(Schema::Object(variant_object)) =
                                 variant_obj.properties.values_mut().next()
                             {
-                                match variant_object {
-                                    SchemaObject {
-                                        metadata: Some(metadata),
-                                        ..
-                                    } => {
-                                        metadata.description = Some(description.to_string());
-                                    }
-                                    _ => {
-                                        let mut metadata = Metadata::default();
-                                        metadata.description = Some(description.to_string());
-                                        variant_object.metadata = Some(Box::new(metadata));
-                                    }
-                                };
+                                let metadata = variant_object.metadata.get_or_insert_with(|| Box::new(Metadata::default()));
+                                metadata.description = Some(description.to_string());
                             }
                         }
                     }
