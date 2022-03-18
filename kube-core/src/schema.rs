@@ -49,7 +49,7 @@ impl Visitor for StructuralSchemaRewriter {
                         if let Some(description) = std::mem::take(&mut variant_metadata.description) {
                             if let Some(Schema::Object(variant_object)) = only_item(variant_obj.properties.values_mut()) {
                                 let metadata = variant_object.metadata.get_or_insert_with(|| Box::new(Metadata::default()));
-                                metadata.description = Some(description.to_string());
+                                metadata.description = Some(description);
                             }
                         }
                     }
