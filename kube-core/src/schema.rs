@@ -119,14 +119,17 @@ impl Visitor for StructuralSchemaRewriter {
                 }) = variant
                 {
                     if let Some(description) = std::mem::take(&mut variant_metadata.description) {
-                        if variant_obj.properties.len() == 1 {
-                            if let Some(Schema::Object(variant_object)) =
-                                variant_obj.properties.values_mut().next()
-                            {
+                        match only_item(variant_obj.properties.values_mut()) {
+                            None => panic!(
+                                "the list of properties in {:?} was expected to only contain a single property: the variant of an enum",
+                                variant_obj.properties
+                            ),
+                            Some(Schema::Object(variant_object)) => {
                                 let metadata = variant_object.metadata.get_or_insert_with(|| Box::new(Metadata::default()));
                                 metadata.description = Some(description.to_string());
-                            }
-                        }
+                            },
+                            Some(Schema::Bool(_)) => {},
+                        };
                     }
                 }
 
@@ -172,4 +175,12 @@ impl Visitor for StructuralSchemaRewriter {
             }
         }
     }
+}
+
+fn only_item<I: Iterator>(mut i: I) -> Option<I::Item> {
+    let item = i.next()?;
+    if i.next().is_some() {
+        return None;
+    }
+    Some(item)
 }
