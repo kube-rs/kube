@@ -2,11 +2,11 @@
 
 mod sleep;
 
-use std::convert::Infallible;
+use std::{convert::Infallible, pin::Pin};
 
 use futures::{
     future::{self, Either},
-    pin_mut, Future, StreamExt,
+    pin_mut, Future, Stream, StreamExt, TryStream,
 };
 use k8s_openapi::{
     api::coordination::v1::{Lease, LeaseSpec},
@@ -14,6 +14,7 @@ use k8s_openapi::{
     chrono::{DateTime, Duration, Utc, MIN_DATETIME},
 };
 use kube_client::Api;
+use pin_project::pin_project;
 
 use crate::watcher::{self, watch_object};
 
@@ -37,7 +38,7 @@ impl Elector {
 
     #[tracing::instrument(skip(self, fut))]
     pub async fn run<F: Future>(&self, fut: F) -> Result<F::Output, RunError> {
-        self.acquire().await.map_err(RunError::Acquire)?;
+        dbg!(self.acquire().await.map_err(RunError::Acquire))?;
         let renewer = self.keep_renewed();
         pin_mut!(renewer, fut);
         let output = match future::select(renewer, fut).await {
@@ -87,41 +88,48 @@ impl Elector {
         }
     }
 
-    #[tracing::instrument(skip(self))]
-    async fn acquire(&self) -> Result<(), AcquireError> {
-        let watcher = watch_object(self.api.clone(), &self.name);
+    #[tracing::instrument(skip(self, watcher))]
+    async fn acquire(
+        &self,
+        watcher: Pin<&mut StreamCache<impl Stream<Item = watcher::Result<Option<Lease>>>>>,
+    ) -> Result<(), AcquireError> {
+        // let watcher = watch_object(self.api.clone(), &self.name);
+        let mut watcher = watcher.recv();
         let active_acquisition = future::Either::Left(future::pending());
         pin_mut!(watcher, active_acquisition);
         loop {
             match future::select(watcher.next(), active_acquisition.as_mut()).await {
-                Either::Left((None, _)) => panic!("watcher should never terminate"),
-                Either::Left((Some(Err(err)), _)) => return Err(AcquireError::Watch(err)),
-                Either::Left((Some(Ok(lease)), _)) => {
-                    let lease_state = self.state(&lease.and_then(|l| l.spec).unwrap_or_default());
-                    let now = Utc::now();
+                Either::Left((watcher_evt, _)) => match watcher_evt {
+                    None => panic!("watcher should never terminate"),
+                    Some(Err(err)) => return Err(AcquireError::Watch(err)),
+                    Some(Ok(lease)) => {
+                        let lease_state = self.state(&lease.and_then(|l| l.spec).unwrap_or_default());
 
-                    if let LeaseState::HeldBySelf { expires_at, .. } = lease_state {
-                        if expires_at > now {
-                            return Ok(());
+                        if let LeaseState::HeldBySelf { expires_at, .. } = lease_state {
+                            if expires_at > Utc::now() {
+                                return Ok(());
+                            }
                         }
+
+                        active_acquisition.set(future::Either::Right(async move {
+                            if let LeaseState::HeldByOther { holder, expires_at } = lease_state {
+                                tracing::info!(?holder, %expires_at, "scheduling next acquisition attempt...");
+                                sleep::until(expires_at).await;
+                            }
+                            tracing::debug!("acquiring");
+                            self.try_acquire(Utc::now()).await?;
+                            tracing::debug!("acquisition finished");
+                            Ok(())
+                        }))
                     }
-
-                    active_acquisition.set(future::Either::Right(async move {
-                        if let LeaseState::HeldByOther { holder, expires_at } = lease_state {
-                            tracing::info!(?holder, %expires_at, "scheduling next acquisition attempt...");
-                            sleep::until(expires_at).await;
-                        }
-                        tracing::debug!("acquiring");
-                        self.try_acquire(now).await?;
-                        tracing::debug!("acquisition finished");
-                        Ok(())
-                    }))
-                }
-                Either::Right((Err(TryAcquireError::Acquire(err)), _)) => return Err(err),
-                Either::Right((Ok(()) | Err(TryAcquireError::Conflict { .. }), _)) => {
-                    // watcher should emit the new lease, triggering a successful return or re-check
-                    active_acquisition.set(future::Either::Left(future::pending()));
-                }
+                },
+                Either::Right((attempt_result, _)) => match dbg!(attempt_result) {
+                    Err(TryAcquireError::Acquire(err)) => return Err(err),
+                    Ok(()) | Err(TryAcquireError::Conflict { .. }) => {
+                        // watcher should emit the new lease, triggering a successful return or re-check
+                        active_acquisition.set(future::Either::Left(future::pending()));
+                    }
+                },
             }
         }
     }
@@ -199,7 +207,7 @@ impl Elector {
             None => LeaseState::Unheld,
             Some(holder) if holder == &self.identity => LeaseState::HeldBySelf {
                 expires_at: last_renewal + lease_duration,
-                renew_at: last_renewal + lease_duration / 2,
+                renew_at: last_renewal + lease_duration * 2,
             },
             Some(holder) => LeaseState::HeldByOther {
                 holder: holder.clone(),
@@ -265,4 +273,37 @@ pub enum RunError {
     Renew(RenewError),
     #[error("failed to release lease")]
     Release(ReleaseError),
+}
+
+#[pin_project]
+struct StreamCache<S: Stream> {
+    #[pin]
+    stream: S,
+    last_item: Option<S::Item>,
+}
+
+impl<S: Stream> StreamCache<S> {
+    fn recv(self: Pin<&mut Self>) -> StreamCacheRecv<S> {
+        StreamCacheRecv {
+            cache: self,
+            emitted_first_item: false,
+        }
+    }
+}
+
+struct StreamCacheRecv<'a, S: Stream> {
+    cache: Pin<&'a mut StreamCache<S>>,
+    emitted_first_item: bool,
+}
+
+impl<'a, S: Stream> StreamCacheRecv<'a, S> {
+    async fn next(&mut self) -> Option<&mut S::Item> {
+        let mut cache = self.cache.as_mut().project();
+
+        if self.emitted_first_item || cache.last_item.is_none() {
+            *cache.last_item = cache.stream.next().await;
+        }
+        self.emitted_first_item = true;
+        cache.last_item.as_mut()
+    }
 }
