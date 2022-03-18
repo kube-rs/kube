@@ -57,7 +57,7 @@ enum ComplexEnum {
     /// Second variant with an String
     VariantTwo { str: String },
     /// Third variant which doesn't has an attribute
-    VariantThree {}
+    VariantThree {},
 }
 
 #[test]

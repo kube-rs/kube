@@ -7,9 +7,8 @@ use std::collections::btree_map::Entry;
 // Used in docs
 #[allow(unused_imports)] use schemars::gen::SchemaSettings;
 
-use schemars::schema::Metadata;
 use schemars::{
-    schema::{ObjectValidation, Schema, SchemaObject},
+    schema::{Metadata, ObjectValidation, Schema, SchemaObject},
     visit::Visitor,
 };
 
@@ -47,8 +46,12 @@ impl Visitor for StructuralSchemaRewriter {
                     if let Some(variant_metadata) = variant_metadata {
                         // Move enum variant description from oneOf clause to its corresponding property
                         if let Some(description) = std::mem::take(&mut variant_metadata.description) {
-                            if let Some(Schema::Object(variant_object)) = only_item(variant_obj.properties.values_mut()) {
-                                let metadata = variant_object.metadata.get_or_insert_with(|| Box::new(Metadata::default()));
+                            if let Some(Schema::Object(variant_object)) =
+                                only_item(variant_obj.properties.values_mut())
+                            {
+                                let metadata = variant_object
+                                    .metadata
+                                    .get_or_insert_with(|| Box::new(Metadata::default()));
                                 metadata.description = Some(description);
                             }
                         }
