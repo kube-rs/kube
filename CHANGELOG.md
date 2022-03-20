@@ -7,8 +7,45 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.70.0...master
 
-0.70.0 / 2022-03-20
+[0.70.0](https://github.com/kube-rs/kube-rs/releases/tag/0.70.0) / 2022-03-20
 ===================
+## Highlights
+
+### [Support for EC keys with rustls](https://github.com/kube-rs/kube-rs/pull/804)
+
+This was one of the big blockers for using `rustls` against clusters like `k3d` or `k3s`
+While __not sufficient__ to fix using those clusters out of the box, it is now __possible__ to use them [with a workarodund](https://github.com/kube-rs/kube-rs/issues/153)
+
+### [More ergonomic reconciler](https://github.com/kube-rs/kube-rs/pull/851)
+The signature and end the `Ok` action in `reconcile` fns has been simplified slightly, and requires the following user updates:
+
+```diff
+-async fn reconcile(obj: Arc<MyObject>, ctx: Context<Data>) -> Result<ReconcilerAction, Error> {
+-    ...
+-    Ok(ReconcilerAction {
+-        requeue_after: Some(Duration::from_secs(300)),
+-    })
++async fn reconcile(obj: Arc<MyObject>, ctx: Context<Data>) -> Result<Action, Error> {
++    ...
++    Ok(Action::requeue(Duration::from_secs(300)))
+```
+
+The `Action` import lives in the same place as the old `ReconcilerAction`.
+
+## What's Changed
+### Added
+* Add support for EC private keys by @farcaller in https://github.com/kube-rs/kube-rs/pull/804
+* Add helper for creating a controller owner_ref on Resource by @clux in https://github.com/kube-rs/kube-rs/pull/850
+### Changed
+* Remove `scheduler::Error` by @teozkr in https://github.com/kube-rs/kube-rs/pull/827
+* Bump parking_lot to 0.12, but allow dep duplicates by @clux in https://github.com/kube-rs/kube-rs/pull/836
+* Update tokio-tungstenite requirement from 0.16.1 to 0.17.1 by @dependabot in https://github.com/kube-rs/kube-rs/pull/841
+* Let OccupiedEntry::commit take PostParams by @teozkr in https://github.com/kube-rs/kube-rs/pull/842
+* Change ReconcileAction to Action and add associated ctors by @clux in https://github.com/kube-rs/kube-rs/pull/851
+### Fixed
+* Token reloading with RwLock by @kazk in https://github.com/kube-rs/kube-rs/pull/835
+* Fix event publishing for cluster scoped crds by @zhrebicek in https://github.com/kube-rs/kube-rs/pull/847
+* Fix invalid CRD when Enum variants have descriptions by @sbernauer in https://github.com/kube-rs/kube-rs/pull/852
 
 [0.69.1](https://github.com/kube-rs/kube-rs/releases/tag/0.69.1) / 2022-02-16
 ===================
