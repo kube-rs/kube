@@ -37,8 +37,7 @@ async fn main() -> anyhow::Result<()> {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(15), running).await?;
 
     let mut pf = pods.portforward("example", &[80]).await?;
-    let ports = pf.ports();
-    let mut port = ports[0].stream().unwrap();
+    let mut port = pf.take_stream(80).unwrap();
     port.write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nAccept: */*\r\n\r\n")
         .await?;
     let mut rstream = tokio_util::io::ReaderStream::new(port);

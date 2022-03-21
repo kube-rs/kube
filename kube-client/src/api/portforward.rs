@@ -1,9 +1,4 @@
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::{Context, Poll, Waker},
-};
+use std::{collections::HashMap, future::Future};
 
 use bytes::{Buf, Bytes};
 use futures::{
@@ -62,6 +57,9 @@ pub enum Error {
     /// Failed to receive a WebSocket message from the server.
     #[error("failed to receive a WebSocket message: {0}")]
     ReceiveWebSocketMessage(#[source] ws::Error),
+
+    #[error("failed to complete the background task: {0}")]
+    Spawn(#[from] tokio::task::JoinError),
 }
 
 type ErrorReceiver = oneshot::Receiver<String>;
@@ -73,18 +71,15 @@ enum Message {
     ToPod(u8, Bytes),
 }
 
-struct PortforwarderState {
-    waker: Option<Waker>,
-    result: Option<Result<(), Error>>,
-}
-
-// Provides `AsyncRead + AsyncWrite` for each port and **does not** bind to local ports.
-// Error channel for each port is only written by the server when there's an exception and
-// the port cannot be used (didn't initialize or can't be used anymore).
-/// Manage port forwarding.
+/// Manages port-forwarded streams.
+///
+/// Provides `AsyncRead + AsyncWrite` for each port and **does not** bind to local ports.  Error
+/// channel for each port is only written by the server when there's an exception and
+//. the port cannot be used (didn't initialize or can't be used anymore).
 pub struct Portforwarder {
-    ports: Vec<Port>,
-    state: Arc<Mutex<PortforwarderState>>,
+    ports: HashMap<u16, DuplexStream>,
+    errors: HashMap<u16, ErrorReceiver>,
+    task: tokio::task::JoinHandle<Result<(), Error>>,
 }
 
 impl Portforwarder {
@@ -92,90 +87,59 @@ impl Portforwarder {
     where
         S: AsyncRead + AsyncWrite + Unpin + Sized + Send + 'static,
     {
-        let mut ports = Vec::new();
-        let mut errors = Vec::new();
-        let mut duplexes = Vec::new();
-        for _ in port_nums.iter() {
+        let mut ports = HashMap::with_capacity(port_nums.len());
+        let mut error_rxs = HashMap::with_capacity(port_nums.len());
+        let mut error_txs = Vec::with_capacity(port_nums.len());
+        let mut task_ios = Vec::with_capacity(port_nums.len());
+        for port in port_nums.iter() {
             let (a, b) = tokio::io::duplex(1024 * 1024);
+            ports.insert(*port, a);
+            task_ios.push(b);
+
             let (tx, rx) = oneshot::channel();
-            ports.push(Port::new(a, rx));
-            errors.push(Some(tx));
-            duplexes.push(b);
+            error_rxs.insert(*port, rx);
+            error_txs.push(Some(tx));
         }
+        let task = tokio::spawn(start_message_loop(
+            stream,
+            port_nums.to_vec(),
+            task_ios,
+            error_txs,
+        ));
 
-        let state = Arc::new(Mutex::new(PortforwarderState {
-            waker: None,
-            result: None,
-        }));
-        let shared_state = state.clone();
-        let port_nums = port_nums.to_owned();
-        tokio::spawn(async move {
-            let result = start_message_loop(stream, port_nums, duplexes, errors).await;
-
-            let mut shared = shared_state.lock().unwrap();
-            shared.result = Some(result);
-            if let Some(waker) = shared.waker.take() {
-                waker.wake()
-            }
-        });
-        Portforwarder { ports, state }
-    }
-
-    /// Get streams for forwarded ports.
-    pub fn ports(&mut self) -> &mut [Port] {
-        self.ports.as_mut_slice()
-    }
-}
-
-impl Future for Portforwarder {
-    type Output = Result<(), Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut state = self.state.lock().unwrap();
-        if let Some(result) = state.result.take() {
-            return Poll::Ready(result);
-        }
-
-        if let Some(waker) = &state.waker {
-            if waker.will_wake(cx.waker()) {
-                return Poll::Pending;
-            }
-        }
-
-        state.waker = Some(cx.waker().clone());
-        Poll::Pending
-    }
-}
-
-pub struct Port {
-    // Data pipe.
-    stream: Option<DuplexStream>,
-    // Error channel.
-    error: Option<ErrorReceiver>,
-}
-
-impl Port {
-    pub(crate) fn new(stream: DuplexStream, error: ErrorReceiver) -> Self {
-        Port {
-            stream: Some(stream),
-            error: Some(error),
+        Portforwarder {
+            ports,
+            errors: error_rxs,
+            task,
         }
     }
 
-    /// Data pipe for sending to and receiving from the forwarded port.
+    /// Take a port stream by the port on the target resource.
     ///
-    /// This returns a `Some` on the first call, then a `None` on every subsequent call
-    pub fn stream(&mut self) -> Option<impl AsyncRead + AsyncWrite + Unpin> {
-        self.stream.take()
+    /// A value is returned at most once per port.
+    #[inline]
+    pub fn take_stream(&mut self, port: u16) -> Option<impl AsyncRead + AsyncWrite + Unpin> {
+        self.ports.remove(&port)
     }
 
-    /// Future that resolves with any error message or when the error sender is dropped.
+    /// Take a future that resolves with any error message or when the error sender is dropped.
     /// When the future resolves, the port should be considered no longer usable.
     ///
-    /// This returns a `Some` on the first call, then a `None` on every subsequent call
-    pub fn error(&mut self) -> Option<impl Future<Output = Option<String>>> {
-        // Ignore Cancellation error.
-        self.error.take().map(|recv| recv.map(|res| res.ok()))
+    /// A value is returned at most once per port.
+    #[inline]
+    pub fn take_error(&mut self, port: u16) -> Option<impl Future<Output = Option<String>>> {
+        self.errors.remove(&port).map(|recv| recv.map(|res| res.ok()))
+    }
+
+    /// Abort the background task, causing port forwards to fail.
+    #[inline]
+    pub fn abort(&self) {
+        self.task.abort();
+    }
+
+    /// Waits for port forwarding task to complete.
+    pub async fn join(self) -> Result<(), Error> {
+        self.task.await.unwrap_or_else(|e| Err(e.into()))
     }
 }
 

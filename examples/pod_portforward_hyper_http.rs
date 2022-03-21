@@ -36,8 +36,7 @@ async fn main() -> anyhow::Result<()> {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(15), running).await?;
 
     let mut pf = pods.portforward("example", &[80]).await?;
-    let ports = pf.ports();
-    let port = ports[0].stream().unwrap();
+    let port = pf.take_stream(80).unwrap();
 
     // let hyper drive the HTTP state in our DuplexStream via a task
     let (mut sender, connection) = hyper::client::conn::handshake(port).await?;
