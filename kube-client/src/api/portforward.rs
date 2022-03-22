@@ -59,7 +59,7 @@ pub enum Error {
     ReceiveWebSocketMessage(#[source] ws::Error),
 
     #[error("failed to complete the background task: {0}")]
-    Spawn(#[from] tokio::task::JoinError),
+    Spawn(#[source] tokio::task::JoinError),
 }
 
 type ErrorReceiver = oneshot::Receiver<String>;
@@ -139,7 +139,7 @@ impl Portforwarder {
 
     /// Waits for port forwarding task to complete.
     pub async fn join(self) -> Result<(), Error> {
-        self.task.await.unwrap_or_else(|e| Err(e.into()))
+        self.task.await.unwrap_or_else(|e| Err(Error::Spawn(e)))
     }
 }
 
