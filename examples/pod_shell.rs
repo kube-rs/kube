@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
         tokio::io::copy(&mut stdout_reader, &mut stdout).await.unwrap();
     });
     // When done, type `exit\n` to end it, so the pod is deleted.
-    let status = attached.await;
+    let status = attached.take_status().unwrap().await;
     println!("{:?}", status);
 
     // Delete it
