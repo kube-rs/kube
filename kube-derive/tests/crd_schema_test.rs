@@ -51,6 +51,7 @@ fn default_nullable() -> Option<String> {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::enum_variant_names)]
 enum ComplexEnum {
     /// First variant with an int
     VariantOne { int: i32 },
