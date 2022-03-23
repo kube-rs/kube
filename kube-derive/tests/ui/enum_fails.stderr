@@ -1,5 +1,0 @@
-error: Enums or Unions can not #[derive(CustomResource)]
- --> $DIR/enum_fails.rs:6:6
-  |
-6 | enum FooSpec {
-  |      ^^^^^^^
