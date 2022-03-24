@@ -81,6 +81,8 @@ impl Visitor for StructuralSchemaRewriter {
                 }
             }
         }
+        // check for maps without with properties (i.e. flattnened maps)
+        // and allow these to persist dynamically
         if let Some(object) = &mut schema.object {
             if !object.properties.is_empty() {
                 if object.additional_properties.as_deref() == Some(&Schema::Bool(true)) {
