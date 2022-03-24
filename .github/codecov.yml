@@ -1,6 +1,6 @@
 comment:
   require_changes: no
-  layout: "files, diff, flags"
+  layout: "diff, tree"
 
 flag_management:
   default_rules:
