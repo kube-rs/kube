@@ -1,0 +1,15 @@
+comment:
+  require_changes: no
+  layout: "diff,files"
+
+#flags:
+#  kube:
+#    paths: ["kube"]
+#  core:
+#    paths: ["kube-core"]
+#  client:
+#    paths: ["kube-client"]
+#  runtime:
+#    paths: ["kube-runtime"]
+#  derive:
+#    paths: ["kube-derive"]
