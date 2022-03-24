@@ -1,0 +1,19 @@
+comment:
+  require_changes: yes
+  layout: "diff, files"
+
+flag_management:
+  default_rules:
+    carryforward: true
+    statuses: []
+  individual_flags: # exceptions to the default rules above, stated flag by flag
+    - name: kube
+      paths: ["kube/"]
+    - name: core
+      paths: ["kube-core/"]
+    - name: client
+      paths: ["kube-client/"]
+    - name: runtime
+      paths: ["kube-runtime/"]
+    - name: derive
+      paths: ["kube-derive/"]
