@@ -110,6 +110,7 @@ impl From<String> for Reporter {
         }
     }
 }
+
 impl From<&str> for Reporter {
     fn from(es: &str) -> Self {
         Self {
@@ -170,13 +171,13 @@ pub struct Recorder {
 impl Recorder {
     /// Create a new recorder that can publish events for one specific object
     ///
-    /// This is intended to be createad at the start of your controller's reconcile fn.
+    /// This is intended to be created at the start of your controller's reconcile fn.
+    ///
+    /// Cluster scoped objects will publish events in the "default" namespace.
     #[must_use]
     pub fn new(client: Client, reporter: Reporter, reference: ObjectReference) -> Self {
-        let events = match reference.namespace.as_ref() {
-            None => Api::all(client),
-            Some(namespace) => Api::namespaced(client, namespace),
-        };
+        let default_namespace = "default".to_owned();
+        let events = Api::namespaced(client, reference.namespace.as_ref().unwrap_or(&default_namespace));
         Self {
             events,
             reporter,
@@ -238,9 +239,14 @@ impl Recorder {
 #[cfg(test)]
 mod test {
     #![allow(unused_imports)]
-    use super::{Event, EventType, Recorder};
-    use k8s_openapi::api::core::v1::{Event as CoreEvent, Service};
+
+    use k8s_openapi::api::{
+        core::v1::{Event as CoreEvent, Service},
+        rbac::v1::ClusterRole,
+    };
     use kube_client::{Api, Client, Resource};
+
+    use super::{Event, EventType, Recorder};
 
     #[tokio::test]
     #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
@@ -267,6 +273,38 @@ mod test {
             .find(|e| std::matches!(e.reason.as_deref(), Some("VeryCoolService")))
             .unwrap();
         assert_eq!(found_event.message.unwrap(), "Sending kubernetes to detention");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
+    async fn event_recorder_attaches_events_without_namespace() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+
+        let svcs: Api<ClusterRole> = Api::all(client.clone());
+        let s = svcs.get("system:basic-user").await?; // always get this default ClusterRole
+        let recorder = Recorder::new(client.clone(), "kube".into(), s.object_ref(&()));
+        recorder
+            .publish(Event {
+                type_: EventType::Normal,
+                reason: "VeryCoolServiceNoNamespace".into(),
+                note: Some("Sending kubernetes to detention without namespace".into()),
+                action: "Test event - plz ignore".into(),
+                secondary: None,
+            })
+            .await?;
+        let events: Api<CoreEvent> = Api::namespaced(client, "default");
+
+        let event_list = events.list(&Default::default()).await?;
+        let found_event = event_list
+            .into_iter()
+            .find(|e| std::matches!(e.reason.as_deref(), Some("VeryCoolServiceNoNamespace")))
+            .unwrap();
+        assert_eq!(
+            found_event.message.unwrap(),
+            "Sending kubernetes to detention without namespace"
+        );
 
         Ok(())
     }

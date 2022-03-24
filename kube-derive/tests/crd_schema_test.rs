@@ -38,6 +38,7 @@ struct FooSpec {
     // Using feature `chrono`
     timestamp: DateTime<Utc>,
 
+    /// This is a complex enum
     complex_enum: ComplexEnum,
 }
 
@@ -59,9 +60,14 @@ pub struct FlatteningSpec {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::enum_variant_names)]
 enum ComplexEnum {
+    /// First variant with an int
     VariantOne { int: i32 },
+    /// Second variant with an String
     VariantTwo { str: String },
+    /// Third variant which doesn't has an attribute
+    VariantThree {},
 }
 
 #[test]
@@ -186,7 +192,8 @@ fn test_crd_schema_matches_expected() {
                                                                 "format": "int32"
                                                             }
                                                         },
-                                                        "required": ["int"]
+                                                        "required": ["int"],
+                                                        "description": "First variant with an int"
                                                     },
                                                     "variantTwo": {
                                                         "type": "object",
@@ -195,7 +202,12 @@ fn test_crd_schema_matches_expected() {
                                                                 "type": "string"
                                                             }
                                                         },
-                                                        "required": ["str"]
+                                                        "required": ["str"],
+                                                        "description": "Second variant with an String"
+                                                    },
+                                                    "variantThree": {
+                                                        "type": "object",
+                                                        "description": "Third variant which doesn't has an attribute"
                                                     }
                                                 },
                                                 "oneOf": [
@@ -204,8 +216,12 @@ fn test_crd_schema_matches_expected() {
                                                     },
                                                     {
                                                         "required": ["variantTwo"]
+                                                    },
+                                                    {
+                                                        "required": ["variantThree"]
                                                     }
-                                                ]
+                                                ],
+                                                "description": "This is a complex enum"
                                             }
                                         },
                                         "required": [

@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
     // Get `Portforwarder` that handles the WebSocket connection.
     // There's no need to spawn a task to drive this, but it can be awaited to be notified on error.
     let mut forwarder = pods.portforward("example", &[80]).await?;
-    let port = forwarder.ports()[0].stream().unwrap();
+    let port = forwarder.take_stream(80).unwrap();
 
     // let hyper drive the HTTP state in our DuplexStream via a task
     let (sender, connection) = hyper::client::conn::handshake(port).await?;
@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     // The following task is only used to show any error from the forwarder.
     // This example can be stopped with Ctrl-C if anything happens.
     tokio::spawn(async move {
-        if let Err(e) = forwarder.await {
+        if let Err(e) = forwarder.join().await {
             log::error!("forwarder errored: {}", e);
         }
     });

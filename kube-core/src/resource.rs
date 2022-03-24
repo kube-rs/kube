@@ -82,6 +82,22 @@ pub trait Resource {
             ..Default::default()
         }
     }
+
+    /// Generates a controller owner reference pointing to this resource
+    ///
+    /// Note: this returns an `Option`, but for objects populated from the apiserver,
+    /// this Option can be safely unwrapped.
+    fn controller_owner_ref(&self, dt: &Self::DynamicType) -> Option<OwnerReference> {
+        let meta = self.meta();
+        Some(OwnerReference {
+            api_version: Self::api_version(dt).to_string(),
+            kind: Self::kind(dt).to_string(),
+            name: meta.name.clone()?,
+            uid: meta.uid.clone()?,
+            controller: Some(true),
+            ..OwnerReference::default()
+        })
+    }
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource

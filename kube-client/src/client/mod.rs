@@ -11,8 +11,7 @@ use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
-use hyper::{client::HttpConnector, Body};
-use hyper_timeout::TimeoutConnector;
+use hyper::Body;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
@@ -23,15 +22,14 @@ use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
-use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceBuilder, ServiceExt};
-use tower_http::{
-    classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
-};
+use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceExt};
+use tower_http::map_response_body::MapResponseBodyLayer;
 
 use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
 
 mod auth;
 mod body;
+mod builder;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
 mod config_ext;
@@ -40,6 +38,7 @@ pub use config_ext::ConfigExt;
 pub mod middleware;
 #[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
 mod tls;
+
 #[cfg(feature = "native-tls")] pub use tls::native_tls::Error as NativeTlsError;
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
@@ -51,6 +50,8 @@ pub use tls::openssl_tls::Error as OpensslTlsError;
 pub use auth::OAuthError;
 
 #[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
+
+pub use builder::{ClientBuilder, DynBody};
 
 /// Client for connecting with a Kubernetes cluster.
 ///
@@ -450,110 +451,9 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
 impl TryFrom<Config> for Client {
     type Error = Error;
 
-    /// Convert [`Config`] into a [`Client`]
+    /// Builds a default [`Client`] from a [`Config`], see [`ClientBuilder`] if more customization is required
     fn try_from(config: Config) -> Result<Self> {
-        use std::time::Duration;
-
-        use http::header::HeaderMap;
-        use tracing::Span;
-
-        let timeout = config.timeout;
-        let default_ns = config.default_namespace.clone();
-
-        let client: hyper::Client<_, Body> = {
-            let mut connector = HttpConnector::new();
-            connector.enforce_http(false);
-
-            // Current TLS feature precedence when more than one are set:
-            // 1. openssl-tls
-            // 2. native-tls
-            // 3. rustls-tls
-            // Create a custom client to use something else.
-            // If TLS features are not enabled, http connector will be used.
-            #[cfg(feature = "openssl-tls")]
-            let connector = config.openssl_https_connector_with_connector(connector)?;
-            #[cfg(all(not(feature = "openssl-tls"), feature = "native-tls"))]
-            let connector = hyper_tls::HttpsConnector::from((
-                connector,
-                tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
-            ));
-            #[cfg(all(
-                not(any(feature = "openssl-tls", feature = "native-tls")),
-                feature = "rustls-tls"
-            ))]
-            let connector = hyper_rustls::HttpsConnector::from((
-                connector,
-                std::sync::Arc::new(config.rustls_client_config()?),
-            ));
-
-            let mut connector = TimeoutConnector::new(connector);
-            connector.set_connect_timeout(timeout);
-            connector.set_read_timeout(timeout);
-
-            hyper::Client::builder().build(connector)
-        };
-
-        let stack = ServiceBuilder::new().layer(config.base_uri_layer()).into_inner();
-        #[cfg(feature = "gzip")]
-        let stack = ServiceBuilder::new()
-            .layer(stack)
-            .layer(tower_http::decompression::DecompressionLayer::new())
-            .into_inner();
-
-        let service = ServiceBuilder::new()
-            .layer(stack)
-            .option_layer(config.auth_layer()?)
-            .layer(config.extra_headers_layer()?)
-            .layer(
-                // Attribute names follow [Semantic Conventions].
-                // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
-                TraceLayer::new_for_http()
-                    .make_span_with(|req: &Request<hyper::Body>| {
-                        tracing::debug_span!(
-                            "HTTP",
-                             http.method = %req.method(),
-                             http.url = %req.uri(),
-                             http.status_code = tracing::field::Empty,
-                             otel.name = req.extensions().get::<&'static str>().unwrap_or(&"HTTP"),
-                             otel.kind = "client",
-                             otel.status_code = tracing::field::Empty,
-                        )
-                    })
-                    .on_request(|_req: &Request<hyper::Body>, _span: &Span| {
-                        tracing::debug!("requesting");
-                    })
-                    .on_response(|res: &Response<hyper::Body>, _latency: Duration, span: &Span| {
-                        let status = res.status();
-                        span.record("http.status_code", &status.as_u16());
-                        if status.is_client_error() || status.is_server_error() {
-                            span.record("otel.status_code", &"ERROR");
-                        }
-                    })
-                    // Explicitly disable `on_body_chunk`. The default does nothing.
-                    .on_body_chunk(())
-                    .on_eos(|_: Option<&HeaderMap>, _duration: Duration, _span: &Span| {
-                        tracing::debug!("stream closed");
-                    })
-                    .on_failure(|ec: ServerErrorsFailureClass, _latency: Duration, span: &Span| {
-                        // Called when
-                        // - Calling the inner service errored
-                        // - Polling `Body` errored
-                        // - the response was classified as failure (5xx)
-                        // - End of stream was classified as failure
-                        span.record("otel.status_code", &"ERROR");
-                        match ec {
-                            ServerErrorsFailureClass::StatusCode(status) => {
-                                span.record("http.status_code", &status.as_u16());
-                                tracing::error!("failed with status {}", status)
-                            }
-                            ServerErrorsFailureClass::Error(err) => {
-                                tracing::error!("failed with error {}", err)
-                            }
-                        }
-                    }),
-            )
-            .service(client);
-        Ok(Self::new(service, default_ns))
+        Ok(ClientBuilder::try_from(config)?.build())
     }
 }
 

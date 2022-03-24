@@ -136,11 +136,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     };
     // Limit derive to structs
     match derive_input.data {
-        Data::Struct(_) => {}
+        Data::Struct(_) | Data::Enum(_) => {}
         _ => {
             return syn::Error::new_spanned(
                 &derive_input.ident,
-                r#"Enums or Unions can not #[derive(CustomResource)]"#,
+                r#"Unions can not #[derive(CustomResource)]"#,
             )
             .to_compile_error()
         }
