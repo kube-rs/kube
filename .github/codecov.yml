@@ -1,5 +1,5 @@
 comment:
-  require_changes: yes
+  require_changes: no
   layout: "diff, files"
 
 flag_management:
