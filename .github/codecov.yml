@@ -1,6 +1,6 @@
 comment:
   require_changes: no
-  layout: "diff, tree, flags"
+  layout: "diff,files,flags"
 
 flags:
   kube:
