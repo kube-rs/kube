@@ -1,6 +1,6 @@
 name: clippy
-#on:
-#  pull_request:
+on:
+  pull_request:
 jobs:
   clippy_nightly:
     runs-on: ubuntu-latest
