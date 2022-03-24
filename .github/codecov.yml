@@ -1,6 +1,6 @@
 comment:
   require_changes: no
-  layout: "files"
+  layout: "files, diff, flags"
 
 flag_management:
   default_rules:
