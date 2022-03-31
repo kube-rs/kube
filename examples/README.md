@@ -41,7 +41,7 @@ How deriving `CustomResource` works in practice, and how it interacts with the [
 cargo run --example crd_api
 cargo run --example crd_derive
 cargo run --example crd_derive_schema
-cargo run --example crd_derive_no_schema --no-default-features --features=native-tls,latest
+cargo run --example crd_derive_no_schema --no-default-features --features=openssl-tls,latest
 ```
 
 The last one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
@@ -51,7 +51,7 @@ The last one opts out from the default `schema` feature from `kube-derive` (and 
 It is also possible to run the `crd_api` example against the legacy `v1beta1` CustomResourceDefinition endpoint. To do this you need to run the example with the `deprecated` feature and opt out of defaults:
 
 ```sh
-cargo run --example crd_api --no-default-features --features=deprecated,native-tls,kubederive
+cargo run --example crd_api --no-default-features --features=deprecated,openssl-tls,kubederive
 ```
 
 Note that these examples also contain tests for CI, and are invoked with the same parameters, but using `cargo test` rather than `cargo run`.

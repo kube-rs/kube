@@ -174,6 +174,21 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore] // needs cluster (lists pods)
+    #[cfg(all(feature = "openssl-tls"))]
+    async fn custom_client_openssl_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
+        let config = Config::infer().await?;
+        let https = config.openssl_https_connector()?;
+        let service = ServiceBuilder::new()
+            .layer(config.base_uri_layer())
+            .service(hyper::Client::builder().build(https));
+        let client = Client::new(service, config.default_namespace);
+        let pods: Api<Pod> = Api::default_namespaced(client);
+        pods.list(&Default::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
     #[ignore] // needs cluster (lists api resources)
     #[cfg(all(feature = "discovery"))]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {

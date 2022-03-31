@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
             .service(hyper::Client::builder().build(https));
         Client::new(service, config.default_namespace)
     } else {
-        let https = config.native_tls_https_connector()?;
+        let https = config.openssl_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
             .service(hyper::Client::builder().build(https));
