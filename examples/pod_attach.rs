@@ -92,8 +92,7 @@ async fn separate_outputs(mut attached: AttachedProcess) {
     });
 
     join!(stdouts, stderrs);
-
-    if let Some(status) = attached.await {
+    if let Some(status) = attached.take_status().unwrap().await {
         println!("{:?}", status);
     }
 }
@@ -109,8 +108,7 @@ async fn combined_output(mut attached: AttachedProcess) {
         }
     });
     outputs.await;
-
-    if let Some(status) = attached.await {
+    if let Some(status) = attached.take_status().unwrap().await {
         println!("{:?}", status);
     }
 }

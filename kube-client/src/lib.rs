@@ -336,7 +336,7 @@ mod test {
                 .collect::<Vec<_>>()
                 .await
                 .join("");
-            attached.await;
+            attached.join().await.unwrap();
             assert_eq!(out.lines().count(), 3);
             assert_eq!(out, "1\n2\n3\n");
         }
@@ -362,7 +362,8 @@ mod test {
             // AttachedProcess resolves with status object.
             // Send `exit 1` to get a failure status.
             stdin_writer.write(b"exit 1\n").await?;
-            if let Some(status) = attached.await {
+            let status = attached.take_status().unwrap();
+            if let Some(status) = status.await {
                 println!("{:?}", status);
                 assert_eq!(status.status, Some("Failure".to_owned()));
                 assert_eq!(status.reason, Some("NonZeroExitCode".to_owned()));

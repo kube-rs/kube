@@ -95,10 +95,11 @@ async fn main() -> anyhow::Result<()> {
         println!("{}", stdout);
         assert_eq!(stdout, "test string 1\n");
 
-        // AttachedProcess resolves with status object.
+        // AttachedProcess provides access to a future that resolves with a status object.
+        let status = attached.take_status().unwrap();
         // Send `exit 1` to get a failure status.
         stdin_writer.write(b"exit 1\n").await?;
-        if let Some(status) = attached.await {
+        if let Some(status) = status.await {
             println!("{:?}", status);
             assert_eq!(status.status, Some("Failure".to_owned()));
             assert_eq!(status.reason, Some("NonZeroExitCode".to_owned()));
@@ -122,6 +123,6 @@ async fn get_output(mut attached: AttachedProcess) -> String {
         .collect::<Vec<_>>()
         .await
         .join("");
-    attached.await;
+    attached.join().await.unwrap();
     out
 }
