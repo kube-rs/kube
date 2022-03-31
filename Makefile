@@ -18,8 +18,9 @@ test:
 	cargo test -p kube-examples --examples
 	cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
 	cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
+	cargo test -p kube --lib --no-default-features --features=openssl-tls,ws,oauth
 	cargo test -p kube --lib --no-default-features
-	cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,native-tls
+	cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,openssl-tls
 
 test-integration:
 	kubectl delete pod -lapp=kube-rs-test

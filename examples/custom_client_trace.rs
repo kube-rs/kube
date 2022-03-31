@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let config = Config::infer().await?;
-    let https = config.native_tls_https_connector()?;
+    let https = config.openssl_https_connector()?;
     let service = ServiceBuilder::new()
         .layer(config.base_uri_layer())
         // showcase rate limiting; max 10rps, and 4 concurrent

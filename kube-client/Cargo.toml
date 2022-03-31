@@ -16,7 +16,7 @@ rust-version = "1.56"
 edition = "2021"
 
 [features]
-default = ["client", "native-tls"]
+default = ["client", "openssl-tls"]
 native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
 rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls"]
 openssl-tls = ["openssl", "hyper-openssl"]
