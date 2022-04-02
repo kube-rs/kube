@@ -29,7 +29,7 @@ Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 - **Documentation** To check documentation, run `make doc`
 - **Testing**: To run tests, run `make test` and see below.
 
-For a list of tooling that we glue together everything see [TOOLS.md](https://github.com/kube-rs/.github/blob/main/TOOLS.md).
+For a list of tooling that we glue together everything see [TOOLS.md](https://kube.rs/tools/).
 
 ## Testing
 
