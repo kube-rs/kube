@@ -39,7 +39,7 @@ Official examples:
 - [version-rs](https://github.com/kube-rs/version-rs): lightweight deployment `reflector` using axum
 - [controller-rs](https://github.com/kube-rs/controller-rs): `Controller` of a crd inside actix
 
-For real world projects see [ADOPTERS](https://github.com/kube-rs/kube-rs/blob/master/ADOPTERS.md).
+For real world projects see [ADOPTERS](https://kube.rs/adopters/).
 
 ## Api
 
