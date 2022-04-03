@@ -275,7 +275,7 @@ The following breaking changes were made as a part of an effort to refine errors
  * `kube::runtime::wait::conditions` added `is_crd_established` helper - [#659](https://github.com/kube-rs/kube-rs/issues/659)
  * `kube::CustomResource` derive can now take an arbitrary `#[kube(kube_core)]` path for `kube::core` - [#658](https://github.com/kube-rs/kube-rs/issues/658)
  * `kube::core` consistently re-exported across crates
- * docs: major overhaul + [architecture.md](./architecture.md) - [#416](https://github.com/kube-rs/kube-rs/issues/416) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
+ * docs: major overhaul + [architecture.md](https://kube.rs/architecture/) - [#416](https://github.com/kube-rs/kube-rs/issues/416) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
 
 [0.61.0](https://github.com/kube-rs/kube-rs/releases/tag/0.61.0) / 2021-10-09
 ===================

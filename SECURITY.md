@@ -9,7 +9,7 @@ Once `0.71.1` is released, we will no longer provide updates for `0.69` releases
 
 ## Reporting a Vulnerability
 
-To report a security problem in Kube-rs, please contact at least two [maintainers][./maintainers.md]
+To report a security problem in Kube-rs, please contact at least two [maintainers](https://kube.rs/maintainers/)
 
 These people will help diagnose the severity of the issue and determine how to address the issue.
 Issues deemed to be non-critical will be filed as GitHub issues.
