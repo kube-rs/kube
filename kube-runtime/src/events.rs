@@ -176,7 +176,7 @@ impl Recorder {
     /// Cluster scoped objects will publish events in the "default" namespace.
     #[must_use]
     pub fn new(client: Client, reporter: Reporter, reference: ObjectReference) -> Self {
-        let default_namespace = "default".to_owned();
+        let default_namespace = "kube-system".to_owned(); // default does not work on k8s < 1.22
         let events = Api::namespaced(client, reference.namespace.as_ref().unwrap_or(&default_namespace));
         Self {
             events,
@@ -294,7 +294,7 @@ mod test {
                 secondary: None,
             })
             .await?;
-        let events: Api<CoreEvent> = Api::namespaced(client, "default");
+        let events: Api<CoreEvent> = Api::namespaced(client, "kube-system");
 
         let event_list = events.list(&Default::default()).await?;
         let found_event = event_list
