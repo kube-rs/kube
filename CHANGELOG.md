@@ -7,8 +7,33 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.71.0...master
 
-0.71.0 / 2022-04-12
+[0.71.0](https://github.com/kube-rs/kube-rs/releases/tag/0.71.0) / 2022-04-12
 ===================
+
+## Highlights
+Several quality of life changes and improvement this release for port-forwarding, a new `ClientBuilder`, better handling of `kube-derive` edge-cases.
+
+We highlight some **changes** here that you should be especially aware of.
+
+### [events::Recorder publishing to `kube-system` for cluster scoped resources](https://github.com/kube-rs/kube-rs/pull/871)
+Publishing events via [Recorder](https://docs.rs/kube/latest/kube/runtime/events/struct.Recorder.html) for cluster scoped resources (supported since `0.70.0`) now publish to `kube-system` rather than `default`, as all but the newest clusters struggle with publishing events in the `default` namespace.
+
+### [Default TLS stack set to OpenSSL](https://github.com/kube-rs/kube-rs/pull/863)
+The previous `native-tls` default  was there because we used to depend on `reqwest`, but because we depended on openssl anyway the feature does not make much sense. Changing to `openssl-tls` also improves the situation on macOS where the Security Framework struggles with PKCS#12 certs from OpenSSL v3.  The `native-tls` feature will still be available in this release in case of issues, but the plan is to decommission it shortly. Of course, we all ideally want to move to rustls, but we are still blocked by #153.
+
+## What's Changed
+### Added
+* Add `ClientBuilder` that lets users add custom middleware without full stack replacement by @teozkr in https://github.com/kube-rs/kube-rs/pull/855
+* Support top-level enums in CRDs by @sbernauer in https://github.com/kube-rs/kube-rs/pull/856
+### Changed
+* portforward: Improve API and support background task cancelation by @olix0r in https://github.com/kube-rs/kube-rs/pull/854
+* Make remote commands cancellable and remove panics by @kazk in https://github.com/kube-rs/kube-rs/pull/861
+* Change the default TLS to OpenSSL by @kazk in https://github.com/kube-rs/kube-rs/pull/863
+* change event recorder cluster namespace to kube-system by @clux in https://github.com/kube-rs/kube-rs/pull/871
+### Fixed
+* Fix schemas containing both properties and additionalProperties by @jcaesar in https://github.com/kube-rs/kube-rs/pull/845
+* Make dependency pins between sibling crates stricter by @clux in https://github.com/kube-rs/kube-rs/pull/864
+* Fix in-cluster kube_host_port generation for IPv6 by @somnusfish in https://github.com/kube-rs/kube-rs/pull/875
 
 [0.70.0](https://github.com/kube-rs/kube-rs/releases/tag/0.70.0) / 2022-03-20
 ===================
