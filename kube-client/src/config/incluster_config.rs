@@ -60,7 +60,12 @@ pub fn kube_dns() -> http::Uri {
 fn kube_host_port() -> Option<String> {
     let host = kube_host()?;
     let port = kube_port()?;
-    Some(format!("https://{}:{}", host, port))
+    if host.contains(":") {
+        // IPv6 cluster
+        Some(format!("https://[{}]:{}", host, port))
+    } else {
+        Some(format!("https://{}:{}", host, port))
+    }
 }
 
 fn kube_host() -> Option<String> {
@@ -108,4 +113,16 @@ fn test_kube_server() {
     env::set_var(SERVICE_HOSTENV, host);
     env::set_var(SERVICE_PORTENV, port);
     assert_eq!(kube_server().unwrap(), "https://fake.io:8080");
+}
+
+#[test]
+fn test_kube_server_ipv6() {
+    let host = "2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+    let port = "8080";
+    env::set_var(SERVICE_HOSTENV, host);
+    env::set_var(SERVICE_PORTENV, port);
+    assert_eq!(
+        kube_server().unwrap(),
+        "https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080"
+    );
 }
