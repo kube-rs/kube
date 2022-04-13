@@ -1,7 +1,5 @@
 use thiserror::Error;
 
-// New method to connect to kubernetes
-const SERVICE_DNS: &str = "kubernetes.default.svc";
 // Mounted credential files
 const SERVICE_TOKENFILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const SERVICE_CERTFILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
@@ -28,12 +26,7 @@ pub enum Error {
 }
 
 pub fn kube_dns() -> http::Uri {
-    http::Uri::builder()
-        .scheme("https")
-        .authority(SERVICE_DNS)
-        .path_and_query("/")
-        .build()
-        .unwrap()
+    http::Uri::from_static("https://kubernetes.default.svc/")
 }
 
 pub fn token_file() -> String {
