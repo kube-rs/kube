@@ -11,11 +11,15 @@ use crate::watcher::{self, watch_object};
 pub enum Error {
     #[error("failed to probe for whether the condition is fulfilled yet: {0}")]
     ProbeFailed(#[source] watcher::Error),
+
+    #[error("watch closed before the condition was fulfilled")]
+    WatchClosed,
 }
 
-/// Watch an object, and Wait for some condition `cond` to return `true`.
+/// Watch an object, and Wait for some condition `cond`.
 ///
-/// `cond` is passed `Some` if the object is found, otherwise `None`.
+/// `cond` is passed `Some` if the object is found, otherwise `None`. `cond` produces a `T` typed
+/// value (`()` by default) when the condition is fulfilled and `None` otherwise.
 ///
 /// # Caveats
 ///
@@ -44,18 +48,17 @@ pub enum Error {
 /// # Ok(())
 /// # }
 /// ```
-pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<(), Error>
+pub async fn await_condition<K, T>(api: Api<K>, name: &str, cond: impl Condition<K, T>) -> Result<T, Error>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
     watch_object(api, name)
-        .map_err(Error::ProbeFailed)
-        .try_take_while(|obj| {
-            let result = !cond.matches_object(obj.as_ref());
-            async move { Ok(result) }
-        })
-        .try_for_each(|_| async { Ok(()) })
+        .map_ok(|obj| cond.matches_object(obj.as_ref()))
+        .try_take_while(|match_| futures::future::ok(match_.is_none()))
+        .try_fold(None, |_, match_| futures::future::ok(match_))
         .await
+        .map_err(Error::ProbeFailed)?
+        .ok_or(Error::WatchClosed)
 }
 
 /// A trait for condition functions to be used by [`await_condition`]
@@ -82,8 +85,9 @@ where
 ///     }
 /// }
 /// ```
-pub trait Condition<K> {
-    fn matches_object(&self, obj: Option<&K>) -> bool;
+pub trait Condition<K, T = ()> {
+    /// Returns `Some` when the condition is fulfilled, `None` otherwise.
+    fn matches_object(&self, obj: Option<&K>) -> Option<T>;
 
     /// Returns a `Condition` that holds if `self` does not
     ///
@@ -92,12 +96,13 @@ pub trait Condition<K> {
     /// ```
     /// # use kube_runtime::wait::Condition;
     /// let condition: fn(Option<&()>) -> bool = |_| true;
-    /// assert!(condition.matches_object(None));
-    /// assert!(!condition.not().matches_object(None));
+    /// assert!(condition.matches_object(None).is_some());
+    /// assert!(condition.not().matches_object(None).is_none());
     /// ```
     fn not(self) -> conditions::Not<Self>
     where
         Self: Sized,
+        conditions::Not<Self>: Condition<K, T>,
     {
         conditions::Not(self)
     }
@@ -110,14 +115,16 @@ pub trait Condition<K> {
     /// # use kube_runtime::wait::Condition;
     /// let cond_false: fn(Option<&()>) -> bool = |_| false;
     /// let cond_true: fn(Option<&()>) -> bool = |_| true;
-    /// assert!(!cond_false.and(cond_false).matches_object(None));
-    /// assert!(!cond_false.and(cond_true).matches_object(None));
-    /// assert!(!cond_true.and(cond_false).matches_object(None));
-    /// assert!(cond_true.and(cond_true).matches_object(None));
+    /// assert!(cond_false.and(cond_false).matches_object(None).is_none());
+    /// assert!(cond_false.and(cond_true).matches_object(None).is_none());
+    /// assert!(cond_true.and(cond_false).matches_object(None).is_none());
+    /// assert!(cond_true.and(cond_true).matches_object(None).is_some());
     /// ```
-    fn and<Other: Condition<K>>(self, other: Other) -> conditions::And<Self, Other>
+    fn and<Other>(self, other: Other) -> conditions::And<Self, Other>
     where
         Self: Sized,
+        Other: Condition<K>,
+        conditions::And<Self, Other>: Condition<K>,
     {
         conditions::And(self, other)
     }
@@ -130,22 +137,53 @@ pub trait Condition<K> {
     /// # use kube_runtime::wait::Condition;
     /// let cond_false: fn(Option<&()>) -> bool = |_| false;
     /// let cond_true: fn(Option<&()>) -> bool = |_| true;
-    /// assert!(!cond_false.or(cond_false).matches_object(None));
-    /// assert!(cond_false.or(cond_true).matches_object(None));
-    /// assert!(cond_true.or(cond_false).matches_object(None));
-    /// assert!(cond_true.or(cond_true).matches_object(None));
+    /// assert!(cond_false.or(cond_false).matches_object(None).is_none());
+    /// assert!(cond_false.or(cond_true).matches_object(None).is_some());
+    /// assert!(cond_true.or(cond_false).matches_object(None).is_some());
+    /// assert!(cond_true.or(cond_true).matches_object(None).is_some());
     /// ```
-    fn or<Other: Condition<K>>(self, other: Other) -> conditions::Or<Self, Other>
+    fn or<Other>(self, other: Other) -> conditions::Or<Self, Other>
     where
         Self: Sized,
+        Other: Condition<K, T>,
+        conditions::Or<Self, Other>: Condition<K, T>,
     {
         conditions::Or(self, other)
     }
 }
 
-impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
-    fn matches_object(&self, obj: Option<&K>) -> bool {
-        (self)(obj)
+impl<K, F> Condition<K> for F
+where
+    F: Fn(Option<&K>) -> bool,
+{
+    fn matches_object(&self, obj: Option<&K>) -> Option<()> {
+        if (self)(obj) {
+            Some(())
+        } else {
+            None
+        }
+    }
+}
+
+/// Builds a `Condition` from a function that returns a value of type `T` when the condition is
+/// fulfilled and returns `None` otherwise.
+pub fn condition_fn<K, T, F>(f: F) -> impl Condition<K, T>
+where
+    F: Fn(Option<&K>) -> Option<T>,
+{
+    ConditionFn(f)
+}
+
+/// A `Condition` implementation backed by a function that returns a value of type `T` when the
+/// condition is fulfilled.
+#[derive(Clone)]
+struct ConditionFn<F>(F);
+impl<K, T, F> Condition<K, T> for ConditionFn<F>
+where
+    F: Fn(Option<&K>) -> Option<T>,
+{
+    fn matches_object(&self, obj: Option<&K>) -> Option<T> {
+        (self.0)(obj)
     }
 }
 
@@ -210,8 +248,11 @@ pub mod conditions {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct Not<A>(pub(super) A);
     impl<A: Condition<K>, K> Condition<K> for Not<A> {
-        fn matches_object(&self, obj: Option<&K>) -> bool {
-            !self.0.matches_object(obj)
+        fn matches_object(&self, obj: Option<&K>) -> Option<()> {
+            match self.0.matches_object(obj) {
+                Some(()) => None,
+                None => Some(()),
+            }
         }
     }
 
@@ -223,21 +264,25 @@ pub mod conditions {
         A: Condition<K>,
         B: Condition<K>,
     {
-        fn matches_object(&self, obj: Option<&K>) -> bool {
-            self.0.matches_object(obj) && self.1.matches_object(obj)
+        fn matches_object(&self, obj: Option<&K>) -> Option<()> {
+            self.0.matches_object(obj)?;
+            self.1.matches_object(obj)
         }
     }
 
     /// See [`Condition::or`]
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct Or<A, B>(pub(super) A, pub(super) B);
-    impl<A, B, K> Condition<K> for Or<A, B>
+    impl<A, B, K, T> Condition<K, T> for Or<A, B>
     where
-        A: Condition<K>,
-        B: Condition<K>,
+        A: Condition<K, T>,
+        B: Condition<K, T>,
     {
-        fn matches_object(&self, obj: Option<&K>) -> bool {
-            self.0.matches_object(obj) || self.1.matches_object(obj)
+        fn matches_object(&self, obj: Option<&K>) -> Option<T> {
+            if let Some(value) = self.0.matches_object(obj) {
+                return Some(value);
+            }
+            self.1.matches_object(obj)
         }
     }
 }
