@@ -132,7 +132,7 @@ pub struct Config {
     ///
     /// A value of `None` means no timeout
     pub timeout: Option<std::time::Duration>,
-    /// Whether to accept invalid ceritifacts
+    /// Whether to accept invalid certificates
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
     pub(crate) auth_info: AuthInfo,
