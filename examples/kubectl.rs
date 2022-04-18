@@ -2,9 +2,11 @@
 //! Supports kubectl get only atm.
 use anyhow::{bail, Result};
 use clap::{arg, command};
+use either::Either;
 use kube::{
-    api::{Api, DynamicObject, ListParams, ResourceExt},
+    api::{Api, DynamicObject, ListParams, Resource, ResourceExt},
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
+    runtime::wait::{await_condition, conditions::is_deleted},
     Client,
 };
 use log::info;
@@ -101,14 +103,20 @@ async fn main() -> Result<()> {
             println!("{0:<width$} {1:<20}", "NAME", "CREATED", width = max_name);
             for inst in result {
                 let name = inst.name();
-                let created = inst.creation().unwrap().0;
+                //let created = inst.creation().unwrap().0; // needs #888
+                let created = inst.meta().creation_timestamp.clone().unwrap().0; // use Resource for now
                 println!("{0:<width$} {1:<20}", name, created, width = max_name);
             }
         }
     } else if verb == "delete" {
         if let Some(n) = &name {
-            api.delete(n, &Default::default()).await?;
-            // TODO: await_condition is_deleted
+            match api.delete(n, &Default::default()).await? {
+                Either::Left(pdel) => {
+                    // await delete before returning
+                    await_condition(api, n, is_deleted(&pdel.uid().unwrap())).await?
+                }
+                _ => {}
+            }
         } else {
             api.delete_collection(&Default::default(), &lp).await?;
         }
