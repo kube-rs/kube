@@ -119,6 +119,10 @@ name = "job_api"
 path = "job_api.rs"
 
 [[example]]
+name = "kubectl"
+path = "kubectl.rs"
+
+[[example]]
 name = "log_stream"
 path = "log_stream.rs"
 
