@@ -1,8 +1,14 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::{
     api::core::v1::ObjectReference,
+<<<<<<< HEAD
     apimachinery::pkg::apis::meta::v1::{ManagedFieldsEntry, OwnerReference},
 };
+=======
+    apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
+};
+
+>>>>>>> 40aa4c1d (Add ResourceExt::creation)
 use std::{borrow::Cow, collections::BTreeMap};
 
 /// An accessor trait for a kubernetes Resource.
@@ -157,6 +163,10 @@ pub trait ResourceExt: Resource {
     /// Unique ID (if you delete resource and then create a new
     /// resource with the same name, it will have different ID)
     fn uid(&self) -> Option<String>;
+    /// Returns the creation timestamp
+    ///
+    /// This is guaranteed to exist on resources received by the apiserver.
+    fn creation(&self) -> Option<Time>;
     /// Returns resource labels
     fn labels(&self) -> &BTreeMap<String, String>;
     /// Provides mutable access to the labels
@@ -199,6 +209,10 @@ impl<K: Resource> ResourceExt for K {
 
     fn uid(&self) -> Option<String> {
         self.meta().uid.clone()
+    }
+
+    fn creation(&self) -> Option<Time> {
+        self.meta().creation_timestamp.clone()
     }
 
     fn labels(&self) -> &BTreeMap<String, String> {
