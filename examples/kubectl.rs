@@ -12,20 +12,19 @@ use std::{collections::BTreeMap, env};
 
 type KindMap = BTreeMap<String, (ApiResource, ApiCapabilities)>;
 async fn discover_valid_inputs(client: Client) -> Result<KindMap> {
-    let mut inputmap = BTreeMap::new(); // valid inputs (keys are plural or kind)
+    let mut kinds = BTreeMap::new(); // valid inputs (keys are plural or kind)
     let discovery = Discovery::new(client).run().await?;
-    // NB: relies on sort order of discovery groups for precedence
-    // (this matters; podmetrics.plural==pods, nodemetrics.plural==nodes)
+    // NB: relies on sort order of discovery groups for precedence (which is not perfect)
     for group in discovery.groups() {
         for (ar, caps) in group.recommended_resources() {
             // two entries per (TODO: extend ApiResource with shortname - its in APIResource..)
-            inputmap
+            kinds
                 .entry(ar.kind.to_lowercase())
                 .or_insert((ar.clone(), caps.clone()));
-            inputmap.entry(ar.plural.to_lowercase()).or_insert((ar, caps));
+            kinds.entry(ar.plural.to_lowercase()).or_insert((ar, caps));
         }
     }
-    Ok(inputmap)
+    Ok(kinds)
 }
 
 #[tokio::main]
@@ -37,18 +36,20 @@ async fn main() -> Result<()> {
 
     // 1. arg parsing
     let matches = command!()
-        .arg(arg!(-o[OUTPUT]).default_value("").possible_values(["yaml", ""]))
-        .arg(arg!(-l[SELECTOR]))
-        .arg(arg!(<VERB>))
-        .arg(arg!(<RESOURCE>))
-        .arg(arg!([NAME]))
+        .arg(arg!(-o[output]).default_value("").possible_values(["yaml", ""]))
+        .arg(arg!(-l[selector]))
+        .arg(arg!(-n[namespace]))
+        .arg(arg!(-A - -all))
+        .arg(arg!(<verb>))
+        .arg(arg!(<resource>))
+        .arg(arg!([name]))
         .get_matches();
-    let verb = matches.value_of("VERB").unwrap().to_lowercase();
-    let resource = matches.value_of("RESOURCE").unwrap().to_lowercase();
-    let name = matches.value_of("NAME").map(|x| x.to_lowercase());
-    let output = matches.value_of("OUTPUT").unwrap();
+    let verb = matches.value_of("verb").unwrap().to_lowercase();
+    let resource = matches.value_of("resource").unwrap().to_lowercase();
+    let name = matches.value_of("name").map(|x| x.to_lowercase());
+    let output = matches.value_of("output").unwrap();
     let mut lp = ListParams::default();
-    if let Some(label) = matches.value_of("SELECTOR") {
+    if let Some(label) = matches.value_of("selector") {
         lp = lp.labels(label);
     }
 
@@ -63,13 +64,19 @@ async fn main() -> Result<()> {
     // 3. sanity checks
     // TODO: if verb == get, and name.is_some, then verb = list
     if !caps.supports_operation(&verb) {
+        //log::warn!("supported verbs: {:?}", caps.operations);
         bail!("resource '{}' does not support verb '{}'", resource, verb);
     }
 
     // 4. create an Api based on parsed parameters
     let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
-        //TODO: support -n or -A via Api::namespaced_with or Api::all_with resp
-        Api::default_namespaced_with(client.clone(), &ar)
+        if let Some(ns) = matches.value_of("namespace") {
+            Api::namespaced_with(client.clone(), ns, &ar)
+        } else if matches.is_present("all") {
+            Api::all_with(client.clone(), &ar)
+        } else {
+            Api::default_namespaced_with(client.clone(), &ar)
+        }
     } else {
         Api::all_with(client.clone(), &ar)
     };
@@ -77,36 +84,34 @@ async fn main() -> Result<()> {
     // 5. specialized handling for each verb (but resource agnostic)
     info!("{} {} {}", verb, resource, name.clone().unwrap_or_default());
     if verb == "get" {
-        let result: Vec<_> = if let Some(n) = &name {
+        let mut result: Vec<_> = if let Some(n) = &name {
             vec![api.get(&n).await?]
         } else {
             api.list(&lp).await?.items
-        }
-        .into_iter()
-        .map(|mut x| {
+        };
+        for x in &mut result {
             x.metadata.managed_fields = None; // hide managed fields by default
-            x
-        })
-        .collect();
+        }
 
         if output == "yaml" {
             println!("{}", serde_yaml::to_string(&result)?);
         } else {
             // Display style; size colums according to biggest name
-            let max_name = result
-                .iter()
-                .map(|x| x.metadata.name.as_ref().unwrap().len() + 2)
-                .max()
-                .unwrap_or(63);
-            println!("{0:<name_width$} {1:<20}", "NAME", "AGE", name_width = max_name);
+            let max_name = result.iter().map(|x| x.name().len() + 2).max().unwrap_or(63);
+            println!("{0:<width$} {1:<20}", "NAME", "CREATED", width = max_name);
             for inst in result {
-                // TODO: impl ResourceExt for DynamicObject ?
-                let name = inst.metadata.name.unwrap();
-                let age = inst.metadata.creation_timestamp; // TODO: agify
-                println!("{0:<name_width$} {1:<20?}", name, age, name_width = max_name);
+                let name = inst.name();
+                let created = inst.creation().unwrap().0;
+                println!("{0:<width$} {1:<20}", name, created, width = max_name);
             }
         }
     } else if verb == "delete" {
+        if let Some(n) = &name {
+            api.delete(n, &Default::default()).await?;
+            // TODO: await_condition is_deleted
+        } else {
+            api.delete_collection(&Default::default(), &lp).await?;
+        }
     }
 
     Ok(())
