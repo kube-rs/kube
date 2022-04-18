@@ -9,13 +9,11 @@ struct KubeAttrs {
     group: String,
     version: String,
     kind: String,
-    #[darling(default, rename = "struct")]
+    #[darling(rename = "struct")]
     kind_struct: Option<String>,
     /// lowercase plural of kind (inferred if omitted)
-    #[darling(default)]
     plural: Option<String>,
     /// singular defaults to lowercased kind
-    #[darling(default)]
     singular: Option<String>,
     #[darling(default)]
     namespaced: bool,
@@ -23,9 +21,7 @@ struct KubeAttrs {
     apiextensions: String,
     #[darling(multiple, rename = "derive")]
     derives: Vec<String>,
-    #[darling(default)]
     schema: Option<SchemaMode>,
-    #[darling(default)]
     status: Option<String>,
     #[darling(multiple, rename = "category")]
     categories: Vec<String>,
@@ -33,7 +29,6 @@ struct KubeAttrs {
     shortnames: Vec<String>,
     #[darling(multiple, rename = "printcolumn")]
     printcolums: Vec<String>,
-    #[darling(default)]
     scale: Option<String>,
     #[darling(default)]
     crates: Crates,
