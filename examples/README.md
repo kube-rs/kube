@@ -23,6 +23,16 @@ cargo run --example dynamic_jsonpath
 NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
+## kubectl like example
+The `kubectl` example supports `get`, `delete`, and `watch` on arbitrary resources:
+
+```sh
+cargo run --example kubectl -- get nodes
+cargo run --example kubectl -- get pods -lapp.kubernetes.io/name=prometheus -n monitoring
+cargo run --example kubectl -- watch pods --all
+cargo run --example kubectl -- delete pod metrics-server-86cbb8457f-8fct5
+```
+
 ## kube admission controller example
 Admission controllers are a bit of a special beast. They don't actually need `kube_client` (unless you need to verify something with the api-server) or `kube_runtime` (unless you also build a complementing reconciler) because, by themselves, they simply get changes sent to them over `https`. You will need a webserver, certificates, and either your controller deployed behind a `Service`, or as we do here: running locally with a private ip that your `k3d` cluster can reach.
 

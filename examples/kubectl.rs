@@ -1,5 +1,5 @@
 //! This is a simple imitation of the basic functionality of kubectl
-//! Supports kubectl get only atm.
+//! Supports kubectl {get, delete, watch} <resource> [name] (name optional) with labels and namespace selectors
 use anyhow::{bail, Result};
 use clap::{arg, command};
 use either::Either;
@@ -69,11 +69,17 @@ async fn main() -> Result<()> {
     }
     let (ar, caps) = arac.unwrap().clone();
 
-    // 3. sanity checks
-    // TODO: if verb == get, and name.is_some, then verb = list
-    if !caps.supports_operation(&verb) {
+    // 3. capability sanity checks and verb -> cap remapping
+    let cap = if verb == "get" && name.is_none() {
+        "list".into()
+    } else if verb == "apply" {
+        "patch".into()
+    } else {
+        verb.clone() // normally the colloquial verb matches the capability verb
+    };
+    if !caps.supports_operation(&cap) {
         //log::warn!("supported verbs: {:?}", caps.operations);
-        bail!("resource '{}' does not support verb '{}'", resource, verb);
+        bail!("resource '{}' does not support verb '{}'", resource, cap);
     }
 
     // 4. create an Api based on parsed parameters
