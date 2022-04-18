@@ -3,7 +3,7 @@
 use crate::{Client, Result};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
 use kube_core::gvk::GroupVersionKind;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 mod apigroup;
 pub mod oneshot;
 pub use apigroup::ApiGroup;
@@ -21,7 +21,6 @@ enum DiscoveryMode {
 }
 
 impl DiscoveryMode {
-    #[allow(clippy::ptr_arg)] // hashmap complains on &str here
     fn is_queryable(&self, group: &String) -> bool {
         match &self {
             Self::Allow(allowed) => allowed.contains(group),
@@ -52,7 +51,7 @@ impl DiscoveryMode {
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub struct Discovery {
     client: Client,
-    groups: HashMap<String, ApiGroup>,
+    groups: BTreeMap<String, ApiGroup>,
     mode: DiscoveryMode,
 }
 
@@ -63,7 +62,7 @@ impl Discovery {
     /// Construct a caching api discovery client
     #[must_use]
     pub fn new(client: Client) -> Self {
-        let groups = HashMap::new();
+        let groups = BTreeMap::new();
         let mode = DiscoveryMode::Block(vec![]);
         Self { client, groups, mode }
     }
