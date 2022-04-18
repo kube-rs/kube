@@ -3,10 +3,16 @@
 use anyhow::{bail, Result};
 use clap::{arg, command};
 use either::Either;
+use futures::{StreamExt, TryStreamExt};
+use k8s_openapi::chrono::{Duration, Utc};
 use kube::{
-    api::{Api, DynamicObject, ListParams, Resource, ResourceExt},
+    api::{Api, DynamicObject, ListParams, ObjectMeta, Resource, ResourceExt},
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
-    runtime::wait::{await_condition, conditions::is_deleted},
+    runtime::{
+        utils::try_flatten_applied,
+        wait::{await_condition, conditions::is_deleted},
+        watcher,
+    },
     Client,
 };
 use log::info;
@@ -100,12 +106,10 @@ async fn main() -> Result<()> {
         } else {
             // Display style; size colums according to biggest name
             let max_name = result.iter().map(|x| x.name().len() + 2).max().unwrap_or(63);
-            println!("{0:<width$} {1:<20}", "NAME", "CREATED", width = max_name);
+            println!("{0:<width$} {1:<20}", "NAME", "AGE", width = max_name);
             for inst in result {
-                let name = inst.name();
-                //let created = inst.creation().unwrap().0; // needs #888
-                let created = inst.meta().creation_timestamp.clone().unwrap().0; // use Resource for now
-                println!("{0:<width$} {1:<20}", name, created, width = max_name);
+                let age = format_creation_since(inst.meta());
+                println!("{0:<width$} {1:<20}", inst.name(), age, width = max_name);
             }
         }
     } else if verb == "delete" {
@@ -120,7 +124,40 @@ async fn main() -> Result<()> {
         } else {
             api.delete_collection(&Default::default(), &lp).await?;
         }
+    } else if verb == "watch" {
+        let w = if let Some(n) = &name {
+            lp = lp.fields(&format!("metadata.name={}", n));
+            watcher(api, lp) // NB: keeps watching even if object dies
+        } else {
+            watcher(api, lp)
+        };
+
+        // present a dumb table for it for now. maybe drop the whole watch. kubectl does not do it anymore.
+        let mut stream = try_flatten_applied(w).boxed();
+        println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
+        while let Some(inst) = stream.try_next().await? {
+            let age = format_creation_since(inst.meta());
+            println!("{0:<width$} {1:<20}", inst.name(), age, width = 63);
+        }
     }
 
     Ok(())
+}
+
+fn format_creation_since(meta: &ObjectMeta) -> String {
+    let ts = meta.creation_timestamp.clone().unwrap().0;
+    let age = Utc::now().signed_duration_since(ts);
+    format_duration(age)
+}
+fn format_duration(dur: Duration) -> String {
+    let days = dur.num_days();
+    let hours = dur.num_hours();
+    let mins = dur.num_minutes();
+    if days > 0 {
+        format!("{}d", days)
+    } else if hours > 0 {
+        format!("{}h", hours)
+    } else {
+        format!("{}m", mins)
+    }
 }
