@@ -3,7 +3,7 @@
 use crate::{Client, Result};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
 use kube_core::gvk::GroupVersionKind;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 mod apigroup;
 pub mod oneshot;
 pub use apigroup::ApiGroup;
@@ -51,7 +51,7 @@ impl DiscoveryMode {
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub struct Discovery {
     client: Client,
-    groups: BTreeMap<String, ApiGroup>,
+    groups: HashMap<String, ApiGroup>,
     mode: DiscoveryMode,
 }
 
@@ -62,7 +62,7 @@ impl Discovery {
     /// Construct a caching api discovery client
     #[must_use]
     pub fn new(client: Client) -> Self {
-        let groups = BTreeMap::new();
+        let groups = HashMap::new();
         let mode = DiscoveryMode::Block(vec![]);
         Self { client, groups, mode }
     }
