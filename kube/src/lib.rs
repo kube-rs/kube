@@ -357,7 +357,7 @@ mod test {
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
-            discovery::{self, verbs, Discovery, Scope},
+            discovery::{self, verbs, ApiGroup, Discovery, Scope},
             runtime::wait::{await_condition, conditions},
         };
 
@@ -403,6 +403,8 @@ mod test {
         assert_eq!(ar.kind, gvk.kind);
 
         // check all non-excluded groups that are iterable
+        let firstgroup = discovery.groups().next().unwrap();
+        assert_eq!(firstgroup.name, ApiGroup::CORE_GROUP);
         for group in discovery.groups() {
             for (ar, caps) in group.recommended_resources() {
                 if !caps.supports_operation(verbs::LIST) {

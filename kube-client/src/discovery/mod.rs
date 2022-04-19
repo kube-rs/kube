@@ -134,7 +134,10 @@ impl Discovery {
 impl Discovery {
     /// Returns iterator over all served groups
     pub fn groups(&self) -> impl Iterator<Item = &ApiGroup> {
-        self.groups.values()
+        let mut values: Vec<_> = self.groups.values().collect();
+        // collect to maintain kubectl order of groups
+        values.sort_by_cached_key(|g| &g.name);
+        values.into_iter()
     }
 
     /// Returns the [`ApiGroup`] for a given group if served
