@@ -133,13 +133,18 @@ impl Discovery {
 /// Interface to the Discovery cache
 impl Discovery {
     /// Returns iterator over all served groups
-    ///
-    /// This iterator returns groups in an alphabetical order following kubectl's default precedence.
     pub fn groups(&self) -> impl Iterator<Item = &ApiGroup> {
-        let mut values: Vec<_> = self.groups.values().collect();
+        self.groups.values()
+    }
+
+    /// Returns a sorted vector of all served groups
+    ///
+    /// This vector is in kubectl's normal alphabetical group order
+    pub fn groups_alphabetical(&self) -> Vec<&ApiGroup> {
+        let mut values: Vec<_> = self.groups().collect();
         // collect to maintain kubectl order of groups
         values.sort_by_cached_key(|g| &g.name);
-        values.into_iter()
+        values
     }
 
     /// Returns the [`ApiGroup`] for a given group if served
