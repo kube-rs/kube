@@ -41,11 +41,11 @@ pub mod v1 {
         #[error("Served api version {0} not found")]
         MissingServedApi(String),
 
-        /// Globals api not present
-        #[error("Globals api version {0} not found")]
-        MissingGlobalsApi(String),
+        /// Root api not present
+        #[error("Root api version {0} not found")]
+        MissingRootVersion(String),
 
-        /// Globals api not present
+        /// Too many versions given to individual crds
         #[error("Given CRD must have exactly one version each")]
         TooManyVersions,
 
@@ -56,17 +56,13 @@ pub mod v1 {
         /// Mismatching kind
         #[error("Mismatching kinds from given CRDs")]
         KindMismatch,
-        //#[error("failed to build request: {0}")]
-        //BuildRequest(#[source] http::Error),
-        //#[error("failed to serialize body: {0}")]
-        //SerializeBody(#[source] serde_json::Error),
     }
 
     /// Merger for multi-version setups of kube-derived crd schemas
     pub struct CrdMerger {
         crds: Vec<Crd>,
         served: Option<String>,
-        globals: Option<String>,
+        root: Option<String>,
     }
 
     impl CrdMerger {
@@ -82,13 +78,19 @@ pub mod v1 {
             Self {
                 crds,
                 served: None,
-                globals: None,
+                root: None,
             }
         }
 
         /// Set the apiversion to be served
         pub fn served(mut self, served_apiversion: impl Into<String>) -> Self {
             self.served = Some(served_apiversion.into());
+            self
+        }
+
+        /// Set the apiversion to be used for root properties
+        pub fn root(mut self, root_apiversion: impl Into<String>) -> Self {
+            self.root = Some(root_apiversion.into());
             self
         }
 
@@ -103,16 +105,16 @@ pub mod v1 {
                     return Err(CrdError::TooManyVersions);
                 }
             }
-            let mut root = if let Some(g) = self.globals {
+            let mut root = if let Some(g) = self.root {
                 match self.crds.iter().find(|c| c.spec.versions[0].name == g) {
-                    None => return Err(CrdError::MissingGlobalsApi(g)),
+                    None => return Err(CrdError::MissingRootVersion(g)),
                     Some(g) => g.clone(),
                 }
             } else {
                 self.crds.iter().next().unwrap().clone() // we know first is non-empty
             };
 
-            let global_ver = root.spec.versions[0].name.clone();
+            let root_ver = root.spec.versions[0].name.clone();
             let group = &root.spec.group;
             let kind = &root.spec.names.kind;
             // validation
@@ -129,7 +131,7 @@ pub mod v1 {
             // validation ok, smash them together:
             let versions = &mut root.spec.versions;
             for crd in self.crds {
-                if crd.spec.versions[0].name == global_ver {
+                if crd.spec.versions[0].name == root_ver {
                     continue;
                 }
                 versions.push(crd.spec.versions[0].clone());
