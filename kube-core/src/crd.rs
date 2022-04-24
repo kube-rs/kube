@@ -56,8 +56,6 @@ pub mod v1 {
         /// Mismatching kind
         #[error("Mismatching kinds from given CRDs")]
         KindMismatch,
-
-
         //#[error("failed to build request: {0}")]
         //BuildRequest(#[source] http::Error),
         //#[error("failed to serialize body: {0}")]
@@ -81,7 +79,11 @@ pub mod v1 {
         /// let final_crd = CrdMerger::new(crds).served("v1").merge()?;
         /// ```
         pub fn new(crds: Vec<Crd>) -> Self {
-            Self { crds, served: None, globals: None }
+            Self {
+                crds,
+                served: None,
+                globals: None,
+            }
         }
 
         /// Set the apiversion to be served
@@ -91,13 +93,14 @@ pub mod v1 {
         }
 
         /// Merge the crds with the given options
-        pub fn merge(self) -> Result<Crd, CrdError> { // TODO: error
+        pub fn merge(self) -> Result<Crd, CrdError> {
+            // TODO: error
             if self.crds.is_empty() {
-                return Err(CrdError::MissingCrds)
+                return Err(CrdError::MissingCrds);
             }
             for crd in self.crds.iter() {
                 if crd.spec.versions.len() != 1 {
-                    return Err(CrdError::TooManyVersions)
+                    return Err(CrdError::TooManyVersions);
                 }
             }
             let mut root = if let Some(g) = self.globals {
@@ -115,10 +118,10 @@ pub mod v1 {
             // validation
             for crd in self.crds.iter() {
                 if &crd.spec.group != group {
-                    return Err(CrdError::ApiGroupMismatch)
+                    return Err(CrdError::ApiGroupMismatch);
                 }
                 if &crd.spec.names.kind != kind {
-                    return Err(CrdError::KindMismatch)
+                    return Err(CrdError::KindMismatch);
                 }
                 // TODO: validate conversion hooks
             }
