@@ -240,17 +240,30 @@ mod custom_resource;
 /// Note that any changes to your struct / validation rules / serialization attributes will require you to re-apply the
 /// generated schema to kubernetes, so that the apiserver can validate against the right version of your structs.
 ///
-/// Backwards compatibility between schema versions is recommended unless you are in a controlled environment
+/// **Backwards compatibility** between schema versions is **recommended** unless you are in a controlled environment
 /// where you can migrate manually. I.e. if you add new properties behind options, and simply mark old fields as deprecated,
-/// then you can safely roll schema out changes without bumping the version.
+/// then you can safely roll schema out changes **without bumping** the version.
 ///
-/// On the other hand, if you are making **breaking changes** to your schemas, you should have:
+/// If you need **multiple versions**, then you need:
 ///
-/// - one module for each version of your types (e.g. v1::MyCrd and v2::MyCrd)
-/// - use the [`merge_crds`](https://docs.rs/kube/latest/kube/core/crd/fn.merge_crds.html) fn to combine them
-/// - roll out new schemas utilizing conversion webhooks
+/// - one **module** for **each version** of your types (e.g. `v1::MyCrd` and `v2::MyCrd`)
+/// - use the [`merge_crds`](https://docs.rs/kube/latest/kube/core/crd/fn.merge_crds.html) fn to combine crds
+/// - roll out new schemas utilizing conversion webhooks / manual conversions / or allow kubectl to do its best
 ///
-/// Note that kube has not implemented conversion webhooks yet. See [#865](https://github.com/kube-rs/kube-rs/issues/865).
+/// See the [crd_derive_multi](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive_multi.rs) example to see
+/// how this upgrade flow works without special logic.
+///
+/// The **upgrade flow** with **breaking changes** involves:
+///
+/// 1. upgrade version marked as `storage` (from v1 to v2)
+/// 2. read instances from the older `Api<v1::MyCrd>`
+/// 3. perform conversion in memory and write them to the new `Api<v2::MyCrd>`.
+/// 4. remove support for old version
+///
+/// If you need to maintain support for the old version for some time, then you have to repeat or continuously
+/// run steps 2 and 3. I.e. you probably need a **conversion webhook**.
+///
+/// **NB**: kube does currently [not implement conversion webhooks yet](https://github.com/kube-rs/kube-rs/issues/865).
 ///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.
