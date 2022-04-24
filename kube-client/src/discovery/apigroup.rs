@@ -6,7 +6,7 @@ use kube_core::{
     gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
     Version,
 };
-use std::cmp::{Ordering, Reverse};
+use std::cmp::Reverse;
 
 
 /// Describes one API groups collected resources and capabilities.
@@ -270,24 +270,5 @@ impl ApiGroup {
             }
         }
         None
-    }
-
-    /// Comparator to help sort a collection of ApiGroups in alphabetical ordering
-    ///
-    /// This follows the default group ordering of `kubectl`.
-    ///
-    /// ```
-    /// use kube::discovery::{ApiGroup, Discovery};
-    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client: kube::Client = todo!();
-    /// let discovery = Discovery::new(client).run().await?;
-    /// let groups: Vec<_> = discovery.groups().collect();
-    /// groups.sort_by(|x, y| ApiGroup::alpha_cmp(x, y));
-    /// assert_eq!(groups[0].name, ApiGroup::CORE_GROUP);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn alpha_cmp(lhs: &ApiGroup, rhs: &ApiGroup) -> Ordering {
-        lhs.name.cmp(&rhs.name)
     }
 }
