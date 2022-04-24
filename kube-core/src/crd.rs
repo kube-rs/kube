@@ -61,8 +61,8 @@ pub mod v1 {
     /// Merge a collection of crds into a single multiversion crd
     ///
     /// Given multiple [`CustomResource`] derived types granting [`CRD`]s via [`CustomResourceExt::crd`],
-    /// we can merge them into a single [`CRD`] with multiple [`CRDVersion`] objects, marking only the specified apiversion
-    /// as `storage: true`.
+    /// we can merge them into a single [`CRD`] with multiple [`CRDVersion`] objects, marking only
+    /// the specified apiversion as `storage: true`.
     ///
     /// This merge algorithm assumes that every [`CRD`]:
     ///
