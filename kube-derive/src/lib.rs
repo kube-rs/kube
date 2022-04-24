@@ -237,10 +237,20 @@ mod custom_resource;
 /// For sanity, you should review the generated schema before sending it to kubernetes.
 ///
 /// ## Versioning
-/// Note that any changes to your struct / validation rules / serialization attributes will require you to re-apply the generated
-/// schema to kubernetes, so that the apiserver can validate against the right version of your structs.
+/// Note that any changes to your struct / validation rules / serialization attributes will require you to re-apply the
+/// generated schema to kubernetes, so that the apiserver can validate against the right version of your structs.
 ///
-/// How to best deal with version changes has not been fully sketched out. See [#569](https://github.com/kube-rs/kube-rs/issues/569).
+/// Backwards compatibility between schema versions is recommended unless you are in a controlled environment
+/// where you can migrate manually. I.e. if you add new properties behind options, and simply mark old fields as deprecated,
+/// then you can safely roll schema out changes without bumping the version.
+///
+/// On the other hand, if you are making **breaking changes** to your schemas, you should have:
+///
+/// - one module for each version of your types (e.g. v1::MyCrd and v2::MyCrd)
+/// - use the [`merge_crds`](https://docs.rs/kube/latest/kube/core/crd/fn.merge_crds.html) fn to combine them
+/// - roll out new schemas utilizing conversion webhooks
+///
+/// Note that kube has not implemented conversion webhooks yet. See [#865](https://github.com/kube-rs/kube-rs/issues/865).
 ///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.

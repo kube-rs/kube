@@ -138,4 +138,4 @@ pub mod v1 {
 
 /// re-export the current latest version until a newer one is available in cloud providers
 pub use v1::CustomResourceExt;
-pub use v1::{MergeError, merge_crds};
+pub use v1::{merge_crds, MergeError};
