@@ -67,7 +67,7 @@ pub enum Error {
 
     /// Errors from OpenSSL TLS
     #[cfg(feature = "openssl-tls")]
-    #[cfg_attr(docsrs, doc(feature = "openssl-tls"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
     #[error("openssl tls error: {0}")]
     OpensslTls(#[source] crate::client::OpensslTlsError),
 

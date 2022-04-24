@@ -53,13 +53,9 @@ pub mod v1 {
         #[error("Mergeable CRDs cannot have multiple versions")]
         MultiVersionCrd,
 
-        /// Mismatching api group
-        #[error("Mismatching api groups from given CRDs")]
-        ApiGroupMismatch,
-
-        /// Mismatching kind
-        #[error("Mismatching kinds from given CRDs")]
-        KindMismatch,
+        /// Mismatching spec properties on crds
+        #[error("Mismatching {0} property from given CRDs")]
+        PropertyMismatch(String),
     }
 
     /// Merge a collection of crds into a single multiversion crd
@@ -68,7 +64,12 @@ pub mod v1 {
     /// we can merge them into a single [`CRD`] with multiple [`CRDVersion`] objects, marking only the specified apiversion
     /// as `served: true`.
     ///
-    /// This merge algorithm assumes that each CRD only exposes a single version each (as is the case with [`CustomResource`] derives).
+    /// This merge algorithm assumes that every [`CRD`]:
+    ///
+    /// - exposes exactly one [`CRDVersion`]
+    /// - uses identical values for `spec.group`, `spec.scope`, and `spec.names.kind`
+    ///
+    /// This is always true for [`CustomResource`] derives.
     ///
     /// ## Usage
     ///
@@ -86,7 +87,7 @@ pub mod v1 {
     /// - crd containing the `served_apiversion` as the place the other crds merge their [`CRDVersion`] items
     /// - served version is marked with `served: true`, while all others get `served: false`
     ///
-    /// [`CustomResourceExt::crd`]: kube_core::CustomResourceExt::crd
+    /// [`CustomResourceExt::crd`]: crate::CustomResourceExt::crd
     /// [`CRD`]: https://docs.rs/k8s-openapi/latest/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinition.html
     /// [`CRDVersion`]: https://docs.rs/k8s-openapi/latest/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinitionVersion.html
     /// [`CustomResource`]: https://docs.rs/kube/latest/kube/derive.CustomResource.html
@@ -109,19 +110,23 @@ pub mod v1 {
             None => return Err(MergeError::MissingRootVersion(ver)),
             Some(idx) => crds.remove(idx),
         };
-        root.spec.versions[0].served = true; // main version
+        root.spec.versions[0].served = true; // main version - set true in case modified
 
+        // Values that needs to be identical across crds:
         let group = &root.spec.group;
         let kind = &root.spec.names.kind;
+        let scope = &root.spec.scope;
         // sanity; don't merge crds with mismatching groups, versions, or other core properties
         for crd in crds.iter() {
             if &crd.spec.group != group {
-                return Err(MergeError::ApiGroupMismatch);
+                return Err(MergeError::PropertyMismatch("group".to_string()));
             }
             if &crd.spec.names.kind != kind {
-                return Err(MergeError::KindMismatch);
+                return Err(MergeError::PropertyMismatch("kind".to_string()));
             }
-            // TODO: validate conversion hooks
+            if &crd.spec.scope != scope {
+                return Err(MergeError::PropertyMismatch("scope".to_string()));
+            }
         }
 
         // combine all version objects into the root object
