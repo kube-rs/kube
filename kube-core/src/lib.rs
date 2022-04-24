@@ -20,7 +20,7 @@ pub mod dynamic;
 pub use dynamic::{ApiResource, DynamicObject};
 
 pub mod crd;
-pub use crd::CustomResourceExt;
+pub use crd::{CustomResourceExt};
 
 pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};

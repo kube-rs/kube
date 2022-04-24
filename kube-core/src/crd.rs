@@ -32,7 +32,7 @@ pub mod v1 {
 
     /// Possible errors when merging CRDs
     #[derive(Debug, thiserror::Error)]
-    pub enum CrdError {
+    pub enum MergeError {
         /// No crds given
         #[error("Empty list of CRDs cannot be merged")]
         MissingCrds,
@@ -45,9 +45,13 @@ pub mod v1 {
         #[error("Root api version {0} not found")]
         MissingRootVersion(String),
 
+        /// No versions given in one crd to merge
+        #[error("Given CRD must have versions")]
+        MissingVersions,
+
         /// Too many versions given to individual crds
-        #[error("Given CRD must have exactly one version each")]
-        TooManyVersions,
+        #[error("Mergeable CRDs cannot have multiple versions")]
+        MultiVersionCrd,
 
         /// Mismatching api group
         #[error("Mismatching api groups from given CRDs")]
@@ -58,88 +62,80 @@ pub mod v1 {
         KindMismatch,
     }
 
-    /// Merger for multi-version setups of kube-derived crd schemas
-    pub struct CrdMerger {
-        crds: Vec<Crd>,
-        served: Option<String>,
-        root: Option<String>,
-    }
-
-    impl CrdMerger {
-        /// Create a CrdMerger from a list of crds
-        ///
-        /// ```no_run
-        /// #let mycrd_v1: CustomResourceDefinition = todo!(); // v1::MyCrd::crd();
-        /// #let mycrd_v2: CustomResourceDefinition = todo!(); // v2::MyCrd::crd();
-        /// let crds = vec![mycrd_v1, mycrd_v2];
-        /// let final_crd = CrdMerger::new(crds).served("v1").merge()?;
-        /// ```
-        pub fn new(crds: Vec<Crd>) -> Self {
-            Self {
-                crds,
-                served: None,
-                root: None,
+    /// Merge a collection of crds into a single multiversion crd
+    ///
+    /// Given multiple [`CustomResource`] derived types granting [`CRD`]s via [`CustomResourceExt::crd`],
+    /// we can merge them into a single [`CRD`] with multiple [`CRDVersion`] objects, marking only the specified apiversion
+    /// as `served: true`.
+    ///
+    /// This merge algorithm assumes that each CRD only exposes a single version each (as is the case with [`CustomResource`] derives).
+    ///
+    /// ## Usage
+    ///
+    /// ```no_run
+    /// # use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+    /// use kube::core::crd::merge_crds;
+    /// # let mycrd_v1: CustomResourceDefinition = todo!(); // v1::MyCrd::crd();
+    /// # let mycrd_v2: CustomResourceDefinition = todo!(); // v2::MyCrd::crd();
+    /// let crds = vec![mycrd_v1, mycrd_v2];
+    /// let multi_version_crd = merge_crds(crds, "v1").unwrap();
+    /// ```
+    ///
+    /// Note the merge is done by marking the:
+    ///
+    /// - crd containing the `served_apiversion` as the place the other crds merge their [`CRDVersion`] items
+    /// - served version is marked with `served: true`, while all others get `served: false`
+    ///
+    /// [`CustomResourceExt::crd`]: kube_core::CustomResourceExt::crd
+    /// [`CRD`]: https://docs.rs/k8s-openapi/latest/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinition.html
+    /// [`CRDVersion`]: https://docs.rs/k8s-openapi/latest/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinitionVersion.html
+    /// [`CustomResource`]: https://docs.rs/kube/latest/kube/derive.CustomResource.html
+    pub fn merge_crds(mut crds: Vec<Crd>, served_apiversion: impl Into<String>) -> Result<Crd, MergeError> {
+        if crds.is_empty() {
+            return Err(MergeError::MissingCrds);
+        }
+        for crd in crds.iter() {
+            if crd.spec.versions.is_empty() {
+                return Err(MergeError::MissingVersions);
+            }
+            if crd.spec.versions.len() != 1 {
+                return Err(MergeError::MultiVersionCrd);
             }
         }
+        let ver: String = served_apiversion.into();
+        let found = crds.iter().position(|c| c.spec.versions[0].name == ver);
+        // Extract the root/first object to start with (the one we will merge into)
+        let mut root = match found {
+            None => return Err(MergeError::MissingRootVersion(ver)),
+            Some(idx) => crds.remove(idx),
+        };
+        root.spec.versions[0].served = true; // main version
 
-        /// Set the apiversion to be served
-        pub fn served(mut self, served_apiversion: impl Into<String>) -> Self {
-            self.served = Some(served_apiversion.into());
-            self
+        let group = &root.spec.group;
+        let kind = &root.spec.names.kind;
+        // sanity; don't merge crds with mismatching groups, versions, or other core properties
+        for crd in crds.iter() {
+            if &crd.spec.group != group {
+                return Err(MergeError::ApiGroupMismatch);
+            }
+            if &crd.spec.names.kind != kind {
+                return Err(MergeError::KindMismatch);
+            }
+            // TODO: validate conversion hooks
         }
 
-        /// Set the apiversion to be used for root properties
-        pub fn root(mut self, root_apiversion: impl Into<String>) -> Self {
-            self.root = Some(root_apiversion.into());
-            self
+        // combine all version objects into the root object
+        let versions = &mut root.spec.versions;
+        while let Some(mut crd) = crds.pop() {
+            while let Some(mut v) = crd.spec.versions.pop() {
+                v.served = false; // secondary versions
+                versions.push(v);
+            }
         }
-
-        /// Merge the crds with the given options
-        pub fn merge(self) -> Result<Crd, CrdError> {
-            // TODO: error
-            if self.crds.is_empty() {
-                return Err(CrdError::MissingCrds);
-            }
-            for crd in self.crds.iter() {
-                if crd.spec.versions.len() != 1 {
-                    return Err(CrdError::TooManyVersions);
-                }
-            }
-            let mut root = if let Some(g) = self.root {
-                match self.crds.iter().find(|c| c.spec.versions[0].name == g) {
-                    None => return Err(CrdError::MissingRootVersion(g)),
-                    Some(g) => g.clone(),
-                }
-            } else {
-                self.crds.iter().next().unwrap().clone() // we know first is non-empty
-            };
-
-            let root_ver = root.spec.versions[0].name.clone();
-            let group = &root.spec.group;
-            let kind = &root.spec.names.kind;
-            // validation
-            for crd in self.crds.iter() {
-                if &crd.spec.group != group {
-                    return Err(CrdError::ApiGroupMismatch);
-                }
-                if &crd.spec.names.kind != kind {
-                    return Err(CrdError::KindMismatch);
-                }
-                // TODO: validate conversion hooks
-            }
-
-            // validation ok, smash them together:
-            let versions = &mut root.spec.versions;
-            for crd in self.crds {
-                if crd.spec.versions[0].name == root_ver {
-                    continue;
-                }
-                versions.push(crd.spec.versions[0].clone());
-            }
-            Ok(root)
-        }
+        Ok(root)
     }
 }
 
 /// re-export the current latest version until a newer one is available in cloud providers
 pub use v1::CustomResourceExt;
+pub use v1::{MergeError, merge_crds};
