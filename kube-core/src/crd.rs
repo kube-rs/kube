@@ -37,9 +37,9 @@ pub mod v1 {
         #[error("Empty list of CRDs cannot be merged")]
         MissingCrds,
 
-        /// Served api not present
-        #[error("Served api version {0} not found")]
-        MissingServedApi(String),
+        /// Stored api not present
+        #[error("Stored api version {0} not found")]
+        MissingStoredApi(String),
 
         /// Root api not present
         #[error("Root api version {0} not found")]
@@ -62,7 +62,7 @@ pub mod v1 {
     ///
     /// Given multiple [`CustomResource`] derived types granting [`CRD`]s via [`CustomResourceExt::crd`],
     /// we can merge them into a single [`CRD`] with multiple [`CRDVersion`] objects, marking only the specified apiversion
-    /// as `served: true`.
+    /// as `storage: true`.
     ///
     /// This merge algorithm assumes that every [`CRD`]:
     ///
@@ -84,14 +84,14 @@ pub mod v1 {
     ///
     /// Note the merge is done by marking the:
     ///
-    /// - crd containing the `served_apiversion` as the place the other crds merge their [`CRDVersion`] items
-    /// - served version is marked with `served: true`, while all others get `served: false`
+    /// - crd containing the `stored_apiversion` as the place the other crds merge their [`CRDVersion`] items
+    /// - stored version is marked with `storage: true`, while all others get `storage: false`
     ///
     /// [`CustomResourceExt::crd`]: crate::CustomResourceExt::crd
     /// [`CRD`]: https://docs.rs/k8s-openapi/latest/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinition.html
     /// [`CRDVersion`]: https://docs.rs/k8s-openapi/latest/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinitionVersion.html
     /// [`CustomResource`]: https://docs.rs/kube/latest/kube/derive.CustomResource.html
-    pub fn merge_crds(mut crds: Vec<Crd>, served_apiversion: impl Into<String>) -> Result<Crd, MergeError> {
+    pub fn merge_crds(mut crds: Vec<Crd>, stored_apiversion: impl Into<String>) -> Result<Crd, MergeError> {
         if crds.is_empty() {
             return Err(MergeError::MissingCrds);
         }
@@ -103,14 +103,14 @@ pub mod v1 {
                 return Err(MergeError::MultiVersionCrd);
             }
         }
-        let ver: String = served_apiversion.into();
+        let ver: String = stored_apiversion.into();
         let found = crds.iter().position(|c| c.spec.versions[0].name == ver);
         // Extract the root/first object to start with (the one we will merge into)
         let mut root = match found {
             None => return Err(MergeError::MissingRootVersion(ver)),
             Some(idx) => crds.remove(idx),
         };
-        root.spec.versions[0].served = true; // main version - set true in case modified
+        root.spec.versions[0].storage = true; // main version - set true in case modified
 
         // Values that needs to be identical across crds:
         let group = &root.spec.group;
@@ -133,7 +133,7 @@ pub mod v1 {
         let versions = &mut root.spec.versions;
         while let Some(mut crd) = crds.pop() {
             while let Some(mut v) = crd.spec.versions.pop() {
-                v.served = false; // secondary versions
+                v.storage = false; // secondary versions
                 versions.push(v);
             }
         }
@@ -221,8 +221,8 @@ pub mod v1 {
                   openAPIV3Schema:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
-                served: false
-                storage: true"#;
+                served: true
+                storage: false"#;
 
 
             let c1: Crd = serde_yaml::from_str(crd1).unwrap();
