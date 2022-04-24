@@ -139,6 +139,102 @@ pub mod v1 {
         }
         Ok(root)
     }
+
+    mod tests {
+        #[test]
+        fn crd_merge() {
+            use super::{merge_crds, Crd};
+            let crd1 = r#"
+            apiVersion: apiextensions.k8s.io/v1
+            kind: CustomResourceDefinition
+            metadata:
+              name: multiversions.kube.rs
+            spec:
+              group: kube.rs
+              names:
+                categories: []
+                kind: MultiVersion
+                plural: multiversions
+                shortNames: []
+                singular: multiversion
+              scope: Namespaced
+              versions:
+              - additionalPrinterColumns: []
+                name: v1
+                schema:
+                  openAPIV3Schema:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                served: true
+                storage: true"#;
+
+            let crd2 = r#"
+            apiVersion: apiextensions.k8s.io/v1
+            kind: CustomResourceDefinition
+            metadata:
+              name: multiversions.kube.rs
+            spec:
+              group: kube.rs
+              names:
+                categories: []
+                kind: MultiVersion
+                plural: multiversions
+                shortNames: []
+                singular: multiversion
+              scope: Namespaced
+              versions:
+              - additionalPrinterColumns: []
+                name: v2
+                schema:
+                  openAPIV3Schema:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                served: true
+                storage: true"#;
+
+            let expected = r#"
+            apiVersion: apiextensions.k8s.io/v1
+            kind: CustomResourceDefinition
+            metadata:
+              name: multiversions.kube.rs
+            spec:
+              group: kube.rs
+              names:
+                categories: []
+                kind: MultiVersion
+                plural: multiversions
+                shortNames: []
+                singular: multiversion
+              scope: Namespaced
+              versions:
+              - additionalPrinterColumns: []
+                name: v2
+                schema:
+                  openAPIV3Schema:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                served: true
+                storage: true
+              - additionalPrinterColumns: []
+                name: v1
+                schema:
+                  openAPIV3Schema:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                served: false
+                storage: true"#;
+
+
+            let c1: Crd = serde_yaml::from_str(crd1).unwrap();
+            let c2: Crd = serde_yaml::from_str(crd2).unwrap();
+            let ce: Crd = serde_yaml::from_str(expected).unwrap();
+            let combined = merge_crds(vec![c1, c2], "v2").unwrap();
+
+            let combo_json = serde_json::to_value(&combined).unwrap();
+            let exp_json = serde_json::to_value(&ce).unwrap();
+            assert_json_diff::assert_json_eq!(combo_json, exp_json);
+        }
+    }
 }
 
 /// re-export the current latest version until a newer one is available in cloud providers
