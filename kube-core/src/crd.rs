@@ -91,7 +91,7 @@ pub mod v1 {
     /// [`CRD`]: https://docs.rs/k8s-openapi/latest/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinition.html
     /// [`CRDVersion`]: https://docs.rs/k8s-openapi/latest/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinitionVersion.html
     /// [`CustomResource`]: https://docs.rs/kube/latest/kube/derive.CustomResource.html
-    pub fn merge_crds(mut crds: Vec<Crd>, stored_apiversion: impl Into<String>) -> Result<Crd, MergeError> {
+    pub fn merge_crds(mut crds: Vec<Crd>, stored_apiversion: &str) -> Result<Crd, MergeError> {
         if crds.is_empty() {
             return Err(MergeError::MissingCrds);
         }
@@ -103,11 +103,11 @@ pub mod v1 {
                 return Err(MergeError::MultiVersionCrd);
             }
         }
-        let ver: String = stored_apiversion.into();
+        let ver = stored_apiversion;
         let found = crds.iter().position(|c| c.spec.versions[0].name == ver);
         // Extract the root/first object to start with (the one we will merge into)
         let mut root = match found {
-            None => return Err(MergeError::MissingRootVersion(ver)),
+            None => return Err(MergeError::MissingRootVersion(ver.into())),
             Some(idx) => crds.remove(idx),
         };
         root.spec.versions[0].storage = true; // main version - set true in case modified
