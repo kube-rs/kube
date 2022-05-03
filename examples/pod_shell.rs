@@ -1,7 +1,6 @@
-#[macro_use] extern crate log;
-
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
+use tracing::*;
 
 use kube::{
     api::{Api, AttachParams, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
@@ -10,8 +9,7 @@ use kube::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
@@ -74,10 +72,10 @@ async fn main() -> anyhow::Result<()> {
     });
     // When done, type `exit\n` to end it, so the pod is deleted.
     let status = attached.take_status().unwrap().await;
-    println!("{:?}", status);
+    info!("{:?}", status);
 
     // Delete it
-    println!("deleting");
+    info!("deleting");
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {

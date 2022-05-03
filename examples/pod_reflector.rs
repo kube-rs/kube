@@ -5,9 +5,11 @@ use kube::{
     runtime::{reflector, watcher},
     Client,
 };
+use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
@@ -18,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     // Use try_for_each to fail on first error, use for_each to keep retrying
     reflector
         .try_for_each(|_event| async {
-            println!("Current pod count: {}", store.state().len());
+            info!("Current pod count: {}", store.state().len());
             Ok(())
         })
         .await?;

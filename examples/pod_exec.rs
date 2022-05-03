@@ -1,7 +1,6 @@
-#[macro_use] extern crate log;
-
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
+use tracing::*;
 
 use kube::{
     api::{
@@ -13,8 +12,7 @@ use tokio::io::AsyncWriteExt;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 

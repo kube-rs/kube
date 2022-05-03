@@ -1,5 +1,6 @@
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
+use tracing::*;
 
 use kube::{
     api::{Api, DeleteParams, PostParams},
@@ -11,8 +12,7 @@ use tokio::io::AsyncWriteExt;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
@@ -45,15 +45,15 @@ async fn main() -> anyhow::Result<()> {
         match res {
             Ok(bytes) => {
                 let response = std::str::from_utf8(&bytes[..]).unwrap();
-                println!("{}", response);
+                info!("resp: {}", response);
                 assert!(response.contains("Welcome to nginx!"));
             }
-            Err(err) => eprintln!("{:?}", err),
+            Err(err) => warn!("{:?}", err),
         }
     }
 
     // Delete it
-    println!("deleting");
+    info!("deleting");
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {

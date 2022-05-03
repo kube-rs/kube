@@ -5,20 +5,20 @@ use kube::{
     runtime::{utils::try_flatten_applied, watcher},
     Client,
 };
+use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let api = Api::<Pod>::namespaced(client, &namespace);
 
     try_flatten_applied(watcher(api, ListParams::default()))
         .try_for_each(|p| async move {
-            log::debug!("Applied: {}", p.name());
+            debug!("Applied: {}", p.name());
             if let Some(unready_reason) = pod_unready(&p) {
-                log::warn!("{}", unready_reason);
+                warn!("{}", unready_reason);
             }
             Ok(())
         })

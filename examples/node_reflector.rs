@@ -1,4 +1,3 @@
-#[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Node;
 use kube::{
@@ -6,11 +5,11 @@ use kube::{
     runtime::{reflector, utils::try_flatten_applied, watcher},
     Client,
 };
+use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
     let nodes: Api<Node> = Api::all(client.clone());

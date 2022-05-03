@@ -5,11 +5,15 @@ the `kube` crates.
 
 All examples can be executed with:
 
-```
+```sh
 cargo run --example $name
 ```
 
-Examples in general show a common flows. These all have logging of this library set up to `debug`, and frequently pick up on the `NAMESPACE` evar.
+All examples enable logging via `RUST_LOG`. To enable deeper logging of the `kube` crates you can do:
+
+```sh
+RUST_LOG=info,kube=debug cargo run --example $name
+```
 
 ## kube focused api examples
 For a basic overview of how to use the `Api` try:
@@ -22,6 +26,19 @@ cargo run --example dynamic_api
 cargo run --example dynamic_jsonpath
 NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
+
+## kubectl light example
+
+The `kubectl` light example supports `get`, `delete`, and `watch` on arbitrary resources:
+
+```sh
+cargo run --example kubectl -- get nodes
+cargo run --example kubectl -- get pods -lapp.kubernetes.io/name=prometheus -n monitoring
+cargo run --example kubectl -- watch pods --all
+cargo run --example kubectl -- delete pod metrics-server-86cbb8457f-8fct5
+```
+
+Supported flags are `-lLABELSELECTOR`, `-nNAMESPACE`, `--all`, and `-oyaml`.
 
 ## kube admission controller example
 Admission controllers are a bit of a special beast. They don't actually need `kube_client` (unless you need to verify something with the api-server) or `kube_runtime` (unless you also build a complementing reconciler) because, by themselves, they simply get changes sent to them over `https`. You will need a webserver, certificates, and either your controller deployed behind a `Service`, or as we do here: running locally with a private ip that your `k3d` cluster can reach.

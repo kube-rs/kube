@@ -5,13 +5,13 @@ use kube::{
     runtime::{utils::try_flatten_applied, watcher},
     Client,
 };
+use tracing::*;
 
 use std::env;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
     // Take dynamic resource identifiers:
@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
     // Fully compatible with kube-runtime
     try_flatten_applied(watcher(api, ListParams::default()))
         .try_for_each(|p| async move {
-            log::info!("Applied: {}", p.name());
+            info!("Applied: {}", p.name());
             Ok(())
         })
         .await?;

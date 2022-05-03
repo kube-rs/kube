@@ -6,12 +6,11 @@ use kube::{
     discovery::{verbs, Discovery, Scope},
     Client,
 };
-use log::info;
+use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let ns_filter = std::env::var("NAMESPACE").ok();
 
