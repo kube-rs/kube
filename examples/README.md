@@ -61,12 +61,6 @@ The last one opts out from the default `schema` feature from `kube-derive` (and 
 
 **However**: without the `schema` feature, it's left **up to you to fill in a valid openapi v3 schema**, as schemas are **required** for [v1::CustomResourceDefinitions](https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinition.html), and the generated crd will be rejected by the apiserver if it's missing. As the last example shows, you can do this directly without `schemars`.
 
-It is also possible to run the `crd_api` example against the legacy `v1beta1` CustomResourceDefinition endpoint. To do this you need to run the example with the `deprecated` feature and opt out of defaults:
-
-```sh
-cargo run --example crd_api --no-default-features --features=deprecated,openssl-tls,kubederive
-```
-
 Note that these examples also contain tests for CI, and are invoked with the same parameters, but using `cargo test` rather than `cargo run`.
 
 ## kube-runtime focused examples

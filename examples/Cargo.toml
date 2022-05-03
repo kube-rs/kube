@@ -21,7 +21,6 @@ rustls-tls = ["kube/client", "kube/rustls-tls"]
 runtime = ["kube/runtime"]
 ws = ["kube/ws"]
 latest = ["k8s-openapi/v1_22"]
-deprecated = ["kube/deprecated-crd-v1beta1", "k8s-openapi/v1_21"]
 
 [dev-dependencies]
 tokio-util = "0.7.0"
@@ -49,7 +48,7 @@ warp = { version = "0.3", default-features = false, features = ["tls"] }
 http = "0.2.5"
 json-patch = "0.2.6"
 tower = { version = "0.4.6", features = ["limit"] }
-tower-http = { version = "0.2.0", features = ["trace", "decompression-gzip"] }
+tower-http = { version = "0.3.2", features = ["trace", "decompression-gzip"] }
 hyper = { version = "0.14.13", features = ["client", "http1", "stream", "tcp"] }
 thiserror = "1.0.29"
 backoff = "0.4.0"
@@ -86,6 +85,10 @@ path = "crd_derive_schema.rs"
 [[example]]
 name = "crd_derive_custom_schema"
 path = "crd_derive_custom_schema.rs"
+
+[[example]]
+name = "crd_derive_multi"
+path = "crd_derive_multi.rs"
 
 [[example]]
 name = "crd_derive_no_schema"
