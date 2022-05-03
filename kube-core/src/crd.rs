@@ -34,27 +34,27 @@ pub mod v1 {
     #[derive(Debug, thiserror::Error)]
     pub enum MergeError {
         /// No crds given
-        #[error("Empty list of CRDs cannot be merged")]
+        #[error("empty list of CRDs cannot be merged")]
         MissingCrds,
 
         /// Stored api not present
-        #[error("Stored api version {0} not found")]
+        #[error("stored api version {0} not found")]
         MissingStoredApi(String),
 
         /// Root api not present
-        #[error("Root api version {0} not found")]
+        #[error("root api version {0} not found")]
         MissingRootVersion(String),
 
         /// No versions given in one crd to merge
-        #[error("Given CRD must have versions")]
+        #[error("given CRD must have versions")]
         MissingVersions,
 
         /// Too many versions given to individual crds
-        #[error("Mergeable CRDs cannot have multiple versions")]
+        #[error("mergeable CRDs cannot have multiple versions")]
         MultiVersionCrd,
 
         /// Mismatching spec properties on crds
-        #[error("Mismatching {0} property from given CRDs")]
+        #[error("mismatching {0} property from given CRDs")]
         PropertyMismatch(String),
     }
 
@@ -237,6 +237,5 @@ pub mod v1 {
     }
 }
 
-/// re-export the current latest version until a newer one is available in cloud providers
-pub use v1::CustomResourceExt;
-pub use v1::{merge_crds, MergeError};
+// re-export current latest (v1)
+pub use v1::{merge_crds, CustomResourceExt, MergeError};
