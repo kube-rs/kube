@@ -37,7 +37,9 @@ fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResourc
 #[tokio::main]
 async fn main() -> Result<()> {
     // 0. init
-    std::env::set_var("RUST_LOG", "info,kube=info");
+    if std::env::var_os("RUST_LOG").is_none() {
+        std::env::set_var("RUST_LOG", "info,kube=info");
+    }
     env_logger::init();
     let client = Client::try_default().await?;
 
