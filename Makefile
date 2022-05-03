@@ -10,7 +10,7 @@ fmt:
 	rustfmt +nightly --edition 2021 $$(find . -type f -iname *.rs)
 
 doc:
-	RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_22 --open
+	RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_23 --open
 
 test:
 	cargo test --lib --all
