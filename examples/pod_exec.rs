@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
         let mut stdin_writer = attached.stdin().unwrap();
         let mut stdout_stream = tokio_util::io::ReaderStream::new(attached.stdout().unwrap());
         let next_stdout = stdout_stream.next();
-        stdin_writer.write(b"echo test string 1\n").await?;
+        stdin_writer.write_all(b"echo test string 1\n").await?;
         let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
         println!("{}", stdout);
         assert_eq!(stdout, "test string 1\n");
@@ -98,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
         // AttachedProcess provides access to a future that resolves with a status object.
         let status = attached.take_status().unwrap();
         // Send `exit 1` to get a failure status.
-        stdin_writer.write(b"exit 1\n").await?;
+        stdin_writer.write_all(b"exit 1\n").await?;
         if let Some(status) = status.await {
             println!("{:?}", status);
             assert_eq!(status.status, Some("Failure".to_owned()));
