@@ -15,7 +15,6 @@ use kube::{
     },
     Client,
 };
-use log::info;
 
 #[derive(clap::Parser)]
 struct Opts {
@@ -71,7 +70,7 @@ async fn main() -> Result<()> {
     if std::env::var_os("RUST_LOG").is_none() {
         std::env::set_var("RUST_LOG", "info,kube=info");
     }
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
     // 1. arg parsing
@@ -121,14 +120,14 @@ async fn main() -> Result<()> {
         (Scope::Namespaced, ObjectScope::NamedNamespace(ns)) => Api::namespaced_with(client.clone(), ns, &ar),
         (Scope::Namespaced, ObjectScope::Cluster) | (Scope::Cluster, _) => {
             if let ObjectScope::NamedNamespace(_) = user_scope {
-                log::warn!("ignoring --namespace since resource is cluster-scoped")
+                tracing::warn!("ignoring --namespace since resource is cluster-scoped")
             }
             Api::all_with(client.clone(), &ar)
         }
     };
 
     // 5. specialized handling for each verb (but resource agnostic)
-    info!("{} {} {}", verb, resource, name.clone().unwrap_or_default());
+    tracing::info!(?verb, ?resource, name = ?name.clone().unwrap_or_default(), "requested objects");
     if verb == "get" {
         let mut result: Vec<_> = if let Some(n) = &name {
             vec![api.get(n).await?]
