@@ -1,7 +1,7 @@
 //! This is a simple imitation of the basic functionality of kubectl
 //! Supports kubectl {get, delete, watch} <resource> [name] (name optional) with labels and namespace selectors
 use anyhow::{bail, Context, Result};
-use clap::{arg, command};
+use clap::Parser;
 use either::Either;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::chrono::{Duration, Utc};
@@ -16,7 +16,38 @@ use kube::{
     Client,
 };
 use log::info;
-use std::env;
+
+#[derive(clap::Parser)]
+struct Opts {
+    #[clap(long, short, arg_enum, default_value_t)]
+    output: OutputMode,
+    #[clap(long, short = 'l')]
+    selector: Option<String>,
+    #[clap(long, short)]
+    namespace: Option<String>,
+    #[clap(long, short = 'A')]
+    all: bool,
+    verb: String,
+    resource: String,
+    name: Option<String>,
+}
+
+#[derive(clap::ArgEnum, Clone, PartialEq, Eq)]
+enum OutputMode {
+    Pretty,
+    Yaml,
+}
+impl Default for OutputMode {
+    fn default() -> Self {
+        Self::Pretty
+    }
+}
+
+enum ObjectScope {
+    DefaultNamespace,
+    NamedNamespace(String),
+    Cluster,
+}
 
 fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResource, ApiCapabilities)> {
     discovery
@@ -44,28 +75,30 @@ async fn main() -> Result<()> {
     let client = Client::try_default().await?;
 
     // 1. arg parsing
-    let matches = command!()
-        .arg(arg!(-o[output]).default_value("").possible_values(["yaml", ""]))
-        .arg(arg!(-l[selector]))
-        .arg(arg!(-n[namespace]))
-        .arg(arg!(-A - -all))
-        .arg(arg!(<verb>))
-        .arg(arg!(<resource>))
-        .arg(arg!([name]))
-        .get_matches();
-    let verb = matches.value_of("verb").unwrap().to_lowercase();
-    let resource = matches.value_of("resource").unwrap();
-    let name = matches.value_of("name").map(|x| x.to_lowercase());
-    let output = matches.value_of("output").unwrap();
+    let Opts {
+        output,
+        selector,
+        namespace,
+        all,
+        verb,
+        resource,
+        name,
+    } = Opts::parse();
     let mut lp = ListParams::default();
-    if let Some(label) = matches.value_of("selector") {
-        lp = lp.labels(label);
+    if let Some(label) = selector {
+        lp = lp.labels(&label);
     }
+    let user_scope = match (namespace, all) {
+        (None, false) => ObjectScope::DefaultNamespace,
+        (Some(ns), false) => ObjectScope::NamedNamespace(ns),
+        (None, true) => ObjectScope::Cluster,
+        (Some(_ns), true) => bail!("cannot set both --all and --namespace"),
+    };
 
     // 2. discovery (to be able to infer apis from kind/plural only)
     let discovery = Discovery::new(client.clone()).run().await?;
-    let (ar, caps) = resolve_api_resource(&discovery, resource)
-        .with_context(|| format!("resource {resource:?} not found in cluster"))?;
+    let (ar, caps) = resolve_api_resource(&discovery, &resource)
+        .with_context(|| format!("resource {:?} not found in cluster", resource))?;
 
     // 3. capability sanity checks and verb -> cap remapping
     let cap = if verb == "get" && name.is_none() {
@@ -77,27 +110,28 @@ async fn main() -> Result<()> {
     };
     if !caps.supports_operation(&cap) {
         //log::warn!("supported verbs: {:?}", caps.operations);
-        bail!("resource '{}' does not support verb '{}'", resource, cap);
+        bail!("resource {:?} does not support verb {:?}", resource, cap);
     }
 
     // 4. create an Api based on parsed parameters
-    let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
-        if let Some(ns) = matches.value_of("namespace") {
-            Api::namespaced_with(client.clone(), ns, &ar)
-        } else if matches.is_present("all") {
-            Api::all_with(client.clone(), &ar)
-        } else {
+    let api: Api<DynamicObject> = match (&caps.scope, &user_scope) {
+        (Scope::Namespaced, ObjectScope::DefaultNamespace) => {
             Api::default_namespaced_with(client.clone(), &ar)
         }
-    } else {
-        Api::all_with(client.clone(), &ar)
+        (Scope::Namespaced, ObjectScope::NamedNamespace(ns)) => Api::namespaced_with(client.clone(), ns, &ar),
+        (Scope::Namespaced, ObjectScope::Cluster) | (Scope::Cluster, _) => {
+            if let ObjectScope::NamedNamespace(_) = user_scope {
+                log::warn!("ignoring --namespace since resource is cluster-scoped")
+            }
+            Api::all_with(client.clone(), &ar)
+        }
     };
 
     // 5. specialized handling for each verb (but resource agnostic)
     info!("{} {} {}", verb, resource, name.clone().unwrap_or_default());
     if verb == "get" {
         let mut result: Vec<_> = if let Some(n) = &name {
-            vec![api.get(&n).await?]
+            vec![api.get(n).await?]
         } else {
             api.list(&lp).await?.items
         };
@@ -105,25 +139,23 @@ async fn main() -> Result<()> {
             x.metadata.managed_fields = None; // hide managed fields by default
         }
 
-        if output == "yaml" {
-            println!("{}", serde_yaml::to_string(&result)?);
-        } else {
-            // Display style; size colums according to biggest name
-            let max_name = result.iter().map(|x| x.name().len() + 2).max().unwrap_or(63);
-            println!("{0:<width$} {1:<20}", "NAME", "AGE", width = max_name);
-            for inst in result {
-                let age = format_creation_since(inst.meta());
-                println!("{0:<width$} {1:<20}", inst.name(), age, width = max_name);
+        match output {
+            OutputMode::Yaml => println!("{}", serde_yaml::to_string(&result)?),
+            OutputMode::Pretty => {
+                // Display style; size colums according to biggest name
+                let max_name = result.iter().map(|x| x.name().len() + 2).max().unwrap_or(63);
+                println!("{0:<width$} {1:<20}", "NAME", "AGE", width = max_name);
+                for inst in result {
+                    let age = format_creation_since(inst.meta());
+                    println!("{0:<width$} {1:<20}", inst.name(), age, width = max_name);
+                }
             }
         }
     } else if verb == "delete" {
         if let Some(n) = &name {
-            match api.delete(n, &Default::default()).await? {
-                Either::Left(pdel) => {
-                    // await delete before returning
-                    await_condition(api, n, is_deleted(&pdel.uid().unwrap())).await?
-                }
-                _ => {}
+            if let Either::Left(pdel) = api.delete(n, &Default::default()).await? {
+                // await delete before returning
+                await_condition(api, n, is_deleted(&pdel.uid().unwrap())).await?
             }
         } else {
             api.delete_collection(&Default::default(), &lp).await?;
