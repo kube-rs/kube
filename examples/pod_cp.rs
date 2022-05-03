@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
         let mut tar = pods
             .exec("example", vec!["tar", "xf", "-", "-C", "/"], &ap)
             .await?;
-        tar.stdin().unwrap().write(&data).await?;
+        tar.stdin().unwrap().write_all(&data).await?;
     }
 
     // Check that the file was written

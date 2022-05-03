@@ -121,12 +121,9 @@ async fn apply_crd(client: Client, crd: CustomResourceDefinition) -> anyhow::Res
 async fn cleanup(client: Client) -> anyhow::Result<()> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     let obj = crds.delete("manyderives.kube.rs", &Default::default()).await?;
-    match obj {
-        either::Either::Left(o) => {
-            let uid = o.uid().unwrap();
-            await_condition(crds, "manyderives.kube.rs", conditions::is_deleted(&uid)).await?;
-        }
-        _ => {}
+    if let either::Either::Left(o) = obj {
+        let uid = o.uid().unwrap();
+        await_condition(crds, "manyderives.kube.rs", conditions::is_deleted(&uid)).await?;
     }
     Ok(())
 }

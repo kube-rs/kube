@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[kube(group = "clux.dev", version = "v1", kind = "FooEnum")]
 #[kube(apiextensions = "v1")]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::enum_variant_names)]
 enum FooEnumSpec {
     /// First variant with an int
     VariantOne { int: i32 },
