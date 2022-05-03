@@ -65,9 +65,6 @@ jobs:
       - name: Test crd_derive_no_schema example
         run: cargo test -p kube-examples --example crd_derive_no_schema --no-default-features --features=openssl-tls,latest
         if: matrix.os == 'ubuntu-latest'
-      - name: Test crd_api example with deprecated crd
-        run: cargo test -p kube-examples --example crd_api --no-default-features --features=deprecated,kubederive,openssl-tls
-        if: matrix.os == 'ubuntu-latest'
 
   check-msrv:
     # Run `cargo check` on our minimum supported Rust version
