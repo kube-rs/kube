@@ -20,7 +20,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 ws = []
 admission = ["json-patch"]
 jsonpatch = ["json-patch"]
-deprecated-crd-v1beta1 = []
 schema = ["schemars"]
 
 [dependencies]

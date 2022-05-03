@@ -27,7 +27,6 @@ client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "dirs"]
-deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
