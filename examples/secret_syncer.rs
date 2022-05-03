@@ -3,7 +3,6 @@
 // NOTE: This is designed to demonstrate how to use finalizers, but is not in itself a good use case for them.
 // If you actually want to clean up other Kubernetes objects then you should use `ownerReferences` instead and let
 // k8s garbage collect the children.
-
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 use kube::{
@@ -16,6 +15,7 @@ use kube::{
 };
 use std::{sync::Arc, time::Duration};
 use thiserror::Error;
+use tracing::*;
 
 #[derive(Debug, Error)]
 enum Error {
@@ -38,7 +38,7 @@ fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
 }
 
 async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
-    println!("Reconciling {:?}", cm);
+    info!("Reconciling {:?}", cm);
     let secret_name = secret_name_for_configmap(&cm)?;
     secrets
         .patch(
@@ -60,7 +60,7 @@ async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action
 }
 
 async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
-    println!("Cleaning up {:?}", cm);
+    info!("Cleaning up {:?}", cm);
     secrets
         .delete(&secret_name_for_configmap(&cm)?, &DeleteParams::default())
         .await
@@ -76,7 +76,7 @@ async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Acti
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let kube = kube::Client::try_default().await?;
     let all_cms = kube::Api::<ConfigMap>::all(kube.clone());
     Controller::new(
@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
         |_err, _| Action::requeue(Duration::from_secs(2)),
         Context::new(()),
     )
-    .for_each(|msg| async move { println!("Reconciled: {:?}", msg) })
+    .for_each(|msg| async move { info!("Reconciled: {:?}", msg) })
     .await;
     Ok(())
 }

@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
         verb.clone() // normally the colloquial verb matches the capability verb
     };
     if !caps.supports_operation(&cap) {
-        //log::warn!("supported verbs: {:?}", caps.operations);
+        //tracing::warn!("supported verbs: {:?}", caps.operations);
         bail!("resource {:?} does not support verb {:?}", resource, cap);
     }
 

@@ -1,4 +1,3 @@
-#[macro_use] extern crate log;
 use anyhow::Result;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
@@ -12,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, io::BufRead, sync::Arc};
 use thiserror::Error;
 use tokio::time::Duration;
+use tracing::*;
 
 #[derive(Debug, Error)]
 enum Error {
@@ -30,9 +30,9 @@ struct ConfigMapGeneratorSpec {
 
 /// Controller triggers this whenever our main object or our children changed
 async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Context<Data>) -> Result<Action, Error> {
-    log::info!("working hard");
+    info!("working hard");
     tokio::time::sleep(Duration::from_secs(2)).await;
-    log::info!("hard work is done!");
+    info!("hard work is done!");
 
     let client = ctx.get_ref().client.clone();
 
@@ -82,15 +82,14 @@ struct Data {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube-runtime=debug,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
     let cms = Api::<ConfigMap>::all(client.clone());
 
-    log::info!("starting configmapgen-controller");
-    log::info!("press <enter> to force a reconciliation of all objects");
+    info!("starting configmapgen-controller");
+    info!("press <enter> to force a reconciliation of all objects");
 
     let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
     // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
@@ -113,6 +112,6 @@ async fn main() -> Result<()> {
             }
         })
         .await;
-    log::info!("controller terminated");
+    info!("controller terminated");
     Ok(())
 }

@@ -5,11 +5,15 @@ the `kube` crates.
 
 All examples can be executed with:
 
-```
+```sh
 cargo run --example $name
 ```
 
-Examples in general show a common flows. These all have logging of this library set up to `debug`, and frequently pick up on the `NAMESPACE` evar.
+All examples enable logging via `RUST_LOG`. To enable deeper logging of the `kube` crates you can do:
+
+```sh
+RUST_LOG=info,kube=debug cargo run --example $name
+```
 
 ## kube focused api examples
 For a basic overview of how to use the `Api` try:

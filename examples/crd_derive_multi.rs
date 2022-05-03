@@ -1,4 +1,3 @@
-#[macro_use] extern crate log;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{Api, Patch, PatchParams},
@@ -8,6 +7,7 @@ use kube::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::*;
 
 mod v1 {
     use super::*;
@@ -32,8 +32,7 @@ mod v2 {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=info");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let client = Client::try_default().await?;
     let ssapply = PatchParams::apply("crd_derive_multi").force();

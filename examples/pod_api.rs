@@ -1,5 +1,6 @@
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
+use tracing::*;
 
 use kube::{
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
@@ -9,7 +10,6 @@ use kube::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let pods: Api<Pod> = Api::default_namespaced(client);
 
     // Create Pod blog
-    tracing::info!("Creating Pod instance blog");
+    info!("Creating Pod instance blog");
     let p: Pod = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Pod",
@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
         Ok(o) => {
             let name = o.name();
             assert_eq!(p.name(), name);
-            tracing::info!("Created {}", name);
+            info!("Created {}", name);
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
         Err(e) => return Err(e.into()),                        // any other case is probably bad
@@ -46,15 +46,15 @@ async fn main() -> anyhow::Result<()> {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(15), establish).await?;
 
     // Verify we can get it
-    tracing::info!("Get Pod blog");
+    info!("Get Pod blog");
     let p1cpy = pods.get("blog").await?;
     if let Some(spec) = &p1cpy.spec {
-        tracing::info!("Got blog pod with containers: {:?}", spec.containers);
+        info!("Got blog pod with containers: {:?}", spec.containers);
         assert_eq!(spec.containers[0].name, "blog");
     }
 
     // Replace its spec
-    tracing::info!("Patch Pod blog");
+    info!("Patch Pod blog");
     let patch = json!({
         "metadata": {
             "resourceVersion": p1cpy.resource_version(),
@@ -69,14 +69,14 @@ async fn main() -> anyhow::Result<()> {
 
     let lp = ListParams::default().fields(&format!("metadata.name={}", "blog")); // only want results for our pod
     for p in pods.list(&lp).await? {
-        tracing::info!("Found Pod: {}", p.name());
+        info!("Found Pod: {}", p.name());
     }
 
     // Delete it
     let dp = DeleteParams::default();
     pods.delete("blog", &dp).await?.map_left(|pdel| {
         assert_eq!(pdel.name(), "blog");
-        tracing::info!("Deleting blog pod started: {:?}", pdel);
+        info!("Deleting blog pod started: {:?}", pdel);
     });
 
     Ok(())
