@@ -43,6 +43,9 @@ impl Default for OutputMode {
 }
 
 fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResource, ApiCapabilities)> {
+    // iterate through groups to find matching kind/plural names at recommended versions
+    // and then take the minimal match by group.name (equivalent to sorting groups by group.name).
+    // this is equivalent to kubectl's api group preference
     discovery
         .groups()
         .flat_map(|group| {
@@ -52,6 +55,8 @@ fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResourc
                 .map(move |res| (group, res))
         })
         .filter(|(_, (res, _))| {
+            // match on both resource name and kind name
+            // ideally we should allow shortname matches as well
             name.eq_ignore_ascii_case(&res.kind) || name.eq_ignore_ascii_case(&res.plural)
         })
         .min_by_key(|(group, _res)| group.name())
