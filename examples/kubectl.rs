@@ -1,6 +1,6 @@
 //! This is a simple imitation of the basic functionality of kubectl
 //! Supports kubectl {get, delete, watch} <resource> [name] (name optional) with labels and namespace selectors
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::{arg, command};
 use either::Either;
 use futures::{StreamExt, TryStreamExt};
@@ -16,23 +16,22 @@ use kube::{
     Client,
 };
 use log::info;
-use std::{collections::BTreeMap, env};
+use std::env;
 
-type KindMap = BTreeMap<String, (ApiResource, ApiCapabilities)>;
-async fn discover_valid_inputs(client: Client) -> Result<KindMap> {
-    let mut kinds = BTreeMap::new(); // valid inputs (keys are plural or kind)
-    let discovery = Discovery::new(client).run().await?;
-    // NB: relies on sort order of discovery groups for precedence (which is not perfect)
-    for group in discovery.groups() {
-        for (ar, caps) in group.recommended_resources() {
-            // two entries per (TODO: extend ApiResource with shortname - its in APIResource..)
-            kinds
-                .entry(ar.kind.to_lowercase())
-                .or_insert((ar.clone(), caps.clone()));
-            kinds.entry(ar.plural.to_lowercase()).or_insert((ar, caps));
-        }
-    }
-    Ok(kinds)
+fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResource, ApiCapabilities)> {
+    discovery
+        .groups()
+        .flat_map(|group| {
+            group
+                .recommended_resources()
+                .into_iter()
+                .map(move |res| (group, res))
+        })
+        .filter(|(_, (res, _))| {
+            name.eq_ignore_ascii_case(&res.kind) || name.eq_ignore_ascii_case(&res.plural)
+        })
+        .min_by_key(|(group, _res)| group.name())
+        .map(|(_, res)| res)
 }
 
 #[tokio::main]
@@ -53,7 +52,7 @@ async fn main() -> Result<()> {
         .arg(arg!([name]))
         .get_matches();
     let verb = matches.value_of("verb").unwrap().to_lowercase();
-    let resource = matches.value_of("resource").unwrap().to_lowercase();
+    let resource = matches.value_of("resource").unwrap();
     let name = matches.value_of("name").map(|x| x.to_lowercase());
     let output = matches.value_of("output").unwrap();
     let mut lp = ListParams::default();
@@ -62,12 +61,9 @@ async fn main() -> Result<()> {
     }
 
     // 2. discovery (to be able to infer apis from kind/plural only)
-    let kindmap = discover_valid_inputs(client.clone()).await?;
-    let arac = kindmap.get(&resource);
-    if arac.is_none() {
-        bail!("resource '{}' not found in cluster", resource);
-    }
-    let (ar, caps) = arac.unwrap().clone();
+    let discovery = Discovery::new(client.clone()).run().await?;
+    let (ar, caps) = resolve_api_resource(&discovery, resource)
+        .with_context(|| format!("resource {resource:?} not found in cluster"))?;
 
     // 3. capability sanity checks and verb -> cap remapping
     let cap = if verb == "get" && name.is_none() {
