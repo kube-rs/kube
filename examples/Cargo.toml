@@ -86,6 +86,10 @@ name = "crd_derive_custom_schema"
 path = "crd_derive_custom_schema.rs"
 
 [[example]]
+name = "crd_derive_multi"
+path = "crd_derive_multi.rs"
+
+[[example]]
 name = "crd_derive_no_schema"
 path = "crd_derive_no_schema.rs"
 
