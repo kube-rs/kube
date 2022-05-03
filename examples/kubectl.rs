@@ -42,12 +42,6 @@ impl Default for OutputMode {
     }
 }
 
-enum ObjectScope {
-    DefaultNamespace,
-    NamedNamespace(String),
-    Cluster,
-}
-
 fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResource, ApiCapabilities)> {
     discovery
         .groups()
@@ -84,12 +78,6 @@ async fn main() -> Result<()> {
     if let Some(label) = selector {
         lp = lp.labels(&label);
     }
-    let user_scope = match (namespace, all) {
-        (None, false) => ObjectScope::DefaultNamespace,
-        (Some(ns), false) => ObjectScope::NamedNamespace(ns),
-        (None, true) => ObjectScope::Cluster,
-        (Some(_ns), true) => bail!("cannot set both --all and --namespace"),
-    };
 
     // 2. discovery (to be able to infer apis from kind/plural only)
     let discovery = Discovery::new(client.clone()).run().await?;
@@ -110,17 +98,16 @@ async fn main() -> Result<()> {
     }
 
     // 4. create an Api based on parsed parameters
-    let api: Api<DynamicObject> = match (&caps.scope, &user_scope) {
-        (Scope::Namespaced, ObjectScope::DefaultNamespace) => {
+    let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
+        if all {
+            Api::all_with(client.clone(), &ar)
+        } else if let Some(ns) = namespace {
+            Api::namespaced_with(client.clone(), &ns, &ar)
+        } else {
             Api::default_namespaced_with(client.clone(), &ar)
         }
-        (Scope::Namespaced, ObjectScope::NamedNamespace(ns)) => Api::namespaced_with(client.clone(), ns, &ar),
-        (Scope::Namespaced, ObjectScope::Cluster) | (Scope::Cluster, _) => {
-            if let ObjectScope::NamedNamespace(_) = user_scope {
-                tracing::warn!("ignoring --namespace since resource is cluster-scoped")
-            }
-            Api::all_with(client.clone(), &ar)
-        }
+    } else {
+        Api::all_with(client.clone(), &ar)
     };
 
     // 5. specialized handling for each verb (but resource agnostic)
