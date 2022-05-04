@@ -46,29 +46,18 @@ impl GroupVersionKind {
     /// Extract a GroupVersionKind from a yaml document
     ///
     /// ```rust
-    /// # use serde::Deserialize;
-    /// use kube::core::GroupVersionKind;
-    ///
-    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-    /// let input = r#"
-    /// ---
+    /// # use kube::core::GroupVersionKind;
+    /// # fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// let doc = serde_yaml::from_str(r#"---
     /// apiVersion: kube.rs/v1
     /// kind: Example
     /// metadata:
-    ///   name: doc1
-    /// ---
-    /// apiVersion: kube.rs/v1
-    /// kind: Other
-    /// metadata:
-    ///   name: doc2"#;
+    ///   name: doc1"#)?;
     ///
-    /// let mut gvks = vec![];
-    /// for de in serde_yaml::Deserializer::from_str(input) {
-    ///   let doc = serde_yaml::Value::deserialize(de)?;
-    ///   gvks.push(GroupVersionKind::from_yaml(&doc)?);
-    /// }
-    /// assert_eq!(gvks[0].kind, "Example");
-    /// assert_eq!(gvks[1].group, "kube.rs");
+    /// let gvk = GroupVersionKind::from_yaml(&doc)?;
+    /// assert_eq!(gvk.group, "kube.rs");
+    /// assert_eq!(gvk.version, "v1");
+    /// assert_eq!(gvk.kind, "Example");
     /// # Ok(())
     /// # }
     /// ```
@@ -183,5 +172,32 @@ impl GroupVersionResource {
             resource,
             api_version,
         }
+    }
+}
+
+mod test {
+    #[test]
+    fn gvk_yaml() {
+        use crate::GroupVersionKind;
+        use serde::Deserialize;
+        let input = r#"
+---
+apiVersion: kube.rs/v1
+kind: Example
+metadata:
+  name: doc1
+---
+apiVersion: kube.rs/v1
+kind: Other
+metadata:
+  name: doc2"#;
+
+        let mut gvks = vec![];
+        for de in serde_yaml::Deserializer::from_str(input) {
+            let doc = serde_yaml::Value::deserialize(de).unwrap();
+            gvks.push(GroupVersionKind::from_yaml(&doc).unwrap());
+        }
+        assert_eq!(gvks[0].kind, "Example");
+        assert_eq!(gvks[1].group, "kube.rs");
     }
 }
