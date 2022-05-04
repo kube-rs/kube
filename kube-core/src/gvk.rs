@@ -75,7 +75,7 @@ impl GroupVersionKind {
     pub fn from_yaml(doc: &serde_yaml::Value) -> Result<Self, InferError> {
         if let (Some(avv), Some(kv)) = (doc.get("apiVersion"), doc.get("kind")) {
             if let (Some(apiver), Some(kind)) = (avv.as_str(), kv.as_str()) {
-                let gvk = GroupVersion::from_str(&apiver)
+                let gvk = GroupVersion::from_str(apiver)
                     .map_err(InferError::ParseGroupVersion)?
                     .with_kind(kind);
                 Ok(gvk)
