@@ -9,17 +9,16 @@ use thiserror::Error;
 /// Failed to parse group version
 pub struct ParseGroupVersionError(pub String);
 
-
 /// Possible errors when inferring GVKs
 #[derive(Debug, Error)]
-pub enum InferError {
+pub enum GvkYamlError {
     /// Failing to parse the apiVersion
     #[error("ParseGroupVersionError: {0}")]
     ParseGroupVersion(#[source] ParseGroupVersionError),
 
     /// Failing to find or parse the expected apiVersion + kind
-    #[error("MalformedDocument: {0}")]
-    MalformedDocument(String),
+    #[error("InvalidDocument: {0}")]
+    InvalidDocument(String),
 }
 
 /// Core information about an API Resource.
@@ -61,20 +60,19 @@ impl GroupVersionKind {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_yaml(doc: &serde_yaml::Value) -> Result<Self, InferError> {
+    pub fn from_yaml(doc: &serde_yaml::Value) -> Result<Self, GvkYamlError> {
         if let (Some(avv), Some(kv)) = (doc.get("apiVersion"), doc.get("kind")) {
-            if let (Some(apiver), Some(kind)) = (avv.as_str(), kv.as_str()) {
+            return if let (Some(apiver), Some(kind)) = (avv.as_str(), kv.as_str()) {
                 let gvk = GroupVersion::from_str(apiver)
-                    .map_err(InferError::ParseGroupVersion)?
+                    .map_err(GvkYamlError::ParseGroupVersion)?
                     .with_kind(kind);
                 Ok(gvk)
             } else {
-                let err = format!("invalid apiVersion or kind: {:?}:{:?}", avv, kv);
-                Err(InferError::MalformedDocument(err))
-            }
-        } else {
-            Err(InferError::MalformedDocument("missing apiVersion or kind".into()))
+                let err = format!("invalid apiVersion/kind: {:?}:{:?}", avv, kv);
+                Err(GvkYamlError::InvalidDocument(err))
+            };
         }
+        Err(GvkYamlError::InvalidDocument("missing apiVersion or kind".into()))
     }
 }
 
