@@ -6,8 +6,21 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 #[error("failed to parse group version: {0}")]
-/// Failed to parse group version.
+/// Failed to parse group version
 pub struct ParseGroupVersionError(pub String);
+
+
+/// Possible errors when inferring GVKs
+#[derive(Debug, Error)]
+pub enum InferError {
+    /// Failing to parse the apiVersion
+    #[error("ParseGroupVersionError: {0}")]
+    ParseGroupVersion(#[source] ParseGroupVersionError),
+
+    /// Failing to find or parse the expected apiVersion + kind
+    #[error("MalformedDocument: {0}")]
+    MalformedDocument(String),
+}
 
 /// Core information about an API Resource.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -29,6 +42,51 @@ impl GroupVersionKind {
 
         Self { group, version, kind }
     }
+
+    /// Extract a GroupVersionKind from a yaml document
+    ///
+    /// ```rust
+    /// # use serde::Deserialize;
+    /// use kube::core::GroupVersionKind;
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// let input = r#"
+    /// ---
+    /// apiVersion: kube.rs/v1
+    /// kind: Example
+    /// metadata:
+    ///   name: doc1
+    /// ---
+    /// apiVersion: kube.rs/v1
+    /// kind: Other
+    /// metadata:
+    ///   name: doc2"#;
+    ///
+    /// let mut gvks = vec![];
+    /// for de in serde_yaml::Deserializer::from_str(input) {
+    ///   let doc = serde_yaml::Value::deserialize(de)?;
+    ///   gvks.push(GroupVersionKind::from_yaml(&doc)?);
+    /// }
+    /// assert_eq!(gvks[0].kind, "Example");
+    /// assert_eq!(gvks[1].group, "kube.rs");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_yaml(doc: &serde_yaml::Value) -> Result<Self, InferError> {
+        if let (Some(avv), Some(kv)) = (doc.get("apiVersion"), doc.get("kind")) {
+            if let (Some(apiver), Some(kind)) = (avv.as_str(), kv.as_str()) {
+                let gvk = GroupVersion::from_str(&apiver)
+                    .map_err(InferError::ParseGroupVersion)?
+                    .with_kind(kind);
+                Ok(gvk)
+            } else {
+                let err = format!("invalid apiVersion or kind: {:?}:{:?}", avv, kv);
+                Err(InferError::MalformedDocument(err))
+            }
+        } else {
+            Err(InferError::MalformedDocument("missing apiVersion or kind".into()))
+        }
+    }
 }
 
 /// Core information about a family of API Resources
@@ -46,6 +104,15 @@ impl GroupVersion {
         let version = version_.to_string();
         let group = group_.to_string();
         Self { group, version }
+    }
+
+    /// Upgrade a GroupVersion to a GroupVersionKind
+    pub fn with_kind(self, kind: &str) -> GroupVersionKind {
+        GroupVersionKind {
+            group: self.group,
+            version: self.version,
+            kind: kind.into(),
+        }
     }
 }
 
