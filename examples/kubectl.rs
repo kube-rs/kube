@@ -8,7 +8,7 @@ use k8s_openapi::{
 };
 use kube::{
     api::{Api, DynamicObject, ListParams, ObjectMeta, Patch, PatchParams, Resource, ResourceExt},
-    core::GroupVersionKind,
+    core::{GroupVersionKind, TypeMeta},
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
     runtime::{
         utils::try_flatten_applied,
@@ -97,7 +97,8 @@ async fn main() -> Result<()> {
                 std::fs::read_to_string(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
             for doc in multidoc_deserialize(&yaml)? {
                 let yaml_name = doc.get("metadata").map(|m| m.get("name").map(|v| v.as_str()));
-                let gvk = GroupVersionKind::from_yaml(&doc)?;
+                let tm: TypeMeta = serde_yaml::from_value(doc.clone())?;
+                let gvk = GroupVersionKind::try_from(&tm)?;
                 if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
                     if let Some(Some(Some(name))) = yaml_name {
                         let api = dynamic_api(ar, caps, client.clone(), &namespace, false);
