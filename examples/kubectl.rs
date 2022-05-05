@@ -106,6 +106,8 @@ async fn main() -> Result<()> {
                         let data: serde_json::Value = serde_json::to_value(&doc)?;
                         let r = api.patch(name, &ssapply, &Patch::Apply(data)).await?;
                         info!("applied {:?}", r);
+                    } else {
+                        warn!("Cannot apply {} document without a name", gvk.kind);
                     }
                 } else {
                     warn!("Cannot apply document for unknown {:?}", gvk);
