@@ -1,6 +1,7 @@
 //! Type information structs for dynamic resources.
 use std::str::FromStr;
 
+use crate::TypeMeta;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -8,18 +9,6 @@ use thiserror::Error;
 #[error("failed to parse group version: {0}")]
 /// Failed to parse group version
 pub struct ParseGroupVersionError(pub String);
-
-/// Possible errors when inferring GVKs
-#[derive(Debug, Error)]
-pub enum GvkYamlError {
-    /// Failing to parse the apiVersion
-    #[error("ParseGroupVersionError: {0}")]
-    ParseGroupVersion(#[source] ParseGroupVersionError),
-
-    /// Failing to find or parse the expected apiVersion + kind
-    #[error("InvalidDocument: {0}")]
-    InvalidDocument(String),
-}
 
 /// Core information about an API Resource.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -41,38 +30,20 @@ impl GroupVersionKind {
 
         Self { group, version, kind }
     }
+}
 
-    /// Extract a GroupVersionKind from a yaml document
-    ///
-    /// ```rust
-    /// # use kube::core::GroupVersionKind;
-    /// # fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-    /// let doc = serde_yaml::from_str(r#"---
-    /// apiVersion: kube.rs/v1
-    /// kind: Example
-    /// metadata:
-    ///   name: doc1"#)?;
-    ///
-    /// let gvk = GroupVersionKind::from_yaml(&doc)?;
-    /// assert_eq!(gvk.group, "kube.rs");
-    /// assert_eq!(gvk.version, "v1");
-    /// assert_eq!(gvk.kind, "Example");
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn from_yaml(doc: &serde_yaml::Value) -> Result<Self, GvkYamlError> {
-        if let (Some(avv), Some(kv)) = (doc.get("apiVersion"), doc.get("kind")) {
-            return if let (Some(apiver), Some(kind)) = (avv.as_str(), kv.as_str()) {
-                let gvk = GroupVersion::from_str(apiver)
-                    .map_err(GvkYamlError::ParseGroupVersion)?
-                    .with_kind(kind);
-                Ok(gvk)
-            } else {
-                let err = format!("invalid apiVersion/kind: {:?}:{:?}", avv, kv);
-                Err(GvkYamlError::InvalidDocument(err))
-            };
-        }
-        Err(GvkYamlError::InvalidDocument("missing apiVersion or kind".into()))
+impl TryFrom<&TypeMeta> for GroupVersionKind {
+    type Error = ParseGroupVersionError;
+
+    fn try_from(tm: &TypeMeta) -> Result<Self, Self::Error> {
+        Ok(GroupVersion::from_str(&tm.api_version)?.with_kind(&tm.kind))
+    }
+}
+impl TryFrom<TypeMeta> for GroupVersionKind {
+    type Error = ParseGroupVersionError;
+
+    fn try_from(tm: TypeMeta) -> Result<Self, Self::Error> {
+        Ok(GroupVersion::from_str(&tm.api_version)?.with_kind(&tm.kind))
     }
 }
 
@@ -173,29 +144,23 @@ impl GroupVersionResource {
     }
 }
 
-mod test {
+#[cfg(test)]
+mod tests {
     #[test]
     fn gvk_yaml() {
-        use crate::GroupVersionKind;
-        use serde::Deserialize;
-        let input = r#"
----
+        use crate::{GroupVersionKind, TypeMeta};
+        let input = r#"---
 apiVersion: kube.rs/v1
 kind: Example
 metadata:
   name: doc1
----
-apiVersion: kube.rs/v1
-kind: Other
-metadata:
-  name: doc2"#;
-
-        let mut gvks = vec![];
-        for de in serde_yaml::Deserializer::from_str(input) {
-            let doc = serde_yaml::Value::deserialize(de).unwrap();
-            gvks.push(GroupVersionKind::from_yaml(&doc).unwrap());
-        }
-        assert_eq!(gvks[0].kind, "Example");
-        assert_eq!(gvks[1].group, "kube.rs");
+"#;
+        let tm: TypeMeta = serde_yaml::from_str(input).unwrap();
+        let gvk = GroupVersionKind::try_from(&tm).unwrap(); // takes ref
+        let gvk2: GroupVersionKind = tm.try_into().unwrap(); // takes value
+        assert_eq!(gvk.kind, "Example");
+        assert_eq!(gvk.group, "kube.rs");
+        assert_eq!(gvk.version, "v1");
+        assert_eq!(gvk.kind, gvk2.kind);
     }
 }
