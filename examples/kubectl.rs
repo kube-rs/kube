@@ -1,5 +1,5 @@
 //! This is a simple imitation of the basic functionality of kubectl
-//! Supports kubectl {get, delete, apply, watch} <resource> [name] (name optional) with labels and namespace selectors
+//! Supports kubectl {get, delete, apply, watch, edit} <resource> [name] (name optional) with labels and namespace selectors
 use anyhow::{Context, Result};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::{
@@ -129,7 +129,21 @@ async fn main() -> Result<()> {
         let api = dynamic_api(ar, caps, client.clone(), &namespace, all);
 
         tracing::info!(?verb, ?resource, name = ?name.clone().unwrap_or_default(), "requested objects");
-        if verb == "get" {
+        if verb == "edit" {
+            if let Some(n) = &name {
+                let orig = api.get(n).await?;
+                let input = serde_yaml::to_string(&orig)?;
+                info!("opening {} in {:?}", orig.name(), edit::get_editor());
+                let edited = edit::edit(&input)?;
+                if edited != input {
+                    info!("updating changed object {}", orig.name());
+                    let data: DynamicObject = serde_yaml::from_str(&edited)?;
+                    api.replace(&n, &Default::default(), &data).await?;
+                }
+            } else {
+                warn!("need a name to edit");
+            }
+        } else if verb == "get" {
             let mut result: Vec<_> = if let Some(n) = &name {
                 vec![api.get(n).await?]
             } else {
