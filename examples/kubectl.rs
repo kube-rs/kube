@@ -1,6 +1,6 @@
 //! This is a simple imitation of the basic functionality of kubectl
 //! Supports kubectl {get, delete, apply, watch, edit} <resource> [name] (name optional) with labels and namespace selectors
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::Time,
@@ -8,7 +8,7 @@ use k8s_openapi::{
 };
 use kube::{
     api::{Api, DynamicObject, ListParams, ObjectMeta, Patch, PatchParams, Resource, ResourceExt},
-    core::{GroupVersionKind, TypeMeta},
+    core::GroupVersionKind,
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
     runtime::{
         utils::try_flatten_applied,
@@ -96,19 +96,19 @@ async fn main() -> Result<()> {
             let yaml =
                 std::fs::read_to_string(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
             for doc in multidoc_deserialize(&yaml)? {
-                let yaml_name = doc.get("metadata").map(|m| m.get("name").map(|v| v.as_str()));
-                let tm: TypeMeta = serde_yaml::from_value(doc.clone())?;
-                let gvk = GroupVersionKind::try_from(&tm)?;
+                let obj: DynamicObject = serde_yaml::from_value(doc)?;
+                let gvk = if let Some(tm) = &obj.types {
+                    GroupVersionKind::try_from(tm)?
+                } else {
+                    bail!("cannot apply object without valid TypeMeta {:?}", obj);
+                };
+                let name = obj.name();
                 if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
-                    if let Some(Some(Some(name))) = yaml_name {
-                        let api = dynamic_api(ar, caps, client.clone(), &namespace, false);
-                        trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&doc)?);
-                        let data: serde_json::Value = serde_json::to_value(&doc)?;
-                        let r = api.patch(name, &ssapply, &Patch::Apply(data)).await?;
-                        info!("applied {:?}", r);
-                    } else {
-                        warn!("Cannot apply {} document without a name", gvk.kind);
-                    }
+                    let api = dynamic_api(ar, caps, client.clone(), &namespace, false);
+                    trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
+                    let data: serde_json::Value = serde_json::to_value(&obj)?;
+                    let r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
+                    info!("applied {:?}", r);
                 } else {
                     warn!("Cannot apply document for unknown {:?}", gvk);
                 }
