@@ -4,7 +4,10 @@ use anyhow::{bail, Context, Result};
 use clap::Parser;
 use either::Either;
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::chrono::{Duration, Utc};
+use k8s_openapi::{
+    apimachinery::pkg::apis::meta::v1::Time,
+    chrono::{Duration, Utc},
+};
 use kube::{
     api::{Api, DynamicObject, ListParams, ObjectMeta, Resource, ResourceExt},
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
@@ -134,7 +137,7 @@ async fn main() -> Result<()> {
                 let max_name = result.iter().map(|x| x.name().len() + 2).max().unwrap_or(63);
                 println!("{0:<width$} {1:<20}", "NAME", "AGE", width = max_name);
                 for inst in result {
-                    let age = format_creation_since(inst.meta());
+                    let age = format_creation_since(inst.creation_timestamp());
                     println!("{0:<width$} {1:<20}", inst.name(), age, width = max_name);
                 }
             }
@@ -160,7 +163,7 @@ async fn main() -> Result<()> {
         let mut stream = try_flatten_applied(w).boxed();
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
-            let age = format_creation_since(inst.meta());
+            let age = format_creation_since(inst.creation_timestamp());
             println!("{0:<width$} {1:<20}", inst.name(), age, width = 63);
         }
     }
@@ -168,8 +171,8 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn format_creation_since(meta: &ObjectMeta) -> String {
-    let ts = meta.creation_timestamp.clone().unwrap().0;
+fn format_creation_since(time: Option<Time>) -> String {
+    let ts = time.unwrap().0;
     let age = Utc::now().signed_duration_since(ts);
     format_duration(age)
 }
