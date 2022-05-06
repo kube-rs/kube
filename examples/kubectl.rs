@@ -131,9 +131,10 @@ async fn main() -> Result<()> {
         tracing::info!(?verb, ?resource, name = ?name.clone().unwrap_or_default(), "requested objects");
         if verb == "edit" {
             if let Some(n) = &name {
-                let orig = api.get(n).await?;
+                let mut orig = api.get(n).await?;
+                orig.meta_mut().managed_fields = None; // hide managed fields
                 let input = serde_yaml::to_string(&orig)?;
-                info!("opening {} in {:?}", orig.name(), edit::get_editor());
+                debug!("opening {} in {:?}", orig.name(), edit::get_editor());
                 let edited = edit::edit(&input)?;
                 if edited != input {
                     info!("updating changed object {}", orig.name());
