@@ -339,6 +339,7 @@ mod test {
                 .entry("kube.rs".to_string())
                 .or_insert_with(|| "hello".to_string());
             pod.finalizers_mut().push("kube-finalizer".to_string());
+            pod.managed_fields_mut().clear();
             // NB: we are **not** pushing these back upstream - (Api::apply or Api::replace needed for it)
         }
         // check we can iterate over ObjectList normally - and check the mutations worked
@@ -347,6 +348,7 @@ mod test {
             assert!(pod.labels().get("kube.rs").is_some());
             assert!(pod.finalizers().contains(&"kube-finalizer".to_string()));
             assert!(pod.spec().containers.is_empty());
+            assert!(pod.managed_fields().is_empty());
         }
         Ok(())
     }

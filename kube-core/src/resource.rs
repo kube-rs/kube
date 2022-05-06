@@ -1,5 +1,8 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
+use k8s_openapi::{
+    api::core::v1::ObjectReference,
+    apimachinery::pkg::apis::meta::v1::{ManagedFieldsEntry, OwnerReference},
+};
 use std::{borrow::Cow, collections::BTreeMap};
 
 /// An accessor trait for a kubernetes Resource.
@@ -170,6 +173,10 @@ pub trait ResourceExt: Resource {
     fn finalizers(&self) -> &[String];
     /// Provides mutable access to the finalizers
     fn finalizers_mut(&mut self) -> &mut Vec<String>;
+    /// Returns managed fields
+    fn managed_fields(&self) -> &[ManagedFieldsEntry];
+    /// Provides mutable access to managed fields
+    fn managed_fields_mut(&mut self) -> &mut Vec<ManagedFieldsEntry>;
 }
 
 // TODO: replace with ordinary static when BTreeMap::new() is no longer
@@ -224,5 +231,13 @@ impl<K: Resource> ResourceExt for K {
 
     fn finalizers_mut(&mut self) -> &mut Vec<String> {
         self.meta_mut().finalizers.get_or_insert_with(Vec::new)
+    }
+
+    fn managed_fields(&self) -> &[ManagedFieldsEntry] {
+        self.meta().managed_fields.as_deref().unwrap_or_default()
+    }
+
+    fn managed_fields_mut(&mut self) -> &mut Vec<ManagedFieldsEntry> {
+        self.meta_mut().managed_fields.get_or_insert_with(Vec::new)
     }
 }
