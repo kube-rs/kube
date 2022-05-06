@@ -166,7 +166,7 @@ pub trait ResourceExt: Resource {
     /// Returns the creation timestamp
     ///
     /// This is guaranteed to exist on resources received by the apiserver.
-    fn creation(&self) -> Option<Time>;
+    fn created_at(&self) -> Option<Time>;
     /// Returns resource labels
     fn labels(&self) -> &BTreeMap<String, String>;
     /// Provides mutable access to the labels
@@ -211,7 +211,7 @@ impl<K: Resource> ResourceExt for K {
         self.meta().uid.clone()
     }
 
-    fn creation(&self) -> Option<Time> {
+    fn created_at(&self) -> Option<Time> {
         self.meta().creation_timestamp.clone()
     }
 
