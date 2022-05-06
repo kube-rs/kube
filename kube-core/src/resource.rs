@@ -1,14 +1,9 @@
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::{
     api::core::v1::ObjectReference,
-<<<<<<< HEAD
-    apimachinery::pkg::apis::meta::v1::{ManagedFieldsEntry, OwnerReference},
-};
-=======
-    apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
+    apimachinery::pkg::apis::meta::v1::{ManagedFieldsEntry, OwnerReference, Time},
 };
 
->>>>>>> 40aa4c1d (Add ResourceExt::creation)
 use std::{borrow::Cow, collections::BTreeMap};
 
 /// An accessor trait for a kubernetes Resource.
