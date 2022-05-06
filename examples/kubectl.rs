@@ -7,7 +7,7 @@ use k8s_openapi::{
     chrono::{Duration, Utc},
 };
 use kube::{
-    api::{Api, DynamicObject, ListParams, ObjectMeta, Patch, PatchParams, Resource, ResourceExt},
+    api::{Api, DynamicObject, ListParams, Patch, PatchParams, Resource, ResourceExt},
     core::GroupVersionKind,
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
     runtime::{
