@@ -139,6 +139,7 @@ async fn main() -> Result<()> {
                 if edited != input {
                     info!("updating changed object {}", orig.name());
                     let data: DynamicObject = serde_yaml::from_str(&edited)?;
+                    // NB: simplified kubectl constructs a merge-patch of differences
                     api.replace(&n, &Default::default(), &data).await?;
                 }
             } else {
