@@ -58,10 +58,6 @@ name = "configmapgen_controller"
 path = "configmapgen_controller.rs"
 
 [[example]]
-name = "configmap_watcher"
-path = "configmap_watcher.rs"
-
-[[example]]
 name = "configmap_reflector"
 path = "configmap_reflector.rs"
 
