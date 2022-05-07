@@ -157,8 +157,8 @@ impl App {
                 let api = dynamic_api(ar, caps, client.clone(), &self.namespace, false);
                 trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
                 let data: serde_json::Value = serde_json::to_value(&obj)?;
-                let r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
-                info!("applied {}:\n {}", gvk.kind, serde_yaml::to_string(&r)?);
+                let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
+                info!("applied {} {}", gvk.kind, name);
             } else {
                 warn!("Cannot apply document for unknown {:?}", gvk);
             }

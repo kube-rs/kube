@@ -12,14 +12,12 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
-
     let store = reflector::store::Writer::<Deployment>::default();
     let reader = store.as_reader();
     let rf = reflector(
         store,
         watcher(
-            Api::<Deployment>::namespaced(client.clone(), &namespace),
+            Api::<Deployment>::default_namespaced(client),
             ListParams::default().timeout(10), // short watch timeout in this example
         ),
     );

@@ -11,8 +11,7 @@ use tracing::*;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
-    let api = Api::<Pod>::namespaced(client, &namespace);
+    let api = Api::<Pod>::default_namespaced(client);
 
     try_flatten_applied(watcher(api, ListParams::default()))
         .try_for_each(|p| async move {

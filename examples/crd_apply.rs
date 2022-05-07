@@ -35,7 +35,6 @@ pub struct FooStatus {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let ssapply = PatchParams::apply("crd_apply_example").force();
 
@@ -51,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
 
     // Start applying foos
-    let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
+    let foos: Api<Foo> = Api::default_namespaced(client.clone());
 
     // 1. Apply from a full struct (e.g. equivalent to replace w/o resource_version)
     let foo = Foo::new("baz", FooSpec {

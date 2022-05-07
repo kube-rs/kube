@@ -12,7 +12,6 @@ use kube::{
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // Create a Job
     let pod_name = "empty-pod";
@@ -31,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }))?;
 
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods: Api<Pod> = Api::default_namespaced(client);
     let pp = PostParams::default();
     pods.create(&pp, &empty_pod).await?;
 
