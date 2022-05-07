@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
     let mypod = env::args()
         .nth(1)
         .ok_or_else(|| anyhow!("Usage: log_follow <pod>"))?;
-    info!("Fetching logs for {:?} in {}", mypod, namespace);
+    info!("Fetching logs for {:?}", mypod);
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     let mut logs = pods
