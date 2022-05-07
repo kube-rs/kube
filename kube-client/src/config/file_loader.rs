@@ -111,7 +111,9 @@ impl ConfigLoader {
 
         if let Some(proxy) = nonempty(self.cluster.proxy_url.clone())
             .or_else(|| nonempty(std::env::var("HTTP_PROXY").ok()))
+            .or_else(|| nonempty(std::env::var("http_proxy").ok()))
             .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
+            .or_else(|| nonempty(std::env::var("https_proxy").ok()))
         {
             Ok(Some(
                 proxy
