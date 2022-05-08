@@ -1,6 +1,7 @@
 //! Helpers for manipulating built-in streams
 
 mod backoff_reset_timer;
+mod event_flatten;
 mod stream_backoff;
 mod watch_ext;
 
