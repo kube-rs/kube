@@ -1,4 +1,4 @@
-use futures::{Future, FutureExt, Stream};
+use futures_util::{Future, FutureExt, Stream};
 use std::{
     collections::HashMap,
     hash::Hash,
@@ -76,7 +76,8 @@ mod tests {
     use std::task::Poll;
 
     use super::FutureHashMap;
-    use futures::{channel::mpsc, future, poll, StreamExt};
+    use futures_channel::mpsc;
+    use futures_util::{future, poll, StreamExt};
 
     #[tokio::test]
     async fn fhm_should_forward_all_values_and_shut_down() {

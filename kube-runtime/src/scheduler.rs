@@ -1,6 +1,6 @@
 //! Delays and deduplicates [`Stream`] items
 
-use futures::{stream::Fuse, Stream, StreamExt};
+use futures_util::{stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -204,7 +204,8 @@ mod tests {
     use crate::utils::KubeRuntimeStreamExt;
 
     use super::{scheduler, ScheduleRequest};
-    use futures::{channel::mpsc, future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
+    use futures_channel::mpsc;
+    use futures_util::{future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
     use std::task::Poll;
     use tokio::time::{advance, pause, sleep, Duration, Instant};
 

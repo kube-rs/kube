@@ -5,7 +5,7 @@ pub mod store;
 
 pub use self::object_ref::{Extra as ObjectRefExtra, ObjectRef};
 use crate::watcher;
-use futures::{Stream, TryStreamExt};
+use futures_util::{Stream, TryStreamExt};
 use kube_client::Resource;
 use std::hash::Hash;
 pub use store::{store, Store};
@@ -29,7 +29,7 @@ where
 mod tests {
     use super::{reflector, store, ObjectRef};
     use crate::watcher;
-    use futures::{stream, StreamExt, TryStreamExt};
+    use futures_util::{stream, StreamExt, TryStreamExt};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use rand::{
         distributions::{Bernoulli, Uniform},

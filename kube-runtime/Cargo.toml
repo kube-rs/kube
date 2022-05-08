@@ -20,7 +20,8 @@ features = ["k8s-openapi/v1_23"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-futures = "0.3.17"
+futures-channel = { version = "0.3.17", features = ["sink"] }
+futures-util = { version = "0.3.17", features = ["sink"] }
 kube-client = { path = "../kube-client", version = "=0.71.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative = "2.1.1"
 serde = "1.0.130"
@@ -43,7 +44,7 @@ default-features = false
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "<1.0.0, >=0.60.0" }
 serde_json = "1.0.68"
-tokio = { version = "1.14.0", features = ["full", "test-util"] }
+tokio = { version = "1.14.0", features = ["macros", "rt-multi-thread", "test-util"] }
 rand = "0.8.0"
 schemars = "0.8.6"
 

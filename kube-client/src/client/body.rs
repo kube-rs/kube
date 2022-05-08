@@ -3,7 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::stream::Stream;
+use futures_util::Stream;
 use http_body::Body;
 use pin_project::pin_project;
 

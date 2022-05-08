@@ -13,8 +13,7 @@ use crate::{
 };
 use backoff::backoff::Backoff;
 use derivative::Derivative;
-use futures::{
-    channel,
+use futures_util::{
     future::{self, BoxFuture},
     stream, Future, FutureExt, SinkExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
@@ -237,7 +236,7 @@ impl Display for ReconcileReason {
 ///
 /// The `queue` indicates which objects should be reconciled. For the core objects this will usually be
 /// the [`reflector`] (piped through [`trigger_self`]). If your core objects own any subobjects then you
-/// can also make them trigger reconciliations by [merging](`futures::stream::select`) the [`reflector`]
+/// can also make them trigger reconciliations by [merging](`futures_util::stream::select`) the [`reflector`]
 /// with a [`watcher`](watcher()) or [`reflector`](reflector()) for the subobject.
 ///
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
@@ -258,9 +257,10 @@ where
     QueueStream::Ok: Into<ReconcileRequest<K>>,
     QueueStream::Error: std::error::Error + 'static,
 {
-    let (scheduler_shutdown_tx, scheduler_shutdown_rx) = channel::oneshot::channel();
+    let (scheduler_shutdown_tx, scheduler_shutdown_rx) = futures_channel::oneshot::channel();
     let err_context = context.clone();
-    let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(100);
+    let (scheduler_tx, scheduler_rx) =
+        futures_channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(100);
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
@@ -356,7 +356,7 @@ where
 /// };
 /// use serde::{Deserialize, Serialize};
 /// use tokio::time::Duration;
-/// use futures::StreamExt;
+/// use futures_util::StreamExt;
 /// use k8s_openapi::api::core::v1::ConfigMap;
 /// use schemars::JsonSchema;
 /// use std::sync::Arc;
@@ -606,7 +606,7 @@ where
     ///
     /// ```
     /// # async {
-    /// use futures::stream::StreamExt;
+    /// use futures_util::StreamExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{
     ///     Client,
@@ -614,7 +614,7 @@ where
     ///     runtime::{controller::{Context, Controller, Action}},
     /// };
     /// use std::{convert::Infallible, io::BufRead};
-    /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
+    /// let (mut reload_tx, reload_rx) = futures_channel::mpsc::channel(0);
     /// // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
     /// // and its worker prevents the Tokio runtime from shutting down.
     /// std::thread::spawn(move || {
@@ -672,7 +672,7 @@ where
     ///
     /// ```rust
     /// # async {
-    /// use futures::future::FutureExt;
+    /// use futures_util::future::FutureExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{api::ListParams, Api, Client, ResourceExt};
     /// use kube_runtime::controller::{Context, Controller, Action};
@@ -720,7 +720,7 @@ where
     #[must_use]
     pub fn shutdown_on_signal(mut self) -> Self {
         async fn shutdown_signal() {
-            futures::future::select(
+            futures_util::future::select(
                 tokio::signal::ctrl_c().map(|_| ()).boxed(),
                 #[cfg(unix)]
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
@@ -735,7 +735,7 @@ where
             .await;
         }
 
-        let (graceful_tx, graceful_rx) = channel::oneshot::channel();
+        let (graceful_tx, graceful_rx) = futures_channel::oneshot::channel();
         self.graceful_shutdown_selector
             .push(graceful_rx.map(|_| ()).boxed());
         self.forceful_shutdown_selector.push(
@@ -786,7 +786,7 @@ where
             StreamBackoff::new(self.trigger_selector, self.trigger_backoff)
                 .take_until(future::select_all(self.graceful_shutdown_selector)),
         )
-        .take_until(futures::future::select_all(self.forceful_shutdown_selector))
+        .take_until(futures_util::future::select_all(self.forceful_shutdown_selector))
     }
 }
 

@@ -11,7 +11,7 @@ pub use stream_backoff::StreamBackoff;
 pub use watch_ext::WatchStreamExt;
 
 use crate::watcher;
-use futures::{
+use futures_util::{
     pin_mut,
     stream::{self, Peekable},
     Future, FutureExt, Stream, StreamExt, TryStream, TryStreamExt,

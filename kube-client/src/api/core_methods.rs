@@ -1,5 +1,5 @@
 use either::Either;
-use futures::Stream;
+use futures_util::Stream;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
@@ -289,7 +289,7 @@ where
     /// ```no_run
     /// use kube::{api::{Api, ListParams, ResourceExt, WatchEvent}, Client};
     /// use k8s_openapi::api::batch::v1::Job;
-    /// use futures::{StreamExt, TryStreamExt};
+    /// use futures_util::{StreamExt, TryStreamExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;

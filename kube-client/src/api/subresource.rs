@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use futures::Stream;
+use futures_util::Stream;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 

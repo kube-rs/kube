@@ -1,7 +1,7 @@
 use std::{pin::Pin, task::Poll};
 
 use backoff::backoff::Backoff;
-use futures::{Future, Stream, TryStream};
+use futures_util::{Future, Stream, TryStream};
 use pin_project::pin_project;
 use tokio::time::{sleep, Instant, Sleep};
 
@@ -100,7 +100,8 @@ pub(crate) mod tests {
 
     use super::StreamBackoff;
     use backoff::backoff::Backoff;
-    use futures::{channel::mpsc, pin_mut, poll, stream, StreamExt};
+    use futures_channel::mpsc;
+    use futures_util::{pin_mut, poll, stream, StreamExt};
 
     #[tokio::test]
     async fn stream_should_back_off() {

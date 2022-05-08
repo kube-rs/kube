@@ -1,10 +1,8 @@
 use std::{collections::HashMap, future::Future};
 
 use bytes::{Buf, Bytes};
-use futures::{
-    channel::{mpsc, oneshot},
-    future, FutureExt, SinkExt, StreamExt,
-};
+use futures_channel::{mpsc, oneshot};
+use futures_util::{future, FutureExt, SinkExt, StreamExt};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
 use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
@@ -28,11 +26,11 @@ pub enum Error {
 
     /// Failed to forward bytes from Pod.
     #[error("failed to forward bytes from Pod: {0}")]
-    ForwardFromPod(#[source] futures::channel::mpsc::SendError),
+    ForwardFromPod(#[source] mpsc::SendError),
 
     /// Failed to forward bytes to Pod.
     #[error("failed to forward bytes to Pod: {0}")]
-    ForwardToPod(#[source] futures::channel::mpsc::SendError),
+    ForwardToPod(#[source] mpsc::SendError),
 
     /// Failed to write bytes from Pod.
     #[error("failed to write bytes from Pod: {0}")]
@@ -196,7 +194,7 @@ async fn to_pod_loop(
 }
 
 async fn from_pod_loop<S>(
-    mut ws_stream: futures::stream::SplitStream<WebSocketStream<S>>,
+    mut ws_stream: futures_util::stream::SplitStream<WebSocketStream<S>>,
     mut sender: mpsc::Sender<Message>,
 ) -> Result<(), Error>
 where
@@ -231,7 +229,7 @@ where
 async fn forwarder_loop<S>(
     ports: &[u16],
     mut receiver: mpsc::Receiver<Message>,
-    mut ws_sink: futures::stream::SplitSink<WebSocketStream<S>, ws::Message>,
+    mut ws_sink: futures_util::stream::SplitSink<WebSocketStream<S>, ws::Message>,
     mut writers: Vec<tokio::io::WriteHalf<DuplexStream>>,
     mut error_senders: Vec<Option<ErrorSender>>,
 ) -> Result<(), Error>

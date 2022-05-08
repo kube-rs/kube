@@ -23,7 +23,7 @@ openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
 oauth = ["client", "tame-oauth"]
 gzip = ["client", "tower-http/decompression-gzip"]
-client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
+client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures-channel", "futures-util", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "dirs"]
@@ -47,7 +47,8 @@ http = "0.2.5"
 http-body = { version = "0.4.2", optional = true }
 either = { version = "1.6.1", optional = true }
 thiserror = "1.0.29"
-futures = { version = "0.3.17", optional = true }
+futures-channel = { version = "0.3.17", features = ["sink"], optional = true }
+futures-util = { version = "0.3.17", features = ["sink"], optional = true }
 pem = { version = "1.0.1", optional = true }
 openssl = { version = "0.10.36", optional = true }
 tokio-native-tls = { version = "0.3.0", optional = true }

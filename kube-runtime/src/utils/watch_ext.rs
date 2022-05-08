@@ -4,7 +4,7 @@ use crate::{
 };
 use backoff::backoff::Backoff;
 
-use futures::{Stream, TryStream};
+use futures_util::{Stream, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {

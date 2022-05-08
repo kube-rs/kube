@@ -18,7 +18,7 @@
 //!
 //! # Using the Client
 //! ```no_run
-//! use futures::{StreamExt, TryStreamExt};
+//! use futures_util::{StreamExt, TryStreamExt};
 //! use kube::{Client, api::{Api, ResourceExt, ListParams, PostParams}};
 //! use k8s_openapi::api::core::v1::Pod;
 //!
@@ -49,7 +49,7 @@
 //! use serde::{Deserialize, Serialize};
 //! use serde_json::json;
 //! use validator::Validate;
-//! use futures::{StreamExt, TryStreamExt};
+//! use futures_util::{StreamExt, TryStreamExt};
 //! use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 //! use kube::{
 //!     api::{Api, DeleteParams, ListParams, PatchParams, Patch, ResourceExt},

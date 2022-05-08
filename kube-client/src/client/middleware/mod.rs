@@ -31,7 +31,7 @@ mod tests {
     use std::{matches, sync::Arc};
 
     use chrono::{Duration, Utc};
-    use futures::pin_mut;
+    use futures_util::pin_mut;
     use http::{header::AUTHORIZATION, HeaderValue, Request, Response};
     use hyper::Body;
     use secrecy::SecretString;

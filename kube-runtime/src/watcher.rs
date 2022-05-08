@@ -5,7 +5,7 @@
 use crate::utils::ResetTimerBackoff;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
-use futures::{stream::BoxStream, Stream, StreamExt};
+use futures_util::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
@@ -217,8 +217,8 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// Errors from the underlying watch are propagated, after which the stream will go into recovery mode on the next poll.
 /// You can apply your own backoff by not polling the stream for a duration after errors.
-/// Keep in mind that some [`TryStream`](futures::TryStream) combinators (such as
-/// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
+/// Keep in mind that some [`TryStream`](futures_util::TryStream) combinators (such as
+/// [`try_for_each`](futures_util::TryStreamExt::try_for_each) and [`try_concat`](futures_util::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
 /// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
@@ -230,7 +230,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
-/// use futures::{StreamExt, TryStreamExt};
+/// use futures_util::{StreamExt, TryStreamExt};
 /// #[tokio::main]
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
@@ -264,7 +264,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
-    futures::stream::unfold(
+    futures_util::stream::unfold(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {
             let (event, state) = step(&api, &list_params, state).await;

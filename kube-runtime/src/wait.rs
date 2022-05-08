@@ -1,5 +1,5 @@
 //! Waits for objects to reach desired states
-use futures::TryStreamExt;
+use futures_util::TryStreamExt;
 use kube_client::{Api, Resource};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;

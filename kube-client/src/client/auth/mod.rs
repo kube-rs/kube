@@ -5,7 +5,7 @@ use std::{
 };
 
 use chrono::{DateTime, Duration, Utc};
-use futures::future::BoxFuture;
+use futures_util::future::BoxFuture;
 use http::{
     header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,

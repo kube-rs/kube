@@ -9,7 +9,7 @@
 //! retrieve the resources served by the kubernetes API.
 use bytes::Bytes;
 use either::{Either, Left, Right};
-use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
+use futures_util::{Stream, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
 use hyper::Body;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
@@ -461,7 +461,7 @@ impl TryFrom<Config> for Client {
 mod tests {
     use crate::{Api, Client};
 
-    use futures::pin_mut;
+    use futures_util::pin_mut;
     use http::{Request, Response};
     use hyper::Body;
     use k8s_openapi::api::core::v1::Pod;

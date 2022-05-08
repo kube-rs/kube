@@ -2,8 +2,8 @@ use std::future::Future;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
-use futures::{
-    channel::oneshot,
+use futures_channel::oneshot;
+use futures_util::{
     future::{
         select,
         Either::{Left, Right},
