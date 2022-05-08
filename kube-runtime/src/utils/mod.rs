@@ -2,9 +2,11 @@
 
 mod backoff_reset_timer;
 mod stream_backoff;
+mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use stream_backoff::StreamBackoff;
+pub use watch_ext::WatchStreamExt;
 
 use crate::watcher;
 use futures::{
