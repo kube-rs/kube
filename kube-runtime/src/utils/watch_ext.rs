@@ -28,7 +28,10 @@ pub trait WatchStreamExt: Stream {
         StreamBackoff::new(self, b)
     }
 
-    // This works with bottom setup - but is extremely specific with input/output types
+    /// Flatten a [`watcher`] stream into a stream of applied objects
+    ///
+    /// All Added/Modified events are passed through, and critical errors bubble up.
+    /// This is functionally equivalent to calling [`try_flatten_applied`] on a [`watcher`].
     fn watch_applies<K>(self) -> EventFlatten<Self, K>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
@@ -36,7 +39,10 @@ pub trait WatchStreamExt: Stream {
         EventFlatten::new(self, false)
     }
 
-    // This works with bottom setup - but is extremely specific with input/output types
+    /// Flatten a [`watcher`] stream into a stream of touched objects
+    ///
+    /// All Added/Modified/Deleted events are passed through, and critical errors bubble up.
+    /// This is functionally equivalent to calling [`try_flatten_touched`] on a [`watcher`].
     fn watch_touches<K>(self) -> EventFlatten<Self, K>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
@@ -109,5 +115,43 @@ where
                 None => return Poll::Pending,
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use std::task::Poll;
+
+    use crate::utils::watch_ext::EventFlatten;
+    use crate::watcher::{Event, Error};
+    use futures::{pin_mut, poll, stream, StreamExt};
+
+    #[tokio::test]
+    async fn watches_applies_uses_correct_eventflattened_stream() {
+        let data = stream::iter([
+            Ok(Event::Applied(0)),
+            Ok(Event::Applied(1)),
+            Ok(Event::Deleted(0)),
+            Ok(Event::Applied(2)),
+            Ok(Event::Restarted(vec![1,2])),
+            Err(Error::TooManyObjects),
+            Ok(Event::Applied(2)),
+        ]);
+        let rx = EventFlatten::new(data, false);
+        pin_mut!(rx);
+        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(0)))));
+        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(1)))));
+        // NB: no Deleted events here
+        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(2)))));
+        // Restart comes through, currently in reverse order
+        // (normally on restart they just come in alphabetical order by name)
+        // this is fine though, alphabetical event order has no functional meaning in watchers
+        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(2)))));
+        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(1)))));
+        // Error passed through
+        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Err(Error::TooManyObjects)))));
+        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(2)))));
+        assert!(matches!(poll!(rx.next()), Poll::Pending));
     }
 }
