@@ -79,4 +79,6 @@ bump-k8s:
   fastmod -m -d . --extensions toml "$current" "$next"
   fastmod -m README.md "$current" "$next"
 
-# vim: set ft=make
+# mode: makefile
+# End:
+# vim: set ft=make :
