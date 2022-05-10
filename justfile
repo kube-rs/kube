@@ -10,7 +10,7 @@ clippy:
 
 fmt:
   #rustup component add rustfmt --toolchain nightly
-  rustfmt +nightly --edition 2021 $$(find . -type f -iname *.rs)
+  rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
 
 doc:
   RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_23 --open
