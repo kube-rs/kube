@@ -20,6 +20,7 @@ features = ["k8s-openapi/v1_23"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
+futures = { version = "0.3.17", optional = true }
 futures-channel = { version = "0.3.17", features = ["sink"] }
 futures-util = { version = "0.3.17", features = ["sink"] }
 kube-client = { path = "../kube-client", version = "=0.71.0", default-features = false, features = ["jsonpatch", "client"] }
@@ -53,3 +54,7 @@ schemars = "0.8.6"
 version = "0.14.0"
 default-features = false
 features = ["v1_23"]
+
+[features]
+# Switch to "dep:futures" if/when rust-version >= 1.60
+__for_docs_only_do_not_use = ["futures"]
