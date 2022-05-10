@@ -25,9 +25,9 @@ Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 ## Rust Guidelines
 
 - **Channel**: Code is built and tested using the **stable** channel of Rust, but documented and formatted with **nightly** <sup>[*](https://github.com/kube-rs/kube-rs/issues/707)</sup>
-- **Formatting**: To format the codebase, run `make fmt`
-- **Documentation** To check documentation, run `make doc`
-- **Testing**: To run tests, run `make test` and see below.
+- **Formatting**: To format the codebase, run `just fmt`
+- **Documentation** To check documentation, run `just doc`
+- **Testing**: To run tests, run `just test` and see below.
 
 For a list of tooling that we glue together everything see [TOOLS.md](https://kube.rs/tools/).
 
@@ -41,13 +41,13 @@ We have 3 classes of tests.
 
 The last two will try to access the Kubernetes cluster that is your `current-context`; i.e. via your local `KUBECONFIG` evar or `~/.kube/config` file.
 
-The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](https://k3d.io/) (`make k3d`).
+The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](https://k3d.io/) (`just k3d`).
 
 ### Unit Tests & Documentation Tests
 
 **Most** unit/doc tests are run from `cargo test --lib --doc --all`, but because of feature-sets, and examples, you will need a couple of extra invocations to replicate our CI.
 
-For the complete variations, run the `make test` target in the `Makefile`.
+For the complete variations, run the `just test` target in the `justfile`.
 
 All public interfaces must be documented, and most should have minor documentation examples to show usage.
 
@@ -57,7 +57,7 @@ Slower set of tests within the crates marked with an **`#[ignore]`** attribute.
 
 :warning: These  **WILL** try to modify resources in your current cluster :warning:
 
-Most integration tests are run with `cargo test --all --lib -- --ignored`, but because of feature-sets, you will need a few invocations of these to replicate our CI. See `make test-integration`
+Most integration tests are run with `cargo test --all --lib -- --ignored`, but because of feature-sets, you will need a few invocations of these to replicate our CI. See `just test-integration`
 
 ### End to End Tests
 
@@ -65,7 +65,7 @@ We have a small set of [e2e tests](https://github.com/kube-rs/kube-rs/tree/maste
 
 These tests are the heaviest tests we have because they require a full `docker build`, image import (or push/pull flow), yaml construction, and `kubectl` usage to verify that the outcome was sufficient.
 
-To run E2E tests, use (or follow) `make e2e` as appropriate.
+To run E2E tests, use (or follow) `just e2e` as appropriate.
 
 ### Test Guidelines
 
