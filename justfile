@@ -71,3 +71,10 @@ k3d:
     --k3s-arg "--no-deploy=traefik@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
+
+bump-k8s:
+  #!/usr/bin/env bash
+  current=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1)
+  next=${current::-2}$((${current:3} + 1))
+  fastmod -m -d . --extensions toml "$current" "$next"
+  fastmod -m README.md "$current" "$next"
