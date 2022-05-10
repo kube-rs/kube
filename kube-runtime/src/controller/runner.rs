@@ -90,8 +90,10 @@ where
 mod tests {
     use super::Runner;
     use crate::scheduler::{scheduler, ScheduleRequest};
-    use futures_channel::{mpsc, oneshot};
-    use futures_util::{future, poll, SinkExt, StreamExt};
+    use futures::{
+        channel::{mpsc, oneshot},
+        future, poll, SinkExt, StreamExt,
+    };
     use std::{cell::RefCell, time::Duration};
     use tokio::{
         runtime::Handle,
@@ -151,7 +153,7 @@ mod tests {
         // pause();
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
         let (result_tx, result_rx) = oneshot::channel();
-        let mut runner = Runner::new(scheduler(sched_rx), |msg: &u8| futures_util::future::ready(*msg));
+        let mut runner = Runner::new(scheduler(sched_rx), |msg: &u8| futures::future::ready(*msg));
         // Start a background task that starts listening /before/ we enqueue the message
         // We can't just use Stream::poll_next(), since that bypasses the waker system
         Handle::current().spawn(async move { result_tx.send(runner.next().await).unwrap() });

@@ -100,8 +100,7 @@ pub(crate) mod tests {
 
     use super::StreamBackoff;
     use backoff::backoff::Backoff;
-    use futures_channel::mpsc;
-    use futures_util::{pin_mut, poll, stream, StreamExt};
+    use futures::{channel::mpsc, pin_mut, poll, stream, StreamExt};
 
     #[tokio::test]
     async fn stream_should_back_off() {

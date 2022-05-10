@@ -204,8 +204,7 @@ mod tests {
     use crate::utils::KubeRuntimeStreamExt;
 
     use super::{scheduler, ScheduleRequest};
-    use futures_channel::mpsc;
-    use futures_util::{future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
+    use futures::{channel::mpsc, future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
     use std::task::Poll;
     use tokio::time::{advance, pause, sleep, Duration, Instant};
 

@@ -217,8 +217,8 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// Errors from the underlying watch are propagated, after which the stream will go into recovery mode on the next poll.
 /// You can apply your own backoff by not polling the stream for a duration after errors.
-/// Keep in mind that some [`TryStream`](futures_util::TryStream) combinators (such as
-/// [`try_for_each`](futures_util::TryStreamExt::try_for_each) and [`try_concat`](futures_util::TryStreamExt::try_concat))
+/// Keep in mind that some [`TryStream`](futures::TryStream) combinators (such as
+/// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
 /// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].

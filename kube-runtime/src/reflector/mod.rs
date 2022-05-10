@@ -29,7 +29,7 @@ where
 mod tests {
     use super::{reflector, store, ObjectRef};
     use crate::watcher;
-    use futures_util::{stream, StreamExt, TryStreamExt};
+    use futures::{stream, StreamExt, TryStreamExt};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use rand::{
         distributions::{Bernoulli, Uniform},

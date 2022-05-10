@@ -236,7 +236,7 @@ impl Display for ReconcileReason {
 ///
 /// The `queue` indicates which objects should be reconciled. For the core objects this will usually be
 /// the [`reflector`] (piped through [`trigger_self`]). If your core objects own any subobjects then you
-/// can also make them trigger reconciliations by [merging](`futures_util::stream::select`) the [`reflector`]
+/// can also make them trigger reconciliations by [merging](`futures::stream::select`) the [`reflector`]
 /// with a [`watcher`](watcher()) or [`reflector`](reflector()) for the subobject.
 ///
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
@@ -356,7 +356,7 @@ where
 /// };
 /// use serde::{Deserialize, Serialize};
 /// use tokio::time::Duration;
-/// use futures_util::StreamExt;
+/// use futures::StreamExt;
 /// use k8s_openapi::api::core::v1::ConfigMap;
 /// use schemars::JsonSchema;
 /// use std::sync::Arc;
@@ -606,7 +606,7 @@ where
     ///
     /// ```
     /// # async {
-    /// use futures_util::StreamExt;
+    /// use futures::StreamExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{
     ///     Client,
@@ -614,7 +614,7 @@ where
     ///     runtime::{controller::{Context, Controller, Action}},
     /// };
     /// use std::{convert::Infallible, io::BufRead};
-    /// let (mut reload_tx, reload_rx) = futures_channel::mpsc::channel(0);
+    /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
     /// // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
     /// // and its worker prevents the Tokio runtime from shutting down.
     /// std::thread::spawn(move || {
@@ -672,7 +672,7 @@ where
     ///
     /// ```rust
     /// # async {
-    /// use futures_util::future::FutureExt;
+    /// use futures::future::FutureExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{api::ListParams, Api, Client, ResourceExt};
     /// use kube_runtime::controller::{Context, Controller, Action};

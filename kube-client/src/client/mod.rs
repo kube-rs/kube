@@ -461,7 +461,7 @@ impl TryFrom<Config> for Client {
 mod tests {
     use crate::{Api, Client};
 
-    use futures_util::pin_mut;
+    use futures::pin_mut;
     use http::{Request, Response};
     use hyper::Body;
     use k8s_openapi::api::core::v1::Pod;

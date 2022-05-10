@@ -9,7 +9,7 @@
 //! and then watch for it to become available using a manual [`Api::watch`] call.
 //!
 //! ```rust,no_run
-//! use futures_util::{StreamExt, TryStreamExt};
+//! use futures::{StreamExt, TryStreamExt};
 //! use kube_client::api::{Api, ResourceExt, ListParams, PatchParams, Patch};
 //! use kube_client::Client;
 //! use k8s_openapi::api::core::v1::Pod;
@@ -135,7 +135,7 @@ mod test {
         client::ConfigExt,
         Api, Client, Config, ResourceExt,
     };
-    use futures_util::{StreamExt, TryStreamExt};
+    use futures::{StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::Pod;
     use kube_core::params::{DeleteParams, Patch};
     use serde_json::json;
