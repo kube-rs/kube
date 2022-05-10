@@ -54,7 +54,7 @@ RUN scurl "https://github.com/xd009642/tarpaulin/releases/download/${CARGO_TARPA
     | tar xzvf - -C $HOME/bin
 
 ARG JUST_VERSION=1.1.3
-run scurl https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+RUN scurl https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz \
     | tar xzvf - -C $HOME/bin
 
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
