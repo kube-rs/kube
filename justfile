@@ -78,3 +78,5 @@ bump-k8s:
   next=${current::-2}$((${current:3} + 1))
   fastmod -m -d . --extensions toml "$current" "$next"
   fastmod -m README.md "$current" "$next"
+
+# vim: set ft=make
