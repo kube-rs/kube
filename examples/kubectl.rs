@@ -32,7 +32,8 @@ struct App {
     namespace: Option<String>,
     #[clap(long, short = 'A')]
     all: bool,
-    verb: String,
+    #[clap(arg_enum)]
+    verb: Verb,
     resource: Option<String>,
     name: Option<String>,
 }
@@ -46,6 +47,14 @@ impl Default for OutputMode {
     fn default() -> Self {
         Self::Pretty
     }
+}
+#[derive(clap::ArgEnum, Clone, PartialEq, Eq, Debug)]
+enum Verb {
+    Get,
+    Delete,
+    Edit,
+    Watch,
+    Apply,
 }
 
 fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResource, ApiCapabilities)> {
@@ -188,14 +197,14 @@ async fn main() -> Result<()> {
         let api = dynamic_api(ar, caps, client.clone(), &app.namespace, app.all);
 
         tracing::info!(?app.verb, ?resource, name = ?app.name.clone().unwrap_or_default(), "requested objects");
-        match app.verb.as_ref() {
-            "edit" => app.edit(api).await?,
-            "get" => app.get(api, lp).await?,
-            "delete" => app.delete(api, lp).await?,
-            "watch" => app.watch(api, lp).await?,
-            x => bail!("unsupported verb {}", x),
+        match app.verb {
+            Verb::Edit => app.edit(api).await?,
+            Verb::Get => app.get(api, lp).await?,
+            Verb::Delete => app.delete(api, lp).await?,
+            Verb::Watch => app.watch(api, lp).await?,
+            Verb::Apply => bail!("verb {:?} cannot act on explicit resource", app.verb),
         }
-    } else if app.verb == "apply" {
+    } else if app.verb == Verb::Apply {
         app.apply(client, &discovery).await? // multi-resource special behaviour
     }
     Ok(())
