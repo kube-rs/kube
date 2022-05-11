@@ -3,18 +3,8 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use futures::{Stream, TryStream};
+use futures::{Stream, TryStream, ready};
 use pin_project::pin_project;
-
-// grab from private part of tokio
-macro_rules! ready {
-    ($e:expr $(,)?) => {
-        match $e {
-            std::task::Poll::Ready(t) => t,
-            std::task::Poll::Pending => return std::task::Poll::Pending,
-        }
-    };
-}
 
 #[pin_project]
 /// Stream returned by the [`watch_applies`](super::WatchStreamExt::watch_applies) and [`watch_touches`](super::WatchStreamExt::watch_touches) method.
