@@ -14,11 +14,10 @@ use tracing::*;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
-    let deploys: Api<Deployment> = Api::namespaced(client.clone(), &namespace);
-    let cms: Api<ConfigMap> = Api::namespaced(client.clone(), &namespace);
-    let secret: Api<Secret> = Api::namespaced(client.clone(), &namespace);
+    let deploys: Api<Deployment> = Api::default_namespaced(client.clone());
+    let cms: Api<ConfigMap> = Api::default_namespaced(client.clone());
+    let secret: Api<Secret> = Api::default_namespaced(client.clone());
     let dep_watcher = watcher(deploys, ListParams::default());
     let cm_watcher = watcher(cms, ListParams::default());
     let sec_watcher = watcher(secret, ListParams::default());

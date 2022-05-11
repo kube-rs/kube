@@ -22,7 +22,6 @@ pub struct FooSpec {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // 0. Ensure the CRD is installed (you probably just want to do this on CI)
     // (crd file can be created by piping `Foo::crd`'s yaml ser to kubectl apply)
@@ -36,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
     // 1. Run a reflector against the installed CRD
     let store = reflector::store::Writer::<Foo>::default();
     let reader = store.as_reader();
-    let foos: Api<Foo> = Api::namespaced(client, &namespace);
+    let foos: Api<Foo> = Api::default_namespaced(client);
     let lp = ListParams::default().timeout(20); // low timeout in this example
     let rf = reflector(store, watcher(foos, lp));
 
