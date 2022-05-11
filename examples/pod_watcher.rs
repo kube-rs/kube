@@ -2,7 +2,7 @@ use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{utils::try_flatten_applied, watcher},
+    runtime::{watcher, WatchStreamExt},
     Client,
 };
 use tracing::*;
@@ -13,9 +13,10 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let api = Api::<Pod>::default_namespaced(client);
 
-    try_flatten_applied(watcher(api, ListParams::default()))
+    watcher(api, ListParams::default())
+        .watch_applies()
         .try_for_each(|p| async move {
-            debug!("Applied: {}", p.name());
+            info!("saw {}", p.name());
             if let Some(unready_reason) = pod_unready(&p) {
                 warn!("{}", unready_reason);
             }

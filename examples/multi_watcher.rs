@@ -5,7 +5,7 @@ use k8s_openapi::api::{
 };
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{utils::try_flatten_applied, watcher},
+    runtime::{watcher, WatchStreamExt},
     Client,
 };
 use tracing::*;
@@ -24,9 +24,9 @@ async fn main() -> anyhow::Result<()> {
 
     // select on applied events from all watchers
     let mut combo_stream = stream::select_all(vec![
-        try_flatten_applied(dep_watcher).map_ok(Watched::Deploy).boxed(),
-        try_flatten_applied(cm_watcher).map_ok(Watched::Config).boxed(),
-        try_flatten_applied(sec_watcher).map_ok(Watched::Secret).boxed(),
+        dep_watcher.watch_applies().map_ok(Watched::Deploy).boxed(),
+        cm_watcher.watch_applies().map_ok(Watched::Config).boxed(),
+        sec_watcher.watch_applies().map_ok(Watched::Secret).boxed(),
     ]);
     // SelectAll Stream elements must have the same Item, so all packed in this:
     #[allow(clippy::large_enum_variant)]
