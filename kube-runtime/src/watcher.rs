@@ -230,7 +230,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
-/// use futures_util::{StreamExt, TryStreamExt};
+/// use futures::{StreamExt, TryStreamExt};
 /// #[tokio::main]
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
