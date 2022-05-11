@@ -102,28 +102,26 @@ A low level streaming interface (similar to informers) that presents `Applied`, 
 
 ```rust
 let api = Api::<Pod>::namespaced(client, "default");
-let watcher = watcher(api, ListParams::default());
+let mut stream = watcher(api, ListParams::default()).applied_objects();
 ```
 
 This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
 
 ```rust
-let mut apply_events = try_flatten_applied(watcher).boxed_local();
-while let Some(event) = apply_events.try_next().await? {
+while let Some(event) = stream.try_next().await? {
     println!("Applied: {}", event.name());
 }
 ```
 
-NB: the plain stream items a `watcher` returns are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities like `try_flatten_applied` or `try_flatten_touched`.
+NB: the plain items in a `watcher` stream are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities from `WatchStreamExt`, such as `applied_objects`.
 
 ## Reflectors
 
 A `reflector` is a `watcher` with `Store` on `K`. It acts on all the `Event<K>` exposed by `watcher` to ensure that the state in the `Store` is as accurate as possible.
 
 ```rust
-let nodes: Api<Node> = Api::namespaced(client, &namespace);
-let lp = ListParams::default()
-    .labels("beta.kubernetes.io/instance-type=m4.2xlarge");
+let nodes: Api<Node> = Api::default_namespaced(client);
+let lp = ListParams::default().labels("kubernetes.io/arch=amd64");
 let store = reflector::store::Writer::<Node>::default();
 let reader = store.as_reader();
 let rf = reflector(store, watcher(nodes, lp));
