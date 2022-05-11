@@ -194,7 +194,7 @@ async fn main() -> Result<()> {
         if let Some(label) = &app.selector {
             lp = lp.labels(label);
         }
-        let api = dynamic_api(ar, caps, client.clone(), &app.namespace, app.all);
+        let api = dynamic_api(ar, caps, client, &app.namespace, app.all);
 
         tracing::info!(?app.verb, ?resource, name = ?app.name.clone().unwrap_or_default(), "requested objects");
         match app.verb {
@@ -202,7 +202,7 @@ async fn main() -> Result<()> {
             Verb::Get => app.get(api, lp).await?,
             Verb::Delete => app.delete(api, lp).await?,
             Verb::Watch => app.watch(api, lp).await?,
-            Verb::Apply => bail!("verb {:?} cannot act on explicit resource", app.verb),
+            Verb::Apply => bail!("verb {:?} cannot act on an explicit resource", app.verb),
         }
     } else if app.verb == Verb::Apply {
         app.apply(client, &discovery).await? // multi-resource special behaviour
