@@ -8,6 +8,7 @@ mod watch_ext;
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use stream_backoff::StreamBackoff;
 pub use watch_ext::WatchStreamExt;
+pub use event_flatten::EventFlatten;
 
 use crate::watcher;
 use futures::{
