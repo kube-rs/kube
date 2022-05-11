@@ -8,10 +8,7 @@ use crate::{
         ObjectRef,
     },
     scheduler::{scheduler, ScheduleRequest},
-    utils::{
-        try_flatten_applied, try_flatten_touched, trystream_try_via, CancelableJoinHandle,
-        KubeRuntimeStreamExt, StreamBackoff,
-    },
+    utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
     watcher::{self, watcher},
 };
 use backoff::backoff::Backoff;
@@ -465,7 +462,7 @@ where
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
-            try_flatten_applied(reflector(writer, watcher(owned_api, lp))),
+            reflector(writer, watcher(owned_api, lp)).watch_applies(),
             dyntype.clone(),
         )
         .boxed();
@@ -535,11 +532,7 @@ where
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners(
-            try_flatten_touched(watcher(api, lp)),
-            self.dyntype.clone(),
-            dyntype,
-        );
+        let child_watcher = trigger_owners(watcher(api, lp).watch_touches(), self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -590,7 +583,7 @@ where
         I::IntoIter: Send,
         Other::DynamicType: Clone,
     {
-        let other_watcher = trigger_with(try_flatten_touched(watcher(api, lp)), move |obj| {
+        let other_watcher = trigger_with(watcher(api, lp).watch_touches(), move |obj| {
             let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
             mapper(obj)
                 .into_iter()

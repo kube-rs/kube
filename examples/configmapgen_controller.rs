@@ -30,10 +30,6 @@ struct ConfigMapGeneratorSpec {
 
 /// Controller triggers this whenever our main object or our children changed
 async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Context<Data>) -> Result<Action, Error> {
-    info!("working hard");
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    info!("hard work is done!");
-
     let client = ctx.get_ref().client.clone();
 
     let mut contents = BTreeMap::new();

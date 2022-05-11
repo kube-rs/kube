@@ -99,7 +99,7 @@ kubectl apply -f configmapgen_controller_object.yaml
 and the finalizer example (reconciles a labelled subset of configmaps):
 
 ```sh
-cargo run --example configmapgen_controller
+cargo run --example secret_syncer
 kubectl apply -f secret_syncer_configmap.yaml
 kubectl delete -f secret_syncer_configmap.yaml
 ```
@@ -114,8 +114,6 @@ These examples watch resources as well as ive a store access point:
 cargo run --example pod_reflector
 # Watch nodes for applied events and current active nodes
 cargo run --example node_reflector
-# Watch namespace deployments for applied events and current deployments
-cargo run --example deployment_reflector
 # Watch namespaced secrets for applied events and print secret keys in a task
 cargo run --example secret_reflector
 # Watch namespaced configmaps for applied events and print store info in task

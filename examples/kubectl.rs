@@ -12,9 +12,8 @@ use kube::{
     core::GroupVersionKind,
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
     runtime::{
-        utils::try_flatten_applied,
         wait::{await_condition, conditions::is_deleted},
-        watcher,
+        watcher, WatchStreamExt,
     },
     Client,
 };
@@ -118,10 +117,8 @@ impl App {
         if let Some(n) = &self.name {
             lp = lp.fields(&format!("metadata.name={}", n));
         }
-        let w = watcher(api, lp);
-
-        // present a dumb table for it for now. maybe drop the whole watch. kubectl does not do it anymore.
-        let mut stream = try_flatten_applied(w).boxed();
+        // present a dumb table for it for now. kubectl does not do this anymore.
+        let mut stream = watcher(api, lp).watch_applies().boxed();
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
             let age = format_creation_since(inst.creation_timestamp());
