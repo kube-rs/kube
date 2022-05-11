@@ -94,10 +94,6 @@ name = "crd_reflector"
 path = "crd_reflector.rs"
 
 [[example]]
-name = "deployment_reflector"
-path = "deployment_reflector.rs"
-
-[[example]]
 name = "dynamic_api"
 path = "dynamic_api.rs"
 

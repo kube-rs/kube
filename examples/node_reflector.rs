@@ -2,7 +2,7 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{reflector, utils::try_flatten_applied, watcher},
+    runtime::{reflector, watcher, WatchStreamExt},
     Client,
 };
 use tracing::*;
@@ -14,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
 
     let nodes: Api<Node> = Api::all(client.clone());
     let lp = ListParams::default()
-        .labels("beta.kubernetes.io/instance-type=m4.2xlarge") // filter instances by label
+        .labels("kubernetes.io/arch=amd64") // filter instances by label
         .timeout(10); // short watch timeout in this example
 
     let store = reflector::store::Writer::<Node>::default();
@@ -31,9 +31,9 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Drain and log applied events from the reflector
-    let mut rfa = try_flatten_applied(rf).boxed();
+    let mut rfa = rf.watch_applies().boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", event.name());
+        info!("saw {}", event.name());
     }
 
     Ok(())

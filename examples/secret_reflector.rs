@@ -2,7 +2,7 @@ use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher},
+    runtime::{reflector, reflector::Store, watcher, WatchStreamExt},
     Client,
 };
 use std::collections::BTreeMap;
@@ -60,9 +60,9 @@ async fn main() -> anyhow::Result<()> {
     let rf = reflector(store, watcher(secrets, lp));
     spawn_periodic_reader(reader); // read from a reader in the background
 
-    try_flatten_applied(rf)
+    rf.watch_applies()
         .try_for_each(|s| async move {
-            info!("Applied: {}", s.name());
+            info!("saw: {}", s.name());
             Ok(())
         })
         .await?;

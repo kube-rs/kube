@@ -4,7 +4,7 @@ use tracing::*;
 
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
-    runtime::{reflector, utils::try_flatten_applied, watcher},
+    runtime::{reflector, watcher, WatchStreamExt},
     Client, CustomResource, CustomResourceExt,
 };
 
@@ -48,9 +48,9 @@ async fn main() -> anyhow::Result<()> {
             info!("Current crds: {:?}", crds);
         }
     });
-    let mut rfa = try_flatten_applied(rf).boxed();
+    let mut rfa = rf.watch_applies().boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", event.name());
+        info!("saw {}", event.name());
     }
     Ok(())
 }

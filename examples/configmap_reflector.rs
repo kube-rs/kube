@@ -2,7 +2,7 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{reflector, reflector::Store, utils::try_flatten_applied, watcher},
+    runtime::{reflector, reflector::Store, watcher, WatchStreamExt},
     Client,
 };
 use tracing::*;
@@ -32,9 +32,9 @@ async fn main() -> anyhow::Result<()> {
 
     spawn_periodic_reader(reader); // read from a reader in the background
 
-    let mut applied_events = try_flatten_applied(rf).boxed_local();
+    let mut applied_events = rf.watch_applies().boxed_local();
     while let Some(event) = applied_events.try_next().await? {
-        info!("Applied {}", event.name())
+        info!("saw {}", event.name())
     }
     Ok(())
 }
