@@ -3,7 +3,6 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
 };
 use kube_derive::CustomResource;
 use serde::{Deserialize, Serialize};
-use tracing::*;
 
 /// CustomResource with manually implemented schema
 ///

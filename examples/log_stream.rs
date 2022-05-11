@@ -12,14 +12,13 @@ use tracing::*;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let mypod = env::args()
         .nth(1)
         .ok_or_else(|| anyhow!("Usage: log_follow <pod>"))?;
-    info!("Fetching logs for {:?} in {}", mypod, namespace);
+    info!("Fetching logs for {:?}", mypod);
 
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods: Api<Pod> = Api::default_namespaced(client);
     let mut logs = pods
         .log_stream(&mypod, &LogParams {
             follow: true,

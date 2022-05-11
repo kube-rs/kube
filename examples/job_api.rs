@@ -12,7 +12,6 @@ use kube::{
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // Create a Job
     let job_name = "empty-job";
@@ -38,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }))?;
 
-    let jobs: Api<Job> = Api::namespaced(client, &namespace);
+    let jobs: Api<Job> = Api::default_namespaced(client);
     let pp = PostParams::default();
 
     jobs.create(&pp, &my_job).await?;

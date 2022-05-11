@@ -24,7 +24,7 @@ cargo run --example log_stream
 cargo run --example pod_api
 cargo run --example dynamic_api
 cargo run --example dynamic_jsonpath
-NAMESPACE=dev cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
+cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
 ## kubectl light example
@@ -35,7 +35,9 @@ The `kubectl` light example supports `get`, `delete`, and `watch` on arbitrary r
 cargo run --example kubectl -- get nodes
 cargo run --example kubectl -- get pods -lapp.kubernetes.io/name=prometheus -n monitoring
 cargo run --example kubectl -- watch pods --all
+cargo run --example kubectl -- edit pod metrics-server-86cbb8457f-8fct5
 cargo run --example kubectl -- delete pod metrics-server-86cbb8457f-8fct5
+cargo run --example kubectl -- apply -f configmapgen_controller_crd.yaml
 ```
 
 Supported flags are `-lLABELSELECTOR`, `-nNAMESPACE`, `--all`, and `-oyaml`.
@@ -73,14 +75,12 @@ Note that these examples also contain tests for CI, and are invoked with the sam
 These example watch a single resource and does some basic filtering on the watchevent stream:
 
 ```sh
-# watch all configmap events in a namespace
-NAMESPACE=dev cargo run --example configmap_watcher
-# watch unready pods in a namespace
-NAMESPACE=dev cargo run --example pod_watcher
+# watch unready pods in the current namespace
+cargo run --example pod_watcher
 # watch all event events
 cargo run --example event_watcher
-# watch deployments, configmaps, secrets in one namespace
-NAMESPACE=dev cargo run --example multi_watcher
+# watch deployments, configmaps, secrets in the current namespace
+cargo run --example multi_watcher
 # watch broken nodes and cross reference with events api
 cargo run --example node_watcher
 # watch arbitrary, untyped objects across all namespaces

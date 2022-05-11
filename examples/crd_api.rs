@@ -38,7 +38,6 @@ pub struct FooStatus {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // Manage CRDs first
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
@@ -79,7 +78,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(1)).await;
 
     // Manage the Foo CR
-    let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
+    let foos: Api<Foo> = Api::default_namespaced(client.clone());
 
     // Create Foo baz
     info!("Creating Foo instance baz");

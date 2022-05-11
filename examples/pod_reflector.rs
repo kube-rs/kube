@@ -11,9 +11,8 @@ use tracing::*;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
-    let api: Api<Pod> = Api::namespaced(client, &namespace);
+    let api: Api<Pod> = Api::default_namespaced(client);
     let store_w = reflector::store::Writer::default();
     let store = store_w.as_reader();
     let reflector = reflector(store_w, watcher(api, ListParams::default()));
