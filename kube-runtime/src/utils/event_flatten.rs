@@ -3,7 +3,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use futures::{Stream, TryStream, ready};
+use futures::{ready, Stream, TryStream};
 use pin_project::pin_project;
 
 #[pin_project]
@@ -13,13 +13,13 @@ pub struct EventFlatten<St, K> {
     #[pin]
     stream: St,
     emit_deleted: bool,
-    state: Option<Result<Event<K>, Error>>,
+    queue: std::vec::IntoIter<K>,
 }
 impl<St: TryStream<Ok = Event<K>>, K> EventFlatten<St, K> {
     pub(super) fn new(stream: St, emit_deleted: bool) -> Self {
         Self {
             stream,
-            state: None,
+            queue: vec![].into_iter(),
             emit_deleted,
         }
     }
@@ -32,43 +32,27 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
-        loop {
-            if let Some(curr) = me.state.take() {
-                match curr {
-                    Ok(event) => {
-                        // drain an individual event as per Event::into_iter_applied
-                        match event {
-                            Event::Applied(obj) => {
-                                return Poll::Ready(Some(Ok(obj)));
-                            }
-                            Event::Deleted(obj) => {
-                                // only pass delete events for touches
-                                if *me.emit_deleted {
-                                    return Poll::Ready(Some(Ok(obj)));
-                                }
-                            }
-                            Event::Restarted(mut reslist) => {
-                                if let Some(last) = reslist.pop() {
-                                    // store the remainder
-                                    *me.state = Some(Ok(Event::Restarted(reslist)));
-                                    return Poll::Ready(Some(Ok(last)));
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        return Poll::Ready(Some(Err(e)));
+        Poll::Ready(loop {
+            if let Some(item) = me.queue.next() {
+                break Some(Ok(item));
+            }
+            break match ready!(me.stream.as_mut().poll_next(cx)) {
+                Some(Ok(Event::Applied(obj))) => Some(Ok(obj)),
+                Some(Ok(Event::Deleted(obj))) => {
+                    if *me.emit_deleted {
+                        Some(Ok(obj))
+                    } else {
+                        continue;
                     }
                 }
-            }
-            let next = ready!(me.stream.as_mut().poll_next(cx));
-            match next {
-                Some(event) => {
-                    *me.state = Some(event); // continue around loop to extract from it
+                Some(Ok(Event::Restarted(objs))) => {
+                    *me.queue = objs.into_iter();
+                    continue;
                 }
-                None => return Poll::Pending,
-            }
-        }
+                Some(Err(err)) => Some(Err(err)),
+                None => return Poll::Ready(None),
+            };
+        })
     }
 }
 
@@ -99,14 +83,14 @@ pub(crate) mod tests {
         // Restart comes through, currently in reverse order
         // (normally on restart they just come in alphabetical order by name)
         // this is fine though, alphabetical event order has no functional meaning in watchers
-        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(2)))));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(1)))));
+        assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(2)))));
         // Error passed through
         assert!(matches!(
             poll!(rx.next()),
             Poll::Ready(Some(Err(Error::TooManyObjects)))
         ));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(2)))));
-        assert!(matches!(poll!(rx.next()), Poll::Pending));
+        assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
     }
 }
