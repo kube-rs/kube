@@ -21,7 +21,7 @@ pub trait WatchStreamExt: Stream {
     ///
     /// All Added/Modified events are passed through, and critical errors bubble up.
     /// This is functionally equivalent to calling [`try_flatten_applied`] on a [`watcher`].
-    fn watch_applies<K>(self) -> EventFlatten<Self, K>
+    fn applied_objects<K>(self) -> EventFlatten<Self, K>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
@@ -32,7 +32,7 @@ pub trait WatchStreamExt: Stream {
     ///
     /// All Added/Modified/Deleted events are passed through, and critical errors bubble up.
     /// This is functionally equivalent to calling [`try_flatten_touched`] on a [`watcher`].
-    fn watch_touches<K>(self) -> EventFlatten<Self, K>
+    fn touched_objects<K>(self) -> EventFlatten<Self, K>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {

@@ -60,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
     let rf = reflector(store, watcher(secrets, lp));
     spawn_periodic_reader(reader); // read from a reader in the background
 
-    rf.watch_applies()
+    rf.applied_objects()
         .try_for_each(|s| async move {
             info!("saw: {}", s.name());
             Ok(())

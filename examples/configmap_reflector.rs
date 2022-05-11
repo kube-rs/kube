@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
 
     spawn_periodic_reader(reader); // read from a reader in the background
 
-    let mut applied_events = rf.watch_applies().boxed_local();
+    let mut applied_events = rf.applied_objects().boxed_local();
     while let Some(event) = applied_events.try_next().await? {
         info!("saw {}", event.name())
     }

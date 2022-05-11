@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let lp = ListParams::default().labels("beta.kubernetes.io/arch=amd64");
     let obs = watcher(nodes, lp)
         .backoff(ExponentialBackoff::default())
-        .watch_applies();
+        .applied_objects();
 
     pin_mut!(obs);
     while let Some(n) = obs.try_next().await? {

@@ -24,9 +24,9 @@ async fn main() -> anyhow::Result<()> {
 
     // select on applied events from all watchers
     let mut combo_stream = stream::select_all(vec![
-        dep_watcher.watch_applies().map_ok(Watched::Deploy).boxed(),
-        cm_watcher.watch_applies().map_ok(Watched::Config).boxed(),
-        sec_watcher.watch_applies().map_ok(Watched::Secret).boxed(),
+        dep_watcher.applied_objects().map_ok(Watched::Deploy).boxed(),
+        cm_watcher.applied_objects().map_ok(Watched::Config).boxed(),
+        sec_watcher.applied_objects().map_ok(Watched::Secret).boxed(),
     ]);
     // SelectAll Stream elements must have the same Item, so all packed in this:
     #[allow(clippy::large_enum_variant)]

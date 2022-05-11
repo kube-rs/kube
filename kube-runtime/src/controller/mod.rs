@@ -462,7 +462,7 @@ where
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
-            reflector(writer, watcher(owned_api, lp)).watch_applies(),
+            reflector(writer, watcher(owned_api, lp)).applied_objects(),
             dyntype.clone(),
         )
         .boxed();
@@ -532,7 +532,7 @@ where
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners(watcher(api, lp).watch_touches(), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners(watcher(api, lp).touched_objects(), self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -583,7 +583,7 @@ where
         I::IntoIter: Send,
         Other::DynamicType: Clone,
     {
-        let other_watcher = trigger_with(watcher(api, lp).watch_touches(), move |obj| {
+        let other_watcher = trigger_with(watcher(api, lp).touched_objects(), move |obj| {
             let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
             mapper(obj)
                 .into_iter()
