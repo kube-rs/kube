@@ -12,15 +12,15 @@ use pin_project::pin_project;
 pub struct EventFlatten<St, K> {
     #[pin]
     stream: St,
-    delete: bool,
+    emit_deleted: bool,
     state: Option<Result<Event<K>, Error>>,
 }
 impl<St: TryStream<Ok = Event<K>>, K> EventFlatten<St, K> {
-    pub(super) fn new(stream: St, delete: bool) -> Self {
+    pub(super) fn new(stream: St, emit_deleted: bool) -> Self {
         Self {
             stream,
             state: None,
-            delete,
+            emit_deleted,
         }
     }
 }
@@ -43,7 +43,7 @@ where
                             }
                             Event::Deleted(obj) => {
                                 // only pass delete events for touches
-                                if *me.delete {
+                                if *me.emit_deleted {
                                     return Poll::Ready(Some(Ok(obj)));
                                 }
                             }
