@@ -31,10 +31,8 @@ enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
-    Ok(format!(
-        "cm---{}",
-        cm.metadata.name.as_deref().ok_or(Error::NoName)?
-    ))
+    let name = cm.metadata.name.as_deref().ok_or(Error::NoName)?;
+    Ok(format!("cmsyncer-{}", name))
 }
 
 async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
@@ -77,17 +75,16 @@ async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Acti
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let kube = kube::Client::try_default().await?;
-    let all_cms = kube::Api::<ConfigMap>::all(kube.clone());
+    let client = kube::Client::try_default().await?;
     Controller::new(
-        all_cms,
+        Api::<ConfigMap>::all(client.clone()),
         ListParams::default().labels("configmap-secret-syncer.nullable.se/sync=true"),
     )
     .run(
         |cm, _| {
             let ns = cm.meta().namespace.as_deref().ok_or(Error::NoNamespace).unwrap();
-            let cms: Api<ConfigMap> = Api::namespaced(kube.clone(), ns);
-            let secrets: Api<Secret> = Api::namespaced(kube.clone(), ns);
+            let cms: Api<ConfigMap> = Api::namespaced(client.clone(), ns);
+            let secrets: Api<Secret> = Api::namespaced(client.clone(), ns);
             async move {
                 finalizer(
                     &cms,

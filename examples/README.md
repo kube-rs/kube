@@ -99,7 +99,7 @@ kubectl apply -f configmapgen_controller_object.yaml
 and the finalizer example (reconciles a labelled subset of configmaps):
 
 ```sh
-cargo run --example configmapgen_controller
+cargo run --example secret_syncer
 kubectl apply -f secret_syncer_configmap.yaml
 kubectl delete -f secret_syncer_configmap.yaml
 ```
