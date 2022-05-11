@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
     let api = Api::<DynamicObject>::all_with(client, &ar);
 
     // Fully compatible with kube-runtime
-    let mut items = watcher(api, ListParams::default()).watch_applies().boxed();
+    let mut items = watcher(api, ListParams::default()).applied_objects().boxed();
     while let Some(p) = items.try_next().await? {
         if caps.scope == Scope::Cluster {
             info!("saw {}", p.name());

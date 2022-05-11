@@ -191,13 +191,13 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`],
-/// direct users may want to flatten composite events with [`try_flatten_applied`]:
+/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
+/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
 ///
 /// ```no_run
 /// use kube::{
 ///   api::{Api, ListParams, ResourceExt}, Client,
-///   runtime::{utils::try_flatten_applied, watcher}
+///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::{StreamExt, TryStreamExt};
@@ -206,8 +206,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     let watcher = watcher(pods, ListParams::default());
-///     try_flatten_applied(watcher)
+///     watcher(pods, ListParams::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name());
 ///             Ok(())
@@ -216,7 +215,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///    Ok(())
 /// }
 /// ```
-/// [`try_flatten_applied`]: super::utils::try_flatten_applied
+/// [`WatchStreamExt`]: super::WatchStreamExt
 /// [`reflector`]: super::reflector::reflector
 /// [`Api::watch`]: kube_client::Api::watch
 ///

@@ -7,7 +7,7 @@ use futures::{ready, Stream, TryStream};
 use pin_project::pin_project;
 
 #[pin_project]
-/// Stream returned by the [`watch_applies`](super::WatchStreamExt::watch_applies) and [`watch_touches`](super::WatchStreamExt::watch_touches) method.
+/// Stream returned by the [`applied_objects`](super::WatchStreamExt::applied_objects) and [`touched_objects`](super::WatchStreamExt::touched_objects) method.
 #[must_use = "streams do nothing unless polled"]
 pub struct EventFlatten<St, K> {
     #[pin]

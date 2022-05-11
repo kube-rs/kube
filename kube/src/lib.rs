@@ -55,7 +55,7 @@
 //!     api::{Api, DeleteParams, ListParams, PatchParams, Patch, ResourceExt},
 //!     core::CustomResourceExt,
 //!     Client, CustomResource,
-//!     runtime::{watcher, utils::try_flatten_applied, wait::{conditions, await_condition}},
+//!     runtime::{watcher, WatchStreamExt, wait::{conditions, await_condition}},
 //! };
 //!
 //! // Our custom resource
@@ -88,7 +88,7 @@
 //!     // Watch for changes to foos in the configured namespace
 //!     let foos: Api<Foo> = Api::default_namespaced(client.clone());
 //!     let lp = ListParams::default();
-//!     let mut apply_stream = try_flatten_applied(watcher(foos, lp)).boxed();
+//!     let mut apply_stream = watcher(foos, lp).applied_objects().boxed();
 //!     while let Some(f) = apply_stream.try_next().await? {
 //!         println!("saw apply to {}", f.name());
 //!     }

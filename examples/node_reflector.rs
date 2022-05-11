@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Drain and log applied events from the reflector
-    let mut rfa = rf.watch_applies().boxed();
+    let mut rfa = rf.applied_objects().boxed();
     while let Some(event) = rfa.try_next().await? {
         info!("saw {}", event.name());
     }

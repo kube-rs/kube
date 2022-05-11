@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client);
     let lp = ListParams::default();
 
-    let ew = watcher(events, lp).watch_applies();
+    let ew = watcher(events, lp).applied_objects();
 
     pin_mut!(ew);
     while let Some(event) = ew.try_next().await? {

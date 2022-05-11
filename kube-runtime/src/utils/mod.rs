@@ -6,6 +6,7 @@ mod stream_backoff;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
+pub use event_flatten::EventFlatten;
 pub use stream_backoff::StreamBackoff;
 pub use watch_ext::WatchStreamExt;
 
@@ -28,7 +29,7 @@ use tokio::{runtime::Handle, task::JoinHandle};
 /// Flattens each item in the list following the rules of [`watcher::Event::into_iter_applied`].
 #[deprecated(
     since = "0.72.0",
-    note = "fn replaced with the WatchStreamExt::watch_applies which can be chained onto watcher. Add `use kube::runtime::WatchStreamExt;` and call `stream.watch_applies()` instead. This function will be removed in 0.75.0."
+    note = "fn replaced with the WatchStreamExt::applied_objects which can be chained onto watcher. Add `use kube::runtime::WatchStreamExt;` and call `stream.applied_objects()` instead. This function will be removed in 0.75.0."
 )]
 pub fn try_flatten_applied<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,
@@ -41,7 +42,7 @@ pub fn try_flatten_applied<K, S: TryStream<Ok = watcher::Event<K>>>(
 /// Flattens each item in the list following the rules of [`watcher::Event::into_iter_touched`].
 #[deprecated(
     since = "0.72.0",
-    note = "fn replaced with the WatchStreamExt::watch_touches which can be chained onto watcher. Add `use kube::runtime::WatchStreamExt;` and call `stream.watch_touches()` instead. This function will be removed in 0.75.0."
+    note = "fn replaced with the WatchStreamExt::touched_objects which can be chained onto watcher. Add `use kube::runtime::WatchStreamExt;` and call `stream.touched_objects()` instead. This function will be removed in 0.75.0."
 )]
 pub fn try_flatten_touched<K, S: TryStream<Ok = watcher::Event<K>>>(
     stream: S,

@@ -118,7 +118,7 @@ impl App {
             lp = lp.fields(&format!("metadata.name={}", n));
         }
         // present a dumb table for it for now. kubectl does not do this anymore.
-        let mut stream = watcher(api, lp).watch_applies().boxed();
+        let mut stream = watcher(api, lp).applied_objects().boxed();
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
             let age = format_creation_since(inst.creation_timestamp());
