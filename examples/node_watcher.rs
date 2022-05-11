@@ -54,7 +54,6 @@ async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result
             warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);
         }
     } else {
-        // Turn node_watcher=debug in log to see all
         info!("Healthy node: {}", name);
     }
     Ok(())
