@@ -47,7 +47,7 @@ The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with 
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
-let pods: Api<Pod> = Api::namespaced(client, "apps");
+let pods: Api<Pod> = Api::default_namespaced(client);
 
 let p = pods.get("blog").await?;
 println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
@@ -55,7 +55,7 @@ println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
 }});
-let pp = PatchParams::apply("my_controller");
+let pp = PatchParams::apply("kube");
 let patched = pods.patch("blog", &pp, &Patch::Apply(patch)).await?;
 assert_eq!(patched.spec.active_deadline_seconds, Some(5));
 
@@ -72,20 +72,20 @@ You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec st
 
 ```rust
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
-#[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-pub struct FooSpec {
-    name: String,
-    info: String,
+#[kube(group = "kube.rs", version = "v1", kind = "Document", namespaced)]
+pub struct DocumentSpec {
+    title: String,
+    content: String,
 }
 ```
 
-Then you can use the generated wrapper struct `Foo` as a [`kube::Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
+Then you can use the generated wrapper struct `Document` as a [`kube::Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
 
 ```rust
-let foos: Api<Foo> = Api::namespaced(client, "default");
-let f = Foo::new("my-foo", FooSpec::default());
-println!("foo: {:?}", f);
-println!("crd: {:?}", serde_yaml::to_string(&Foo::crd()));
+let docs: Api<DocumentSpec> = Api::default_namespaced(client);
+let d = Document::new("guide", DocumentSpec::default());
+println!("doc: {:?}", d);
+println!("crd: {:?}", serde_yaml::to_string(&Document::crd()));
 ```
 
 There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples) for more.
@@ -101,7 +101,7 @@ The `runtime` module exports the `kube_runtime` crate and contains higher level 
 A low level streaming interface (similar to informers) that presents `Applied`, `Deleted` or `Restarted` events.
 
 ```rust
-let api = Api::<Pod>::namespaced(client, "default");
+let api = Api::<Pod>::default_namespaced(client);
 let mut stream = watcher(api, ListParams::default()).applied_objects();
 ```
 
@@ -122,9 +122,8 @@ A `reflector` is a `watcher` with `Store` on `K`. It acts on all the `Event<K>` 
 ```rust
 let nodes: Api<Node> = Api::default_namespaced(client);
 let lp = ListParams::default().labels("kubernetes.io/arch=amd64");
-let store = reflector::store::Writer::<Node>::default();
-let reader = store.as_reader();
-let rf = reflector(store, watcher(nodes, lp));
+let (reader, writer) = reflector::store();
+let rf = reflector(writer, watcher(nodes, lp));
 ```
 
 At this point you can listen to the `reflector` as if it was a `watcher`, but you can also query the `reader` at any point.
