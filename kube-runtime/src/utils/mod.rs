@@ -55,7 +55,7 @@ pub fn try_flatten_touched<K, S: TryStream<Ok = watcher::Event<K>>>(
 /// Allows splitting a `Stream` into several streams that each emit a disjoint subset of the input stream's items,
 /// like a streaming variant of pattern matching.
 ///
-/// NOTE: The cases MUST be reunited into the same final stream (using `futures::stream::select` or similar),
+/// NOTE: The cases MUST be reunited into the same final stream (using [`futures_util::stream::select`] or similar),
 /// since cases for rejected items will *not* register wakeup correctly, and may otherwise lose items and/or deadlock.
 ///
 /// NOTE: The whole set of cases will deadlock if there is ever an item that no live case wants to consume.

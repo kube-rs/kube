@@ -236,7 +236,7 @@ impl Display for ReconcileReason {
 ///
 /// The `queue` indicates which objects should be reconciled. For the core objects this will usually be
 /// the [`reflector`] (piped through [`trigger_self`]). If your core objects own any subobjects then you
-/// can also make them trigger reconciliations by [merging](futures::stream::select) the [`reflector`]
+/// can also make them trigger reconciliations by [merging](futures_util::stream::select) the [`reflector`]
 /// with a [`watcher`](watcher()) or [`reflector`](reflector()) for the subobject.
 ///
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
