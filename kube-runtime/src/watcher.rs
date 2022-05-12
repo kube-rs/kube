@@ -94,10 +94,10 @@ impl<K> Event<K> {
     /// });
     /// ```
     #[must_use]
-    pub fn modify(mut self, f: impl Fn(&mut K)) -> Self {
+    pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
         match &mut self {
             Event::Applied(obj) => (f)(obj),
-            Event::Deleted(_) => {}
+            Event::Deleted(obj) => (f)(obj),
             Event::Restarted(objs) => {
                 for k in objs {
                     (f)(k)
