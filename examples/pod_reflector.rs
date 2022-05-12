@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let stream = watcher(api, ListParams::default()).map_ok(|ev| {
-        ev.map_event(|pod| {
+        ev.modify(|pod| {
             // memory optimization for our store - we don't care about fields/annotations/status
             pod.managed_fields_mut().clear();
             pod.annotations_mut().clear();

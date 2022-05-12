@@ -76,7 +76,7 @@ impl<K> Event<K> {
         .into_iter()
     }
 
-    /// Map each object in an event through a mutable fn
+    /// Map each object in an event through a mutator fn
     ///
     /// This allows for memory optimizations in watch streams.
     /// If you are chaining a watch stream into a reflector as an in memory state store,
@@ -87,13 +87,14 @@ impl<K> Event<K> {
     /// use kube::ResourceExt;
     /// # use kube::runtime::watcher::Event;
     /// # let event: Event<Pod> = todo!();
-    /// event.map_event(|pod| {
+    /// event.modify(|pod| {
     ///     pod.managed_fields_mut().clear();
     ///     pod.annotations_mut().clear();
     ///     pod.status = None;
     /// });
     /// ```
-    pub fn map_event(mut self, f: impl Fn(&mut K)) -> Self {
+    #[must_use]
+    pub fn modify(mut self, f: impl Fn(&mut K)) -> Self {
         match &mut self {
             Event::Applied(obj) => (f)(obj),
             Event::Deleted(_) => {}
