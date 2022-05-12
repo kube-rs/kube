@@ -55,9 +55,9 @@ async fn main() -> anyhow::Result<()> {
     let secrets: Api<Secret> = Api::default_namespaced(client);
     let lp = ListParams::default().timeout(10); // short watch timeout in this example
 
-    let store = reflector::store::Writer::<Secret>::default();
-    let reader = store.as_reader();
-    let rf = reflector(store, watcher(secrets, lp));
+    let (reader, writer) = reflector::store::<Secret>();
+    let rf = reflector(writer, watcher(secrets, lp));
+
     spawn_periodic_reader(reader); // read from a reader in the background
 
     rf.applied_objects()
