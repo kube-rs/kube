@@ -33,11 +33,11 @@ async fn main() -> anyhow::Result<()> {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await; // wait for k8s to deal with it
 
     // 1. Run a reflector against the installed CRD
-    let store = reflector::store::Writer::<Foo>::default();
-    let reader = store.as_reader();
+    let (reader, writer) = reflector::store::<Foo>();
+
     let foos: Api<Foo> = Api::default_namespaced(client);
     let lp = ListParams::default().timeout(20); // low timeout in this example
-    let rf = reflector(store, watcher(foos, lp));
+    let rf = reflector(writer, watcher(foos, lp));
 
     tokio::spawn(async move {
         loop {

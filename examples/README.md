@@ -107,17 +107,15 @@ kubectl delete -f secret_syncer_configmap.yaml
 the finalizer is resilient against controller downtime (try stopping the controller before deleting).
 
 ### reflectors
-These examples watch resources as well as ive a store access point:
+These examples watch resources plus log from its queryable store:
 
 ```sh
-# Watch namespace pods and print the current pod count every event
+# Watch namespaced pods and print the current pod count every event
 cargo run --example pod_reflector
 # Watch nodes for applied events and current active nodes
 cargo run --example node_reflector
 # Watch namespaced secrets for applied events and print secret keys in a task
 cargo run --example secret_reflector
-# Watch namespaced configmaps for applied events and print store info in task
-cargo run --example configmap_reflector
 # Watch namespaced foo crs for applied events and print store info in task
 cargo run --example crd_reflector
 ```
