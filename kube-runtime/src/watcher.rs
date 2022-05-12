@@ -96,8 +96,7 @@ impl<K> Event<K> {
     #[must_use]
     pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
         match &mut self {
-            Event::Applied(obj) => (f)(obj),
-            Event::Deleted(obj) => (f)(obj),
+            Event::Applied(obj) | Event::Deleted(obj) => (f)(obj),
             Event::Restarted(objs) => {
                 for k in objs {
                     (f)(k)
