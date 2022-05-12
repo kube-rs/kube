@@ -96,6 +96,7 @@ where
     ///     pod
     /// });
     /// ```
+    #[must_use]
     pub fn with_mutator<F: (Fn(K) -> K) + 'static + Send>(mut self, f: F) -> Self {
         self.mutator = Box::new(f);
         self
