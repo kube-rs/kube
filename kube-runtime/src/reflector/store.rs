@@ -86,6 +86,7 @@ where
     /// you can control the space used by each object by filtering out certain fields:
     ///
     /// ```
+    /// # use kube::runtime::reflector::store::Writer;
     /// use k8s_openapi::api::core::v1::Pod;
     /// use kube::ResourceExt;
     /// let writer = Writer::<Pod>::default().with_mutator(|mut pod: Pod| {
