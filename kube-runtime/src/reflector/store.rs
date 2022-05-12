@@ -4,7 +4,11 @@ use ahash::AHashMap;
 use derivative::Derivative;
 use kube_client::Resource;
 use parking_lot::RwLock;
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::{
+    fmt::{self, Debug},
+    hash::Hash,
+    sync::Arc,
+};
 
 type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
@@ -12,14 +16,40 @@ type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 ///
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
-#[derive(Debug, Derivative)]
-#[derivative(Default(bound = "K::DynamicType: Default"))]
 pub struct Writer<K: 'static + Resource>
 where
     K::DynamicType: Eq + Hash,
 {
     store: Cache<K>,
     dyntype: K::DynamicType,
+    mutator: Box<dyn Fn(K) -> K + 'static + Send>,
+}
+
+impl<K> Debug for Writer<K>
+where
+    K: Debug + Resource,
+    K::DynamicType: Eq + Hash + Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Writer")
+            .field("store", &self.store)
+            .field("dyntype", &self.dyntype)
+            .finish()
+    }
+}
+
+impl<K> Default for Writer<K>
+where
+    K: Resource + 'static,
+    K::DynamicType: Default + Eq + Hash,
+{
+    fn default() -> Self {
+        Self {
+            store: Cache::default(),
+            dyntype: K::DynamicType::default(),
+            mutator: Box::new(|x| x),
+        }
+    }
 }
 
 impl<K: 'static + Resource + Clone> Writer<K>
@@ -34,6 +64,7 @@ where
         Writer {
             store: Default::default(),
             dyntype,
+            mutator: Box::new(|x| x),
         }
     }
 
@@ -48,12 +79,33 @@ where
         }
     }
 
+    /// Configure a mutator to be called on each object as it is saved in the store
+    ///
+    /// This allows for memory optimizations for consumers.
+    /// If you are using your reflector as an in memory state store / lookup table,
+    /// you can control the space used by each object by filtering out certain fields:
+    ///
+    /// ```
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// use kube::ResourceExt;
+    /// let writer = Writer::<Pod>::default().with_mutator(|mut pod: Pod| {
+    ///     pod.managed_fields_mut().clear();
+    ///     pod.annotations_mut().clear();
+    ///     pod.status = None;
+    ///     pod
+    /// });
+    /// ```
+    pub fn with_mutator<F: (Fn(K) -> K) + 'static + Send>(mut self, f: F) -> Self {
+        self.mutator = Box::new(f);
+        self
+    }
+
     /// Applies a single watcher event to the store
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
                 let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
-                let obj = Arc::new(obj.clone());
+                let obj = Arc::new((self.mutator)(obj.clone()));
                 self.store.write().insert(key, obj);
             }
             watcher::Event::Deleted(obj) => {
@@ -66,7 +118,7 @@ where
                     .map(|obj| {
                         (
                             ObjectRef::from_obj_with(obj, self.dyntype.clone()),
-                            Arc::new(obj.clone()),
+                            Arc::new((self.mutator)(obj.clone())),
                         )
                     })
                     .collect::<AHashMap<_, _>>();
@@ -129,9 +181,25 @@ where
     }
 }
 
+
+/// Create a (Reader, Writer) for a `Store<K>` for a typed resource `K`
+///
+/// The `Writer` should be passed to a [`reflector()`],
+/// and the [`Store`] is a read-only handle.
+pub fn store<K>() -> (Store<K>, Writer<K>)
+where
+    K: Resource + Clone + 'static,
+    K::DynamicType: Eq + Hash + Clone + Default,
+{
+    let w = Writer::<K>::default();
+    let r = w.as_reader();
+    (r, w)
+}
+
+
 #[cfg(test)]
 mod tests {
-    use super::Writer;
+    use super::{cache, Writer};
     use crate::{reflector::ObjectRef, watcher};
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::api::ObjectMeta;
@@ -180,9 +248,8 @@ mod tests {
             },
             ..ConfigMap::default()
         };
-        let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
-        let store = store_w.as_reader();
+        let (store, mut writer) = cache();
+        writer.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 

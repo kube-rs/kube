@@ -17,9 +17,8 @@ async fn main() -> anyhow::Result<()> {
         .labels("kubernetes.io/arch=amd64") // filter instances by label
         .timeout(10); // short watch timeout in this example
 
-    let store = reflector::store::Writer::<Node>::default();
-    let reader = store.as_reader();
-    let rf = reflector(store, watcher(nodes, lp));
+    let (reader, writer) = reflector::store();
+    let rf = reflector(writer, watcher(nodes, lp));
 
     // Periodically read our state in the background
     tokio::spawn(async move {

@@ -1,9 +1,9 @@
-use futures::prelude::*;
+use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, ListParams},
-    runtime::{reflector, watcher},
-    Client,
+    runtime::{reflector, watcher, WatchStreamExt},
+    Client, ResourceExt,
 };
 use tracing::*;
 
@@ -13,15 +13,32 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let api: Api<Pod> = Api::default_namespaced(client);
-    let store_w = reflector::store::Writer::default();
-    let store = store_w.as_reader();
-    let reflector = reflector(store_w, watcher(api, ListParams::default()));
-    // Use try_for_each to fail on first error, use for_each to keep retrying
-    reflector
-        .try_for_each(|_event| async {
-            info!("Current pod count: {}", store.state().len());
-            Ok(())
-        })
-        .await?;
+    let writer = reflector::store::Writer::default().with_mutator(|mut pod: Pod| {
+        // memory optimization for our store - we don't care about fields/annotations/status
+        pod.managed_fields_mut().clear();
+        pod.annotations_mut().clear();
+        pod.status = None;
+        pod
+    });
+    let reader = writer.as_reader();
+    tokio::spawn(async move {
+        // Show state every 5 seconds of watching
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            info!("Current pod count: {}", reader.state().len());
+            // full information with debug logs
+            for p in reader.state() {
+                let yaml = serde_yaml::to_string(p.as_ref()).unwrap();
+                debug!("Pod {}: \n{}", p.name(), yaml);
+            }
+        }
+    });
+
+    let rf = reflector(writer, watcher(api, ListParams::default())).applied_objects();
+    futures::pin_mut!(rf);
+
+    while let Some(pod) = rf.try_next().await? {
+        info!("saw {}", pod.name());
+    }
     Ok(())
 }
