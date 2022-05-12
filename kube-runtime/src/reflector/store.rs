@@ -200,7 +200,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{cache, Writer};
+    use super::{store, Writer};
     use crate::{reflector::ObjectRef, watcher};
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::api::ObjectMeta;
@@ -249,7 +249,7 @@ mod tests {
             },
             ..ConfigMap::default()
         };
-        let (store, mut writer) = cache();
+        let (store, mut writer) = store();
         writer.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
