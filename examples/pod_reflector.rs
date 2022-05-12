@@ -13,14 +13,8 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let api: Api<Pod> = Api::default_namespaced(client);
-    let writer = reflector::store::Writer::default().with_mutator(|mut pod: Pod| {
-        // memory optimization for our store - we don't care about fields/annotations/status
-        pod.managed_fields_mut().clear();
-        pod.annotations_mut().clear();
-        pod.status = None;
-        pod
-    });
-    let reader = writer.as_reader();
+    let (reader, writer) = reflector::store::<Pod>();
+
     tokio::spawn(async move {
         // Show state every 5 seconds of watching
         loop {
@@ -34,7 +28,16 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let rf = reflector(writer, watcher(api, ListParams::default())).applied_objects();
+    let stream = watcher(api, ListParams::default()).map_ok(|ev| {
+        ev.map_event(|pod| {
+            // memory optimization for our store - we don't care about fields/annotations/status
+            pod.managed_fields_mut().clear();
+            pod.annotations_mut().clear();
+            pod.status = None;
+        })
+    });
+
+    let rf = reflector(writer, stream).applied_objects();
     futures::pin_mut!(rf);
 
     while let Some(pod) = rf.try_next().await? {
