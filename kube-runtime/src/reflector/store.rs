@@ -187,6 +187,7 @@ where
 ///
 /// The `Writer` should be passed to a [`reflector()`],
 /// and the [`Store`] is a read-only handle.
+#[must_use]
 pub fn store<K>() -> (Store<K>, Writer<K>)
 where
     K: Resource + Clone + 'static,
