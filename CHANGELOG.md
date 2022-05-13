@@ -5,7 +5,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.71.0...master
+ * see https://github.com/kube-rs/kube-rs/compare/0.72.0...master
+
+0.72.0 / 2022-05-13
+===================
 
 [0.71.0](https://github.com/kube-rs/kube-rs/releases/tag/0.71.0) / 2022-04-12
 ===================
@@ -19,7 +22,7 @@ We highlight some **changes** here that you should be especially aware of.
 Publishing events via [Recorder](https://docs.rs/kube/latest/kube/runtime/events/struct.Recorder.html) for cluster scoped resources (supported since `0.70.0`) now publish to `kube-system` rather than `default`, as all but the newest clusters struggle with publishing events in the `default` namespace.
 
 ### [Default TLS stack set to OpenSSL](https://github.com/kube-rs/kube-rs/pull/863)
-The previous `native-tls` default  was there because we used to depend on `reqwest`, but because we depended on openssl anyway the feature does not make much sense. Changing to `openssl-tls` also improves the situation on macOS where the Security Framework struggles with PKCS#12 certs from OpenSSL v3.  The `native-tls` feature will still be available in this release in case of issues, but the plan is to decommission it shortly. Of course, we all ideally want to move to rustls, but we are still blocked by #153.
+The previous `native-tls` default  was there because we used to depend on `reqwest`, but because we depended on openssl anyway the feature does not make much sense. Changing to `openssl-tls` also improves the situation on macOS where the Security Framework struggles with PKCS#12 certs from OpenSSL v3.  The `native-tls` feature will still be available in this release in case of issues, but the plan is to decommission it shortly. Of course, we all ideally want to move to rustls, but we are still blocked by [#153](https://github.com/kube-rs/kube-rs/issues/153).
 
 ## What's Changed
 ### Added
