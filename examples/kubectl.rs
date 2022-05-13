@@ -138,7 +138,7 @@ impl App {
                 info!("updating changed object {}", orig.name());
                 let data: DynamicObject = serde_yaml::from_str(&edited)?;
                 // NB: simplified kubectl constructs a merge-patch of differences
-                api.replace(&n, &Default::default(), &data).await?;
+                api.replace(n, &Default::default(), &data).await?;
             }
         } else {
             warn!("need a name to edit");
@@ -185,7 +185,7 @@ async fn main() -> Result<()> {
     // Defer to methods for verbs
     if let Some(resource) = &app.resource {
         // Common discovery, parameters, and api configuration for a single resource
-        let (ar, caps) = resolve_api_resource(&discovery, &resource)
+        let (ar, caps) = resolve_api_resource(&discovery, resource)
             .with_context(|| format!("resource {:?} not found in cluster", resource))?;
         let mut lp = ListParams::default();
         if let Some(label) = &app.selector {

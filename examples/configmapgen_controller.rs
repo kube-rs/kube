@@ -3,7 +3,7 @@ use futures::StreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ListParams, ObjectMeta, Patch, PatchParams, Resource},
-    runtime::controller::{Action, Context, Controller},
+    runtime::controller::{Action, Controller},
     Client, CustomResource,
 };
 use schemars::JsonSchema;
@@ -29,8 +29,8 @@ struct ConfigMapGeneratorSpec {
 }
 
 /// Controller triggers this whenever our main object or our children changed
-async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Context<Data>) -> Result<Action, Error> {
-    let client = ctx.get_ref().client.clone();
+async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Arc<Data>) -> Result<Action, Error> {
+    let client = &ctx.client;
 
     let mut contents = BTreeMap::new();
     contents.insert("content".to_string(), generator.spec.content.clone());
@@ -67,7 +67,7 @@ async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Context<Data>) -> Re
 }
 
 /// The controller triggers this on reconcile errors
-fn error_policy(_error: &Error, _ctx: Context<Data>) -> Action {
+fn error_policy(_error: &Error, _ctx: Arc<Data>) -> Action {
     Action::requeue(Duration::from_secs(1))
 }
 
@@ -100,7 +100,7 @@ async fn main() -> Result<()> {
         .owns(cms, ListParams::default())
         .reconcile_all_on(reload_rx.map(|_| ()))
         .shutdown_on_signal()
-        .run(reconcile, error_policy, Context::new(Data { client }))
+        .run(reconcile, error_policy, Arc::new(Data { client }))
         .for_each(|res| async move {
             match res {
                 Ok(o) => info!("reconciled {:?}", o),

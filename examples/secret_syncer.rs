@@ -9,7 +9,7 @@ use kube::{
     api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
     error::ErrorResponse,
     runtime::{
-        controller::{Action, Context, Controller},
+        controller::{Action, Controller},
         finalizer::{finalizer, Event},
     },
 };
@@ -101,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
             }
         },
         |_err, _| Action::requeue(Duration::from_secs(2)),
-        Context::new(()),
+        Arc::new(()),
     )
     .for_each(|msg| async move { info!("Reconciled: {:?}", msg) })
     .await;
