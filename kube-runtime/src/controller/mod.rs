@@ -147,35 +147,6 @@ where
     })
 }
 
-/// A context data type that's passed through to the controllers callbacks
-///
-/// `Context` gets passed to both the `reconciler` and the `error_policy` callbacks,
-/// allowing a read-only view of the world without creating a big nested lambda.
-/// More or less the same as Actix's [`Data`](https://docs.rs/actix-web/3.x/actix_web/web/struct.Data.html).
-#[derive(Debug, Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct Context<T>(Arc<T>);
-
-impl<T> Context<T> {
-    /// Create new `Context` instance.
-    #[must_use]
-    pub fn new(state: T) -> Context<T> {
-        Context(Arc::new(state))
-    }
-
-    /// Get reference to inner controller data.
-    #[must_use]
-    pub fn get_ref(&self) -> &T {
-        self.0.as_ref()
-    }
-
-    /// Convert to the internal `Arc<T>`.
-    #[must_use]
-    pub fn into_inner(self) -> Arc<T> {
-        self.0
-    }
-}
-
 /// A request to reconcile an object, annotated with why that request was made.
 ///
 /// NOTE: The reason is ignored for comparison purposes. This means that, for example,
@@ -242,10 +213,10 @@ impl Display for ReconcileReason {
 ///
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
-pub fn applier<K, QueueStream, ReconcilerFut, T>(
-    mut reconciler: impl FnMut(Arc<K>, Context<T>) -> ReconcilerFut,
-    mut error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> Action,
-    context: Context<T>,
+pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
+    mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
+    mut error_policy: impl FnMut(&ReconcilerFut::Error, Arc<Ctx>) -> Action,
+    context: Arc<Ctx>,
     store: Store<K>,
     queue: QueueStream,
 ) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, QueueStream::Error>>>
@@ -352,7 +323,7 @@ where
 /// use kube::{
 ///   Client, CustomResource,
 ///   api::{Api, ListParams},
-///   runtime::controller::{Context, Controller, Action}
+///   runtime::controller::{Controller, Action}
 /// };
 /// use serde::{Deserialize, Serialize};
 /// use tokio::time::Duration;
@@ -373,13 +344,13 @@ where
 /// }
 ///
 /// /// The reconciler that will be called when either object change
-/// async fn reconcile(g: Arc<ConfigMapGenerator>, _ctx: Context<()>) -> Result<Action, Error> {
+/// async fn reconcile(g: Arc<ConfigMapGenerator>, _ctx: Arc<()>) -> Result<Action, Error> {
 ///     // .. use api here to reconcile a child ConfigMap with ownerreferences
 ///     // see configmapgen_controller example for full info
 ///     Ok(Action::requeue(Duration::from_secs(300)))
 /// }
 /// /// an error handler that will be called when the reconciler fails
-/// fn error_policy(_error: &Error, _ctx: Context<()>) -> Action {
+/// fn error_policy(_error: &Error, _ctx: Arc<()>) -> Action {
 ///     Action::requeue(Duration::from_secs(60))
 /// }
 ///
@@ -387,7 +358,7 @@ where
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
-///     let context = Context::new(()); // bad empty context - put client in here
+///     let context = Arc::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
 ///     Controller::new(cmgs, ListParams::default())
@@ -611,9 +582,9 @@ where
     /// use kube::{
     ///     Client,
     ///     api::{ListParams, Api, ResourceExt},
-    ///     runtime::{controller::{Context, Controller, Action}},
+    ///     runtime::{controller::{Controller, Action}},
     /// };
-    /// use std::{convert::Infallible, io::BufRead};
+    /// use std::{convert::Infallible, io::BufRead, sync::Arc};
     /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
     /// // Using a regular background thread since tokio::io::stdin() doesn't allow aborting reads,
     /// // and its worker prevents the Tokio runtime from shutting down.
@@ -633,7 +604,7 @@ where
     ///         Ok(Action::await_change())
     ///     },
     ///     |err: &Infallible, _| Err(err).unwrap(),
-    ///     Context::new(()),
+    ///     Arc::new(()),
     /// );
     /// # };
     /// ```
@@ -675,8 +646,8 @@ where
     /// use futures::future::FutureExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{api::ListParams, Api, Client, ResourceExt};
-    /// use kube_runtime::controller::{Context, Controller, Action};
-    /// use std::convert::Infallible;
+    /// use kube_runtime::controller::{Controller, Action};
+    /// use std::{convert::Infallible, sync::Arc};
     /// Controller::new(
     ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
     ///     ListParams::default(),
@@ -688,7 +659,7 @@ where
     ///         Ok(Action::await_change())
     ///     },
     ///     |err: &Infallible, _| Err(err).unwrap(),
-    ///     Context::new(()),
+    ///     Arc::new(()),
     /// );
     /// # };
     /// ```
@@ -761,12 +732,12 @@ where
     ///
     /// This creates a stream from all builder calls and starts an applier with
     /// a specified `reconciler` and `error_policy` callbacks. Each of these will be called
-    /// with a configurable [`Context`].
-    pub fn run<ReconcilerFut, T>(
+    /// with a configurable `context`.
+    pub fn run<ReconcilerFut, Ctx>(
         self,
-        mut reconciler: impl FnMut(Arc<K>, Context<T>) -> ReconcilerFut,
-        error_policy: impl FnMut(&ReconcilerFut::Error, Context<T>) -> Action,
-        context: Context<T>,
+        mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
+        error_policy: impl FnMut(&ReconcilerFut::Error, Arc<Ctx>) -> Action,
+        context: Arc<Ctx>,
     ) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, watcher::Error>>>
     where
         K::DynamicType: Debug + Unpin,
@@ -792,7 +763,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Action, Context};
+    use std::sync::Arc;
+
+    use super::Action;
     use crate::Controller;
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::Api;
@@ -814,7 +787,7 @@ mod tests {
             Controller::new(mock_type::<Api<ConfigMap>>(), Default::default()).run(
                 |_, _| async { Ok(mock_type::<Action>()) },
                 |_: &std::io::Error, _| mock_type::<Action>(),
-                Context::new(()),
+                Arc::new(()),
             ),
         );
     }
