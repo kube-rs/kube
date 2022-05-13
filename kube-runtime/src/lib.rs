@@ -27,6 +27,8 @@ pub mod scheduler;
 pub mod utils;
 pub mod wait;
 pub mod watcher;
+mod predicate;
+pub use predicate::{predicates, Predicate};
 
 pub use controller::{applier, Controller};
 pub use finalizer::finalizer;
