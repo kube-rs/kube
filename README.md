@@ -82,7 +82,7 @@ pub struct DocumentSpec {
 Then you can use the generated wrapper struct `Document` as a [`kube::Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
 
 ```rust
-let docs: Api<DocumentSpec> = Api::default_namespaced(client);
+let docs: Api<Document> = Api::default_namespaced(client);
 let d = Document::new("guide", DocumentSpec::default());
 println!("doc: {:?}", d);
 println!("crd: {:?}", serde_yaml::to_string(&Document::crd()));
