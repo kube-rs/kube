@@ -27,8 +27,6 @@ pub mod scheduler;
 pub mod utils;
 pub mod wait;
 pub mod watcher;
-mod predicate;
-pub use predicate::{predicates, Predicate};
 
 pub use controller::{applier, Controller};
 pub use finalizer::finalizer;
@@ -36,3 +34,6 @@ pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
 pub use watcher::watcher;
+
+pub use utils::predicates;
+pub use wait::conditions;

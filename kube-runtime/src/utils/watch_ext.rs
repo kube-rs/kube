@@ -1,8 +1,9 @@
 use crate::{
-    utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
+    utils::{event_flatten::EventFlatten, predicate::PredicateFilter, stream_backoff::StreamBackoff},
     watcher,
 };
 use backoff::backoff::Backoff;
+use kube_client::Resource;
 
 use futures::{Stream, TryStream};
 
@@ -35,6 +36,19 @@ pub trait WatchStreamExt: Stream {
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
         EventFlatten::new(self, true)
+    }
+
+    /// Filter out a flattened stream on predicates
+    fn predicate_filter<K, V>(
+        self,
+        predicate: impl Fn(&K) -> Option<V> + 'static,
+    ) -> PredicateFilter<Self, K, V>
+    where
+        Self: Stream<Item = Result<K, watcher::Error>> + Sized,
+        V: PartialEq,
+        K: Resource + 'static,
+    {
+        PredicateFilter::new(self, predicate)
     }
 }
 impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
