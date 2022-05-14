@@ -38,7 +38,7 @@ pub trait WatchStreamExt: Stream {
         EventFlatten::new(self, true)
     }
 
-    /// Filter out a flattened stream on predicates
+    /// Filter out a flattened stream on [`predicates`](crate::runtime::predicates)
     fn predicate_filter<K, V>(
         self,
         predicate: impl Fn(&K) -> Option<V> + 'static,

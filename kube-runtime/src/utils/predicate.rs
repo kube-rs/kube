@@ -8,6 +8,7 @@ use kube_client::Resource;
 use pin_project::pin_project;
 use std::{collections::HashMap, hash::Hash};
 
+#[allow(clippy::pedantic)]
 #[pin_project]
 /// Stream returned by the [`predicate_filter`](super::WatchStreamExt::predicate_filter) method.
 #[must_use = "streams do nothing unless polled"]
@@ -15,6 +16,7 @@ pub struct PredicateFilter<St, K: Resource, V: PartialEq> {
     #[pin]
     stream: St,
     predicate: Box<dyn (Fn(&K) -> Option<V>)>,
+    // TODO: HashMap should only store a Hash of V
     cache: HashMap<ObjectRef<K>, V>,
 }
 impl<St: TryStream<Ok = K>, K: Resource, V: PartialEq> PredicateFilter<St, K, V> {
@@ -80,8 +82,7 @@ pub mod predicates {
         x.meta().generation
     }
 
-    /// TODO: does this even impl Predicate? needs PartialEq on return type...
-    /// TODO: hash these? users don't actually need a per-object label cache...
+    /// Compute the labels of a Resource K
     pub fn labels<K: Resource>(x: &K) -> Option<BTreeMap<String, String>> {
         x.meta().labels.clone()
     }
