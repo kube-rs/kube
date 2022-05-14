@@ -5,7 +5,7 @@
 use crate::utils::ResetTimerBackoff;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
-use futures_util::{stream::BoxStream, Stream, StreamExt};
+use futures_util::{self, stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
