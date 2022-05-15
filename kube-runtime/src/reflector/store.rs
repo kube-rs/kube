@@ -132,7 +132,7 @@ where
 
 /// Create a (Reader, Writer) for a `Store<K>` for a typed resource `K`
 ///
-/// The `Writer` should be passed to a [`reflector()`](super::reflector),
+/// The `Writer` should be passed to a [`reflector`](crate::reflector()),
 /// and the [`Store`] is a read-only handle.
 #[must_use]
 pub fn store<K>() -> (Store<K>, Writer<K>)
