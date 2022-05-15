@@ -53,16 +53,18 @@ pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
-    watch_object(api, name)
-        .map_ok(|obj| {
-            if cond.matches_object(obj.as_ref()) {
-                Some(obj)
-            } else {
-                None
-            }
-        })
-        .try_take_while(|match_| futures::future::ok(match_.is_none()))
-        .try_fold(None, |_, match_| futures::future::ok(match_))
+    tokio::pin! {
+        // Skip updates until the condition is satisfied.
+        let stream = watch_object(api, name)
+            .try_skip_while(|obj| {
+                let matches = cond.matches_object(obj.as_ref());
+                futures::future::ok(!matches)
+            });
+    }
+
+    // Then take the first update that satisfies the condition.
+    stream
+        .try_next()
         .await
         .map_err(Error::ProbeFailed)?
         .ok_or(Error::WatchClosed)
