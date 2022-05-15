@@ -31,7 +31,6 @@ impl<St, K> Stream for PredicateFilter<St, K>
 where
     St: Stream<Item = Result<K, Error>>,
     K: Resource,
-
     K::DynamicType: Default + Eq + Hash,
 {
     type Item = Result<K, Error>;
@@ -71,7 +70,7 @@ where
 }
 
 pub mod predicates {
-    use kube_client::Resource;
+    use kube_client::{Resource, ResourceExt};
     use std::{
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
@@ -92,12 +91,12 @@ pub mod predicates {
 
     /// Hash the labels of a Resource K
     pub fn labels<K: Resource>(obj: &K) -> Option<u64> {
-        obj.meta().labels.as_ref().map(|x| hash(&x))
+        Some(hash(obj.labels()))
     }
 
     /// Hash the annotations of a Resource K
     pub fn annotations<K: Resource>(obj: &K) -> Option<u64> {
-        obj.meta().annotations.as_ref().map(|x| hash(&x))
+        Some(hash(obj.annotations()))
     }
 }
 
