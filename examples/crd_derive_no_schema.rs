@@ -48,6 +48,7 @@ impl Bar {
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
     let crd = Bar::crd_with_manual_schema();
     println!("{}", serde_yaml::to_string(&crd).unwrap());
 }

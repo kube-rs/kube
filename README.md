@@ -17,8 +17,8 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.71.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.14.0", features = ["v1_22"] }
+kube = { version = "0.72.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.14.0", features = ["v1_23"] }
 ```
 
 [Features are available](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
@@ -47,7 +47,7 @@ The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with 
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
-let pods: Api<Pod> = Api::namespaced(client, "apps");
+let pods: Api<Pod> = Api::default_namespaced(client);
 
 let p = pods.get("blog").await?;
 println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
@@ -55,7 +55,7 @@ println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
 }});
-let pp = PatchParams::apply("my_controller");
+let pp = PatchParams::apply("kube");
 let patched = pods.patch("blog", &pp, &Patch::Apply(patch)).await?;
 assert_eq!(patched.spec.active_deadline_seconds, Some(5));
 
@@ -72,20 +72,20 @@ You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec st
 
 ```rust
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
-#[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-pub struct FooSpec {
-    name: String,
-    info: String,
+#[kube(group = "kube.rs", version = "v1", kind = "Document", namespaced)]
+pub struct DocumentSpec {
+    title: String,
+    content: String,
 }
 ```
 
-Then you can use the generated wrapper struct `Foo` as a [`kube::Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
+Then you can use the generated wrapper struct `Document` as a [`kube::Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
 
 ```rust
-let foos: Api<Foo> = Api::namespaced(client, "default");
-let f = Foo::new("my-foo", FooSpec::default());
-println!("foo: {:?}", f);
-println!("crd: {:?}", serde_yaml::to_string(&Foo::crd()));
+let docs: Api<Document> = Api::default_namespaced(client);
+let d = Document::new("guide", DocumentSpec::default());
+println!("doc: {:?}", d);
+println!("crd: {:?}", serde_yaml::to_string(&Document::crd()));
 ```
 
 There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples) for more.
@@ -101,32 +101,29 @@ The `runtime` module exports the `kube_runtime` crate and contains higher level 
 A low level streaming interface (similar to informers) that presents `Applied`, `Deleted` or `Restarted` events.
 
 ```rust
-let api = Api::<Pod>::namespaced(client, "default");
-let watcher = watcher(api, ListParams::default());
+let api = Api::<Pod>::default_namespaced(client);
+let stream = watcher(api, ListParams::default()).applied_objects();
 ```
 
 This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
 
 ```rust
-let mut apply_events = try_flatten_applied(watcher).boxed_local();
-while let Some(event) = apply_events.try_next().await? {
+while let Some(event) = stream.try_next().await? {
     println!("Applied: {}", event.name());
 }
 ```
 
-NB: the plain stream items a `watcher` returns are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities like `try_flatten_applied` or `try_flatten_touched`.
+NB: the plain items in a `watcher` stream are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities from `WatchStreamExt`, such as `applied_objects`.
 
 ## Reflectors
 
 A `reflector` is a `watcher` with `Store` on `K`. It acts on all the `Event<K>` exposed by `watcher` to ensure that the state in the `Store` is as accurate as possible.
 
 ```rust
-let nodes: Api<Node> = Api::namespaced(client, &namespace);
-let lp = ListParams::default()
-    .labels("beta.kubernetes.io/instance-type=m4.2xlarge");
-let store = reflector::store::Writer::<Node>::default();
-let reader = store.as_reader();
-let rf = reflector(store, watcher(nodes, lp));
+let nodes: Api<Node> = Api::all(client);
+let lp = ListParams::default().labels("kubernetes.io/arch=amd64");
+let (reader, writer) = reflector::store();
+let rf = reflector(writer, watcher(nodes, lp));
 ```
 
 At this point you can listen to the `reflector` as if it was a `watcher`, but you can also query the `reader` at any point.
@@ -156,8 +153,8 @@ Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues
 
 ```toml
 [dependencies]
-kube = { version = "0.71.0", default-features = false, features = ["client", "rustls-tls"] }
-k8s-openapi = { version = "0.14.0", features = ["v1_22"] }
+kube = { version = "0.72.0", default-features = false, features = ["client", "rustls-tls"] }
+k8s-openapi = { version = "0.14.0", features = ["v1_23"] }
 ```
 
 This will pull in `rustls` and `hyper-rustls`.

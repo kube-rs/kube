@@ -8,7 +8,6 @@
 
 	// These extensions are loaded for all users by default.
 	"extensions": [
-		"DavidAnson.vscode-markdownlint",
 		"matklad.rust-analyzer",
 		"NathanRidley.autotrim",
 		"samverschueren.final-newline",

@@ -1,19 +1,17 @@
 use k8s_openapi::api::core::v1::Pod;
-
 use kube::{
     api::{Api, DeleteParams, PostParams},
     runtime::wait::{await_condition, conditions::is_pod_running},
     Client, ResourceExt,
 };
+use tracing::*;
 
 use hyper::{body, Body, Request};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let p: Pod = serde_json::from_value(serde_json::json!({
         "apiVersion": "v1",
@@ -27,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }))?;
 
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods: Api<Pod> = Api::default_namespaced(client);
     // Stop on error including a pod already exists or is still being deleted.
     pods.create(&PostParams::default(), &p).await?;
 
@@ -42,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
     let (mut sender, connection) = hyper::client::conn::handshake(port).await?;
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("Error in connection: {}", e);
+            warn!("Error in connection: {}", e);
         }
     });
 
@@ -62,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
     assert!(body_str.contains("Welcome to nginx!"));
 
     // Delete it
-    println!("deleting");
+    info!("deleting");
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {

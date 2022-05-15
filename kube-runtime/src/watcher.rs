@@ -75,6 +75,36 @@ impl<K> Event<K> {
         }
         .into_iter()
     }
+
+    /// Map each object in an event through a mutator fn
+    ///
+    /// This allows for memory optimizations in watch streams.
+    /// If you are chaining a watch stream into a reflector as an in memory state store,
+    /// you can control the space used by each object by dropping fields.
+    ///
+    /// ```no_run
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// use kube::ResourceExt;
+    /// # use kube::runtime::watcher::Event;
+    /// # let event: Event<Pod> = todo!();
+    /// event.modify(|pod| {
+    ///     pod.managed_fields_mut().clear();
+    ///     pod.annotations_mut().clear();
+    ///     pod.status = None;
+    /// });
+    /// ```
+    #[must_use]
+    pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
+        match &mut self {
+            Event::Applied(obj) | Event::Deleted(obj) => (f)(obj),
+            Event::Restarted(objs) => {
+                for k in objs {
+                    (f)(k)
+                }
+            }
+        }
+        self
+    }
 }
 
 #[derive(Derivative)]
@@ -191,13 +221,13 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`],
-/// direct users may want to flatten composite events with [`try_flatten_applied`]:
+/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
+/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
 ///
 /// ```no_run
 /// use kube::{
 ///   api::{Api, ListParams, ResourceExt}, Client,
-///   runtime::{utils::try_flatten_applied, watcher}
+///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::{StreamExt, TryStreamExt};
@@ -206,8 +236,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     let watcher = watcher(pods, ListParams::default());
-///     try_flatten_applied(watcher)
+///     watcher(pods, ListParams::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name());
 ///             Ok(())
@@ -216,7 +245,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///    Ok(())
 /// }
 /// ```
-/// [`try_flatten_applied`]: super::utils::try_flatten_applied
+/// [`WatchStreamExt`]: super::WatchStreamExt
 /// [`reflector`]: super::reflector::reflector
 /// [`Api::watch`]: kube_client::Api::watch
 ///

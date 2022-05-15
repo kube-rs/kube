@@ -1,10 +1,10 @@
-#[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+use tracing::*;
 
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
-    runtime::{reflector, utils::try_flatten_applied, watcher},
+    runtime::{reflector, watcher, WatchStreamExt},
     Client, CustomResource, CustomResourceExt,
 };
 
@@ -20,10 +20,8 @@ pub struct FooSpec {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // 0. Ensure the CRD is installed (you probably just want to do this on CI)
     // (crd file can be created by piping `Foo::crd`'s yaml ser to kubectl apply)
@@ -35,11 +33,11 @@ async fn main() -> anyhow::Result<()> {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await; // wait for k8s to deal with it
 
     // 1. Run a reflector against the installed CRD
-    let store = reflector::store::Writer::<Foo>::default();
-    let reader = store.as_reader();
-    let foos: Api<Foo> = Api::namespaced(client, &namespace);
+    let (reader, writer) = reflector::store::<Foo>();
+
+    let foos: Api<Foo> = Api::default_namespaced(client);
     let lp = ListParams::default().timeout(20); // low timeout in this example
-    let rf = reflector(store, watcher(foos, lp));
+    let rf = reflector(writer, watcher(foos, lp));
 
     tokio::spawn(async move {
         loop {
@@ -50,9 +48,9 @@ async fn main() -> anyhow::Result<()> {
             info!("Current crds: {:?}", crds);
         }
     });
-    let mut rfa = try_flatten_applied(rf).boxed();
+    let mut rfa = rf.applied_objects().boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("Applied {}", event.name());
+        info!("saw {}", event.name());
     }
     Ok(())
 }

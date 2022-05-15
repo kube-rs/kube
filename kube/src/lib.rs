@@ -55,7 +55,7 @@
 //!     api::{Api, DeleteParams, ListParams, PatchParams, Patch, ResourceExt},
 //!     core::CustomResourceExt,
 //!     Client, CustomResource,
-//!     runtime::{watcher, utils::try_flatten_applied, wait::{conditions, await_condition}},
+//!     runtime::{watcher, WatchStreamExt, wait::{conditions, await_condition}},
 //! };
 //!
 //! // Our custom resource
@@ -88,7 +88,7 @@
 //!     // Watch for changes to foos in the configured namespace
 //!     let foos: Api<Foo> = Api::default_namespaced(client.clone());
 //!     let lp = ListParams::default();
-//!     let mut apply_stream = try_flatten_applied(watcher(foos, lp)).boxed();
+//!     let mut apply_stream = watcher(foos, lp).applied_objects().boxed();
 //!     while let Some(f) = apply_stream.try_next().await? {
 //!         println!("saw apply to {}", f.name());
 //!     }
@@ -339,6 +339,7 @@ mod test {
                 .entry("kube.rs".to_string())
                 .or_insert_with(|| "hello".to_string());
             pod.finalizers_mut().push("kube-finalizer".to_string());
+            pod.managed_fields_mut().clear();
             // NB: we are **not** pushing these back upstream - (Api::apply or Api::replace needed for it)
         }
         // check we can iterate over ObjectList normally - and check the mutations worked
@@ -347,6 +348,7 @@ mod test {
             assert!(pod.labels().get("kube.rs").is_some());
             assert!(pod.finalizers().contains(&"kube-finalizer".to_string()));
             assert!(pod.spec().containers.is_empty());
+            assert!(pod.managed_fields().is_empty());
         }
         Ok(())
     }

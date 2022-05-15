@@ -1,11 +1,11 @@
 // Minimal custom client example.
 use k8s_openapi::api::core::v1::Pod;
+use tracing::*;
 
 use kube::{client::ConfigExt, Api, Client, Config, ResourceExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=trace");
     tracing_subscriber::fmt::init();
 
     let config = Config::infer().await?;
@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     for p in pods.list(&Default::default()).await? {
-        println!("{}", p.name());
+        info!("{}", p.name());
     }
 
     Ok(())

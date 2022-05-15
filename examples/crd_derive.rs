@@ -39,6 +39,7 @@ pub struct FooStatus {
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
     println!("Kind {}", FooCrd::kind(&()));
     let mut foo = FooCrd::new("hi", MyFoo {
         name: "hi".into(),

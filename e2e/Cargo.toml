@@ -17,8 +17,8 @@ path = "dapp.rs"
 anyhow = "1.0.44"
 env_logger = "0.9.0"
 futures = "0.3.17"
-kube = { path = "../kube", version = "^0.71.0", default-features = false, features = ["client", "rustls-tls"] }
-k8s-openapi = { version = "0.14.0", features = ["v1_22"], default-features = false }
+kube = { path = "../kube", version = "^0.72.0", default-features = false, features = ["client", "rustls-tls"] }
+k8s-openapi = { version = "0.14.0", features = ["v1_23"], default-features = false }
 log = "0.4.11"
 serde_json = "1.0.68"
 tokio = { version = "1.14.0", features = ["full"] }

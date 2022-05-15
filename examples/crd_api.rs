@@ -1,4 +1,3 @@
-#[macro_use] extern crate log;
 use anyhow::{bail, Result};
 use either::Either::{Left, Right};
 use schemars::JsonSchema;
@@ -6,28 +5,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
 use tokio::time::sleep;
+use tracing::*;
 use validator::Validate;
 
-// Using the old v1beta1 extension requires the deprecated-crd-v1beta1 feature on kube
-#[cfg(feature = "deprecated")]
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1beta1 as apiexts;
-#[cfg(feature = "deprecated")] use kube::core::crd::v1beta1::CustomResourceExt;
-
-// Recommended: no deprecated features (v1 crd)
-#[cfg(not(feature = "deprecated"))]
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
-#[cfg(not(feature = "deprecated"))] use kube::core::crd::v1::CustomResourceExt;
-
-use apiexts::CustomResourceDefinition;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
+    core::crd::CustomResourceExt,
     Client, CustomResource,
 };
 
 // Own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, Validate, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-#[cfg_attr(feature = "deprecated", kube(apiextensions = "v1beta1"))]
 #[kube(status = "FooStatus")]
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 #[kube(printcolumn = r#"{"name":"Team", "jsonPath": ".spec.metadata.team", "type": "string"}"#)]
@@ -46,10 +36,8 @@ pub struct FooStatus {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // Manage CRDs first
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
@@ -90,7 +78,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(1)).await;
 
     // Manage the Foo CR
-    let foos: Api<Foo> = Api::namespaced(client.clone(), &namespace);
+    let foos: Api<Foo> = Api::default_namespaced(client.clone());
 
     // Create Foo baz
     info!("Creating Foo instance baz");

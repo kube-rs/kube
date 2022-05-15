@@ -3,19 +3,19 @@
 // NOTE: This is designed to demonstrate how to use finalizers, but is not in itself a good use case for them.
 // If you actually want to clean up other Kubernetes objects then you should use `ownerReferences` instead and let
 // k8s garbage collect the children.
-
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 use kube::{
     api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
     error::ErrorResponse,
     runtime::{
-        controller::{Action, Context, Controller},
+        controller::{Action, Controller},
         finalizer::{finalizer, Event},
     },
 };
 use std::{sync::Arc, time::Duration};
 use thiserror::Error;
+use tracing::*;
 
 #[derive(Debug, Error)]
 enum Error {
@@ -31,14 +31,12 @@ enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
-    Ok(format!(
-        "cm---{}",
-        cm.metadata.name.as_deref().ok_or(Error::NoName)?
-    ))
+    let name = cm.metadata.name.as_deref().ok_or(Error::NoName)?;
+    Ok(format!("cmsyncer-{}", name))
 }
 
 async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
-    println!("Reconciling {:?}", cm);
+    info!("Reconciling {:?}", cm);
     let secret_name = secret_name_for_configmap(&cm)?;
     secrets
         .patch(
@@ -60,7 +58,7 @@ async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action
 }
 
 async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
-    println!("Cleaning up {:?}", cm);
+    info!("Cleaning up {:?}", cm);
     secrets
         .delete(&secret_name_for_configmap(&cm)?, &DeleteParams::default())
         .await
@@ -76,18 +74,17 @@ async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Acti
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
-    let kube = kube::Client::try_default().await?;
-    let all_cms = kube::Api::<ConfigMap>::all(kube.clone());
+    tracing_subscriber::fmt::init();
+    let client = kube::Client::try_default().await?;
     Controller::new(
-        all_cms,
+        Api::<ConfigMap>::all(client.clone()),
         ListParams::default().labels("configmap-secret-syncer.nullable.se/sync=true"),
     )
     .run(
         |cm, _| {
             let ns = cm.meta().namespace.as_deref().ok_or(Error::NoNamespace).unwrap();
-            let cms: Api<ConfigMap> = Api::namespaced(kube.clone(), ns);
-            let secrets: Api<Secret> = Api::namespaced(kube.clone(), ns);
+            let cms: Api<ConfigMap> = Api::namespaced(client.clone(), ns);
+            let secrets: Api<Secret> = Api::namespaced(client.clone(), ns);
             async move {
                 finalizer(
                     &cms,
@@ -104,9 +101,9 @@ async fn main() -> anyhow::Result<()> {
             }
         },
         |_err, _| Action::requeue(Duration::from_secs(2)),
-        Context::new(()),
+        Arc::new(()),
     )
-    .for_each(|msg| async move { println!("Reconciled: {:?}", msg) })
+    .for_each(|msg| async move { info!("Reconciled: {:?}", msg) })
     .await;
     Ok(())
 }
