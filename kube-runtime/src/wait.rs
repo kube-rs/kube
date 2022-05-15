@@ -128,10 +128,9 @@ pub trait Condition<K> {
     /// assert!(!cond_true.and(cond_false).matches_object(None));
     /// assert!(cond_true.and(cond_true).matches_object(None));
     /// ```
-    fn and<Other>(self, other: Other) -> conditions::And<Self, Other>
+    fn and<Other: Condition<K>>(self, other: Other) -> conditions::And<Self, Other>
     where
         Self: Sized,
-        Other: Condition<K>,
     {
         conditions::And(self, other)
     }
@@ -149,10 +148,9 @@ pub trait Condition<K> {
     /// assert!(cond_true.or(cond_false).matches_object(None));
     /// assert!(cond_true.or(cond_true).matches_object(None));
     /// ```
-    fn or<Other>(self, other: Other) -> conditions::Or<Self, Other>
+    fn or<Other: Condition<K>>(self, other: Other) -> conditions::Or<Self, Other>
     where
         Self: Sized,
-        Other: Condition<K>,
     {
         conditions::Or(self, other)
     }
