@@ -87,3 +87,59 @@ pub mod predicates {
         x.meta().labels.clone()
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use std::task::Poll;
+
+    use super::{predicates, Error, PredicateFilter};
+    use futures::{pin_mut, poll, stream, FutureExt, StreamExt};
+    use kube_client::Resource;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn predicate_filtering_hides_equal_predicate_values() {
+        use k8s_openapi::api::core::v1::Pod;
+        let mkobj = |gen: i32| {
+            let p: Pod = serde_json::from_value(json!({
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {
+                    "name": "blog",
+                    "generation": Some(gen),
+                },
+                "spec": {
+                    "containers": [{
+                      "name": "blog",
+                      "image": "clux/blog:0.1.0"
+                    }],
+                }
+            }))
+            .unwrap();
+            p
+        };
+        let data = stream::iter([
+            Ok(mkobj(1)),
+            Err(Error::TooManyObjects),
+            Ok(mkobj(1)),
+            Ok(mkobj(2)),
+        ]);
+        let rx = PredicateFilter::new(data, predicates::generation);
+        pin_mut!(rx);
+
+        // mkobj(1) passed through
+        let first = rx.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(first.meta().generation, Some(1));
+
+        // Error passed through
+        assert!(matches!(
+            poll!(rx.next()),
+            Poll::Ready(Some(Err(Error::TooManyObjects)))
+        ));
+        // (no repeat mkobj(1) - same generation)
+        // mkobj(2) next
+        let second = rx.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(second.meta().generation, Some(2));
+        assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
+    }
+}
