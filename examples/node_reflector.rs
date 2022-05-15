@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
         .predicate_filter(predicates::labels);
     pin_mut!(rf);
     while let Some(node) = rf.try_next().await? {
-        info!("saw node {} with changed labels", node.name());
+        info!("saw node {} with hitherto unseen labels", node.name());
     }
 
     Ok(())

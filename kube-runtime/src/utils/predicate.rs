@@ -12,15 +12,14 @@ use std::{collections::HashMap, hash::Hash};
 #[pin_project]
 /// Stream returned by the [`predicate_filter`](super::WatchStreamExt::predicate_filter) method.
 #[must_use = "streams do nothing unless polled"]
-pub struct PredicateFilter<St, K: Resource, V: PartialEq> {
+pub struct PredicateFilter<St, K: Resource> {
     #[pin]
     stream: St,
-    predicate: Box<dyn (Fn(&K) -> Option<V>)>,
-    // TODO: HashMap should only store a Hash of V
-    cache: HashMap<ObjectRef<K>, V>,
+    predicate: Box<dyn (Fn(&K) -> Option<u64>)>,
+    cache: HashMap<ObjectRef<K>, u64>,
 }
-impl<St: TryStream<Ok = K>, K: Resource, V: PartialEq> PredicateFilter<St, K, V> {
-    pub(super) fn new(stream: St, predicate: impl Fn(&K) -> Option<V> + 'static) -> Self {
+impl<St: TryStream<Ok = K>, K: Resource> PredicateFilter<St, K> {
+    pub(super) fn new(stream: St, predicate: impl Fn(&K) -> Option<u64> + 'static) -> Self {
         Self {
             stream,
             predicate: Box::new(predicate),
@@ -28,11 +27,11 @@ impl<St: TryStream<Ok = K>, K: Resource, V: PartialEq> PredicateFilter<St, K, V>
         }
     }
 }
-impl<St, K, V> Stream for PredicateFilter<St, K, V>
+impl<St, K> Stream for PredicateFilter<St, K>
 where
     St: Stream<Item = Result<K, Error>>,
-    V: PartialEq,
     K: Resource,
+
     K::DynamicType: Default + Eq + Hash,
 {
     type Item = Result<K, Error>;
@@ -43,7 +42,6 @@ where
             break match ready!(me.stream.as_mut().poll_next(cx)) {
                 Some(Ok(obj)) => {
                     if let Some(val) = (me.predicate)(&obj) {
-                        // TODO: hash value here
                         let key = ObjectRef::from_obj(&obj);
                         let changed = if let Some(old) = me.cache.get(&key) {
                             *old != val
@@ -74,17 +72,32 @@ where
 
 pub mod predicates {
     use kube_client::Resource;
-    use std::collections::BTreeMap;
-    // TODO: import from https://github.com/kubernetes-sigs/controller-runtime/blob/v0.12.0/pkg/predicate/predicate.go
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
 
-    /// Compute the generation of a Resource K
-    pub fn generation<K: Resource>(x: &K) -> Option<i64> {
-        x.meta().generation
+    // See: https://github.com/kubernetes-sigs/controller-runtime/blob/v0.12.0/pkg/predicate/predicate.go
+
+    fn hash<T: Hash>(t: &T) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        t.hash(&mut hasher);
+        hasher.finish()
     }
 
-    /// Compute the labels of a Resource K
-    pub fn labels<K: Resource>(x: &K) -> Option<BTreeMap<String, String>> {
-        x.meta().labels.clone()
+    /// Hash the generation of a Resource K
+    pub fn generation<K: Resource>(obj: &K) -> Option<u64> {
+        obj.meta().generation.map(|g| hash(&g))
+    }
+
+    /// Hash the labels of a Resource K
+    pub fn labels<K: Resource>(obj: &K) -> Option<u64> {
+        obj.meta().labels.as_ref().map(|x| hash(&x))
+    }
+
+    /// Hash the annotations of a Resource K
+    pub fn annotations<K: Resource>(obj: &K) -> Option<u64> {
+        obj.meta().annotations.as_ref().map(|x| hash(&x))
     }
 }
 

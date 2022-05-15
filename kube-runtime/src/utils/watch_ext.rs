@@ -39,13 +39,9 @@ pub trait WatchStreamExt: Stream {
     }
 
     /// Filter out a flattened stream on [`predicates`](crate::runtime::predicates)
-    fn predicate_filter<K, V>(
-        self,
-        predicate: impl Fn(&K) -> Option<V> + 'static,
-    ) -> PredicateFilter<Self, K, V>
+    fn predicate_filter<K>(self, predicate: impl Fn(&K) -> Option<u64> + 'static) -> PredicateFilter<Self, K>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
-        V: PartialEq,
         K: Resource + 'static,
     {
         PredicateFilter::new(self, predicate)
