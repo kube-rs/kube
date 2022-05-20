@@ -91,7 +91,6 @@ where
 /// }
 /// ```
 pub trait Condition<K> {
-    /// Returns `Some` when the condition is fulfilled, `None` otherwise.
     fn matches_object(&self, obj: Option<&K>) -> bool;
 
     /// Returns a `Condition` that holds if `self` does not
