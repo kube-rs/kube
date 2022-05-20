@@ -11,9 +11,6 @@ use crate::watcher::{self, watch_object};
 pub enum Error {
     #[error("failed to probe for whether the condition is fulfilled yet: {0}")]
     ProbeFailed(#[source] watcher::Error),
-
-    #[error("watch closed before the condition was fulfilled")]
-    WatchClosed,
 }
 
 /// Watch an object, and wait for some condition `cond` to return `true`.
@@ -53,21 +50,20 @@ pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
-    tokio::pin! {
-        // Skip updates until the condition is satisfied.
-        let stream = watch_object(api, name)
-            .try_skip_while(|obj| {
-                let matches = cond.matches_object(obj.as_ref());
-                futures::future::ok(!matches)
-            });
-    }
+    // Skip updates until the condition is satisfied.
+    let stream = watch_object(api, name).try_skip_while(|obj| {
+        let matches = cond.matches_object(obj.as_ref());
+        futures::future::ok(!matches)
+    });
+    futures::pin_mut!(stream);
 
     // Then take the first update that satisfies the condition.
-    stream
+    let obj = stream
         .try_next()
         .await
         .map_err(Error::ProbeFailed)?
-        .ok_or(Error::WatchClosed)
+        .expect("stream must not terminate");
+    Ok(obj)
 }
 
 /// A trait for condition functions to be used by [`await_condition`]
