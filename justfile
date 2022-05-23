@@ -13,7 +13,7 @@ fmt:
   rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
 
 doc:
-  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_23 --open
+  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_24 --open
 
 # Unit tests
 test:
@@ -77,7 +77,8 @@ bump-k8s:
   current=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1)
   next=${current::-2}$((${current:3} + 1))
   fastmod -m -d . --extensions toml "$current" "$next"
-  fastmod -m README.md "$current" "$next"
+  fastmod -m "$current" "$next" -- README.md
+  fastmod -m "$current" "$next" -- justfile
 
 # mode: makefile
 # End:
