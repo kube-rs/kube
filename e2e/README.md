@@ -23,6 +23,6 @@ General process, optimized for time.
 It's successful if the app exits successfully, without encountering errors.
 
 ### Running
-Start a cluster first, e.g. `make k3d`.
+Start a cluster first, e.g. `just k3d`.
 
-Run `make integration` to cross compile `dapp` with `muslrust` locally using the same docker image, and then deploy it to the current active cluster.
+Run `just integration` to cross compile `dapp` with `muslrust` locally using the same docker image, and then deploy it to the current active cluster.

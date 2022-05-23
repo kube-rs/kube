@@ -20,20 +20,18 @@ openssl-tls = ["kube/client", "kube/openssl-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
 runtime = ["kube/runtime"]
 ws = ["kube/ws"]
-latest = ["k8s-openapi/v1_22"]
+latest = ["k8s-openapi/v1_23"]
 
 [dev-dependencies]
 tokio-util = "0.7.0"
 assert-json-diff = "2.0.1"
-validator = { version = "0.14.0", features = ["derive"] }
+validator = { version = "0.15.0", features = ["derive"] }
 anyhow = "1.0.44"
-env_logger = "0.9.0"
 futures = "0.3.17"
 jsonpath_lib = "0.3.0"
-kube = { path = "../kube", version = "^0.71.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.71.0", default-features = false } # only needed to opt out of schema
+kube = { path = "../kube", version = "^0.72.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.72.0", default-features = false } # only needed to opt out of schema
 k8s-openapi = { version = "0.14.0", default-features = false }
-log = "0.4.11"
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
 serde_yaml = "0.8.21"
@@ -52,18 +50,12 @@ tower-http = { version = "0.3.2", features = ["trace", "decompression-gzip"] }
 hyper = { version = "0.14.13", features = ["client", "http1", "stream", "tcp"] }
 thiserror = "1.0.29"
 backoff = "0.4.0"
+clap = { version = "3.1.9", default-features = false, features = ["std", "cargo", "derive"] }
+edit = "0.1.3"
 
 [[example]]
 name = "configmapgen_controller"
 path = "configmapgen_controller.rs"
-
-[[example]]
-name = "configmap_watcher"
-path = "configmap_watcher.rs"
-
-[[example]]
-name = "configmap_reflector"
-path = "configmap_reflector.rs"
 
 [[example]]
 name = "crd_api"
@@ -98,10 +90,6 @@ name = "crd_reflector"
 path = "crd_reflector.rs"
 
 [[example]]
-name = "deployment_reflector"
-path = "deployment_reflector.rs"
-
-[[example]]
 name = "dynamic_api"
 path = "dynamic_api.rs"
 
@@ -120,6 +108,10 @@ path = "event_watcher.rs"
 [[example]]
 name = "job_api"
 path = "job_api.rs"
+
+[[example]]
+name = "kubectl"
+path = "kubectl.rs"
 
 [[example]]
 name = "log_stream"

@@ -3,13 +3,12 @@ use kube::core::{
     DynamicObject, ResourceExt,
 };
 use std::{convert::Infallible, error::Error};
-#[macro_use] extern crate log;
+use tracing::*;
 use warp::{reply, Filter, Reply};
 
 #[tokio::main]
 async fn main() {
-    std::env::set_var("RUST_LOG", "info,warp=warn,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let routes = warp::path("mutate")
         .and(warp::body::json())

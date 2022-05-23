@@ -2,13 +2,12 @@ use kube::{
     api::{Api, ApiResource, NotUsed, Object, ResourceExt},
     Client,
 };
-use log::info;
 use serde::Deserialize;
+use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
     // Here we replace heavy type k8s_openapi::api::core::v1::PodSpec with

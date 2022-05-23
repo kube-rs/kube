@@ -1,14 +1,14 @@
 // Example to listen on port 8080 locally, forwarding to port 80 in the example pod.
 // Similar to `kubectl port-forward pod/example 8080:80`.
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
-
 use futures::FutureExt;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use tower::ServiceExt;
+use tracing::*;
 
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
@@ -19,10 +19,8 @@ use kube::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     let p: Pod = serde_json::from_value(serde_json::json!({
         "apiVersion": "v1",
@@ -36,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }))?;
 
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods: Api<Pod> = Api::default_namespaced(client);
     // Stop on error including a pod already exists or is still being deleted.
     pods.create(&PostParams::default(), &p).await?;
 
@@ -53,14 +51,14 @@ async fn main() -> anyhow::Result<()> {
     let (sender, connection) = hyper::client::conn::handshake(port).await?;
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            log::error!("error in connection: {}", e);
+            error!("error in connection: {}", e);
         }
     });
     // The following task is only used to show any error from the forwarder.
     // This example can be stopped with Ctrl-C if anything happens.
     tokio::spawn(async move {
         if let Err(e) = forwarder.join().await {
-            log::error!("forwarder errored: {}", e);
+            error!("forwarder errored: {}", e);
         }
     });
 
@@ -85,14 +83,14 @@ async fn main() -> anyhow::Result<()> {
     // Stop the server and delete the pod on Ctrl-C.
     tokio::spawn(async move {
         tokio::signal::ctrl_c().map(|_| ()).await;
-        log::info!("stopping the server");
+        info!("stopping the server");
         let _ = tx.send(());
     });
     if let Err(e) = server.await {
-        log::error!("server error: {}", e);
+        error!("server error: {}", e);
     }
 
-    log::info!("deleting the pod");
+    info!("deleting the pod");
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {

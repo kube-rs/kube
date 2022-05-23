@@ -1,7 +1,7 @@
-#[macro_use] extern crate log;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::batch::v1::Job;
 use serde_json::json;
+use tracing::*;
 
 use kube::{
     api::{Api, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
@@ -10,10 +10,8 @@ use kube::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     // Create a Job
     let job_name = "empty-job";
@@ -39,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }))?;
 
-    let jobs: Api<Job> = Api::namespaced(client, &namespace);
+    let jobs: Api<Job> = Api::default_namespaced(client);
     let pp = PostParams::default();
 
     jobs.create(&pp, &my_job).await?;

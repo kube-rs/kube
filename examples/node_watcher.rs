@@ -1,28 +1,24 @@
-#[macro_use] extern crate log;
 use backoff::ExponentialBackoff;
 use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    runtime::{
-        utils::{try_flatten_applied, StreamBackoff},
-        watcher,
-    },
+    runtime::{watcher, WatchStreamExt},
     Client,
 };
+use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,node_watcher=debug,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 
-    let obs = try_flatten_applied(StreamBackoff::new(
-        watcher(nodes, ListParams::default().labels("beta.kubernetes.io/os=linux")),
-        ExponentialBackoff::default(),
-    ));
+    let lp = ListParams::default().labels("beta.kubernetes.io/arch=amd64");
+    let obs = watcher(nodes, lp)
+        .backoff(ExponentialBackoff::default())
+        .applied_objects();
 
     pin_mut!(obs);
     while let Some(n) = obs.try_next().await? {
@@ -58,8 +54,7 @@ async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result
             warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);
         }
     } else {
-        // Turn node_watcher=debug in log to see all
-        debug!("Healthy node: {}", name);
+        info!("Healthy node: {}", name);
     }
     Ok(())
 }

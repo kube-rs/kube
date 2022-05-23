@@ -13,9 +13,11 @@ pub enum Error {
     ProbeFailed(#[source] watcher::Error),
 }
 
-/// Watch an object, and Wait for some condition `cond` to return `true`.
+/// Watch an object, and wait for some condition `cond` to return `true`.
 ///
 /// `cond` is passed `Some` if the object is found, otherwise `None`.
+///
+/// The object is returned when the condition is fulfilled.
 ///
 /// # Caveats
 ///
@@ -44,18 +46,24 @@ pub enum Error {
 /// # Ok(())
 /// # }
 /// ```
-pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<(), Error>
+pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<Option<K>, Error>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
-    watch_object(api, name)
-        .map_err(Error::ProbeFailed)
-        .try_take_while(|obj| {
-            let result = !cond.matches_object(obj.as_ref());
-            async move { Ok(result) }
-        })
-        .try_for_each(|_| async { Ok(()) })
+    // Skip updates until the condition is satisfied.
+    let stream = watch_object(api, name).try_skip_while(|obj| {
+        let matches = cond.matches_object(obj.as_ref());
+        futures::future::ok(!matches)
+    });
+    futures::pin_mut!(stream);
+
+    // Then take the first update that satisfies the condition.
+    let obj = stream
+        .try_next()
         .await
+        .map_err(Error::ProbeFailed)?
+        .expect("stream must not terminate");
+    Ok(obj)
 }
 
 /// A trait for condition functions to be used by [`await_condition`]
@@ -282,6 +290,7 @@ pub mod delete {
             .ok_or(Error::NoUid)?;
         await_condition(api, name, conditions::is_deleted(&deleted_obj_uid))
             .await
-            .map_err(Error::Await)
+            .map_err(Error::Await)?;
+        Ok(())
     }
 }

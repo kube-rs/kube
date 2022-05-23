@@ -122,8 +122,7 @@ async fn main() -> Result<()> {
     assert!(create_crd(client.clone()).await.is_ok());
 
     // Test creating Foo resource.
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
-    let foos = Api::<Foo>::namespaced(client.clone(), &namespace);
+    let foos = Api::<Foo>::default_namespaced(client.clone());
     // Create with defaults using typed Api first.
     // `non_nullable` and `non_nullable_with_default` are set to empty strings.
     // Nullables defaults to `None` and only sent if it's not configured to skip.
@@ -151,7 +150,7 @@ async fn main() -> Result<()> {
     // Set up dynamic resource to test using raw values.
     let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
     let api_resource = ApiResource::from_gvk(&gvk);
-    let dynapi: Api<DynamicObject> = Api::namespaced_with(client.clone(), &namespace, &api_resource);
+    let dynapi: Api<DynamicObject> = Api::default_namespaced_with(client.clone(), &api_resource);
 
     // Test that skipped nullable field without default is not defined.
     let val = dynapi.get("bar").await?.data;

@@ -129,9 +129,26 @@ where
     }
 }
 
+
+/// Create a (Reader, Writer) for a `Store<K>` for a typed resource `K`
+///
+/// The `Writer` should be passed to a [`reflector`](crate::reflector()),
+/// and the [`Store`] is a read-only handle.
+#[must_use]
+pub fn store<K>() -> (Store<K>, Writer<K>)
+where
+    K: Resource + Clone + 'static,
+    K::DynamicType: Eq + Hash + Clone + Default,
+{
+    let w = Writer::<K>::default();
+    let r = w.as_reader();
+    (r, w)
+}
+
+
 #[cfg(test)]
 mod tests {
-    use super::Writer;
+    use super::{store, Writer};
     use crate::{reflector::ObjectRef, watcher};
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::api::ObjectMeta;
@@ -180,9 +197,8 @@ mod tests {
             },
             ..ConfigMap::default()
         };
-        let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
-        let store = store_w.as_reader();
+        let (store, mut writer) = store();
+        writer.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 

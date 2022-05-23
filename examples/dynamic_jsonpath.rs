@@ -3,11 +3,11 @@ use kube::{
     api::{Api, ListParams},
     Client,
 };
+use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
     // Equivalent to `kubectl get pods --all-namespace \
@@ -26,6 +26,6 @@ async fn main() -> anyhow::Result<()> {
     // Use the given JSONPATH to filter the ObjectList
     let list_json = serde_json::to_value(&list)?;
     let res = jsonpath_lib::select(&list_json, &*jsonpath).unwrap();
-    println!("\t\t {:?}", res);
+    info!("\t\t {:?}", res);
     Ok(())
 }

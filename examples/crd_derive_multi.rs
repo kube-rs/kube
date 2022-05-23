@@ -1,4 +1,3 @@
-#[macro_use] extern crate log;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{Api, Patch, PatchParams},
@@ -8,6 +7,7 @@ use kube::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::*;
 
 mod v1 {
     use super::*;
@@ -32,8 +32,7 @@ mod v2 {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=info");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let client = Client::try_default().await?;
     let ssapply = PatchParams::apply("crd_derive_multi").force();
@@ -121,12 +120,9 @@ async fn apply_crd(client: Client, crd: CustomResourceDefinition) -> anyhow::Res
 async fn cleanup(client: Client) -> anyhow::Result<()> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     let obj = crds.delete("manyderives.kube.rs", &Default::default()).await?;
-    match obj {
-        either::Either::Left(o) => {
-            let uid = o.uid().unwrap();
-            await_condition(crds, "manyderives.kube.rs", conditions::is_deleted(&uid)).await?;
-        }
-        _ => {}
+    if let either::Either::Left(o) = obj {
+        let uid = o.uid().unwrap();
+        await_condition(crds, "manyderives.kube.rs", conditions::is_deleted(&uid)).await?;
     }
     Ok(())
 }

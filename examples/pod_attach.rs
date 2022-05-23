@@ -1,6 +1,5 @@
-#[macro_use] extern crate log;
-
 use std::io::Write;
+use tracing::*;
 
 use futures::{join, stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
@@ -14,10 +13,8 @@ use kube::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    std::env::set_var("RUST_LOG", "info,kube=debug");
-    env_logger::init();
+    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
 
     info!("Creating a Pod that outputs numbers for 15s");
     let p: Pod = serde_json::from_value(serde_json::json!({
@@ -33,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }))?;
 
-    let pods: Api<Pod> = Api::namespaced(client, &namespace);
+    let pods: Api<Pod> = Api::default_namespaced(client);
     // Stop on error including a pod already exists or is still being deleted.
     pods.create(&PostParams::default(), &p).await?;
 
@@ -93,7 +90,7 @@ async fn separate_outputs(mut attached: AttachedProcess) {
 
     join!(stdouts, stderrs);
     if let Some(status) = attached.take_status().unwrap().await {
-        println!("{:?}", status);
+        info!("{:?}", status);
     }
 }
 
@@ -109,6 +106,6 @@ async fn combined_output(mut attached: AttachedProcess) {
     });
     outputs.await;
     if let Some(status) = attached.take_status().unwrap().await {
-        println!("{:?}", status);
+        info!("{:?}", status);
     }
 }
