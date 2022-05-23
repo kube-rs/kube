@@ -1,7 +1,7 @@
 # kube-rs
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
-[![Rust 1.56](https://img.shields.io/badge/MSRV-1.56-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.56.0)
+[![Rust 1.60](https://img.shields.io/badge/MSRV-1.60-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.60.0)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 [![Client Capabilities](https://img.shields.io/badge/Kubernetes%20client-Silver-blue.svg?style=plastic&colorB=C0C0C0&colorA=306CE8)](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-capabilities)
 [![Client Support Level](https://img.shields.io/badge/kubernetes%20client-beta-green.svg?style=plastic&colorA=306CE8)](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-support-level)
@@ -18,7 +18,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 ```toml
 [dependencies]
 kube = { version = "0.72.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.14.0", features = ["v1_23"] }
+k8s-openapi = { version = "0.15.0", features = ["v1_24"] }
 ```
 
 [Features are available](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
@@ -154,7 +154,7 @@ Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues
 ```toml
 [dependencies]
 kube = { version = "0.72.0", default-features = false, features = ["client", "rustls-tls"] }
-k8s-openapi = { version = "0.14.0", features = ["v1_23"] }
+k8s-openapi = { version = "0.15.0", features = ["v1_24"] }
 ```
 
 This will pull in `rustls` and `hyper-rustls`.

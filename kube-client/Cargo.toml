@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube-rs"
 readme = "../README.md"
 keywords = ["kubernetes", "client",]
 categories = ["web-programming::http-client"]
-rust-version = "1.56"
+rust-version = "1.60.0"
 edition = "2021"
 
 [features]
@@ -32,7 +32,7 @@ config = ["__non_core", "pem", "dirs"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "openssl-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_23"]
+features = ["client", "native-tls", "rustls-tls", "openssl-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_24"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -73,7 +73,7 @@ tracing = { version = "0.1.29", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
 
 [dependencies.k8s-openapi]
-version = "0.14.0"
+version = "0.15.0"
 default-features = false
 features = []
 
@@ -86,6 +86,6 @@ tokio-test = "0.4.0"
 tower-test = "0.4.0"
 
 [dev-dependencies.k8s-openapi]
-version = "0.14.0"
+version = "0.15.0"
 default-features = false
-features = ["v1_23"]
+features = ["v1_24"]
