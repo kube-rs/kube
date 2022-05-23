@@ -11,7 +11,7 @@ repository = "https://github.com/kube-rs/kube-rs"
 readme = "../README.md"
 keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
 categories = ["web-programming::http-client"]
-rust-version = "1.56"
+rust-version = "1.60.0"
 edition = "2021"
 
 [package.metadata.docs.rs]
