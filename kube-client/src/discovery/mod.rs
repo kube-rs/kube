@@ -21,7 +21,6 @@ enum DiscoveryMode {
 }
 
 impl DiscoveryMode {
-    #[allow(clippy::ptr_arg)] // hashmap complains on &str here
     fn is_queryable(&self, group: &String) -> bool {
         match &self {
             Self::Allow(allowed) => allowed.contains(group),
@@ -136,6 +135,16 @@ impl Discovery {
     /// Returns iterator over all served groups
     pub fn groups(&self) -> impl Iterator<Item = &ApiGroup> {
         self.groups.values()
+    }
+
+    /// Returns a sorted vector of all served groups
+    ///
+    /// This vector is in kubectl's normal alphabetical group order
+    pub fn groups_alphabetical(&self) -> Vec<&ApiGroup> {
+        let mut values: Vec<_> = self.groups().collect();
+        // collect to maintain kubectl order of groups
+        values.sort_by_key(|g| g.name());
+        values
     }
 
     /// Returns the [`ApiGroup`] for a given group if served
