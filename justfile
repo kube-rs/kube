@@ -72,6 +72,25 @@ k3d:
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
 
+# Bump the msrv of kube; "just bump-msrv 1.60.0"
+bump-msrv msrv:
+  #!/usr/bin/env bash
+  oldmsrv="$(rg "rust-version = \"(.*)\"" -r '$1' kube/Cargo.toml)"
+  fastmod -m -d . --extensions toml "rust-version = \"$oldmsrv\"" "rust-version = \"{{msrv}}\""
+  # sanity
+  if [[ $(cat ./*/Cargo.toml | grep "rust-version" | uniq | wc -l) -gt 1 ]]; then
+    echo "inconsistent rust-version keys set in various kube-crates:"
+    rg "rust-version" ./*/Cargo.toml
+    exit 1
+  fi
+  fullmsrv="{{msrv}}"
+  shortmsrv="${fullmsrv::-2}" # badge can use a short display version
+  badge="[![Rust ${shortmsrv}](https://img.shields.io/badge/MSRV-${shortmsrv}-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/{{msrv}})"
+  sd "^.+badge/MSRV.+$" "${badge}" README.md
+  sd "${oldmsrv}" "{{msrv}}" .devcontainer/Dockerfile
+  cargo msrv
+
+# Increment the Kubernetes feature version from k8s-openapi for tests; "just bump-k8s"
 bump-k8s:
   #!/usr/bin/env bash
   current=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1)
