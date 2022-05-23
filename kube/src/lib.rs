@@ -407,7 +407,7 @@ mod test {
         // check all non-excluded groups that are iterable
         let mut groups = discovery.groups_alphabetical().into_iter();
         let firstgroup = groups.next().unwrap();
-        assert_eq!(firstgroup.name, ApiGroup::CORE_GROUP);
+        assert_eq!(firstgroup.name(), ApiGroup::CORE_GROUP);
         for group in groups {
             for (ar, caps) in group.recommended_resources() {
                 if !caps.supports_operation(verbs::LIST) {
