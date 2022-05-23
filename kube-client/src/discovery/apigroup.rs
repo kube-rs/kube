@@ -64,7 +64,7 @@ use std::cmp::Reverse;
 /// [`ApiGroup::recommended_kind`]: crate::discovery::ApiGroup::recommended_kind
 pub struct ApiGroup {
     /// Name of the group e.g. apiregistration.k8s.io
-    pub name: String,
+    name: String,
     /// List of resource information, capabilities at particular versions
     data: Vec<GroupVersionData>,
     /// Preferred version if exported by the `APIGroup`

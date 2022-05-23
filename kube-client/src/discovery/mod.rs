@@ -143,7 +143,7 @@ impl Discovery {
     pub fn groups_alphabetical(&self) -> Vec<&ApiGroup> {
         let mut values: Vec<_> = self.groups().collect();
         // collect to maintain kubectl order of groups
-        values.sort_by_key(|g| &g.name);
+        values.sort_by_key(|g| g.name());
         values
     }
 
