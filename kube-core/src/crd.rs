@@ -6,8 +6,6 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions as apiexts;
 pub mod v1 {
     use super::apiexts::v1::CustomResourceDefinition as Crd;
     /// Extension trait that is implemented by kube-derive
-    ///
-    /// This trait variant is implemented by default (or when `#[kube(apiextensions = "v1")]`)
     pub trait CustomResourceExt {
         /// Helper to generate the CRD including the JsonSchema
         ///
