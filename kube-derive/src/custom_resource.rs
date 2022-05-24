@@ -333,7 +333,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let impl_default = if has_default {
         quote! {
             impl Default for #rootident {
-                /// bah
                 fn default() -> Self {
                     Self {
                         metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
