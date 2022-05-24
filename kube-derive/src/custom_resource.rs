@@ -252,13 +252,13 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
     let root_obj = quote! {
         #[doc = #docstr]
+        #[automatically_derived]
+        #[allow(missing_docs)]
         #[derive(#(#derive_paths),*)]
         #[serde(rename_all = "camelCase")]
         #visibility struct #rootident {
             #schemars_skip
-            /// Metadata on derived type
             #visibility metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
-            /// Spec on derived type
             #visibility spec: #ident,
             #status_field
         }
@@ -570,7 +570,6 @@ fn process_status(
         let ident = format_ident!("{}", status_name);
         StatusInformation {
             field: quote! {
-                /// Status on derived type
                 #[serde(skip_serializing_if = "Option::is_none")]
                 #visibility status: Option<#ident>,
             },
