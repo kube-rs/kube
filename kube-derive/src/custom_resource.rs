@@ -597,6 +597,5 @@ mod tests {
         };
         let input = syn::parse2(input).unwrap();
         let kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
-        assert_eq!(kube_attrs.apiextensions, "v1");
     }
 }

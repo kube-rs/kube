@@ -16,7 +16,6 @@ use std::collections::HashMap;
     shortname = "fo",
     shortname = "f"
 )]
-#[kube(apiextensions = "v1")]
 #[serde(rename_all = "camelCase")]
 struct FooSpec {
     non_nullable: String,
