@@ -256,11 +256,14 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #[serde(rename_all = "camelCase")]
         #visibility struct #rootident {
             #schemars_skip
+            /// Metadata on derived type
             #visibility metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
+            /// Spec on derived type
             #visibility spec: #ident,
             #status_field
         }
         impl #rootident {
+            /// Spec based constructor for derived custom resource
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
                     metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
@@ -330,6 +333,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let impl_default = if has_default {
         quote! {
             impl Default for #rootident {
+                /// bah
                 fn default() -> Self {
                     Self {
                         metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta::default(),
@@ -567,6 +571,7 @@ fn process_status(
         let ident = format_ident!("{}", status_name);
         StatusInformation {
             field: quote! {
+                /// Status on derived type
                 #[serde(skip_serializing_if = "Option::is_none")]
                 #visibility status: Option<#ident>,
             },
