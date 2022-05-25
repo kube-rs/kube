@@ -1,3 +1,5 @@
+//! Generated types support documentation
+#![deny(missing_docs)]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::*;
@@ -11,10 +13,7 @@ use kube::{
     Client, CustomResource, CustomResourceExt,
 };
 
-// NB: This example uses server side apply and beta1 customresources
-// Please test against Kubernetes 1.16.X!
-
-// Own custom resource
+/// Spec object for Foo
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
@@ -25,6 +24,7 @@ pub struct FooSpec {
     replicas: isize,
 }
 
+/// Status object for Foo
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct FooStatus {
     is_bad: bool,

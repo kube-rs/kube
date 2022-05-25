@@ -241,6 +241,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
     let root_obj = quote! {
         #[doc = #docstr]
+        #[automatically_derived]
+        #[allow(missing_docs)]
         #[derive(#(#derive_paths),*)]
         #[serde(rename_all = "camelCase")]
         #visibility struct #rootident {
@@ -250,6 +252,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             #status_field
         }
         impl #rootident {
+            /// Spec based constructor for derived custom resource
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
                     metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
