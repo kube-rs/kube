@@ -28,7 +28,6 @@ use serde::{Deserialize, Serialize};
     derive = "PartialEq",
     derive = "Default"
 )]
-#[kube(apiextensions = "v1")]
 pub struct FooSpec {
     // Non-nullable without default is required.
     //

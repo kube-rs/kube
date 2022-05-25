@@ -68,13 +68,6 @@ mod custom_resource;
 ///
 /// # Optional `#[kube]` attributes
 ///
-/// ## `#[kube(apiextensions = "v1beta1")]`
-/// The version for `CustomResourceDefinition` desired in the `apiextensions.k8s.io` group.
-/// Default is `v1` (for clusters >= 1.17). If using kubernetes <= 1.16 please use `v1beta1`.
-///
-/// - **NOTE**: Support for `v1` requires deriving the openapi v3 `JsonSchema` via the `schemars` dependency.
-/// - **NOTE**: When using `v1beta` the associated `CustomResourceExt` trait lives in `kube::core::crd::v1beta`
-///
 /// ## `#[kube(singular = "nonstandard-singular")]`
 /// To specify the singular name. Defaults to lowercased `kind`.
 ///
@@ -122,9 +115,9 @@ mod custom_resource;
 /// This can be used to provide a completely custom schema, or to interact with third-party custom resources
 /// where you are not responsible for installing the `CustomResourceDefinition`.
 ///
-/// Defaults to `"disabled"` when `apiextensions = "v1beta1"`, otherwise `"derived"`.
+/// Defaults to `"derived"`.
 ///
-/// NOTE: `apiextensions = "v1"` `CustomResourceDefinition`s require a schema. If `schema = "disabled"` then
+/// NOTE: `CustomResourceDefinition`s require a schema. If `schema = "disabled"` then
 /// `Self::crd()` will not be installable into the cluster as-is.
 ///
 /// ## `#[kube(scale = r#"json"#)]`
