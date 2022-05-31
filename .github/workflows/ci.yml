@@ -3,7 +3,7 @@ on:
   pull_request:
 
 jobs:
-  cargo-test:
+  unit:
     strategy:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
@@ -66,7 +66,7 @@ jobs:
         run: cargo test -p kube-examples --example crd_derive_no_schema --no-default-features --features=openssl-tls,latest
         if: matrix.os == 'ubuntu-latest'
 
-  check-msrv:
+  msrv:
     # Run `cargo check` on our minimum supported Rust version
     runs-on: ubuntu-latest
     steps:
@@ -101,12 +101,12 @@ jobs:
         fi
 
   integration:
+    runs-on: ubuntu-latest
     strategy:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
         k8s: [v1.20, latest]
-    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
