@@ -106,7 +106,7 @@ jobs:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
-        k8s: [v1.20, latest]
+        k8s: [v1.19, latest]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -154,7 +154,7 @@ jobs:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
-        k8s: [v1.20, latest]
+        k8s: [v1.19, latest]
     steps:
       - uses: actions/checkout@v2
 
