@@ -175,7 +175,7 @@ jobs:
           # Used to avoid rate limits when fetching the releases from k3s repo.
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
-          k3d-args: --no-lb --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
+          k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
 
       - name: Compile dapp
         run: |
