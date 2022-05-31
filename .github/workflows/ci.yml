@@ -100,6 +100,53 @@ jobs:
           exit 1
         fi
 
+  integration:
+    strategy:
+      # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
+      fail-fast: false
+      matrix:
+        k8s: [v1.20, latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          toolchain: stable
+          profile: minimal
+      # Smart caching for Rust projects.
+      # Includes workaround for macos cache corruption.
+      # - https://github.com/rust-lang/cargo/issues/8603
+      # - https://github.com/actions/cache/issues/403
+      - uses: Swatinem/rust-cache@v1
+
+      - uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: ${{matrix.k8s}}
+          # k3d-kube
+          k3d-name: kube
+          # Used to avoid rate limits when fetching the releases from k3s repo.
+          # Anonymous access is limited to 60 requests / hour / worker
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
+          k3d-args: --no-lb --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
+
+      # Real CI work starts here
+      - name: Build workspace
+        run: cargo build
+
+      # Run the equivalent of `just integration`
+      - name: Run all default features integration library tests
+        run: cargo test --lib --all -- --ignored
+      - name: Run all facade integration library tests with extra features
+        run: cargo test -p kube --lib --features=derive,runtime -- --ignored
+      - name: Run all client integration library tests with rustls and ws
+        run: cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
+      - name: Run derive example tests
+        run: cargo run -p kube-examples --example crd_derive
+      - name: Run crd example tests
+        run: cargo run -p kube-examples --example crd_api
+
+
   e2e:
     # e2e tests are docker on linux
     runs-on: ubuntu-latest
@@ -107,7 +154,7 @@ jobs:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
-        k8s: [v1.20, v1.21, v1.22, v1.23, v1.24]
+        k8s: [v1.20, latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -118,7 +165,7 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git
             target
-          key: musl-cargo-${{ hashFiles('**/Cargo.toml') }}
+          key: musl-cargo-${{ hashFiles('**/Cargo.toml') }}-${{matrix.k8s}}
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
@@ -128,6 +175,7 @@ jobs:
           # Used to avoid rate limits when fetching the releases from k3s repo.
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
+          k3d-args: --no-lb --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
 
       - name: Compile dapp
         run: |
