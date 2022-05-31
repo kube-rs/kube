@@ -103,6 +103,11 @@ jobs:
   e2e:
     # e2e tests are docker on linux
     runs-on: ubuntu-latest
+    strategy:
+      # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
+      fail-fast: false
+      matrix:
+        k8s: [v1.20, v1.21, v1.22, v1.23, v1.24]
     steps:
       - uses: actions/checkout@v2
 
@@ -117,7 +122,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.20
+          version: ${{matrix.k8s}}
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
