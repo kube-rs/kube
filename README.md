@@ -148,7 +148,7 @@ Here `reconcile` and `error_policy` refer to functions you define. The first wil
 
 ## Rustls
 
-Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues?q=is%3Aissue+is%3Aopen+rustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
+Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues?q=is%3Aopen+is%3Aissue+label%3Arustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
 
 ```toml
 [dependencies]

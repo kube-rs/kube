@@ -147,7 +147,45 @@ jobs:
         run: cargo run -p kube-examples --example crd_api
 
 
-  e2e:
+  e2e-mk8sv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          toolchain: stable
+          profile: minimal
+      # Smart caching for Rust projects.
+      # Includes workaround for macos cache corruption.
+      # - https://github.com/rust-lang/cargo/issues/8603
+      # - https://github.com/actions/cache/issues/403
+      - uses: Swatinem/rust-cache@v1
+
+      - uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: v1.19
+          # k3d-kube
+          k3d-name: kube
+          # Used to avoid rate limits when fetching the releases from k3s repo.
+          # Anonymous access is limited to 60 requests / hour / worker
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
+          k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
+
+      # Real CI work starts here
+      - name: Build workspace
+        run: cargo build
+
+      - name: boot openssl, latest k8s
+        run: cargo run -p e2e --bin boot --features=openssl,latest
+      - name: boot openssl, minimum supported k8s
+        run: cargo run -p e2e --bin boot --features=openssl,mk8sv
+      - name: boot rustls, latest k8s
+        run: cargo run -p e2e --bin boot --features=rustls,latest
+      - name: boot rustls, minimum supported k8s
+        run: cargo run -p e2e --bin boot --features=rustls,mk8sv
+
+  e2e-job:
     # e2e tests are docker on linux
     runs-on: ubuntu-latest
     strategy:
@@ -155,6 +193,7 @@ jobs:
       fail-fast: false
       matrix:
         k8s: [v1.19, latest]
+        tls: [openssl, rustls]
     steps:
       - uses: actions/checkout@v2
 
@@ -177,7 +216,7 @@ jobs:
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
 
-      - name: Compile dapp
+      - name: Compile e2e
         run: |
           mkdir -p ~/.cargo/{git,registry}
           docker run --rm -t \
@@ -185,24 +224,24 @@ jobs:
               --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
               --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
               clux/muslrust:stable \
-              cargo build -p e2e --release -v
-          cp target/x86_64-unknown-linux-musl/release/dapp e2e/
+              cargo build -p e2e --release --bin=job --features=latest,${{matrix.tls}} -v
+          cp target/x86_64-unknown-linux-musl/release/job e2e/
 
       - name: Build image
-        run: "docker build -t clux/kube-dapp:${{ github.sha }} e2e/"
+        run: "docker build -t clux/kube-e2e:${{ github.sha }} e2e/"
       - name: Import image
-        run: "k3d image import clux/kube-dapp:${{ github.sha }} --cluster kube"
+        run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
       - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
 
       - name: Create resource
         run: kubectl apply -f e2e/deployment.yaml -n apps
       - run: kubectl get all -n apps
-      - run: kubectl describe jobs/dapp -n apps
+      - run: kubectl describe jobs/e2e -n apps
       - name: Wait for job to complete
         run: |
-          kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
+          kubectl wait --for=condition=complete job/e2e -n apps --timeout=50s || kubectl logs -f job/e2e -n apps
           kubectl get all -n apps
-          kubectl wait --for=condition=complete job/dapp -n apps --timeout=10s || kubectl get pods -n apps | grep dapp | grep Completed
+          kubectl wait --for=condition=complete job/e2e -n apps --timeout=10s || kubectl get pods -n apps | grep e2e | grep Completed
 
   cargo-deny:
     name: Run cargo deny

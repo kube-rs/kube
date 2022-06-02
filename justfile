@@ -44,27 +44,33 @@ deny:
 readme:
   rustdoc README.md --test --edition=2021
 
-e2e: dapp
-  ls -lah e2e/
-  docker build -t clux/kube-dapp:{{VERSION}} e2e/
-  k3d image import clux/kube-dapp:{{VERSION}} --cluster main
+e2e: (e2e-boot) (e2e-job "rustls,latest")
+
+e2e-boot:
+  cargo run -p e2e --bin boot --features=openssl,latest
+  cargo run -p e2e --bin boot --features=openssl,mk8sv
+  cargo run -p e2e --bin boot --features=rustls,latest
+  cargo run -p e2e --bin boot --features=rustls,mk8sv
+e2e-job features:
+  just e2e-job-musl {{features}}
+  docker build -t clux/kube-e2e:{{VERSION}} e2e/
+  k3d image import clux/kube-e2e:{{VERSION}} --cluster main
   sed -i 's/latest/{{VERSION}}/g' e2e/deployment.yaml
   kubectl apply -f e2e/deployment.yaml
   sed -i 's/{{VERSION}}/latest/g' e2e/deployment.yaml
   kubectl get all -n apps
-  kubectl describe jobs/dapp -n apps
-  kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
+  kubectl describe jobs/e2e -n apps
+  kubectl wait --for=condition=complete job/e2e -n apps --timeout=50s || kubectl logs -f job/e2e -n apps
   kubectl get all -n apps
-  kubectl wait --for=condition=complete job/dapp -n apps --timeout=10s || kubectl get pods -n apps | grep dapp | grep Completed
-
-dapp:
+  kubectl wait --for=condition=complete job/e2e -n apps --timeout=10s || kubectl get pods -n apps | grep e2e | grep Completed
+e2e-job-musl features:
   #!/usr/bin/env bash
   docker run \
     -v cargo-cache:/root/.cargo/registry \
     -v "$PWD:/volume" -w /volume \
-    --rm -it clux/muslrust:stable cargo build --release -p e2e
-  cp target/x86_64-unknown-linux-musl/release/dapp e2e/dapp
-  chmod +x e2e/dapp
+    --rm -it clux/muslrust:stable cargo build --release --features={{features}} -p e2e
+  cp target/x86_64-unknown-linux-musl/release/job e2e/job
+  chmod +x e2e/job
 
 k3d:
   k3d cluster create main --servers 1 --agents 1 --registry-create main \
@@ -98,6 +104,7 @@ bump-k8s:
   fastmod -m -d . --extensions toml "$current" "$next"
   fastmod -m "$current" "$next" -- README.md
   fastmod -m "$current" "$next" -- justfile
+  # TODO: e2e/Cargo.toml needs to bump mk8sv
 
 # mode: makefile
 # End:

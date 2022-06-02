@@ -1,28 +1,37 @@
 # E2E tests
 
-Small set of tests to verify differences between local and in-cluster development.
+Small set of tests complete e2e flows, like local vs. in-cluster configs, incluster namespace defaulting, and non-standard feature flags that are hard to test within kube.
 
-**[You probably do not want to make a new E2E test](../CONTRIBUTING.md#test-guidelines)**.
+**[You probably do not want to make an E2E test](../CONTRIBUTING.md#test-guidelines)**.
 
-## dapp
+## boot
 
-A working example of a kubernetes application `dapp` deployed on CI during the `e2e` job via [our ci workflow](https://github.com/kube-rs/kube-rs/blob/2b5e4ad788366125448ad40eadaf68cf9ceeaf31/.github/workflows/ci.yml#L58-L107). It is here to ensure in-cluster configuration is working.
+Simple executable that lists pods.
 
-### Behavior
-The app currently only does what the `job_api` example does, but from within the cluster, so it needs the rbac permissions to `create` a `job` in `batch`.
+Intended as a compilation target to ensure kube builds with any k8s-openapi version feature selection greater than or equal to our MK8SV.
 
-### Github Actions
-General process, optimized for time.
+## job
 
-- compile the image with [muslrust](https://github.com/clux/muslrust)
-- put the static binary into a [distroless:static](https://github.com/GoogleContainerTools/distroless) image
-- import the image into `k3d` (to avoid pushing)
-- `kubectl apply` the [test yaml](./deployment.yaml)
-- wait for the job to complete for up to 60s
+A more advanced application that is containerised and deployed into a cluster on CI during the `e2e` job via [our ci workflow](https://github.com/kube-rs/kube-rs/blob/2b5e4ad788366125448ad40eadaf68cf9ceeaf31/.github/workflows/ci.yml#L58-L107).
 
-It's successful if the app exits successfully, without encountering errors.
+Functionally equivalent to the `job_api` example. Creates a noop job, waits for it to complete, then deletes it.
 
-### Running
-Start a cluster first, e.g. `just k3d`.
+Intended as a safety mechanism to ensure in-cluster authenication is working, not hanging, and its minimal work is is verifiable out-of-band.
 
-Run `just integration` to cross compile `dapp` with `muslrust` locally using the same docker image, and then deploy it to the current active cluster.
+## Testing Strategy
+
+
+### job
+Compile the `job` binary (via [muslrust](https://github.com/clux/muslrust)) and put the it into a [distroless:static](https://github.com/GoogleContainerTools/distroless) image.
+
+Then, import the image into `k3d` (to avoid pushing), and apply the [test yaml](./deployment.yaml). We can observe the job completes.
+
+Running these locally requires a local cluster. Use `just k3d` to start a simple one.
+
+Then, run `just e2e-job openssl,latest` or `just e2e-job rustls,latest`.
+
+### boot
+
+Build the `boot` bin against various `k8s-openapi` version features. Check that it runs. Uses local auth; not dockerised.
+
+To run this with all feature combinations combinations, run `just e2e-boot`.
