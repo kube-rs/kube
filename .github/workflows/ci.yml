@@ -180,10 +180,10 @@ jobs:
         run: cargo run -p e2e --bin boot --features=openssl,latest
       - name: boot openssl, minimum supported k8s
         run: cargo run -p e2e --bin boot --features=openssl,mk8sv
-      - name: boot rustls, latest k8s
-        run: cargo run -p e2e --bin boot --features=rustls,latest
-      - name: boot rustls, minimum supported k8s
-        run: cargo run -p e2e --bin boot --features=rustls,mk8sv
+      #- name: boot rustls, latest k8s
+      #  run: cargo run -p e2e --bin boot --features=rustls,latest
+      #- name: boot rustls, minimum supported k8s
+      #  run: cargo run -p e2e --bin boot --features=rustls,mk8sv
 
   e2e-job:
     # e2e tests are docker on linux
