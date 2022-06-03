@@ -5,11 +5,22 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.73.1...master
+ * see https://github.com/kube-rs/kube-rs/compare/0.73.1...0.73.x
 
-0.73.1 / 2022-06-03
+[0.73.1](https://github.com/kube-rs/kube-rs/releases/tag/0.73.1) / 2022-06-03
 ===================
+## Highlights
 
+This patch release fixes a bug causing `applier` and `Controller` to deadlock when too many Kubernetes object change events were ingested at once. All users of `applier` and `Controller` are encouraged to upgrade as quickly as possible. Older versions are also affected, this bug is believed to have existed since the original release of `kube_runtime`.
+
+<!-- Release notes generated using configuration in .github/release.yml at 0.73.1 -->
+
+## What's Changed
+### Fixed
+* [0.73 backport] fix applier hangs which can happen with many watched objects (#925) by @moustafab (backported by @teozkr) in https://github.com/kube-rs/kube-rs/pull/927
+
+
+**Full Changelog**: https://github.com/kube-rs/kube-rs/compare/0.73.0...0.73.1
 0.73.0 / 2022-05-23
 ===================
 
