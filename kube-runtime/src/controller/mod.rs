@@ -231,7 +231,7 @@ where
 {
     let (scheduler_shutdown_tx, scheduler_shutdown_rx) = channel::oneshot::channel();
     let err_context = context.clone();
-    let (scheduler_tx, scheduler_rx) = channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(100);
+    let (scheduler_tx, scheduler_rx) = channel::mpsc::unbounded::<ScheduleRequest<ReconcileRequest<K>>>();
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
