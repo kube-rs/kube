@@ -376,7 +376,7 @@ mod test {
         crds.patch("testcrs.kube.rs", &ssapply, &Patch::Apply(TestCr::crd()))
             .await?;
         let establish = await_condition(crds.clone(), "testcrs.kube.rs", conditions::is_crd_established());
-        let crd = tokio::time::timeout(std::time::Duration::from_secs(20), establish).await??;
+        let crd = tokio::time::timeout(std::time::Duration::from_secs(30), establish).await??;
         assert!(conditions::is_crd_established().matches_object(crd.as_ref()));
 
         // create partial information for it to discover
