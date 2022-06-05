@@ -376,8 +376,9 @@ mod test {
         crds.patch("testcrs.kube.rs", &ssapply, &Patch::Apply(TestCr::crd()))
             .await?;
         let establish = await_condition(crds.clone(), "testcrs.kube.rs", conditions::is_crd_established());
-        let crd = tokio::time::timeout(std::time::Duration::from_secs(30), establish).await??;
+        let crd = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await??;
         assert!(conditions::is_crd_established().matches_object(crd.as_ref()));
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await; // Established condition is actually not enough for api discovery :(
 
         // create partial information for it to discover
         let gvk = GroupVersionKind::gvk("kube.rs", "v1", "TestCr");
@@ -408,7 +409,7 @@ mod test {
         // check all non-excluded groups that are iterable
         let mut groups = discovery.groups_alphabetical().into_iter();
         let firstgroup = groups.next().unwrap();
-        assert_eq!(firstgroup.name(), ApiGroup::CORE_GROUP);
+        assert_eq!(firstgroup.name(), ApiGroup::CORE_GROUP, "core not first");
         for group in groups {
             for (ar, caps) in group.recommended_resources() {
                 if !caps.supports_operation(verbs::LIST) {
