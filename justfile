@@ -75,7 +75,7 @@ e2e-job-musl features:
   chmod +x e2e/job
 
 k3d:
-  k3d cluster create main --servers 1 --agents 1 --registry-create main \
+  k3d cluster create main --servers 1 --registry-create main \
     --k3s-arg "--no-deploy=traefik@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
