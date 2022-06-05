@@ -1,4 +1,4 @@
-name: Devcontainer
+name: devcontainer
 
 # When a pull request is opened that changes the Devcontainer configuration,
 # ensure that the container continues to build properly.

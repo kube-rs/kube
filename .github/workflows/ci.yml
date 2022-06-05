@@ -1,4 +1,4 @@
-name: ci
+name: test
 on:
   pull_request:
 
@@ -159,35 +159,125 @@ jobs:
       - name: Run crd example tests
         run: cargo run -p kube-examples --example crd_api
 
-  cargo-deny:
-    name: Run cargo deny
+
+  mk8sv:
+    # comile check e2e tests against mk8sv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Verify MK8SV set correctly
+
+      - name: Find MK8SV
+        id: mk8sv
+        run: |
+          MK8SV=$(grep MK8SV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+" | head -n 1)
+          echo $MK8SV
+          echo ::set-output name=mk8sv::${MK8SV}
+          echo ::set-output name=mk8svdash::v${MK8SV/\./_}
+
+      - name: Check ci jobs run against advertised MK8SV
+        run: |
+          if ! grep "${{ steps.mk8sv.outputs.mk8sv }}" .github/workflows/ci.yml; then
+            echo "mk8sv not set correctly in tests"
+            exit 1
+          fi
+          if ! grep "${{ steps.mk8sv.outputs.mk8svdash }}" e2e/Cargo.toml | grep mk8sv; then
+            echo "mk8sv not set correctly in e2e features"
+            exit 1
+          if
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          toolchain: stable
+          profile: minimal
+      # Smart caching for Rust projects.
+      # Includes workaround for macos cache corruption.
+      # - https://github.com/rust-lang/cargo/issues/8603
+      # - https://github.com/actions/cache/issues/403
+      - uses: Swatinem/rust-cache@v1
+
+      - uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: v1.19
+          # k3d-kube
+          k3d-name: kube
+          # Used to avoid rate limits when fetching the releases from k3s repo.
+          # Anonymous access is limited to 60 requests / hour / worker
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
+          k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
+
+      # Real CI work starts here
+      - name: Build workspace
+        run: cargo build
+
+      - name: boot openssl, latest k8s
+        run: cargo run -p e2e --bin boot --features=openssl,latest
+      - name: boot openssl, minimum supported k8s
+        run: cargo run -p e2e --bin boot --features=openssl,mk8sv
+      # no rustls local yet: https://github.com/kube-rs/kube-rs/issues/153
+      # we could edit kubeconfig and /etc/hosts to have the following lines:
+      # /etc/hosts: 127.0.0.1       k3d.local
+      # kubeconfig:     server: https://k3d.local:36729 (e.g. swap out 0.0.0.0 under cluster)
+      # Together, that makes it work locally. Maybe that can be done with some k3d-args to host-aliases.
+      #- name: boot rustls, latest k8s
+      #  run: cargo run -p e2e --bin boot --features=rustls,latest
+      #- name: boot rustls, minimum supported k8s
+      #  run: cargo run -p e2e --bin boot --features=rustls,mk8sv
+
+  in-cluster:
+    # in-cluster e2e via docker on linux
     runs-on: ubuntu-latest
     strategy:
+      # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
+      fail-fast: false
       matrix:
-        checks:
-          - advisories
-          - bans licenses sources
-
-    # Prevent sudden announcement of a new advisory from failing ci:
-    continue-on-error: ${{ matrix.checks == 'advisories' }}
-
+        tls: [openssl, rustls]
     steps:
       - uses: actions/checkout@v2
-      - uses: EmbarkStudios/cargo-deny-action@v1
-        with:
-          command: check ${{ matrix.checks }}
 
-  rustfmt:
-    name: Run rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1.0.7
+      - uses: actions/cache@v2
         with:
-          profile: minimal
-          toolchain: nightly
-          components: rustfmt
-          override: true
-      - name: Run rustfmt
-        id: rustfmt
-        run: rustfmt +nightly --edition 2018 --check $(find . -type f -iname *.rs)
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+            target
+          key: musl-cargo-${{ hashFiles('**/Cargo.toml') }}-${{matrix.tls}}
+
+      - uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: latest
+          # k3d-kube
+          k3d-name: kube
+          # Used to avoid rate limits when fetching the releases from k3s repo.
+          # Anonymous access is limited to 60 requests / hour / worker
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
+          k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
+
+      - name: Compile e2e
+        run: |
+          mkdir -p ~/.cargo/{git,registry}
+          docker run --rm -t \
+              --mount type=bind,source=${{ github.workspace }},target=/volume \
+              --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
+              --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
+              clux/muslrust:stable \
+              cargo build -p e2e --release --bin=job --features=latest,${{matrix.tls}} -v
+          cp target/x86_64-unknown-linux-musl/release/job e2e/
+
+      - name: Build image
+        run: "docker build -t clux/kube-e2e:${{ github.sha }} e2e/"
+      - name: Import image
+        run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
+      - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
+
+      - name: Create resource
+        run: kubectl apply -f e2e/deployment.yaml -n apps
+      - run: kubectl get all -n apps
+      - run: kubectl describe jobs/e2e -n apps
+      - name: Wait for job to complete
+        run: |
+          kubectl wait --for=condition=complete job/e2e -n apps --timeout=50s || kubectl logs -f job/e2e -n apps
+          kubectl get all -n apps
+          kubectl wait --for=condition=complete job/e2e -n apps --timeout=10s || kubectl get pods -n apps | grep e2e | grep Completed
