@@ -89,6 +89,18 @@ jobs:
         command: check
         args: --all
 
+    - name: Check rust-version keys matches MSRV consistently
+      run: |
+        if [[ $(cat ./*/Cargo.toml | grep "rust-version" | uniq | wc -l) -gt 1 ]]; then
+          echo "inconsistent rust-version keys set in various kube-crates:"
+          rg "rust-version" ./*/Cargo.toml
+          exit 1
+        fi
+        if ! cat kube/Cargo.toml | grep "rust-version" | grep ${{ steps.msrv.outputs.msrv }}"; then
+          echo "msrv policy inconsistent with rust-version key"
+          exit 1
+        fi
+
     - name: Check devcontainer matches MSRV
       run: |
         versions=$(sed -nE 's|^FROM (.*/)?rust:([^ ]+)|\2|p' .devcontainer/Dockerfile)

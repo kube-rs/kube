@@ -10,6 +10,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Verify MK8SV set correctly
+
+      - name: Find MK8SV
+        id: mk8sv
+        run: |
+          MK8SV=$(grep MK8SV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+" | head -n 1)
+          echo $MK8SV
+          echo ::set-output name=mk8sv::${MK8SV}
+          echo ::set-output name=mk8svdash::v${MK8SV/\./_}
+
+      - name: Check ci jobs run against advertised MK8SV
+        run: |
+          if ! grep "${{ steps.mk8sv.outputs.mk8sv }}" .github/workflows/e2e.yml; then
+            echo "mk8sv not set correctly in e2e tests"
+            exit 1
+          fi
+          if ! grep "${{ steps.mk8sv.outputs.mk8sv }}" .github/workflows/ci.yml; then
+            echo "mk8sv not set correctly in integration tests"
+            exit 1
+          fi
+          if ! grep "${{ steps.mk8sv.outputs.mk8svdash }}" e2e/Cargo.toml | grep mk8sv; then
+            echo "mk8sv not set correctly in e2e features"
+            exit 1
+          if
+
       - uses: actions-rs/toolchain@v1
         with:
           override: true
