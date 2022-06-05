@@ -256,7 +256,7 @@ jobs:
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
 
-      - name: Compile e2e
+      - name: Compile e2e job against ${{matrix.tls}}
         run: |
           mkdir -p ~/.cargo/{git,registry}
           docker run --rm -t \
