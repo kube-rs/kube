@@ -360,7 +360,7 @@ mod test {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
             discovery::{self, verbs, ApiGroup, Discovery, Scope},
-            runtime::wait::{await_condition, conditions},
+            runtime::wait::{await_condition, conditions, Condition},
         };
 
         #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
@@ -376,7 +376,8 @@ mod test {
         crds.patch("testcrs.kube.rs", &ssapply, &Patch::Apply(TestCr::crd()))
             .await?;
         let establish = await_condition(crds.clone(), "testcrs.kube.rs", conditions::is_crd_established());
-        tokio::time::timeout(std::time::Duration::from_secs(20), establish).await?;
+        let crd = tokio::time::timeout(std::time::Duration::from_secs(20), establish).await??;
+        assert!(conditions::is_crd_established().matches_object(crd.as_ref()));
 
         // create partial information for it to discover
         let gvk = GroupVersionKind::gvk("kube.rs", "v1", "TestCr");
