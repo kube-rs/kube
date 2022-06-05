@@ -44,14 +44,16 @@ deny:
 readme:
   rustdoc README.md --test --edition=2021
 
-e2e: (e2e-boot) (e2e-job "rustls,latest")
+e2e: (e2e-mink8s) (e2e-incluster "rustls,latest")
 
-e2e-boot:
+e2e-mink8s:
   cargo run -p e2e --bin boot --features=openssl,latest
   cargo run -p e2e --bin boot --features=openssl,mk8sv
-  cargo run -p e2e --bin boot --features=rustls,latest
-  cargo run -p e2e --bin boot --features=rustls,mk8sv
-e2e-job features:
+
+  #cargo run -p e2e --bin boot --features=rustls,latest
+  #cargo run -p e2e --bin boot --features=rustls,mk8sv
+
+e2e-incluster features:
   just e2e-job-musl {{features}}
   docker build -t clux/kube-e2e:{{VERSION}} e2e/
   k3d image import clux/kube-e2e:{{VERSION}} --cluster main
@@ -78,9 +80,12 @@ k3d:
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
 
+## RELEASE RELATED
+
 # Bump the msrv of kube; "just bump-msrv 1.60.0"
 bump-msrv msrv:
   #!/usr/bin/env bash
+  # TODO: warn if not msrv+2 not found
   oldmsrv="$(rg "rust-version = \"(.*)\"" -r '$1' kube/Cargo.toml)"
   fastmod -m -d . --extensions toml "rust-version = \"$oldmsrv\"" "rust-version = \"{{msrv}}\""
   # sanity
@@ -101,10 +106,14 @@ bump-k8s:
   #!/usr/bin/env bash
   current=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1)
   next=${current::-2}$((${current:3} + 1))
-  fastmod -m -d . --extensions toml "$current" "$next"
-  fastmod -m "$current" "$next" -- README.md
-  fastmod -m "$current" "$next" -- justfile
-  # TODO: e2e/Cargo.toml needs to bump mk8sv
+  #fastmod -m -d . -e toml "$current" "$next"
+  #fastmod -m "$current" "$next" -- README.md
+  #fastmod -m "$current" "$next" -- justfile
+  # bumping supported version also bumps our mk8sv
+  mk8svnew=${current::-2}$((${current:3}) - 5)
+  mk8svold=${current::-2}$((${current:3}) - 6)
+  fastmod -m -d e2e -e toml "$mk8svold" "$mk8svnew"
+  fastmod -m -d .github/workflows -e yml "&mk8sv ${mk8svold/_/.}" "&mk8sv ${mk8svnew/_/.}"
 
 # mode: makefile
 # End:

@@ -20,18 +20,18 @@ Intended as a safety mechanism to ensure in-cluster authenication is working, no
 
 ## Testing Strategy
 
-
 ### job
+
 Compile the `job` binary (via [muslrust](https://github.com/clux/muslrust)) and put the it into a [distroless:static](https://github.com/GoogleContainerTools/distroless) image.
 
 Then, import the image into `k3d` (to avoid pushing), and apply the [test yaml](./deployment.yaml). We can observe the job completes.
 
 Running these locally requires a local cluster. Use `just k3d` to start a simple one.
 
-Then, run `just e2e-job openssl,latest` or `just e2e-job rustls,latest`.
+Then, run `just e2e-incluster openssl,latest` or `just e2e-incluster rustls,latest`.
 
 ### boot
 
-Build the `boot` bin against various `k8s-openapi` version features. Check that it runs. Uses local auth; not dockerised.
+Build the `boot` bin against various `k8s-openapi` version features, and check that it runs. Uses local auth; not dockerised.
 
-To run this with all feature combinations combinations, run `just e2e-boot`.
+To run this with all feature combinations combinations, run `just e2e-mink8s`.
