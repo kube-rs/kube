@@ -114,6 +114,9 @@ bump-k8s:
   mk8svold=${current::-2}$((${current:3} - 5))
   fastmod -m -d e2e -e toml "$mk8svold" "$mk8svnew"
   fastmod -m -d .github/workflows -e yml "${mk8svold/_/\.}" "${mk8svnew/_/.}"
+  # bump mk8sv badge
+  badge="[![Tested against Kubernetes ${mk8svnew} and above](https://img.shields.io/badge/MK8SV-${mk8svnew}-326ce5.svg)](https://kube.rs/kubernetes-version)"
+  sd "^.+badge/MK8SV.+$" "${badge}" README.md
 
 # mode: makefile
 # End:

@@ -2,8 +2,6 @@ name: ci
 on:
   pull_request:
 
-mk8sv: &mk8sv v1.19
-
 jobs:
   unit:
     strategy:
@@ -109,7 +107,7 @@ jobs:
       fail-fast: false
       matrix:
         # Run these tests against older clusters as well
-        k8s: [*mk8sv, latest]
+        k8s: [v1.19, latest]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1

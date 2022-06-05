@@ -2,7 +2,7 @@ name: e2e
 on:
   pull_request:
 
-mk8sv: &mk8sv v1.19
+
 
 jobs:
   mk8sv:
@@ -23,7 +23,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: *mk8sv
+          version: v1.19
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
