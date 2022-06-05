@@ -96,7 +96,7 @@ jobs:
           rg "rust-version" ./*/Cargo.toml
           exit 1
         fi
-        if ! cat kube/Cargo.toml | grep "rust-version" | grep ${{ steps.msrv.outputs.msrv }}"; then
+        if ! cat kube/Cargo.toml | grep "rust-version" | grep "${{ steps.msrv.outputs.msrv }}"; then
           echo "msrv policy inconsistent with rust-version key"
           exit 1
         fi
@@ -176,14 +176,14 @@ jobs:
 
       - name: Check ci jobs run against advertised MK8SV
         run: |
-          if ! grep "${{ steps.mk8sv.outputs.mk8sv }}" .github/workflows/ci.yml; then
+          if ! grep "${{ steps.mk8sv.outputs.mk8sv }}" -q .github/workflows/ci.yml; then
             echo "mk8sv not set correctly in tests"
             exit 1
           fi
           if ! grep "${{ steps.mk8sv.outputs.mk8svdash }}" e2e/Cargo.toml | grep mk8sv; then
             echo "mk8sv not set correctly in e2e features"
             exit 1
-          if
+          fi
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -234,7 +234,6 @@ jobs:
         tls: [openssl, rustls]
     steps:
       - uses: actions/checkout@v2
-
       - uses: actions/cache@v2
         with:
           path: |
