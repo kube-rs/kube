@@ -106,14 +106,14 @@ bump-k8s:
   #!/usr/bin/env bash
   current=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1)
   next=${current::-2}$((${current:3} + 1))
-  #fastmod -m -d . -e toml "$current" "$next"
-  #fastmod -m "$current" "$next" -- README.md
-  #fastmod -m "$current" "$next" -- justfile
+  fastmod -m -d . -e toml "$current" "$next"
+  fastmod -m "$current" "$next" -- README.md
+  fastmod -m "$current" "$next" -- justfile
   # bumping supported version also bumps our mk8sv
-  mk8svnew=${current::-2}$((${current:3}) - 5)
-  mk8svold=${current::-2}$((${current:3}) - 6)
+  mk8svnew=${current::-2}$((${current:3} - 4))
+  mk8svold=${current::-2}$((${current:3} - 5))
   fastmod -m -d e2e -e toml "$mk8svold" "$mk8svnew"
-  fastmod -m -d .github/workflows -e yml "&mk8sv ${mk8svold/_/.}" "&mk8sv ${mk8svnew/_/.}"
+  fastmod -m -d .github/workflows -e yml "${mk8svold/_/\.}" "${mk8svnew/_/.}"
 
 # mode: makefile
 # End:
