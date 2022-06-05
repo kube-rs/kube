@@ -376,7 +376,7 @@ mod test {
         crds.patch("testcrs.kube.rs", &ssapply, &Patch::Apply(TestCr::crd()))
             .await?;
         let establish = await_condition(crds.clone(), "testcrs.kube.rs", conditions::is_crd_established());
-        let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+        tokio::time::timeout(std::time::Duration::from_secs(20), establish).await?;
 
         // create partial information for it to discover
         let gvk = GroupVersionKind::gvk("kube.rs", "v1", "TestCr");
@@ -388,7 +388,7 @@ mod test {
         let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
         assert_eq!(caps1.operations.len(), caps2.operations.len(), "unequal caps");
         assert_eq!(ar1, ar2, "unequal apiresource");
-        assert_eq!(DynamicObject::api_version(&ar2), "kube.rs/v1", "unequal dyn apiversion");
+        assert_eq!(DynamicObject::api_version(&ar2), "kube.rs/v1", "unequal dynver");
 
         // run (almost) full discovery
         let discovery = Discovery::new(client.clone())

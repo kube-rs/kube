@@ -3,7 +3,7 @@ on:
   pull_request:
 
 env:
-  RUST_BACKTRACE: full
+  RUST_BACKTRACE: 1
 
 jobs:
   unit:
@@ -154,7 +154,7 @@ jobs:
       - name: Run all default features integration library tests
         run: cargo test --lib --all -- --ignored
       - name: Run all facade integration library tests with extra features
-        run: cargo test -p kube --lib --features=derive,runtime -- --ignored
+        run: cargo test -p kube --lib --features=derive,runtime -- --ignored --nocapture
       - name: Run all client integration library tests with rustls and ws
         run: cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
       - name: Run derive example tests
