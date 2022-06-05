@@ -386,9 +386,9 @@ mod test {
         let apigroup = discovery::oneshot::pinned_group(&client, &gv).await?;
         let (ar1, caps1) = apigroup.recommended_kind("TestCr").unwrap();
         let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
-        assert_eq!(caps1.operations.len(), caps2.operations.len());
-        assert_eq!(ar1, ar2);
-        assert_eq!(DynamicObject::api_version(&ar2), "kube.rs/v1");
+        assert_eq!(caps1.operations.len(), caps2.operations.len(), "unequal caps");
+        assert_eq!(ar1, ar2, "unequal apiresource");
+        assert_eq!(DynamicObject::api_version(&ar2), "kube.rs/v1", "unequal dyn apiversion");
 
         // run (almost) full discovery
         let discovery = Discovery::new(client.clone())
@@ -398,11 +398,11 @@ mod test {
             .await?;
 
         // check our custom resource first by resolving within groups
-        assert!(discovery.has_group("kube.rs"));
+        assert!(discovery.has_group("kube.rs"), "missing group kube.rs");
         let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
-        assert_eq!(ar.group, gvk.group);
-        assert_eq!(ar.version, gvk.version);
-        assert_eq!(ar.kind, gvk.kind);
+        assert_eq!(ar.group, gvk.group, "unexpected discovered group");
+        assert_eq!(ar.version, gvk.version, "unexcepted discovered ver");
+        assert_eq!(ar.kind, gvk.kind, "unexpected discovered kind");
 
         // check all non-excluded groups that are iterable
         let mut groups = discovery.groups_alphabetical().into_iter();
