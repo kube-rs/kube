@@ -165,7 +165,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Verify MK8SV set correctly
 
       - name: Find MK8SV
         id: mk8sv
