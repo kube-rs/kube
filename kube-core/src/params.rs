@@ -140,6 +140,33 @@ impl ListParams {
     }
 }
 
+/// The validation directive to use for `fieldValidation` when using server-side apply.
+#[derive(Clone, Debug)]
+pub enum ValidationDirective {
+    /// This will fail the request with a BadRequest error if any unknown fields would be dropped from the
+    /// object, or if any duplicate fields are present. The error returned from the server will contain
+    /// all unknown and duplicate fields encountered.
+    Strict,
+    /// This will send a warning via the standard warning response header for each unknown field that
+    /// is dropped from the object, and for each duplicate field that is encountered. The request will
+    /// still succeed if there are no other errors, and will only persist the last of any duplicate fields.
+    Warn,
+    /// This will ignore any unknown fields that are silently dropped from the object, and will ignore
+    /// all but the last duplicate field that the decoder encounters.
+    Ignore,
+}
+
+impl ValidationDirective {
+    /// Returns the string format of the directive
+    pub fn as_str(self: &Self) -> &str {
+        match self {
+            Self::Strict => "Strict",
+            Self::Warn => "Warn",
+            Self::Ignore => "Ignore",
+        }
+    }
+}
+
 /// Common query parameters for put/post calls
 #[derive(Default, Clone, Debug)]
 pub struct PostParams {
@@ -270,6 +297,8 @@ pub struct PatchParams {
     /// fieldManager is a name of the actor that is making changes. Required for [`Patch::Apply`]
     /// optional for everything else.
     pub field_manager: Option<String>,
+    /// The server-side validation directive to use. Applicable only to [`Patch::Apply`].
+    pub field_validation: Option<ValidationDirective>,
 }
 
 impl PatchParams {
@@ -301,6 +330,9 @@ impl PatchParams {
         if let Some(ref fm) = self.field_manager {
             qp.append_pair("fieldManager", fm);
         }
+        if let Some(sv) = &self.field_validation {
+            qp.append_pair("fieldValidation", sv.as_str());
+        }
     }
 
     /// Construct `PatchParams` for server-side apply
@@ -325,6 +357,13 @@ impl PatchParams {
     #[must_use]
     pub fn dry_run(mut self) -> Self {
         self.dry_run = true;
+        self
+    }
+
+    /// Set the validation directive for `fieldValidation` during server-side apply.
+    #[must_use]
+    pub fn field_validation(mut self, directive: ValidationDirective) -> Self {
+        self.field_validation = Some(directive);
         self
     }
 }
@@ -435,7 +474,7 @@ where
 }
 #[cfg(test)]
 mod test {
-    use super::DeleteParams;
+    use super::{DeleteParams, PatchParams, ValidationDirective};
     #[test]
     fn delete_param_serialize() {
         let mut dp = DeleteParams::default();
@@ -462,6 +501,27 @@ mod test {
         let dp_orphan = DeleteParams::orphan();
         let ser = serde_json::to_value(&dp_orphan).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Orphan"}));
+    }
+
+    #[test]
+    fn patch_param_serializes_field_validation() {
+        let pp = PatchParams::default().field_validation(ValidationDirective::Ignore);
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        pp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert_eq!(String::from("some/resource?fieldValidation=Ignore"), urlstr);
+
+        let pp = PatchParams::default().field_validation(ValidationDirective::Warn);
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        pp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert_eq!(String::from("some/resource?fieldValidation=Warn"), urlstr);
+
+        let pp = PatchParams::default().field_validation(ValidationDirective::Strict);
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        pp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert_eq!(String::from("some/resource?fieldValidation=Strict"), urlstr);
     }
 }
 
