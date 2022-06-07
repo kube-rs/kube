@@ -143,14 +143,20 @@ impl ListParams {
 /// The validation directive to use for `fieldValidation` when using server-side apply.
 #[derive(Clone, Debug)]
 pub enum ValidationDirective {
+    /// Strict mode will fail any invalid manifests.
+    /// 
     /// This will fail the request with a BadRequest error if any unknown fields would be dropped from the
     /// object, or if any duplicate fields are present. The error returned from the server will contain
     /// all unknown and duplicate fields encountered.
     Strict,
+    /// Warn mode will return a warning for invalid manifests.
+    /// 
     /// This will send a warning via the standard warning response header for each unknown field that
     /// is dropped from the object, and for each duplicate field that is encountered. The request will
     /// still succeed if there are no other errors, and will only persist the last of any duplicate fields.
     Warn,
+    /// Ignore mode will silently ignore any problems.
+    /// 
     /// This will ignore any unknown fields that are silently dropped from the object, and will ignore
     /// all but the last duplicate field that the decoder encounters.
     Ignore,
@@ -403,6 +409,7 @@ pub struct DeleteParams {
 
 impl DeleteParams {
     /// Construct `DeleteParams` with `PropagationPolicy::Background`.
+    /// 
     /// This allows the garbage collector to delete the dependents in the background.
     pub fn background() -> Self {
         Self {
@@ -412,6 +419,7 @@ impl DeleteParams {
     }
 
     /// Construct `DeleteParams` with `PropagationPolicy::Foreground`.
+    /// 
     /// This is a cascading policy that deletes all dependents in the foreground.
     pub fn foreground() -> Self {
         Self {
@@ -421,6 +429,7 @@ impl DeleteParams {
     }
 
     /// Construct `DeleteParams` with `PropagationPolicy::Orphan`.
+    /// 
     /// This orpans the dependents.
     pub fn orphan() -> Self {
         Self {
