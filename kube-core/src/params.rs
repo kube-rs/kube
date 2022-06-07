@@ -518,19 +518,19 @@ mod test {
         let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
-        assert_eq!(String::from("some/resource?fieldValidation=Ignore"), urlstr);
+        assert_eq!(String::from("some/resource?&fieldValidation=Ignore"), urlstr);
 
         let pp = PatchParams::default().field_validation(ValidationDirective::Warn);
         let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
-        assert_eq!(String::from("some/resource?fieldValidation=Warn"), urlstr);
+        assert_eq!(String::from("some/resource?&fieldValidation=Warn"), urlstr);
 
         let pp = PatchParams::default().field_validation(ValidationDirective::Strict);
         let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
-        assert_eq!(String::from("some/resource?fieldValidation=Strict"), urlstr);
+        assert_eq!(String::from("some/resource?&fieldValidation=Strict"), urlstr);
     }
 }
 
