@@ -94,7 +94,8 @@ where
         match inner_peek.poll(cx) {
             Poll::Ready(Some(x_ref)) => {
                 if (this.should_consume_item)(x_ref) {
-                    match inner.as_mut().poll_next(cx) {
+                    let item = inner.as_mut().poll_next(cx);
+                    match item {
                         Poll::Ready(Some(x)) => Poll::Ready(Some((this.try_extract_item_case)(x).expect(
                             "`try_extract_item_case` returned `None` despite `should_consume_item` returning `true`",
                         ))),
