@@ -228,3 +228,36 @@ pub(crate) trait KubeRuntimeStreamExt: Stream + Sized {
 }
 
 impl<S: Stream> KubeRuntimeStreamExt for S {}
+
+#[cfg(test)]
+mod tests {
+    use std::convert::Infallible;
+
+    use futures::stream::{self, StreamExt};
+
+    use super::trystream_try_via;
+
+    // Type-level test does not need to be executed
+    #[allow(dead_code)]
+    fn trystream_try_via_should_be_able_to_borrow() {
+        struct WeirdComplexObject {}
+        impl Drop for WeirdComplexObject {
+            fn drop(&mut self) {}
+        }
+
+        let mut x = WeirdComplexObject {};
+        let y = WeirdComplexObject {};
+        drop(trystream_try_via(
+            Box::pin(stream::once(async {
+                let _ = &mut x;
+                Result::<_, Infallible>::Ok(())
+            })),
+            |s| {
+                s.map(|_| {
+                    let _ = &y;
+                    Ok(())
+                })
+            },
+        ));
+    }
+}
