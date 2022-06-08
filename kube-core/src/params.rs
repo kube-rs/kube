@@ -367,10 +367,27 @@ impl PatchParams {
     }
 
     /// Set the validation directive for `fieldValidation` during server-side apply.
-    #[must_use]
-    pub fn field_validation(mut self, directive: ValidationDirective) -> Self {
+    fn field_validation(mut self, directive: ValidationDirective) -> Self {
         self.field_validation = Some(directive);
         self
+    }
+
+    /// Set the validation directive to `Ignore`
+    #[must_use]
+    pub fn validation_ignore(self) -> Self {
+        self.field_validation(ValidationDirective::Ignore)
+    }
+
+    /// Set the validation directive to `Warn`
+    #[must_use]
+    pub fn validation_warn(self) -> Self {
+        self.field_validation(ValidationDirective::Warn)
+    }
+
+    /// Set the validation directive to `Strict`
+    #[must_use]
+    pub fn validation_strict(self) -> Self {
+        self.field_validation(ValidationDirective::Strict)
     }
 }
 
@@ -514,19 +531,19 @@ mod test {
 
     #[test]
     fn patch_param_serializes_field_validation() {
-        let pp = PatchParams::default().field_validation(ValidationDirective::Ignore);
+        let pp = PatchParams::default().validation_ignore();
         let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         assert_eq!(String::from("some/resource?&fieldValidation=Ignore"), urlstr);
 
-        let pp = PatchParams::default().field_validation(ValidationDirective::Warn);
+        let pp = PatchParams::default().validation_warn();
         let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         assert_eq!(String::from("some/resource?&fieldValidation=Warn"), urlstr);
 
-        let pp = PatchParams::default().field_validation(ValidationDirective::Strict);
+        let pp = PatchParams::default().validation_strict();
         let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
