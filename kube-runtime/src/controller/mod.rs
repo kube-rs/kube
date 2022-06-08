@@ -843,7 +843,7 @@ mod tests {
         reflector::{self, ObjectRef},
         watcher, Controller,
     };
-    use futures::{StreamExt, TryStreamExt};
+    use futures::{pin_mut, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::{core::ObjectMeta, Api};
     use tokio::time::timeout;
@@ -883,23 +883,20 @@ mod tests {
 
         let (queue_tx, queue_rx) = futures::channel::mpsc::unbounded::<ObjectRef<ConfigMap>>();
         let (store_rx, mut store_tx) = reflector::store();
-        let applier = tokio::spawn(
-            applier(
-                |obj, _| {
-                    Box::pin(async move {
-                        // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
-                        println!("reconciling {:?}", obj.metadata.name);
-                        Ok(Action::requeue(Duration::ZERO))
-                    })
-                },
-                |_: &Infallible, _| todo!(),
-                Arc::new(()),
-                store_rx,
-                queue_rx.map(Result::<_, Infallible>::Ok),
-            )
-            .take(reconciles)
-            .try_for_each(|_| async { Ok(()) }),
+        let applier = applier(
+            |obj, _| {
+                Box::pin(async move {
+                    // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
+                    println!("reconciling {:?}", obj.metadata.name);
+                    Ok(Action::requeue(Duration::ZERO))
+                })
+            },
+            |_: &Infallible, _| todo!(),
+            Arc::new(()),
+            store_rx,
+            queue_rx.map(Result::<_, Infallible>::Ok),
         );
+        pin_mut!(applier);
         for i in 0..items {
             let obj = ConfigMap {
                 metadata: ObjectMeta {
@@ -912,11 +909,26 @@ mod tests {
             store_tx.apply_watcher_event(&watcher::Event::Applied(obj.clone()));
             queue_tx.unbounded_send(ObjectRef::from_obj(&obj)).unwrap();
         }
-        // Keep the submission queue open to avoid going into graceful shutdown mode
-        timeout(Duration::from_secs(10), applier)
-            .await
-            .expect("test timeout expired, applier likely deadlocked")
-            .unwrap()
-            .unwrap();
+
+        timeout(
+            Duration::from_secs(10),
+            applier
+                .as_mut()
+                .take(reconciles)
+                .try_for_each(|_| async { Ok(()) }),
+        )
+        .await
+        .expect("test timeout expired, applier likely deadlocked")
+        .unwrap();
+
+        // Do an orderly shutdown to ensure that no individual reconcilers are stuck
+        drop(queue_tx);
+        timeout(
+            Duration::from_secs(10),
+            applier.try_for_each(|_| async { Ok(()) }),
+        )
+        .await
+        .expect("applier cleanup timeout expired, individual reconciler likely deadlocked?")
+        .unwrap();
     }
 }
