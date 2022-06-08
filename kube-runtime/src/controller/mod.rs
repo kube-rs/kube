@@ -202,6 +202,8 @@ impl Display for ReconcileReason {
     }
 }
 
+const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
+
 /// Apply a reconciler to an input stream, with a given retry policy
 ///
 /// Takes a `store` parameter for the core objects, which should usually be updated by a [`reflector`].
@@ -231,7 +233,8 @@ where
 {
     let (scheduler_shutdown_tx, scheduler_shutdown_rx) = channel::oneshot::channel();
     let err_context = context.clone();
-    let (scheduler_tx, scheduler_rx) = channel::mpsc::unbounded::<ScheduleRequest<ReconcileRequest<K>>>();
+    let (scheduler_tx, scheduler_rx) =
+        channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(APPLIER_REQUEUE_BUF_SIZE);
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
