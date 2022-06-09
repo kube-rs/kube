@@ -278,7 +278,7 @@ where
                             .into_future()
                             .then(move |res| {
                                 let error_policy = error_policy;
-                                PostReconciler::new(
+                                RescheduleReconciliation::new(
                                     res,
                                     |err| error_policy(err, error_policy_ctx),
                                     request.obj_ref.clone(),
@@ -308,19 +308,19 @@ where
     .on_complete(async { tracing::debug!("applier terminated") })
 }
 
-/// Internal helper that runs post-reconciliation (such as requesting rescheduling) tasks in the scheduled context of the reconciler
+/// Internal helper [`Future`] that reschedules reconciliation of objects (if required), in the scheduled context of the reconciler
 ///
 /// This could be an `async fn`, but isn't because we want it to be [`Unpin`]
 #[pin_project]
 #[must_use]
-struct PostReconciler<K: Resource, ReconcilerErr> {
+struct RescheduleReconciliation<K: Resource, ReconcilerErr> {
     reschedule_tx: channel::mpsc::Sender<ScheduleRequest<ReconcileRequest<K>>>,
 
     reschedule_request: Option<ScheduleRequest<ReconcileRequest<K>>>,
     result: Option<Result<Action, ReconcilerErr>>,
 }
 
-impl<K, ReconcilerErr> PostReconciler<K, ReconcilerErr>
+impl<K, ReconcilerErr> RescheduleReconciliation<K, ReconcilerErr>
 where
     K: Resource,
 {
@@ -351,7 +351,7 @@ where
     }
 }
 
-impl<K, ReconcilerErr> Future for PostReconciler<K, ReconcilerErr>
+impl<K, ReconcilerErr> Future for RescheduleReconciliation<K, ReconcilerErr>
 where
     K: Resource,
 {
