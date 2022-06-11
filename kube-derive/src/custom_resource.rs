@@ -599,6 +599,6 @@ mod tests {
             struct FooSpec { foo: String }
         };
         let input = syn::parse2(input).unwrap();
-        let kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
+        let _kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
     }
 }
