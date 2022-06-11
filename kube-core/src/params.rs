@@ -367,27 +367,27 @@ impl PatchParams {
     }
 
     /// Set the validation directive for `fieldValidation` during server-side apply.
-    fn field_validation(mut self, directive: ValidationDirective) -> Self {
-        self.field_validation = Some(directive);
+    pub fn validation(mut self, vd: ValidationDirective) -> Self {
+        self.field_validation = Some(vd);
         self
     }
 
     /// Set the validation directive to `Ignore`
     #[must_use]
     pub fn validation_ignore(self) -> Self {
-        self.field_validation(ValidationDirective::Ignore)
+        self.validation(ValidationDirective::Ignore)
     }
 
     /// Set the validation directive to `Warn`
     #[must_use]
     pub fn validation_warn(self) -> Self {
-        self.field_validation(ValidationDirective::Warn)
+        self.validation(ValidationDirective::Warn)
     }
 
     /// Set the validation directive to `Strict`
     #[must_use]
     pub fn validation_strict(self) -> Self {
-        self.field_validation(ValidationDirective::Strict)
+        self.validation(ValidationDirective::Strict)
     }
 }
 
