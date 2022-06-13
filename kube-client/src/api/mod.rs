@@ -34,7 +34,7 @@ pub use kube_core::{
     Resource, ResourceExt,
 };
 pub use params::{
-    DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
+    DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy, ValidationDirective,
 };
 
 use crate::Client;
