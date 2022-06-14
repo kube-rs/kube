@@ -214,6 +214,23 @@ pub mod conditions {
         }
     }
 
+    /// An await condition for `Job` that returns `true` once it is completed
+    #[must_use]
+    pub fn is_job_completed() -> impl Condition<Job> {
+        |obj: Option<&Job>| {
+            if let Some(job) = &obj {
+                if let Some(s) = &job.status {
+                    if let Some(conds) = &s.conditions {
+                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Complete") {
+                            return pcond.status == "True";
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
     /// See [`Condition::not`]
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct Not<A>(pub(super) A);
