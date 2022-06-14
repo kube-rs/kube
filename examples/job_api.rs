@@ -1,25 +1,24 @@
-use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::batch::v1::Job;
-use serde_json::json;
-use tracing::*;
-
 use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
+    api::{Api, DeleteParams, PostParams},
+    runtime::wait::{await_condition, conditions},
     Client,
 };
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
+    let jobs: Api<Job> = Api::default_namespaced(client);
 
-    // Create a Job
-    let job_name = "empty-job";
-    let my_job = serde_json::from_value(json!({
+    info!("Creating job");
+    let name = "empty-job";
+    let data = serde_json::from_value(serde_json::json!({
         "apiVersion": "batch/v1",
         "kind": "Job",
         "metadata": {
-            "name": job_name,
+            "name": name,
         },
         "spec": {
             "template": {
@@ -36,41 +35,13 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }))?;
+    jobs.create(&PostParams::default(), &data).await?;
 
-    let jobs: Api<Job> = Api::default_namespaced(client);
-    let pp = PostParams::default();
+    info!("Waiting for job to complete");
+    let cond = await_condition(jobs.clone(), name, conditions::is_job_completed());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(20), cond).await?;
 
-    jobs.create(&pp, &my_job).await?;
-
-    // See if it ran to completion
-    let lp = ListParams::default()
-        .fields(&format!("metadata.name={}", job_name)) // only want events for our job
-        .timeout(20); // should be done by then
-    let mut stream = jobs.watch(&lp, "").await?.boxed();
-
-    while let Some(status) = stream.try_next().await? {
-        match status {
-            WatchEvent::Added(s) => info!("Added {}", s.name()),
-            WatchEvent::Modified(s) => {
-                let current_status = s.status.clone().expect("Status is missing");
-                match current_status.completion_time {
-                    Some(_) => {
-                        info!("Modified: {} is complete", s.name());
-                        break;
-                    }
-                    _ => info!("Modified: {} is running", s.name()),
-                }
-            }
-            WatchEvent::Deleted(s) => info!("Deleted {}", s.name()),
-            WatchEvent::Error(s) => error!("{}", s),
-            _ => {}
-        }
-    }
-
-    // Clean up the old job record..
-    info!("Deleting the job record.");
-    jobs.delete("empty-job", &DeleteParams::background().dry_run())
-        .await?;
-    jobs.delete("empty-job", &DeleteParams::background()).await?;
+    info!("Cleaning up job record");
+    jobs.delete(name, &DeleteParams::background()).await?;
     Ok(())
 }
