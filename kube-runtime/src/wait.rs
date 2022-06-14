@@ -161,7 +161,8 @@ impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
 pub mod conditions {
     pub use super::Condition;
     use k8s_openapi::{
-        api::core::v1::Pod, apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
+        api::{batch::v1::Job, core::v1::Pod},
+        apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
     use kube_client::Resource;
 
@@ -207,6 +208,23 @@ pub mod conditions {
                 if let Some(status) = &pod.status {
                     if let Some(phase) = &status.phase {
                         return phase == "Running";
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    /// An await condition for `Job` that returns `true` once it is completed
+    #[must_use]
+    pub fn is_job_completed() -> impl Condition<Job> {
+        |obj: Option<&Job>| {
+            if let Some(job) = &obj {
+                if let Some(s) = &job.status {
+                    if let Some(conds) = &s.conditions {
+                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Complete") {
+                            return pcond.status == "True";
+                        }
                     }
                 }
             }
