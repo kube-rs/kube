@@ -161,7 +161,8 @@ impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
 pub mod conditions {
     pub use super::Condition;
     use k8s_openapi::{
-        api::core::v1::Pod, apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
+        api::{batch::v1::Job, core::v1::Pod},
+        apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
     use kube_client::Resource;
 
