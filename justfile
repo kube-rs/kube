@@ -44,37 +44,48 @@ deny:
 readme:
   rustdoc README.md --test --edition=2021
 
-e2e: dapp
-  ls -lah e2e/
-  docker build -t clux/kube-dapp:{{VERSION}} e2e/
-  k3d image import clux/kube-dapp:{{VERSION}} --cluster main
+e2e: (e2e-mink8s) (e2e-incluster "rustls,latest")
+
+e2e-mink8s:
+  cargo run -p e2e --bin boot --features=openssl,latest
+  cargo run -p e2e --bin boot --features=openssl,mk8sv
+
+  #cargo run -p e2e --bin boot --features=rustls,latest
+  #cargo run -p e2e --bin boot --features=rustls,mk8sv
+
+e2e-incluster features:
+  just e2e-job-musl {{features}}
+  docker build -t clux/kube-e2e:{{VERSION}} e2e/
+  k3d image import clux/kube-e2e:{{VERSION}} --cluster main
   sed -i 's/latest/{{VERSION}}/g' e2e/deployment.yaml
   kubectl apply -f e2e/deployment.yaml
   sed -i 's/{{VERSION}}/latest/g' e2e/deployment.yaml
   kubectl get all -n apps
-  kubectl describe jobs/dapp -n apps
-  kubectl wait --for=condition=complete job/dapp -n apps --timeout=50s || kubectl logs -f job/dapp -n apps
+  kubectl describe jobs/e2e -n apps
+  kubectl wait --for=condition=complete job/e2e -n apps --timeout=50s || kubectl logs -f job/e2e -n apps
   kubectl get all -n apps
-  kubectl wait --for=condition=complete job/dapp -n apps --timeout=10s || kubectl get pods -n apps | grep dapp | grep Completed
-
-dapp:
+  kubectl wait --for=condition=complete job/e2e -n apps --timeout=10s || kubectl get pods -n apps | grep e2e | grep Completed
+e2e-job-musl features:
   #!/usr/bin/env bash
   docker run \
     -v cargo-cache:/root/.cargo/registry \
     -v "$PWD:/volume" -w /volume \
-    --rm -it clux/muslrust:stable cargo build --release -p e2e
-  cp target/x86_64-unknown-linux-musl/release/dapp e2e/dapp
-  chmod +x e2e/dapp
+    --rm -it clux/muslrust:stable cargo build --release --features={{features}} -p e2e
+  cp target/x86_64-unknown-linux-musl/release/job e2e/job
+  chmod +x e2e/job
 
 k3d:
-  k3d cluster create main --servers 1 --agents 1 --registry-create main \
+  k3d cluster create main --servers 1 --registry-create main \
     --k3s-arg "--no-deploy=traefik@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
 
+## RELEASE RELATED
+
 # Bump the msrv of kube; "just bump-msrv 1.60.0"
 bump-msrv msrv:
   #!/usr/bin/env bash
+  # TODO: warn if not msrv+2 not found
   oldmsrv="$(rg "rust-version = \"(.*)\"" -r '$1' kube/Cargo.toml)"
   fastmod -m -d . --extensions toml "rust-version = \"$oldmsrv\"" "rust-version = \"{{msrv}}\""
   # sanity
@@ -95,9 +106,17 @@ bump-k8s:
   #!/usr/bin/env bash
   current=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1)
   next=${current::-2}$((${current:3} + 1))
-  fastmod -m -d . --extensions toml "$current" "$next"
+  fastmod -m -d . -e toml "$current" "$next"
   fastmod -m "$current" "$next" -- README.md
   fastmod -m "$current" "$next" -- justfile
+  # bumping supported version also bumps our mk8sv
+  mk8svnew=${current::-2}$((${current:3} - 4))
+  mk8svold=${current::-2}$((${current:3} - 5))
+  fastmod -m -d e2e -e toml "$mk8svold" "$mk8svnew"
+  fastmod -m -d .github/workflows -e yml "${mk8svold/_/\.}" "${mk8svnew/_/.}"
+  # bump mk8sv badge
+  badge="[![Tested against Kubernetes ${mk8svnew} and above](https://img.shields.io/badge/MK8SV-${mk8svnew}-326ce5.svg)](https://kube.rs/kubernetes-version)"
+  sd "^.+badge/MK8SV.+$" "${badge}" README.md
 
 # mode: makefile
 # End:

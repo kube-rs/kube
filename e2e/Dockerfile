@@ -1,4 +1,3 @@
 FROM gcr.io/distroless/static:nonroot
-COPY --chown=nonroot:nonroot ./dapp /app/
-EXPOSE 8080
-ENTRYPOINT ["/app/dapp"]
+COPY --chown=nonroot:nonroot ./job /app/
+ENTRYPOINT ["/app/job"]

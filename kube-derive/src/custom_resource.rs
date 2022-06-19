@@ -592,13 +592,17 @@ mod tests {
     // TODO Unit test `derive`
 
     #[test]
-    fn test_apiextensions_default() {
+    fn test_parse_default() {
         let input = quote! {
             #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
             #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
             struct FooSpec { foo: String }
         };
         let input = syn::parse2(input).unwrap();
-        let _kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
+        let kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
+        assert_eq!(kube_attrs.group, "clux.dev".to_string());
+        assert_eq!(kube_attrs.version, "v1".to_string());
+        assert_eq!(kube_attrs.kind, "Foo".to_string());
+        assert_eq!(kube_attrs.namespaced, true);
     }
 }

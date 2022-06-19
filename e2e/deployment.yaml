@@ -9,7 +9,7 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: dapp
+  name: e2e
   namespace: apps
 automountServiceAccountToken: true
 
@@ -19,7 +19,7 @@ kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   namespace: apps
-  name: dapp-role
+  name: e2e-role
 rules:
   - apiGroups:
     - batch
@@ -37,14 +37,14 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: dapp-binding
+  name: e2e-binding
   namespace: apps
 subjects:
 - kind: ServiceAccount
-  name: dapp
+  name: e2e
 roleRef:
   kind: Role
-  name: dapp-role
+  name: e2e-role
   apiGroup: rbac.authorization.k8s.io
 
 ---
@@ -52,22 +52,19 @@ roleRef:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: dapp
+  name: e2e
   namespace: apps
   labels:
-    app: dapp
+    app: e2e
 spec:
   template:
     metadata:
       labels:
-        app: dapp
+        app: e2e
     spec:
-      serviceAccountName: dapp
+      serviceAccountName: e2e
       restartPolicy: Never
       containers:
-      - name: dapp
-        image: "clux/kube-dapp:latest"
+      - name: e2e
+        image: "clux/kube-e2e:latest"
         imagePullPolicy: IfNotPresent
-        env:
-        - name: NAMESPACE
-          value: "apps"

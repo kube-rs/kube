@@ -1,4 +1,4 @@
-name: Release
+name: release
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'kube-rs' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2

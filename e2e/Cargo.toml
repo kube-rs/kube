@@ -10,15 +10,25 @@ license = "Apache-2.0"
 release = false
 
 [[bin]]
-name = "dapp"
-path = "dapp.rs"
+name = "job"
+path = "job.rs"
+
+[[bin]]
+name = "boot"
+path = "boot.rs"
+
+[features]
+latest = ["k8s-openapi/v1_24"]
+mk8sv = ["k8s-openapi/v1_19"]
+rustls = ["kube/rustls-tls"]
+openssl = ["kube/openssl-tls"]
 
 [dependencies]
 anyhow = "1.0.44"
-env_logger = "0.9.0"
+tracing = "0.1.29"
+tracing-subscriber = "0.3.3"
 futures = "0.3.17"
-kube = { path = "../kube", version = "^0.73.0", default-features = false, features = ["client", "rustls-tls"] }
-k8s-openapi = { version = "0.15.0", features = ["v1_24"], default-features = false }
-log = "0.4.11"
+kube = { path = "../kube", version = "^0.73.0", default-features = false, features = ["client", "runtime", "ws", "admission", "gzip"] }
+k8s-openapi = { version = "0.15.0", default-features = false }
 serde_json = "1.0.68"
 tokio = { version = "1.14.0", features = ["full"] }
