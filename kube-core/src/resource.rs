@@ -144,8 +144,8 @@ where
 pub trait ResourceExt: Resource {
     /// Deprecated fn equivalent to [`name_unchecked`](ResourceExt::name_unchecked)
     #[deprecated(
-        since = "0.73.0",
-        note = "ResourceExt::name can panic and has been replaced by ::name_any + ::name_unchecked + ::name_or_generatename. This fn will be removed in 0.76.0."
+        since = "0.74.0",
+        note = "ResourceExt::name can panic and has been replaced by ::name_any + ::name_unchecked + ::name_or_generatename. This fn will be removed in 0.77.0."
     )]
     fn name(&self) -> String;
 
