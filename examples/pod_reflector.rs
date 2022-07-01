@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
             // full information with debug logs
             for p in reader.state() {
                 let yaml = serde_yaml::to_string(p.as_ref()).unwrap();
-                debug!("Pod {}: \n{}", p.name_unchecked(), yaml);
+                debug!("Pod {}: \n{}", p.name_any(), yaml);
             }
         }
     });
@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     futures::pin_mut!(rf);
 
     while let Some(pod) = rf.try_next().await? {
-        info!("saw {}", pod.name_unchecked());
+        info!("saw {}", pod.name_any());
     }
     Ok(())
 }

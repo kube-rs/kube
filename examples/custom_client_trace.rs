@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     for p in pods.list(&Default::default()).await? {
-        info!("{}", p.name_unchecked());
+        info!("{}", p.name_any());
     }
 
     Ok(())

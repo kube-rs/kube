@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
 
     let pods: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
     for p in pods.list(&Default::default()).await? {
-        info!("Pod {} runs: {:?}", p.name_unchecked(), p.spec.containers);
+        info!("Pod {} runs: {:?}", p.name_any(), p.spec.containers);
     }
 
     Ok(())

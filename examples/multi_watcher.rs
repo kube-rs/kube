@@ -37,9 +37,9 @@ async fn main() -> anyhow::Result<()> {
     }
     while let Some(o) = combo_stream.try_next().await? {
         match o {
-            Watched::Config(cm) => info!("Got configmap: {}", cm.name_unchecked()),
-            Watched::Deploy(d) => info!("Got deployment: {}", d.name_unchecked()),
-            Watched::Secret(s) => info!("Got secret: {}", s.name_unchecked()),
+            Watched::Config(cm) => info!("Got configmap: {}", cm.name_any()),
+            Watched::Deploy(d) => info!("Got deployment: {}", d.name_any()),
+            Watched::Secret(s) => info!("Got secret: {}", s.name_any()),
         }
     }
     Ok(())

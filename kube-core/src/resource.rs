@@ -142,10 +142,10 @@ where
 
 /// Helper methods for resources.
 pub trait ResourceExt: Resource {
-    /// Deprecated duplicate of [`name_unchecked`](ResourceExt::name_unchecked)
+    /// Deprecated fn equivalent to [`name_unchecked`](ResourceExt::name_unchecked)
     #[deprecated(
         since = "0.73.0",
-        note = "ResourceExt::name can panic and has been replaced by ::name_unchecked, ::name_or_generatename and meta().name"
+        note = "ResourceExt::name can panic and has been replaced by ::name_any + ::name_unchecked + ::name_or_generatename. This fn will be removed in 0.76.0."
     )]
     fn name(&self) -> String;
 
@@ -158,7 +158,8 @@ pub trait ResourceExt: Resource {
     /// Before admission, `.metadata.generateName` can be set instead of name
     /// and in those cases this function can panic.
     ///
-    /// Prefer using `.meta().name` or [`name_or_generatename()`](ResourceExt::name_or_generatename) for the more general cases.
+    /// Prefer using `.meta().name`, [`name_or_generatename`](ResourceExt::name_or_generatename), or [`name_any`](ResourceExt::name_any)
+    /// for the more general cases.
     fn name_unchecked(&self) -> String;
 
     /// Returns the name or generateName of a resource
@@ -166,6 +167,17 @@ pub trait ResourceExt: Resource {
     /// This can be safely unwrapped when received by the apiserver in
     /// admission controllers as Kubernetes guarantees one of them set.
     fn name_or_generatename(&self) -> Option<String>;
+
+    /// Returns the most useful name identifier available
+    ///
+    /// This is equivalent to doing [`name_or_generatename`](ResourceExt::name_or_generatename)
+    /// and defaulting to the empty string if neither name or generateName are set.
+    ///
+    /// This is intended to provide something quick and simple for standard logging purposes.
+    /// For more precise use cases, prefer doing your own defaulting.
+    /// For true uniqueness, prefer [`uid`](ResourceExt::uid).
+    fn name_any(&self) -> String;
+
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
     /// The resource version
@@ -218,6 +230,10 @@ impl<K: Resource> ResourceExt for K {
             .name
             .clone()
             .or_else(|| self.meta().generate_name.clone())
+    }
+
+    fn name_any(&self) -> String {
+        self.name_or_generatename().unwrap_or_default()
     }
 
     fn namespace(&self) -> Option<String> {
