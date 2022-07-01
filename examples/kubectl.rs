@@ -89,12 +89,17 @@ impl App {
         match self.output {
             OutputMode::Yaml => println!("{}", serde_yaml::to_string(&result)?),
             OutputMode::Pretty => {
-                // Display style; size colums according to biggest name
-                let max_name = result.iter().map(|x| x.name().len() + 2).max().unwrap_or(63);
+                // Display style; size columns according to longest name
+                let max_name = result
+                    .iter()
+                    .map(|x| x.name_unchecked().len() + 2)
+                    .max()
+                    .unwrap_or(63);
                 println!("{0:<width$} {1:<20}", "NAME", "AGE", width = max_name);
                 for inst in result {
                     let age = format_creation_since(inst.creation_timestamp());
-                    println!("{0:<width$} {1:<20}", inst.name(), age, width = max_name);
+                    let name = inst.name_unchecked();
+                    println!("{0:<width$} {1:<20}", name, age, width = max_name);
                 }
             }
         }
@@ -122,7 +127,7 @@ impl App {
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
             let age = format_creation_since(inst.creation_timestamp());
-            println!("{0:<width$} {1:<20}", inst.name(), age, width = 63);
+            println!("{0:<width$} {1:<20}", inst.name_unchecked(), age, width = 63);
         }
         Ok(())
     }
@@ -132,10 +137,10 @@ impl App {
             let mut orig = api.get(n).await?;
             orig.managed_fields_mut().clear(); // hide managed fields
             let input = serde_yaml::to_string(&orig)?;
-            debug!("opening {} in {:?}", orig.name(), edit::get_editor());
+            debug!("opening {} in {:?}", orig.name_unchecked(), edit::get_editor());
             let edited = edit::edit(&input)?;
             if edited != input {
-                info!("updating changed object {}", orig.name());
+                info!("updating changed object {}", orig.name_unchecked());
                 let data: DynamicObject = serde_yaml::from_str(&edited)?;
                 // NB: simplified kubectl constructs a merge-patch of differences
                 api.replace(n, &Default::default(), &data).await?;
@@ -158,7 +163,7 @@ impl App {
             } else {
                 bail!("cannot apply object without valid TypeMeta {:?}", obj);
             };
-            let name = obj.name();
+            let name = obj.name_unchecked();
             if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
                 let api = dynamic_api(ar, caps, client.clone(), &self.namespace, false);
                 trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);

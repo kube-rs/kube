@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     watcher(api, ListParams::default())
         .applied_objects()
         .try_for_each(|p| async move {
-            info!("saw {}", p.name());
+            info!("saw {}", p.name_unchecked());
             if let Some(unready_reason) = pod_unready(&p) {
                 warn!("{}", unready_reason);
             }
@@ -39,7 +39,7 @@ fn pod_unready(p: &Pod) -> Option<String> {
             if p.metadata.labels.as_ref().unwrap().contains_key("job-name") {
                 return None; // ignore job based pods, they are meant to exit 0
             }
-            return Some(format!("Unready pod {}: {}", p.name(), failed));
+            return Some(format!("Unready pod {}: {}", p.name_unchecked(), failed));
         }
     }
     None

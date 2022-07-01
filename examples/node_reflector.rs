@@ -23,7 +23,11 @@ async fn main() -> anyhow::Result<()> {
     // Periodically read our state in the background
     tokio::spawn(async move {
         loop {
-            let nodes = reader.state().iter().map(|r| r.name()).collect::<Vec<_>>();
+            let nodes = reader
+                .state()
+                .iter()
+                .map(|r| r.name_unchecked())
+                .collect::<Vec<_>>();
             info!("Current {} nodes: {:?}", nodes.len(), nodes);
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
@@ -32,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     // Drain and log applied events from the reflector
     let mut rfa = rf.applied_objects().boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("saw {}", event.name());
+        info!("saw {}", event.name_unchecked());
     }
 
     Ok(())

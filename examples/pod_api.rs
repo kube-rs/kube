@@ -33,8 +33,8 @@ async fn main() -> anyhow::Result<()> {
     let pp = PostParams::default();
     match pods.create(&pp, &p).await {
         Ok(o) => {
-            let name = o.name();
-            assert_eq!(p.name(), name);
+            let name = o.name_unchecked();
+            assert_eq!(p.name_unchecked(), name);
             info!("Created {}", name);
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
@@ -69,13 +69,13 @@ async fn main() -> anyhow::Result<()> {
 
     let lp = ListParams::default().fields(&format!("metadata.name={}", "blog")); // only want results for our pod
     for p in pods.list(&lp).await? {
-        info!("Found Pod: {}", p.name());
+        info!("Found Pod: {}", p.name_unchecked());
     }
 
     // Delete it
     let dp = DeleteParams::default();
     pods.delete("blog", &dp).await?.map_left(|pdel| {
-        assert_eq!(pdel.name(), "blog");
+        assert_eq!(pdel.name_unchecked(), "blog");
         info!("Deleting blog pod started: {:?}", pdel);
     });
 

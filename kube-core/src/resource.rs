@@ -150,7 +150,29 @@ pub trait ResourceExt: Resource {
     ///
     /// For non-panicking alternative, you can directly read `name` field
     /// on the `self.meta()`.
+    #[deprecated(
+        since = "0.73.0",
+        note = "ResourceExt::name can panic and has been replaced by ::name_unchecked, ::name_or_generatename or meta().name"
+    )]
     fn name(&self) -> String;
+
+    /// Returns the name of the resource, panicking if it is unset.
+    ///
+    /// Only use this function if you know that name is set, for example when
+    /// the resource was received from the apiserver, or you constructed the resource.
+    ///
+    /// Im some contexts `.metadata.generateName` is set instead of name,
+    /// such as for admission controllers.
+    ///
+    /// For non-panicking alternative, you can directly read `name` field
+    /// on the `self.meta()`.
+    fn name_unchecked(&self) -> String;
+
+    /// Returns the name or generateName of a resource
+    ///
+    /// This can be safely unwrapped when received by the apiserver in
+    /// admission controllers as Kubernetes guarantees one of them set.
+    fn name_or_generatename(&self) -> Option<String>;
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
     /// The resource version
@@ -192,6 +214,17 @@ static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(BTreeMap::new);
 impl<K: Resource> ResourceExt for K {
     fn name(&self) -> String {
         self.meta().name.clone().expect(".metadata.name missing")
+    }
+
+    fn name_unchecked(&self) -> String {
+        self.meta().name.clone().expect(".metadata.name missing")
+    }
+
+    fn name_or_generatename(&self) -> Option<String> {
+        self.meta()
+            .name
+            .clone()
+            .or_else(|| self.meta().generate_name.clone())
     }
 
     fn namespace(&self) -> Option<String> {

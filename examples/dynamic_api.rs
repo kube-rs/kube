@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
             let list = api.list(&Default::default()).await?;
             for item in list.items {
-                let name = item.name();
+                let name = item.name_unchecked();
                 let ns = item.metadata.namespace.map(|s| s + "/").unwrap_or_default();
                 info!("\t\t{}{}", ns, name);
             }
