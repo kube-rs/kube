@@ -142,30 +142,23 @@ where
 
 /// Helper methods for resources.
 pub trait ResourceExt: Resource {
-    /// Returns the name of the resource, panicking if it is
-    /// missing. Use this function if you know that name is set, for example
-    /// when resource was received from the apiserver.
-    /// Because of `.metadata.generateName` field, in other contexts name
-    /// may be missing.
-    ///
-    /// For non-panicking alternative, you can directly read `name` field
-    /// on the `self.meta()`.
+    /// Deprecated duplicate of [`name_unchecked`](ResourceExt::name_unchecked)
     #[deprecated(
         since = "0.73.0",
-        note = "ResourceExt::name can panic and has been replaced by ::name_unchecked, ::name_or_generatename or meta().name"
+        note = "ResourceExt::name can panic and has been replaced by ::name_unchecked, ::name_or_generatename and meta().name"
     )]
     fn name(&self) -> String;
 
     /// Returns the name of the resource, panicking if it is unset.
     ///
-    /// Only use this function if you know that name is set, for example when
-    /// the resource was received from the apiserver, or you constructed the resource.
+    /// Only use this function if you know that name is set; for example when
+    /// the resource was received from the apiserver (outside of admission),
+    /// or you constructed the resource.
     ///
-    /// Im some contexts `.metadata.generateName` is set instead of name,
-    /// such as for admission controllers.
+    /// Before admission, `.metadata.generateName` can be set instead of name
+    /// and in those cases this function can panic.
     ///
-    /// For non-panicking alternative, you can directly read `name` field
-    /// on the `self.meta()`.
+    /// Prefer using `.meta().name` or [`name_or_generatename()`](ResourceExt::name_or_generatename) for the more general cases.
     fn name_unchecked(&self) -> String;
 
     /// Returns the name or generateName of a resource
