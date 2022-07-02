@@ -145,7 +145,7 @@ pub trait ResourceExt: Resource {
     /// Deprecated fn equivalent to [`name_unchecked`](ResourceExt::name_unchecked)
     #[deprecated(
         since = "0.74.0",
-        note = "ResourceExt::name can panic and has been replaced by ResourceExt::name_any and ResourceExt::name_unchecked. This fn will be removed in 0.77.0."
+        note = "ResourceExt::name can panic and has been replaced by `ResourceExt::name_any` and `ResourceExt::name_unchecked`. This fn will be removed in 0.77.0."
     )]
     fn name(&self) -> String;
 
@@ -164,7 +164,8 @@ pub trait ResourceExt: Resource {
 
     /// Returns the most useful name identifier available
     ///
-    /// This is equivalent  [`name_or`](ResourceExt::name_or) with an empty string as a fallback.
+    /// This is tries `name`, then `generateName`, and falls back on an empty string when neither is set.
+    /// Generally you always have one of the two unless you are creating the object locally.
     ///
     /// This is intended to provide something quick and simple for standard logging purposes.
     /// For more precise use cases, prefer doing your own defaulting.
