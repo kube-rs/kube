@@ -164,7 +164,7 @@ pub enum ValidationDirective {
 
 impl ValidationDirective {
     /// Returns the string format of the directive
-    pub fn as_str(self: &Self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Strict => "Strict",
             Self::Warn => "Warn",
