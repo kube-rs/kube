@@ -45,7 +45,7 @@ async fn mutate_handler(body: AdmissionReview<DynamicObject>) -> Result<impl Rep
     let mut res = AdmissionResponse::from(&req);
     // req.Object always exists for us, but could be None if extending to DELETE events
     if let Some(obj) = req.object {
-        let name = obj.name_or_generatename().unwrap(); // apiserver may not have generated a name yet
+        let name = obj.name_any(); // apiserver may not have generated a name yet
         res = match mutate(res.clone(), &obj) {
             Ok(res) => {
                 info!("accepted: {:?} on Foo {}", req.operation, name);

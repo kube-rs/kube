@@ -145,33 +145,26 @@ pub trait ResourceExt: Resource {
     /// Deprecated fn equivalent to [`name_unchecked`](ResourceExt::name_unchecked)
     #[deprecated(
         since = "0.74.0",
-        note = "ResourceExt::name can panic and has been replaced by ::name_any + ::name_unchecked + ::name_or_generatename. This fn will be removed in 0.77.0."
+        note = "ResourceExt::name can panic and has been replaced by ResourceExt::name_any and ResourceExt::name_unchecked. This fn will be removed in 0.77.0."
     )]
     fn name(&self) -> String;
 
-    /// Returns the name of the resource, panicking if it is unset.
+    /// Returns the name of the resource, panicking if it is unset
     ///
     /// Only use this function if you know that name is set; for example when
-    /// the resource was received from the apiserver (outside of admission),
-    /// or you constructed the resource.
+    /// the resource was received from the apiserver (post-admission),
+    /// or if you constructed the resource with the name.
     ///
-    /// Before admission, `.metadata.generateName` can be set instead of name
+    /// At admission, `.metadata.generateName` can be set instead of name
     /// and in those cases this function can panic.
     ///
-    /// Prefer using `.meta().name`, [`name_or_generatename`](ResourceExt::name_or_generatename), or [`name_any`](ResourceExt::name_any)
+    /// Prefer using `.meta().name` or [`name_any`](ResourceExt::name_any)
     /// for the more general cases.
     fn name_unchecked(&self) -> String;
 
-    /// Returns the name or generateName of a resource
-    ///
-    /// This can be safely unwrapped when received by the apiserver in
-    /// admission controllers as Kubernetes guarantees one of them set.
-    fn name_or_generatename(&self) -> Option<String>;
-
     /// Returns the most useful name identifier available
     ///
-    /// This is equivalent to doing [`name_or_generatename`](ResourceExt::name_or_generatename)
-    /// and defaulting to the empty string if neither name or generateName are set.
+    /// This is equivalent  [`name_or`](ResourceExt::name_or) with an empty string as a fallback.
     ///
     /// This is intended to provide something quick and simple for standard logging purposes.
     /// For more precise use cases, prefer doing your own defaulting.
@@ -225,15 +218,12 @@ impl<K: Resource> ResourceExt for K {
         self.meta().name.clone().expect(".metadata.name missing")
     }
 
-    fn name_or_generatename(&self) -> Option<String> {
+    fn name_any(&self) -> String {
         self.meta()
             .name
             .clone()
             .or_else(|| self.meta().generate_name.clone())
-    }
-
-    fn name_any(&self) -> String {
-        self.name_or_generatename().unwrap_or_default()
+            .unwrap_or_default()
     }
 
     fn namespace(&self) -> Option<String> {
