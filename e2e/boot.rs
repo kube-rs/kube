@@ -7,7 +7,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let pods: Api<Pod> = Api::all(client);
     for p in pods.list(&Default::default()).await? {
-        tracing::info!("Found pod {}", p.name());
+        tracing::info!("Found pod {}", p.name_any());
     }
     Ok(())
 }

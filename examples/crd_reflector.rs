@@ -44,13 +44,13 @@ async fn main() -> anyhow::Result<()> {
             // Periodically read our state
             // while this runs you can kubectl apply -f crd-baz.yaml or crd-qux.yaml and see it works
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let crds = reader.state().iter().map(|r| r.name()).collect::<Vec<_>>();
+            let crds = reader.state().iter().map(|r| r.name_any()).collect::<Vec<_>>();
             info!("Current crds: {:?}", crds);
         }
     });
     let mut rfa = rf.applied_objects().boxed();
     while let Some(event) = rfa.try_next().await? {
-        info!("saw {}", event.name());
+        info!("saw {}", event.name_any());
     }
     Ok(())
 }

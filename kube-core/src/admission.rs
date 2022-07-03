@@ -174,7 +174,7 @@ pub struct AdmissionRequest<T: Resource> {
 }
 
 /// The operation specified in an [`AdmissionRequest`].
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Operation {
     /// An operation that creates a resource.
@@ -329,7 +329,7 @@ impl AdmissionResponse {
 }
 
 /// The type of patch returned in an [`AdmissionResponse`].
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum PatchType {
     /// Specifies the patch body implements JSON Patch under RFC 6902.
     #[serde(rename = "JSONPatch")]

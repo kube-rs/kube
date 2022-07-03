@@ -56,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     pods.delete("example", &DeleteParams::default())
         .await?
         .map_left(|pdel| {
-            assert_eq!(pdel.name(), "example");
+            assert_eq!(pdel.name_any(), "example");
         });
 
     Ok(())

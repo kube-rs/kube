@@ -142,15 +142,36 @@ where
 
 /// Helper methods for resources.
 pub trait ResourceExt: Resource {
-    /// Returns the name of the resource, panicking if it is
-    /// missing. Use this function if you know that name is set, for example
-    /// when resource was received from the apiserver.
-    /// Because of `.metadata.generateName` field, in other contexts name
-    /// may be missing.
-    ///
-    /// For non-panicking alternative, you can directly read `name` field
-    /// on the `self.meta()`.
+    /// Deprecated fn equivalent to [`name_unchecked`](ResourceExt::name_unchecked)
+    #[deprecated(
+        since = "0.74.0",
+        note = "ResourceExt::name can panic and has been replaced by `ResourceExt::name_any` and `ResourceExt::name_unchecked`. This fn will be removed in 0.77.0."
+    )]
     fn name(&self) -> String;
+
+    /// Returns the name of the resource, panicking if it is unset
+    ///
+    /// Only use this function if you know that name is set; for example when
+    /// the resource was received from the apiserver (post-admission),
+    /// or if you constructed the resource with the name.
+    ///
+    /// At admission, `.metadata.generateName` can be set instead of name
+    /// and in those cases this function can panic.
+    ///
+    /// Prefer using `.meta().name` or [`name_any`](ResourceExt::name_any)
+    /// for the more general cases.
+    fn name_unchecked(&self) -> String;
+
+    /// Returns the most useful name identifier available
+    ///
+    /// This is tries `name`, then `generateName`, and falls back on an empty string when neither is set.
+    /// Generally you always have one of the two unless you are creating the object locally.
+    ///
+    /// This is intended to provide something quick and simple for standard logging purposes.
+    /// For more precise use cases, prefer doing your own defaulting.
+    /// For true uniqueness, prefer [`uid`](ResourceExt::uid).
+    fn name_any(&self) -> String;
+
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
     /// The resource version
@@ -192,6 +213,18 @@ static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(BTreeMap::new);
 impl<K: Resource> ResourceExt for K {
     fn name(&self) -> String {
         self.meta().name.clone().expect(".metadata.name missing")
+    }
+
+    fn name_unchecked(&self) -> String {
+        self.meta().name.clone().expect(".metadata.name missing")
+    }
+
+    fn name_any(&self) -> String {
+        self.meta()
+            .name
+            .clone()
+            .or_else(|| self.meta().generate_name.clone())
+            .unwrap_or_default()
     }
 
     fn namespace(&self) -> Option<String> {

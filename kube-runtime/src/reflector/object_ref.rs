@@ -113,7 +113,7 @@ impl<K: Resource> ObjectRef<K> {
         let meta = obj.meta();
         Self {
             dyntype,
-            name: obj.name(),
+            name: obj.name_unchecked(),
             namespace: meta.namespace.clone(),
             extra: Extra::from_obj_meta(meta),
         }
