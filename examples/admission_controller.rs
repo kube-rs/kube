@@ -70,18 +70,24 @@ fn mutate(res: AdmissionResponse, obj: &DynamicObject) -> Result<AdmissionRespon
 
     // If the resource doesn't contain "admission", we add it to the resource.
     if !obj.labels().contains_key("admission") {
-        let patches = vec![
-            // Ensure labels exist before adding a key to it
-            json_patch::PatchOperation::Add(json_patch::AddOperation {
-                path: "/metadata/labels".into(),
-                value: serde_json::json!({}),
-            }),
-            // Add our label
+        let mut patches = Vec::new();
+
+        // Ensure labels exist before adding a key to it
+        if obj.meta().labels.is_none() {
+            patches.push(
+                json_patch::PatchOperation::Add(json_patch::AddOperation {
+                    path: "/metadata/labels".into(),
+                    value: serde_json::json!({}),
+                }),
+            );
+        }
+        // Add our label
+        patches.push(
             json_patch::PatchOperation::Add(json_patch::AddOperation {
                 path: "/metadata/labels/admission".into(),
                 value: serde_json::Value::String("modified-by-admission-controller".into()),
             }),
-        ];
+        );
         Ok(res.with_patch(json_patch::Patch(patches))?)
     } else {
         Ok(res)
