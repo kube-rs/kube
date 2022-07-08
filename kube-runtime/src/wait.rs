@@ -184,6 +184,9 @@ pub mod conditions {
     }
 
     /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
+    ///
+    /// Note that this condition only guarantees you that you can use `Api<CustomResourceDefinition>` when it is ready.
+    /// It usually takes extra time for Discovery to notice the custom resource, and there is no condition for this.
     #[must_use]
     pub fn is_crd_established() -> impl Condition<CustomResourceDefinition> {
         |obj: Option<&CustomResourceDefinition>| {
