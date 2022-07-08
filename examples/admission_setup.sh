@@ -12,9 +12,13 @@ test -n "${ADMISSION_PRIVATE_IP}"
 
 # Cleanup: Remove old MutatingWebhookConfiguration if exists (immutable)
 kubectl delete mutatingwebhookconfiguration admission-controller-demo || true
+# If behind a service:
+#kubectl -n default delete secret admission-controller-tls || true
 
 # Get your IP into the cert
 echo "subjectAltName = IP:${ADMISSION_PRIVATE_IP}" > admission_extfile.cnf
+# Or, if using DNS (e.g. when running behind a service):
+#echo "subjectAltName = DNS:admission-controller.default.svc" > admission_extfile.cnf
 
 # Generate the CA cert and private key
 openssl req -nodes -new -x509 \
