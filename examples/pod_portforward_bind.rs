@@ -1,13 +1,13 @@
+use anyhow::Context;
 // Example to listen on port 8080 locally, forwarding to port 80 in the example pod.
 // Similar to `kubectl port-forward pod/example 8080:80`.
-use futures::FutureExt;
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
+use futures::{StreamExt, TryStreamExt};
+use std::net::SocketAddr;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpListener,
 };
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
-use tokio::sync::Mutex;
-use tower::ServiceExt;
+use tokio_stream::wrappers::TcpListenerStream;
 use tracing::*;
 
 use k8s_openapi::api::core::v1::Pod;
@@ -36,58 +36,39 @@ async fn main() -> anyhow::Result<()> {
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     // Stop on error including a pod already exists or is still being deleted.
+    info!("creating nginx pod");
     pods.create(&PostParams::default(), &p).await?;
 
     // Wait until the pod is running, otherwise we get 500 error.
+    info!("waiting for nginx pod to start");
     let running = await_condition(pods.clone(), "example", is_pod_running());
     let _ = tokio::time::timeout(std::time::Duration::from_secs(30), running).await?;
 
-    // Get `Portforwarder` that handles the WebSocket connection.
-    // There's no need to spawn a task to drive this, but it can be awaited to be notified on error.
-    let mut forwarder = pods.portforward("example", &[80]).await?;
-    let port = forwarder.take_stream(80).unwrap();
-
-    // let hyper drive the HTTP state in our DuplexStream via a task
-    let (sender, connection) = hyper::client::conn::handshake(port).await?;
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            error!("error in connection: {}", e);
-        }
-    });
-    // The following task is only used to show any error from the forwarder.
-    // This example can be stopped with Ctrl-C if anything happens.
-    tokio::spawn(async move {
-        if let Err(e) = forwarder.join().await {
-            error!("forwarder errored: {}", e);
-        }
-    });
-
-    // Shared `SendRequest<Body>` to relay the request.
-    let context = Arc::new(Mutex::new(sender));
-    let make_service = make_service_fn(move |_conn| {
-        let context = context.clone();
-        let service = service_fn(move |req| handle(context.clone(), req));
-        async move { Ok::<_, Infallible>(service) }
-    });
-
-    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-    let server = Server::bind(&addr)
-        .serve(make_service)
-        .with_graceful_shutdown(async {
-            rx.await.ok();
+    let pod_port = 80;
+    info!(local_addr = %addr, pod_port, "forwarding traffic to the pod");
+    info!("try opening http://{0} in a browser, or `curl http://{0}`", addr);
+    info!("use Ctrl-C to stop the server and delete the pod");
+    let server = TcpListenerStream::new(TcpListener::bind(addr).await.unwrap())
+        .take_until(tokio::signal::ctrl_c())
+        .try_for_each(|client_conn| async {
+            if let Ok(peer_addr) = client_conn.peer_addr() {
+                info!(%peer_addr, "new connection");
+            }
+            let pods = pods.clone();
+            tokio::spawn(async move {
+                if let Err(e) = forward_connection(&pods, "example", 80, client_conn).await {
+                    error!(
+                        error = e.as_ref() as &dyn std::error::Error,
+                        "failed to forward connection"
+                    );
+                }
+            });
+            // keep the server running
+            Ok(())
         });
-    println!("Forwarding http://{} to port 80 in the pod", addr);
-    println!("Try opening http://{0} in a browser, or `curl http://{0}`", addr);
-    println!("Use Ctrl-C to stop the server and delete the pod");
-    // Stop the server and delete the pod on Ctrl-C.
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c().map(|_| ()).await;
-        info!("stopping the server");
-        let _ = tx.send(());
-    });
     if let Err(e) = server.await {
-        error!("server error: {}", e);
+        error!(error = &e as &dyn std::error::Error, "server error");
     }
 
     info!("deleting the pod");
@@ -100,12 +81,19 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-// Simply forwards the request to the port through the shared `SendRequest<Body>`.
-async fn handle(
-    context: Arc<Mutex<hyper::client::conn::SendRequest<hyper::Body>>>,
-    req: Request<Body>,
-) -> Result<Response<Body>, Infallible> {
-    let mut sender = context.lock().await;
-    let response = sender.ready().await.unwrap().send_request(req).await.unwrap();
-    Ok(response)
+async fn forward_connection(
+    pods: &Api<Pod>,
+    pod_name: &str,
+    port: u16,
+    mut client_conn: impl AsyncRead + AsyncWrite + Unpin,
+) -> anyhow::Result<()> {
+    let mut forwarder = pods.portforward(pod_name, &[port]).await?;
+    let mut upstream_conn = forwarder
+        .take_stream(port)
+        .context("port not found in forwarder")?;
+    tokio::io::copy_bidirectional(&mut client_conn, &mut upstream_conn).await?;
+    drop(upstream_conn);
+    forwarder.join().await?;
+    info!("connection closed");
+    Ok(())
 }
