@@ -3,7 +3,10 @@
 //! For concrete usage see [examples prefixed with dynamic_](https://github.com/kube-rs/kube-rs/tree/master/examples).
 
 pub use crate::discovery::ApiResource;
-use crate::{metadata::TypeMeta, resource::Resource};
+use crate::{
+    metadata::TypeMeta,
+    resource::{DynamicScope, Resource},
+};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use std::borrow::Cow;
 
@@ -57,6 +60,7 @@ impl DynamicObject {
 
 impl Resource for DynamicObject {
     type DynamicType = ApiResource;
+    type Scope = DynamicScope;
 
     fn group(dt: &ApiResource) -> Cow<'_, str> {
         dt.group.as_str().into()

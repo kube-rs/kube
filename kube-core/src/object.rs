@@ -2,7 +2,7 @@
 use crate::{
     discovery::ApiResource,
     metadata::{ListMeta, ObjectMeta, TypeMeta},
-    resource::Resource,
+    resource::{DynamicScope, Resource},
 };
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -216,6 +216,7 @@ where
     U: Clone,
 {
     type DynamicType = ApiResource;
+    type Scope = DynamicScope;
 
     fn group(dt: &ApiResource) -> Cow<'_, str> {
         dt.group.as_str().into()

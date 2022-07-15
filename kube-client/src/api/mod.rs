@@ -33,6 +33,7 @@ pub use kube_core::{
     watch::WatchEvent,
     Resource, ResourceExt,
 };
+use kube_core::{DynamicScope, NamespaceResourceScope};
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
     ValidationDirective,
@@ -78,7 +79,11 @@ impl<K: Resource> Api<K> {
     /// Namespaced resource within a given namespace
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self {
+    pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self
+    where
+        K: Resource<Scope = DynamicScope>,
+    {
+        // TODO: inspect dyntype scope to verify somehow?
         let url = K::url_path(dyntype, Some(ns));
         Self {
             client,
@@ -94,7 +99,10 @@ impl<K: Resource> Api<K> {
     ///
     /// Unless configured explicitly, the default namespace is either "default"
     /// out of cluster, or the service account's namespace in cluster.
-    pub fn default_namespaced_with(client: Client, dyntype: &K::DynamicType) -> Self {
+    pub fn default_namespaced_with(client: Client, dyntype: &K::DynamicType) -> Self
+    where
+        K: Resource<Scope = DynamicScope>,
+    {
         let ns = client.default_ns().to_string();
         Self::namespaced_with(client, &ns, dyntype)
     }
@@ -124,16 +132,30 @@ where
     }
 
     /// Namespaced resource within a given namespace
-    pub fn namespaced(client: Client, ns: &str) -> Self {
-        Self::namespaced_with(client, ns, &K::DynamicType::default())
+    pub fn namespaced(client: Client, ns: &str) -> Self
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+    {
+        let dyntype = K::DynamicType::default();
+        let url = K::url_path(&dyntype, Some(ns));
+        Self {
+            client,
+            request: Request::new(url),
+            namespace: Some(ns.to_string()),
+            _phantom: std::iter::empty(),
+        }
     }
 
     /// Namespaced resource within the default namespace
     ///
     /// Unless configured explicitly, the default namespace is either "default"
     /// out of cluster, or the service account's namespace in cluster.
-    pub fn default_namespaced(client: Client) -> Self {
-        Self::default_namespaced_with(client, &K::DynamicType::default())
+    pub fn default_namespaced(client: Client) -> Self
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+    {
+        let ns = client.default_ns().to_string();
+        Self::namespaced(client, &ns)
     }
 }
 
