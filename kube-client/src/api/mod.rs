@@ -31,9 +31,9 @@ pub use kube_core::{
     object::{NotUsed, Object, ObjectList},
     request::Request,
     watch::WatchEvent,
-    Resource, ResourceExt,
+    ClusterResourceScope, DynamicScope, NamespaceResourceScope, Resource, ResourceExt, ResourceScope,
 };
-use kube_core::{DynamicScope, NamespaceResourceScope};
+
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
     ValidationDirective,
@@ -63,10 +63,33 @@ pub struct Api<K> {
 ///
 /// This generally means resources created via [`DynamicObject`](crate::api::DynamicObject).
 impl<K: Resource> Api<K> {
-    /// Cluster level resources, or resources viewed across all namespaces
+    /// Namespaced resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
+    pub fn cluster_with(client: Client, dyntype: &K::DynamicType) -> Self
+    where
+        K: Resource<Scope = DynamicScope>,
+    {
+        // NB: dyntype is usually ApiResource and the scope is on ApiCapabilities
+        // so cannot in current form ensure K has a cluster scope
+        let url = K::url_path(dyntype, None);
+        Self {
+            client,
+            request: Request::new(url),
+            namespace: None,
+            _phantom: std::iter::empty(),
+        }
+    }
+
+    /// Cluster level resources
+    ///
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self
+    where
+        K: Resource<Scope = DynamicScope>,
+    {
+        // NB: dyntype is usually ApiResource and the scope is on ApiCapabilities
+        // so cannot in current form ensure K has a namespace scope
         let url = K::url_path(dyntype, None);
         Self {
             client,
@@ -83,7 +106,8 @@ impl<K: Resource> Api<K> {
     where
         K: Resource<Scope = DynamicScope>,
     {
-        // TODO: inspect dyntype scope to verify somehow?
+        // NB: dyntype is usually ApiResource and the scope is on ApiCapabilities
+        // so cannot in current form ensure K has a namespace scope
         let url = K::url_path(dyntype, Some(ns));
         Self {
             client,
@@ -126,9 +150,35 @@ impl<K: Resource> Api<K>
 where
     <K as Resource>::DynamicType: Default,
 {
-    /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all(client: Client) -> Self {
-        Self::all_with(client, &K::DynamicType::default())
+    /// Cluster level resources
+    pub fn cluster(client: Client) -> Self
+    where
+        K: Resource<Scope = ClusterResourceScope>,
+    {
+        let dyntype = K::DynamicType::default();
+        let url = K::url_path(&dyntype, None);
+        Self {
+            client,
+            request: Request::new(url),
+            namespace: None,
+            _phantom: std::iter::empty(),
+        }
+    }
+
+    /// Namespaced resources viewed across all namespaces
+    pub fn all(client: Client) -> Self
+    // TODO: constrain this fn by Scope - currently have not done this as it is a big breaking change
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+    {
+        let dyntype = K::DynamicType::default();
+        let url = K::url_path(&dyntype, None);
+        Self {
+            client,
+            request: Request::new(url),
+            namespace: None,
+            _phantom: std::iter::empty(),
+        }
     }
 
     /// Namespaced resource within a given namespace

@@ -13,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let events: Api<Event> = Api::all(client.clone());
-    let nodes: Api<Node> = Api::all(client.clone());
+    let nodes: Api<Node> = Api::cluster(client.clone());
 
     let lp = ListParams::default().labels("beta.kubernetes.io/arch=amd64");
     let obs = watcher(nodes, lp)

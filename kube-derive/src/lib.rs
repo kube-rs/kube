@@ -46,7 +46,7 @@ mod custom_resource;
 ///  let client = Client::try_default().await?;
 ///  let foos: Api<Foo> = Api::namespaced(client.clone(), "default");
 ///
-///  let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+///  let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
 ///  crds.patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?).await
 ///  ```
 ///

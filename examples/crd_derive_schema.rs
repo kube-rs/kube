@@ -220,7 +220,7 @@ async fn main() -> Result<()> {
 
 // Create CRD and wait for it to be ready.
 async fn create_crd(client: Client) -> Result<CustomResourceDefinition> {
-    let api = Api::<CustomResourceDefinition>::all(client);
+    let api = Api::<CustomResourceDefinition>::cluster(client);
     api.create(&PostParams::default(), &Foo::crd()).await?;
 
     // Wait until it's accepted and established by the api-server
@@ -235,7 +235,7 @@ async fn create_crd(client: Client) -> Result<CustomResourceDefinition> {
 
 // Delete the CRD if it exists and wait until it's deleted.
 async fn delete_crd(client: Client) -> Result<()> {
-    let api = Api::<CustomResourceDefinition>::all(client);
+    let api = Api::<CustomResourceDefinition>::cluster(client);
     if api.get("foos.clux.dev").await.is_ok() {
         api.delete("foos.clux.dev", &DeleteParams::default()).await?;
 

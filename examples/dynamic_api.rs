@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
                 continue;
             }
             let api: Api<DynamicObject> = if caps.scope == Scope::Cluster {
-                Api::all_with(client.clone(), &ar)
+                Api::cluster_with(client.clone(), &ar)
             } else {
                 Api::default_namespaced_with(client.clone(), &ar)
             };

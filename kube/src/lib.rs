@@ -71,7 +71,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let client = Client::try_default().await?;
-//!     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+//!     let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
 //!
 //!     // Apply the CRD so users can create Foo instances in Kubernetes
 //!     crds.patch("foos.clux.dev",
@@ -237,7 +237,7 @@ mod test {
         use serde_json::json;
         let client = Client::try_default().await?;
         let ssapply = PatchParams::apply("kube").force();
-        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+        let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
         // Server-side apply CRD and wait for it to get ready
         crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
             .await?;
@@ -371,7 +371,7 @@ mod test {
         let client = Client::try_default().await?;
 
         // install crd is installed
-        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+        let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
         let ssapply = PatchParams::apply("kube").force();
         crds.patch("testcrs.kube.rs", &ssapply, &Patch::Apply(TestCr::crd()))
             .await?;
@@ -418,7 +418,7 @@ mod test {
                 let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
                     Api::default_namespaced_with(client.clone(), &ar)
                 } else {
-                    Api::all_with(client.clone(), &ar)
+                    Api::cluster_with(client.clone(), &ar)
                 };
                 api.list(&Default::default()).await?;
             }

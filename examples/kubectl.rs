@@ -215,7 +215,7 @@ fn dynamic_api(
     all: bool,
 ) -> Api<DynamicObject> {
     if caps.scope == Scope::Cluster || all {
-        Api::all_with(client, &ar)
+        Api::cluster_with(client, &ar)
     } else if let Some(namespace) = ns {
         Api::namespaced_with(client, namespace, &ar)
     } else {

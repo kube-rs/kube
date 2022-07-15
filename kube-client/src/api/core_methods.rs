@@ -125,7 +125,7 @@ where
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
-    ///     let crds: Api<CustomResourceDefinition> = Api::all(client);
+    ///     let crds: Api<CustomResourceDefinition> = Api::cluster(client);
     ///     crds.delete("foos.clux.dev", &DeleteParams::default()).await?
     ///         .map_left(|o| println!("Deleting CRD: {:?}", o.status))
     ///         .map_right(|s| println!("Deleted CRD: {:?}", s));

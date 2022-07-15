@@ -39,7 +39,7 @@ pub enum Error {
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();
 ///
-/// let crds: Api<CustomResourceDefinition> = Api::all(client);
+/// let crds: Api<CustomResourceDefinition> = Api::cluster(client);
 /// // .. create or apply a crd here ..
 /// let establish = await_condition(crds, "foos.clux.dev", conditions::is_crd_established());
 /// let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
