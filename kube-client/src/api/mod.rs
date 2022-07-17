@@ -127,11 +127,47 @@ where
     <K as Resource>::DynamicType: Default,
 {
     /// Cluster level resources, or resources viewed across all namespaces
+    ///
+    /// Namespace scoped resource allowing querying across all namespaces:
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// let api: Api<Pod> = Api::all(client);
+    /// ```
+    ///
+    /// Cluster scoped resources also use this entrypoint:
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Node;
+    /// let api: Api<Node> = Api::all(client);
+    /// ```
     pub fn all(client: Client) -> Self {
         Self::all_with(client, &K::DynamicType::default())
     }
 
     /// Namespaced resource within a given namespace
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// let api: Api<Pod> = Api::namespaced(client, "default");
+    /// ```
+    ///
+    /// This will ONLY work on namespaced resources as set by `Scope`:
+    ///
+    /// ```compile_fail
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Node;
+    /// let api: Api<Node> = Api::namespaced(client, "default"); // resource not namespaced!
+    /// ```
+    ///
+    /// For dynamic type information, use [`Api::namespaced_with`] variants.
     pub fn namespaced(client: Client, ns: &str) -> Self
     where
         K: Resource<Scope = NamespaceResourceScope>,
@@ -150,6 +186,22 @@ where
     ///
     /// Unless configured explicitly, the default namespace is either "default"
     /// out of cluster, or the service account's namespace in cluster.
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// let api: Api<Pod> = Api::default_namespaced(client);
+    /// ```
+    ///
+    /// This will ONLY work on namespaced resources as set by `Scope`:
+    ///
+    /// ```compile_fail
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Node;
+    /// let api: Api<Node> = Api::default_namespaced(client); // resource not namespaced!
+    /// ```
     pub fn default_namespaced(client: Client) -> Self
     where
         K: Resource<Scope = NamespaceResourceScope>,
