@@ -181,3 +181,25 @@ impl<K> Debug for Api<K> {
             .finish()
     }
 }
+
+/// Sanity test on scope restrictions
+#[cfg(test)]
+mod test {
+    use crate::{Api, Client};
+    use k8s_openapi::api::core::v1 as corev1;
+
+    use http::{Request, Response};
+    use hyper::Body;
+    use tower_test::mock;
+
+    #[tokio::test]
+    async fn scopes_should_allow_correct_interface() {
+        let (mock_service, _handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "default");
+
+        let _: Api<corev1::Node> = Api::all(client.clone());
+        let _: Api<corev1::Pod> = Api::default_namespaced(client.clone());
+        let _: Api<corev1::PersistentVolume> = Api::all(client.clone());
+        let _: Api<corev1::ConfigMap> = Api::namespaced(client.clone(), "default");
+    }
+}
