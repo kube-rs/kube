@@ -97,8 +97,9 @@ impl<K: Resource> Api<K> {
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
     ///
-    /// Unless configured explicitly, the default namespace is either "default"
-    /// out of cluster, or the service account's namespace in cluster.
+    /// The namespace is either configured on `context` in the kubeconfig
+    /// or falls back to `default` when running locally, and it's using the service account's
+    /// namespace when deployed in-cluster.
     pub fn default_namespaced_with(client: Client, dyntype: &K::DynamicType) -> Self
     where
         K: Resource<Scope = DynamicScope>,
@@ -184,8 +185,9 @@ where
 
     /// Namespaced resource within the default namespace
     ///
-    /// Unless configured explicitly, the default namespace is either "default"
-    /// out of cluster, or the service account's namespace in cluster.
+    /// The namespace is either configured on `context` in the kubeconfig
+    /// or falls back to `default` when running locally, and it's using the service account's
+    /// namespace when deployed in-cluster.
     ///
     /// ```no_run
     /// # use kube::{Api, Client};
