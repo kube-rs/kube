@@ -275,7 +275,6 @@ impl Config {
     /// - `KUBE_RS_DEBUG_IMPERSONATE_USER`: A Kubernetes user to impersonate, for example: `system:serviceaccount:default:foo` will impersonate the `ServiceAccount` `foo` in the `Namespace` `default`
     /// - `KUBE_RS_DEBUG_IMPERSONATE_GROUP`: A Kubernetes group to impersonate, multiple groups may be specified by separating them with commas
     /// - `KUBE_RS_DEBUG_OVERRIDE_URL`: A Kubernetes cluster URL to use rather than the one specified in the config, useful for proxying traffic through `kubectl proxy`
-    #[tracing::instrument(level = "warn")]
     pub fn apply_debug_overrides(&mut self) {
         // Log these overrides loudly, to emphasize that this is only a debugging aid, and should not be relied upon in production
         if let Ok(impersonate_user) = std::env::var("KUBE_RS_DEBUG_IMPERSONATE_USER") {
