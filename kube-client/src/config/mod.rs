@@ -135,7 +135,7 @@ pub struct Config {
     /// Whether to accept invalid certificates
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
-    pub(crate) auth_info: AuthInfo,
+    pub auth_info: AuthInfo,
     // TODO Actually support proxy or create an example with custom client
     /// Optional proxy URL.
     pub proxy_url: Option<http::Uri>,
