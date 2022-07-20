@@ -9,8 +9,8 @@ use std::{borrow::Cow, collections::BTreeMap};
 pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScope, SubResourceScope};
 
 /// Indicates that a [`Resource`] is of an indeterminate dynamic scope.
-pub struct DynamicScope {}
-impl ResourceScope for DynamicScope {}
+pub struct DynamicResourceScope {}
+impl ResourceScope for DynamicResourceScope {}
 
 /// An accessor trait for a kubernetes Resource.
 ///
@@ -36,7 +36,7 @@ pub trait Resource {
     /// Type information for the api scope of the resource when known at compile time
     ///
     /// Types from k8s_openapi come with an explicit k8s_openapi::ResourceScope
-    /// Dynamic types should select `DynamicScope`
+    /// Dynamic types should select `Scope = DynamicResourceScope`
     type Scope;
 
     /// Returns kind of this object

@@ -33,7 +33,7 @@ pub use kube_core::{
     watch::WatchEvent,
     Resource, ResourceExt,
 };
-use kube_core::{DynamicScope, NamespaceResourceScope};
+use kube_core::{DynamicResourceScope, NamespaceResourceScope};
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
     ValidationDirective,
@@ -81,7 +81,7 @@ impl<K: Resource> Api<K> {
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
     pub fn namespaced_with(client: Client, ns: &str, dyntype: &K::DynamicType) -> Self
     where
-        K: Resource<Scope = DynamicScope>,
+        K: Resource<Scope = DynamicResourceScope>,
     {
         // TODO: inspect dyntype scope to verify somehow?
         let url = K::url_path(dyntype, Some(ns));
@@ -102,7 +102,7 @@ impl<K: Resource> Api<K> {
     /// namespace when deployed in-cluster.
     pub fn default_namespaced_with(client: Client, dyntype: &K::DynamicType) -> Self
     where
-        K: Resource<Scope = DynamicScope>,
+        K: Resource<Scope = DynamicResourceScope>,
     {
         let ns = client.default_ns().to_string();
         Self::namespaced_with(client, &ns, dyntype)

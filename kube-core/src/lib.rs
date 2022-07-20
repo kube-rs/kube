@@ -38,7 +38,7 @@ pub use request::Request;
 
 mod resource;
 pub use resource::{
-    ClusterResourceScope, DynamicScope, NamespaceResourceScope, Resource, ResourceExt, ResourceScope,
+    ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource, ResourceExt, ResourceScope,
     SubResourceScope,
 };
 
