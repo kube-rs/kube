@@ -37,7 +37,10 @@ pub mod request;
 pub use request::Request;
 
 mod resource;
-pub use resource::{Resource, ResourceExt};
+pub use resource::{
+    ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource, ResourceExt, ResourceScope,
+    SubResourceScope,
+};
 
 pub mod response;
 pub use response::Status;

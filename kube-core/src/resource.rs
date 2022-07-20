@@ -6,6 +6,12 @@ use k8s_openapi::{
 
 use std::{borrow::Cow, collections::BTreeMap};
 
+pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScope, SubResourceScope};
+
+/// Indicates that a [`Resource`] is of an indeterminate dynamic scope.
+pub struct DynamicResourceScope {}
+impl ResourceScope for DynamicResourceScope {}
+
 /// An accessor trait for a kubernetes Resource.
 ///
 /// This is for a subset of Kubernetes type that do not end in `List`.
@@ -27,6 +33,11 @@ pub trait Resource {
     ///
     /// See [`DynamicObject`](crate::dynamic::DynamicObject) for a valid implementation of non-k8s-openapi resources.
     type DynamicType: Send + Sync + 'static;
+    /// Type information for the api scope of the resource when known at compile time
+    ///
+    /// Types from k8s_openapi come with an explicit k8s_openapi::ResourceScope
+    /// Dynamic types should select `Scope = DynamicResourceScope`
+    type Scope;
 
     /// Returns kind of this object
     fn kind(dt: &Self::DynamicType) -> Cow<'_, str>;
@@ -105,11 +116,13 @@ pub trait Resource {
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
-impl<K> Resource for K
+impl<K, S> Resource for K
 where
     K: k8s_openapi::Metadata<Ty = ObjectMeta>,
+    K: k8s_openapi::Resource<Scope = S>,
 {
     type DynamicType = ();
+    type Scope = S;
 
     fn kind(_: &()) -> Cow<'_, str> {
         K::KIND.into()
