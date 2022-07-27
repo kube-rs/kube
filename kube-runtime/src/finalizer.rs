@@ -165,10 +165,16 @@ where
                     }),
                 ]
             } else {
-                vec![PatchOperation::Add(AddOperation {
-                    path: "/metadata/finalizers/-".to_string(),
-                    value: finalizer_name.into(),
-                })]
+                vec![
+                    PatchOperation::Test(TestOperation {
+                        path: "/metadata/finalizers".to_string(),
+                        value: obj.finalizers().into(),
+                    }),
+                    PatchOperation::Add(AddOperation {
+                        path: "/metadata/finalizers/-".to_string(),
+                        value: finalizer_name.into(),
+                    }),
+                ]
             });
             api.patch::<K>(
                 obj.meta().name.as_deref().ok_or(Error::UnnamedObject)?,
