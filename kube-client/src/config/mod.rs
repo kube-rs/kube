@@ -128,9 +128,25 @@ pub struct Config {
     pub default_namespace: String,
     /// The configured root certificate
     pub root_cert: Option<Vec<Vec<u8>>>,
+    /// Set the timeout for connecting to the Kubernetes API.
+    ///
+    /// A value of `None` means no timeout
+    pub connect_timeout: Option<std::time::Duration>,
+    /// Set the timeout for the Kubernetes API response.
+    ///
+    /// A value of `None` means no timeout
+    pub read_timeout: Option<std::time::Duration>,
+    /// Set the timeout for the Kubernetes API request.
+    ///
+    /// A value of `None` means no timeout
+    pub write_timeout: Option<std::time::Duration>,
     /// Timeout for calls to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
+    #[deprecated(
+        since = "0.75.0",
+        note = "replaced by more granular timeouts `connect_timeout`, `read_timeout` and `write_timeout`"
+    )]
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid certificates
     pub accept_invalid_certs: bool,
@@ -152,6 +168,9 @@ impl Config {
             cluster_url,
             default_namespace: String::from("default"),
             root_cert: None,
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
@@ -200,6 +219,9 @@ impl Config {
             cluster_url,
             default_namespace,
             root_cert: Some(root_cert),
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo {
@@ -258,6 +280,9 @@ impl Config {
             cluster_url,
             default_namespace,
             root_cert,
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             proxy_url: loader.proxy_url()?,
@@ -325,6 +350,8 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
 // https://github.com/kube-rs/kube-rs/issues/146#issuecomment-590924397
 /// Default Timeout
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]
