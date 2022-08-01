@@ -25,7 +25,7 @@ latest = ["k8s-openapi/v1_24"]
 [dev-dependencies]
 tokio-util = "0.7.0"
 assert-json-diff = "2.0.1"
-validator = { version = "0.15.0", features = ["derive"] }
+validator = { version = "0.16.0", features = ["derive"] }
 anyhow = "1.0.44"
 futures = "0.3.17"
 jsonpath_lib = "0.3.0"

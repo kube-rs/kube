@@ -28,6 +28,6 @@ serde_yaml = "0.8.21"
 kube = { path = "../kube", default-features = false, version = "<1.0.0, >=0.61.0", features = ["derive"] }
 k8s-openapi = { version = "0.15.0", default-features = false, features = ["v1_24"] }
 schemars = { version = "0.8.6", features = ["chrono"] }
-validator = { version = "0.15.0", features = ["derive"] }
+validator = { version = "0.16.0", features = ["derive"] }
 chrono = { version = "0.4.19", default-features = false }
 trybuild = "1.0.48"
