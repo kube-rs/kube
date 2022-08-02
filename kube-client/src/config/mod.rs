@@ -145,7 +145,7 @@ pub struct Config {
     /// A value of `None` means no timeout
     #[deprecated(
         since = "0.75.0",
-        note = "replaced by more granular timeouts `connect_timeout`, `read_timeout` and `write_timeout`"
+        note = "replaced by more granular members `connect_timeout`, `read_timeout` and `write_timeout`. This member will be removed in 0.78.0."
     )]
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid certificates
