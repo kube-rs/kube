@@ -164,6 +164,7 @@ impl Config {
     /// Most likely you want to use [`Config::infer`] to infer the config from
     /// the environment.
     pub fn new(cluster_url: http::Uri) -> Self {
+        #[allow(deprecated)]
         Self {
             cluster_url,
             default_namespace: String::from("default"),
@@ -215,6 +216,7 @@ impl Config {
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
 
+        #[allow(deprecated)]
         Ok(Self {
             cluster_url,
             default_namespace,
@@ -276,6 +278,7 @@ impl Config {
             root_cert = Some(ca_bundle);
         }
 
+        #[allow(deprecated)]
         Ok(Self {
             cluster_url,
             default_namespace,
