@@ -83,7 +83,7 @@ pub struct AdmissionRequest<T: Resource> {
     /// Copied from the containing [`AdmissionReview`] and used to specify a
     /// response type and version when constructing an [`AdmissionResponse`].
     #[serde(skip)]
-    types: TypeMeta,
+    pub types: TypeMeta,
     /// An identifier for the individual request/response. It allows us to
     /// distinguish instances of requests which are otherwise identical (parallel
     /// requests, requests when earlier requests did not modify, etc). The UID is
@@ -225,7 +225,7 @@ pub enum Operation {
 pub struct AdmissionResponse {
     /// Copied from the corresponding consructing [`AdmissionRequest`].
     #[serde(skip)]
-    types: TypeMeta,
+    pub types: TypeMeta,
     /// Identifier for the individual request/response. This must be copied over
     /// from the corresponding AdmissionRequest.
     pub uid: String,
