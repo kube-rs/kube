@@ -12,6 +12,7 @@ use std::{collections::HashMap, hash::Hash};
 #[pin_project]
 /// Stream returned by the [`predicate_filter`](super::WatchStreamExt::predicate_filter) method.
 #[must_use = "streams do nothing unless polled"]
+#[allow(clippy::type_complexity)]
 pub struct PredicateFilter<St, K: Resource> {
     #[pin]
     stream: St,
