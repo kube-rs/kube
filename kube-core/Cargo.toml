@@ -46,4 +46,4 @@ features = ["v1_24"]
 [dev-dependencies]
 assert-json-diff = "2.0.1"
 kube = { path = "../kube", version = "<1.0.0, >=0.53.0" }
-serde_yaml = "0.8.23"
+serde_yaml = "0.9.4"
