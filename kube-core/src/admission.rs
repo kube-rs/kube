@@ -174,7 +174,7 @@ pub struct AdmissionRequest<T: Resource> {
 }
 
 /// The operation specified in an [`AdmissionRequest`].
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Operation {
     /// An operation that creates a resource.
@@ -249,7 +249,7 @@ pub struct AdmissionResponse {
     /// imagepolicy.example.com/error=image-blacklisted). AuditAnnotations will
     /// be provided by the admission webhook to add additional context to the
     /// audit log for this request.
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub audit_annotations: HashMap<String, String>,
     /// A list of warning messages to return to the requesting API client.
     /// Warning messages describe a problem the client making the API request
@@ -329,7 +329,7 @@ impl AdmissionResponse {
 }
 
 /// The type of patch returned in an [`AdmissionResponse`].
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum PatchType {
     /// Specifies the patch body implements JSON Patch under RFC 6902.
     #[serde(rename = "JSONPatch")]

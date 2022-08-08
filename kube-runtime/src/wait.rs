@@ -13,9 +13,11 @@ pub enum Error {
     ProbeFailed(#[source] watcher::Error),
 }
 
-/// Watch an object, and Wait for some condition `cond` to return `true`.
+/// Watch an object, and wait for some condition `cond` to return `true`.
 ///
 /// `cond` is passed `Some` if the object is found, otherwise `None`.
+///
+/// The object is returned when the condition is fulfilled.
 ///
 /// # Caveats
 ///
@@ -44,18 +46,24 @@ pub enum Error {
 /// # Ok(())
 /// # }
 /// ```
-pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<(), Error>
+pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<Option<K>, Error>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
-    watch_object(api, name)
-        .map_err(Error::ProbeFailed)
-        .try_take_while(|obj| {
-            let result = !cond.matches_object(obj.as_ref());
-            async move { Ok(result) }
-        })
-        .try_for_each(|_| async { Ok(()) })
+    // Skip updates until the condition is satisfied.
+    let stream = watch_object(api, name).try_skip_while(|obj| {
+        let matches = cond.matches_object(obj.as_ref());
+        futures::future::ok(!matches)
+    });
+    futures::pin_mut!(stream);
+
+    // Then take the first update that satisfies the condition.
+    let obj = stream
+        .try_next()
         .await
+        .map_err(Error::ProbeFailed)?
+        .expect("stream must not terminate");
+    Ok(obj)
 }
 
 /// A trait for condition functions to be used by [`await_condition`]
@@ -153,7 +161,8 @@ impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
 pub mod conditions {
     pub use super::Condition;
     use k8s_openapi::{
-        api::core::v1::Pod, apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
+        api::{batch::v1::Job, core::v1::Pod},
+        apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
     use kube_client::Resource;
 
@@ -175,6 +184,9 @@ pub mod conditions {
     }
 
     /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
+    ///
+    /// Note that this condition only guarantees you that you can use `Api<CustomResourceDefinition>` when it is ready.
+    /// It usually takes extra time for Discovery to notice the custom resource, and there is no condition for this.
     #[must_use]
     pub fn is_crd_established() -> impl Condition<CustomResourceDefinition> {
         |obj: Option<&CustomResourceDefinition>| {
@@ -199,6 +211,23 @@ pub mod conditions {
                 if let Some(status) = &pod.status {
                     if let Some(phase) = &status.phase {
                         return phase == "Running";
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    /// An await condition for `Job` that returns `true` once it is completed
+    #[must_use]
+    pub fn is_job_completed() -> impl Condition<Job> {
+        |obj: Option<&Job>| {
+            if let Some(job) = &obj {
+                if let Some(s) = &job.status {
+                    if let Some(conds) = &s.conditions {
+                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Complete") {
+                            return pcond.status == "True";
+                        }
                     }
                 }
             }
@@ -282,6 +311,7 @@ pub mod delete {
             .ok_or(Error::NoUid)?;
         await_condition(api, name, conditions::is_deleted(&deleted_obj_uid))
             .await
-            .map_err(Error::Await)
+            .map_err(Error::Await)?;
+        Ok(())
     }
 }

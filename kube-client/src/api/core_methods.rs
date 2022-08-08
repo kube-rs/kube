@@ -100,6 +100,9 @@ where
     ///     - Tradeoff between the two
     ///     - Easy partially filling of native [`k8s_openapi`] types (most fields optional)
     ///     - Partial safety against runtime errors (at least you must write valid JSON)
+    ///
+    /// Note that this method cannot write to the status object (when it exists) of a resource.
+    /// To set status objects please see [`Api::replace_status`] or [`Api::patch_status`].
     pub async fn create(&self, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,
@@ -207,6 +210,9 @@ where
     /// ```
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
+    ///
+    /// Note that this method cannot write to the status object (when it exists) of a resource.
+    /// To set status objects please see [`Api::replace_status`] or [`Api::patch_status`].
     pub async fn patch<P: Serialize + Debug>(
         &self,
         name: &str,
@@ -262,6 +268,9 @@ where
     /// ```
     ///
     /// Consider mutating the result of `api.get` rather than recreating it.
+    ///
+    /// Note that this method cannot write to the status object (when it exists) of a resource.
+    /// To set status objects please see [`Api::replace_status`] or [`Api::patch_status`].
     pub async fn replace(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
     where
         K: Serialize,

@@ -1,3 +1,5 @@
+//! Generated types support documentation
+#![deny(missing_docs)]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::*;
@@ -11,10 +13,7 @@ use kube::{
     Client, CustomResource, CustomResourceExt,
 };
 
-// NB: This example uses server side apply and beta1 customresources
-// Please test against Kubernetes 1.16.X!
-
-// Own custom resource
+/// Spec object for Foo
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
@@ -25,6 +24,7 @@ pub struct FooSpec {
     replicas: isize,
 }
 
+/// Status object for Foo
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct FooStatus {
     is_bad: bool,
@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
     let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
     // NB: kubernetes < 1.20 will fail to admit scale subresources - see #387
-    info!("Applied 1 {}: {:?}", o.name(), o.spec);
+    info!("Applied 1 {}: {:?}", o.name_any(), o.spec);
 
     // 2. Apply from partial json!
     let patch = serde_json::json!({
@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Applying 2: \n{}", serde_yaml::to_string(&patch)?);
     let o2 = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
-    info!("Applied 2 {}: {:?}", o2.name(), o2.spec);
+    info!("Applied 2 {}: {:?}", o2.name_any(), o2.spec);
 
     Ok(())
 }

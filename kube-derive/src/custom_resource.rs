@@ -17,8 +17,6 @@ struct KubeAttrs {
     singular: Option<String>,
     #[darling(default)]
     namespaced: bool,
-    #[darling(default = "default_apiext")]
-    apiextensions: String,
     #[darling(multiple, rename = "derive")]
     derives: Vec<String>,
     schema: Option<SchemaMode>,
@@ -82,10 +80,6 @@ impl Crates {
     fn default_std() -> Path {
         parse_quote! { ::std }
     }
-}
-
-fn default_apiext() -> String {
-    "v1".to_owned()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -159,7 +153,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         categories,
         shortnames,
         printcolums,
-        apiextensions,
         scale,
         crates:
             Crates {
@@ -231,12 +224,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     }
 
-    // Enable schema generation by default for v1 because it's mandatory.
-    let schema_mode = schema_mode.unwrap_or(if apiextensions == "v1" {
-        SchemaMode::Derived
-    } else {
-        SchemaMode::Disabled
-    });
+    // Enable schema generation by default as in v1 it is mandatory.
+    let schema_mode = schema_mode.unwrap_or(SchemaMode::Derived);
     // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
     // these are validated by the API server implicitly. Also, we can't generate the
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
@@ -252,6 +241,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
     let root_obj = quote! {
         #[doc = #docstr]
+        #[automatically_derived]
+        #[allow(missing_docs)]
         #[derive(#(#derive_paths),*)]
         #[serde(rename_all = "camelCase")]
         #visibility struct #rootident {
@@ -261,6 +252,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             #status_field
         }
         impl #rootident {
+            /// Spec based constructor for derived custom resource
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
                     metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
@@ -289,12 +281,17 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // 2. Implement Resource trait
     let name = singular.unwrap_or_else(|| kind.to_ascii_lowercase());
     let plural = plural.unwrap_or_else(|| to_plural(&name));
-    let scope = if namespaced { "Namespaced" } else { "Cluster" };
+    let (scope, scope_quote) = if namespaced {
+        ("Namespaced", quote! { #kube_core::NamespaceResourceScope })
+    } else {
+        ("Cluster", quote! { #kube_core::ClusterResourceScope })
+    };
 
     let api_ver = format!("{}/{}", group, version);
     let impl_resource = quote! {
         impl #kube_core::Resource for #rootident {
             type DynamicType = ();
+            type Scope = #scope_quote;
 
             fn group(_: &()) -> std::borrow::Cow<'_, str> {
                #group.into()
@@ -346,20 +343,15 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // 4. Implement CustomResource
 
     // Compute a bunch of crd props
-    let mut printers = format!("[ {} ]", printcolums.join(",")); // hacksss
-    if apiextensions == "v1beta1" {
-        // only major api inconsistency..
-        printers = printers.replace("jsonPath", "JSONPath");
-    }
+    let printers = format!("[ {} ]", printcolums.join(",")); // hacksss
     let scale_code = if let Some(s) = scale { s } else { "".to_string() };
 
-    // Ensure it generates for the correct CRD version
-    let v1ident = format_ident!("{}", apiextensions);
+    // Ensure it generates for the correct CRD version (only v1 supported now)
     let apiext = quote! {
-        #k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::#v1ident
+        #k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1
     };
     let extver = quote! {
-        #kube_core::crd::#v1ident
+        #kube_core::crd::v1
     };
 
     let shortnames_slice = {
@@ -396,61 +388,33 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    let jsondata = if apiextensions == "v1" {
-        quote! {
-            #schemagen
+    let jsondata = quote! {
+        #schemagen
 
-            let jsondata = #serde_json::json!({
-                "metadata": #crd_meta,
-                "spec": {
-                    "group": #group,
-                    "scope": #scope,
-                    "names": {
-                        "categories": categories,
-                        "plural": #plural,
-                        "singular": #name,
-                        "kind": #kind,
-                        "shortNames": shorts
+        let jsondata = #serde_json::json!({
+            "metadata": #crd_meta,
+            "spec": {
+                "group": #group,
+                "scope": #scope,
+                "names": {
+                    "categories": categories,
+                    "plural": #plural,
+                    "singular": #name,
+                    "kind": #kind,
+                    "shortNames": shorts
+                },
+                "versions": [{
+                    "name": #version,
+                    "served": true,
+                    "storage": true,
+                    "schema": {
+                        "openAPIV3Schema": schema,
                     },
-                    "versions": [{
-                        "name": #version,
-                        "served": true,
-                        "storage": true,
-                        "schema": {
-                            "openAPIV3Schema": schema,
-                        },
-                        "additionalPrinterColumns": columns,
-                        "subresources": subres,
-                    }],
-                }
-            });
-        }
-    } else {
-        // TODO Include schema if enabled
-        quote! {
-            let jsondata = #serde_json::json!({
-                "metadata": #crd_meta,
-                "spec": {
-                    "group": #group,
-                    "scope": #scope,
-                    "names": {
-                        "categories": categories,
-                        "plural": #plural,
-                        "singular": #name,
-                        "kind": #kind,
-                        "shortNames": shorts
-                    },
-                    // printer columns can't be on versions reliably in v1beta..
                     "additionalPrinterColumns": columns,
-                    "versions": [{
-                        "name": #version,
-                        "served": true,
-                        "storage": true,
-                    }],
                     "subresources": subres,
-                }
-            });
-        }
+                }],
+            }
+        });
     };
 
     // Implement the CustomResourceExt trait to allow users writing generic logic on top of them
@@ -633,7 +597,7 @@ mod tests {
     // TODO Unit test `derive`
 
     #[test]
-    fn test_apiextensions_default() {
+    fn test_parse_default() {
         let input = quote! {
             #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
             #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
@@ -641,6 +605,9 @@ mod tests {
         };
         let input = syn::parse2(input).unwrap();
         let kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
-        assert_eq!(kube_attrs.apiextensions, "v1");
+        assert_eq!(kube_attrs.group, "clux.dev".to_string());
+        assert_eq!(kube_attrs.version, "v1".to_string());
+        assert_eq!(kube_attrs.kind, "Foo".to_string());
+        assert_eq!(kube_attrs.namespaced, true);
     }
 }

@@ -132,7 +132,10 @@ impl Client {
         &self.default_ns
     }
 
-    async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
+    /// Perform a raw HTTP request against the API and return the raw response back.
+    /// This method can be used to get raw access to the API which may be used to, for example,
+    /// create a proxy server or application-level gateway between localhost and the API server.
+    pub async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
         let mut svc = self.inner.clone();
         let res = svc
             .ready()

@@ -31,9 +31,9 @@ async fn main() -> anyhow::Result<()> {
     let mut items = watcher(api, ListParams::default()).applied_objects().boxed();
     while let Some(p) = items.try_next().await? {
         if caps.scope == Scope::Cluster {
-            info!("saw {}", p.name());
+            info!("saw {}", p.name_any());
         } else {
-            info!("saw {} in {}", p.name(), p.namespace().unwrap());
+            info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
         }
     }
     Ok(())

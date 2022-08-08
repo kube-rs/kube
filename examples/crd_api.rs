@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
         res.map_left(|o| {
             info!(
                 "Deleting {}: ({:?})",
-                o.name(),
+                o.name_any(),
                 o.status.unwrap().conditions.unwrap().last()
             );
         })
@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
     let patch_params = PatchParams::default();
     match crds.create(&pp, &foocrd).await {
         Ok(o) => {
-            info!("Created {} ({:?})", o.name(), o.status.unwrap());
+            info!("Created {} ({:?})", o.name_any(), o.status.unwrap());
             debug!("Created CRD: {:?}", o.spec);
         }
         Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
@@ -88,8 +88,8 @@ async fn main() -> Result<()> {
         replicas: 1,
     });
     let o = foos.create(&pp, &f1).await?;
-    assert_eq!(ResourceExt::name(&f1), ResourceExt::name(&o));
-    info!("Created {}", o.name());
+    assert_eq!(ResourceExt::name_any(&f1), ResourceExt::name_any(&o));
+    info!("Created {}", o.name_any());
 
     // Verify we can get it
     info!("Get Foo baz");
@@ -125,12 +125,11 @@ async fn main() -> Result<()> {
         replicas: 0,
         info: "unpatched qux".into(),
     });
-    f2.status = Some(FooStatus::default());
 
     let o = foos.create(&pp, &f2).await?;
-    info!("Created {}", o.name());
+    info!("Created {}", o.name_any());
 
-    // Update status on qux
+    // Update status on qux (cannot be done through replace/create/patch direct)
     info!("Replace Status on Foo instance qux");
     let fs = json!({
         "apiVersion": "clux.dev/v1",
@@ -143,7 +142,7 @@ async fn main() -> Result<()> {
         "status": FooStatus { is_bad: true, replicas: 0 }
     });
     let o = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?).await?;
-    info!("Replaced status {:?} for {}", o.status, o.name());
+    info!("Replaced status {:?} for {}", o.status, o.name_any());
     assert!(o.status.unwrap().is_bad);
 
     info!("Patch Status on Foo instance qux");
@@ -153,12 +152,12 @@ async fn main() -> Result<()> {
     let o = foos
         .patch_status("qux", &patch_params, &Patch::Merge(&fs))
         .await?;
-    info!("Patched status {:?} for {}", o.status, o.name());
+    info!("Patched status {:?} for {}", o.status, o.name_any());
     assert!(!o.status.unwrap().is_bad);
 
     info!("Get Status on Foo instance qux");
     let o = foos.get_status("qux").await?;
-    info!("Got status {:?} for {}", o.status, o.name());
+    info!("Got status {:?} for {}", o.status, o.name_any());
     assert!(!o.status.unwrap().is_bad);
 
     // Check scale subresource:
@@ -172,7 +171,7 @@ async fn main() -> Result<()> {
         "spec": { "replicas": 2 }
     });
     let o = foos.patch_scale("qux", &patch_params, &Patch::Merge(&fs)).await?;
-    info!("Patched scale {:?} for {}", o.spec, o.name());
+    info!("Patched scale {:?} for {}", o.spec, o.name_any());
     assert_eq!(o.status.unwrap().replicas, 1);
     assert_eq!(o.spec.unwrap().replicas.unwrap(), 2); // we only asked for more
 
@@ -182,7 +181,7 @@ async fn main() -> Result<()> {
         "spec": { "info": "patched qux" }
     });
     let o = foos.patch("qux", &patch_params, &Patch::Merge(&patch)).await?;
-    info!("Patched {} with new name: {}", o.name(), o.spec.name);
+    info!("Patched {} with new name: {}", o.name_any(), o.spec.name);
     assert_eq!(o.spec.info, "patched qux");
     assert_eq!(o.spec.name, "qux"); // didn't blat existing params
 
@@ -214,12 +213,12 @@ async fn main() -> Result<()> {
         Err(e) => bail!("somehow got unexpected error from validation: {:?}", e),
         Ok(o) => bail!("somehow created {:?} despite validation", o),
     }
-    info!("Rejected fx for invalid name {}", fx.name());
+    info!("Rejected fx for invalid name {}", fx.name_any());
 
     // Cleanup the full collection - expect a wait
     match foos.delete_collection(&dp, &lp).await? {
         Left(list) => {
-            let deleted: Vec<_> = list.iter().map(ResourceExt::name).collect();
+            let deleted: Vec<_> = list.iter().map(ResourceExt::name_any).collect();
             info!("Deleting collection of foos: {:?}", deleted);
         }
         Right(status) => {
@@ -232,7 +231,7 @@ async fn main() -> Result<()> {
         Left(o) => {
             info!(
                 "Deleting {} CRD definition: {:?}",
-                o.name(),
+                o.name_any(),
                 o.status.unwrap().conditions.unwrap().last()
             );
         }

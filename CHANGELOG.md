@@ -5,7 +5,54 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.72.0...master
+ * see https://github.com/kube-rs/kube-rs/compare/0.74.0...master
+
+0.74.0 / 2022-07-09
+===================
+
+[0.73.1](https://github.com/kube-rs/kube-rs/releases/tag/0.73.1) / 2022-06-03
+===================
+## Highlights
+
+This patch release fixes a bug causing `applier` and `Controller` to deadlock when too many Kubernetes object change events were ingested at once. All users of `applier` and `Controller` are encouraged to upgrade as quickly as possible. Older versions are also affected, this bug is believed to have existed since the original release of `kube_runtime`.
+
+<!-- Release notes generated using configuration in .github/release.yml at 0.73.1 -->
+
+## What's Changed
+### Fixed
+* [0.73 backport] fix applier hangs which can happen with many watched objects (#925) by @moustafab (backported by @teozkr) in https://github.com/kube-rs/kube-rs/pull/927
+
+
+**Full Changelog**: https://github.com/kube-rs/kube-rs/compare/0.73.0...0.73.1
+[0.73.0](https://github.com/kube-rs/kube-rs/releases/tag/0.73.0) / 2022-05-23
+===================
+
+## Highlights
+
+### [New `k8s-openapi` version and MSRV](https://github.com/kube-rs/kube-rs/pull/916)
+
+Support added for Kubernetes `v1_24` support via the [new `k8s-openapi` version](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.15.0). Please also run `cargo upgrade --workspace k8s-openapi` when upgrading `kube`.
+
+This also bumps our [MSRV](https://rust-lang.github.io/rfcs/2495-min-rust-version.html) to [`1.60.0`](https://blog.rust-lang.org/2022/04/07/Rust-1.60.0.html).
+
+### [Reconciler change](https://github.com/kube-rs/kube-rs/pull/910)
+A small ergonomic change in the `reconcile` signature has removed the need for the `Context` object. This has been replaced by an [`Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html). The following change is needed in your controller:
+
+```diff
+-async fn reconcile(doc: Arc<MyObject>, context: Context<Data>) -> Result<Action, Error>
++async fn reconcile(doc: Arc<MyObject>, context: Arc<Data>) -> Result<Action, Error>
+```
+
+This will simplify the usage of the `context` argument. You should no longer need to pass `.get_ref()` on its every use.
+See the [controller-rs upgrade change for details](https://github.com/kube-rs/controller-rs/commit/2976e046409ec033b86dfe8d60173ebc2b4e5dbf#diff-7143adb2b6aaf4eac74de6b133c6a9cf6d2d34bf6929972361f93100abdfc074).
+
+## What's Changed
+### Added
+* Add Discovery::groups_alphabetical following kubectl sort order by @clux in https://github.com/kube-rs/kube-rs/pull/887
+### Changed
+* Replace runtime::controller::Context with Arc by @teozkr in https://github.com/kube-rs/kube-rs/pull/910
+* runtime: Return the object from `await_condition` by @olix0r in https://github.com/kube-rs/kube-rs/pull/877
+* Bump k8s-openapi to 0.15 for kubernetes v1_24 and bump MSRV to 1.60 by @clux in https://github.com/kube-rs/kube-rs/pull/916
 
 [0.72.0](https://github.com/kube-rs/kube-rs/releases/tag/0.72.0) / 2022-05-13
 ===================
