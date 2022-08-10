@@ -14,10 +14,7 @@ async fn main() -> anyhow::Result<()> {
     let api = Api::<Pod>::default_namespaced(client);
 
     let mut continue_token: Option<String> = None;
-    let mut page: u32 = 0;
-
-    loop {
-        page = page + 1;
+    for page in 1.. {
 
         info!("Fetching Page #{page}");
         continue_token = fetch_page(&api, continue_token).await?;
