@@ -21,7 +21,6 @@ async fn main() -> anyhow::Result<()> {
 
         info!("Fetching Page #{}", page);
         continue_token = fetch_page(&api, continue_token).await?;
-        info!("");
 
         if continue_token.is_none() {
             info!("End of list");
