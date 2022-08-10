@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
     loop {
         page = page + 1;
 
-        info!("Fetching Page #{}", page);
+        info!("Fetching Page #{page}");
         continue_token = fetch_page(&api, continue_token).await?;
 
         if continue_token.is_none() {
