@@ -40,6 +40,11 @@ pub const META_API_VERSION_V1BETA1: &str = "admission.k8s.io/v1beta1";
 
 /// The top level struct used for Serializing and Deserializing AdmissionReview
 /// requests and responses.
+///
+/// This is both the input type received by admission controllers, and the
+/// output type admission controllers should return.
+///
+/// An admission controller should start by inspecting the [`AdmissionRequest`].
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AdmissionReview<T: Resource> {
@@ -70,6 +75,9 @@ impl<T: Resource> TryInto<AdmissionRequest<T>> for AdmissionReview<T> {
 }
 
 /// An incoming [`AdmissionReview`] request.
+///
+/// In an admission controller scenario, this is extracted from an [`AdmissionReview`] via [`TryInto`]
+///
 /// ```ignore
 /// use kube::api::{admission::{AdmissionRequest, AdmissionReview}, DynamicObject};
 ///
@@ -77,13 +85,22 @@ impl<T: Resource> TryInto<AdmissionRequest<T>> for AdmissionReview<T> {
 /// let body: AdmissionReview<DynamicObject>;
 /// let req: AdmissionRequest<_> = body.try_into().unwrap();
 /// ```
+///
+/// Based on the contents of the request, an admission controller should construct an
+/// [`AdmissionResponse`] using:
+///
+/// - [`AdmissionResponse::deny`] for illegal/rejected requests
+/// - [`AdmissionResponse::invalid`] for malformed requests
+/// - [`AdmissionResponse::from`] for the happy path
+///
+/// then wrap the chosen response in an [`AdmissionReview`] via [`AdmissionResponse::into_review`].
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AdmissionRequest<T: Resource> {
     /// Copied from the containing [`AdmissionReview`] and used to specify a
     /// response type and version when constructing an [`AdmissionResponse`].
     #[serde(skip)]
-    types: TypeMeta,
+    pub types: TypeMeta,
     /// An identifier for the individual request/response. It allows us to
     /// distinguish instances of requests which are otherwise identical (parallel
     /// requests, requests when earlier requests did not modify, etc). The UID is
@@ -225,7 +242,7 @@ pub enum Operation {
 pub struct AdmissionResponse {
     /// Copied from the corresponding consructing [`AdmissionRequest`].
     #[serde(skip)]
-    types: TypeMeta,
+    pub types: TypeMeta,
     /// Identifier for the individual request/response. This must be copied over
     /// from the corresponding AdmissionRequest.
     pub uid: String,
