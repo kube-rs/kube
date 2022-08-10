@@ -15,7 +15,6 @@ async fn main() -> anyhow::Result<()> {
 
     let mut continue_token: Option<String> = None;
     for page in 1.. {
-
         info!("Fetching Page #{page}");
         continue_token = fetch_page(&api, continue_token).await?;
 
@@ -28,8 +27,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-
-async fn fetch_page(api: &Api::<Pod>, continue_token: Option<String>) -> anyhow::Result<Option<String>> {
+async fn fetch_page(api: &Api<Pod>, continue_token: Option<String>) -> anyhow::Result<Option<String>> {
     let mut lp = ListParams::default().limit(PAGE_SIZE);
     if let Some(token) = continue_token {
         lp = lp.continue_token(&token);
