@@ -8,29 +8,36 @@ use kube::{
     Client, runtime::wait::{await_condition, conditions::is_pod_running},
 };
 use tokio::{io::AsyncWriteExt, select};
+use crossterm::event::{EventStream, Event};
 
 // send the new terminal size to channel when it change
-async fn handle_terminal_size(mut channel: Sender<TerminalSize>) {
-    let (width, height) = crossterm::terminal::size().unwrap();
+async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), anyhow::Error> {
+    // get event stream to get resize event
+    let mut reader = EventStream::new();
+
+    let (width, height) = crossterm::terminal::size()?;
     channel
         .send(TerminalSize { height, width })
-        .await
-        .expect("fail to write new size to channel");
-
-    let mut stream = tokio::signal::unix::signal(
-        tokio::signal::unix::SignalKind::window_change()
-    ).expect("fail to create signal handler for SIGWINCH");
+        .await?;
 
     loop {
         // wait for a change
-        stream.recv().await;
-        let (width, height) = crossterm::terminal::size().unwrap();
-        channel
-            .send(TerminalSize { height, width })
-            .await
-            .expect("fail to write new size to channel");
-
+        let maybe_event = reader.next().await;
+        match maybe_event {
+            Some(Ok(Event::Resize(width, height))) => {
+                channel
+                .send(TerminalSize { height, width })
+                .await?
+            },
+            // we don't care about other events type
+            Some(Ok(_)) => {},
+            Some(Err(err)) => {
+                return Err(err.into());
+            }
+            None => break,
+        }
     }
+    Ok(())
 }
 
 #[tokio::main]
@@ -77,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
 
         let term_tx = attached.terminal_size().unwrap();
 
-        tokio::spawn(handle_terminal_size(term_tx));
+        let mut handle_terminal_size_handle = tokio::spawn(handle_terminal_size(term_tx));
 
         loop {
             select! {
@@ -100,6 +107,12 @@ async fn main() -> anyhow::Result<()> {
                         _ => {
                             break
                         },
+                    }
+                },
+                result = &mut handle_terminal_size_handle => {
+                    match result {
+                        Ok(_) => println!("End of terminal size stream"),
+                        Err(e) => println!("Error getting terminal size: {e:?}")
                     }
                 },
             };
