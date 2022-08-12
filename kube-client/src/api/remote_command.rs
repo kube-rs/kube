@@ -4,12 +4,8 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
 use futures::{
     channel::{
-        mpsc::{self, Sender},
+        mpsc,
         oneshot,
-    },
-    future::{
-        select,
-        Either::{Left, Right},
     },
     FutureExt, SinkExt, StreamExt,
 };
@@ -20,7 +16,7 @@ use tokio::{
     select,
 };
 use tokio_tungstenite::{
-    tungstenite::{self as ws, util::NonBlockingError},
+    tungstenite::{self as ws},
     WebSocketStream,
 };
 
@@ -285,6 +281,7 @@ where
                         return Err(Error::ReceiveWebSocketMessage(err));
                     },
                     None => {
+                        // Connection closed properly
                         break
                     },
                 }
