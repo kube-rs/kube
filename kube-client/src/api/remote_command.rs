@@ -257,8 +257,15 @@ where
     let (mut server_send, raw_server_recv) = stream.split();
     // Work with filtered messages to reduce noise.
     let mut server_recv = raw_server_recv.filter_map(filter_message).boxed();
+    let have_terminal_size_rx = terminal_size_rx.is_some();
 
     loop {
+        let terminal_size_next = async {
+            match terminal_size_rx.as_mut() {
+                Some(tmp) => Some(tmp.next().await),
+                None => None,
+            }
+        };
         select! {
             server_message = server_recv.next() => {
                 match server_message {
@@ -310,7 +317,7 @@ where
                     }
                 }
             },
-            terminal_size_message = terminal_size_rx.as_mut().unwrap().next(), if terminal_size_rx.is_some() => {
+            Some(terminal_size_message) = terminal_size_next, if have_terminal_size_rx => {
                 match terminal_size_message {
                     Some(new_size) => {
                         let mut vec = vec![RESIZE_CHANNEL];
