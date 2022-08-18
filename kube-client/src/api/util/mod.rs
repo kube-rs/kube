@@ -2,8 +2,11 @@ use crate::{
     api::{Api, Resource},
     Error, Result,
 };
-use k8s_openapi::api::core::v1::Node;
-use kube_core::util::Restart;
+use k8s_openapi::api::{
+    authentication::v1::TokenRequest,
+    core::v1::{Node, ServiceAccount},
+};
+use kube_core::{params::PostParams, util::Restart};
 use serde::de::DeserializeOwned;
 
 k8s_openapi::k8s_if_ge_1_19! {
@@ -35,6 +38,24 @@ impl Api<Node> {
         let mut req = self.request.uncordon(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("cordon");
         self.client.request::<Node>(req).await
+    }
+}
+
+impl Api<ServiceAccount> {
+    /// Create a TokenRequest of a ServiceAccount
+    pub async fn create_token_request(
+        &self,
+        name: &str,
+        pp: &PostParams,
+        token_request: &TokenRequest,
+    ) -> Result<TokenRequest> {
+        let bytes = serde_json::to_vec(token_request).map_err(Error::SerdeError)?;
+        let mut req = self
+            .request
+            .create_subresource("token", name, pp, bytes)
+            .map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("create_token_request");
+        self.client.request::<TokenRequest>(req).await
     }
 }
 
