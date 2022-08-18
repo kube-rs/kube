@@ -19,6 +19,7 @@ pub struct DynamicObject {
     #[serde(flatten, default)]
     pub types: Option<TypeMeta>,
     /// Object metadata
+    #[serde(default)]
     pub metadata: ObjectMeta,
 
     /// All other keys
