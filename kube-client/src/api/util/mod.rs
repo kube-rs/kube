@@ -68,7 +68,10 @@ mod test {
         api::{Api, DeleteParams, ListParams, PostParams},
         Client,
     };
-    use k8s_openapi::api::core::v1::Node;
+    use k8s_openapi::api::{
+        authentication::v1::{TokenRequest, TokenRequestSpec, TokenReview, TokenReviewSpec},
+        core::v1::{Node, ServiceAccount},
+    };
     use serde_json::json;
 
     #[tokio::test]
@@ -100,6 +103,58 @@ mod test {
         let nodes_after_uncordon = nodes.list(&schedulables).await?;
         assert_eq!(nodes_after_uncordon.items.len(), num_nodes_before_cordon);
         nodes.delete(node_name, &DeleteParams::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // requires a cluster
+    async fn create_token_request() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+
+        let serviceaccount_name = "fakesa";
+        let serviceaccount_namespace = "default";
+        let audiences = vec!["api".to_string()];
+
+        // Create TokenRequest
+        let serviceaccounts: Api<ServiceAccount> = Api::namespaced(client.clone(), serviceaccount_namespace);
+        let tokenrequest = serviceaccounts
+            .create_token_request(serviceaccount_name, &PostParams::default(), &TokenRequest {
+                metadata: Default::default(),
+                spec: TokenRequestSpec {
+                    audiences: audiences.clone(),
+                    bound_object_ref: None,
+                    expiration_seconds: None,
+                },
+                status: None,
+            })
+            .await?;
+        let token = tokenrequest.status.unwrap().token;
+        assert!(!token.is_empty());
+
+        // Check created token is valid with TokenReview
+        let tokenreviews: Api<TokenReview> = Api::all(client);
+        let tokenreview = tokenreviews
+            .create(&PostParams::default(), &TokenReview {
+                metadata: Default::default(),
+                spec: TokenReviewSpec {
+                    audiences: Some(audiences.clone()),
+                    token: Some(token),
+                },
+                status: None,
+            })
+            .await?;
+        let tokenreviewstatus = tokenreview.status.unwrap();
+        assert_eq!(tokenreviewstatus.audiences, Some(audiences));
+        assert_eq!(tokenreviewstatus.authenticated, Some(true));
+        assert_eq!(tokenreviewstatus.error, None);
+        assert_eq!(
+            tokenreviewstatus.user.unwrap().username,
+            Some(format!(
+                "system:serviceaccount:{}:{}",
+                serviceaccount_namespace, serviceaccount_name
+            ))
+        );
+
         Ok(())
     }
 }
