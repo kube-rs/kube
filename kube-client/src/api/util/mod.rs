@@ -115,8 +115,20 @@ mod test {
         let serviceaccount_namespace = "default";
         let audiences = vec!["api".to_string()];
 
-        // Create TokenRequest
         let serviceaccounts: Api<ServiceAccount> = Api::namespaced(client.clone(), serviceaccount_namespace);
+        let tokenreviews: Api<TokenReview> = Api::all(client);
+
+        // Create ServiceAccount
+        let fake_sa = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {
+                "name": serviceaccount_name,
+            },
+        }))?;
+        serviceaccounts.create(&PostParams::default(), &fake_sa).await?;
+
+        // Create TokenRequest
         let tokenrequest = serviceaccounts
             .create_token_request(serviceaccount_name, &PostParams::default(), &TokenRequest {
                 metadata: Default::default(),
@@ -132,7 +144,6 @@ mod test {
         assert!(!token.is_empty());
 
         // Check created token is valid with TokenReview
-        let tokenreviews: Api<TokenReview> = Api::all(client);
         let tokenreview = tokenreviews
             .create(&PostParams::default(), &TokenReview {
                 metadata: Default::default(),
@@ -154,6 +165,11 @@ mod test {
                 serviceaccount_namespace, serviceaccount_name
             ))
         );
+
+        // Cleanup ServiceAccount
+        serviceaccounts
+            .delete(serviceaccount_name, &DeleteParams::default())
+            .await?;
 
         Ok(())
     }
