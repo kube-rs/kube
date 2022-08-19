@@ -547,6 +547,17 @@ mod test {
         assert_eq!(req.method(), "PUT");
     }
 
+    #[test]
+    fn create_subresource_path() {
+        let url = corev1::ServiceAccount::url_path(&(), Some("ns"));
+        let pp = PostParams::default();
+        let data = vec![];
+        let req = Request::new(url)
+            .create_subresource("token", "sa", &pp, data)
+            .unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/serviceaccounts/sa/token");
+    }
+
     // TODO: reinstate if we get scoping in trait
     //#[test]
     //#[should_panic]
