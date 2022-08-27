@@ -14,6 +14,10 @@
 #[cfg(feature = "admission")]
 pub mod admission;
 
+//#[cfg_attr(docsrs, doc(cfg(feature = "conversion")))]
+//#[cfg(feature = "conversion")]
+pub mod conversion;
+
 pub mod discovery;
 
 pub mod dynamic;

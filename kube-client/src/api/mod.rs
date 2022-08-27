@@ -17,6 +17,8 @@ pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus
 
 mod util;
 
+pub use util::migrate_resources;
+
 pub mod entry;
 
 // Re-exports from kube-core

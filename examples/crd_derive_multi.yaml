@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: conversion-webhook-example
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: conversion-webhook-example
+  name: conversion-webhook
+spec:
+  selector:
+    matchLabels:
+      app: webhook
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: webhook
+    spec:
+      terminationGracePeriodSeconds: 1
+      volumes:
+      - name: tls
+        secret:
+          secretName: conversions-webhook-tls
+      containers:
+      - name: main
+        image: # Specify image name here
+        imagePullPolicy: Always
+        env:
+        - name: WEBHOOK_BIND_IP
+          value: '0.0.0.0'
+        - name: RUN_WEBHOOK
+          value: '1'
+        - name: WEBHOOK_TLS_CRT
+          value: /pki/tls.crt
+        - name: WEBHOOK_TLS_KEY
+          value: /pki/tls.key
+        volumeMounts:
+        - name: tls
+          mountPath: /pki
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: conversion-webhook-example
+  name: conversion-webhook
+spec:
+  selector:
+    app: webhook
+  type: ClusterIP
+  ports:
+  - port: 443
+    targetPort: 8443
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  namespace: conversion-webhook-example
+  name: conversion-webhook
+rules:
+- apiGroups: ['apiextensions.k8s.io']
+  resources: ['customresourcedefinitions']
+  verbs: ['*']
+- apiGroups: ['kube.rs']
+  resources: ['*']
+  verbs: ['*']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  namespace: conversion-webhook-example
+  name: conversion-webhook
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: 'system:serviceaccount:conversion-webhook-example:default'
+roleRef:
+  kind: ClusterRole
+  name: conversion-webhook
+  apiGroup: rbac.authorization.k8s.io
