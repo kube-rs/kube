@@ -1,4 +1,4 @@
-use crate::TypeMeta;
+use crate::{Status, TypeMeta};
 use serde::{Deserialize, Serialize};
 
 /// The `kind` field in [`TypeMeta`].
@@ -41,8 +41,11 @@ pub struct ConversionRequest {
 pub struct ConversionResponse {
     /// Copy of .request.uid
     pub uid: String,
-    /// Outcome of the conversion operation
-    pub result: ConversionResult,
+    /// Outcome of the conversion operation.
+    /// Success: all objects were successfully converted
+    /// Failure: at least one object could not be converted.
+    /// It is recommended that conversion fails as rare as possible.
+    pub result: Status,
     /// Converted objects in the same order as in the request. Should be empty
     /// if conversion failed.
     #[serde(rename = "convertedObjects")]
@@ -57,46 +60,19 @@ impl ConversionResponse {
     pub fn success(request_uid: String, converted_objects: Vec<serde_json::Value>) -> Self {
         ConversionResponse {
             uid: request_uid,
-            result: ConversionResult {
-                status: Some(ConversionStatus::Success),
-                message: None,
-            },
+            result: Status::success(),
             converted_objects: Some(converted_objects),
         }
     }
 
     /// Creates failed conversion response (discouraged).
     /// `request_uid` must be equal to the `.uid` field in the request.
-    /// `message` will be returned to the apiserver.
-    pub fn error(request_uid: String, message: String) -> Self {
+    /// `message` and `reason` will be returned to the apiserver.
+    pub fn error(request_uid: String, message: &str, reason: &str) -> Self {
         ConversionResponse {
             uid: request_uid,
-            result: ConversionResult {
-                status: Some(ConversionStatus::Failed),
-                message: Some(message),
-            },
+            result: Status::failure(message, reason),
             converted_objects: None,
         }
     }
-}
-
-/// Outcome of the conversion operation
-#[derive(Serialize, Deserialize)]
-pub struct ConversionResult {
-    /// Overall status of the conversion
-    pub status: Option<ConversionStatus>,
-    /// Optional message that will be returned to client
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-}
-
-/// Overall status of the conversion
-#[derive(Serialize, Deserialize)]
-pub enum ConversionStatus {
-    /// All objects were successfully converted
-    Success,
-    /// At least one object could not be converted.
-    /// It is recommended that conversion fails as rare as possible, in particular
-    /// no validation checks should be performed.
-    Failed,
 }

@@ -42,7 +42,8 @@ impl ConversionHandler {
                     request: None,
                     response: Some(ConversionResponse::error(
                         String::new(),
-                        ".request is unset in input".to_string(),
+                        ".request is unset in input",
+                        "InvalidRequest",
                     )),
                 }
             }
@@ -57,7 +58,7 @@ impl ConversionHandler {
                     return ConversionReview {
                         types: review.types.clone(),
                         request: None,
-                        response: Some(ConversionResponse::error(req.uid, msg)),
+                        response: Some(ConversionResponse::error(req.uid, &msg, "ConversionFailed")),
                     };
                 }
             }
@@ -89,7 +90,7 @@ pub trait Converter {
 
 #[cfg(test)]
 mod tests {
-    use crate::conversion::low_level::ConversionStatus;
+    use crate::response::StatusSummary;
 
     use super::{
         low_level::{ConversionRequest, ConversionReview, META_API_VERSION_V1, META_KIND},
@@ -134,8 +135,8 @@ mod tests {
         assert_eq!(output.types.api_version, META_API_VERSION_V1);
         assert_eq!(output.types.kind, META_KIND);
         let resp = output.response.unwrap();
-        assert!(matches!(resp.result.status, Some(ConversionStatus::Success)));
-        assert!(resp.result.message.is_none());
+        assert!(matches!(resp.result.status, Some(StatusSummary::Success)));
+        assert!(resp.result.message.is_empty());
         assert_eq!(resp.converted_objects, Some(vec![obj1, obj2]));
     }
 }

@@ -137,7 +137,10 @@ mod test {
     };
     use futures::{StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::Pod;
-    use kube_core::params::{DeleteParams, Patch};
+    use kube_core::{
+        params::{DeleteParams, Patch},
+        response::StatusSummary,
+    };
     use serde_json::json;
     use tower::ServiceBuilder;
 
@@ -475,7 +478,7 @@ mod test {
         let ep = EvictParams::default();
         let eres = pods.evict("busybox-kube3", &ep).await?;
         assert_eq!(eres.code, 201); // created
-        assert_eq!(eres.status, "Success");
+        assert_eq!(eres.status, Some(StatusSummary::Success));
 
         Ok(())
     }

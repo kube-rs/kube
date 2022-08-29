@@ -1,20 +1,20 @@
 //! Generic api response types
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// A Kubernetes status object
 ///
 /// Equivalent to Status in k8s-openapi except we have have simplified options
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Status {
-    /// Suggested HTTP return code (0 if unset)
-    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
-    pub code: u16,
-
     /// Status of the operation
     ///
     /// One of: `Success` or `Failure` - [more info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status)
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<StatusSummary>,
+
+    /// Suggested HTTP return code (0 if unset)
+    #[serde(default, skip_serializing_if = "is_u16_zero")]
+    pub code: u16,
 
     /// A human-readable  description of the status of this operation
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -35,8 +35,53 @@ pub struct Status {
     pub details: Option<StatusDetails>,
 }
 
+impl Status {
+    /// Returns a successful `Status`
+    pub fn success() -> Self {
+        Status {
+            status: Some(StatusSummary::Success),
+            code: 0,
+            message: String::new(),
+            reason: String::new(),
+            details: None,
+        }
+    }
+
+    /// Returns an unsuccessful `Status`
+    pub fn failure(message: &str, reason: &str) -> Self {
+        Status {
+            status: Some(StatusSummary::Failure),
+            code: 0,
+            message: message.to_string(),
+            reason: reason.to_string(),
+            details: None,
+        }
+    }
+
+    /// Sets an explicit HTTP status code
+    pub fn with_code(mut self, code: u16) -> Self {
+        self.code = code;
+        self
+    }
+
+    /// Adds details to the `Status`
+    pub fn with_details(mut self, details: StatusDetails) -> Self {
+        self.details = Some(details);
+        self
+    }
+}
+
+/// Overall status of the operation - whether it succeeded or not
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum StatusSummary {
+    /// Operation succeeded
+    Success,
+    /// Operation failed
+    Failure,
+}
+
 /// Status details object on the [`Status`] object
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusDetails {
     /// The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)
@@ -69,12 +114,12 @@ pub struct StatusDetails {
     ///
     /// Some errors may indicate the client must take an alternate action -
     /// for those errors this field may indicate how long to wait before taking the alternate action.
-    #[serde(default, skip_serializing_if = "num::Zero::is_zero")]
+    #[serde(default, skip_serializing_if = "is_u32_zero")]
     pub retry_after_seconds: u32,
 }
 
 /// Status cause object on the [`StatusDetails`] object
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct StatusCause {
     /// A machine-readable description of the cause of the error. If this value is empty there is no information available.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -90,6 +135,14 @@ pub struct StatusCause {
     /// Fields may appear more than once in an array of causes due to fields having multiple errors.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub field: String,
+}
+
+fn is_u16_zero(&v: &u16) -> bool {
+    v == 0
+}
+
+fn is_u32_zero(&v: &u32) -> bool {
+    v == 0
 }
 
 #[cfg(test)]
