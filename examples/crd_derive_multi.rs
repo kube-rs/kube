@@ -252,7 +252,8 @@ async fn main() -> anyhow::Result<()> {
     apply_crd(client.clone(), merge_crds(all_crds.clone(), "v2")?).await?;
     // here we use `migrate_resources` utility function to migrate all previously stored objects.
     info!("Running storage migration");
-    kube::api::migrate_resources(v2api.clone(), Api::all(client.clone()), &()).await?;
+    let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    crds.migrate_resources(&crd2.name_unchecked());
     // and now we can apply CRD again without specifying v1, completely removing it.
     info!("Removing v1");
     all_crds.remove(0);

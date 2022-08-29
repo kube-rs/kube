@@ -10,11 +10,12 @@ use k8s_openapi::{
     apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
 };
 use kube_core::{
+    discovery::ApiResourceFromCrdHint,
     params::{ListParams, PatchParams, PostParams},
     util::Restart,
-    ResourceExt,
+    ApiResource, DynamicObject, ResourceExt,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
 
 k8s_openapi::k8s_if_ge_1_19! {
     mod csr;
@@ -66,54 +67,42 @@ impl Api<ServiceAccount> {
     }
 }
 
-/// Updates stored versions of all objects so that is matches
-/// stored version of the CustomResourceDefinition.
-///
-/// This function makes apiserver
-/// migrate all its instances to the version, marked with `storage=true`, and deletes all other versions
-/// from the `.status.storedVersions`.
-/// # Guarantees
-/// - This function never corrupts or loses data and does not affect API clients (assuming that conversion is set up properly)
-/// - If this function failed (or was aborted), you can safely call it again.
-/// - If this function succeeded, you can safely call it again (but you shouldn't - this is useless)
-/// - While this function runs, you can call safely it again in parallel (but you shouldn't - this is useless)
-/// - If this function succeeded, you may safely stop serving any other api versions
-pub async fn migrate_resources<K: Resource + Clone + Serialize + DeserializeOwned + std::fmt::Debug>(
-    api: Api<K>,
-    crds_api: Api<CustomResourceDefinition>,
-    dt: &K::DynamicType,
-) -> Result<()> {
-    // fetch crd instance in advance so that we can compare-and-set it later.
-    let mut crd = crds_api.get(&K::crd_name(dt)).await?;
-    let objects = api.list(&ListParams::default()).await?;
-    for object in objects.items {
-        // apply empty patch: this will trigger conversion to the new version.
-        api.patch(
-            &object.name_unchecked(),
-            &PatchParams::default(),
-            &kube_core::params::Patch::Merge(serde_json::json!({})),
-        )
-        .await?;
-    }
-    let mut stored_version = None;
-    for version in &crd.spec.versions {
-        if version.storage {
-            stored_version = Some(version.name.clone());
+impl Api<CustomResourceDefinition> {
+    /// Trigger any outstanding storage version migrations on the apiserver
+    ///
+    /// Migrates all its instances of the `CustomResourceDefinition` to the one marked with `storage=true`,
+    /// then deletes older crd versions from the `.status.storedVersions`.
+    /// Once this has succeeded, you can safely remove api versions without breaking any stored objects.
+    pub async fn migrate_resources(&self, crd_name: &str) -> Result<()> {
+        // fetch crd instance in advance so that we can compare-and-set it later.
+        let mut crd = self.get(crd_name).await?;
+        let instances_api_resource = ApiResource::from_crd(&crd, &ApiResourceFromCrdHint::Storage)
+            .expect("apiserver returned invalid CRD");
+
+        let instances_api = Api::<DynamicObject>::all_with(self.client.clone(), &instances_api_resource);
+        let objects = instances_api.list(&ListParams::default()).await?;
+        for object in objects.items {
+            // apply empty patch: this will trigger conversion to the new version.
+            instances_api
+                .patch(
+                    &object.name_unchecked(),
+                    &PatchParams::default(),
+                    &kube_core::params::Patch::Merge(serde_json::json!({})),
+                )
+                .await?;
         }
-    }
-    let stored_version = stored_version.expect("No version has storage=true");
-    if let Some(s) = crd.status.as_mut() {
-        s.stored_versions = Some(vec![stored_version]);
-    }
-    crds_api
-        .replace_status(
-            &K::crd_name(dt),
+        if let Some(s) = crd.status.as_mut() {
+            s.stored_versions = Some(vec![instances_api_resource.version]);
+        }
+        self.replace_status(
+            crd_name,
             &PostParams::default(),
             serde_json::to_vec(&crd).unwrap(),
         )
         .await?;
 
-    Ok(())
+        Ok(())
+    }
 }
 
 // Tests that require a cluster and the complete feature set

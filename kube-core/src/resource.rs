@@ -184,9 +184,7 @@ pub trait ResourceExt: Resource {
     /// For more precise use cases, prefer doing your own defaulting.
     /// For true uniqueness, prefer [`uid`](ResourceExt::uid).
     fn name_any(&self) -> String;
-    /// Returns name of the CustomResourceDefinition object exposing this resource.
-    /// If this resource has other nature (builtin or ApiService), returns unspecified value.
-    fn crd_name(dt: &Self::DynamicType) -> String;
+
     /// The namespace the resource is in
     fn namespace(&self) -> Option<String>;
     /// The resource version
@@ -240,10 +238,6 @@ impl<K: Resource> ResourceExt for K {
             .clone()
             .or_else(|| self.meta().generate_name.clone())
             .unwrap_or_default()
-    }
-
-    fn crd_name(dt: &Self::DynamicType) -> String {
-        format!("{}.{}", K::plural(dt), K::group(dt))
     }
 
     fn namespace(&self) -> Option<String> {
