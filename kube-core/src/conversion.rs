@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use self::low_level::{ConversionResponse, ConversionReview};
+use self::low_level::{ConversionRequest, ConversionResponse, ConversionReview};
 
 /// Defines low-level typings.
 pub mod low_level;
@@ -34,40 +34,26 @@ impl ConversionHandler {
     /// to think about copying `.uid` and other boring things.
     /// Returned value is ready to be serialized and returned.
     pub fn handle(&self, review: ConversionReview) -> ConversionReview {
-        let req = match review.request {
-            Some(r) => r,
-            None => {
-                return ConversionReview {
-                    types: review.types.clone(),
-                    request: None,
-                    response: Some(ConversionResponse::error(
-                        String::new(),
-                        ".request is unset in input",
-                        "InvalidRequest",
-                    )),
-                }
+        let mut req = match ConversionRequest::from_review(review) {
+            Ok(r) => r,
+            Err(_) => {
+                return ConversionResponse::unmatched_error(".request is unset in input", "InvalidRequest")
+                    .into_review()
             }
         };
 
         let mut converted_objects = Vec::new();
-        for (idx, object) in req.objects.into_iter().enumerate() {
+        let input_objects = std::mem::take(&mut req.objects);
+        for (idx, object) in input_objects.into_iter().enumerate() {
             match self.converter.convert(object, &req.desired_api_version) {
                 Ok(c) => converted_objects.push(c),
                 Err(error) => {
                     let msg = format!("Conversion of object {} failed: {}", idx, error);
-                    return ConversionReview {
-                        types: review.types.clone(),
-                        request: None,
-                        response: Some(ConversionResponse::error(req.uid, &msg, "ConversionFailed")),
-                    };
+                    return ConversionResponse::error(req, &msg, "ConversionFailed").into_review();
                 }
             }
         }
-        ConversionReview {
-            types: review.types.clone(),
-            request: None,
-            response: Some(ConversionResponse::success(req.uid, converted_objects)),
-        }
+        ConversionResponse::success(req, converted_objects).into_review()
     }
 }
 
@@ -124,6 +110,7 @@ mod tests {
                 kind: META_KIND.to_string(),
             },
             request: Some(ConversionRequest {
+                types: None,
                 uid: "some-uid".to_string(),
                 desired_api_version: "doesnotmatter".to_string(),
                 objects: vec![obj1.clone(), obj2.clone()],
