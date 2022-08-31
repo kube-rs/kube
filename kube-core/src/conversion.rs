@@ -1,8 +1,8 @@
 //! Contains utilities for implements custom resource conversion webhooks.
 //! Abstractions in this module and its submodules may be ordered:
 //! - `low_level` submodule contains raw typings, allowing for full control (probably you don't need these unless you are implementing your own apiserver).
-//! - `Converter` together with `ConversionHandler` are middle ground: they abstract you from low-level details but not require particular conversion strategy.
-//! - `StarConverter` is opinionated strategy, where all conversions are done using intermediate unversioned representation as a middle point.
+//! - `Conversion` together with `ConversionHandler` are middle ground: they abstract you from low-level details but not require particular conversion strategy.
+//! - `StarConversion` is opinionated strategy, where all conversions are done using intermediate unversioned representation as a middle point.
 //! Third option is preferred - this is how Kubernetes implements versioning and convertion for builtin APIs.
 
 use std::sync::Arc;
@@ -11,22 +11,22 @@ use self::low_level::{ConversionRequest, ConversionResponse, ConversionReview};
 
 /// Defines low-level typings.
 pub mod low_level;
-/// High-level easy-to-use converter.
+/// High-level easy-to-use conversion.
 mod star;
 
-pub use star::{StarConverter, StarConverterBuilder, StarRay};
+pub use star::{StarConversion, StarConversionBuilder, StarRay};
 
 /// Helper which implements low-level API based on the provided converter.
 #[derive(Clone)]
 pub struct ConversionHandler {
-    converter: Arc<dyn Converter + Send + Sync>,
+    conversion: Arc<dyn Conversion + Send + Sync>,
 }
 
 impl ConversionHandler {
-    /// Creates new `ConversionHandler` which will use given `converter` for operation.
-    pub fn new<C: Converter + Send + Sync + 'static>(converter: C) -> Self {
+    /// Creates new `ConversionHandler` which will use given `conversion` for operation.
+    pub fn new<C: Conversion + Send + Sync + 'static>(conversion: C) -> Self {
         ConversionHandler {
-            converter: Arc::new(converter),
+            conversion: Arc::new(conversion),
         }
     }
 
@@ -45,7 +45,7 @@ impl ConversionHandler {
         let mut converted_objects = Vec::new();
         let input_objects = std::mem::take(&mut req.objects);
         for (idx, object) in input_objects.into_iter().enumerate() {
-            match self.converter.convert(object, &req.desired_api_version) {
+            match self.conversion.convert(object, &req.desired_api_version) {
                 Ok(c) => converted_objects.push(c),
                 Err(error) => {
                     let msg = format!("Conversion of object {} failed: {}", idx, error);
@@ -57,10 +57,10 @@ impl ConversionHandler {
     }
 }
 
-/// Converter is entity which supports all `N*(N-1)` possible conversion directions.
+/// Conversion is entity which supports all `N*(N-1)` possible conversion directions.
 /// This trait does not specify strategy used. You may implement this trait yourself
-/// or use [`StarConverter`](StarConverter).
-pub trait Converter {
+/// or use [`StarConversion`](StarConversion).
+pub trait Conversion {
     /// Actually performs conversion.
     /// # Requirements
     /// All metadata fields except labels and annotations must not be mutated.
@@ -80,11 +80,11 @@ mod tests {
 
     use super::{
         low_level::{ConversionRequest, ConversionReview, META_API_VERSION_V1, META_KIND},
-        ConversionHandler, Converter,
+        Conversion, ConversionHandler,
     };
 
-    struct NoopConverter;
-    impl Converter for NoopConverter {
+    struct NoopConversion;
+    impl Conversion for NoopConversion {
         fn convert(
             &self,
             object: serde_json::Value,
@@ -102,7 +102,7 @@ mod tests {
         let obj2 = serde_json::json!({
             "bar": 6
         });
-        let handler = ConversionHandler::new(NoopConverter);
+        let handler = ConversionHandler::new(NoopConversion);
 
         let input = ConversionReview {
             types: crate::TypeMeta {

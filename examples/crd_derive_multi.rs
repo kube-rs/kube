@@ -10,7 +10,7 @@ use k8s_openapi::{
 use kube::{
     api::{Api, Patch, PatchParams},
     core::{
-        conversion::{ConversionHandler, StarConverter},
+        conversion::{ConversionHandler, StarConversion},
         crd::merge_crds,
     },
     runtime::wait::{await_condition, conditions},
@@ -120,11 +120,11 @@ mod conversion {
 
 // this function actually implements conversion service
 async fn run_conversion_webhook() {
-    let star_converter = StarConverter::builder()
+    let star_conversion = StarConversion::builder()
         .add_ray(conversion::RayV1)
         .add_ray(conversion::RayV2)
         .build();
-    let handler = ConversionHandler::new(star_converter);
+    let handler = ConversionHandler::new(star_conversion);
 
     let routes = warp::path("convert")
         .and(warp::body::json())
@@ -253,7 +253,7 @@ async fn main() -> anyhow::Result<()> {
     // here we use `migrate_resources` utility function to migrate all previously stored objects.
     info!("Running storage migration");
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-    crds.migrate_resources(&crd2.name_unchecked());
+    crds.migrate_resources(&crd2.name_unchecked()).await?;
     // and now we can apply CRD again without specifying v1, completely removing it.
     info!("Removing v1");
     all_crds.remove(0);

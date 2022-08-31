@@ -4,25 +4,25 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::Resource;
 
-use super::Converter;
+use super::Conversion;
 
-/// StarConverter is opinionated easy-to-use Converter implementation.
+/// StarConversion is opinionated easy-to-use Conversion implementation.
 ///
 /// # Semantics
-/// StarConverter assumes both unversioned and all versioned representations are logically equivalent, and each version can be
+/// StarConversion assumes both unversioned and all versioned representations are logically equivalent, and each version can be
 /// converted to and from unversioned representation without loss of data. If you cannot satisfy this requirement,
-/// you may need to implement `Converter` directly instead to minimize data loss.
+/// you may need to implement `Conversion` directly instead to minimize data loss.
 ///
-/// It then implements `Converter` contract by converting input object to the unversioned representation at first,
+/// It then implements `Conversion` contract by converting input object to the unversioned representation at first,
 /// and then converting this representation to the desired version.
-pub struct StarConverter {
+pub struct StarConversion {
     rays: Vec<Box<dyn ErasedStarRay + Send + Sync + 'static>>,
 }
 
-impl StarConverter {
+impl StarConversion {
     /// Creates new builder.
-    pub fn builder<U>() -> StarConverterBuilder<U> {
-        StarConverterBuilder {
+    pub fn builder<U>() -> StarConversionBuilder<U> {
+        StarConversionBuilder {
             marker: PhantomData,
             rays: Vec::new(),
         }
@@ -55,7 +55,7 @@ impl StarConverter {
     }
 }
 
-impl Converter for StarConverter {
+impl Conversion for StarConversion {
     fn convert(
         &self,
         object: serde_json::Value,
@@ -74,14 +74,14 @@ impl Converter for StarConverter {
     }
 }
 
-/// Simple builder for the `StarConverter`.
+/// Simple builder for the `StarConversion`.
 /// `I` is type of the IR.
-pub struct StarConverterBuilder<U> {
+pub struct StarConversionBuilder<U> {
     marker: PhantomData<fn(U) -> U>,
     rays: Vec<Box<dyn ErasedStarRay + Send + Sync + 'static>>,
 }
 
-impl<U: 'static> StarConverterBuilder<U> {
+impl<U: 'static> StarConversionBuilder<U> {
     /// Registers new ray of the star.
     /// # Panics
     /// This method panics if another ray was added for the same api version.
@@ -112,9 +112,9 @@ impl<U: 'static> StarConverterBuilder<U> {
         self
     }
 
-    /// Finalizes construction and returns `StarConverter` instance
-    pub fn build(self) -> StarConverter {
-        StarConverter { rays: self.rays }
+    /// Finalizes construction and returns `StarConversion` instance
+    pub fn build(self) -> StarConversion {
+        StarConversion { rays: self.rays }
     }
 }
 
@@ -135,7 +135,7 @@ impl<T: StarRay> ErasedStarRay for ErasedStarRayImpl<T> {
     }
 
     fn from_ur(&self, unversioned: Box<dyn Any>) -> Result<serde_json::Value, String> {
-        // StarConverterBuilder enforces at compile-time that downcast will work.
+        // StarConversionBuilder enforces at compile-time that downcast will work.
         let unversioned = unversioned.downcast().expect("invalid input");
         let versioned = self.0.from_unversioned(*unversioned)?;
         serde_json::to_value(versioned).map_err(|err| format!("Failed to serialize object: {}", err))
@@ -146,7 +146,7 @@ impl<T: StarRay> ErasedStarRay for ErasedStarRayImpl<T> {
     }
 }
 
-/// Helper trait for the `StarConverter`.
+/// Helper trait for the `StarConversion`.
 /// # Errors
 /// While the signature allows returning errors, it is discouraged.
 /// Ideally, conversion should always succeed.
@@ -166,9 +166,9 @@ pub trait StarRay: Send + Sync + 'static {
 mod tests {
     use serde::{Deserialize, Serialize};
 
-    use crate::{conversion::Converter, TypeMeta};
+    use crate::{conversion::Conversion, TypeMeta};
 
-    use super::{StarConverter, StarRay};
+    use super::{StarConversion, StarRay};
 
     #[derive(Serialize, Deserialize)]
     struct V1 {
@@ -226,8 +226,8 @@ mod tests {
     }
 
     #[test]
-    fn test_star_converter_works() {
-        let converter = StarConverter::builder()
+    fn test_star_conversion_works() {
+        let converter = StarConversion::builder()
             .add_ray_with_version(Ray1, "foo/v1")
             .add_ray_with_version(Ray2, "foo/v2")
             .build();
@@ -252,8 +252,8 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_star_converter_panics_when_versions_are_duplicated() {
-        StarConverter::builder()
+    fn test_star_conversion_panics_when_versions_are_duplicated() {
+        StarConversion::builder()
             .add_ray_with_version(Ray1, "foo/v1")
             .add_ray_with_version(Ray2, "foo/v1");
     }
