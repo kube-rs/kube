@@ -47,7 +47,7 @@ pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error:
 }
 
 /// Results of the reconciliation attempt
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Action {
     /// Whether (and when) to next trigger the reconciliation if no external watch triggers hit
     ///
