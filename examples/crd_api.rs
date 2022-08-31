@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
 
     // Create Foo qux with status
     info!("Create Foo instance qux");
-    let mut f2 = Foo::new("qux", FooSpec {
+    let f2 = Foo::new("qux", FooSpec {
         name: "qux".into(),
         replicas: 0,
         info: "unpatched qux".into(),
