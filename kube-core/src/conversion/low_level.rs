@@ -90,27 +90,38 @@ pub struct ConversionResponse {
 }
 
 impl ConversionResponse {
-    /// Creates successful conversion response.
-    /// `converted_objects` must specify objects in the exact same order as on input.
-    pub fn success(request: ConversionRequest, converted_objects: Vec<serde_json::Value>) -> Self {
+    /// Creates a new response, matching provided request.
+    /// Returned response is empty: you should call `success` or `error`
+    /// to get a complete `ConversionResponse`.
+    pub fn for_request(request: ConversionRequest) -> Self {
         ConversionResponse {
             types: request.types,
             uid: request.uid,
-            result: Status::success(),
-            converted_objects: Some(converted_objects),
+            result: Status {
+                status: None,
+                code: 0,
+                message: String::new(),
+                reason: String::new(),
+                details: None,
+            },
+            converted_objects: None,
         }
+    }
+
+    /// Creates successful conversion response.
+    /// `converted_objects` must specify objects in the exact same order as on input.
+    pub fn success(mut self, converted_objects: Vec<serde_json::Value>) -> Self {
+        self.result = Status::success();
+        self.converted_objects = Some(converted_objects);
+        self
     }
 
     /// Creates failed conversion response (discouraged).
     /// `request_uid` must be equal to the `.uid` field in the request.
     /// `message` and `reason` will be returned to the apiserver.
-    pub fn error(request: ConversionRequest, message: &str, reason: &str) -> Self {
-        ConversionResponse {
-            types: request.types,
-            uid: request.uid,
-            result: Status::failure(message, reason),
-            converted_objects: None,
-        }
+    pub fn error(mut self, message: &str, reason: &str) -> Self {
+        self.result = Status::failure(message, reason);
+        self
     }
 
     /// Creates failed conversion response, not matched with any request.
@@ -138,6 +149,12 @@ impl ConversionResponse {
             request: None,
             response: Some(self),
         }
+    }
+}
+
+impl From<ConversionRequest> for ConversionResponse {
+    fn from(request: ConversionRequest) -> Self {
+        ConversionResponse::for_request(request)
     }
 }
 

@@ -49,11 +49,15 @@ impl ConversionHandler {
                 Ok(c) => converted_objects.push(c),
                 Err(error) => {
                     let msg = format!("Conversion of object {} failed: {}", idx, error);
-                    return ConversionResponse::error(req, &msg, "ConversionFailed").into_review();
+                    return ConversionResponse::for_request(req)
+                        .error(&msg, "ConversionFailed")
+                        .into_review();
                 }
             }
         }
-        ConversionResponse::success(req, converted_objects).into_review()
+        ConversionResponse::for_request(req)
+            .success(converted_objects)
+            .into_review()
     }
 }
 
