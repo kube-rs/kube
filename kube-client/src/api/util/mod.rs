@@ -10,7 +10,6 @@ use k8s_openapi::{
     apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
 };
 use kube_core::{
-    discovery::ApiResourceFromCrdHint,
     params::{ListParams, PatchParams, PostParams},
     util::Restart,
     ApiResource, DynamicObject, ResourceExt,
@@ -76,8 +75,8 @@ impl Api<CustomResourceDefinition> {
     pub async fn migrate_resources(&self, crd_name: &str) -> Result<()> {
         // fetch crd instance in advance so that we can compare-and-set it later.
         let mut crd = self.get(crd_name).await?;
-        let instances_api_resource = ApiResource::from_crd(&crd, &ApiResourceFromCrdHint::Storage)
-            .expect("apiserver returned invalid CRD");
+        let instances_api_resource =
+            ApiResource::from_crd(&crd, None).expect("apiserver returned invalid CRD");
 
         let instances_api = Api::<DynamicObject>::all_with(self.client.clone(), &instances_api_resource);
         let objects = instances_api.list(&ListParams::default()).await?;

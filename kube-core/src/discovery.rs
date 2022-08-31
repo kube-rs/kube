@@ -1,8 +1,6 @@
 //! Type information structs for API discovery
 use crate::{gvk::GroupVersionKind, resource::Resource};
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
-    CustomResourceDefinition, CustomResourceDefinitionVersion,
-};
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use serde::{Deserialize, Serialize};
 
 /// Information about a Kubernetes API resource
@@ -63,12 +61,12 @@ impl ApiResource {
     /// defined by the CRD. You may use this `ApiResource` to manipulate
     /// instances of the CRD.
     /// ```no_run
-    /// # use kube::{Api, Client, core::{ApiResource, DynamicObject, ResourceExt, discovery::ApiResourceFromCrdHint}};
+    /// # use kube::{Api, Client, core::{ApiResource, DynamicObject, ResourceExt}};
     /// # use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
     /// # use std::error::Error;
     /// async fn print_instances(k: &kube::Client, crd: &CustomResourceDefinition) -> Result<(), Box<dyn Error>> {
-    ///     let api_resource = ApiResource::from_crd(crd, &ApiResourceFromCrdHint::SingleVersioned)
-    ///         .expect("in this example we assume crd has one version");
+    ///     let api_resource = ApiResource::from_crd(crd, Some("v1"))
+    ///         .expect("in this example we assume crd version v1");
     ///     let api = Api::<DynamicObject>::all_with(k.clone(), &api_resource);
     ///     for item in api.list(&Default::default()).await? {
     ///         println!("{}", item.name_unchecked());
@@ -78,48 +76,25 @@ impl ApiResource {
     /// ```
     /// # Hint
     /// If crd has multiple versions, than it defines several api resources in fact.
-    /// Therefore this function takes additional `hint` parameter. See [`ApiResourceFromCrdHint`]
-    /// for effect of each variant.
-    pub fn from_crd(crd: &CustomResourceDefinition, hint: &ApiResourceFromCrdHint) -> Option<ApiResource> {
+    /// Therefore this function takes additional `hint` parameter.
+    /// If hint is `None`, this function uses version marked as storage (in this mode
+    /// None can be returned only for invalid CRDs, where no version are marked as storage).
+    /// If hint is `Some(v)`, this function uses version `v` (and returns None if version is not found).
+    pub fn from_crd(crd: &CustomResourceDefinition, hint: Option<&str>) -> Option<ApiResource> {
         let kind = crd.spec.names.kind.clone();
         let group = crd.spec.group.clone();
         let plural = crd.spec.names.plural.clone();
-        let version = hint.select(crd)?.name.clone();
+        let crd_version = match hint {
+            Some(expected) => crd.spec.versions.iter().find(|ver| ver.name == *expected),
+            None => crd.spec.versions.iter().find(|ver| ver.storage),
+        };
+        let version = crd_version?.name.clone();
         let gvk = GroupVersionKind { group, version, kind };
 
         Some(ApiResource::from_gvk_with_plural(&gvk, &plural))
     }
 }
 
-/// Hint for [`ApiResource::from_crd`]
-pub enum ApiResourceFromCrdHint {
-    /// Assume that CRD has only one version.
-    /// If this assumption is violated, None will be returned.
-    SingleVersioned,
-    /// Use given version.
-    /// If CRD does not have this version, None will be returned.
-    Exact(String),
-    /// Use storage version. This hint always succeeds for valid CRDs.
-    Storage,
-}
-
-impl ApiResourceFromCrdHint {
-    fn select<'a>(&self, crd: &'a CustomResourceDefinition) -> Option<&'a CustomResourceDefinitionVersion> {
-        match self {
-            ApiResourceFromCrdHint::SingleVersioned => {
-                if crd.spec.versions.len() == 1 {
-                    Some(&crd.spec.versions[0])
-                } else {
-                    None
-                }
-            }
-            ApiResourceFromCrdHint::Exact(expected) => {
-                crd.spec.versions.iter().find(|ver| ver.name == *expected)
-            }
-            ApiResourceFromCrdHint::Storage => crd.spec.versions.iter().find(|ver| ver.storage),
-        }
-    }
-}
 
 /// Resource scope
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
