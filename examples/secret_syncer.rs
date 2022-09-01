@@ -100,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
                 .await
             }
         },
-        |_err, _| Action::requeue(Duration::from_secs(2)),
+        |_obj, _err, _| Action::requeue(Duration::from_secs(2)),
         Arc::new(()),
     )
     .for_each(|msg| async move { info!("Reconciled: {:?}", msg) })
