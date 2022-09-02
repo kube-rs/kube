@@ -485,11 +485,11 @@ fn load_from_base64_or_file<P: AsRef<Path>>(
 }
 
 fn load_from_base64(value: &str) -> Result<Vec<u8>, LoadDataError> {
-    base64::decode(&value).map_err(LoadDataError::DecodeBase64)
+    base64::decode(value).map_err(LoadDataError::DecodeBase64)
 }
 
 fn load_from_file<P: AsRef<Path>>(file: &P) -> Result<Vec<u8>, LoadDataError> {
-    fs::read(&file).map_err(|source| LoadDataError::ReadFile(source, file.as_ref().into()))
+    fs::read(file).map_err(|source| LoadDataError::ReadFile(source, file.as_ref().into()))
 }
 
 // Ensure there is a trailing newline in the blob

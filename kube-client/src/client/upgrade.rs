@@ -91,5 +91,5 @@ pub fn verify_response(res: &Response<Body>, key: &str) -> Result<(), UpgradeCon
 /// This must be nonce consisting of a randomly selected 16-byte value in base64.
 pub fn sec_websocket_key() -> String {
     let r: [u8; 16] = rand::random();
-    base64::encode(&r)
+    base64::encode(r)
 }
