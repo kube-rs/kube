@@ -323,7 +323,7 @@ mod test {
         assert_eq!(mypod.types.as_ref().unwrap().api_version, "v1");
 
         assert_eq!(mypod.namespace().unwrap(), "dev");
-        assert_eq!(mypod.name(), "blog");
+        assert_eq!(mypod.name_unchecked(), "blog");
         assert!(mypod.status().is_none());
         assert_eq!(mypod.spec().containers[0], ContainerSimple {
             image: "blog".into()
