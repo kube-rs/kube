@@ -1,0 +1,55 @@
+{
+    "kind": "ConversionReview",
+    "apiVersion": "apiextensions.k8s.io/v1",
+    "request": {
+        "uid": "f263987e-4d58-465a-9195-bf72a1c83623",
+        "desiredAPIVersion": "nullable.se/v1",
+        "objects": [
+            {
+                "apiVersion": "nullable.se/v2",
+                "kind": "ConfigMapGenerator",
+                "metadata": {
+                    "annotations": {
+                        "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"nullable.se/v2\",\"kind\":\"ConfigMapGenerator\",\"metadata\":{\"annotations\":{},\"name\":\"kek\",\"namespace\":\"default\"},\"spec\":{\"content\":\"x\"}}\n"
+                    },
+                    "creationTimestamp": "2022-09-04T14:21:34Z",
+                    "generation": 1,
+                    "managedFields": [
+                        {
+                            "apiVersion": "nullable.se/v2",
+                            "fieldsType": "FieldsV1",
+                            "fieldsV1": {
+                                "f:metadata": {
+                                    "f:annotations": {
+                                        ".": {},
+                                        "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                                    }
+                                },
+                                "f:spec": {
+                                    ".": {},
+                                    "f:content": {}
+                                }
+                            },
+                            "manager": "kubectl-client-side-apply",
+                            "operation": "Update",
+                            "time": "2022-09-04T14:21:34Z"
+                        }
+                    ],
+                    "name": "kek",
+                    "namespace": "default",
+                    "uid": "af7e84e4-573e-4b6e-bb66-0ea578c740da"
+                },
+                "spec": {
+                    "content": "x"
+                }
+            }
+        ]
+    },
+    "response": {
+        "uid": "",
+        "convertedObjects": null,
+        "result": {
+            "metadata": {}
+        }
+    }
+}
