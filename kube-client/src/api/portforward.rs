@@ -310,13 +310,11 @@ where
                             .map_err(Error::InvalidErrorMessage)?;
                         sender.send(s).map_err(Error::ForwardErrorMessage)?;
                     }
-                } else {
-                    if !chan_state[port_index].shutdown {
-                        writers[port_index]
-                            .write_all(&bytes)
-                            .await
-                            .map_err(Error::WriteBytesFromPod)?;
-                    }
+                } else if !chan_state[ch].shutdown {
+                    writers[port_index]
+                        .write_all(&bytes)
+                        .await
+                        .map_err(Error::WriteBytesFromPod)?;
                 }
             }
 
@@ -335,9 +333,9 @@ where
                     return Err(Error::InvalidChannel(ch));
                 }
                 let port_index = ch / 2;
-                if !chan_state[port_index].shutdown {
+                if !chan_state[ch].shutdown {
                     writers[port_index].shutdown().await.map_err(Error::Shutdown)?;
-                    chan_state[port_index].shutdown = true;
+                    chan_state[ch].shutdown = true;
 
                     closed_ports += 1;
                 }
