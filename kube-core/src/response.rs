@@ -2,8 +2,6 @@
 use serde::{Deserialize, Serialize};
 
 /// A Kubernetes status object
-///
-/// Equivalent to Status in k8s-openapi except we have have simplified options
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Status {
     /// Status of the operation
@@ -68,6 +66,22 @@ impl Status {
     pub fn with_details(mut self, details: StatusDetails) -> Self {
         self.details = Some(details);
         self
+    }
+
+    /// Checks if this `Status` represents success
+    ///
+    /// Note that it is possible for `Status` to be in indeterminate state
+    /// when both `is_success` and `is_failure` return false.
+    pub fn is_success(&self) -> bool {
+        self.status == Some(StatusSummary::Success)
+    }
+
+    /// Checks if this `Status` represents failure
+    ///
+    /// Note that it is possible for `Status` to be in indeterminate state
+    /// when both `is_success` and `is_failure` return false.
+    pub fn is_failure(&self) -> bool {
+        self.status == Some(StatusSummary::Failure)
     }
 }
 

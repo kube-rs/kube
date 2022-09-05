@@ -478,7 +478,7 @@ mod test {
         let ep = EvictParams::default();
         let eres = pods.evict("busybox-kube3", &ep).await?;
         assert_eq!(eres.code, 201); // created
-        assert_eq!(eres.status, Some(StatusSummary::Success));
+        assert!(eres.is_success());
 
         Ok(())
     }
