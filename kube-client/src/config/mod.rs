@@ -128,9 +128,25 @@ pub struct Config {
     pub default_namespace: String,
     /// The configured root certificate
     pub root_cert: Option<Vec<Vec<u8>>>,
+    /// Set the timeout for connecting to the Kubernetes API.
+    ///
+    /// A value of `None` means no timeout
+    pub connect_timeout: Option<std::time::Duration>,
+    /// Set the timeout for the Kubernetes API response.
+    ///
+    /// A value of `None` means no timeout
+    pub read_timeout: Option<std::time::Duration>,
+    /// Set the timeout for the Kubernetes API request.
+    ///
+    /// A value of `None` means no timeout
+    pub write_timeout: Option<std::time::Duration>,
     /// Timeout for calls to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
+    #[deprecated(
+        since = "0.75.0",
+        note = "replaced by more granular members `connect_timeout`, `read_timeout` and `write_timeout`. This member will be removed in 0.78.0."
+    )]
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid certificates
     pub accept_invalid_certs: bool,
@@ -148,10 +164,14 @@ impl Config {
     /// Most likely you want to use [`Config::infer`] to infer the config from
     /// the environment.
     pub fn new(cluster_url: http::Uri) -> Self {
+        #[allow(deprecated)]
         Self {
             cluster_url,
             default_namespace: String::from("default"),
             root_cert: None,
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
@@ -196,10 +216,14 @@ impl Config {
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
 
+        #[allow(deprecated)]
         Ok(Self {
             cluster_url,
             default_namespace,
             root_cert: Some(root_cert),
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo {
@@ -254,10 +278,14 @@ impl Config {
             root_cert = Some(ca_bundle);
         }
 
+        #[allow(deprecated)]
         Ok(Self {
             cluster_url,
             default_namespace,
             root_cert,
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             proxy_url: loader.proxy_url()?,
@@ -325,6 +353,8 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
 // https://github.com/kube-rs/kube-rs/issues/146#issuecomment-590924397
 /// Default Timeout
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]

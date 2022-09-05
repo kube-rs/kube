@@ -210,6 +210,24 @@ impl Request {
         req.body(vec![]).map_err(Error::BuildRequest)
     }
 
+    /// Create an instance of the subresource
+    pub fn create_subresource(
+        &self,
+        subresource_name: &str,
+        name: &str,
+        pp: &PostParams,
+        data: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>, Error> {
+        let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
+        let mut qp = form_urlencoded::Serializer::new(target);
+        if pp.dry_run {
+            qp.append_pair("dryRun", "All");
+        }
+        let urlstr = qp.finish();
+        let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
+        req.body(data).map_err(Error::BuildRequest)
+    }
+
     /// Patch an instance of the subresource
     pub fn patch_subresource<P: serde::Serialize>(
         &self,
@@ -527,6 +545,17 @@ mod test {
             .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
         assert_eq!(req.method(), "PUT");
+    }
+
+    #[test]
+    fn create_subresource_path() {
+        let url = corev1::ServiceAccount::url_path(&(), Some("ns"));
+        let pp = PostParams::default();
+        let data = vec![];
+        let req = Request::new(url)
+            .create_subresource("token", "sa", &pp, data)
+            .unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/serviceaccounts/sa/token");
     }
 
     // TODO: reinstate if we get scoping in trait
