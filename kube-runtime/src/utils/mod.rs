@@ -82,11 +82,15 @@ where
 {
     type Item = Case;
 
+    #[allow(clippy::mut_mutex_lock)]
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = self.project();
+        // this code triggers false positive in Clippy
+        // https://github.com/rust-lang/rust-clippy/issues/9415
+        // TODO: remove #[allow] once fix reaches nightly.
         let inner = this.inner.lock().unwrap();
         let mut inner = Pin::new(inner);
         let inner_peek = inner.as_mut().peek();

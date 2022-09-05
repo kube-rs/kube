@@ -137,7 +137,7 @@ where
             }
         }
 
-        match scheduler.poll_pop_queue_message(cx, &can_take_message) {
+        match scheduler.poll_pop_queue_message(cx, can_take_message) {
             Poll::Ready(expired) => Poll::Ready(Some(expired)),
             Poll::Pending => Poll::Pending,
         }

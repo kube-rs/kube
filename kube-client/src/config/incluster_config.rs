@@ -35,11 +35,11 @@ pub fn token_file() -> String {
 
 /// Returns certification from specified path in cluster.
 pub fn load_cert() -> Result<Vec<Vec<u8>>, Error> {
-    let certs = std::fs::read(&SERVICE_CERTFILE).map_err(Error::ReadCertificateBundle)?;
+    let certs = std::fs::read(SERVICE_CERTFILE).map_err(Error::ReadCertificateBundle)?;
     super::certs(&certs).map_err(Error::ParseCertificates)
 }
 
 /// Returns the default namespace from specified path in cluster.
 pub fn load_default_ns() -> Result<String, Error> {
-    std::fs::read_to_string(&SERVICE_DEFAULT_NS).map_err(Error::ReadDefaultNamespace)
+    std::fs::read_to_string(SERVICE_DEFAULT_NS).map_err(Error::ReadDefaultNamespace)
 }

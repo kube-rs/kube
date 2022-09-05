@@ -37,7 +37,7 @@ mod future_hash_map;
 mod runner;
 
 #[derive(Debug, Error)]
-pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
+pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
     #[error("reconciler for object {1} failed")]
