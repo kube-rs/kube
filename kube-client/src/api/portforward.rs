@@ -278,13 +278,11 @@ where
         match msg {
             Message::FromPod(ch, mut bytes) => {
                 let ch = ch as usize;
-                if ch >= chan_state.len() {
-                    return Err(Error::InvalidChannel(ch));
-                }
+                let channel = chan_state.get_mut(ch).ok_or(Error::InvalidChannel(ch))?;
 
                 let port_index = ch / 2;
                 // Initialization
-                if !chan_state[ch].initialized {
+                if !channel.initialized {
                     // The initial message must be 3 bytes including the channel prefix.
                     if bytes.len() != 2 {
                         return Err(Error::InvalidInitialFrameSize);
@@ -298,7 +296,7 @@ where
                         });
                     }
 
-                    chan_state[ch].initialized = true;
+                    channel.initialized = true;
                     continue;
                 }
 
@@ -310,7 +308,7 @@ where
                             .map_err(Error::InvalidErrorMessage)?;
                         sender.send(s).map_err(Error::ForwardErrorMessage)?;
                     }
-                } else if !chan_state[ch].shutdown {
+                } else if !channel.shutdown {
                     writers[port_index]
                         .write_all(&bytes)
                         .await
@@ -329,13 +327,12 @@ where
             }
             Message::ToPodClose(ch) => {
                 let ch = ch as usize;
-                if ch >= chan_state.len() {
-                    return Err(Error::InvalidChannel(ch));
-                }
+                let channel = chan_state.get_mut(ch).ok_or(Error::InvalidChannel(ch))?;
                 let port_index = ch / 2;
-                if !chan_state[ch].shutdown {
+
+                if !channel.shutdown {
                     writers[port_index].shutdown().await.map_err(Error::Shutdown)?;
-                    chan_state[ch].shutdown = true;
+                    channel.shutdown = true;
 
                     closed_ports += 1;
                 }
