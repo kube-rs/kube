@@ -1,5 +1,5 @@
 use crate::{Status, TypeMeta};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 /// The `kind` field in [`TypeMeta`]
@@ -92,8 +92,27 @@ pub struct ConversionResponse {
     /// This field should contain objects in the same order as in the request
     /// Should be empty if conversion failed.
     #[serde(rename = "convertedObjects")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub converted_objects: Option<Vec<serde_json::Value>>,
+    #[serde(deserialize_with = "parse_converted_objects")]
+    pub converted_objects: Vec<serde_json::Value>,
+}
+
+fn parse_converted_objects<'de, D>(de: D) -> Result<Vec<serde_json::Value>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Helper {
+        List(Vec<serde_json::Value>),
+        Null(()),
+    }
+
+    let h: Helper = Helper::deserialize(de)?;
+    let res = match h {
+        Helper::List(l) => l,
+        Helper::Null(()) => Vec::new(),
+    };
+    Ok(res)
 }
 
 impl ConversionResponse {
@@ -113,7 +132,7 @@ impl ConversionResponse {
                 reason: String::new(),
                 details: None,
             },
-            converted_objects: None,
+            converted_objects: Vec::new(),
         }
     }
 
@@ -122,7 +141,7 @@ impl ConversionResponse {
     /// `converted_objects` must specify objects in the exact same order as on input.
     pub fn success(mut self, converted_objects: Vec<serde_json::Value>) -> Self {
         self.result = Status::success();
-        self.converted_objects = Some(converted_objects);
+        self.converted_objects = converted_objects;
         self
     }
 
@@ -144,7 +163,7 @@ impl ConversionResponse {
             types: None,
             uid: String::new(),
             result: Status::failure(message, reason),
-            converted_objects: None,
+            converted_objects: Vec::new(),
         }
     }
 
