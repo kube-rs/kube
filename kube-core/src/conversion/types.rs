@@ -99,8 +99,9 @@ pub struct ConversionResponse {
 impl ConversionResponse {
     /// Creates a new response, matching provided request
     ///
-    /// Returned response is empty: you should call `success` or `error`
-    /// to get a complete `ConversionResponse`.
+    /// This response must be finalized with one of:
+    /// - [`ConversionResponse::success`] when conversion succeeded
+    /// - [`ConversionResponse::failure`] when conversion failed
     pub fn for_request(request: ConversionRequest) -> Self {
         ConversionResponse {
             types: request.types,
@@ -129,7 +130,7 @@ impl ConversionResponse {
     ///
     /// `request_uid` must be equal to the `.uid` field in the request.
     /// `message` and `reason` will be returned to the apiserver.
-    pub fn error(mut self, message: &str, reason: &str) -> Self {
+    pub fn failure(mut self, message: &str, reason: &str) -> Self {
         self.result = Status::failure(message, reason);
         self
     }
@@ -138,7 +139,7 @@ impl ConversionResponse {
     ///
     /// You should only call this function when request couldn't be parsed into [`ConversionRequest`].
     /// Otherwise use `error`.
-    pub fn unmatched_error(message: &str, reason: &str) -> Self {
+    pub fn invalid(message: &str, reason: &str) -> Self {
         ConversionResponse {
             types: None,
             uid: String::new(),
