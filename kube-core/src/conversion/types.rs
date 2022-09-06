@@ -52,13 +52,7 @@ pub struct ConversionRequest {
 impl ConversionRequest {
     /// Extracts request from the [`ConversionReview`]
     pub fn from_review(review: ConversionReview) -> Result<Self, ConvertConversionReviewError> {
-        match review.request {
-            Some(mut req) => {
-                req.types = Some(review.types);
-                Ok(req)
-            }
-            None => Err(ConvertConversionReviewError),
-        }
+        ConversionRequest::try_from(review)
     }
 }
 
@@ -66,7 +60,13 @@ impl TryFrom<ConversionReview> for ConversionRequest {
     type Error = ConvertConversionReviewError;
 
     fn try_from(review: ConversionReview) -> Result<Self, Self::Error> {
-        ConversionRequest::from_review(review)
+        match review.request {
+            Some(mut req) => {
+                req.types = Some(review.types);
+                Ok(req)
+            }
+            None => Err(ConvertConversionReviewError),
+        }
     }
 }
 
@@ -122,18 +122,7 @@ impl ConversionResponse {
     /// - [`ConversionResponse::success`] when conversion succeeded
     /// - [`ConversionResponse::failure`] when conversion failed
     pub fn for_request(request: ConversionRequest) -> Self {
-        ConversionResponse {
-            types: request.types,
-            uid: request.uid,
-            result: Status {
-                status: None,
-                code: 0,
-                message: String::new(),
-                reason: String::new(),
-                details: None,
-            },
-            converted_objects: Vec::new(),
-        }
+        ConversionResponse::from(request)
     }
 
     /// Creates successful conversion response
@@ -168,9 +157,32 @@ impl ConversionResponse {
     }
 
     /// Converts response into a [`ConversionReview`] value, ready to be sent as a response
-    pub fn into_review(mut self) -> ConversionReview {
+    pub fn into_review(self) -> ConversionReview {
+        self.into()
+    }
+}
+
+impl From<ConversionRequest> for ConversionResponse {
+    fn from(request: ConversionRequest) -> Self {
+        ConversionResponse {
+            types: request.types,
+            uid: request.uid,
+            result: Status {
+                status: None,
+                code: 0,
+                message: String::new(),
+                reason: String::new(),
+                details: None,
+            },
+            converted_objects: Vec::new(),
+        }
+    }
+}
+
+impl From<ConversionResponse> for ConversionReview {
+    fn from(mut response: ConversionResponse) -> Self {
         ConversionReview {
-            types: self.types.take().unwrap_or_else(|| {
+            types: response.types.take().unwrap_or_else(|| {
                 // we don't know which uid, apiVersion and kind to use, let's just use something
                 TypeMeta {
                     api_version: META_API_VERSION_V1.to_string(),
@@ -178,20 +190,8 @@ impl ConversionResponse {
                 }
             }),
             request: None,
-            response: Some(self),
+            response: Some(response),
         }
-    }
-}
-
-impl From<ConversionRequest> for ConversionResponse {
-    fn from(request: ConversionRequest) -> Self {
-        ConversionResponse::for_request(request)
-    }
-}
-
-impl From<ConversionResponse> for ConversionReview {
-    fn from(response: ConversionResponse) -> Self {
-        response.into_review()
     }
 }
 
