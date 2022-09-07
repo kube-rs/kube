@@ -231,7 +231,7 @@ mod test {
 
         let pp = PostParams::default();
         match pods.create(&pp, &p).await {
-            Ok(o) => assert_eq!(p.name(), o.name()),
+            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
             Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
@@ -276,7 +276,7 @@ mod test {
         // Delete it
         let dp = DeleteParams::default();
         pods.delete("busybox-kube1", &dp).await?.map_left(|pdel| {
-            assert_eq!(pdel.name(), "busybox-kube1");
+            assert_eq!(pdel.name_unchecked(), "busybox-kube1");
         });
 
         Ok(())
@@ -311,7 +311,7 @@ mod test {
         }))?;
 
         match pods.create(&Default::default(), &p).await {
-            Ok(o) => assert_eq!(p.name(), o.name()),
+            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
             Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
@@ -388,7 +388,7 @@ mod test {
         // Delete it
         let dp = DeleteParams::default();
         pods.delete("busybox-kube2", &dp).await?.map_left(|pdel| {
-            assert_eq!(pdel.name(), "busybox-kube2");
+            assert_eq!(pdel.name_unchecked(), "busybox-kube2");
         });
 
         Ok(())
@@ -425,7 +425,7 @@ mod test {
         }))?;
 
         match pods.create(&Default::default(), &p).await {
-            Ok(o) => assert_eq!(p.name(), o.name()),
+            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
             Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }

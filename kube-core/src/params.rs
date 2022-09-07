@@ -501,7 +501,7 @@ where
 }
 #[cfg(test)]
 mod test {
-    use super::{DeleteParams, PatchParams, ValidationDirective};
+    use super::{DeleteParams, PatchParams};
     #[test]
     fn delete_param_serialize() {
         let mut dp = DeleteParams::default();
