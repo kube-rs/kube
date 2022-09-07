@@ -139,6 +139,11 @@ impl StateHolder {
         Ok(State(val))
     }
 
+    async fn refresh(&mut self) -> Result<(), kube_client::Error> {
+        self.state = Some(self.get_state().await?);
+        Ok(())
+    }
+
     async fn compare_and_set_inner(
         &self,
         f: &dyn Fn(State) -> Result<Lease, State>,
@@ -267,6 +272,13 @@ impl RawLock {
             .map_or(DateTime::<Utc>::MIN_UTC, |(last_renewed_at, duration)| {
                 last_renewed_at.0 + Duration::seconds(duration.into())
             })
+    }
+
+    /// Tries to fetch latest state from the server.
+    /// # Errors
+    /// This function fails if the apiserver returns error.
+    pub async fn refresh(&mut self) -> Result<(), kube_client::Error> {
+        self.state.refresh().await
     }
 
     /// If lock is released or stale, acquires it and returns true.
