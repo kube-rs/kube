@@ -16,6 +16,10 @@ pub enum Error {
     #[error("failed to read a certificate bundle: {0}")]
     ReadCertificateBundle(#[source] std::io::Error),
 
+    /// Failed to parse cluster port value
+    #[error("failed to parse cluster port: {0}")]
+    ParseClusterPort(#[source] std::num::ParseIntError),
+
     /// Failed to parse cluster url
     #[error("failed to parse cluster url: {0}")]
     ParseClusterUrl(#[source] http::uri::InvalidUri),
@@ -27,6 +31,45 @@ pub enum Error {
 
 pub fn kube_dns() -> http::Uri {
     http::Uri::from_static("https://kubernetes.default.svc/")
+}
+
+pub fn try_kube_from_legacy_env_or_dns() -> Result<http::Uri, Error> {
+    // client-go requires that both environment variables are set, so we do too.
+    let host = match std::env::var("KUBERNETES_SERVICE_HOST") {
+        Ok(h) => h,
+        Err(_) => return Ok(kube_dns()),
+    };
+    let port = match std::env::var("KUBERNETES_SERVICE_PORT") {
+        Ok(p) => p.parse::<u16>().map_err(Error::ParseClusterPort)?,
+        Err(_) => return Ok(kube_dns()),
+    };
+
+    // Format a host and, if not using 443, a port.
+    //
+    // Ensure that IPv6 addresses are properly bracketed.
+    let uri = match host.parse::<std::net::IpAddr>() {
+        Ok(ip) => {
+            if port == 443 {
+                if ip.is_ipv6() {
+                    format!("https://[{ip}]")
+                } else {
+                    format!("https://{ip}")
+                }
+            } else {
+                let addr = std::net::SocketAddr::new(ip, port);
+                format!("https://{addr}")
+            }
+        }
+        Err(_) => {
+            if port == 443 {
+                format!("https://{host}")
+            } else {
+                format!("https://{host}:{port}")
+            }
+        }
+    };
+
+    uri.parse().map_err(Error::ParseClusterUrl)
 }
 
 pub fn token_file() -> String {
