@@ -47,24 +47,25 @@ pub fn try_kube_from_legacy_env_or_dns() -> Result<http::Uri, Error> {
     // Format a host and, if not using 443, a port.
     //
     // Ensure that IPv6 addresses are properly bracketed.
+    const HTTPS: &str = "https";
     let uri = match host.parse::<std::net::IpAddr>() {
         Ok(ip) => {
             if port == 443 {
                 if ip.is_ipv6() {
-                    format!("https://[{ip}]")
+                    format!("{HTTPS}://[{ip}]")
                 } else {
-                    format!("https://{ip}")
+                    format!("{HTTPS}://{ip}")
                 }
             } else {
                 let addr = std::net::SocketAddr::new(ip, port);
-                format!("https://{addr}")
+                format!("{HTTPS}://{addr}")
             }
         }
         Err(_) => {
             if port == 443 {
-                format!("https://{host}")
+                format!("{HTTPS}://{host}")
             } else {
-                format!("https://{host}:{port}")
+                format!("{HTTPS}://{host}:{port}")
             }
         }
     };
