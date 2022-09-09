@@ -222,7 +222,7 @@ impl Config {
     /// <https://github.com/kube-rs/kube-rs/issues/1003>.
     #[cfg(feature = "rustls-tls")]
     pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_dns(incluster_config::kube_dns())
+        Self::incluster_dns()
     }
     /// Load an in-cluster config using the `KUBERNETES_SERVICE_HOST` and
     /// `KUBERNETES_SERVICE_PORT` environment variables.
