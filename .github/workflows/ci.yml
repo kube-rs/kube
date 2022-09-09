@@ -234,8 +234,7 @@ jobs:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
-        # TODO: Enable rustls https://github.com/kube-rs/kube-rs/issues/1003
-        tls: [openssl]
+        tls: [openssl, rustls]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
