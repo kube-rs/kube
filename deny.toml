@@ -79,17 +79,8 @@ allow-git = []
 multiple-versions = "deny"
 
 [[bans.skip]]
-# The following dependencies are still working on upgrading to 0.7:
-# https://github.com/hyperium/h2/pull/603
-# https://github.com/tower-rs/tower/pull/638
-# https://github.com/tower-rs/tower-http/pull/221
-name = "tokio-util"
-version = "0.6"
-
-[[bans.skip]]
-# The following dependencies are still working on upgrading to 0.3
-# https://github.com/rustls/hyper-rustls/pull/165
-name = "rustls-pemfile"
+# Waiting on https://github.com/Keats/validator/pull/233
+name = "idna"
 version = "0.2"
 
 [[bans.skip]]
