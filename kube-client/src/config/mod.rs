@@ -218,7 +218,7 @@ impl Config {
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     pub fn from_cluster_env() -> Result<Self, InClusterError> {
         let uri = incluster_config::try_kube_from_env()?;
-        Self::load_inluster_with_uri(uri)
+        Self::load_incluster_with_uri(uri)
     }
 
     /// Load an in-cluster config using the API server at
@@ -230,10 +230,10 @@ impl Config {
     /// A service account's token must be available in
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     pub fn from_cluster_dns() -> Result<Self, InClusterError> {
-        Self::load_inluster_with_uri(incluster_config::kube_dns())
+        Self::load_incluster_with_uri(incluster_config::kube_dns())
     }
 
-    fn load_inluster_with_uri(cluster_url: http::uri::Uri) -> Result<Self, InClusterError> {
+    fn load_incluster_with_uri(cluster_url: http::uri::Uri) -> Result<Self, InClusterError> {
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
 
