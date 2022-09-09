@@ -8,7 +8,7 @@
 
 	// These extensions are loaded for all users by default.
 	"extensions": [
-		"matklad.rust-analyzer",
+		"rust-lang.rust-analyzer",
 		"NathanRidley.autotrim",
 		"samverschueren.final-newline",
 		"tamasfe.even-better-toml",
