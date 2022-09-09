@@ -182,16 +182,9 @@ impl Config {
     /// Infer a Kubernetes client configuration.
     ///
     /// First, a user's kubeconfig is loaded from `KUBECONFIG` or
-    /// `~/.kube/config`. If that fails, an in-cluster config is loaded. If
-    /// inference from both sources fails, then an error is returned.
-    ///
-    /// When an [`Config::incluster`] configuration is loaded, the behavior is
-    /// dependent on the features that are enabled. If `rustls-tls` is enabled,
-    /// the `kubernetes.default.svc` DNS name is used to connect to a Kubernetes
-    /// cluster. Otherwise, if another TLS implementation is enabled, the
-    /// default `KUBERNETES_SERVICE_HOST` and `KUBERNETES_SERVICE_PORT`
-    /// environment variables are used to reference the Kubernetes API server.
-    /// See <https://github.com/kube-rs/kube-rs/issues/1003>.
+    /// `~/.kube/config`. If that fails, an in-cluster config is loaded via
+    /// [`Config::incluster`]. If inference from both sources fails, then an
+    /// error is returned.
     ///
     /// [`Config::apply_debug_overrides`] is used to augment the loaded
     /// configuration based on the environment.
@@ -214,16 +207,34 @@ impl Config {
         Ok(config)
     }
 
+    /// Load an in-cluster Kubernetes client configuration using
+    /// [`Config::incluster_env`].
+    #[cfg(not(feature = "rustls-tls"))]
+    pub fn incluster() -> Result<Self, InClusterError> {
+        Self::incluster_env()
+    }
+
+    /// Load an in-cluster Kubernetes client configuration using
+    /// [`Config::incluster_dns`].
+    ///
+    /// The `rustls-tls` feature is currently incompatible with
+    /// [`Config::incluster_env`]. See
+    /// <https://github.com/kube-rs/kube-rs/issues/1003>.
+    #[cfg(feature = "rustls-tls")]
+    pub fn incluster() -> Result<Self, InClusterError> {
+        Self::incluster_dns(incluster_config::kube_dns())
+    }
     /// Load an in-cluster config using the `KUBERNETES_SERVICE_HOST` and
     /// `KUBERNETES_SERVICE_PORT` environment variables.
     ///
-    /// This matches the behavior of the official Kubernetes client libraries,
-    /// but it is not compatible with `rustls`.
-    ///
     /// A service account's token must be available in
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
-    #[cfg(not(feature = "rustls-tls"))]
-    pub fn incluster() -> Result<Self, InClusterError> {
+    ///
+    /// This method matches the behavior of the official Kubernetes client
+    /// libraries, but it is not compatible with the `rustls-tls` feature . When
+    /// this feature is enabled, [`Config::incluster_dns`] should be used
+    /// instead. See <https://github.com/kube-rs/kube-rs/issues/1003>.
+    pub fn incluster_env() -> Result<Self, InClusterError> {
         let uri = incluster_config::try_kube_from_env()?;
         Self::incluster_with_uri(uri)
     }
@@ -231,13 +242,12 @@ impl Config {
     /// Load an in-cluster config using the API server at
     /// `https://kubernetes.default.svc`.
     ///
-    /// This behavior does not match that of the official Kubernetes clients,
-    /// but this approach is compatible with `rustls`.
-    ///
     /// A service account's token must be available in
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
-    #[cfg(feature = "rustls-tls")]
-    pub fn incluster() -> Result<Self, InClusterError> {
+    ///
+    /// This behavior does not match that of the official Kubernetes clients,
+    /// but this approach is compatible with the `rustls-tls` feature.
+    pub fn incluster_dns() -> Result<Self, InClusterError> {
         Self::incluster_with_uri(incluster_config::kube_dns())
     }
 

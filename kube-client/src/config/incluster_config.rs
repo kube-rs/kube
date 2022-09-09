@@ -33,11 +33,16 @@ pub enum Error {
     ParseCertificates(#[source] pem::PemError),
 }
 
-pub fn kube_dns() -> http::Uri {
+/// Returns the URI of the Kubernetes API server using the in-cluster DNS name
+/// `kubernetes.default.svc`.
+pub(super) fn kube_dns() -> http::Uri {
     http::Uri::from_static("https://kubernetes.default.svc/")
 }
 
-pub fn try_kube_from_env() -> Result<http::Uri, Error> {
+/// Returns the URI of the Kubernetes API server by reading the
+/// `KUBERNETES_SERVICE_HOST` and `KUBERNETES_SERVICE_PORT` environment
+/// variables.
+pub(super) fn try_kube_from_env() -> Result<http::Uri, Error> {
     // client-go requires that both environment variables are set.
     let host = std::env::var("KUBERNETES_SERVICE_HOST").map_err(Error::ReadEnvironmentVariable)?;
     let port = std::env::var("KUBERNETES_SERVICE_PORT")
