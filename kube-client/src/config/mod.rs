@@ -181,12 +181,14 @@ impl Config {
 
     /// Infer the configuration from the environment
     ///
-    /// Done by attempting to load the local kubec-config first, and
-    /// then if that fails, trying the in-cluster environment variables .
+    /// Done by attempting to load the local kubec-config first, and then if
+    /// that fails, trying the in-cluster environment variables via
+    /// [`Config::from_cluster_env`].
     ///
     /// Fails if inference from both sources fails
     ///
-    /// Applies debug overrides, see [`Config::apply_debug_overrides`] for more details
+    /// Applies debug overrides, see [`Config::apply_debug_overrides`] for more
+    /// details
     pub async fn infer() -> Result<Self, InferConfigError> {
         let mut config = match Self::from_kubeconfig(&KubeConfigOptions::default()).await {
             Err(kubeconfig_err) => {
@@ -195,8 +197,8 @@ impl Config {
                     "no local config found, falling back to local in-cluster config"
                 );
 
-                Self::load_in_cluster().map_err(|in_cluster_err| InferConfigError {
-                    in_cluster: in_cluster_err,
+                Self::from_cluster_env().map_err(|in_cluster| InferConfigError {
+                    in_cluster,
                     kubeconfig: kubeconfig_err,
                 })?
             }
@@ -206,42 +208,32 @@ impl Config {
         Ok(config)
     }
 
-    /// Replaced by [`Self::load_in_cluster`].
-    #[deprecated(since = "0.75.0", note = "use Config::load_in_cluster")]
-    pub fn from_cluster_env() -> Result<Self, InClusterError> {
-        Self::load_in_cluster()
-    }
-
-    /// Load the default in-cluster config.
-    ///
-    /// This follows the standard [API Access from a Pod][docs] policy of using
-    /// `https://kubernetes.default.svc` to connect to the Kubernetes API
-    /// server. A service account's token must be available in
-    /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
-    ///
-    /// [docs]: https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
-    pub fn load_in_cluster() -> Result<Self, InClusterError> {
-        Self::load_in_cluster_with_uri(incluster_config::kube_dns())
-    }
-
-    /// Load an in-cluster config use the legacy `KUBERNETES_SERVICE_HOST` and
+    /// Load an in-cluster config using the `KUBERNETES_SERVICE_HOST` and
     /// `KUBERNETES_SERVICE_PORT` environment variables.
     ///
-    /// This matches the behavior of [client-go], but it will fallback to using
-    /// `kubernetes.default.svc` if the environment is not set.
+    /// This matches the behavior of the official Kubernetes client libraries,
+    /// but it may not be compatible with `rustls`.
     ///
     /// A service account's token must be available in
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
-    ///
-    /// This will be deprecated/removed when client-go's behavior changes.
-    ///
-    /// [client-go]: https://github.com/kubernetes/kubernetes/blob/67bde9a1023d1805e33d698b28aa6fad991dfb39/staging/src/k8s.io/client-go/rest/config.go#L507-L541
-    pub fn load_in_cluster_from_legacy_env() -> Result<Self, InClusterError> {
-        let uri = incluster_config::try_kube_from_legacy_env_or_dns()?;
-        Self::load_in_cluster_with_uri(uri)
+    pub fn from_cluster_env() -> Result<Self, InClusterError> {
+        let uri = incluster_config::try_kube_from_env()?;
+        Self::load_inluster_with_uri(uri)
     }
 
-    fn load_in_cluster_with_uri(cluster_url: http::uri::Uri) -> Result<Self, InClusterError> {
+    /// Load an in-cluster config using the API server at
+    /// `https://kubernetes.default.svc`.
+    ///
+    /// This behavior does not match that of the official Kubernetes clients,
+    /// but this approach is compatible with `rustls`.
+    ///
+    /// A service account's token must be available in
+    /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
+    pub fn from_cluster_dns() -> Result<Self, InClusterError> {
+        Self::load_inluster_with_uri(incluster_config::kube_dns())
+    }
+
+    fn load_inluster_with_uri(cluster_url: http::uri::Uri) -> Result<Self, InClusterError> {
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
 

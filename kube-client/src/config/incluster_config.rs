@@ -12,6 +12,10 @@ pub enum Error {
     #[error("failed to read the default namespace: {0}")]
     ReadDefaultNamespace(#[source] std::io::Error),
 
+    /// Failed to read the in-cluster environment variables
+    #[error("failed to read an incluster environment variable: {0}")]
+    ReadEnvironmentVariable(#[source] std::env::VarError),
+
     /// Failed to read a certificate bundle
     #[error("failed to read a certificate bundle: {0}")]
     ReadCertificateBundle(#[source] std::io::Error),
@@ -33,16 +37,13 @@ pub fn kube_dns() -> http::Uri {
     http::Uri::from_static("https://kubernetes.default.svc/")
 }
 
-pub fn try_kube_from_legacy_env_or_dns() -> Result<http::Uri, Error> {
-    // client-go requires that both environment variables are set, so we do too.
-    let host = match std::env::var("KUBERNETES_SERVICE_HOST") {
-        Ok(h) => h,
-        Err(_) => return Ok(kube_dns()),
-    };
-    let port = match std::env::var("KUBERNETES_SERVICE_PORT") {
-        Ok(p) => p.parse::<u16>().map_err(Error::ParseClusterPort)?,
-        Err(_) => return Ok(kube_dns()),
-    };
+pub fn try_kube_from_env() -> Result<http::Uri, Error> {
+    // client-go requires that both environment variables are set.
+    let host = std::env::var("KUBERNETES_SERVICE_HOST").map_err(Error::ReadEnvironmentVariable)?;
+    let port = std::env::var("KUBERNETES_SERVICE_PORT")
+        .map_err(Error::ReadEnvironmentVariable)?
+        .parse::<u16>()
+        .map_err(Error::ParseClusterPort)?;
 
     // Format a host and, if not using 443, a port.
     //
