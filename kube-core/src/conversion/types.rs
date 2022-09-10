@@ -9,7 +9,7 @@ pub const META_API_VERSION_V1: &str = "apiextensions.k8s.io/v1";
 
 #[derive(Debug, Error)]
 #[error("request missing in ConversionReview")]
-/// Returned when `AdmissionReview` cannot be converted into `AdmissionRequest`
+/// Returned when `ConversionReview` cannot be converted into `ConversionRequest`
 pub struct ConvertConversionReviewError;
 
 /// Struct that describes both request and response
