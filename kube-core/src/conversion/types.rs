@@ -138,8 +138,8 @@ impl ConversionResponse {
     ///
     /// `request_uid` must be equal to the `.uid` field in the request.
     /// `message` and `reason` will be returned to the apiserver.
-    pub fn failure(mut self, message: &str, reason: &str) -> Self {
-        self.result = Status::failure(message, reason);
+    pub fn failure(mut self, status: Status) -> Self {
+        self.result = status;
         self
     }
 
@@ -147,11 +147,11 @@ impl ConversionResponse {
     ///
     /// You should only call this function when request couldn't be parsed into [`ConversionRequest`].
     /// Otherwise use `error`.
-    pub fn invalid(message: &str, reason: &str) -> Self {
+    pub fn invalid(status: Status) -> Self {
         ConversionResponse {
             types: None,
             uid: String::new(),
-            result: Status::failure(message, reason),
+            result: status,
             converted_objects: Vec::new(),
         }
     }
