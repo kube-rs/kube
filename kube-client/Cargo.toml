@@ -73,7 +73,7 @@ tracing = { version = "0.1.29", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
 
 [dependencies.k8s-openapi]
-version = "0.15.0"
+version = "0.16.0"
 default-features = false
 features = []
 
@@ -86,6 +86,6 @@ tokio-test = "0.4.0"
 tower-test = "0.4.0"
 
 [dev-dependencies.k8s-openapi]
-version = "0.15.0"
+version = "0.16.0"
 default-features = false
 features = ["v1_24"]
