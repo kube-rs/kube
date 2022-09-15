@@ -305,7 +305,7 @@ impl AdmissionResponse {
             },
             uid: Default::default(),
             allowed: false,
-            result: Status::failure("", &reason.to_string()),
+            result: Status::failure(&reason.to_string(), "InvalidRequest"),
             patch: None,
             patch_type: None,
             audit_annotations: Default::default(),
