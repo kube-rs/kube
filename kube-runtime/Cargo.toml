@@ -15,7 +15,7 @@ rust-version = "1.60.0"
 edition = "2021"
 
 [package.metadata.docs.rs]
-features = ["k8s-openapi/v1_24"]
+features = ["k8s-openapi/v1_25"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -50,4 +50,4 @@ schemars = "0.8.6"
 [dev-dependencies.k8s-openapi]
 version = "0.16.0"
 default-features = false
-features = ["v1_24"]
+features = ["v1_25"]

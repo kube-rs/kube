@@ -20,7 +20,7 @@ openssl-tls = ["kube/client", "kube/openssl-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
 runtime = ["kube/runtime"]
 ws = ["kube/ws"]
-latest = ["k8s-openapi/v1_24"]
+latest = ["k8s-openapi/v1_25"]
 
 [dev-dependencies]
 tokio-util = "0.7.0"
