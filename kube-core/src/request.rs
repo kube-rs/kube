@@ -149,19 +149,17 @@ impl Request {
         }
         let urlstr = qp.finish();
 
-        use crate::metadata::TypeMeta;
         #[derive(serde::Serialize)]
-        struct KindWrapper {
-            #[serde(flatten)]
-            types: TypeMeta,
+        #[serde(rename_all = "camelCase")]
+        struct KindWrapper<'a> {
+            api_version: &'a str,
+            kind: &'a str,
             #[serde(flatten)]
             data: serde_json::Value,
         }
         let kind_wrapped_dp = KindWrapper {
-            types: TypeMeta {
-                api_version: "meta.k8s.io/v1".to_string(),
-                kind: "DeleteOptions".to_string(),
-            },
+            api_version: "meta.k8s.io/v1",
+            kind: "DeleteOptions",
             data: serde_json::to_value(&dp).map_err(Error::SerializeBody)?,
         };
         let body = serde_json::to_vec(&kind_wrapped_dp).map_err(Error::SerializeBody)?;
