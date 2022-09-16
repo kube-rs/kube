@@ -10,14 +10,12 @@ use crate::{
     gvk::{GroupVersionKind, GroupVersionResource},
     metadata::TypeMeta,
     resource::Resource,
+    Status,
 };
 
 use std::collections::HashMap;
 
-use k8s_openapi::{
-    api::authentication::v1::UserInfo,
-    apimachinery::pkg::{apis::meta::v1::Status, runtime::RawExtension},
-};
+use k8s_openapi::{api::authentication::v1::UserInfo, apimachinery::pkg::runtime::RawExtension};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -307,10 +305,7 @@ impl AdmissionResponse {
             },
             uid: Default::default(),
             allowed: false,
-            result: Status {
-                reason: Some(reason.to_string()),
-                ..Default::default()
-            },
+            result: Status::failure(&reason.to_string(), "InvalidRequest"),
             patch: None,
             patch_type: None,
             audit_annotations: Default::default(),
@@ -322,7 +317,7 @@ impl AdmissionResponse {
     #[must_use]
     pub fn deny<T: ToString>(mut self, reason: T) -> Self {
         self.allowed = false;
-        self.result.message = Some(reason.to_string());
+        self.result.message = reason.to_string();
         self
     }
 

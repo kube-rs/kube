@@ -14,6 +14,8 @@
 #[cfg(feature = "admission")]
 pub mod admission;
 
+pub mod conversion;
+
 pub mod discovery;
 
 pub mod dynamic;
