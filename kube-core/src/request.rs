@@ -148,7 +148,24 @@ impl Request {
             qp.append_pair("labelSelector", labels);
         }
         let urlstr = qp.finish();
-        let body = serde_json::to_vec(&dp).map_err(Error::SerializeBody)?;
+
+        use crate::metadata::TypeMeta;
+        #[derive(serde::Serialize)]
+        pub struct KindWrapper {
+            #[serde(flatten)]
+            pub types: TypeMeta,
+            #[serde(flatten)]
+            pub data: serde_json::Value,
+        }
+        let kind_wrapped_dp = KindWrapper {
+            types: TypeMeta {
+                api_version: "meta.k8s.io/v1".to_string(),
+                kind: "DeleteOptions".to_string(),
+            },
+            data: serde_json::to_value(&dp).map_err(Error::SerializeBody)?,
+        };
+        let body = serde_json::to_vec(&kind_wrapped_dp).map_err(Error::SerializeBody)?;
+
         let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(body).map_err(Error::BuildRequest)
     }

@@ -76,7 +76,8 @@ e2e-job-musl features:
 
 k3d:
   k3d cluster create main --servers 1 --registry-create main \
-    --k3s-arg "--no-deploy=traefik@server:*" \
+    --no-lb --no-rollback \
+    --k3s-arg "--disable=traefik,servicelb,metrics-server@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
 

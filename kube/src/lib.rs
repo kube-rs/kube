@@ -243,7 +243,6 @@ mod test {
             .await?;
         let establish = await_condition(crds.clone(), "foos.clux.dev", conditions::is_crd_established());
         let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
-
         // Use it
         let foos: Api<Foo> = Api::default_namespaced(client.clone());
         // Apply from generated struct
