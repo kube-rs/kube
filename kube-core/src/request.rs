@@ -151,11 +151,11 @@ impl Request {
 
         use crate::metadata::TypeMeta;
         #[derive(serde::Serialize)]
-        pub struct KindWrapper {
+        struct KindWrapper {
             #[serde(flatten)]
-            pub types: TypeMeta,
+            types: TypeMeta,
             #[serde(flatten)]
-            pub data: serde_json::Value,
+            data: serde_json::Value,
         }
         let kind_wrapped_dp = KindWrapper {
             types: TypeMeta {
