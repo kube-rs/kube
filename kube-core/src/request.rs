@@ -149,6 +149,8 @@ impl Request {
         }
         let urlstr = qp.finish();
 
+        // Empty delete params triggers an error in kubernetes v1.25
+        // https://github.com/kubernetes/kubernetes/issues/111985
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct KindWrapper<'a> {
