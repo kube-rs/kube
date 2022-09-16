@@ -159,15 +159,21 @@ impl Request {
             #[serde(flatten)]
             data: serde_json::Value,
         }
-        let kind_wrapped_dp = KindWrapper {
-            api_version: "meta.k8s.io/v1",
-            kind: "DeleteOptions",
-            data: serde_json::to_value(&dp).map_err(Error::SerializeBody)?,
+
+        k8s_openapi::k8s_if_ge_1_25! {
+            let kind_wrapped_dp = KindWrapper {
+                api_version: "meta.k8s.io/v1",
+                kind: "DeleteOptions",
+                data: serde_json::to_value(&dp).map_err(Error::SerializeBody)?,
+            };
+            let data = serde_json::to_vec(&kind_wrapped_dp).map_err(Error::SerializeBody)?;
         };
-        let body = serde_json::to_vec(&kind_wrapped_dp).map_err(Error::SerializeBody)?;
+        k8s_openapi::k8s_if_le_1_24! {
+            let data = serde_json::to_vec(&dp).map_err(Error::SerializeBody)?
+        };
 
         let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
-        req.body(body).map_err(Error::BuildRequest)
+        req.body(data).map_err(Error::BuildRequest)
     }
 
     /// Patch an instance of a resource
