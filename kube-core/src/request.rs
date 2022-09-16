@@ -276,11 +276,10 @@ mod test {
     use crate::{params::PostParams, request::Request, resource::Resource};
     use k8s::{
         admissionregistration::v1 as adregv1, apps::v1 as appsv1, authorization::v1 as authv1,
-        autoscaling::v1 as autoscalingv1, batch::v1beta1 as batchv1beta1, core::v1 as corev1,
+        autoscaling::v1 as autoscalingv1, batch::v1 as batchv1, core::v1 as corev1,
         networking::v1 as networkingv1, rbac::v1 as rbacv1, storage::v1 as storagev1,
     };
     use k8s_openapi::api as k8s;
-    // use k8s::batch::v1 as batchv1;
 
     // NB: stable requires >= 1.17
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiextsv1;
@@ -315,9 +314,9 @@ mod test {
 
     #[test]
     fn api_url_cj() {
-        let url = batchv1beta1::CronJob::url_path(&(), Some("ns"));
+        let url = batchv1::CronJob::url_path(&(), Some("ns"));
         let req = Request::new(url).create(&PostParams::default(), vec![]).unwrap();
-        assert_eq!(req.uri(), "/apis/batch/v1beta1/namespaces/ns/cronjobs?");
+        assert_eq!(req.uri(), "/apis/batch/v1/namespaces/ns/cronjobs?");
     }
     #[test]
     fn api_url_hpa() {
