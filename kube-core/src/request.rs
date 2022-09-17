@@ -169,7 +169,7 @@ impl Request {
             let data = serde_json::to_vec(&kind_wrapped_dp).map_err(Error::SerializeBody)?;
         };
         k8s_openapi::k8s_if_le_1_24! {
-            let data = serde_json::to_vec(&dp).map_err(Error::SerializeBody)?
+            let data = serde_json::to_vec(&dp).map_err(Error::SerializeBody)?;
         };
 
         let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
