@@ -29,8 +29,6 @@ admission = ["kube-core/admission"]
 derive = ["kube-derive", "kube-core/schema"]
 config = ["kube-client/config"]
 runtime = ["kube-runtime"]
-# unstable features
-_v1_25_delete = ["kube-core/_v1_25_delete"]
 
 [package.metadata.docs.rs]
 features = ["client", "native-tls", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/v1_25"]

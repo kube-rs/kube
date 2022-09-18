@@ -149,18 +149,20 @@ impl Request {
         }
         let urlstr = qp.finish();
 
-        // Empty delete params triggers an error in kubernetes v1.25
-        // https://github.com/kubernetes/kubernetes/issues/111985
-        #[derive(serde::Serialize)]
-        #[serde(rename_all = "camelCase")]
-        struct KindWrapper<'a> {
-            api_version: &'a str,
-            kind: &'a str,
-            #[serde(flatten)]
-            data: serde_json::Value,
-        }
+        let data = if std::env::var("KUBE_UNSTABLE_V1_25_DELETE").is_ok() {
+            // Empty delete params triggers an error in kubernetes v1.25
+            // https://github.com/kubernetes/kubernetes/issues/111985
 
-        let data = if cfg!(feature = "_v1_25_delete") {
+            // This is a hacky temporary branch that we hope we can remove
+            // in the next version of kube when upstream resolves the issue.
+            #[derive(serde::Serialize)]
+            #[serde(rename_all = "camelCase")]
+            struct KindWrapper<'a> {
+                api_version: &'a str,
+                kind: &'a str,
+                #[serde(flatten)]
+                data: serde_json::Value,
+            }
             let kind_wrapped_dp = KindWrapper {
                 api_version: "meta.k8s.io/v1",
                 kind: "DeleteOptions",

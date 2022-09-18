@@ -146,39 +146,27 @@ jobs:
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
+      # Set a hacky workaround evar for https://github.com/kubernetes/kubernetes/issues/111985
+      - name: Workaround upstream Kubernetes 1.25 bug
+        if: matrix.k8s == 'latest'
+        run: echo "KUBE_UNSTABLE_V1_25_DELETE=1" >> $GITHUB_ENV
+
       # Real CI work starts here
       - name: Build workspace
         run: cargo build
 
       # Run the equivalent of `just integration`
-      # case 1. workaround feature for https://github.com/kubernetes/kubernetes/issues/111985
-      - name: Run all default features integration library tests
-        run: cargo test --lib --all --features=_v1_25_delete -- --ignored
-        if: matrix.k8s == 'latest'
-      - name: Run all facade integration library tests with extra features
-        run: cargo test -p kube --lib --features=derive,runtime,_v1_25_delete -- --ignored --nocapture
-        if: matrix.k8s == 'latest'
-      - name: Run crd example tests
-        run: cargo run -p kube-examples --features=_v1_25_delete --example crd_api
-        if: matrix.k8s == 'latest'
-
-      # case 2. older kubernetes version unaffected by it
-      - name: Run all default features integration library tests
-        run: cargo test --lib --all -- --ignored
-        if: matrix.k8s != 'latest'
+      - run: cargo test --lib --all -- --ignored
       - name: Run all facade integration library tests with extra features
         run: cargo test -p kube --lib --features=derive,runtime -- --ignored --nocapture
-        if: matrix.k8s != 'latest'
       - name: Run crd example tests
         run: cargo run -p kube-examples --example crd_api
-        if: matrix.k8s != 'latest'
-
-      # remaining tests not affected by the bug
       - name: Run all client integration library tests with rustls and ws
         run: cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
       - name: Run derive example tests
         run: cargo run -p kube-examples --example crd_derive
-
+      - name: Run crd example tests
+        run: cargo run -p kube-examples --example crd_api
 
   mk8sv:
     # comile check e2e tests against mk8sv
