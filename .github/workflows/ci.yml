@@ -151,10 +151,23 @@ jobs:
         run: cargo build
 
       # Run the equivalent of `just integration`
+      # case 1. workaround feature for https://github.com/kubernetes/kubernetes/issues/111985
+      - name: Run all default features integration library tests
+        run: cargo test --lib --all --features=_v1_25_delete -- --ignored
+        if: matrix.k8s == 'latest'
+      - name: Run all facade integration library tests with extra features
+        run: cargo test -p kube --lib --features=derive,runtime,_v1_25_delete -- --ignored --nocapture
+        if: matrix.k8s == 'latest'
+
+      # case 2. older kubernetes version unaffected by it
       - name: Run all default features integration library tests
         run: cargo test --lib --all -- --ignored
+        if: matrix.k8s != 'latest'
       - name: Run all facade integration library tests with extra features
         run: cargo test -p kube --lib --features=derive,runtime -- --ignored --nocapture
+        if: matrix.k8s != 'latest'
+
+      # remaining tests not affected by the bug
       - name: Run all client integration library tests with rustls and ws
         run: cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
       - name: Run derive example tests
