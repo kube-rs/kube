@@ -21,6 +21,8 @@ ws = []
 admission = ["json-patch"]
 jsonpatch = ["json-patch"]
 schema = ["schemars"]
+# unstable features
+_v1_25_delete = []
 
 [dependencies]
 serde = { version = "1.0.130", features = ["derive"] }
