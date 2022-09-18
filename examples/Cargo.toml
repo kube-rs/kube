@@ -22,6 +22,11 @@ runtime = ["kube/runtime"]
 ws = ["kube/ws"]
 latest = ["k8s-openapi/v1_25"]
 
+# temporary hack for kubernetes 1.25
+# currently this feature is needed for 1.25
+# see https://github.com/kube-rs/kube-rs/issues/997
+_v1_25_delete = ["kube/_v1_25_delete"]
+
 [dev-dependencies]
 tokio-util = "0.7.0"
 assert-json-diff = "2.0.1"

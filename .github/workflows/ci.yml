@@ -158,6 +158,9 @@ jobs:
       - name: Run all facade integration library tests with extra features
         run: cargo test -p kube --lib --features=derive,runtime,_v1_25_delete -- --ignored --nocapture
         if: matrix.k8s == 'latest'
+      - name: Run crd example tests
+        run: cargo run -p kube-examples --features=_v1_25_delete --example crd_api
+        if: matrix.k8s = 'latest'
 
       # case 2. older kubernetes version unaffected by it
       - name: Run all default features integration library tests
@@ -166,14 +169,15 @@ jobs:
       - name: Run all facade integration library tests with extra features
         run: cargo test -p kube --lib --features=derive,runtime -- --ignored --nocapture
         if: matrix.k8s != 'latest'
+      - name: Run crd example tests
+        run: cargo run -p kube-examples --example crd_api
+        if: matrix.k8s != 'latest'
 
       # remaining tests not affected by the bug
       - name: Run all client integration library tests with rustls and ws
         run: cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
       - name: Run derive example tests
         run: cargo run -p kube-examples --example crd_derive
-      - name: Run crd example tests
-        run: cargo run -p kube-examples --example crd_api
 
 
   mk8sv:
