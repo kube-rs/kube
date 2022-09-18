@@ -160,7 +160,7 @@ jobs:
         if: matrix.k8s == 'latest'
       - name: Run crd example tests
         run: cargo run -p kube-examples --features=_v1_25_delete --example crd_api
-        if: matrix.k8s = 'latest'
+        if: matrix.k8s == 'latest'
 
       # case 2. older kubernetes version unaffected by it
       - name: Run all default features integration library tests
