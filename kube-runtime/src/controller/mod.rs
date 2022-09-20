@@ -37,7 +37,7 @@ mod future_hash_map;
 mod runner;
 
 #[derive(Debug, Error)]
-pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
+pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
     #[error("reconciler for object {1} failed")]
@@ -47,7 +47,7 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
 }
 
 /// Results of the reconciliation attempt
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Action {
     /// Whether (and when) to next trigger the reconciliation if no external watch triggers hit
     ///
@@ -219,7 +219,7 @@ const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
 pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
     mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
-    error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
+    error_policy: impl Fn(&ReconcilerFut::Error, Arc<Ctx>) -> Action,
     context: Arc<Ctx>,
     store: Store<K>,
     queue: QueueStream,
@@ -274,13 +274,13 @@ where
                             object.reason = %request.reason
                         );
                         reconciler_span
-                            .in_scope(|| reconciler(Arc::clone(&obj), context.clone()))
+                            .in_scope(|| reconciler(obj, context.clone()))
                             .into_future()
                             .then(move |res| {
                                 let error_policy = error_policy;
                                 RescheduleReconciliation::new(
                                     res,
-                                    |err| error_policy(obj, err, error_policy_ctx),
+                                    |err| error_policy(err, error_policy_ctx),
                                     request.obj_ref.clone(),
                                     scheduler_tx,
                                 )
@@ -421,9 +421,8 @@ where
 ///     // see configmapgen_controller example for full info
 ///     Ok(Action::requeue(Duration::from_secs(300)))
 /// }
-/// /// an error handler that will be called when the reconciler fails with access to both the
-/// /// object that caused the failure and the actual error
-/// fn error_policy(obj: Arc<ConfigMapGenerator>, _error: &Error, _ctx: Arc<()>) -> Action {
+/// /// an error handler that will be called when the reconciler fails
+/// fn error_policy(_error: &Error, _ctx: Arc<()>) -> Action {
 ///     Action::requeue(Duration::from_secs(60))
 /// }
 ///
@@ -676,7 +675,7 @@ where
     ///         println!("Reconciling {}", o.name());
     ///         Ok(Action::await_change())
     ///     },
-    ///     |_object: Arc<ConfigMap>, err: &Infallible, _| Err(err).unwrap(),
+    ///     |err: &Infallible, _| Err(err).unwrap(),
     ///     Arc::new(()),
     /// );
     /// # };
@@ -731,7 +730,7 @@ where
     ///         println!("Reconciling {}", o.name());
     ///         Ok(Action::await_change())
     ///     },
-    ///     |_, err: &Infallible, _| Err(err).unwrap(),
+    ///     |err: &Infallible, _| Err(err).unwrap(),
     ///     Arc::new(()),
     /// );
     /// # };
@@ -809,7 +808,7 @@ where
     pub fn run<ReconcilerFut, Ctx>(
         self,
         mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
-        error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
+        error_policy: impl Fn(&ReconcilerFut::Error, Arc<Ctx>) -> Action,
         context: Arc<Ctx>,
     ) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, watcher::Error>>>
     where
@@ -865,7 +864,7 @@ mod tests {
         assert_send(
             Controller::new(mock_type::<Api<ConfigMap>>(), Default::default()).run(
                 |_, _| async { Ok(mock_type::<Action>()) },
-                |_: Arc<ConfigMap>, _: &std::io::Error, _| mock_type::<Action>(),
+                |_: &std::io::Error, _| mock_type::<Action>(),
                 Arc::new(()),
             ),
         );
@@ -892,7 +891,7 @@ mod tests {
                     Ok(Action::requeue(Duration::ZERO))
                 })
             },
-            |_: Arc<ConfigMap>, _: &Infallible, _| todo!(),
+            |_: &Infallible, _| todo!(),
             Arc::new(()),
             store_rx,
             queue_rx.map(Result::<_, Infallible>::Ok),

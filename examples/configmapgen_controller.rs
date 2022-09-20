@@ -67,7 +67,7 @@ async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Arc<Data>) -> Result
 }
 
 /// The controller triggers this on reconcile errors
-fn error_policy(_object: Arc<ConfigMapGenerator>, _error: &Error, _ctx: Arc<Data>) -> Action {
+fn error_policy(_error: &Error, _ctx: Arc<Data>) -> Action {
     Action::requeue(Duration::from_secs(1))
 }
 

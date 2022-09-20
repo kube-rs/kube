@@ -137,10 +137,7 @@ mod test {
     };
     use futures::{StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::Pod;
-    use kube_core::{
-        params::{DeleteParams, Patch},
-        response::StatusSummary,
-    };
+    use kube_core::params::{DeleteParams, Patch};
     use serde_json::json;
     use tower::ServiceBuilder;
 
@@ -234,7 +231,7 @@ mod test {
 
         let pp = PostParams::default();
         match pods.create(&pp, &p).await {
-            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
+            Ok(o) => assert_eq!(p.name(), o.name()),
             Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
@@ -279,7 +276,7 @@ mod test {
         // Delete it
         let dp = DeleteParams::default();
         pods.delete("busybox-kube1", &dp).await?.map_left(|pdel| {
-            assert_eq!(pdel.name_unchecked(), "busybox-kube1");
+            assert_eq!(pdel.name(), "busybox-kube1");
         });
 
         Ok(())
@@ -314,7 +311,7 @@ mod test {
         }))?;
 
         match pods.create(&Default::default(), &p).await {
-            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
+            Ok(o) => assert_eq!(p.name(), o.name()),
             Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
@@ -391,7 +388,7 @@ mod test {
         // Delete it
         let dp = DeleteParams::default();
         pods.delete("busybox-kube2", &dp).await?.map_left(|pdel| {
-            assert_eq!(pdel.name_unchecked(), "busybox-kube2");
+            assert_eq!(pdel.name(), "busybox-kube2");
         });
 
         Ok(())
@@ -428,7 +425,7 @@ mod test {
         }))?;
 
         match pods.create(&Default::default(), &p).await {
-            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
+            Ok(o) => assert_eq!(p.name(), o.name()),
             Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
@@ -478,7 +475,7 @@ mod test {
         let ep = EvictParams::default();
         let eres = pods.evict("busybox-kube3", &ep).await?;
         assert_eq!(eres.code, 201); // created
-        assert!(eres.is_success());
+        assert_eq!(eres.status, "Success");
 
         Ok(())
     }

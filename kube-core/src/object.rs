@@ -2,7 +2,7 @@
 use crate::{
     discovery::ApiResource,
     metadata::{ListMeta, ObjectMeta, TypeMeta},
-    resource::{DynamicResourceScope, Resource},
+    resource::Resource,
 };
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -216,7 +216,6 @@ where
     U: Clone,
 {
     type DynamicType = ApiResource;
-    type Scope = DynamicResourceScope;
 
     fn group(dt: &ApiResource) -> Cow<'_, str> {
         dt.group.as_str().into()
@@ -323,7 +322,7 @@ mod test {
         assert_eq!(mypod.types.as_ref().unwrap().api_version, "v1");
 
         assert_eq!(mypod.namespace().unwrap(), "dev");
-        assert_eq!(mypod.name_unchecked(), "blog");
+        assert_eq!(mypod.name(), "blog");
         assert!(mypod.status().is_none());
         assert_eq!(mypod.spec().containers[0], ContainerSimple {
             image: "blog".into()

@@ -76,25 +76,6 @@ where
         self.client.request::<K>(req).await
     }
 
-    /// Create an instance of the subresource
-    pub async fn create_subresource<T>(
-        &self,
-        subresource_name: &str,
-        name: &str,
-        pp: &PostParams,
-        data: Vec<u8>,
-    ) -> Result<T>
-    where
-        T: DeserializeOwned,
-    {
-        let mut req = self
-            .request
-            .create_subresource(subresource_name, name, pp, data)
-            .map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("create_subresource");
-        self.client.request::<T>(req).await
-    }
-
     /// Patch an instance of the subresource
     pub async fn patch_subresource<P: serde::Serialize + Debug>(
         &self,

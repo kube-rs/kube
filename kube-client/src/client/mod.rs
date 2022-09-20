@@ -132,10 +132,7 @@ impl Client {
         &self.default_ns
     }
 
-    /// Perform a raw HTTP request against the API and return the raw response back.
-    /// This method can be used to get raw access to the API which may be used to, for example,
-    /// create a proxy server or application-level gateway between localhost and the API server.
-    pub async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
+    async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
         let mut svc = self.inner.clone();
         let res = svc
             .ready()
@@ -144,13 +141,16 @@ impl Client {
             .call(request)
             .await
             .map_err(|err| {
-                // Error decorating request
-                err.downcast::<Error>()
-                    .map(|e| *e)
+                if err.is::<Error>() {
+                    // Error decorating request
+                    *err.downcast::<Error>().expect("kube_client::Error")
+                } else if err.is::<hyper::Error>() {
                     // Error requesting
-                    .or_else(|err| err.downcast::<hyper::Error>().map(|err| Error::HyperError(*err)))
-                    // Error from another middleware
-                    .unwrap_or_else(|err| Error::Service(err))
+                    Error::HyperError(*err.downcast::<hyper::Error>().expect("hyper::Error"))
+                } else {
+                    // Errors from other middlewares
+                    Error::Service(err)
+                }
             })?;
         Ok(res)
     }

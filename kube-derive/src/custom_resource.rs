@@ -281,17 +281,12 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // 2. Implement Resource trait
     let name = singular.unwrap_or_else(|| kind.to_ascii_lowercase());
     let plural = plural.unwrap_or_else(|| to_plural(&name));
-    let (scope, scope_quote) = if namespaced {
-        ("Namespaced", quote! { #kube_core::NamespaceResourceScope })
-    } else {
-        ("Cluster", quote! { #kube_core::ClusterResourceScope })
-    };
+    let scope = if namespaced { "Namespaced" } else { "Cluster" };
 
     let api_ver = format!("{}/{}", group, version);
     let impl_resource = quote! {
         impl #kube_core::Resource for #rootident {
             type DynamicType = ();
-            type Scope = #scope_quote;
 
             fn group(_: &()) -> std::borrow::Cow<'_, str> {
                #group.into()

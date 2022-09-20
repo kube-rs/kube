@@ -465,10 +465,7 @@ mod test {
         }))?;
 
         let pp = PostParams::default();
-        assert_eq!(
-            data.name_unchecked(),
-            pods.create(&pp, &data).await?.name_unchecked()
-        );
+        assert_eq!(data.name(), pods.create(&pp, &data).await?.name());
 
         // Watch it phase for a few seconds
         let is_running = await_condition(pods.clone(), "busybox-kube4", conditions::is_pod_running());

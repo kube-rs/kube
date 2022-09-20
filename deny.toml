@@ -41,18 +41,9 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "LicenseRef-ring",
-    "LicenseRef-webpki",
+    "LicenseRef-webpki"
 ]
 
-exceptions = [
-    # The Unicode-DFS--2016 license is necessary for unicode-ident because they
-    # use data from the unicode tables to generate the tables which are
-    # included in the application. We do not distribute those data files so
-    # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
-    # for more details.
-    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" }
-
-]
 
 [[licenses.clarify]]
 name = "ring"
@@ -61,13 +52,13 @@ license-files = [
     { path = "LICENSE", hash = 0xbd0eed23 },
 ]
 
-
 [[licenses.clarify]]
 name = "webpki"
 expression = "LicenseRef-webpki"
 license-files = [
     { path = "LICENSE", hash = 0x001c7e6c },
 ]
+
 
 [sources]
 unknown-registry = "deny"
@@ -79,8 +70,17 @@ allow-git = []
 multiple-versions = "deny"
 
 [[bans.skip]]
-# Waiting on https://github.com/Keats/validator/pull/233
-name = "idna"
+# The following dependencies are still working on upgrading to 0.7:
+# https://github.com/hyperium/h2/pull/603
+# https://github.com/tower-rs/tower/pull/638
+# https://github.com/tower-rs/tower-http/pull/221
+name = "tokio-util"
+version = "0.6"
+
+[[bans.skip]]
+# The following dependencies are still working on upgrading to 0.3
+# https://github.com/rustls/hyper-rustls/pull/165
+name = "rustls-pemfile"
 version = "0.2"
 
 [[bans.skip]]

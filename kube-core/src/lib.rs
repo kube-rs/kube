@@ -14,8 +14,6 @@
 #[cfg(feature = "admission")]
 pub mod admission;
 
-pub mod conversion;
-
 pub mod discovery;
 
 pub mod dynamic;
@@ -39,10 +37,7 @@ pub mod request;
 pub use request::Request;
 
 mod resource;
-pub use resource::{
-    ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource, ResourceExt, ResourceScope,
-    SubResourceScope,
-};
+pub use resource::{Resource, ResourceExt};
 
 pub mod response;
 pub use response::Status;

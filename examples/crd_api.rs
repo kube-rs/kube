@@ -120,16 +120,17 @@ async fn main() -> Result<()> {
 
     // Create Foo qux with status
     info!("Create Foo instance qux");
-    let f2 = Foo::new("qux", FooSpec {
+    let mut f2 = Foo::new("qux", FooSpec {
         name: "qux".into(),
         replicas: 0,
         info: "unpatched qux".into(),
     });
+    f2.status = Some(FooStatus::default());
 
     let o = foos.create(&pp, &f2).await?;
     info!("Created {}", o.name_any());
 
-    // Update status on qux (cannot be done through replace/create/patch direct)
+    // Update status on qux
     info!("Replace Status on Foo instance qux");
     let fs = json!({
         "apiVersion": "clux.dev/v1",
