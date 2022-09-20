@@ -141,13 +141,13 @@ pub mod rustls_tls {
             ClientConfig::builder()
                 .with_cipher_suites(&cipher_suites)
                 .with_safe_default_kx_groups()
-                .with_protocol_versions(&[&TLS12])
+                .with_protocol_versions(&[&TLS12])?
                 .with_root_certificates(root_store(certs)?)
         } else {
             ClientConfig::builder()
                 .with_cipher_suites(&cipher_suites)
                 .with_safe_default_kx_groups()
-                .with_protocol_versions(&[&TLS12])
+                .with_protocol_versions(&[&TLS12])?
                 .with_native_roots()
         };
 
