@@ -156,7 +156,8 @@ jobs:
         run: cargo build
 
       # Run the equivalent of `just integration`
-      - run: cargo test --lib --all -- --ignored
+      - name: Run all default features integration library tests
+        run: cargo test --lib --all -- --ignored
       - name: Run all facade integration library tests with extra features
         run: cargo test -p kube --lib --features=derive,runtime -- --ignored --nocapture
       - name: Run crd example tests

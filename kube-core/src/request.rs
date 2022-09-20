@@ -149,7 +149,9 @@ impl Request {
         }
         let urlstr = qp.finish();
 
-        let data = if std::env::var("KUBE_UNSTABLE_V1_25_DELETE").is_ok() {
+        let data = if dp.is_default() {
+            vec![] // default serialize needs to be empty body
+        } else if std::env::var("KUBE_UNSTABLE_V1_25_DELETE").is_ok() {
             // Empty delete params triggers an error in kubernetes v1.25
             // https://github.com/kubernetes/kubernetes/issues/111985
 
