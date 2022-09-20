@@ -83,6 +83,11 @@ pub mod rustls_tls {
     use hyper_rustls::ConfigBuilderExt;
     use rustls::{
         self,
+        cipher_suite::{
+            TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+            TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+            TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+        },
         client::{ServerCertVerified, ServerCertVerifier},
         Certificate, ClientConfig, PrivateKey,
     };
@@ -123,12 +128,22 @@ pub mod rustls_tls {
         root_certs: Option<&[Vec<u8>]>,
         accept_invalid: bool,
     ) -> Result<ClientConfig, Error> {
+        let cipher_suites = [
+            TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+            TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+            TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+            TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+            TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+            TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+        ];
         let config_builder = if let Some(certs) = root_certs {
             ClientConfig::builder()
-                .with_safe_defaults()
+                .with_cipher_suites(&cipher_suites)
                 .with_root_certificates(root_store(certs)?)
         } else {
-            ClientConfig::builder().with_safe_defaults().with_native_roots()
+            ClientConfig::builder()
+                .with_cipher_suites(&cipher_suites)
+                .with_native_roots()
         };
 
         let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {
