@@ -152,11 +152,13 @@ impl Request {
         let data = if dp.is_default() {
             vec![] // default serialize needs to be empty body
         } else if std::env::var("KUBE_UNSTABLE_V1_25_DELETE").is_ok() {
-            // Empty delete params triggers an error in kubernetes v1.25
-            // https://github.com/kubernetes/kubernetes/issues/111985
+            // The kube-apiserver in Kubernetes v1.25.0 has broken deserialization of non-default delete options
+            // So we have to wrap our DeleteParams inside a kind/apiVersion struct to work around it.
+            // See https://github.com/kubernetes/kubernetes/issues/111985
+            // This workaround breaks on older Kubernetes versions so it has to be opt-in.
 
-            // This is a hacky temporary branch that we hope we can remove
-            // in the next version of kube when upstream resolves the issue.
+            // NB: This is a hack that we plan on removing in the next kube release
+            // when upstream hopefully resolves the issue.
             #[derive(serde::Serialize)]
             #[serde(rename_all = "camelCase")]
             struct KindWrapper<'a> {
