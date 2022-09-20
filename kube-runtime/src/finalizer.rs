@@ -165,19 +165,10 @@ where
                     }),
                 ]
             } else {
-                vec![
-                    // Kubernetes doesn't automatically deduplicate finalizers (see
-                    // https://github.com/kube-rs/kube-rs/issues/964#issuecomment-1197311254),
-                    // so we need to fail and retry if anyone else has added the finalizer in the meantime
-                    PatchOperation::Test(TestOperation {
-                        path: "/metadata/finalizers".to_string(),
-                        value: obj.finalizers().into(),
-                    }),
-                    PatchOperation::Add(AddOperation {
-                        path: "/metadata/finalizers/-".to_string(),
-                        value: finalizer_name.into(),
-                    }),
-                ]
+                vec![PatchOperation::Add(AddOperation {
+                    path: "/metadata/finalizers/-".to_string(),
+                    value: finalizer_name.into(),
+                })]
             });
             api.patch::<K>(
                 obj.meta().name.as_deref().ok_or(Error::UnnamedObject)?,

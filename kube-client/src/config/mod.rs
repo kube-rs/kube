@@ -128,30 +128,14 @@ pub struct Config {
     pub default_namespace: String,
     /// The configured root certificate
     pub root_cert: Option<Vec<Vec<u8>>>,
-    /// Set the timeout for connecting to the Kubernetes API.
-    ///
-    /// A value of `None` means no timeout
-    pub connect_timeout: Option<std::time::Duration>,
-    /// Set the timeout for the Kubernetes API response.
-    ///
-    /// A value of `None` means no timeout
-    pub read_timeout: Option<std::time::Duration>,
-    /// Set the timeout for the Kubernetes API request.
-    ///
-    /// A value of `None` means no timeout
-    pub write_timeout: Option<std::time::Duration>,
     /// Timeout for calls to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
-    #[deprecated(
-        since = "0.75.0",
-        note = "replaced by more granular members `connect_timeout`, `read_timeout` and `write_timeout`. This member will be removed in 0.78.0."
-    )]
     pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid certificates
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
-    pub auth_info: AuthInfo,
+    pub(crate) auth_info: AuthInfo,
     // TODO Actually support proxy or create an example with custom client
     /// Optional proxy URL.
     pub proxy_url: Option<http::Uri>,
@@ -164,14 +148,10 @@ impl Config {
     /// Most likely you want to use [`Config::infer`] to infer the config from
     /// the environment.
     pub fn new(cluster_url: http::Uri) -> Self {
-        #[allow(deprecated)]
         Self {
             cluster_url,
             default_namespace: String::from("default"),
             root_cert: None,
-            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
-            read_timeout: Some(DEFAULT_READ_TIMEOUT),
-            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
@@ -179,15 +159,14 @@ impl Config {
         }
     }
 
-    /// Infer a Kubernetes client configuration.
+    /// Infer the configuration from the environment
     ///
-    /// First, a user's kubeconfig is loaded from `KUBECONFIG` or
-    /// `~/.kube/config`. If that fails, an in-cluster config is loaded via
-    /// [`Config::incluster`]. If inference from both sources fails, then an
-    /// error is returned.
+    /// Done by attempting to load the local kubec-config first, and
+    /// then if that fails, trying the in-cluster environment variables .
     ///
-    /// [`Config::apply_debug_overrides`] is used to augment the loaded
-    /// configuration based on the environment.
+    /// Fails if inference from both sources fails
+    ///
+    /// Applies debug overrides, see [`Config::apply_debug_overrides`] for more details
     pub async fn infer() -> Result<Self, InferConfigError> {
         let mut config = match Self::from_kubeconfig(&KubeConfigOptions::default()).await {
             Err(kubeconfig_err) => {
@@ -196,8 +175,8 @@ impl Config {
                     "no local config found, falling back to local in-cluster config"
                 );
 
-                Self::incluster().map_err(|in_cluster| InferConfigError {
-                    in_cluster,
+                Self::from_cluster_env().map_err(|in_cluster_err| InferConfigError {
+                    in_cluster: in_cluster_err,
                     kubeconfig: kubeconfig_err,
                 })?
             }
@@ -207,63 +186,20 @@ impl Config {
         Ok(config)
     }
 
-    /// Load an in-cluster Kubernetes client configuration using
-    /// [`Config::incluster_env`].
-    #[cfg(not(feature = "rustls-tls"))]
-    pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_env()
-    }
-
-    /// Load an in-cluster Kubernetes client configuration using
-    /// [`Config::incluster_dns`].
+    /// Create configuration from the cluster's environment variables
     ///
-    /// The `rustls-tls` feature is currently incompatible with
-    /// [`Config::incluster_env`]. See
-    /// <https://github.com/kube-rs/kube-rs/issues/1003>.
-    #[cfg(feature = "rustls-tls")]
-    pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_dns()
-    }
-
-    /// Load an in-cluster config using the `KUBERNETES_SERVICE_HOST` and
-    /// `KUBERNETES_SERVICE_PORT` environment variables.
-    ///
-    /// A service account's token must be available in
-    /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
-    ///
-    /// This method matches the behavior of the official Kubernetes client
-    /// libraries, but it is not compatible with the `rustls-tls` feature . When
-    /// this feature is enabled, [`Config::incluster_dns`] should be used
-    /// instead. See <https://github.com/kube-rs/kube-rs/issues/1003>.
-    pub fn incluster_env() -> Result<Self, InClusterError> {
-        let uri = incluster_config::try_kube_from_env()?;
-        Self::incluster_with_uri(uri)
-    }
-
-    /// Load an in-cluster config using the API server at
-    /// `https://kubernetes.default.svc`.
-    ///
-    /// A service account's token must be available in
-    /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
-    ///
-    /// This behavior does not match that of the official Kubernetes clients,
-    /// but this approach is compatible with the `rustls-tls` feature.
-    pub fn incluster_dns() -> Result<Self, InClusterError> {
-        Self::incluster_with_uri(incluster_config::kube_dns())
-    }
-
-    fn incluster_with_uri(cluster_url: http::uri::Uri) -> Result<Self, InClusterError> {
+    /// This follows the standard [API Access from a Pod](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod)
+    /// and relies on you having the service account's token mounted,
+    /// as well as having given the service account rbac access to do what you need.
+    pub fn from_cluster_env() -> Result<Self, InClusterError> {
+        let cluster_url = incluster_config::kube_dns();
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
 
-        #[allow(deprecated)]
         Ok(Self {
             cluster_url,
             default_namespace,
             root_cert: Some(root_cert),
-            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
-            read_timeout: Some(DEFAULT_READ_TIMEOUT),
-            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo {
@@ -318,14 +254,10 @@ impl Config {
             root_cert = Some(ca_bundle);
         }
 
-        #[allow(deprecated)]
         Ok(Self {
             cluster_url,
             default_namespace,
             root_cert,
-            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
-            read_timeout: Some(DEFAULT_READ_TIMEOUT),
-            write_timeout: None,
             timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             proxy_url: loader.proxy_url()?,
@@ -343,6 +275,7 @@ impl Config {
     /// - `KUBE_RS_DEBUG_IMPERSONATE_USER`: A Kubernetes user to impersonate, for example: `system:serviceaccount:default:foo` will impersonate the `ServiceAccount` `foo` in the `Namespace` `default`
     /// - `KUBE_RS_DEBUG_IMPERSONATE_GROUP`: A Kubernetes group to impersonate, multiple groups may be specified by separating them with commas
     /// - `KUBE_RS_DEBUG_OVERRIDE_URL`: A Kubernetes cluster URL to use rather than the one specified in the config, useful for proxying traffic through `kubectl proxy`
+    #[tracing::instrument(level = "warn")]
     pub fn apply_debug_overrides(&mut self) {
         // Log these overrides loudly, to emphasize that this is only a debugging aid, and should not be relied upon in production
         if let Ok(impersonate_user) = std::env::var("KUBE_RS_DEBUG_IMPERSONATE_USER") {
@@ -393,8 +326,6 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
 // https://github.com/kube-rs/kube-rs/issues/146#issuecomment-590924397
 /// Default Timeout
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
-const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
 
 // temporary catalina hack for openssl only
 #[cfg(all(target_os = "macos", feature = "native-tls"))]
@@ -417,6 +348,7 @@ pub use file_config::{
     AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedAuthInfo, NamedCluster,
     NamedContext, NamedExtension, Preferences,
 };
+
 
 #[cfg(test)]
 mod tests {

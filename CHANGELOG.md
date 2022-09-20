@@ -7,47 +7,8 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.74.0...master
 
-[0.74.0](https://github.com/kube-rs/kube-rs/releases/tag/0.74.0) / 2022-07-09
+0.74.0 / 2022-07-09
 ===================
-<!-- Release notes generated using configuration in .github/release.yml at 0.74.0 -->
-
-## Highlights
-
-### Polish, bug fixes, guidelines, ci improvements, and new contributors
-This release features smaller improvements/additions/cleanups/fixes, many of which are from new first-time contributors! Thank you everyone!
-The listed [deadlock fix](https://github.com/kube-rs/kube-rs/pull/925) was backported to 0.73.1.
-
-We have also been trying to clarify and **prove** a lot more of our external-facing guarantees, and as a result:
-
- - We have codified our [Kubernetes versioning policy](https://kube.rs/kubernetes-version/) 
- - The [Rust version policy](https://kube.rs/rust-version/) has extended its support range
- - Our [CI has been extended](https://github.com/kube-rs/kube-rs/pull/924)
-
-### [`ResourceExt::name` deprecation](https://github.com/kube-rs/kube-rs/pull/945)
-
-A consequence of all the policy writing and the improved clarity we have decided to deprecate the common [`ResourceExt::name`](https://docs.rs/kube/0.74.0/kube/trait.ResourceExt.html#tymethod.name) helper.
-
-This method could panic and it is unexpected for the users and bad for our consistency. To get the old functionality, you can replace any `.name()` call on a Kubernetes resources with [`.name_unchecked()`](https://docs.rs/kube/0.74.0/kube/trait.ResourceExt.html#tymethod.name_unchecked); but as the name implies, it can panic (in a local setting, or during admission). We recommend you replace it with the new [`ResourceExt::name_any`](https://docs.rs/kube/0.74.0/kube/trait.ResourceExt.html#tymethod.name_any) for a general identifier:
-
-```diff
--pod.name()
-+pod.name_any()
-```
-
-## What's Changed
-### Added
-* Add support for passing the `fieldValidation` query parameter on patch by @phroggyy in https://github.com/kube-rs/kube-rs/pull/929
-* Add `conditions::is_job_completed` by @clux in https://github.com/kube-rs/kube-rs/pull/935
-### Changed
-* Deprecate `ResourceExt::name` in favour of safe name_* alternatives by @clux in https://github.com/kube-rs/kube-rs/pull/945
-### Removed
-* Remove `#[kube(apiextensions)]` flag from `kube-derive` by @clux in https://github.com/kube-rs/kube-rs/pull/920
-### Fixed
-* Document every public derived fn from kube-derive by @clux in https://github.com/kube-rs/kube-rs/pull/919
-* fix applier hangs which can happen with many watched objects by @moustafab in https://github.com/kube-rs/kube-rs/pull/925
-* Applier: Improve reconciler reschedule context to avoid deadlocking on full channel by @teozkr in https://github.com/kube-rs/kube-rs/pull/932
-* Fix deserialization issue in AdmissionResponse by @clux in https://github.com/kube-rs/kube-rs/pull/939
-* Admission controller example fixes by @Alibirb in https://github.com/kube-rs/kube-rs/pull/950
 
 [0.73.1](https://github.com/kube-rs/kube-rs/releases/tag/0.73.1) / 2022-06-03
 ===================
