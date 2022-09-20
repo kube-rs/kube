@@ -89,6 +89,7 @@ pub mod rustls_tls {
             TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
         },
         client::{ServerCertVerified, ServerCertVerifier},
+        version::TLS12,
         Certificate, ClientConfig, PrivateKey,
     };
     use thiserror::Error;
@@ -139,10 +140,14 @@ pub mod rustls_tls {
         let config_builder = if let Some(certs) = root_certs {
             ClientConfig::builder()
                 .with_cipher_suites(&cipher_suites)
+                .with_safe_default_kx_groups()
+                .with_protocol_versions(&[&TLS12])
                 .with_root_certificates(root_store(certs)?)
         } else {
             ClientConfig::builder()
                 .with_cipher_suites(&cipher_suites)
+                .with_safe_default_kx_groups()
+                .with_protocol_versions(&[&TLS12])
                 .with_native_roots()
         };
 
