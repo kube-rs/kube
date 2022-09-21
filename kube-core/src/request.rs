@@ -151,28 +151,6 @@ impl Request {
 
         let data = if dp.is_default() {
             vec![] // default serialize needs to be empty body
-        } else if std::env::var("KUBE_UNSTABLE_V1_25_DELETE").is_ok() {
-            // The kube-apiserver in Kubernetes v1.25.0 has broken deserialization of non-default delete options
-            // So we have to wrap our DeleteParams inside a kind/apiVersion struct to work around it.
-            // See https://github.com/kubernetes/kubernetes/issues/111985
-            // This workaround breaks on older Kubernetes versions so it has to be opt-in.
-
-            // NB: This is a hack that we plan on removing in the next kube release
-            // when upstream hopefully resolves the issue.
-            #[derive(serde::Serialize)]
-            #[serde(rename_all = "camelCase")]
-            struct KindWrapper<'a> {
-                api_version: &'a str,
-                kind: &'a str,
-                #[serde(flatten)]
-                data: serde_json::Value,
-            }
-            let kind_wrapped_dp = KindWrapper {
-                api_version: "meta.k8s.io/v1",
-                kind: "DeleteOptions",
-                data: serde_json::to_value(&dp).map_err(Error::SerializeBody)?,
-            };
-            serde_json::to_vec(&kind_wrapped_dp).map_err(Error::SerializeBody)?
         } else {
             serde_json::to_vec(&dp).map_err(Error::SerializeBody)?
         };
