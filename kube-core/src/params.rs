@@ -476,6 +476,13 @@ impl DeleteParams {
         self.preconditions = Some(preconditions);
         self
     }
+
+    pub(crate) fn is_default(&self) -> bool {
+        !self.dry_run
+            && self.grace_period_seconds.is_none()
+            && self.propagation_policy.is_none()
+            && self.preconditions.is_none()
+    }
 }
 
 // dryRun serialization differ when used as body parameters and query strings:

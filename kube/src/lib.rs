@@ -243,7 +243,6 @@ mod test {
             .await?;
         let establish = await_condition(crds.clone(), "foos.clux.dev", conditions::is_crd_established());
         let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
-
         // Use it
         let foos: Api<Foo> = Api::default_namespaced(client.clone());
         // Apply from generated struct
@@ -270,12 +269,14 @@ mod test {
                 }
             });
             let o = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
-            assert_eq!(o.spec.replicas, 2);
+            assert_eq!(o.spec.replicas, 2, "patching spec updated spec.replicas");
         }
         // check subresource
         {
-            assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
-            assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
+            let scale = foos.get_scale("baz").await?;
+            assert_eq!(scale.spec.unwrap().replicas, Some(2));
+            let status = foos.get_status("baz").await?;
+            assert!(status.status.is_none(), "nothing has set status");
         }
         // set status subresource
         {
@@ -283,7 +284,7 @@ mod test {
             let o = foos
                 .patch_status("baz", &Default::default(), &Patch::Merge(&fs))
                 .await?;
-            assert!(o.status.is_some());
+            assert!(o.status.is_some(), "status set after patch_status");
         }
         // set scale subresource
         {
@@ -291,8 +292,9 @@ mod test {
             let o = foos
                 .patch_scale("baz", &Default::default(), &Patch::Merge(&fs))
                 .await?;
-            assert_eq!(o.status.unwrap().replicas, 1); // something needs to set the status for this
-            assert_eq!(o.spec.unwrap().replicas.unwrap(), 3); // what we asked for got updated
+            assert_eq!(o.status.unwrap().replicas, 1, "scale replicas got patched");
+            let linked_replicas = o.spec.unwrap().replicas.unwrap();
+            assert_eq!(linked_replicas, 3, "patch_scale updates linked spec.replicas");
         }
 
         // cleanup

@@ -13,7 +13,7 @@ fmt:
   rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
 
 doc:
-  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_24 --open
+  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_25 --open
 
 # Unit tests
 test:
@@ -76,7 +76,8 @@ e2e-job-musl features:
 
 k3d:
   k3d cluster create main --servers 1 --registry-create main \
-    --k3s-arg "--no-deploy=traefik@server:*" \
+    --no-lb --no-rollback \
+    --k3s-arg "--disable=traefik,servicelb,metrics-server@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
 

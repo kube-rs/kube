@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 [![Rust 1.60](https://img.shields.io/badge/MSRV-1.60-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.60.0)
-[![Tested against Kubernetes 1.19 and above](https://img.shields.io/badge/MK8SV-1.19-326ce5.svg)](https://kube.rs/kubernetes-version)
+[![Tested against Kubernetes v1_20 and above](https://img.shields.io/badge/MK8SV-v1_20-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 
@@ -17,7 +17,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 ```toml
 [dependencies]
 kube = { version = "0.74.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.15.0", features = ["v1_24"] }
+k8s-openapi = { version = "0.15.0", features = ["v1_25"] }
 ```
 
 [Features are available](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
@@ -153,7 +153,7 @@ Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues
 ```toml
 [dependencies]
 kube = { version = "0.74.0", default-features = false, features = ["client", "rustls-tls"] }
-k8s-openapi = { version = "0.15.0", features = ["v1_24"] }
+k8s-openapi = { version = "0.15.0", features = ["v1_25"] }
 ```
 
 This will pull in `rustls` and `hyper-rustls`.

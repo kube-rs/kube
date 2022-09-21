@@ -122,7 +122,7 @@ jobs:
       fail-fast: false
       matrix:
         # Run these tests against older clusters as well
-        k8s: [v1.19, latest]
+        k8s: [v1.20, latest]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -144,7 +144,7 @@ jobs:
           # Used to avoid rate limits when fetching the releases from k3s repo.
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
-          k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
+          k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       # Real CI work starts here
       - name: Build workspace
@@ -155,13 +155,14 @@ jobs:
         run: cargo test --lib --all -- --ignored
       - name: Run all facade integration library tests with extra features
         run: cargo test -p kube --lib --features=derive,runtime -- --ignored --nocapture
+      - name: Run crd example tests
+        run: cargo run -p kube-examples --example crd_api
       - name: Run all client integration library tests with rustls and ws
         run: cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
       - name: Run derive example tests
         run: cargo run -p kube-examples --example crd_derive
       - name: Run crd example tests
         run: cargo run -p kube-examples --example crd_api
-
 
   mk8sv:
     # comile check e2e tests against mk8sv
@@ -201,13 +202,13 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.19
+          version: v1.20
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
-          k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
+          k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       # Real CI work starts here
       - name: Build workspace
@@ -254,7 +255,7 @@ jobs:
           # Used to avoid rate limits when fetching the releases from k3s repo.
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
-          k3d-args: "--no-lb --k3s-arg --no-deploy=traefik,servicelb,metrics-server@server:*"
+          k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       - name: Compile e2e job against ${{matrix.tls}}
         run: |

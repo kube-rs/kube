@@ -31,7 +31,7 @@ config = ["kube-client/config"]
 runtime = ["kube-runtime"]
 
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/v1_24"]
+features = ["client", "native-tls", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/v1_25"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -44,7 +44,7 @@ kube-runtime = { path = "../kube-runtime", version = "=0.74.0", optional = true}
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
 [dependencies.k8s-openapi]
-version = "0.15.0"
+version = "0.16.0"
 default-features = false
 
 [dev-dependencies]
@@ -56,6 +56,6 @@ serde = { version = "1.0.130", features = ["derive"] }
 schemars = "0.8.6"
 
 [dev-dependencies.k8s-openapi]
-version = "0.15.0"
+version = "0.16.0"
 default-features = false
-features = ["v1_24"]
+features = ["v1_25"]
