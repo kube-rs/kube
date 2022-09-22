@@ -144,7 +144,7 @@ mod test {
     use serde_json::json;
     use tower::ServiceBuilder;
 
-    // hard disabled test atm due to k3d rustls issues: https://github.com/kube-rs/kube-rs/issues?q=is%3Aopen+is%3Aissue+label%3Arustls
+    // hard disabled test atm due to k3d rustls issues: https://github.com/kube-rs/kube/issues?q=is%3Aopen+is%3Aissue+label%3Arustls
     #[cfg(feature = "when_rustls_works_with_k3d")]
     #[tokio::test]
     #[ignore] // needs cluster (lists pods)

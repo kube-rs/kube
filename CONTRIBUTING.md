@@ -24,7 +24,7 @@ Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 
 ## Rust Guidelines
 
-- **Channel**: Code is built and tested using the **stable** channel of Rust, but documented and formatted with **nightly** <sup>[*](https://github.com/kube-rs/kube-rs/issues/707)</sup>
+- **Channel**: Code is built and tested using the **stable** channel of Rust, but documented and formatted with **nightly** <sup>[*](https://github.com/kube-rs/kube/issues/707)</sup>
 - **Formatting**: To format the codebase, run `just fmt`
 - **Documentation** To check documentation, run `just doc`
 - **Testing**: To run tests, run `just test` and see below.
@@ -61,7 +61,7 @@ Most integration tests are run with `cargo test --all --lib -- --ignored`, but b
 
 ### End to End Tests
 
-We have a small set of [e2e tests](https://github.com/kube-rs/kube-rs/tree/master/e2e) that tests difference between in-cluster and local configuration.
+We have a small set of [e2e tests](https://github.com/kube-rs/kube/tree/master/e2e) that tests difference between in-cluster and local configuration.
 
 These tests are the heaviest tests we have because they require a full `docker build`, image import (or push/pull flow), yaml construction, and `kubectl` usage to verify that the outcome was sufficient.
 
@@ -75,7 +75,7 @@ All public interfaces should have doc tests with examples for [docs.rs](https://
 
 When adding new non-trivial pieces of logic that results in a drop in coverage you should add a test.
 
-Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube-rs/branch/master/graph/badge.svg?token=9FCqEcyDTZ)](https://codecov.io/gh/kube-rs/kube-rs) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](https://github.com/kube-rs/kube-rs/blob/master/tarpaulin.toml) config, and **will run both unit and integration** tests.
+Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube/branch/master/graph/badge.svg?token=9FCqEcyDTZ)](https://codecov.io/gh/kube-rs/kube) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](https://github.com/kube-rs/kube/blob/master/tarpaulin.toml) config, and **will run both unit and integration** tests.
 
 #### What type of test
 
@@ -98,5 +98,5 @@ In general: **use the least powerful method** of testing available to you:
 The [high-level architecture document](https://kube.rs/architecture/) is written for contributors.
 
 ### Contact
-You can ask general questions / share ideas / query the community at the [kube-rs discussions forum](https://github.com/kube-rs/kube-rs/discussions).
+You can ask general questions / share ideas / query the community at the [kube-rs discussions forum](https://github.com/kube-rs/kube/discussions).
 You can reach the maintainers of this project at [#kube](https://discord.gg/tokio) channel on the Tokio discord.

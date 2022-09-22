@@ -52,7 +52,7 @@ mod custom_resource;
 ///
 /// This example posts the generated `::crd` to the `CustomResourceDefinition` API.
 /// After this has been accepted (few secs max), you can start using `foos` as a normal
-/// kube `Api` object. See the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples/)
+/// kube `Api` object. See the `crd_` prefixed [examples](https://github.com/kube-rs/kube/blob/master/examples/)
 /// for details on this.
 ///
 /// # Required properties
@@ -199,13 +199,13 @@ mod custom_resource;
 /// # Customizing Schemas
 /// Should you need to customize the schemas, you can use:
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
-/// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive.rs))
-/// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/kube-rs/kube-rs/issues/129#issuecomment-750852916)
-/// - [`#[validate(...)]` field attributes with validator](https://github.com/Keats/validator) for kubebuilder style validation rules (see [`crd_api` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_api.rs)))
+/// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube/blob/master/examples/crd_derive.rs))
+/// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/kube-rs/kube/issues/129#issuecomment-750852916)
+/// - [`#[validate(...)]` field attributes with validator](https://github.com/Keats/validator) for kubebuilder style validation rules (see [`crd_api` example](https://github.com/kube-rs/kube/blob/master/examples/crd_api.rs)))
 ///
 /// You might need to override parts of the schemas (for fields in question) when you are:
 /// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
-/// - **customizing [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy)** (e.g. like in the [`crd_derive_schema` example](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive_schema.rs))
+/// - **customizing [merge-strategies](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy)** (e.g. like in the [`crd_derive_schema` example](https://github.com/kube-rs/kube/blob/master/examples/crd_derive_schema.rs))
 ///
 /// See [kubernetes openapi validation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation) for the format of the OpenAPI v3 schemas.
 ///
@@ -243,7 +243,7 @@ mod custom_resource;
 /// - use the [`merge_crds`](https://docs.rs/kube/latest/kube/core/crd/fn.merge_crds.html) fn to combine crds
 /// - roll out new schemas utilizing conversion webhooks / manual conversions / or allow kubectl to do its best
 ///
-/// See the [crd_derive_multi](https://github.com/kube-rs/kube-rs/blob/master/examples/crd_derive_multi.rs) example to see
+/// See the [crd_derive_multi](https://github.com/kube-rs/kube/blob/master/examples/crd_derive_multi.rs) example to see
 /// how this upgrade flow works without special logic.
 ///
 /// The **upgrade flow** with **breaking changes** involves:
@@ -256,7 +256,7 @@ mod custom_resource;
 /// If you need to maintain support for the old version for some time, then you have to repeat or continuously
 /// run steps 2 and 3. I.e. you probably need a **conversion webhook**.
 ///
-/// **NB**: kube does currently [not implement conversion webhooks yet](https://github.com/kube-rs/kube-rs/issues/865).
+/// **NB**: kube does currently [not implement conversion webhooks yet](https://github.com/kube-rs/kube/issues/865).
 ///
 /// ## Debugging
 /// Try `cargo-expand` to see your own macro expansion.

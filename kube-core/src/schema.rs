@@ -16,7 +16,7 @@ use schemars::{
 ///
 /// The following two transformations are applied
 ///  * Rewrite enums from `oneOf` to `object`s with multiple variants ([schemars#84](https://github.com/GREsau/schemars/issues/84))
-///  * Rewrite `additionalProperties` from `#[serde(flatten)]` to `x-kubernetes-preserve-unknown-fields` ([kube-rs#844](https://github.com/kube-rs/kube-rs/issues/844))
+///  * Rewrite `additionalProperties` from `#[serde(flatten)]` to `x-kubernetes-preserve-unknown-fields` ([kube-rs#844](https://github.com/kube-rs/kube/issues/844))
 ///
 /// This is used automatically by `kube::derive`'s `#[derive(CustomResource)]`,
 /// but it can also be used manually with [`SchemaSettings::with_visitor`].

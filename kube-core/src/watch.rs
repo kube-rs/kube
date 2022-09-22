@@ -17,7 +17,7 @@ pub enum WatchEvent<K> {
     Modified(K),
     /// Resource was deleted
     Deleted(K),
-    /// Resource bookmark. `Bookmark` is a slimmed down `K` due to [#285](https://github.com/kube-rs/kube-rs/issues/285).
+    /// Resource bookmark. `Bookmark` is a slimmed down `K` due to [#285](https://github.com/kube-rs/kube/issues/285).
     ///
     /// From [Watch bookmarks](https://kubernetes.io/docs/reference/using-api/api-concepts/#watch-bookmarks).
     ///
@@ -39,7 +39,7 @@ impl<K> Debug for WatchEvent<K> {
     }
 }
 
-/// Slimed down K for [`WatchEvent::Bookmark`] due to [#285](https://github.com/kube-rs/kube-rs/issues/285).
+/// Slimed down K for [`WatchEvent::Bookmark`] due to [#285](https://github.com/kube-rs/kube/issues/285).
 ///
 /// Can only be relied upon to have metadata with resource version.
 /// Bookmarks contain apiVersion + kind + basically empty metadata.

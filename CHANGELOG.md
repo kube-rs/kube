@@ -5,15 +5,15 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube-rs/compare/0.75.0...master
+ * see https://github.com/kube-rs/kube/compare/0.75.0...master
 
-[0.75.0](https://github.com/kube-rs/kube-rs/releases/tag/0.75.0) / 2022-09-21
+[0.75.0](https://github.com/kube-rs/kube/releases/tag/0.75.0) / 2022-09-21
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.75.0 -->
 
 ## Highlights
 
-### [Upgrade `k8s-openapi` to 0.16 for Kubernetes 1.25](https://github.com/kube-rs/kube-rs/pull/1008)
+### [Upgrade `k8s-openapi` to 0.16 for Kubernetes 1.25](https://github.com/kube-rs/kube/pull/1008)
 
 The update to [k8s-openapi@0.16.0](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0160-2022-09-15) makes this the first release with **tentative** Kubernetes 1.25 support.
 While the new structs and apis now exist, we **recommend holding off** on using 1.25 until a [deserialization bug in the apiserver](https://github.com/kubernetes/kubernetes/issues/111985) is resolved upstream. See #997 / #1008 for details.
@@ -24,11 +24,11 @@ To upgrade, ensure you bump both `kube` and `k8s-openapi`:
 cargo upgrade kube k8s-openapi
 ```
 
-### [New/Old `Config::incluster` default to connect in cluster](https://github.com/kube-rs/kube-rs/pull/1001)
+### [New/Old `Config::incluster` default to connect in cluster](https://github.com/kube-rs/kube/pull/1001)
 
-Our previous default of connecting to the Kubernetes apiserver via `kubernetes.default.svc` has been reverted back to use the old environment variables after [Kubernetes updated](https://github.com/kubernetes/kubernetes/issues/112263) their position that the environment variables are not legacy. This does unfortunately regress on `rustls` support, so for those users we have included a [`Config::incluster_dns`](https://docs.rs/kube/latest/kube/struct.Config.html#method.incluster_dns) to work around the old [rustls issue](https://github.com/kube-rs/kube-rs/issues/153) while it is open.
+Our previous default of connecting to the Kubernetes apiserver via `kubernetes.default.svc` has been reverted back to use the old environment variables after [Kubernetes updated](https://github.com/kubernetes/kubernetes/issues/112263) their position that the environment variables are not legacy. This does unfortunately regress on `rustls` support, so for those users we have included a [`Config::incluster_dns`](https://docs.rs/kube/latest/kube/struct.Config.html#method.incluster_dns) to work around the old [rustls issue](https://github.com/kube-rs/kube/issues/153) while it is open.
 
-### [Controller `error_policy` extension](https://github.com/kube-rs/kube-rs/pull/995)
+### [Controller `error_policy` extension](https://github.com/kube-rs/kube/pull/995)
 
 The `error_policy` fn now has access to the `object` that failed the reconciliation to ease metric creation / failure attribution. The following change is needed on the user side:
 
@@ -38,29 +38,29 @@ The `error_policy` fn now has access to the `object` that failed the reconciliat
 ```
 
 ### Polish / Subresources / Conversion
-There are also a slew of ergonomics improvements, closing of [gaps in subresources](https://github.com/kube-rs/kube-rs/pull/989), adding [initial support for `ConversionReview`](https://github.com/kube-rs/kube-rs/pull/999), making [`Api::namespaced` impossible to use for non-namepaced resources](https://github.com/kube-rs/kube-rs/pull/956) (a common pitfall), as well as many great fixes to the edge cases in [portforwarding](https://github.com/kube-rs/kube-rs/pull/973) and [finalizers](https://github.com/kube-rs/kube-rs/pull/965). Many of these changes came from first time contributors. A huge thank you to everyone involved.
+There are also a slew of ergonomics improvements, closing of [gaps in subresources](https://github.com/kube-rs/kube/pull/989), adding [initial support for `ConversionReview`](https://github.com/kube-rs/kube/pull/999), making [`Api::namespaced` impossible to use for non-namepaced resources](https://github.com/kube-rs/kube/pull/956) (a common pitfall), as well as many great fixes to the edge cases in [portforwarding](https://github.com/kube-rs/kube/pull/973) and [finalizers](https://github.com/kube-rs/kube/pull/965). Many of these changes came from first time contributors. A huge thank you to everyone involved.
 
 ## What's Changed
 ### Added
-* Make `Config::auth_info` public by @danrspencer in https://github.com/kube-rs/kube-rs/pull/959
-* Make raw `Client::send` method public by @tiagolobocastro in https://github.com/kube-rs/kube-rs/pull/972
-* Make `types` on `AdmissionRequest` and `AdmissionResponse` public by @clux in https://github.com/kube-rs/kube-rs/pull/977
-* Add `#[serde(default)]` to metadata field of `DynamicObject` by @pbzweihander in https://github.com/kube-rs/kube-rs/pull/987
-* Add `create_subresource` method to `Api` and `create_token_request` method to `Api<ServiceAccount>` by @pbzweihander in https://github.com/kube-rs/kube-rs/pull/989
-* Controller: impl Eq and PartialEq for `Action` by @Sherlock-Holo in https://github.com/kube-rs/kube-rs/pull/993
-* Add support for CRD `ConversionReview` types by @MikailBag in https://github.com/kube-rs/kube-rs/pull/999
+* Make `Config::auth_info` public by @danrspencer in https://github.com/kube-rs/kube/pull/959
+* Make raw `Client::send` method public by @tiagolobocastro in https://github.com/kube-rs/kube/pull/972
+* Make `types` on `AdmissionRequest` and `AdmissionResponse` public by @clux in https://github.com/kube-rs/kube/pull/977
+* Add `#[serde(default)]` to metadata field of `DynamicObject` by @pbzweihander in https://github.com/kube-rs/kube/pull/987
+* Add `create_subresource` method to `Api` and `create_token_request` method to `Api<ServiceAccount>` by @pbzweihander in https://github.com/kube-rs/kube/pull/989
+* Controller: impl Eq and PartialEq for `Action` by @Sherlock-Holo in https://github.com/kube-rs/kube/pull/993
+* Add support for CRD `ConversionReview` types by @MikailBag in https://github.com/kube-rs/kube/pull/999
 ### Changed
-* Constrain Resource trait and Api::namespaced by Scope by @clux in https://github.com/kube-rs/kube-rs/pull/956
-* Add connect/read/write timeouts to `Config` by @goenning in https://github.com/kube-rs/kube-rs/pull/971
-* Controller: Include the object being reconciled in the `error_policy` by @felipesere in https://github.com/kube-rs/kube-rs/pull/995
-* `Config`: New `incluster` and `incluster_dns` constructors by @olix0r in https://github.com/kube-rs/kube-rs/pull/1001
-* Upgrade `k8s-openapi` to 0.16 by @clux in https://github.com/kube-rs/kube-rs/pull/1008
+* Constrain Resource trait and Api::namespaced by Scope by @clux in https://github.com/kube-rs/kube/pull/956
+* Add connect/read/write timeouts to `Config` by @goenning in https://github.com/kube-rs/kube/pull/971
+* Controller: Include the object being reconciled in the `error_policy` by @felipesere in https://github.com/kube-rs/kube/pull/995
+* `Config`: New `incluster` and `incluster_dns` constructors by @olix0r in https://github.com/kube-rs/kube/pull/1001
+* Upgrade `k8s-openapi` to 0.16 by @clux in https://github.com/kube-rs/kube/pull/1008
 ### Fixed
-* Remove `tracing::instrument` from `apply_debug_overrides` by @kazk in https://github.com/kube-rs/kube-rs/pull/958
-* fix duplicate finalizers race condition by @alex-hunt-materialize in https://github.com/kube-rs/kube-rs/pull/965
-* fix: portforward connection cleanup by @tiagolobocastro in https://github.com/kube-rs/kube-rs/pull/973
+* Remove `tracing::instrument` from `apply_debug_overrides` by @kazk in https://github.com/kube-rs/kube/pull/958
+* fix duplicate finalizers race condition by @alex-hunt-materialize in https://github.com/kube-rs/kube/pull/965
+* fix: portforward connection cleanup by @tiagolobocastro in https://github.com/kube-rs/kube/pull/973
 
-[0.74.0](https://github.com/kube-rs/kube-rs/releases/tag/0.74.0) / 2022-07-09
+[0.74.0](https://github.com/kube-rs/kube/releases/tag/0.74.0) / 2022-07-09
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.74.0 -->
 
@@ -68,15 +68,15 @@ There are also a slew of ergonomics improvements, closing of [gaps in subresourc
 
 ### Polish, bug fixes, guidelines, ci improvements, and new contributors
 This release features smaller improvements/additions/cleanups/fixes, many of which are from new first-time contributors! Thank you everyone!
-The listed [deadlock fix](https://github.com/kube-rs/kube-rs/pull/925) was backported to 0.73.1.
+The listed [deadlock fix](https://github.com/kube-rs/kube/pull/925) was backported to 0.73.1.
 
 We have also been trying to clarify and **prove** a lot more of our external-facing guarantees, and as a result:
 
  - We have codified our [Kubernetes versioning policy](https://kube.rs/kubernetes-version/) 
  - The [Rust version policy](https://kube.rs/rust-version/) has extended its support range
- - Our [CI has been extended](https://github.com/kube-rs/kube-rs/pull/924)
+ - Our [CI has been extended](https://github.com/kube-rs/kube/pull/924)
 
-### [`ResourceExt::name` deprecation](https://github.com/kube-rs/kube-rs/pull/945)
+### [`ResourceExt::name` deprecation](https://github.com/kube-rs/kube/pull/945)
 
 A consequence of all the policy writing and the improved clarity we have decided to deprecate the common [`ResourceExt::name`](https://docs.rs/kube/0.74.0/kube/trait.ResourceExt.html#tymethod.name) helper.
 
@@ -89,20 +89,20 @@ This method could panic and it is unexpected for the users and bad for our consi
 
 ## What's Changed
 ### Added
-* Add support for passing the `fieldValidation` query parameter on patch by @phroggyy in https://github.com/kube-rs/kube-rs/pull/929
-* Add `conditions::is_job_completed` by @clux in https://github.com/kube-rs/kube-rs/pull/935
+* Add support for passing the `fieldValidation` query parameter on patch by @phroggyy in https://github.com/kube-rs/kube/pull/929
+* Add `conditions::is_job_completed` by @clux in https://github.com/kube-rs/kube/pull/935
 ### Changed
-* Deprecate `ResourceExt::name` in favour of safe name_* alternatives by @clux in https://github.com/kube-rs/kube-rs/pull/945
+* Deprecate `ResourceExt::name` in favour of safe name_* alternatives by @clux in https://github.com/kube-rs/kube/pull/945
 ### Removed
-* Remove `#[kube(apiextensions)]` flag from `kube-derive` by @clux in https://github.com/kube-rs/kube-rs/pull/920
+* Remove `#[kube(apiextensions)]` flag from `kube-derive` by @clux in https://github.com/kube-rs/kube/pull/920
 ### Fixed
-* Document every public derived fn from kube-derive by @clux in https://github.com/kube-rs/kube-rs/pull/919
-* fix applier hangs which can happen with many watched objects by @moustafab in https://github.com/kube-rs/kube-rs/pull/925
-* Applier: Improve reconciler reschedule context to avoid deadlocking on full channel by @teozkr in https://github.com/kube-rs/kube-rs/pull/932
-* Fix deserialization issue in AdmissionResponse by @clux in https://github.com/kube-rs/kube-rs/pull/939
-* Admission controller example fixes by @Alibirb in https://github.com/kube-rs/kube-rs/pull/950
+* Document every public derived fn from kube-derive by @clux in https://github.com/kube-rs/kube/pull/919
+* fix applier hangs which can happen with many watched objects by @moustafab in https://github.com/kube-rs/kube/pull/925
+* Applier: Improve reconciler reschedule context to avoid deadlocking on full channel by @teozkr in https://github.com/kube-rs/kube/pull/932
+* Fix deserialization issue in AdmissionResponse by @clux in https://github.com/kube-rs/kube/pull/939
+* Admission controller example fixes by @Alibirb in https://github.com/kube-rs/kube/pull/950
 
-[0.73.1](https://github.com/kube-rs/kube-rs/releases/tag/0.73.1) / 2022-06-03
+[0.73.1](https://github.com/kube-rs/kube/releases/tag/0.73.1) / 2022-06-03
 ===================
 ## Highlights
 
@@ -112,22 +112,22 @@ This patch release fixes a bug causing `applier` and `Controller` to deadlock wh
 
 ## What's Changed
 ### Fixed
-* [0.73 backport] fix applier hangs which can happen with many watched objects (#925) by @moustafab (backported by @teozkr) in https://github.com/kube-rs/kube-rs/pull/927
+* [0.73 backport] fix applier hangs which can happen with many watched objects (#925) by @moustafab (backported by @teozkr) in https://github.com/kube-rs/kube/pull/927
 
 
-**Full Changelog**: https://github.com/kube-rs/kube-rs/compare/0.73.0...0.73.1
-[0.73.0](https://github.com/kube-rs/kube-rs/releases/tag/0.73.0) / 2022-05-23
+**Full Changelog**: https://github.com/kube-rs/kube/compare/0.73.0...0.73.1
+[0.73.0](https://github.com/kube-rs/kube/releases/tag/0.73.0) / 2022-05-23
 ===================
 
 ## Highlights
 
-### [New `k8s-openapi` version and MSRV](https://github.com/kube-rs/kube-rs/pull/916)
+### [New `k8s-openapi` version and MSRV](https://github.com/kube-rs/kube/pull/916)
 
 Support added for Kubernetes `v1_24` support via the [new `k8s-openapi` version](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.15.0). Please also run `cargo upgrade --workspace k8s-openapi` when upgrading `kube`.
 
 This also bumps our [MSRV](https://rust-lang.github.io/rfcs/2495-min-rust-version.html) to [`1.60.0`](https://blog.rust-lang.org/2022/04/07/Rust-1.60.0.html).
 
-### [Reconciler change](https://github.com/kube-rs/kube-rs/pull/910)
+### [Reconciler change](https://github.com/kube-rs/kube/pull/910)
 A small ergonomic change in the `reconcile` signature has removed the need for the `Context` object. This has been replaced by an [`Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html). The following change is needed in your controller:
 
 ```diff
@@ -140,18 +140,18 @@ See the [controller-rs upgrade change for details](https://github.com/kube-rs/co
 
 ## What's Changed
 ### Added
-* Add Discovery::groups_alphabetical following kubectl sort order by @clux in https://github.com/kube-rs/kube-rs/pull/887
+* Add Discovery::groups_alphabetical following kubectl sort order by @clux in https://github.com/kube-rs/kube/pull/887
 ### Changed
-* Replace runtime::controller::Context with Arc by @teozkr in https://github.com/kube-rs/kube-rs/pull/910
-* runtime: Return the object from `await_condition` by @olix0r in https://github.com/kube-rs/kube-rs/pull/877
-* Bump k8s-openapi to 0.15 for kubernetes v1_24 and bump MSRV to 1.60 by @clux in https://github.com/kube-rs/kube-rs/pull/916
+* Replace runtime::controller::Context with Arc by @teozkr in https://github.com/kube-rs/kube/pull/910
+* runtime: Return the object from `await_condition` by @olix0r in https://github.com/kube-rs/kube/pull/877
+* Bump k8s-openapi to 0.15 for kubernetes v1_24 and bump MSRV to 1.60 by @clux in https://github.com/kube-rs/kube/pull/916
 
-[0.72.0](https://github.com/kube-rs/kube-rs/releases/tag/0.72.0) / 2022-05-13
+[0.72.0](https://github.com/kube-rs/kube/releases/tag/0.72.0) / 2022-05-13
 ===================
 
 ## Highlights
 ### Ergonomics improvements
-A new [`runtime::WatchSteamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html) ([#899](https://github.com/kube-rs/kube-rs/pull/899) + [#906](https://github.com/kube-rs/kube-rs/pull/906)) allows for simpler setups for streams from [`watcher`](https://docs.rs/kube/latest/kube/runtime/fn.watcher.html) or [`reflector`](https://docs.rs/kube/latest/kube/runtime/fn.reflector.html).
+A new [`runtime::WatchSteamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html) ([#899](https://github.com/kube-rs/kube/pull/899) + [#906](https://github.com/kube-rs/kube/pull/906)) allows for simpler setups for streams from [`watcher`](https://docs.rs/kube/latest/kube/runtime/fn.watcher.html) or [`reflector`](https://docs.rs/kube/latest/kube/runtime/fn.reflector.html).
 
 ```diff
 - let stream = utils::try_flatten_applied(StreamBackoff::new(watcher(api, lp), b));
@@ -160,7 +160,7 @@ A new [`runtime::WatchSteamExt`](https://docs.rs/kube/latest/kube/runtime/trait.
 
 The `util::try_flatten_*` helpers have been marked as deprecated since they are not used by the stream impls.
 
-A new [`reflector:store()`](https://docs.rs/kube/latest/kube/runtime/reflector/fn.store.html) fn allows simpler reflector setups [#907](https://github.com/kube-rs/kube-rs/pull/907):
+A new [`reflector:store()`](https://docs.rs/kube/latest/kube/runtime/reflector/fn.store.html) fn allows simpler reflector setups [#907](https://github.com/kube-rs/kube/pull/907):
 
 ```diff
 - let store = reflector::store::Writer::<Node>::default();
@@ -168,35 +168,35 @@ A new [`reflector:store()`](https://docs.rs/kube/latest/kube/runtime/reflector/f
 + let (reader, writer) = reflector::store();
 ```
 
-Additional conveniences getters/settes to [`ResourceExt`](https://docs.rs/kube/latest/kube/trait.ResourceExt.html) for manged_fields and creation_timestamp [#888](https://github.com/kube-rs/kube-rs/pull/888) + [#898](https://github.com/kube-rs/kube-rs/pull/898), plus a [`GroupVersion::with_kind`](https://docs.rs/kube/latest/kube/core/struct.GroupVersion.html#method.with_kind) path to a GVK, and a [`TryFrom<TypeMeta> for GroupVersionKind`](https://docs.rs/kube/latest/kube/core/struct.GroupVersionKind.html#impl-TryFrom%3CTypeMeta%3E) in [#896](https://github.com/kube-rs/kube-rs/pull/896).
+Additional conveniences getters/settes to [`ResourceExt`](https://docs.rs/kube/latest/kube/trait.ResourceExt.html) for manged_fields and creation_timestamp [#888](https://github.com/kube-rs/kube/pull/888) + [#898](https://github.com/kube-rs/kube/pull/898), plus a [`GroupVersion::with_kind`](https://docs.rs/kube/latest/kube/core/struct.GroupVersion.html#method.with_kind) path to a GVK, and a [`TryFrom<TypeMeta> for GroupVersionKind`](https://docs.rs/kube/latest/kube/core/struct.GroupVersionKind.html#impl-TryFrom%3CTypeMeta%3E) in [#896](https://github.com/kube-rs/kube/pull/896).
 
 ### CRD Version Selection
 Managing multiple [version in CustomResourceDefinitions](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/) can be pretty complicated, but we now have helpers and docs on how to tackle it.
 
-A new function [`kube::core::crd::merge_crds`](https://docs.rs/kube/latest/kube/core/crd/fn.merge_crds.html) have been added (in [#889](https://github.com/kube-rs/kube-rs/pull/889)) to help push crd schemas generated by kube-derived crds with different `#[kube(version)]` properties. See the [kube-derive#version](https://docs.rs/kube/latest/kube/derive.CustomResource.html#versioning) documentation for details.
+A new function [`kube::core::crd::merge_crds`](https://docs.rs/kube/latest/kube/core/crd/fn.merge_crds.html) have been added (in [#889](https://github.com/kube-rs/kube/pull/889)) to help push crd schemas generated by kube-derived crds with different `#[kube(version)]` properties. See the [kube-derive#version](https://docs.rs/kube/latest/kube/derive.CustomResource.html#versioning) documentation for details.
 
-A new example showcases [how one can manage two or more versions of a crd](https://github.com/kube-rs/kube-rs/blob/7715cabd4d1976493e6b8949471f283df927a79e/examples/crd_derive_multi.rs#L12-L31) and what the expected truncation outcomes are when moving between versions.
+A new example showcases [how one can manage two or more versions of a crd](https://github.com/kube-rs/kube/blob/7715cabd4d1976493e6b8949471f283df927a79e/examples/crd_derive_multi.rs#L12-L31) and what the expected truncation outcomes are when moving between versions.
 
 ### Examples
-Examples now have moved to `tracing` for its logging, respects `RUST_LOG`, and namespace selection via the kubeconfig context. There is also a [larger kubectl example](https://github.com/kube-rs/kube-rs/blob/master/examples/kubectl.rs) showcasing [`kubectl apply -f yaml`](https://github.com/kube-rs/kube-rs/blob/7715cabd4d1976493e6b8949471f283df927a79e/examples/kubectl.rs#L149-L170) as well as `kubectl {edit,delete,get,watch}` via [#885](https://github.com/kube-rs/kube-rs/pull/885) + [#897](https://github.com/kube-rs/kube-rs/pull/897).
+Examples now have moved to `tracing` for its logging, respects `RUST_LOG`, and namespace selection via the kubeconfig context. There is also a [larger kubectl example](https://github.com/kube-rs/kube/blob/master/examples/kubectl.rs) showcasing [`kubectl apply -f yaml`](https://github.com/kube-rs/kube/blob/7715cabd4d1976493e6b8949471f283df927a79e/examples/kubectl.rs#L149-L170) as well as `kubectl {edit,delete,get,watch}` via [#885](https://github.com/kube-rs/kube/pull/885) + [#897](https://github.com/kube-rs/kube/pull/897).
 
 ## What's Changed
 ### Added
-* Allow merging multi-version CRDs into a single schema by @clux in https://github.com/kube-rs/kube-rs/pull/889
-* Add GroupVersion::with_kind and TypeMeta -> GroupVersionKind converters by @clux in https://github.com/kube-rs/kube-rs/pull/896
-* Add managed_fields accessors to ResourceExt by @clux in https://github.com/kube-rs/kube-rs/pull/898
-* Add ResourceExt::creation_timestamp by @clux in https://github.com/kube-rs/kube-rs/pull/888
-* Support lowercase http_proxy & https_proxy evars by @DevineLiu in https://github.com/kube-rs/kube-rs/pull/892
-* Add a WatchStreamExt trait for stream chaining by @clux in https://github.com/kube-rs/kube-rs/pull/899
-* Add Event::modify + reflector::store helpers by @clux in https://github.com/kube-rs/kube-rs/pull/907
+* Allow merging multi-version CRDs into a single schema by @clux in https://github.com/kube-rs/kube/pull/889
+* Add GroupVersion::with_kind and TypeMeta -> GroupVersionKind converters by @clux in https://github.com/kube-rs/kube/pull/896
+* Add managed_fields accessors to ResourceExt by @clux in https://github.com/kube-rs/kube/pull/898
+* Add ResourceExt::creation_timestamp by @clux in https://github.com/kube-rs/kube/pull/888
+* Support lowercase http_proxy & https_proxy evars by @DevineLiu in https://github.com/kube-rs/kube/pull/892
+* Add a WatchStreamExt trait for stream chaining by @clux in https://github.com/kube-rs/kube/pull/899
+* Add Event::modify + reflector::store helpers by @clux in https://github.com/kube-rs/kube/pull/907
 ### Changed
-* Switch to kubernetes cluster dns for incluster url everywhere by @clux in https://github.com/kube-rs/kube-rs/pull/876
-* Update tower-http requirement from 0.2.0 to 0.3.2 by @dependabot in https://github.com/kube-rs/kube-rs/pull/893
+* Switch to kubernetes cluster dns for incluster url everywhere by @clux in https://github.com/kube-rs/kube/pull/876
+* Update tower-http requirement from 0.2.0 to 0.3.2 by @dependabot in https://github.com/kube-rs/kube/pull/893
 ### Removed
-* Remove deprecated legacy crd v1beta1 by @clux in https://github.com/kube-rs/kube-rs/pull/890
+* Remove deprecated legacy crd v1beta1 by @clux in https://github.com/kube-rs/kube/pull/890
 
 
-[0.71.0](https://github.com/kube-rs/kube-rs/releases/tag/0.71.0) / 2022-04-12
+[0.71.0](https://github.com/kube-rs/kube/releases/tag/0.71.0) / 2022-04-12
 ===================
 
 ## Highlights
@@ -204,36 +204,36 @@ Several quality of life changes and improvement this release for port-forwarding
 
 We highlight some **changes** here that you should be especially aware of.
 
-### [events::Recorder publishing to `kube-system` for cluster scoped resources](https://github.com/kube-rs/kube-rs/pull/871)
+### [events::Recorder publishing to `kube-system` for cluster scoped resources](https://github.com/kube-rs/kube/pull/871)
 Publishing events via [Recorder](https://docs.rs/kube/latest/kube/runtime/events/struct.Recorder.html) for cluster scoped resources (supported since `0.70.0`) now publish to `kube-system` rather than `default`, as all but the newest clusters struggle with publishing events in the `default` namespace.
 
-### [Default TLS stack set to OpenSSL](https://github.com/kube-rs/kube-rs/pull/863)
-The previous `native-tls` default  was there because we used to depend on `reqwest`, but because we depended on openssl anyway the feature does not make much sense. Changing to `openssl-tls` also improves the situation on macOS where the Security Framework struggles with PKCS#12 certs from OpenSSL v3.  The `native-tls` feature will still be available in this release in case of issues, but the plan is to decommission it shortly. Of course, we all ideally want to move to rustls, but we are still blocked by [#153](https://github.com/kube-rs/kube-rs/issues/153).
+### [Default TLS stack set to OpenSSL](https://github.com/kube-rs/kube/pull/863)
+The previous `native-tls` default  was there because we used to depend on `reqwest`, but because we depended on openssl anyway the feature does not make much sense. Changing to `openssl-tls` also improves the situation on macOS where the Security Framework struggles with PKCS#12 certs from OpenSSL v3.  The `native-tls` feature will still be available in this release in case of issues, but the plan is to decommission it shortly. Of course, we all ideally want to move to rustls, but we are still blocked by [#153](https://github.com/kube-rs/kube/issues/153).
 
 ## What's Changed
 ### Added
-* Add `ClientBuilder` that lets users add custom middleware without full stack replacement by @teozkr in https://github.com/kube-rs/kube-rs/pull/855
-* Support top-level enums in CRDs by @sbernauer in https://github.com/kube-rs/kube-rs/pull/856
+* Add `ClientBuilder` that lets users add custom middleware without full stack replacement by @teozkr in https://github.com/kube-rs/kube/pull/855
+* Support top-level enums in CRDs by @sbernauer in https://github.com/kube-rs/kube/pull/856
 ### Changed
-* portforward: Improve API and support background task cancelation by @olix0r in https://github.com/kube-rs/kube-rs/pull/854
-* Make remote commands cancellable and remove panics by @kazk in https://github.com/kube-rs/kube-rs/pull/861
-* Change the default TLS to OpenSSL by @kazk in https://github.com/kube-rs/kube-rs/pull/863
-* change event recorder cluster namespace to kube-system by @clux in https://github.com/kube-rs/kube-rs/pull/871
+* portforward: Improve API and support background task cancelation by @olix0r in https://github.com/kube-rs/kube/pull/854
+* Make remote commands cancellable and remove panics by @kazk in https://github.com/kube-rs/kube/pull/861
+* Change the default TLS to OpenSSL by @kazk in https://github.com/kube-rs/kube/pull/863
+* change event recorder cluster namespace to kube-system by @clux in https://github.com/kube-rs/kube/pull/871
 ### Fixed
-* Fix schemas containing both properties and additionalProperties by @jcaesar in https://github.com/kube-rs/kube-rs/pull/845
-* Make dependency pins between sibling crates stricter by @clux in https://github.com/kube-rs/kube-rs/pull/864
-* Fix in-cluster kube_host_port generation for IPv6 by @somnusfish in https://github.com/kube-rs/kube-rs/pull/875
+* Fix schemas containing both properties and additionalProperties by @jcaesar in https://github.com/kube-rs/kube/pull/845
+* Make dependency pins between sibling crates stricter by @clux in https://github.com/kube-rs/kube/pull/864
+* Fix in-cluster kube_host_port generation for IPv6 by @somnusfish in https://github.com/kube-rs/kube/pull/875
 
-[0.70.0](https://github.com/kube-rs/kube-rs/releases/tag/0.70.0) / 2022-03-20
+[0.70.0](https://github.com/kube-rs/kube/releases/tag/0.70.0) / 2022-03-20
 ===================
 ## Highlights
 
-### [Support for EC keys with rustls](https://github.com/kube-rs/kube-rs/pull/804)
+### [Support for EC keys with rustls](https://github.com/kube-rs/kube/pull/804)
 
 This was one of the big blockers for using `rustls` against clusters like `k3d` or `k3s`
-While __not sufficient__ to fix using those clusters out of the box, it is now __possible__ to use them [with a workarodund](https://github.com/kube-rs/kube-rs/issues/153)
+While __not sufficient__ to fix using those clusters out of the box, it is now __possible__ to use them [with a workarodund](https://github.com/kube-rs/kube/issues/153)
 
-### [More ergonomic reconciler](https://github.com/kube-rs/kube-rs/pull/851)
+### [More ergonomic reconciler](https://github.com/kube-rs/kube/pull/851)
 The signature and end the `Ok` action in `reconcile` fns has been simplified slightly, and requires the following user updates:
 
 ```diff
@@ -251,20 +251,20 @@ The `Action` import lives in the same place as the old `ReconcilerAction`.
 
 ## What's Changed
 ### Added
-* Add support for EC private keys by @farcaller in https://github.com/kube-rs/kube-rs/pull/804
-* Add helper for creating a controller owner_ref on Resource by @clux in https://github.com/kube-rs/kube-rs/pull/850
+* Add support for EC private keys by @farcaller in https://github.com/kube-rs/kube/pull/804
+* Add helper for creating a controller owner_ref on Resource by @clux in https://github.com/kube-rs/kube/pull/850
 ### Changed
-* Remove `scheduler::Error` by @teozkr in https://github.com/kube-rs/kube-rs/pull/827
-* Bump parking_lot to 0.12, but allow dep duplicates by @clux in https://github.com/kube-rs/kube-rs/pull/836
-* Update tokio-tungstenite requirement from 0.16.1 to 0.17.1 by @dependabot in https://github.com/kube-rs/kube-rs/pull/841
-* Let OccupiedEntry::commit take PostParams by @teozkr in https://github.com/kube-rs/kube-rs/pull/842
-* Change ReconcileAction to Action and add associated ctors by @clux in https://github.com/kube-rs/kube-rs/pull/851
+* Remove `scheduler::Error` by @teozkr in https://github.com/kube-rs/kube/pull/827
+* Bump parking_lot to 0.12, but allow dep duplicates by @clux in https://github.com/kube-rs/kube/pull/836
+* Update tokio-tungstenite requirement from 0.16.1 to 0.17.1 by @dependabot in https://github.com/kube-rs/kube/pull/841
+* Let OccupiedEntry::commit take PostParams by @teozkr in https://github.com/kube-rs/kube/pull/842
+* Change ReconcileAction to Action and add associated ctors by @clux in https://github.com/kube-rs/kube/pull/851
 ### Fixed
-* Token reloading with RwLock by @kazk in https://github.com/kube-rs/kube-rs/pull/835
-* Fix event publishing for cluster scoped crds by @zhrebicek in https://github.com/kube-rs/kube-rs/pull/847
-* Fix invalid CRD when Enum variants have descriptions by @sbernauer in https://github.com/kube-rs/kube-rs/pull/852
+* Token reloading with RwLock by @kazk in https://github.com/kube-rs/kube/pull/835
+* Fix event publishing for cluster scoped crds by @zhrebicek in https://github.com/kube-rs/kube/pull/847
+* Fix invalid CRD when Enum variants have descriptions by @sbernauer in https://github.com/kube-rs/kube/pull/852
 
-[0.69.1](https://github.com/kube-rs/kube-rs/releases/tag/0.69.1) / 2022-02-16
+[0.69.1](https://github.com/kube-rs/kube/releases/tag/0.69.1) / 2022-02-16
 ===================
 ## Highlights
 
@@ -276,19 +276,19 @@ All users of 0.69.0 are encouraged to upgrade immediately. 0.68.x and below are 
 
 ## What's Changed
 ### Fixed
-* [0.69.x] Fix deadlock in token reloading by @clux (backported by @teozkr) in https://github.com/kube-rs/kube-rs/pull/831
+* [0.69.x] Fix deadlock in token reloading by @clux (backported by @teozkr) in https://github.com/kube-rs/kube/pull/831
 
-[0.69.0](https://github.com/kube-rs/kube-rs/releases/tag/0.69.0) / 2022-02-14
+[0.69.0](https://github.com/kube-rs/kube/releases/tag/0.69.0) / 2022-02-14
 ===================
 ## Highlights
 ### Ergonomic Additions to Api
 
 Two new methods have been added to the client `Api` this release to reduce the amount of boiler-plate needed for common patterns.
 
-- [`Api::entry`](https://docs.rs/kube/latest/kube/struct.Api.html#method.entry) via [811](https://github.com/kube-rs/kube-rs/pull/811) - to aid idempotent crud operation flows (following the style of [`Map::Entry`](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html#method.entry))
-- [`Api::get_opt`](https://docs.rs/kube/latest/kube/struct.Api.html#method.get_opt) via [809](https://github.com/kube-rs/kube-rs/pull/809) - to aid dealing with the `NotFound` type error via a returned `Option`
+- [`Api::entry`](https://docs.rs/kube/latest/kube/struct.Api.html#method.entry) via [811](https://github.com/kube-rs/kube/pull/811) - to aid idempotent crud operation flows (following the style of [`Map::Entry`](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html#method.entry))
+- [`Api::get_opt`](https://docs.rs/kube/latest/kube/struct.Api.html#method.get_opt) via [809](https://github.com/kube-rs/kube/pull/809) - to aid dealing with the `NotFound` type error via a returned `Option`
 
-### [In-cluster Token reloading](https://github.com/kube-rs/kube-rs/pull/768)
+### [In-cluster Token reloading](https://github.com/kube-rs/kube/pull/768)
 
 Following a requirement for Kubernetes clients against versions `>= 1.22.0`, our bundled [`AuthLayer`](https://docs.rs/kube/0.69.0/kube/client/middleware/struct.AuthLayer.html) will reload tokens every minute when deployed in-cluster.
 
@@ -296,74 +296,74 @@ Following a requirement for Kubernetes clients against versions `>= 1.22.0`, our
 
 ## What's Changed
 ### Added
-* Add conversion for `ObjectRef<K>` to `ObjectReference` by @teozkr in https://github.com/kube-rs/kube-rs/pull/815
-* Add `Api::get_opt` for better existence handling by @teozkr in https://github.com/kube-rs/kube-rs/pull/809
-* Entry API by @teozkr in https://github.com/kube-rs/kube-rs/pull/811
+* Add conversion for `ObjectRef<K>` to `ObjectReference` by @teozkr in https://github.com/kube-rs/kube/pull/815
+* Add `Api::get_opt` for better existence handling by @teozkr in https://github.com/kube-rs/kube/pull/809
+* Entry API by @teozkr in https://github.com/kube-rs/kube/pull/811
 ### Changed
-* Reload token file at least once a minute by @kazk in https://github.com/kube-rs/kube-rs/pull/768
-* Prefer kubeconfig over in-cluster config by @teozkr in https://github.com/kube-rs/kube-rs/pull/823
+* Reload token file at least once a minute by @kazk in https://github.com/kube-rs/kube/pull/768
+* Prefer kubeconfig over in-cluster config by @teozkr in https://github.com/kube-rs/kube/pull/823
 ### Fixed
-* Disable CSR utilities on K8s <1.19 by @teozkr in https://github.com/kube-rs/kube-rs/pull/817
+* Disable CSR utilities on K8s <1.19 by @teozkr in https://github.com/kube-rs/kube/pull/817
 
-[0.68.0](https://github.com/kube-rs/kube-rs/releases/tag/0.68.0) / 2022-02-01
+[0.68.0](https://github.com/kube-rs/kube/releases/tag/0.68.0) / 2022-02-01
 ===================
 
 ### Interface Changes
 
-To reduce the amount of allocation done inside the `runtime` by reflectors and controllers, the following change via [#786](https://github.com/kube-rs/kube-rs/issues/786) is needed on the signature of your `reconcile` functions:
+To reduce the amount of allocation done inside the `runtime` by reflectors and controllers, the following change via [#786](https://github.com/kube-rs/kube/issues/786) is needed on the signature of your `reconcile` functions:
 
 ```diff
 -async fn reconcile(myobj: MyK, ctx: Context<Data>) -> Result<ReconcilerAction>
 +async fn reconcile(myobj: Arc<MyK>, ctx: Context<Data>) -> Result<ReconcilerAction>
 ```
 
-This also affects the [finalizer helper](https://github.com/kube-rs/kube-rs/pull/792).
+This also affects the [finalizer helper](https://github.com/kube-rs/kube/pull/792).
 
-### [Port-forwarding](https://github.com/kube-rs/kube-rs/pull/446)
+### [Port-forwarding](https://github.com/kube-rs/kube/pull/446)
 
-As one of the last steps toward [gold level client requirements](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-capabilities), port-forwarding landed in [#446](https://github.com/kube-rs/kube-rs/issues/446). There are 3 new [examples](https://github.com/kube-rs/kube-rs/tree/master/examples) (`port_forward*.rs`) that showcases how to use this websocket based functionality.
+As one of the last steps toward [gold level client requirements](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-capabilities), port-forwarding landed in [#446](https://github.com/kube-rs/kube/issues/446). There are 3 new [examples](https://github.com/kube-rs/kube/tree/master/examples) (`port_forward*.rs`) that showcases how to use this websocket based functionality.
 
-## [What's Changed](https://github.com/kube-rs/kube-rs/releases/tag/0.68.0)
+## [What's Changed](https://github.com/kube-rs/kube/releases/tag/0.68.0)
 ### Added
-* Add a VS Code devcontainer configuration by @olix0r in https://github.com/kube-rs/kube-rs/pull/788
-* Add support for user impersonation by @teozkr in https://github.com/kube-rs/kube-rs/pull/797
-* Add port forward by @kazk in https://github.com/kube-rs/kube-rs/pull/446
+* Add a VS Code devcontainer configuration by @olix0r in https://github.com/kube-rs/kube/pull/788
+* Add support for user impersonation by @teozkr in https://github.com/kube-rs/kube/pull/797
+* Add port forward by @kazk in https://github.com/kube-rs/kube/pull/446
 ### Changed
-* runtime: Store resources in an `Arc` by @olix0r in https://github.com/kube-rs/kube-rs/pull/786
-* Propagate Arc through the finalizer reconciler helper by @teozkr in https://github.com/kube-rs/kube-rs/pull/792
-* Disable unused default features of chrono crate by @dreamer in https://github.com/kube-rs/kube-rs/pull/801
+* runtime: Store resources in an `Arc` by @olix0r in https://github.com/kube-rs/kube/pull/786
+* Propagate Arc through the finalizer reconciler helper by @teozkr in https://github.com/kube-rs/kube/pull/792
+* Disable unused default features of chrono crate by @dreamer in https://github.com/kube-rs/kube/pull/801
 ### Fixed
-* Use absolute path to Result in derives by @teozkr in https://github.com/kube-rs/kube-rs/pull/795
-* core: add missing reason to Display on Error::Validation in Request by @clux in https://github.com/kube-rs/kube-rs/pull/798
+* Use absolute path to Result in derives by @teozkr in https://github.com/kube-rs/kube/pull/795
+* core: add missing reason to Display on Error::Validation in Request by @clux in https://github.com/kube-rs/kube/pull/798
 
-[0.67.0](https://github.com/kube-rs/kube-rs/releases/tag/0.67.0) / 2022-01-25
+[0.67.0](https://github.com/kube-rs/kube/releases/tag/0.67.0) / 2022-01-25
 ===================
 ### Changed
 
-* runtime: Replace `DashMap` with a locked `AHashMap` by @olix0r in https://github.com/kube-rs/kube-rs/pull/785
-* update k8s-openapi for kubernetes 1.23 support by @clux in https://github.com/kube-rs/kube-rs/pull/789
+* runtime: Replace `DashMap` with a locked `AHashMap` by @olix0r in https://github.com/kube-rs/kube/pull/785
+* update k8s-openapi for kubernetes 1.23 support by @clux in https://github.com/kube-rs/kube/pull/789
 
-[0.66.0](https://github.com/kube-rs/kube-rs/releases/tag/0.66.0) / 2022-01-15
+[0.66.0](https://github.com/kube-rs/kube/releases/tag/0.66.0) / 2022-01-15
 ===================
 
 Tons of ergonomics improvements, and 3 new contributors.
 Highlighted first is the 3 **most discussed** changes:
 
-### [Support for auto-generating schemas for enums in `kube-derive`](https://github.com/kube-rs/kube-rs/issues/779)
+### [Support for auto-generating schemas for enums in `kube-derive`](https://github.com/kube-rs/kube/issues/779)
 
 It is now possible to **embed complex enums** inside structs that use `#[derive(CustomResource)]`.
 
-This has been a [highly requested feature](https://github.com/kube-rs/kube-rs/issues/648) since the inception of auto-generated schemas. It does [not work for all cases](https://docs.rs/kube/latest/kube/derive.CustomResource.html#enums), and has [certain ergonomics caveats](https://docs.rs/kube/0.66.0/kube/core/schema/struct.StructuralSchemaRewriter.html#method.visit_schema_object), but represents a huge step forwards.
+This has been a [highly requested feature](https://github.com/kube-rs/kube/issues/648) since the inception of auto-generated schemas. It does [not work for all cases](https://docs.rs/kube/latest/kube/derive.CustomResource.html#enums), and has [certain ergonomics caveats](https://docs.rs/kube/0.66.0/kube/core/schema/struct.StructuralSchemaRewriter.html#method.visit_schema_object), but represents a huge step forwards.
 
 Note that **if** you depend on `kube-derive` directly rather than via `kube` then you **must** now add the `schema` feature to `kube-core`
 
-### [New `StreamBackoff` mechanism in `kube-runtime`](https://github.com/kube-rs/kube-rs/issues/703)
+### [New `StreamBackoff` mechanism in `kube-runtime`](https://github.com/kube-rs/kube/issues/703)
 
 To avoid spamming the apiserver when on certain watch errors cases, it's now possible to [stream wrap](https://docs.rs/kube/0.66.0/kube/runtime/utils/struct.StreamBackoff.html) the `watcher` to set backoffs. The new [`default_backoff`](https://docs.rs/kube/0.66.0/kube/runtime/watcher/fn.default_backoff.html) follows existing `client-go` conventions of being kind to the apiserver.
 
 Initially, this is **default-enabled** in `Controller` watches (configurable via [`Controller::trigger_backoff`](https://docs.rs/kube/latest/kube/runtime/struct.Controller.html#method.trigger_backoff)) and avoids spam errors when crds are not installed.
 
-### [New version priority parser in `kube-core`](https://github.com/kube-rs/kube-rs/issues/764)
+### [New version priority parser in `kube-core`](https://github.com/kube-rs/kube/issues/764)
 
 To aid users picking the most appropriate version of a `kind` from [api discovery](https://docs.rs/kube/0.66.0/kube/discovery/index.html) or [through a CRD](https://github.com/kube-rs/kopium/), two new sort orders have been exposed on the new [`kube_core::Version`](https://docs.rs/kube/latest/kube/core/enum.Version.html)
 
@@ -371,56 +371,56 @@ To aid users picking the most appropriate version of a `kind` from [api discover
 - [`Version::generation`](https://docs.rs/kube/0.66.0/kube/core/enum.Version.html#method.generation) implementing a more traditional; generational sort (highest version)
 
 ## Changes
-Merged PRs from [github release](https://github.com/kube-rs/kube-rs/releases/tag/0.66.0).
+Merged PRs from [github release](https://github.com/kube-rs/kube/releases/tag/0.66.0).
 ### Added
-* Add `DeleteParams` constructors for easily setting `PropagationPolicy` by @kate-goldenring in https://github.com/kube-rs/kube-rs/pull/757
-* Add Serialize to ObjecList and add field-selector and jsonpath example by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/760
-* Implement cordon/uncordon for Node by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/762
-* Export Version priority parser with Ord impls in kube_core by @clux in https://github.com/kube-rs/kube-rs/pull/764
-* Add Api fns for arbitrary subresources and approval subresource for CertificateSigningRequest by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/773
+* Add `DeleteParams` constructors for easily setting `PropagationPolicy` by @kate-goldenring in https://github.com/kube-rs/kube/pull/757
+* Add Serialize to ObjecList and add field-selector and jsonpath example by @ChinYing-Li in https://github.com/kube-rs/kube/pull/760
+* Implement cordon/uncordon for Node by @ChinYing-Li in https://github.com/kube-rs/kube/pull/762
+* Export Version priority parser with Ord impls in kube_core by @clux in https://github.com/kube-rs/kube/pull/764
+* Add Api fns for arbitrary subresources and approval subresource for CertificateSigningRequest by @ChinYing-Li in https://github.com/kube-rs/kube/pull/773
 
 ### Changed
-* Add backoff handling for watcher and Controller by @clux in https://github.com/kube-rs/kube-rs/pull/703
-* Remove crate private `identity_pem` field from `Config` by @kazk in https://github.com/kube-rs/kube-rs/pull/771
-* Use SecretString in AuthInfo to avoid credential leaking by @ChinYing-Li in https://github.com/kube-rs/kube-rs/pull/766
+* Add backoff handling for watcher and Controller by @clux in https://github.com/kube-rs/kube/pull/703
+* Remove crate private `identity_pem` field from `Config` by @kazk in https://github.com/kube-rs/kube/pull/771
+* Use SecretString in AuthInfo to avoid credential leaking by @ChinYing-Li in https://github.com/kube-rs/kube/pull/766
 
-[0.65.0](https://github.com/kube-rs/kube-rs/releases/tag/0.65.0) / 2021-12-10
+[0.65.0](https://github.com/kube-rs/kube/releases/tag/0.65.0) / 2021-12-10
 ===================
 
- * BREAKING: Removed `kube::Error::OpenSslError` - [#716](https://github.com/kube-rs/kube-rs/issues/716)
- * BREAKING: Removed `kube::Error::SslError` - [#704](https://github.com/kube-rs/kube-rs/issues/704) and [#716](https://github.com/kube-rs/kube-rs/issues/716)
- * BREAKING: Added `kube::Error::NativeTls(kube::client::NativeTlsError)` for errors from Native TLS - [#716](https://github.com/kube-rs/kube-rs/issues/716)
- * BREAKING: Added `kube::Error::RustlsTls(kube::client::RustlsTlsError)` for errors from Rustls TLS - [#704](https://github.com/kube-rs/kube-rs/issues/704)
- * Modified `Kubeconfig` parsing - allow empty kubeconfigs as per kubectl - [#721](https://github.com/kube-rs/kube-rs/issues/721)
- * Added `Kubeconfig::from_yaml` - [#718](https://github.com/kube-rs/kube-rs/issues/718) via [#719](https://github.com/kube-rs/kube-rs/issues/719)
- * Updated `rustls` to 0.20.1 - [#704](https://github.com/kube-rs/kube-rs/issues/704)
- * BREAKING: Added `ObjectRef` to the object that failed to be reconciled to `kube::runtime::controller::Error::ReconcileFailed` - [#733](https://github.com/kube-rs/kube-rs/issues/733)
- * BREAKING: Removed `api_version` and `kind` fields from `kind` structs generated by `kube::CustomResource` - [#739](https://github.com/kube-rs/kube-rs/issues/739)
- * Updated `tokio-tungstenite` to 0.16 - [#750](https://github.com/kube-rs/kube-rs/issues/750)
- * Updated `tower-http` to 0.2.0 - [#748](https://github.com/kube-rs/kube-rs/issues/748)
- * BREAKING: `kube-client`: replace `RefreshTokenLayer` with `AsyncFilterLayer` in `AuthLayer` - [#752](https://github.com/kube-rs/kube-rs/issues/752)
+ * BREAKING: Removed `kube::Error::OpenSslError` - [#716](https://github.com/kube-rs/kube/issues/716)
+ * BREAKING: Removed `kube::Error::SslError` - [#704](https://github.com/kube-rs/kube/issues/704) and [#716](https://github.com/kube-rs/kube/issues/716)
+ * BREAKING: Added `kube::Error::NativeTls(kube::client::NativeTlsError)` for errors from Native TLS - [#716](https://github.com/kube-rs/kube/issues/716)
+ * BREAKING: Added `kube::Error::RustlsTls(kube::client::RustlsTlsError)` for errors from Rustls TLS - [#704](https://github.com/kube-rs/kube/issues/704)
+ * Modified `Kubeconfig` parsing - allow empty kubeconfigs as per kubectl - [#721](https://github.com/kube-rs/kube/issues/721)
+ * Added `Kubeconfig::from_yaml` - [#718](https://github.com/kube-rs/kube/issues/718) via [#719](https://github.com/kube-rs/kube/issues/719)
+ * Updated `rustls` to 0.20.1 - [#704](https://github.com/kube-rs/kube/issues/704)
+ * BREAKING: Added `ObjectRef` to the object that failed to be reconciled to `kube::runtime::controller::Error::ReconcileFailed` - [#733](https://github.com/kube-rs/kube/issues/733)
+ * BREAKING: Removed `api_version` and `kind` fields from `kind` structs generated by `kube::CustomResource` - [#739](https://github.com/kube-rs/kube/issues/739)
+ * Updated `tokio-tungstenite` to 0.16 - [#750](https://github.com/kube-rs/kube/issues/750)
+ * Updated `tower-http` to 0.2.0 - [#748](https://github.com/kube-rs/kube/issues/748)
+ * BREAKING: `kube-client`: replace `RefreshTokenLayer` with `AsyncFilterLayer` in `AuthLayer` - [#752](https://github.com/kube-rs/kube/issues/752)
 
-[0.64.0](https://github.com/kube-rs/kube-rs/releases/tag/0.64.0) / 2021-11-16
+[0.64.0](https://github.com/kube-rs/kube/releases/tag/0.64.0) / 2021-11-16
 ===================
 
- * BREAKING: Replaced feature `kube-derive/schema` with attribute `#[kube(schema)]` - [#690](https://github.com/kube-rs/kube-rs/issues/690)
+ * BREAKING: Replaced feature `kube-derive/schema` with attribute `#[kube(schema)]` - [#690](https://github.com/kube-rs/kube/issues/690)
    - If you currently disable default `kube-derive` default features to avoid automatic schema generation, add `#[kube(schema = "disabled")]` to your spec struct instead
- * BREAKING: Moved `CustomResource` derive crate overrides into subattribute `#[kube(crates(...))]` - [#690](https://github.com/kube-rs/kube-rs/issues/690)
+ * BREAKING: Moved `CustomResource` derive crate overrides into subattribute `#[kube(crates(...))]` - [#690](https://github.com/kube-rs/kube/issues/690)
    - Replace `#[kube(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..)]` with `#[kube(crates(kube_core = .., k8s_openapi = .., schema = .., serde = .., serde_json = ..))]`
- * Added `openssl-tls` feature to use `openssl` for TLS on all platforms. Note that, even though `native-tls` uses a platform specific TLS, `kube` requires `openssl` on all platforms because `native-tls` only allows PKCS12 input to load certificates and private key at the moment, and creating PKCS12 requires `openssl`. - [#700](https://github.com/kube-rs/kube-rs/issues/700)
- * BREAKING: Changed to fail loading configurations with PEM-encoded certificates containing invalid sections instead of ignoring them. Updated `pem` to 1.0.1. - [#702](https://github.com/kube-rs/kube-rs/issues/702)
- * `oauth`: Updated `tame-oauth` to [0.6.0](https://github.com/EmbarkStudios/tame-oauth/blob/main/CHANGELOG.md#060---2021-08-07) which supports the same default credentials flow as the Go `oauth2` for Google OAuth. In addition to reading the service account information from JSON file specified with `GOOGLE_APPLICATION_CREDENTIALS` environment variable, [Application Default Credentials](https://cloud.google.com/sdk/gcloud/reference/auth/application-default) from `gcloud`, and obtaining OAuth tokens from local metadata server when running inside GCP are now supported. - [#701](https://github.com/kube-rs/kube-rs/issues/701)
+ * Added `openssl-tls` feature to use `openssl` for TLS on all platforms. Note that, even though `native-tls` uses a platform specific TLS, `kube` requires `openssl` on all platforms because `native-tls` only allows PKCS12 input to load certificates and private key at the moment, and creating PKCS12 requires `openssl`. - [#700](https://github.com/kube-rs/kube/issues/700)
+ * BREAKING: Changed to fail loading configurations with PEM-encoded certificates containing invalid sections instead of ignoring them. Updated `pem` to 1.0.1. - [#702](https://github.com/kube-rs/kube/issues/702)
+ * `oauth`: Updated `tame-oauth` to [0.6.0](https://github.com/EmbarkStudios/tame-oauth/blob/main/CHANGELOG.md#060---2021-08-07) which supports the same default credentials flow as the Go `oauth2` for Google OAuth. In addition to reading the service account information from JSON file specified with `GOOGLE_APPLICATION_CREDENTIALS` environment variable, [Application Default Credentials](https://cloud.google.com/sdk/gcloud/reference/auth/application-default) from `gcloud`, and obtaining OAuth tokens from local metadata server when running inside GCP are now supported. - [#701](https://github.com/kube-rs/kube/issues/701)
 
 ### Refining Errors
 
-We started working on improving error ergonomics. See the tracking issue [#688](https://github.com/kube-rs/kube-rs/issues/688) for more details.
+We started working on improving error ergonomics. See the tracking issue [#688](https://github.com/kube-rs/kube/issues/688) for more details.
 
 The following is the summary of changes to `kube::Error` included in this release:
 
 * Added `Error::Auth(kube::client::AuthError)` (errors related to client auth, some of them were previously in `Error::Kubeconfig`)
 * Added `Error::BuildRequest(kube::core::request::Error)` (errors building request from `kube::core`)
 * Added `Error::InferConfig(kube::config::InferConfigError)` (for `Client::try_default`)
-* Added `Error::OpensslTls(kube::client::OpensslTlsError)` (new `openssl-tls` feature) - [#700](https://github.com/kube-rs/kube-rs/issues/700)
+* Added `Error::OpensslTls(kube::client::OpensslTlsError)` (new `openssl-tls` feature) - [#700](https://github.com/kube-rs/kube/issues/700)
 * Added `Error::UpgradeConnection(kube::client::UpgradeConnectinError)` (`ws` feature, errors from upgrading a connection)
 * Removed `Error::Connection` (was unused)
 * Removed `Error::RequestBuild` (was unused)
@@ -441,132 +441,132 @@ The following is the summary of changes to `kube::Error` included in this releas
 
 The following breaking changes were made as a part of an effort to refine errors (the list is large, but most of them are lower level, and shouldn't require much change in most cases):
 
-* Removed `impl From<E> for kube::Error` - [#686](https://github.com/kube-rs/kube-rs/issues/686)
-* Removed unused error variants in `kube::Error`: `Connection`, `RequestBuild`, `RequestSend`, `RequestParse` - [#689](https://github.com/kube-rs/kube-rs/issues/689)
-* Removed unused error variant `kube::error::ConfigError::LoadConfigFile` - [#689](https://github.com/kube-rs/kube-rs/issues/689)
-* Changed `kube::Error::RequestValidation(String)` to `kube::Error::BuildRequest(kube::core::request::Error)`. Includes possible errors from building an HTTP request, and contains some errors from `kube::core` that was previously grouped under `kube::Error::SerdeError` and `kube::Error::HttpError`. `kube::core::request::Error` is described below. - [#686](https://github.com/kube-rs/kube-rs/issues/686)
-* Removed `kube::core::Error` and `kube::core::Result`. `kube::core::Error` was replaced by more specific errors. - [#686](https://github.com/kube-rs/kube-rs/issues/686)
+* Removed `impl From<E> for kube::Error` - [#686](https://github.com/kube-rs/kube/issues/686)
+* Removed unused error variants in `kube::Error`: `Connection`, `RequestBuild`, `RequestSend`, `RequestParse` - [#689](https://github.com/kube-rs/kube/issues/689)
+* Removed unused error variant `kube::error::ConfigError::LoadConfigFile` - [#689](https://github.com/kube-rs/kube/issues/689)
+* Changed `kube::Error::RequestValidation(String)` to `kube::Error::BuildRequest(kube::core::request::Error)`. Includes possible errors from building an HTTP request, and contains some errors from `kube::core` that was previously grouped under `kube::Error::SerdeError` and `kube::Error::HttpError`. `kube::core::request::Error` is described below. - [#686](https://github.com/kube-rs/kube/issues/686)
+* Removed `kube::core::Error` and `kube::core::Result`. `kube::core::Error` was replaced by more specific errors. - [#686](https://github.com/kube-rs/kube/issues/686)
   - Replaced `kube::core::Error::InvalidGroupVersion` with `kube::core::gvk::ParseGroupVersionError`
   - Changed the error returned from `kube::core::admission::AdmissionRequest::with_patch` to `kube::core::admission::SerializePatchError` (was `kube::core::Error::SerdeError`)
   - Changed the error associated with `TryInto<AdmissionRequest<T>>` to `kube::core::admission::ConvertAdmissionReviewError` (was `kube::core::Error::RequestValidation`)
   - Changed the error returned from methods of `kube::core::Request` to `kube::core::request::Error` (was `kube::core::Error`). `kube::core::request::Error` represents possible errors when building an HTTP request. The removed `kube::core::Error` had `RequestValidation(String)`, `SerdeError(serde_json::Error)`, and `HttpError(http::Error)` variants. They are now `Validation(String)`, `SerializeBody(serde_json::Error)`, and  `BuildRequest(http::Error)` respectively in `kube::core::request::Error`.
-* Changed variants of error enums in `kube::runtime` to tuples. Replaced `snafu` with `thiserror`. - [#686](https://github.com/kube-rs/kube-rs/issues/686)
-* Removed `kube::error::ConfigError` and `kube::Error::Kubeconfig(ConfigError)` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Changed variants of error enums in `kube::runtime` to tuples. Replaced `snafu` with `thiserror`. - [#686](https://github.com/kube-rs/kube/issues/686)
+* Removed `kube::error::ConfigError` and `kube::Error::Kubeconfig(ConfigError)` - [#696](https://github.com/kube-rs/kube/issues/696)
   - Error variants related to client auth were moved to a new error `kube::client::AuthError` as described below
   - Remaining variants were split into `kube::config::{InferConfigError, InClusterError, KubeconfigError}` as described below
-* Added `kube::client::AuthError` by extracting error variants related to client auth from `kube::ConfigError` and adding more variants to preserve context - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Moved `kube::error::OAuthError` to `kube::client::OAuthError` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Changed all errors in `kube::client::auth` to `kube::client::AuthError` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Added `kube::Error::Auth(kube::client::AuthError)` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Added `kube::config::InferConfigError` which is an error from `Config::infer()` and `kube::Error::InferConfig(kube::config::InferConfigError)` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Added `kube::config::InClusterError` for errors related to loading in-cluster configuration by splitting `kube::ConfigError` and adding more variants to preserve context. - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Added `kube::config::KubeconfigError` for errors related to loading kubeconfig by splitting `kube::ConfigError` and adding more variants to preserve context. - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Changed methods of `kube::Config` to return these erorrs instead of `kube::Error` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Removed `kube::Error::InvalidUri` which was replaced by error variants preserving context, such as `KubeconfigError::ParseProxyUrl` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
-* Moved all errors from upgrading to a WebSocket connection into `kube::Error::UpgradeConnection(kube::client::UpgradeConnectionError)` - [#696](https://github.com/kube-rs/kube-rs/issues/696)
+* Added `kube::client::AuthError` by extracting error variants related to client auth from `kube::ConfigError` and adding more variants to preserve context - [#696](https://github.com/kube-rs/kube/issues/696)
+* Moved `kube::error::OAuthError` to `kube::client::OAuthError` - [#696](https://github.com/kube-rs/kube/issues/696)
+* Changed all errors in `kube::client::auth` to `kube::client::AuthError` - [#696](https://github.com/kube-rs/kube/issues/696)
+* Added `kube::Error::Auth(kube::client::AuthError)` - [#696](https://github.com/kube-rs/kube/issues/696)
+* Added `kube::config::InferConfigError` which is an error from `Config::infer()` and `kube::Error::InferConfig(kube::config::InferConfigError)` - [#696](https://github.com/kube-rs/kube/issues/696)
+* Added `kube::config::InClusterError` for errors related to loading in-cluster configuration by splitting `kube::ConfigError` and adding more variants to preserve context. - [#696](https://github.com/kube-rs/kube/issues/696)
+* Added `kube::config::KubeconfigError` for errors related to loading kubeconfig by splitting `kube::ConfigError` and adding more variants to preserve context. - [#696](https://github.com/kube-rs/kube/issues/696)
+* Changed methods of `kube::Config` to return these erorrs instead of `kube::Error` - [#696](https://github.com/kube-rs/kube/issues/696)
+* Removed `kube::Error::InvalidUri` which was replaced by error variants preserving context, such as `KubeconfigError::ParseProxyUrl` - [#696](https://github.com/kube-rs/kube/issues/696)
+* Moved all errors from upgrading to a WebSocket connection into `kube::Error::UpgradeConnection(kube::client::UpgradeConnectionError)` - [#696](https://github.com/kube-rs/kube/issues/696)
 
 </details>
 
-[0.63.2](https://github.com/kube-rs/kube-rs/releases/tag/0.63.2) / 2021-10-28
+[0.63.2](https://github.com/kube-rs/kube/releases/tag/0.63.2) / 2021-10-28
 ===================
-* `kube::runtime::events`: fix build and hide module on kubernetes < 1.19 (events/v1 missing there) - [#685](https://github.com/kube-rs/kube-rs/issues/685)
+* `kube::runtime::events`: fix build and hide module on kubernetes < 1.19 (events/v1 missing there) - [#685](https://github.com/kube-rs/kube/issues/685)
 
-[0.63.1](https://github.com/kube-rs/kube-rs/releases/tag/0.63.1) / 2021-10-26
+[0.63.1](https://github.com/kube-rs/kube/releases/tag/0.63.1) / 2021-10-26
 ===================
- * `kube::runtime::wait::Condition` added boolean combinators (`not`/`and`/`or`) - [#678](https://github.com/kube-rs/kube-rs/issues/678)
- * `kube`: fix docs.rs build - [#681](https://github.com/kube-rs/kube-rs/issues/681) via [#682](https://github.com/kube-rs/kube-rs/pull/682)
+ * `kube::runtime::wait::Condition` added boolean combinators (`not`/`and`/`or`) - [#678](https://github.com/kube-rs/kube/issues/678)
+ * `kube`: fix docs.rs build - [#681](https://github.com/kube-rs/kube/issues/681) via [#682](https://github.com/kube-rs/kube/pull/682)
 
-[0.63.0](https://github.com/kube-rs/kube-rs/releases/tag/0.63.0) / 2021-10-26
+[0.63.0](https://github.com/kube-rs/kube/releases/tag/0.63.0) / 2021-10-26
 ===================
- * rust `edition` bumped to `2021` - [#664](https://github.com/kube-rs/kube-rs/pull/664/), [#666](https://github.com/kube-rs/kube-rs/pull/666), [#667](https://github.com/kube-rs/kube-rs/pull/667)
- * `kube::CustomResource` derive can now take arbitrary `#[kube(k8s_openapi)]` style-paths for `k8s_openapi`, `schemars`, `serde`, and `serde_json` - [#675](https://github.com/kube-rs/kube-rs/pull/675)
- * `kube`: fix `native-tls` included when only `rustls-tls` feature is selected - [#673](https://github.com/kube-rs/kube-rs/issues/673) via [#674](https://github.com/kube-rs/kube-rs/pull/674)
+ * rust `edition` bumped to `2021` - [#664](https://github.com/kube-rs/kube/pull/664/), [#666](https://github.com/kube-rs/kube/pull/666), [#667](https://github.com/kube-rs/kube/pull/667)
+ * `kube::CustomResource` derive can now take arbitrary `#[kube(k8s_openapi)]` style-paths for `k8s_openapi`, `schemars`, `serde`, and `serde_json` - [#675](https://github.com/kube-rs/kube/pull/675)
+ * `kube`: fix `native-tls` included when only `rustls-tls` feature is selected - [#673](https://github.com/kube-rs/kube/issues/673) via [#674](https://github.com/kube-rs/kube/pull/674)
 
-[0.62.0](https://github.com/kube-rs/kube-rs/releases/tag/0.62.0) / 2021-10-22
+[0.62.0](https://github.com/kube-rs/kube/releases/tag/0.62.0) / 2021-10-22
 ===================
- * `kube` now re-exports `kube-runtime` under `runtime` feature - [#651](https://github.com/kube-rs/kube-rs/issues/651) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
+ * `kube` now re-exports `kube-runtime` under `runtime` feature - [#651](https://github.com/kube-rs/kube/issues/651) via [#652](https://github.com/kube-rs/kube/issues/652)
   - no need to keep both `kube` and `kube_runtime` in `Cargo.toml` anymore
   - fixes issues with dependabot / lock-step upgrading
   - change `kube_runtime::X` import paths to `kube::runtime::X` when moving to the feature
- * `kube::runtime` added `events` module with an event `Recorder` - [#249](https://github.com/kube-rs/kube-rs/issues/249) via [#653](https://github.com/kube-rs/kube-rs/issues/653) + [#662](https://github.com/kube-rs/kube-rs/issues/662) + [#663](https://github.com/kube-rs/kube-rs/issues/663)
- * `kube::runtime::wait::conditions` added `is_crd_established` helper - [#659](https://github.com/kube-rs/kube-rs/issues/659)
- * `kube::CustomResource` derive can now take an arbitrary `#[kube(kube_core)]` path for `kube::core` - [#658](https://github.com/kube-rs/kube-rs/issues/658)
+ * `kube::runtime` added `events` module with an event `Recorder` - [#249](https://github.com/kube-rs/kube/issues/249) via [#653](https://github.com/kube-rs/kube/issues/653) + [#662](https://github.com/kube-rs/kube/issues/662) + [#663](https://github.com/kube-rs/kube/issues/663)
+ * `kube::runtime::wait::conditions` added `is_crd_established` helper - [#659](https://github.com/kube-rs/kube/issues/659)
+ * `kube::CustomResource` derive can now take an arbitrary `#[kube(kube_core)]` path for `kube::core` - [#658](https://github.com/kube-rs/kube/issues/658)
  * `kube::core` consistently re-exported across crates
- * docs: major overhaul + [architecture.md](https://kube.rs/architecture/) - [#416](https://github.com/kube-rs/kube-rs/issues/416) via [#652](https://github.com/kube-rs/kube-rs/issues/652)
+ * docs: major overhaul + [architecture.md](https://kube.rs/architecture/) - [#416](https://github.com/kube-rs/kube/issues/416) via [#652](https://github.com/kube-rs/kube/issues/652)
 
-[0.61.0](https://github.com/kube-rs/kube-rs/releases/tag/0.61.0) / 2021-10-09
+[0.61.0](https://github.com/kube-rs/kube/releases/tag/0.61.0) / 2021-10-09
 ===================
- * `kube-core`: BREAKING: extend `CustomResourceExt` trait with `::shortnames` method (impl in `kube-derive`) - [#641](https://github.com/kube-rs/kube-rs/issues/641)
- * `kube-runtime`: add `wait` module to `await_condition`, and added `watch_object` to watcher - [#632](https://github.com/kube-rs/kube-rs/issues/632) via [#633](https://github.com/kube-rs/kube-rs/issues/633)
- * `kube`: add `Restart` marker trait to allow `Api::restart` on core workloads - [#630](https://github.com/kube-rs/kube-rs/issues/630) via [#635](https://github.com/kube-rs/kube-rs/issues/635)
- * bump dependencies: `tokio-tungstenite`, `k8s-openapi`, `schemars`, `tokio` in particular - [#643](https://github.com/kube-rs/kube-rs/issues/643) + [#645](https://github.com/kube-rs/kube-rs/issues/645)
+ * `kube-core`: BREAKING: extend `CustomResourceExt` trait with `::shortnames` method (impl in `kube-derive`) - [#641](https://github.com/kube-rs/kube/issues/641)
+ * `kube-runtime`: add `wait` module to `await_condition`, and added `watch_object` to watcher - [#632](https://github.com/kube-rs/kube/issues/632) via [#633](https://github.com/kube-rs/kube/issues/633)
+ * `kube`: add `Restart` marker trait to allow `Api::restart` on core workloads - [#630](https://github.com/kube-rs/kube/issues/630) via [#635](https://github.com/kube-rs/kube/issues/635)
+ * bump dependencies: `tokio-tungstenite`, `k8s-openapi`, `schemars`, `tokio` in particular - [#643](https://github.com/kube-rs/kube/issues/643) + [#645](https://github.com/kube-rs/kube/issues/645)
 
-[0.60.0](https://github.com/kube-rs/kube-rs/releases/tag/0.60.0) / 2021-09-02
+[0.60.0](https://github.com/kube-rs/kube/releases/tag/0.60.0) / 2021-09-02
 ===================
- * `kube`: support `k8s-openapi` with `v1_22` features - [#621](https://github.com/kube-rs/kube-rs/issues/621) via [#622](https://github.com/kube-rs/kube-rs/issues/622)
- * `kube`: `BREAKING`: support for `CustomResourceDefinition` at `v1beta1` now requires an opt-in `deprecated-crd-v1beta1` feature - [#622](https://github.com/kube-rs/kube-rs/issues/622)
- * `kube-core`: add content-type header to requests with body - [#626](https://github.com/kube-rs/kube-rs/issues/626) via [#627](https://github.com/kube-rs/kube-rs/issues/627)
+ * `kube`: support `k8s-openapi` with `v1_22` features - [#621](https://github.com/kube-rs/kube/issues/621) via [#622](https://github.com/kube-rs/kube/issues/622)
+ * `kube`: `BREAKING`: support for `CustomResourceDefinition` at `v1beta1` now requires an opt-in `deprecated-crd-v1beta1` feature - [#622](https://github.com/kube-rs/kube/issues/622)
+ * `kube-core`: add content-type header to requests with body - [#626](https://github.com/kube-rs/kube/issues/626) via [#627](https://github.com/kube-rs/kube/issues/627)
 
-[0.59.0](https://github.com/kube-rs/kube-rs/releases/tag/0.59.0) / 2021-08-09
+[0.59.0](https://github.com/kube-rs/kube/releases/tag/0.59.0) / 2021-08-09
 ===================
- * `BREAKING`: bumped `k8s-openapi` to [0.13.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.13.0) - [#581](https://github.com/kube-rs/kube-rs/issues/581) via [#616](https://github.com/kube-rs/kube-rs/issues/616)
- * `kube` connects to kubernetes via cluster dns when using `rustls` - [#587](https://github.com/kube-rs/kube-rs/issues/587) via [#597](https://github.com/kube-rs/kube-rs/issues/597)
-   - client now works with `rustls` feature __in-cluster__ - [#153](https://github.com/kube-rs/kube-rs/issues/153) via [#597](https://github.com/kube-rs/kube-rs/issues/597)
- * `kube` nicer serialization of `Kubeconfig` - [#613](https://github.com/kube-rs/kube-rs/issues/613)
- * `kube-core` added serde traits for `ApiResource` - [#590](https://github.com/kube-rs/kube-rs/issues/590)
- * `kube-core` added `CrdExtensions::crd_name` method (implemented by `kube-derive`) - [#583](https://github.com/kube-rs/kube-rs/issues/583)
- * `kube-core` added the `HasSpec` and `HasStatus` traits - [#605](https://github.com/kube-rs/kube-rs/issues/605)
- * `kube-derive` added support to automatically implement the `HasSpec` and `HasStatus` traits - [#605](https://github.com/kube-rs/kube-rs/issues/605)
-* `kube-runtime` fix tracing span hierarchy from applier - [#600](https://github.com/kube-rs/kube-rs/issues/600)
+ * `BREAKING`: bumped `k8s-openapi` to [0.13.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.13.0) - [#581](https://github.com/kube-rs/kube/issues/581) via [#616](https://github.com/kube-rs/kube/issues/616)
+ * `kube` connects to kubernetes via cluster dns when using `rustls` - [#587](https://github.com/kube-rs/kube/issues/587) via [#597](https://github.com/kube-rs/kube/issues/597)
+   - client now works with `rustls` feature __in-cluster__ - [#153](https://github.com/kube-rs/kube/issues/153) via [#597](https://github.com/kube-rs/kube/issues/597)
+ * `kube` nicer serialization of `Kubeconfig` - [#613](https://github.com/kube-rs/kube/issues/613)
+ * `kube-core` added serde traits for `ApiResource` - [#590](https://github.com/kube-rs/kube/issues/590)
+ * `kube-core` added `CrdExtensions::crd_name` method (implemented by `kube-derive`) - [#583](https://github.com/kube-rs/kube/issues/583)
+ * `kube-core` added the `HasSpec` and `HasStatus` traits - [#605](https://github.com/kube-rs/kube/issues/605)
+ * `kube-derive` added support to automatically implement the `HasSpec` and `HasStatus` traits - [#605](https://github.com/kube-rs/kube/issues/605)
+* `kube-runtime` fix tracing span hierarchy from applier - [#600](https://github.com/kube-rs/kube/issues/600)
 
-[0.58.1](https://github.com/kube-rs/kube-rs/releases/tag/0.58.1) / 2021-07-06
+[0.58.1](https://github.com/kube-rs/kube/releases/tag/0.58.1) / 2021-07-06
 ===================
- * `kube-runtime`: fix non-unix builds - [#582](https://github.com/kube-rs/kube-rs/issues/582)
+ * `kube-runtime`: fix non-unix builds - [#582](https://github.com/kube-rs/kube/issues/582)
 
-[0.58.0](https://github.com/kube-rs/kube-rs/releases/tag/0.58.0) / 2021-07-05
+[0.58.0](https://github.com/kube-rs/kube/releases/tag/0.58.0) / 2021-07-05
 ===================
- * `kube`: `BREAKING`: subresource marker traits renamed conjugation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - [#536](https://github.com/kube-rs/kube-rs/issues/536) via [#560](https://github.com/kube-rs/kube-rs/issues/560)
- * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - [#559](https://github.com/kube-rs/kube-rs/issues/559)
- * `kube-runtime` added `finalizer` helper [#291](https://github.com/kube-rs/kube-rs/issues/291) via [#475](https://github.com/kube-rs/kube-rs/issues/475)
- * `kube-runtime` added tracing for why reconciliations happened [#457](https://github.com/kube-rs/kube-rs/issues/457) via [#571](https://github.com/kube-rs/kube-rs/issues/571)
- * `kube-runtime` added `Controller::reconcile_all_on` to allow scheduling all objects for reconciliation [#551](https://github.com/kube-rs/kube-rs/issues/551) via [#555](https://github.com/kube-rs/kube-rs/issues/555)
- * `kube-runtime` added `Controller::graceful_shutdown_on` for shutting down the `Controller` while waiting for running reconciliations to finish - [#552](https://github.com/kube-rs/kube-rs/issues/552) via [#573](https://github.com/kube-rs/kube-rs/issues/573)
+ * `kube`: `BREAKING`: subresource marker traits renamed conjugation: `Log`, `Execute`, `Attach`, `Evict` (previously `Logging`, `Executable`, `Attachable`, `Evictable`) - [#536](https://github.com/kube-rs/kube/issues/536) via [#560](https://github.com/kube-rs/kube/issues/560)
+ * `kube-derive` added `#[kube(category)]` attr to set [CRD categories](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#categories) - [#559](https://github.com/kube-rs/kube/issues/559)
+ * `kube-runtime` added `finalizer` helper [#291](https://github.com/kube-rs/kube/issues/291) via [#475](https://github.com/kube-rs/kube/issues/475)
+ * `kube-runtime` added tracing for why reconciliations happened [#457](https://github.com/kube-rs/kube/issues/457) via [#571](https://github.com/kube-rs/kube/issues/571)
+ * `kube-runtime` added `Controller::reconcile_all_on` to allow scheduling all objects for reconciliation [#551](https://github.com/kube-rs/kube/issues/551) via [#555](https://github.com/kube-rs/kube/issues/555)
+ * `kube-runtime` added `Controller::graceful_shutdown_on` for shutting down the `Controller` while waiting for running reconciliations to finish - [#552](https://github.com/kube-rs/kube/issues/552) via [#573](https://github.com/kube-rs/kube/issues/573)
   - BREAKING: `controller::applier` now starts a graceful shutdown when the `queue` terminates
   - BREAKING: `scheduler` now shuts down immediately when `requests` terminates, rather than waiting for the pending reconciliations to drain
  * `kube-runtime` added tracking for reconciliation reason
-  - Added: `Controller::owns_with` and `Controller::watches_with` to pass a `dyntype` argument for dynamic `Api`s - [#575](https://github.com/kube-rs/kube-rs/issues/575)
+  - Added: `Controller::owns_with` and `Controller::watches_with` to pass a `dyntype` argument for dynamic `Api`s - [#575](https://github.com/kube-rs/kube/issues/575)
   - BREAKING: `Controller::owns` signature changed to not allow `DynamicType`s
   - BREAKING: `controller::trigger_*` now returns a `ReconcileRequest` rather than `ObjectRef`. The `ObjectRef` can be accessed via the `obj_ref` field
 
 ### Known Issues
-- Api::replace can fail to unset list values with k8s-openapi 0.12 [#581](https://github.com/kube-rs/kube-rs/issues/581)
+- Api::replace can fail to unset list values with k8s-openapi 0.12 [#581](https://github.com/kube-rs/kube/issues/581)
 
 0.57.0 / 2021-06-16
 ===================
- * `kube`: custom clients now respect default namespaces - fixes [#534](https://github.com/kube-rs/kube-rs/issues/534) via [#544](https://github.com/kube-rs/kube-rs/issues/544)
+ * `kube`: custom clients now respect default namespaces - fixes [#534](https://github.com/kube-rs/kube/issues/534) via [#544](https://github.com/kube-rs/kube/issues/544)
   - BREAKING: custom clients via `Client::new` must pass `config.default_namespace` as 2nd arg
- * `kube`: Added `CustomResourceExt` trait for `kube-derive` - [#497](https://github.com/kube-rs/kube-rs/issues/497) via [#545](https://github.com/kube-rs/kube-rs/issues/545)
+ * `kube`: Added `CustomResourceExt` trait for `kube-derive` - [#497](https://github.com/kube-rs/kube/issues/497) via [#545](https://github.com/kube-rs/kube/issues/545)
   - BREAKING: `kube-derive` users must import `kube::CustomResourceExt` (or `kube::core::crd::v1beta1::CustomResourceExt` if using legacy `#[kube(apiextensions = "v1beta1")]`) to use generated methods `Foo::crd` or `Foo::api_resource`
-  - BREAKING: `k8s_openapi` bumped to [0.12.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.12.0) - [#531](https://github.com/kube-rs/kube-rs/pull/531)
+  - BREAKING: `k8s_openapi` bumped to [0.12.0](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.12.0) - [#531](https://github.com/kube-rs/kube/pull/531)
     * Generated structs simplified + `Resource` trait expanded
     * Adds support for kubernetes `v1_21`
     * Contains bugfix for [kubernetes#102159](https://github.com/kubernetes/kubernetes/pull/102159)
- * `kube` resource plurals is no longer inferred from `k8s-openapi` structs - [#284](https://github.com/kube-rs/kube-rs/issues/284) via [#556](https://github.com/kube-rs/kube-rs/issues/556)
+ * `kube` resource plurals is no longer inferred from `k8s-openapi` structs - [#284](https://github.com/kube-rs/kube/issues/284) via [#556](https://github.com/kube-rs/kube/issues/556)
   - BREAKING: `kube::Resource` trait now requires a `plural` implementation
 
 ### Known Issues
-- Api::replace can fail to unset list values with k8s-openapi 0.12 [#581](https://github.com/kube-rs/kube-rs/issues/581)
+- Api::replace can fail to unset list values with k8s-openapi 0.12 [#581](https://github.com/kube-rs/kube/issues/581)
 
 0.56.0 / 2021-06-05
 ===================
- * `kube`: added `Api::default_namespaced` - [#209](https://github.com/kube-rs/kube-rs/issues/209) via [#534](https://github.com/kube-rs/kube-rs/issues/534)
- * `kube`: added `config` feature - [#533](https://github.com/kube-rs/kube-rs/issues/533) via [#535](https://github.com/kube-rs/kube-rs/issues/535)
- * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module [#538](https://github.com/kube-rs/kube-rs/issues/538)
-  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds [#538](https://github.com/kube-rs/kube-rs/issues/538)
+ * `kube`: added `Api::default_namespaced` - [#209](https://github.com/kube-rs/kube/issues/209) via [#534](https://github.com/kube-rs/kube/issues/534)
+ * `kube`: added `config` feature - [#533](https://github.com/kube-rs/kube/issues/533) via [#535](https://github.com/kube-rs/kube/issues/535)
+ * `kube`: BREAKING: moved `client::discovery` module to `kube::discovery` and rewritten module [#538](https://github.com/kube-rs/kube/issues/538)
+  - `discovery`: added `oneshot` helpers for quick selection of recommended resources / kinds [#538](https://github.com/kube-rs/kube/issues/538)
   - `discovery`: moved `ApiResource` and `ApiCapabilities` (result of discovery) to `kube_core::discovery`
   - BREAKING: removed internal `ApiResource::from_apiresource`
 
- * `kube::Client` is now configurable with layers using `tower-http` [#539](https://github.com/kube-rs/kube-rs/issues/539) via [#540](https://github.com/kube-rs/kube-rs/issues/540)
+ * `kube::Client` is now configurable with layers using `tower-http` [#539](https://github.com/kube-rs/kube/issues/539) via [#540](https://github.com/kube-rs/kube/issues/540)
   - three new examples added: [`custom_client`](./examples/custom_client.rs), [`custom_client_tls`](./examples/custom_client_tls.rs) and [`custom_client_trace`](./examples/custom_client_trace.rs)
   - Big feature streamlining, big service and layer restructuring, dependency restructurings
   - Changes can hit advanced users, but unlikely to hit base use cases with `Api` and `Client`.
@@ -574,11 +574,11 @@ The following breaking changes were made as a part of an effort to refine errors
 
 ### TLS Enhancements
 
-- Add `kube::client::ConfigExt` extending `Config` for custom `Client`. This includes methods to configure TLS connection when building a custom client [#539](https://github.com/kube-rs/kube-rs/issues/539)
+- Add `kube::client::ConfigExt` extending `Config` for custom `Client`. This includes methods to configure TLS connection when building a custom client [#539](https://github.com/kube-rs/kube/issues/539)
   - `native-tls`: `Config::native_tls_https_connector` and `Config::native_tls_connector`
   - `rustls-tls`: `Config::rustls_https_connector` and `Config::rustls_client_config`
 - Remove the requirement of having `native-tls` or `rustls-tls` enabled when `client` is enabled. Allow one, both or none.
-  - When both, the default Service will use `native-tls` because of [#153](https://github.com/kube-rs/kube-rs/issues/153). `rustls` can be still used with a custom client. Users will have an option to configure TLS at runtime.
+  - When both, the default Service will use `native-tls` because of [#153](https://github.com/kube-rs/kube/issues/153). `rustls` can be still used with a custom client. Users will have an option to configure TLS at runtime.
   - When none, HTTP connector is used.
 - Remove TLS features from `kube-runtime`
   - **BREAKING**: Features must be removed if specified
@@ -607,29 +607,29 @@ The following breaking changes were made as a part of an effort to refine errors
 
 0.55.0 / 2021-05-21
 ===================
- * `kube`: `client` feature added (default-enabled) - [#528](https://github.com/kube-rs/kube-rs/issues/528)
- * `kube`: `PatchParams` force now only works with `Patch::Apply` [#528](https://github.com/kube-rs/kube-rs/issues/528)
- * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/kube-rs/kube-rs/issues/495) + [#482](https://github.com/kube-rs/kube-rs/issues/482)
+ * `kube`: `client` feature added (default-enabled) - [#528](https://github.com/kube-rs/kube/issues/528)
+ * `kube`: `PatchParams` force now only works with `Patch::Apply` [#528](https://github.com/kube-rs/kube/issues/528)
+ * `kube`: `api` `discovery` module now uses a new `ApiResource` struct [#495](https://github.com/kube-rs/kube/issues/495) + [#482](https://github.com/kube-rs/kube/issues/482)
  * `kube`: `api` BREAKING: `DynamicObject` + `Object` now takes an `ApiResource` rather than a `GroupVersionKind`
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
  * `kube`: `client` BREAKING: `kube::client::Status` moved to `kube::core::Status` (accidental, re-adding in 0.56)
- * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/kube-rs/kube-rs/issues/516) via [#517](https://github.com/kube-rs/kube-rs/issues/517) + [#519](https://github.com/kube-rs/kube-rs/issues/519) + [#522](https://github.com/kube-rs/kube-rs/issues/522) + [#528](https://github.com/kube-rs/kube-rs/issues/528) + [#530](https://github.com/kube-rs/kube-rs/issues/530)
- * `kube`: `kube::Service` removed to allow `kube::Client` to take an abritrary `Service<http::Request<hyper::Body>>` - [#532](https://github.com/kube-rs/kube-rs/issues/532)
+ * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/kube-rs/kube/issues/516) via [#517](https://github.com/kube-rs/kube/issues/517) + [#519](https://github.com/kube-rs/kube/issues/519) + [#522](https://github.com/kube-rs/kube/issues/522) + [#528](https://github.com/kube-rs/kube/issues/528) + [#530](https://github.com/kube-rs/kube/issues/530)
+ * `kube`: `kube::Service` removed to allow `kube::Client` to take an abritrary `Service<http::Request<hyper::Body>>` - [#532](https://github.com/kube-rs/kube/issues/532)
 
 0.54.0 / 2021-05-19
 ===================
- * yanked 30 minutes after release due to [#525](https://github.com/kube-rs/kube-rs/issues/525)
+ * yanked 30 minutes after release due to [#525](https://github.com/kube-rs/kube/issues/525)
  * changes lifted to 0.55.0
 
 0.53.0 / 2021-05-15
 ===================
- * `kube`: `admission` controller module added under feature - [#477](https://github.com/kube-rs/kube-rs/issues/477) via [#484](https://github.com/kube-rs/kube-rs/issues/484) + fixes in [#488](https://github.com/kube-rs/kube-rs/issues/488) [#498](https://github.com/kube-rs/kube-rs/issues/498) [#499](https://github.com/kube-rs/kube-rs/issues/499) + [#507](https://github.com/kube-rs/kube-rs/issues/507) + [#509](https://github.com/kube-rs/kube-rs/issues/509)
- * `kube`: `config` parsing of pem blobs now resilient against missing newlines - [#504](https://github.com/kube-rs/kube-rs/issues/504) via [#505](https://github.com/kube-rs/kube-rs/issues/505)
- * `kube`: `discovery` module added to simplify dynamic api usage - [#491](https://github.com/kube-rs/kube-rs/issues/491)
- * `kube`: `api` BREAKING: `DynamicObject::namespace` renamed to `::within` - [#502](https://github.com/kube-rs/kube-rs/issues/502)
- * `kube`: `api` BREAKING: added `ResourceExt` trait moving the getters from `Resource` trait - [#486](https://github.com/kube-rs/kube-rs/issues/486)
- * `kube`: `api` added a generic interface for subresources via `Request` - [#487](https://github.com/kube-rs/kube-rs/issues/487)
- * `kube`: `api` fix bug in `PatchParams::dry_run` not being serialized correctly - [#511](https://github.com/kube-rs/kube-rs/issues/511)
+ * `kube`: `admission` controller module added under feature - [#477](https://github.com/kube-rs/kube/issues/477) via [#484](https://github.com/kube-rs/kube/issues/484) + fixes in [#488](https://github.com/kube-rs/kube/issues/488) [#498](https://github.com/kube-rs/kube/issues/498) [#499](https://github.com/kube-rs/kube/issues/499) + [#507](https://github.com/kube-rs/kube/issues/507) + [#509](https://github.com/kube-rs/kube/issues/509)
+ * `kube`: `config` parsing of pem blobs now resilient against missing newlines - [#504](https://github.com/kube-rs/kube/issues/504) via [#505](https://github.com/kube-rs/kube/issues/505)
+ * `kube`: `discovery` module added to simplify dynamic api usage - [#491](https://github.com/kube-rs/kube/issues/491)
+ * `kube`: `api` BREAKING: `DynamicObject::namespace` renamed to `::within` - [#502](https://github.com/kube-rs/kube/issues/502)
+ * `kube`: `api` BREAKING: added `ResourceExt` trait moving the getters from `Resource` trait - [#486](https://github.com/kube-rs/kube/issues/486)
+ * `kube`: `api` added a generic interface for subresources via `Request` - [#487](https://github.com/kube-rs/kube/issues/487)
+ * `kube`: `api` fix bug in `PatchParams::dry_run` not being serialized correctly - [#511](https://github.com/kube-rs/kube/issues/511)
 
 ### 0.53.0 Migration Guide
 The most likely issue you'll run into is from `kube` when using `Resource` trait which has been split:
@@ -644,26 +644,26 @@ The most likely issue you'll run into is from `kube` when using `Resource` trait
 
 0.52.0 / 2021-03-31
 ===================
- * `kube-derive`: allow overriding `#[kube(plural)]` and `#[kube(singular)]` - [#458](https://github.com/kube-rs/kube-rs/issues/458) via [#463](https://github.com/kube-rs/kube-rs/issues/463)
- * `kube`: added tracing instrumentation for io operations in `kube::Api` - [#455](https://github.com/kube-rs/kube-rs/issues/455)
- * `kube`: `DeleteParams`'s `Preconditions` is now public - [#459](https://github.com/kube-rs/kube-rs/issues/459) via [#460](https://github.com/kube-rs/kube-rs/issues/460)
- * `kube`: remove dependency on duplicate `derive_accept_key` for `ws` - [#452](https://github.com/kube-rs/kube-rs/issues/452)
- * `kube`: Properly verify websocket keys in `ws` handshake - [#447](https://github.com/kube-rs/kube-rs/issues/447)
- * `kube`: BREAKING: removed optional, and deprecated `runtime` module - [#454](https://github.com/kube-rs/kube-rs/issues/454)
- * `kube`: BREAKING: `ListParams` bookmarks default enabled - [#226](https://github.com/kube-rs/kube-rs/issues/226) via [#445](https://github.com/kube-rs/kube-rs/issues/445)
+ * `kube-derive`: allow overriding `#[kube(plural)]` and `#[kube(singular)]` - [#458](https://github.com/kube-rs/kube/issues/458) via [#463](https://github.com/kube-rs/kube/issues/463)
+ * `kube`: added tracing instrumentation for io operations in `kube::Api` - [#455](https://github.com/kube-rs/kube/issues/455)
+ * `kube`: `DeleteParams`'s `Preconditions` is now public - [#459](https://github.com/kube-rs/kube/issues/459) via [#460](https://github.com/kube-rs/kube/issues/460)
+ * `kube`: remove dependency on duplicate `derive_accept_key` for `ws` - [#452](https://github.com/kube-rs/kube/issues/452)
+ * `kube`: Properly verify websocket keys in `ws` handshake - [#447](https://github.com/kube-rs/kube/issues/447)
+ * `kube`: BREAKING: removed optional, and deprecated `runtime` module - [#454](https://github.com/kube-rs/kube/issues/454)
+ * `kube`: BREAKING: `ListParams` bookmarks default enabled - [#226](https://github.com/kube-rs/kube/issues/226) via [#445](https://github.com/kube-rs/kube/issues/445)
    - renames member `::allow_bookmarks` to `::bookmarks`
-   - `::default()` sets `bookmark` to `true` to avoid bad bad defaults [#219](https://github.com/kube-rs/kube-rs/issues/219)
+   - `::default()` sets `bookmark` to `true` to avoid bad bad defaults [#219](https://github.com/kube-rs/kube/issues/219)
    - method `::allow_bookmarks()` replaced by `::disable_bookmarks()`
  * `kube`: `DynamicObject` and `GroupVersionKind` introduced for full dynamic object support
  * `kube-runtime`: watchers/reflectors/controllers can be used with dynamic objects from api discovery
- * `kube`: Pluralisation now only happens for `k8s_openapi` objects by default [#481](https://github.com/kube-rs/kube-rs/issues/481)
-   - inflector dependency removed [#471](https://github.com/kube-rs/kube-rs/issues/471)
+ * `kube`: Pluralisation now only happens for `k8s_openapi` objects by default [#481](https://github.com/kube-rs/kube/issues/481)
+   - inflector dependency removed [#471](https://github.com/kube-rs/kube/issues/471)
    - added internal pluralisation helper for `k8s_openapi` objects
- * `kube`: BREAKING: Restructuring of low level `Resource` request builder [#474](https://github.com/kube-rs/kube-rs/issues/474)
+ * `kube`: BREAKING: Restructuring of low level `Resource` request builder [#474](https://github.com/kube-rs/kube/issues/474)
    - `Resource` renamed to `Request` and requires only a `path_url` to construct
  * `kube`: BREAKING: Mostly internal `Meta` trait revamped to support dynamic types
-   - `Meta` renamed to `kube::Resource` to mimic `k8s_openapi::Resource` [#478](https://github.com/kube-rs/kube-rs/issues/478)
-   - The trait now takes an optional associated type for runtime type info: `DynamicType` [#385](https://github.com/kube-rs/kube-rs/issues/385)
+   - `Meta` renamed to `kube::Resource` to mimic `k8s_openapi::Resource` [#478](https://github.com/kube-rs/kube/issues/478)
+   - The trait now takes an optional associated type for runtime type info: `DynamicType` [#385](https://github.com/kube-rs/kube/issues/385)
    - `Api::all_with` + `Api::namespaced_with` added for querying with dynamic families
    - see `dynamic_watcher` + `dynamic_api` for example usage
  * `kube-runtime`: BREAKING: lower level interface changes as a result of `kube::api::Meta` trait:
@@ -671,7 +671,7 @@ The most likely issue you'll run into is from `kube` when using `Resource` trait
   - `ObjectRef` now generic over `kube::Resource` rather than `RuntimeResource`
   - `reflector::{Writer, Store}` takes a `kube::Resource` rather than a `k8s_openapi::Resource`
  * `kube-derive`: BREAKING: Generated type no longer generates `k8s-openapi` traits
-  - This allows correct pluralisation via `#[kube(plural = "mycustomplurals")]` [#467](https://github.com/kube-rs/kube-rs/issues/467) via [#481](https://github.com/kube-rs/kube-rs/issues/481)
+  - This allows correct pluralisation via `#[kube(plural = "mycustomplurals")]` [#467](https://github.com/kube-rs/kube/issues/467) via [#481](https://github.com/kube-rs/kube/issues/481)
 
 ### 0.52.0 Migration Guide
 While we had a few breaking changes. Most are to low level internal interfaces and should not change much, but some changes you might need to make:
@@ -693,105 +693,105 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.51.0 / 2021-02-28
 ===================
- * `kube` `Config` now allows arbirary extension objects - [#425](https://github.com/kube-rs/kube-rs/issues/425)
- * `kube` `Config` now allows multiple yaml documents per kubeconfig - [#440](https://github.com/kube-rs/kube-rs/issues/440) via [#441](https://github.com/kube-rs/kube-rs/issues/441)
- * `kube-derive` now more robust and is using `darling` - [#435](https://github.com/kube-rs/kube-rs/issues/435)
+ * `kube` `Config` now allows arbirary extension objects - [#425](https://github.com/kube-rs/kube/issues/425)
+ * `kube` `Config` now allows multiple yaml documents per kubeconfig - [#440](https://github.com/kube-rs/kube/issues/440) via [#441](https://github.com/kube-rs/kube/issues/441)
+ * `kube-derive` now more robust and is using `darling` - [#435](https://github.com/kube-rs/kube/issues/435)
  * docs improvements to patch + runtime
 
 0.50.1 / 2021-02-17
 ===================
- * bug: fix oidc auth provider - [#424](https://github.com/kube-rs/kube-rs/issues/424) via [#419](https://github.com/kube-rs/kube-rs/issues/419)
+ * bug: fix oidc auth provider - [#424](https://github.com/kube-rs/kube/issues/424) via [#419](https://github.com/kube-rs/kube/issues/419)
 
 0.50.0 / 2021-02-10
 ===================
- * feat: added support for stacked kubeconfigs - [#132](https://github.com/kube-rs/kube-rs/issues/132) via [#411](https://github.com/kube-rs/kube-rs/issues/411)
- * refactor: authentication logic moved out of `kube::config` and into into `kube::service` - [#409](https://github.com/kube-rs/kube-rs/issues/409)
+ * feat: added support for stacked kubeconfigs - [#132](https://github.com/kube-rs/kube/issues/132) via [#411](https://github.com/kube-rs/kube/issues/411)
+ * refactor: authentication logic moved out of `kube::config` and into into `kube::service` - [#409](https://github.com/kube-rs/kube/issues/409)
   - BREAKING: `Config::get_auth_header` removed
- * refactor: remove `hyper` dependency from `kube::api` - [#410](https://github.com/kube-rs/kube-rs/issues/410)
- * refactor: `kube::Service` simpler auth and gzip handling - [#405](https://github.com/kube-rs/kube-rs/issues/405) + [#408](https://github.com/kube-rs/kube-rs/issues/408)
+ * refactor: remove `hyper` dependency from `kube::api` - [#410](https://github.com/kube-rs/kube/issues/410)
+ * refactor: `kube::Service` simpler auth and gzip handling - [#405](https://github.com/kube-rs/kube/issues/405) + [#408](https://github.com/kube-rs/kube/issues/408)
 
 0.49.0 / 2021-02-08
 ===================
- * dependency on `reqwest` + removed in favour of `hyper` + `tower` [#394](https://github.com/kube-rs/kube-rs/pull/394)
+ * dependency on `reqwest` + removed in favour of `hyper` + `tower` [#394](https://github.com/kube-rs/kube/pull/394)
    - refactor: `kube::Client` now uses `kube::Service` (a `tower::Service<http::Request<hyper::Body>>`) instead of `reqwest::Client` to handle all requests
    - refactor: `kube::Client` now uses a `tokio_util::codec` for internal buffering
    - refactor: `async-tungstenite` ws feature dependency replaced with `tokio-tungstenite`. `WebSocketStream` is now created from a connection upgraded with `hyper`
    - refactor: `oauth2` module for GCP OAuth replaced with optional `tame-oauth` dependency
    - BREAKING: GCP OAuth is now opt-in (`oauth` feature). Note that GCP provider with command based token source is supported by default.
-   - BREAKING: Gzip decompression is now opt-in (`gzip` feature) because Kubernetes does not have compression enabled by default yet and this feature requires extra dependencies. [#399](https://github.com/kube-rs/kube-rs/pull/399)
-   - BREAKING: `Client::new` now takes a `Service` instead of `Config` [#400](https://github.com/kube-rs/kube-rs/pull/400). Allows custom service for features not supported out of the box and testing. To create a `Client` from `Config`, use `Client::try_from` instead.
+   - BREAKING: Gzip decompression is now opt-in (`gzip` feature) because Kubernetes does not have compression enabled by default yet and this feature requires extra dependencies. [#399](https://github.com/kube-rs/kube/pull/399)
+   - BREAKING: `Client::new` now takes a `Service` instead of `Config` [#400](https://github.com/kube-rs/kube/pull/400). Allows custom service for features not supported out of the box and testing. To create a `Client` from `Config`, use `Client::try_from` instead.
    - BREAKING: Removed `Config::proxy`. Proxy is no longer supported out of the box, but it should be possible by using a custom Service.
    - fix: Refreshable token from auth provider not refreshing
-   - fix: Panic when loading config with non-GCP provider [#238](https://github.com/kube-rs/kube-rs/issues/238)
- * feat: subresource support added for `Evictable` types (marked for `Pod`) - [#393](https://github.com/kube-rs/kube-rs/pull/393)
- * `kube`: subresource marker traits renamed to `Loggable`, `Executable`, `Attachable` (previously `LoggingObject`, `ExecutingObject`, `AttachableObject`) - [#395](https://github.com/kube-rs/kube-rs/pull/395)
- * `examples` showcasing `kubectl cp` like behaviour [#381](https://github.com/kube-rs/kube-rs/issues/381) via [#392](https://github.com/kube-rs/kube-rs/pull/392)
+   - fix: Panic when loading config with non-GCP provider [#238](https://github.com/kube-rs/kube/issues/238)
+ * feat: subresource support added for `Evictable` types (marked for `Pod`) - [#393](https://github.com/kube-rs/kube/pull/393)
+ * `kube`: subresource marker traits renamed to `Loggable`, `Executable`, `Attachable` (previously `LoggingObject`, `ExecutingObject`, `AttachableObject`) - [#395](https://github.com/kube-rs/kube/pull/395)
+ * `examples` showcasing `kubectl cp` like behaviour [#381](https://github.com/kube-rs/kube/issues/381) via [#392](https://github.com/kube-rs/kube/pull/392)
 
 0.48.0 / 2021-01-23
 ===================
-  * bump `k8s-openapi` to `0.11.0` - [#388](https://github.com/kube-rs/kube-rs/pull/388)
-  * breaking: `kube`: no longer necessary to serialize patches yourself - [#386](https://github.com/kube-rs/kube-rs/pull/386)
+  * bump `k8s-openapi` to `0.11.0` - [#388](https://github.com/kube-rs/kube/pull/388)
+  * breaking: `kube`: no longer necessary to serialize patches yourself - [#386](https://github.com/kube-rs/kube/pull/386)
     - `PatchParams` removes `PatchStrategy`
     - `Api::patch*` methods now take an enum `Patch` type
     - optional `jsonpatch` feature added for `Patch::Json`
 
 0.47.0 / 2021-01-06
 ===================
-  * chore: upgrade `tokio` to `1.0` - [#363](https://github.com/kube-rs/kube-rs/pull/363)
+  * chore: upgrade `tokio` to `1.0` - [#363](https://github.com/kube-rs/kube/pull/363)
     * BREAKING: This requires the whole application to upgrade to `tokio` 1.0 and `reqwest` to 0.11.0
-  * docs: fix broken documentation in `kube` 0.46.0 [#367](https://github.com/kube-rs/kube-rs/pull/367)
-  * bug: `kube`: removed panics from `ws` features, fix `rustls` support + improve docs [#369](https://github.com/kube-rs/kube-rs/issues/369) via [#370](https://github.com/kube-rs/kube-rs/pull/370) + [#373](https://github.com/kube-rs/kube-rs/pull/373)
-  * bug: `AttachParams` now fixes owned method chaining (slightly breaks from 0.46 if using &mut ref before) - [#364](https://github.com/kube-rs/kube-rs/pull/364)
-  * feat: `AttachParams::interactive_tty` convenience method added - [#364](https://github.com/kube-rs/kube-rs/pull/364)
-  * bug: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - [#375](https://github.com/kube-rs/kube-rs/pull/375)
+  * docs: fix broken documentation in `kube` 0.46.0 [#367](https://github.com/kube-rs/kube/pull/367)
+  * bug: `kube`: removed panics from `ws` features, fix `rustls` support + improve docs [#369](https://github.com/kube-rs/kube/issues/369) via [#370](https://github.com/kube-rs/kube/pull/370) + [#373](https://github.com/kube-rs/kube/pull/373)
+  * bug: `AttachParams` now fixes owned method chaining (slightly breaks from 0.46 if using &mut ref before) - [#364](https://github.com/kube-rs/kube/pull/364)
+  * feat: `AttachParams::interactive_tty` convenience method added - [#364](https://github.com/kube-rs/kube/pull/364)
+  * bug: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - [#375](https://github.com/kube-rs/kube/pull/375)
 
 0.46.1 / 2021-01-06
 ===================
   * maintenance release for 0.46 (last supported tokio 0.2 release) from `tokio02` branch
-  * bug backport: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - [#375](https://github.com/kube-rs/kube-rs/pull/375)
+  * bug backport: fix `Runner` (and thus `Controller` and `applier`) not waking correctly when starting new tasks - [#375](https://github.com/kube-rs/kube/pull/375)
 
 0.46.0 / 2021-01-02
 ===================
-  * feat: `kube` now has __optional__ websocket support with `async_tungstenite` under `ws` and `ws-*-tls` features [#360](https://github.com/kube-rs/kube-rs/pull/360)
-  * feat: `AttachableObject` marker trait added and implemented for `k8s_openapi::api::core::v1::Pod` [#360](https://github.com/kube-rs/kube-rs/pull/360)
-  * feat: `AttachParams` added for `Api::exec` and `Api::attach` for `AttachableObject`s [#360](https://github.com/kube-rs/kube-rs/pull/360)
-  * examples: `pod_shell`, `pod_attach`, `pod_exec` demonstrating the new features [#360](https://github.com/kube-rs/kube-rs/pull/360)
+  * feat: `kube` now has __optional__ websocket support with `async_tungstenite` under `ws` and `ws-*-tls` features [#360](https://github.com/kube-rs/kube/pull/360)
+  * feat: `AttachableObject` marker trait added and implemented for `k8s_openapi::api::core::v1::Pod` [#360](https://github.com/kube-rs/kube/pull/360)
+  * feat: `AttachParams` added for `Api::exec` and `Api::attach` for `AttachableObject`s [#360](https://github.com/kube-rs/kube/pull/360)
+  * examples: `pod_shell`, `pod_attach`, `pod_exec` demonstrating the new features [#360](https://github.com/kube-rs/kube/pull/360)
 
 0.45.0 / 2020-12-26
 ===================
   * feat: `kube-derive` now has a default enabled `schema` feature
-    * allows opting out of `schemars` dependency for handwriting crds - [#355](https://github.com/kube-rs/kube-rs/issues/355)
-  * breaking: `kube-derive` attr `struct_name` renamed to `struct` - [#359](https://github.com/kube-rs/kube-rs/pull/359)
+    * allows opting out of `schemars` dependency for handwriting crds - [#355](https://github.com/kube-rs/kube/issues/355)
+  * breaking: `kube-derive` attr `struct_name` renamed to `struct` - [#359](https://github.com/kube-rs/kube/pull/359)
   * docs: improvements on `kube`, `kube-runtime`, `kube-derive`
 
 0.44.0 / 2020-12-23
 ===================
-  * feat: `kube-derive` now generates openapi v3 schemas and is thus usable with v1 `CustomResourceDefinition` - [#129](https://github.com/kube-rs/kube-rs/issues/129) and [#264](https://github.com/kube-rs/kube-rs/issues/264) via [#348](https://github.com/kube-rs/kube-rs/pull/348)
+  * feat: `kube-derive` now generates openapi v3 schemas and is thus usable with v1 `CustomResourceDefinition` - [#129](https://github.com/kube-rs/kube/issues/129) and [#264](https://github.com/kube-rs/kube/issues/264) via [#348](https://github.com/kube-rs/kube/pull/348)
     * BREAKING: `kube-derive` types now require `JsonSchema` derived via `schemars` libray (not breaking if going to 0.45.0)
-  * feat: `kube_runtime::controller`: now reconciles objects in parallel - [#346](https://github.com/kube-rs/kube-rs/issues/346)
+  * feat: `kube_runtime::controller`: now reconciles objects in parallel - [#346](https://github.com/kube-rs/kube/issues/346)
     * BREAKING: `kube_runtime::controller::applier` now requires that the `reconciler`'s `Future` is `Unpin`,
                 `Box::pin` it or submit it to a runtime if this is not acceptable
     * BREAKING: `kube_runtime::controller::Controller` now requires that the `reconciler`'s `Future` is `Send + 'static`,
                 use the low-level `applier` interface instead if this is not acceptable
   * bug: `kube-runtime`: removed accidentally included `k8s-openapi` default features (you have to opt in to them yourself)
   * feat: `kube`: `TypeMeta` now derives additionally `Debug, Eq, PartialEq, Hash`
-  * bump: `k8s-openapi` to `0.10.0` - [#330](https://github.com/kube-rs/kube-rs/pull/330)
-  * bump: `serde_yaml` - [#349](https://github.com/kube-rs/kube-rs/issues/349)
-  * bump: `dirs` to `dirs-next` - [#340](https://github.com/kube-rs/kube-rs/pull/340)
+  * bump: `k8s-openapi` to `0.10.0` - [#330](https://github.com/kube-rs/kube/pull/330)
+  * bump: `serde_yaml` - [#349](https://github.com/kube-rs/kube/issues/349)
+  * bump: `dirs` to `dirs-next` - [#340](https://github.com/kube-rs/kube/pull/340)
 
 0.43.0 / 2020-10-08
 ===================
   * bug: `kube-derive` attr `#[kube(shortname)]` now working correctly
-  * bug: `kube-derive` now working with badly cased existing types - [#313](https://github.com/kube-rs/kube-rs/issues/313)
-  * missing: `kube` now correctly exports `config::NamedAuthInfo` - [#323](https://github.com/kube-rs/kube-rs/pull/323)
-  * feat: `kube`: expose `Config::get_auth_header` for istio use cases - [#322](https://github.com/kube-rs/kube-rs/issues/322)
-  * feat: `kube`: local config now tackles gcloud auth exec params - [#328](https://github.com/kube-rs/kube-rs/pull/328) and [#84](https://github.com/kube-rs/kube-rs/issues/84)
+  * bug: `kube-derive` now working with badly cased existing types - [#313](https://github.com/kube-rs/kube/issues/313)
+  * missing: `kube` now correctly exports `config::NamedAuthInfo` - [#323](https://github.com/kube-rs/kube/pull/323)
+  * feat: `kube`: expose `Config::get_auth_header` for istio use cases - [#322](https://github.com/kube-rs/kube/issues/322)
+  * feat: `kube`: local config now tackles gcloud auth exec params - [#328](https://github.com/kube-rs/kube/pull/328) and [#84](https://github.com/kube-rs/kube/issues/84)
   * `kube-derive` now actually requires GVK (in particular `#[kube(kind = "Foo")]` which we sometimes inferred earlier, despite documenting the contrary)
 
 0.42.0 / 2020-09-10
 ===================
-  * bug: `kube-derive`'s `Default` derive now sets typemeta correctly - [#315](https://github.com/kube-rs/kube-rs/issues/315)
-  * feat: `ListParams` now supports `continue_token` and `limit` - [#320](https://github.com/kube-rs/kube-rs/pull/320)
+  * bug: `kube-derive`'s `Default` derive now sets typemeta correctly - [#315](https://github.com/kube-rs/kube/issues/315)
+  * feat: `ListParams` now supports `continue_token` and `limit` - [#320](https://github.com/kube-rs/kube/pull/320)
 
 0.41.0 / 2020-09-10
 ===================
@@ -799,31 +799,31 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.40.0 / 2020-08-17
 ===================
-  * `DynamicResource::from_api_resource` added to allow apiserver returned resources - [#305](https://github.com/kube-rs/kube-rs/pull/305) via [#301](https://github.com/kube-rs/kube-rs/pull/301)
+  * `DynamicResource::from_api_resource` added to allow apiserver returned resources - [#305](https://github.com/kube-rs/kube/pull/305) via [#301](https://github.com/kube-rs/kube/pull/301)
   * `Client::list_api_groups` added
   * `Client::list_ap_group_resources` added
   * `Client::list_core_api_versions` added
   * `Client::list_core_api_resources` added
   * `kube::DynamicResource` exposed at top level
-  * Bug: `PatchParams::default_apply()` now requires a manager and renamed to `PatchParams::apply(manager: &str)` for [#300](https://github.com/kube-rs/kube-rs/issues/300)
-  * Bug: `DeleteParams` no longer missing for `Api::delete_collection` - [#53](https://github.com/kube-rs/kube-rs/issues/53)
+  * Bug: `PatchParams::default_apply()` now requires a manager and renamed to `PatchParams::apply(manager: &str)` for [#300](https://github.com/kube-rs/kube/issues/300)
+  * Bug: `DeleteParams` no longer missing for `Api::delete_collection` - [#53](https://github.com/kube-rs/kube/issues/53)
   * Removed paramter `ListParams::include_uninitialized` deprecated since 1.14
   * Added optional `PostParams::field_manager` was missing for `Api::create` case
 
 0.39.0 / 2020-08-05
 ===================
-  * Bug: `ObjectRef` tweak in `kube-runtime` to allow controllers triggering across cluster and namespace scopes - [#293](https://github.com/kube-rs/kube-rs/issues/293) via [#294](https://github.com/kube-rs/kube-rs/pull/294)
+  * Bug: `ObjectRef` tweak in `kube-runtime` to allow controllers triggering across cluster and namespace scopes - [#293](https://github.com/kube-rs/kube/issues/293) via [#294](https://github.com/kube-rs/kube/pull/294)
   * Feature: `kube` now has a `derive` feature which will re-export `kube::CustomResource` from `kube-derive::CustomResource`.
-  * Examples: revamp examples for `kube-runtime` - [#201](https://github.com/kube-rs/kube-rs/issues/201)
+  * Examples: revamp examples for `kube-runtime` - [#201](https://github.com/kube-rs/kube/issues/201)
 
 0.38.0 / 2020-07-23
 ===================
-  * Marked `kube::runtime` module as deprecated - [#281](https://github.com/kube-rs/kube-rs/issues/281)
-  * `Config::timeout` can now be overridden to `None` (with caveats) [#280](https://github.com/kube-rs/kube-rs/pull/280)
-  * Bug: reflector stores could have multiple copies inside datastore - [#286](https://github.com/kube-rs/kube-rs/issues/286)
-     - `dashmap` backend Store driver downgraded - [#286](https://github.com/kube-rs/kube-rs/issues/286)
+  * Marked `kube::runtime` module as deprecated - [#281](https://github.com/kube-rs/kube/issues/281)
+  * `Config::timeout` can now be overridden to `None` (with caveats) [#280](https://github.com/kube-rs/kube/pull/280)
+  * Bug: reflector stores could have multiple copies inside datastore - [#286](https://github.com/kube-rs/kube/issues/286)
+     - `dashmap` backend Store driver downgraded - [#286](https://github.com/kube-rs/kube/issues/286)
      - `Store::iter` temporarily removed
-  * Bug: Specialize WatchEvent::Bookmark so they can be deserialized - [#285](https://github.com/kube-rs/kube-rs/issues/285)
+  * Bug: Specialize WatchEvent::Bookmark so they can be deserialized - [#285](https://github.com/kube-rs/kube/issues/285)
   * Docs: Tons of docs for kube-runtime
 
 0.37.0 / 2020-07-20
@@ -834,9 +834,9 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.36.0 / 2020-07-19
 ===================
-  * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate [#258](https://github.com/kube-rs/kube-rs/pull/258)
-  * `Controller<K>` added ([#148](https://github.com/kube-rs/kube-rs/issues/148) via [#258](https://github.com/kube-rs/kube-rs/pull/258))
-  * `Reflector` api redesigned ([#102](https://github.com/kube-rs/kube-rs/issues/102) via [#258](https://github.com/kube-rs/kube-rs/pull/258))
+  * https://gitlab.com/teozkr/kube-rt/ merged in for a new `kube-runtime` crate [#258](https://github.com/kube-rs/kube/pull/258)
+  * `Controller<K>` added ([#148](https://github.com/kube-rs/kube/issues/148) via [#258](https://github.com/kube-rs/kube/pull/258))
+  * `Reflector` api redesigned ([#102](https://github.com/kube-rs/kube/issues/102) via [#258](https://github.com/kube-rs/kube/pull/258))
   * Migration release for `Informer` -> `watcher` + `Reflector` -> `reflector`
   * `kube::api::CustomResource` removed in favour of `kube::api::Resource::dynamic`
   * `CrBuilder` removed in favour of `DynamicResource` (with new error handling)
@@ -844,27 +844,27 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.35.1 / 2020-06-18
 ===================
-  * Fix in-cluster Client when using having multiple certs in the chain - [#251](https://github.com/kube-rs/kube-rs/issues/251)
+  * Fix in-cluster Client when using having multiple certs in the chain - [#251](https://github.com/kube-rs/kube/issues/251)
 
 0.35.0 / 2020-06-15
 ===================
-  * `Config::proxy` support added - [#246](https://github.com/kube-rs/kube-rs/pull/246)
-  * `PartialEq` can be derived with `kube-derive` - [#242](https://github.com/kube-rs/kube-rs/pull/242)
-  * Windows builds no longer clashes with runtime - [#240](https://github.com/kube-rs/kube-rs/pull/240)
-  * Rancher hosts (with path specifiers) now works - [#244](https://github.com/kube-rs/kube-rs/issues/244)
+  * `Config::proxy` support added - [#246](https://github.com/kube-rs/kube/pull/246)
+  * `PartialEq` can be derived with `kube-derive` - [#242](https://github.com/kube-rs/kube/pull/242)
+  * Windows builds no longer clashes with runtime - [#240](https://github.com/kube-rs/kube/pull/240)
+  * Rancher hosts (with path specifiers) now works - [#244](https://github.com/kube-rs/kube/issues/244)
 
 0.34.0 / 2020-05-08
 ===================
   * Bump `k8s-openapi` to `0.8.0`
   * `Config::from_cluster_env` <- renamed from `Config::new_from_cluster_env`
   * `Config::from_kubeconfig` <- renamed from `Config::new_from_kubeconfig`
-  * `Config::from_custom_kubeconfig` added - [#236](https://github.com/kube-rs/kube-rs/pull/236)
-  * Majorly overhauled error handlind in config module - [#237](https://github.com/kube-rs/kube-rs/pull/237)
+  * `Config::from_custom_kubeconfig` added - [#236](https://github.com/kube-rs/kube/pull/236)
+  * Majorly overhauled error handlind in config module - [#237](https://github.com/kube-rs/kube/pull/237)
 
 0.33.0 / 2020-04-27
 ===================
   * documentation fixes for `Api::patch`
-  * Config: add automatic token refresh - [#72](https://github.com/kube-rs/kube-rs/issues/72) / [#224](https://github.com/kube-rs/kube-rs/issues/224) / [#234](https://github.com/kube-rs/kube-rs/pull/234)
+  * Config: add automatic token refresh - [#72](https://github.com/kube-rs/kube/issues/72) / [#224](https://github.com/kube-rs/kube/issues/224) / [#234](https://github.com/kube-rs/kube/pull/234)
 
 0.32.1 / 2020-04-15
 ===================
@@ -883,7 +883,7 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
   * `Reflector<K>` now only takes an `Api<K>` to construct (.params method)
   * `Informer<K>` now only takes an `Api<K>` to construct (.params method)
   * `Informer::init_from` -> `Informer::set_version`
-  * `Reflector` now self-polls [#151](https://github.com/kube-rs/kube-rs/issues/151) + handles signals [#152](https://github.com/kube-rs/kube-rs/issues/152)
+  * `Reflector` now self-polls [#151](https://github.com/kube-rs/kube/issues/151) + handles signals [#152](https://github.com/kube-rs/kube/issues/152)
   * `Reflector::poll` made private in favour of `Reflector::run`
   * `Api::watch` no longer filters out error events (`next` -> `try_next`)
   * `Api::watch` returns `Result<WatchEvent>` rather than `WatchEvent`
@@ -921,7 +921,7 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 0.28.1 / 2020-03-07
 ===================
   * `#[derive(CustomResource)]` now implements `::new` on the generated `Kind`
-  * derived `Kind` now properly contains `TypeMeta` - [#170](https://github.com/kube-rs/kube-rs/issues/170)
+  * derived `Kind` now properly contains `TypeMeta` - [#170](https://github.com/kube-rs/kube/issues/170)
 
 0.28.0 / 2020-03-05
 ===================
@@ -938,18 +938,18 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 0.27.0 / 2020-02-26
 ===================
  * `Reflector` + `Informer` moved from `kube::api` to `kube::runtime`
- * `Informer` now resets the version to 0 rather than dropping events - [#134](https://github.com/kube-rs/kube-rs/issues/134)
+ * `Informer` now resets the version to 0 rather than dropping events - [#134](https://github.com/kube-rs/kube/issues/134)
    * Removed `Informer::init`, since it is now a no-op when building the `Informer`
  * Downgrade spurious log message when using service account auth
 
 0.26.0 / 2020-02-25
 ===================
-  * Fix a large percentage of EOFs from watches [#146](https://github.com/kube-rs/kube-rs/issues/146)
+  * Fix a large percentage of EOFs from watches [#146](https://github.com/kube-rs/kube/issues/146)
   * => default timeout down to 290s from 300s
-  * => `Reflector` now re-lists a lot less [#146](https://github.com/kube-rs/kube-rs/issues/146)
-  * Fix decoder panic with async-compression (probably) [#144](https://github.com/kube-rs/kube-rs/issues/144)
+  * => `Reflector` now re-lists a lot less [#146](https://github.com/kube-rs/kube/issues/146)
+  * Fix decoder panic with async-compression (probably) [#144](https://github.com/kube-rs/kube/issues/144)
   * `Informer::poll` can now be used with `TryStream`
-  * Exposed `Config::read` and `Config::read_from` - [#124](https://github.com/kube-rs/kube-rs/issues/124)
+  * Exposed `Config::read` and `Config::read_from` - [#124](https://github.com/kube-rs/kube/issues/124)
   * Fix typo on `Api::StatefulSet`
   * Fix typo on `Api::Endpoints`
   * Add `Api::v1CustomResourceDefinition` when on k8s >= 1.17
@@ -957,24 +957,24 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.25.0 / 2020-02-09
 ===================
-  * initial rustls support [#114](https://github.com/kube-rs/kube-rs/pull/114) (some local kube config issues know [#120](https://github.com/kube-rs/kube-rs/issues/120))
-  * crate does better version checking against openapi features - [#106](https://github.com/kube-rs/kube-rs/issues/106)
-  * initial `log_stream` support - [#109](https://github.com/kube-rs/kube-rs/issues/109)
+  * initial rustls support [#114](https://github.com/kube-rs/kube/pull/114) (some local kube config issues know [#120](https://github.com/kube-rs/kube/issues/120))
+  * crate does better version checking against openapi features - [#106](https://github.com/kube-rs/kube/issues/106)
+  * initial `log_stream` support - [#109](https://github.com/kube-rs/kube/issues/109)
 
 0.24.0 / 2020-01-26
 ===================
-  * Add support for ServiceAccount, Role, ClusterRole, RoleBinding, Endpoint - [#113](https://github.com/kube-rs/kube-rs/pull/113) + [#111](https://github.com/kube-rs/kube-rs/pull/111)
+  * Add support for ServiceAccount, Role, ClusterRole, RoleBinding, Endpoint - [#113](https://github.com/kube-rs/kube/pull/113) + [#111](https://github.com/kube-rs/kube/pull/111)
   * Upgrade k8s-openapi to 0.7 => breaking changes: https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v070-2020-01-23
 
 0.23.0 / 2019-12-31
 ===================
   * Bump tokio and reqwest to 0.2 and 0.10
-  * Fix bug in `log` fetcher - [#107](https://github.com/kube-rs/kube-rs/pull/107)
-  * Temporarily allow invalid certs when testing on macosx - [#105](https://github.com/kube-rs/kube-rs/pull/105)
+  * Fix bug in `log` fetcher - [#107](https://github.com/kube-rs/kube/pull/107)
+  * Temporarily allow invalid certs when testing on macosx - [#105](https://github.com/kube-rs/kube/pull/105)
 
 0.22.2 / 2019-12-04
 ===================
-  * Allow sharing Reflectors between threads - [#97](https://github.com/kube-rs/kube-rs/issues/97)
+  * Allow sharing Reflectors between threads - [#97](https://github.com/kube-rs/kube/issues/97)
   * Fix Reflector pararall lock issue (`poll` no longer blocks `state`)
 
 0.22.1 / 2019-11-30
@@ -986,19 +986,19 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
   * Default watch timeouts changed to 300s everywhere
   * This increases efficiency of Informers and Reflectors by keeping the connection open longer.
   * However, if your Reflector relies on frequent polling you can set `timeout` or hide the `poll()` in a different context so it doesn't block your main work
-  * Internal `RwLock` changed to a `futures::Mutex` for soundness / proper non-blocking - [#94](https://github.com/kube-rs/kube-rs/issues/94)
+  * Internal `RwLock` changed to a `futures::Mutex` for soundness / proper non-blocking - [#94](https://github.com/kube-rs/kube/issues/94)
   * blocking `Reflector::read()` renamed to `async Reflector::state()`
-  * Expose `metadata.creation_timestamp` and `.deletion_timestamp` (behind openapi flag) - [#93](https://github.com/kube-rs/kube-rs/issues/93)
+  * Expose `metadata.creation_timestamp` and `.deletion_timestamp` (behind openapi flag) - [#93](https://github.com/kube-rs/kube/issues/93)
 
 0.21.0 / 2019-11-29
 ===================
-  * All watch calls returns a stream of `WatchEvent` - [#92](https://github.com/kube-rs/kube-rs/pull/92)
-  * `Informer::poll` now returns a stream - [#92](https://github.com/kube-rs/kube-rs/pull/92)
+  * All watch calls returns a stream of `WatchEvent` - [#92](https://github.com/kube-rs/kube/pull/92)
+  * `Informer::poll` now returns a stream - [#92](https://github.com/kube-rs/kube/pull/92)
 
 0.20.1 / 2019-11-21
 ===================
-  * ObjectList now implements Iterator - [#91](https://github.com/kube-rs/kube-rs/pull/91)
-  * openapi feature no longer accidentally hardcoded to v1.15 feature - [#90](https://github.com/kube-rs/kube-rs/issues/90)
+  * ObjectList now implements Iterator - [#91](https://github.com/kube-rs/kube/pull/91)
+  * openapi feature no longer accidentally hardcoded to v1.15 feature - [#90](https://github.com/kube-rs/kube/issues/90)
 
 0.19.0 / 2019-11-15
 ==================
@@ -1008,7 +1008,7 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.18.1 / 2019-11-11
 ==================
-  * Fix unpinned gzip dependency breakage - [#87](https://github.com/kube-rs/kube-rs/issues/87)
+  * Fix unpinned gzip dependency breakage - [#87](https://github.com/kube-rs/kube/issues/87)
 
 0.18.0 / 2019-11-07
 ==================
@@ -1019,11 +1019,11 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.17.0 / 2019-10-22
 ==================
-  * Add support for oidc providerss with `auth-provider` w/o `access-token` - [#70](https://github.com/kube-rs/kube-rs/pull/70)
+  * Add support for oidc providerss with `auth-provider` w/o `access-token` - [#70](https://github.com/kube-rs/kube/pull/70)
   * Bump most dependencies to more recent versions
   * Expose custom client creation
   * Added support for `v1beta1Ingress`
-  * Expose incluster_config::load_default_ns - [#74](https://github.com/kube-rs/kube-rs/pull/74)
+  * Expose incluster_config::load_default_ns - [#74](https://github.com/kube-rs/kube/pull/74)
 
 0.16.1 / 2019-08-09
 ==================
@@ -1032,9 +1032,9 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 0.16.0 / 2019-08-09
 ==================
   * Add `Reflector::get` and `Reflector::get_within` as cheaper getters
-  * Add support for OpenShift kube configs with multiple CAs - via [#64](https://github.com/kube-rs/kube-rs/pull/64)
+  * Add support for OpenShift kube configs with multiple CAs - via [#64](https://github.com/kube-rs/kube/pull/64)
   * Add missing `ObjectMeta::ownerReferences`
-  * Reduced memory consumption during compile with `k8s-openapi@0.5.1` - [#62](https://github.com/kube-rs/kube-rs/issues/62)
+  * Reduced memory consumption during compile with `k8s-openapi@0.5.1` - [#62](https://github.com/kube-rs/kube/issues/62)
 
 0.15.1 / 2019-08-18
 ==================
@@ -1043,31 +1043,31 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.15.0 / 2019-08-11
 ==================
-  * Added support for `v1Job` resources - via [#58](https://github.com/kube-rs/kube-rs/pull/58)
-  * Added support for `v1Namespace`, `v1DaemonSet`, `v1ReplicaSet`, `v1PersistentVolumeClaim`, `v1PersistentVolume`, `v1ResourceQuota`, `v1HorizontalPodAutoscaler` - via [#59](https://github.com/kube-rs/kube-rs/pull/59)
-  * Added support for `v1beta1CronJob`, `v1ReplicationController`, `v1VolumeAttachment`, `v1NetworkPolicy` - via [#60](https://github.com/kube-rs/kube-rs/issues/60)
+  * Added support for `v1Job` resources - via [#58](https://github.com/kube-rs/kube/pull/58)
+  * Added support for `v1Namespace`, `v1DaemonSet`, `v1ReplicaSet`, `v1PersistentVolumeClaim`, `v1PersistentVolume`, `v1ResourceQuota`, `v1HorizontalPodAutoscaler` - via [#59](https://github.com/kube-rs/kube/pull/59)
+  * Added support for `v1beta1CronJob`, `v1ReplicationController`, `v1VolumeAttachment`, `v1NetworkPolicy` - via [#60](https://github.com/kube-rs/kube/issues/60)
   * `k8s-openapi` optional dependency bumped to `0.5.0` (for kube 1.14 structs)
 
 0.14.0 / 2019-08-03
 ==================
   * `Reflector::read` now returns a `Vec<K>`` rather than a `Vec<(name, K)>`:
-    This fixes an unsoundness bug internally - [#56](https://github.com/kube-rs/kube-rs/pull/56) via @gnieto
+    This fixes an unsoundness bug internally - [#56](https://github.com/kube-rs/kube/pull/56) via @gnieto
 
 0.13.0 / 2019-07-22
 ==================
-  * Experimental oauth2 support for some providers - via [#44](https://github.com/kube-rs/kube-rs/issues/44) :
+  * Experimental oauth2 support for some providers - via [#44](https://github.com/kube-rs/kube/issues/44) :
     - a big cherry-pick from various prs upstream originally for GCP
-    - EKS works with setup in https://github.com/kube-rs/kube-rs/pull/20#issuecomment-511767551
+    - EKS works with setup in https://github.com/kube-rs/kube/pull/20#issuecomment-511767551
 
 0.12.0 / 2019-07-18
 ==================
-  * Added support for `Log` subresource - via [#50](https://github.com/kube-rs/kube-rs/pull/50)
-  * Added support for `v1ConfigMap` with example - via [#49](https://github.com/kube-rs/kube-rs/pull/49)
+  * Added support for `Log` subresource - via [#50](https://github.com/kube-rs/kube/pull/50)
+  * Added support for `v1ConfigMap` with example - via [#49](https://github.com/kube-rs/kube/pull/49)
   * Demoted some spammy info messages from Reflector
 
 0.11.0 / 2019-07-10
 ==================
-  * Added `PatchParams` with `PatchStrategy` to allow arbitrary patch types - [#24](https://github.com/kube-rs/kube-rs/issues/24) via @ragne
+  * Added `PatchParams` with `PatchStrategy` to allow arbitrary patch types - [#24](https://github.com/kube-rs/kube/issues/24) via @ragne
   * `Event` renamed to `v1Event` to match non-slowflake type names
   * `v1Service` support added
   * Added `v1Secret` snowflake type and a `secret_reflector` example
@@ -1075,14 +1075,14 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 0.10.0 / 2019-06-03
 ==================
   * `Api<P, U>` is now `Api<K>` for some `KubeObject` K:
-    - Big change to allow snowflake objects ([#35](https://github.com/kube-rs/kube-rs/issues/35)) - but also slightly nicer
+    - Big change to allow snowflake objects ([#35](https://github.com/kube-rs/kube/issues/35)) - but also slightly nicer
     - You want aliases `type Pod = Object<PodSpec, PodStatus>`
     - This gives you the required `KubeObject` trait impl for free
-  * Added `Event` native type to prove snowflakes can be handled - [#35](https://github.com/kube-rs/kube-rs/issues/35)
+  * Added `Event` native type to prove snowflakes can be handled - [#35](https://github.com/kube-rs/kube/issues/35)
 
-  * `ApiStatus` renamed to `Status` to match kube api conventions [#36](https://github.com/kube-rs/kube-rs/issues/36)
-  * Rename `Metadata` to `ObjectMeta` [#36](https://github.com/kube-rs/kube-rs/issues/36)
-  * Added `ListMeta` for `ObjectList` and `Status` [#36](https://github.com/kube-rs/kube-rs/issues/36)
+  * `ApiStatus` renamed to `Status` to match kube api conventions [#36](https://github.com/kube-rs/kube/issues/36)
+  * Rename `Metadata` to `ObjectMeta` [#36](https://github.com/kube-rs/kube/issues/36)
+  * Added `ListMeta` for `ObjectList` and `Status` [#36](https://github.com/kube-rs/kube/issues/36)
   * Added `TypeMeta` object which is flattened onto `Object`, so:
     - `o.types.kind` rather than `o.kind`
     - `o.types.version` rather than `o.version`
@@ -1103,16 +1103,16 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 0.8.0 / 2019-05-31
 ==================
   * Typed `Api` variant called `OpenApi` introduced (see crd_openapi example)
-  * Revert `client.request` return type change (back to response only from pre-0.7.0 [#28](https://github.com/kube-rs/kube-rs/issues/28))
-  * `delete` now returns `Either<Object<P, U>, ApiStatus> - for bug[#32](https://github.com/kube-rs/kube-rs/issues/32)
-  * `delete_collection` now returns `Either<ObjectList<Object<P, U>>, ApiStatus> - for bug[#32](https://github.com/kube-rs/kube-rs/issues/32)
+  * Revert `client.request` return type change (back to response only from pre-0.7.0 [#28](https://github.com/kube-rs/kube/issues/28))
+  * `delete` now returns `Either<Object<P, U>, ApiStatus> - for bug[#32](https://github.com/kube-rs/kube/issues/32)
+  * `delete_collection` now returns `Either<ObjectList<Object<P, U>>, ApiStatus> - for bug[#32](https://github.com/kube-rs/kube/issues/32)
   * `Informer::new` renamed to `Informer::raw`
   * `Reflector::new` renamed to `Reflector::raw`
   * `Reflector::new` + `Informer::new` added for "openapi" compile time feature (does not require specifying the generic types)
 
 0.7.0 / 2019-05-27
 ==================
-  * Expose list/watch parameters [#11](https://github.com/kube-rs/kube-rs/issues/11)
+  * Expose list/watch parameters [#11](https://github.com/kube-rs/kube/issues/11)
   * Many API struct renames:
     - `ResourceMap` -> `Cache`
     - `Resource` -> `Object`
@@ -1167,7 +1167,7 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 0.5.0 / 2019-05-09
 ==================
   * added `Informer` struct dedicated to handling events
-  * Reflectors no longer cache `events` - see [#6](https://github.com/kube-rs/kube-rs/issues/6)
+  * Reflectors no longer cache `events` - see [#6](https://github.com/kube-rs/kube/issues/6)
 
 0.4.0 / 2019-05-09
 ==================

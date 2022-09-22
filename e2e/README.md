@@ -12,7 +12,7 @@ Intended as a compilation target to ensure kube builds with any k8s-openapi vers
 
 ## job
 
-A more advanced application that is containerised and deployed into a cluster on CI during the `e2e` job via [our ci workflow](https://github.com/kube-rs/kube-rs/blob/2b5e4ad788366125448ad40eadaf68cf9ceeaf31/.github/workflows/ci.yml#L58-L107).
+A more advanced application that is containerised and deployed into a cluster on CI during the `e2e` job via [our ci workflow](https://github.com/kube-rs/kube/blob/2b5e4ad788366125448ad40eadaf68cf9ceeaf31/.github/workflows/ci.yml#L58-L107).
 
 Functionally equivalent to the `job_api` example. Creates a noop job, waits for it to complete, then deletes it.
 
