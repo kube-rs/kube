@@ -7,8 +7,58 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube-rs/compare/0.75.0...master
 
-0.75.0 / 2022-09-21
+[0.75.0](https://github.com/kube-rs/kube-rs/releases/tag/0.75.0) / 2022-09-21
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.75.0 -->
+
+## Highlights
+
+### [Upgrade `k8s-openapi` to 0.16 for Kubernetes 1.25](https://github.com/kube-rs/kube-rs/pull/1008)
+
+The update to [k8s-openapi@0.16.0](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0160-2022-09-15) makes this the first release with **tentative** Kubernetes 1.25 support.
+While the new structs and apis now exist, we **recommend holding off** on using 1.25 until a [deserialization bug in the apiserver](https://github.com/kubernetes/kubernetes/issues/111985) is resolved upstream. See #997 / #1008 for details.
+
+To upgrade, ensure you bump both `kube` and `k8s-openapi`:
+
+```sh
+cargo upgrade kube k8s-openapi
+```
+
+### [New/Old `Config::incluster` default to connect in cluster](https://github.com/kube-rs/kube-rs/pull/1001)
+
+Our previous default of connecting to the Kubernetes apiserver via `kubernetes.default.svc` has been reverted back to use the old environment variables after [Kubernetes updated](https://github.com/kubernetes/kubernetes/issues/112263) their position that the environment variables are not legacy. This does unfortunately regress on `rustls` support, so for those users we have included a [`Config::incluster_dns`](https://docs.rs/kube/latest/kube/struct.Config.html#method.incluster_dns) to work around the old [rustls issue](https://github.com/kube-rs/kube-rs/issues/153) while it is open.
+
+### [Controller `error_policy` extension](https://github.com/kube-rs/kube-rs/pull/995)
+
+The `error_policy` fn now has access to the `object` that failed the reconciliation to ease metric creation / failure attribution. The following change is needed on the user side:
+
+```diff
+-fn error_policy(error: &Error, ctx: Arc<Data>) -> Action {
++fn error_policy(_obj: Arc<YourObject>, error: &Error, ctx: Arc<Data>) -> Action {
+```
+
+### Polish / Subresources / Conversion
+There are also a slew of ergonomics improvements, closing of [gaps in subresources](https://github.com/kube-rs/kube-rs/pull/989), adding [initial support for `ConversionReview`](https://github.com/kube-rs/kube-rs/pull/999), making [`Api::namespaced` impossible to use for non-namepaced resources](https://github.com/kube-rs/kube-rs/pull/956) (a common pitfall), as well as many great fixes to the edge cases in [portforwarding](https://github.com/kube-rs/kube-rs/pull/973) and [finalizers](https://github.com/kube-rs/kube-rs/pull/965). Many of these changes came from first time contributors. A huge thank you to everyone involved.
+
+## What's Changed
+### Added
+* Make `Config::auth_info` public by @danrspencer in https://github.com/kube-rs/kube-rs/pull/959
+* Make raw `Client::send` method public by @tiagolobocastro in https://github.com/kube-rs/kube-rs/pull/972
+* Make `types` on `AdmissionRequest` and `AdmissionResponse` public by @clux in https://github.com/kube-rs/kube-rs/pull/977
+* Add `#[serde(default)]` to metadata field of `DynamicObject` by @pbzweihander in https://github.com/kube-rs/kube-rs/pull/987
+* Add `create_subresource` method to `Api` and `create_token_request` method to `Api<ServiceAccount>` by @pbzweihander in https://github.com/kube-rs/kube-rs/pull/989
+* Controller: impl Eq and PartialEq for `Action` by @Sherlock-Holo in https://github.com/kube-rs/kube-rs/pull/993
+* Add support for CRD `ConversionReview` types by @MikailBag in https://github.com/kube-rs/kube-rs/pull/999
+### Changed
+* Constrain Resource trait and Api::namespaced by Scope by @clux in https://github.com/kube-rs/kube-rs/pull/956
+* Add connect/read/write timeouts to `Config` by @goenning in https://github.com/kube-rs/kube-rs/pull/971
+* Controller: Include the object being reconciled in the `error_policy` by @felipesere in https://github.com/kube-rs/kube-rs/pull/995
+* `Config`: New `incluster` and `incluster_dns` constructors by @olix0r in https://github.com/kube-rs/kube-rs/pull/1001
+* Upgrade `k8s-openapi` to 0.16 by @clux in https://github.com/kube-rs/kube-rs/pull/1008
+### Fixed
+* Remove `tracing::instrument` from `apply_debug_overrides` by @kazk in https://github.com/kube-rs/kube-rs/pull/958
+* fix duplicate finalizers race condition by @alex-hunt-materialize in https://github.com/kube-rs/kube-rs/pull/965
+* fix: portforward connection cleanup by @tiagolobocastro in https://github.com/kube-rs/kube-rs/pull/973
 
 [0.74.0](https://github.com/kube-rs/kube-rs/releases/tag/0.74.0) / 2022-07-09
 ===================
