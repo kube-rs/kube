@@ -20,16 +20,16 @@ kube = { version = "0.75.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.16.0", features = ["v1_25"] }
 ```
 
-[Features are available](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
+[Features are available](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
 
 ## Upgrading
 
-Please check the [CHANGELOG](https://github.com/kube-rs/kube-rs/blob/master/CHANGELOG.md) when upgrading.
-All crates herein are versioned and [released](https://github.com/kube-rs/kube-rs/blob/master/release.toml) together to guarantee [compatibility before 1.0](https://github.com/kube-rs/kube-rs/issues/508).
+Please check the [CHANGELOG](https://github.com/kube-rs/kube/blob/main/CHANGELOG.md) when upgrading.
+All crates herein are versioned and [released](https://github.com/kube-rs/kube/blob/main/release.toml) together to guarantee [compatibility before 1.0](https://github.com/kube-rs/kube/issues/508).
 
 ## Usage
 
-See the **[examples directory](https://github.com/kube-rs/kube-rs/blob/master/examples)** for how to use any of these crates.
+See the **[examples directory](https://github.com/kube-rs/kube/blob/main/examples)** for how to use any of these crates.
 
 - **[kube API Docs](https://docs.rs/kube/)**
 
@@ -87,7 +87,7 @@ println!("doc: {:?}", d);
 println!("crd: {:?}", serde_yaml::to_string(&Document::crd()));
 ```
 
-There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube-rs/blob/master/examples) for more.
+There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube/blob/main/examples) for more.
 
 **NB:** `#[derive(CustomResource)]` requires the `derive` feature enabled on `kube`.
 
@@ -148,7 +148,7 @@ Here `reconcile` and `error_policy` refer to functions you define. The first wil
 
 ## Rustls
 
-Kube has basic support ([with caveats](https://github.com/kube-rs/kube-rs/issues?q=is%3Aopen+is%3Aissue+label%3Arustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
+Kube has basic support ([with caveats](https://github.com/kube-rs/kube/issues?q=is%3Aopen+is%3Aissue+label%3Arustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
 
 ```toml
 [dependencies]
@@ -160,7 +160,7 @@ This will pull in `rustls` and `hyper-rustls`.
 
 ## musl-libc
 
-Kube will work with [distroless](https://github.com/kube-rs/controller-rs/blob/master/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/kube-rs/kube-rs/issues/331#issuecomment-715962188)).
+Kube will work with [distroless](https://github.com/kube-rs/controller-rs/blob/main/Dockerfile), [scratch](https://github.com/constellation-rs/constellation/blob/27dc89d0d0e34896fd37d638692e7dfe60a904fc/Dockerfile), and `alpine` (it's also possible to use alpine as a builder [with some caveats](https://github.com/kube-rs/kube/issues/331#issuecomment-715962188)).
 
 ## License
 

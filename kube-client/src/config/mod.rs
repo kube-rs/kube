@@ -219,7 +219,7 @@ impl Config {
     ///
     /// The `rustls-tls` feature is currently incompatible with
     /// [`Config::incluster_env`]. See
-    /// <https://github.com/kube-rs/kube-rs/issues/1003>.
+    /// <https://github.com/kube-rs/kube/issues/1003>.
     #[cfg(feature = "rustls-tls")]
     pub fn incluster() -> Result<Self, InClusterError> {
         Self::incluster_dns()
@@ -234,7 +234,7 @@ impl Config {
     /// This method matches the behavior of the official Kubernetes client
     /// libraries, but it is not compatible with the `rustls-tls` feature . When
     /// this feature is enabled, [`Config::incluster_dns`] should be used
-    /// instead. See <https://github.com/kube-rs/kube-rs/issues/1003>.
+    /// instead. See <https://github.com/kube-rs/kube/issues/1003>.
     pub fn incluster_env() -> Result<Self, InClusterError> {
         let uri = incluster_config::try_kube_from_env()?;
         Self::incluster_with_uri(uri)
@@ -390,7 +390,7 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
         .collect::<Vec<_>>())
 }
 
-// https://github.com/kube-rs/kube-rs/issues/146#issuecomment-590924397
+// https://github.com/kube-rs/kube/issues/146#issuecomment-590924397
 /// Default Timeout
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);

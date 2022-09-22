@@ -874,7 +874,7 @@ mod tests {
     #[tokio::test]
     async fn applier_must_not_deadlock_if_reschedule_buffer_fills() {
         // This tests that `applier` handles reschedule queue backpressure correctly, by trying to flood it with no-op reconciles
-        // This is intended to avoid regressing on https://github.com/kube-rs/kube-rs/issues/926
+        // This is intended to avoid regressing on https://github.com/kube-rs/kube/issues/926
 
         // Assume that we can keep APPLIER_REQUEUE_BUF_SIZE flooded if we have 100x the number of objects "in rotation"
         // On my (@teozkr)'s 3900X I can reliably trigger this with 10x, but let's have some safety margin to avoid false negatives

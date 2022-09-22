@@ -9,4 +9,4 @@ This crate is always re-exported from `kube` (even without features) under [`kub
 See the **[kube-core API Docs](https://docs.rs/kube-core/)**
 
 ## Development
-Help very welcome! We need generic utilities, helpers like those in apimachinery, testing improvements, or just documentation. See https://github.com/kube-rs/kube-rs/labels/core
+Help very welcome! We need generic utilities, helpers like those in apimachinery, testing improvements, or just documentation. See https://github.com/kube-rs/kube/labels/core

@@ -7,7 +7,7 @@ authors = [
   "clux <sszynrae@gmail.com>",
 ]
 license = "Apache-2.0"
-repository = "https://github.com/kube-rs/kube-rs"
+repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
 categories = ["web-programming::http-client"]
