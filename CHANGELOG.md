@@ -5,7 +5,7 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.75.0...master
+ * see https://github.com/kube-rs/kube/compare/0.75.0...main
 
 [0.75.0](https://github.com/kube-rs/kube/releases/tag/0.75.0) / 2022-09-21
 ===================
@@ -178,7 +178,7 @@ A new function [`kube::core::crd::merge_crds`](https://docs.rs/kube/latest/kube/
 A new example showcases [how one can manage two or more versions of a crd](https://github.com/kube-rs/kube/blob/7715cabd4d1976493e6b8949471f283df927a79e/examples/crd_derive_multi.rs#L12-L31) and what the expected truncation outcomes are when moving between versions.
 
 ### Examples
-Examples now have moved to `tracing` for its logging, respects `RUST_LOG`, and namespace selection via the kubeconfig context. There is also a [larger kubectl example](https://github.com/kube-rs/kube/blob/master/examples/kubectl.rs) showcasing [`kubectl apply -f yaml`](https://github.com/kube-rs/kube/blob/7715cabd4d1976493e6b8949471f283df927a79e/examples/kubectl.rs#L149-L170) as well as `kubectl {edit,delete,get,watch}` via [#885](https://github.com/kube-rs/kube/pull/885) + [#897](https://github.com/kube-rs/kube/pull/897).
+Examples now have moved to `tracing` for its logging, respects `RUST_LOG`, and namespace selection via the kubeconfig context. There is also a [larger kubectl example](https://github.com/kube-rs/kube/blob/main/examples/kubectl.rs) showcasing [`kubectl apply -f yaml`](https://github.com/kube-rs/kube/blob/7715cabd4d1976493e6b8949471f283df927a79e/examples/kubectl.rs#L149-L170) as well as `kubectl {edit,delete,get,watch}` via [#885](https://github.com/kube-rs/kube/pull/885) + [#897](https://github.com/kube-rs/kube/pull/897).
 
 ## What's Changed
 ### Added
@@ -321,7 +321,7 @@ This also affects the [finalizer helper](https://github.com/kube-rs/kube/pull/79
 
 ### [Port-forwarding](https://github.com/kube-rs/kube/pull/446)
 
-As one of the last steps toward [gold level client requirements](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-capabilities), port-forwarding landed in [#446](https://github.com/kube-rs/kube/issues/446). There are 3 new [examples](https://github.com/kube-rs/kube/tree/master/examples) (`port_forward*.rs`) that showcases how to use this websocket based functionality.
+As one of the last steps toward [gold level client requirements](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/csi-new-client-library-procedure.md#client-capabilities), port-forwarding landed in [#446](https://github.com/kube-rs/kube/issues/446). There are 3 new [examples](https://github.com/kube-rs/kube/tree/main/examples) (`port_forward*.rs`) that showcases how to use this websocket based functionality.
 
 ## [What's Changed](https://github.com/kube-rs/kube/releases/tag/0.68.0)
 ### Added

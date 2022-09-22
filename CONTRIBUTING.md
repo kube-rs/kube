@@ -61,7 +61,7 @@ Most integration tests are run with `cargo test --all --lib -- --ignored`, but b
 
 ### End to End Tests
 
-We have a small set of [e2e tests](https://github.com/kube-rs/kube/tree/master/e2e) that tests difference between in-cluster and local configuration.
+We have a small set of [e2e tests](https://github.com/kube-rs/kube/tree/main/e2e) that tests difference between in-cluster and local configuration.
 
 These tests are the heaviest tests we have because they require a full `docker build`, image import (or push/pull flow), yaml construction, and `kubectl` usage to verify that the outcome was sufficient.
 
@@ -75,7 +75,7 @@ All public interfaces should have doc tests with examples for [docs.rs](https://
 
 When adding new non-trivial pieces of logic that results in a drop in coverage you should add a test.
 
-Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube/branch/master/graph/badge.svg?token=9FCqEcyDTZ)](https://codecov.io/gh/kube-rs/kube) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](https://github.com/kube-rs/kube/blob/master/tarpaulin.toml) config, and **will run both unit and integration** tests.
+Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube/branch/main/graph/badge.svg?token=9FCqEcyDTZ)](https://codecov.io/gh/kube-rs/kube) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](https://github.com/kube-rs/kube/blob/main/tarpaulin.toml) config, and **will run both unit and integration** tests.
 
 #### What type of test
 
