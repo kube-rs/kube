@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use chrono::{DateTime, NaiveDateTime, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
@@ -37,8 +39,11 @@ struct FooSpec {
     // Using feature `chrono`
     timestamp: DateTime<Utc>,
 
-    /// This is a complex enum
+    /// This is a complex enum with a description
     complex_enum: ComplexEnum,
+
+    /// This is a untagged enum with a description
+    untagged_enum_person: UntaggedEnumPerson,
 }
 
 fn default_value() -> String {
@@ -69,6 +74,40 @@ enum ComplexEnum {
     VariantThree {},
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(untagged)]
+enum UntaggedEnumPerson {
+    SexAndAge(SexAndAge),
+    SexAndDateOfBirth(SexAndDateOfBirth),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct SexAndAge {
+    /// Sex of the person
+    sex: Sex,
+    /// Age of the person in years
+    age: i32,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct SexAndDateOfBirth {
+    /// Sex of the person
+    sex: Sex,
+    /// Date of birth of the person as ISO 8601 date
+    date_of_birth: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[serde(rename_all = "PascalCase")]
+enum Sex {
+    Female,
+    Male,
+    Other,
+}
+
 #[test]
 fn test_crd_name() {
     use kube::core::CustomResourceExt;
@@ -93,6 +132,10 @@ fn test_serialized_matches_expected() {
             nullable_with_default: None,
             timestamp: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
             complex_enum: ComplexEnum::VariantOne { int: 23 },
+            untagged_enum_person: UntaggedEnumPerson::SexAndAge(SexAndAge {
+                age: 42,
+                sex: Sex::Male,
+            })
         }))
         .unwrap(),
         serde_json::json!({
@@ -111,6 +154,10 @@ fn test_serialized_matches_expected() {
                     "variantOne": {
                         "int": 23
                     }
+                },
+                "untaggedEnumPerson": {
+                    "age": 42,
+                    "sex": "Male"
                 }
             }
         })
@@ -220,13 +267,42 @@ fn test_crd_schema_matches_expected() {
                                                         "required": ["variantThree"]
                                                     }
                                                 ],
-                                                "description": "This is a complex enum"
+                                                "description": "This is a complex enum with a description"
+                                            },
+                                            "untaggedEnumPerson": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "age": {
+                                                        "type": "integer",
+                                                        "format": "int32",
+                                                        "description": "Age of the person in years"
+                                                    },
+                                                    "dateOfBirth": {
+                                                        "type": "string",
+                                                        "description": "Date of birth of the person as ISO 8601 date"
+                                                    },
+                                                    "sex": {
+                                                        "type": "string",
+                                                        "enum": ["Female", "Male", "Other"],
+                                                        "description": "Sex of the person"
+                                                    }
+                                                },
+                                                "anyOf": [
+                                                    {
+                                                        "required": ["age", "sex"]
+                                                    },
+                                                    {
+                                                        "required": ["dateOfBirth", "sex"]
+                                                    }
+                                                ],
+                                                "description": "This is a untagged enum with a description"
                                             }
                                         },
                                         "required": [
                                             "complexEnum",
                                             "nonNullable",
-                                            "timestamp"
+                                            "timestamp",
+                                            "untaggedEnumPerson"
                                         ],
                                         "type": "object"
                                     }

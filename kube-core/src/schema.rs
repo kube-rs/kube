@@ -8,7 +8,7 @@ use std::collections::btree_map::Entry;
 #[allow(unused_imports)] use schemars::gen::SchemaSettings;
 
 use schemars::{
-    schema::{Metadata, ObjectValidation, Schema, SchemaObject},
+    schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},
     visit::Visitor,
 };
 
@@ -78,21 +78,7 @@ impl Visitor for StructuralSchemaRewriter {
                     // Kubernetes doesn't allow variants to set additionalProperties
                     variant_obj.additional_properties = None;
 
-                    // Try to merge metadata
-                    match (&mut schema.instance_type, variant_type.take()) {
-                        (_, None) => {}
-                        (common_type @ None, variant_type) => {
-                            *common_type = variant_type;
-                        }
-                        (Some(common_type), Some(variant_type)) => {
-                            if *common_type != variant_type {
-                                panic!(
-                                    "variant defined type {:?}, conflicting with existing type {:?}",
-                                    variant_type, common_type
-                                );
-                            }
-                        }
-                    }
+                    merge_metadata(&mut schema.instance_type, variant_type.take());
                 }
             }
         }
@@ -108,6 +94,49 @@ impl Visitor for StructuralSchemaRewriter {
                     .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
             }
         }
+
+        // Support untagged enums
+        if let Some(any_of) = schema
+            .subschemas
+            .as_mut()
+            .and_then(|subschemas| subschemas.any_of.as_mut())
+        {
+            let common_obj = schema
+                .object
+                .get_or_insert_with(|| Box::new(ObjectValidation::default()));
+
+            for variant in any_of {
+                if let Schema::Object(SchemaObject {
+                    instance_type: variant_type,
+                    object: Some(variant_obj),
+                    ..
+                }) = variant
+                {
+                    let variant_properties = std::mem::take(&mut variant_obj.properties);
+
+                    for (property_name, property) in variant_properties {
+                        match common_obj.properties.entry(property_name) {
+                            Entry::Occupied(entry) => {
+                                if &property != entry.get() {
+                                    panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another untagged enum variant. The schemas for a property used in multiple untagged enum variants must be identical",
+                                        entry.key(),
+                                        &property,
+                                        entry.get());
+                                }
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert(property);
+                            }
+                        }
+
+                        // Kubernetes doesn't allow variants to set additionalProperties
+                        variant_obj.additional_properties = None;
+
+                        merge_metadata(&mut schema.instance_type, variant_type.take());
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -117,4 +146,24 @@ fn only_item<I: Iterator>(mut i: I) -> Option<I::Item> {
         return None;
     }
     Some(item)
+}
+
+fn merge_metadata(
+    instance_type: &mut Option<SingleOrVec<InstanceType>>,
+    variant_type: Option<SingleOrVec<InstanceType>>,
+) {
+    match (instance_type, variant_type) {
+        (_, None) => {}
+        (common_type @ None, variant_type) => {
+            *common_type = variant_type;
+        }
+        (Some(common_type), Some(variant_type)) => {
+            if *common_type != variant_type {
+                panic!(
+                    "variant defined type {:?}, conflicting with existing type {:?}",
+                    variant_type, common_type
+                );
+            }
+        }
+    }
 }
