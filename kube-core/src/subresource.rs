@@ -102,12 +102,7 @@ impl Request {
         let pp = &ep.post_options;
         pp.validate()?;
         let mut qp = form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
-        if let Some(ref fm) = pp.field_manager {
-            qp.append_pair("fieldManager", fm);
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         // eviction body parameters are awkward, need metadata with name
         let data = serde_json::to_vec(&serde_json::json!({

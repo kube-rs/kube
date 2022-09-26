@@ -115,12 +115,7 @@ impl Request {
         pp.validate()?;
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
-        if let Some(ref fm) = pp.field_manager {
-            qp.append_pair("fieldManager", fm);
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
@@ -195,12 +190,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
-        if let Some(ref fm) = pp.field_manager {
-            qp.append_pair("fieldManager", fm);
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
@@ -232,9 +222,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
@@ -271,12 +259,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
-        if let Some(ref fm) = pp.field_manager {
-            qp.append_pair("fieldManager", fm);
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
