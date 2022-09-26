@@ -118,6 +118,9 @@ impl Request {
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }
+        if let Some(ref fm) = pp.field_manager {
+            qp.append_pair("fieldManager", fm);
+        }
         let urlstr = qp.finish();
         let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
@@ -195,6 +198,9 @@ impl Request {
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }
+        if let Some(ref fm) = pp.field_manager {
+            qp.append_pair("fieldManager", fm);
+        }
         let urlstr = qp.finish();
         let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
@@ -267,6 +273,9 @@ impl Request {
         let mut qp = form_urlencoded::Serializer::new(target);
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
+        }
+        if let Some(ref fm) = pp.field_manager {
+            qp.append_pair("fieldManager", fm);
         }
         let urlstr = qp.finish();
         let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);

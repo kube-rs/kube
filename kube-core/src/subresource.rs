@@ -105,6 +105,9 @@ impl Request {
         if pp.dry_run {
             qp.append_pair("dryRun", "All");
         }
+        if let Some(ref fm) = pp.field_manager {
+            qp.append_pair("fieldManager", fm);
+        }
         let urlstr = qp.finish();
         // eviction body parameters are awkward, need metadata with name
         let data = serde_json::to_vec(&serde_json::json!({
