@@ -16,6 +16,7 @@ use schemars::{
 ///
 /// The following two transformations are applied
 ///  * Rewrite enums from `oneOf` to `object`s with multiple variants ([schemars#84](https://github.com/GREsau/schemars/issues/84))
+///  * Rewrite untagged enums from `anyOf` to `object`s with multiple variants ([kube#1028](https://github.com/kube-rs/kube/pull/1028))
 ///  * Rewrite `additionalProperties` from `#[serde(flatten)]` to `x-kubernetes-preserve-unknown-fields` ([kube#844](https://github.com/kube-rs/kube/issues/844))
 ///
 /// This is used automatically by `kube::derive`'s `#[derive(CustomResource)]`,
@@ -31,58 +32,24 @@ pub struct StructuralSchemaRewriter;
 impl Visitor for StructuralSchemaRewriter {
     fn visit_schema_object(&mut self, schema: &mut schemars::schema::SchemaObject) {
         schemars::visit::visit_schema_object(self, schema);
+
         if let Some(one_of) = schema
             .subschemas
             .as_mut()
             .and_then(|subschemas| subschemas.one_of.as_mut())
         {
-            let common_obj = schema
-                .object
-                .get_or_insert_with(|| Box::new(ObjectValidation::default()));
-            for variant in one_of {
-                if let Schema::Object(SchemaObject {
-                    instance_type: variant_type,
-                    object: Some(variant_obj),
-                    metadata: variant_metadata,
-                    ..
-                }) = variant
-                {
-                    if let Some(variant_metadata) = variant_metadata {
-                        // Move enum variant description from oneOf clause to its corresponding property
-                        if let Some(description) = std::mem::take(&mut variant_metadata.description) {
-                            if let Some(Schema::Object(variant_object)) =
-                                only_item(variant_obj.properties.values_mut())
-                            {
-                                let metadata = variant_object
-                                    .metadata
-                                    .get_or_insert_with(|| Box::new(Metadata::default()));
-                                metadata.description = Some(description);
-                            }
-                        }
-                    }
-
-                    // Move all properties
-                    let variant_properties = std::mem::take(&mut variant_obj.properties);
-                    for (property_name, property) in variant_properties {
-                        match common_obj.properties.entry(property_name) {
-                            Entry::Occupied(entry) => panic!(
-                                "property {:?} is already defined in another enum variant",
-                                entry.key()
-                            ),
-                            Entry::Vacant(entry) => {
-                                entry.insert(property);
-                            }
-                        }
-                    }
-
-                    // Kubernetes doesn't allow variants to set additionalProperties
-                    variant_obj.additional_properties = None;
-
-                    merge_metadata(&mut schema.instance_type, variant_type.take());
-                }
-            }
+            convert_to_structural(one_of, &mut schema.object, &mut schema.instance_type, false);
         }
-        // check for maps without with properties (i.e. flattnened maps)
+
+        if let Some(any_of) = schema
+            .subschemas
+            .as_mut()
+            .and_then(|subschemas| subschemas.any_of.as_mut())
+        {
+            convert_to_structural(any_of, &mut schema.object, &mut schema.instance_type, true);
+        }
+
+        // check for maps without with properties (i.e. flattened maps)
         // and allow these to persist dynamically
         if let Some(object) = &mut schema.object {
             if !object.properties.is_empty()
@@ -94,48 +61,66 @@ impl Visitor for StructuralSchemaRewriter {
                     .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
             }
         }
+    }
+}
 
-        // Support untagged enums
-        if let Some(any_of) = schema
-            .subschemas
-            .as_mut()
-            .and_then(|subschemas| subschemas.any_of.as_mut())
+fn convert_to_structural(
+    subschemas: &mut Vec<Schema>,
+    common_obj: &mut Option<Box<ObjectValidation>>,
+    instance_type: &mut Option<SingleOrVec<InstanceType>>,
+    allow_repeated_property: bool,
+) {
+    let common_obj = common_obj.get_or_insert_with(|| Box::new(ObjectValidation::default()));
+
+    for variant in subschemas {
+        if let Schema::Object(SchemaObject {
+            instance_type: variant_type,
+            object: Some(variant_obj),
+            metadata: variant_metadata,
+            ..
+        }) = variant
         {
-            let common_obj = schema
-                .object
-                .get_or_insert_with(|| Box::new(ObjectValidation::default()));
-
-            for variant in any_of {
-                if let Schema::Object(SchemaObject {
-                    instance_type: variant_type,
-                    object: Some(variant_obj),
-                    ..
-                }) = variant
-                {
-                    let variant_properties = std::mem::take(&mut variant_obj.properties);
-
-                    for (property_name, property) in variant_properties {
-                        match common_obj.properties.entry(property_name) {
-                            Entry::Occupied(entry) => {
-                                if &property != entry.get() {
-                                    panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another untagged enum variant. The schemas for a property used in multiple untagged enum variants must be identical",
-                                        entry.key(),
-                                        &property,
-                                        entry.get());
-                                }
-                            }
-                            Entry::Vacant(entry) => {
-                                entry.insert(property);
-                            }
-                        }
-
-                        // Kubernetes doesn't allow variants to set additionalProperties
-                        variant_obj.additional_properties = None;
-
-                        merge_metadata(&mut schema.instance_type, variant_type.take());
+            if let Some(variant_metadata) = variant_metadata {
+                // Move enum variant description from oneOf clause to its corresponding property
+                if let Some(description) = std::mem::take(&mut variant_metadata.description) {
+                    if let Some(Schema::Object(variant_object)) =
+                        only_item(variant_obj.properties.values_mut())
+                    {
+                        let metadata = variant_object
+                            .metadata
+                            .get_or_insert_with(|| Box::new(Metadata::default()));
+                        metadata.description = Some(description);
                     }
                 }
             }
+
+            // Move all properties
+            let variant_properties = std::mem::take(&mut variant_obj.properties);
+            for (property_name, property) in variant_properties {
+                match common_obj.properties.entry(property_name) {
+                    Entry::Occupied(entry) => {
+                        if !allow_repeated_property {
+                            panic!(
+                                "property {:?} is already defined in another enum variant",
+                                entry.key()
+                            )
+                        } else if &property != entry.get() {
+                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another untagged enum variant. The schemas for a property used in multiple untagged enum variants must be identical",
+                                    entry.key(),
+                                    &property,
+                                    entry.get());
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(property);
+                    }
+                }
+            }
+
+            // Kubernetes doesn't allow variants to set additionalProperties
+            variant_obj.additional_properties = None;
+
+            merge_metadata(instance_type, variant_type.take());
         }
     }
 }
