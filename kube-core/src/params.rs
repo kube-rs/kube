@@ -183,6 +183,15 @@ pub struct PostParams {
 }
 
 impl PostParams {
+    pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
+        if self.dry_run {
+            qp.append_pair("dryRun", "All");
+        }
+        if let Some(ref fm) = self.field_manager {
+            qp.append_pair("fieldManager", fm);
+        }
+    }
+
     pub(crate) fn validate(&self) -> Result<(), Error> {
         if let Some(field_manager) = &self.field_manager {
             // Implement the easy part of validation, in future this may be extended to provide validation as in go code
