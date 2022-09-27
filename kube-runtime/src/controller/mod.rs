@@ -593,6 +593,59 @@ where
     /// The [`ListParams`] refer to the possible subset of `Watched` objects that you want the [`Api`]
     /// to watch - in the Api's configured scope - and run through the custom mapper.
     /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`ListParams::default`].
+    ///
+    /// # Example
+    ///
+    /// Tracking cross cluster references using the [Operator-SDK] annotations.
+    ///
+    /// ```
+    /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef};
+    /// # use kube::api::{Api, ListParams};
+    /// # use kube::ResourceExt;
+    /// # use k8s_openapi::api::core::v1::{ConfigMap, Namespace};
+    /// # use futures::StreamExt;
+    /// # use std::sync::Arc;
+    /// # type WatchedResource = Namespace;
+    /// # struct Context;
+    /// # async fn reconcile(_: Arc<ConfigMap>, _: Arc<Context>) -> Result<Action, kube::Error> {
+    /// #     Ok(Action::await_change())
+    /// # };
+    /// # fn error_policy(_: Arc<ConfigMap>, _: &kube::Error, _: Arc<Context>) -> Action {
+    /// #     Action::await_change()
+    /// # }
+    /// # async fn doc(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// # let memcached = Api::<ConfigMap>::all(client.clone());
+    /// # let context = Arc::new(Context);
+    /// Controller::new(memcached, ListParams::default())
+    ///     .watches(
+    ///         Api::<WatchedResource>::all(client.clone()),
+    ///         ListParams::default(),
+    ///         |ar| {
+    ///             let prt = ar
+    ///                 .annotations()
+    ///                 .get("operator-sdk/primary-resource-type")
+    ///                 .map(String::as_str);
+    ///
+    ///             if prt != Some("Memcached.cache.example.com") {
+    ///                 return None;
+    ///             }
+    ///
+    ///             let (namespace, name) = ar
+    ///                 .annotations()
+    ///                 .get("operator-sdk/primary-resource")?
+    ///                 .split_once('/')?;
+    ///
+    ///             Some(ObjectRef::new(name).within(namespace))
+    ///         }
+    ///     )
+    ///     .run(reconcile, error_policy, context)
+    ///     .for_each(|_| futures::future::ready(()))
+    ///     .await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [Operator-SDK]: https://sdk.operatorframework.io/docs/building-operators/ansible/reference/retroactively-owned-resources/
     #[must_use]
     pub fn watches<
         Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
