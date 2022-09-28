@@ -38,6 +38,7 @@ impl Visitor for StructuralSchemaRewriter {
             .as_mut()
             .and_then(|subschemas| subschemas.one_of.as_mut())
         {
+            // Tagged enums are serialized using `one_of`
             convert_to_structural(one_of, &mut schema.object, &mut schema.instance_type, false);
         }
 
