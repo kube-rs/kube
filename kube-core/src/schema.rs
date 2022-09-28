@@ -64,7 +64,9 @@ impl Visitor for StructuralSchemaRewriter {
     }
 }
 
-fn convert_to_structural(
+/// Bring all property definitions from subschemas up to the root schema,
+/// since Kubernetes doesn't allow subschemas to define properties.
+fn hoist_subschema_properties(
     subschemas: &mut Vec<Schema>,
     common_obj: &mut Option<Box<ObjectValidation>>,
     instance_type: &mut Option<SingleOrVec<InstanceType>>,
