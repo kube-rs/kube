@@ -109,7 +109,7 @@ fn hoist_subschema_properties(
                                 entry.key()
                             )
                         } else if &property != entry.get() {
-                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another untagged enum variant. The schemas for a property used in multiple untagged enum variants must be identical",
+                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another enum variant. The schemas for a property used in multiple enum variants must be identical",
                                     entry.key(),
                                     &property,
                                     entry.get());
