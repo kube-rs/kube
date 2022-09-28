@@ -39,7 +39,7 @@ impl Visitor for StructuralSchemaRewriter {
             .and_then(|subschemas| subschemas.one_of.as_mut())
         {
             // Tagged enums are serialized using `one_of`
-            convert_to_structural(one_of, &mut schema.object, &mut schema.instance_type, false);
+            hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type, false);
         }
 
         if let Some(any_of) = schema
@@ -48,7 +48,7 @@ impl Visitor for StructuralSchemaRewriter {
             .and_then(|subschemas| subschemas.any_of.as_mut())
         {
             // Untagged enums are serialized using `any_of`
-            convert_to_structural(any_of, &mut schema.object, &mut schema.instance_type, true);
+            hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type, true);
         }
 
         // check for maps without with properties (i.e. flattened maps)
@@ -72,7 +72,7 @@ fn hoist_subschema_properties(
     subschemas: &mut Vec<Schema>,
     common_obj: &mut Option<Box<ObjectValidation>>,
     instance_type: &mut Option<SingleOrVec<InstanceType>>,
-    allow_repeated_property: bool,
+    allow_if_equal: bool,
 ) {
     let common_obj = common_obj.get_or_insert_with(|| Box::new(ObjectValidation::default()));
 
@@ -102,21 +102,25 @@ fn hoist_subschema_properties(
             let variant_properties = std::mem::take(&mut variant_obj.properties);
             for (property_name, property) in variant_properties {
                 match common_obj.properties.entry(property_name) {
-                    Entry::Occupied(entry) => {
-                        if !allow_repeated_property {
-                            panic!(
-                                "property {:?} is already defined in another enum variant",
-                                entry.key()
-                            )
-                        } else if &property != entry.get() {
-                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another enum variant. The schemas for a property used in multiple enum variants must be identical",
-                                    entry.key(),
-                                    &property,
-                                    entry.get());
-                        }
-                    }
                     Entry::Vacant(entry) => {
                         entry.insert(property);
+                    }
+                    Entry::Occupied(entry) => {
+                        if allow_if_equal {
+                            if &property == entry.get() {
+                                continue;
+                            }
+
+                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another untagged enum variant. The schemas for a property used in multiple untagged enum variants must be identical",
+                                entry.key(),
+                                &property,
+                                entry.get());
+                        }
+
+                        panic!(
+                            "Property {:?} is already defined in another tagged enum variant",
+                            entry.key()
+                        )
                     }
                 }
             }
