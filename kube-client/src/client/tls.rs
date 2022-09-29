@@ -83,7 +83,8 @@ pub mod rustls_tls {
     use hyper_rustls::ConfigBuilderExt;
     use rustls::{
         self,
-        client::{ServerCertVerified, ServerCertVerifier},
+        client::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+        internal::msgs::handshake::DigitallySignedStruct,
         Certificate, ClientConfig, PrivateKey,
     };
     use thiserror::Error;
@@ -194,7 +195,26 @@ pub mod rustls_tls {
             _ocsp_response: &[u8],
             _now: std::time::SystemTime,
         ) -> Result<ServerCertVerified, rustls::Error> {
+            tracing::warn!("Server cert bypassed");
             Ok(ServerCertVerified::assertion())
+        }
+
+        fn verify_tls13_signature(
+            &self,
+            _message: &[u8],
+            _cert: &Certificate,
+            _dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            Ok(HandshakeSignatureValid::assertion())
+        }
+
+        fn verify_tls12_signature(
+            &self,
+            _message: &[u8],
+            _cert: &Certificate,
+            _dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            Ok(HandshakeSignatureValid::assertion())
         }
     }
 }
