@@ -30,6 +30,7 @@ use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
 mod auth;
 mod body;
 mod builder;
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))] mod request;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
 mod config_ext;
