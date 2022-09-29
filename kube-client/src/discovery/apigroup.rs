@@ -1,5 +1,6 @@
 use super::parse::{self, GroupVersionData};
 use crate::{error::DiscoveryError, Client, Error, Result};
+use itertools::Itertools;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
 use kube_core::{
@@ -7,7 +8,6 @@ use kube_core::{
     Version,
 };
 use std::cmp::Reverse;
-
 
 /// Describes one API groups collected resources and capabilities.
 ///
@@ -240,8 +240,18 @@ impl ApiGroup {
     ///
     /// This is equivalent to taking the [`ApiGroup::versioned_resources`] at the [`ApiGroup::preferred_version_or_latest`].
     pub fn recommended_resources(&self) -> Vec<(ApiResource, ApiCapabilities)> {
-        let ver = self.preferred_version_or_latest();
-        self.versioned_resources(ver)
+        self.data
+            .iter()
+            .map(|gvd| gvd.resources.clone())
+            .concat()
+            .iter()
+            .into_group_map_by(|(ar, _)| ar.kind.clone())
+            .into_iter()
+            .map(|(_, mut v)| {
+                v.sort_by_cached_key(|(ar, _)| Reverse(Version::parse(ar.version.as_str()).priority()));
+                v[0].to_owned()
+            })
+            .collect()
     }
 
     /// Returns the recommended version of the `kind` in the recommended resources (if found)

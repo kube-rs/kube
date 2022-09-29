@@ -71,6 +71,7 @@ rand = { version = "0.8.3", optional = true }
 secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
 tracing = { version = "0.1.29", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
+itertools = "0.10.5"
 
 [dependencies.k8s-openapi]
 version = "0.16.0"
