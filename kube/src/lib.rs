@@ -435,7 +435,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (fetches api resources, and lists all)
+    // #[ignore] // needs cluster (fetches api resources, and lists all)
     #[cfg(all(feature = "derive"))]
     async fn derived_resources_by_stability_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
@@ -500,8 +500,8 @@ mod test {
 
         // run (almost) full discovery
         let discovery = Discovery::new(client.clone())
-            // skip something in discovery (clux.dev crd being mutated in other tests)
-            .exclude(&["rbac.authorization.k8s.io", "clux.dev"])
+            // only include kube.rs in discovery
+            .filter(&["kube.rs"])
             .run()
             .await?;
 

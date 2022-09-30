@@ -243,7 +243,7 @@ impl ApiGroup {
         self.versioned_resources(ver)
     }
 
-    ///  Returns all (including the lost in the lower group version) resources having the most stable version.
+    ///  Returns all resources in the group at their the most stable respective version
     ///
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
