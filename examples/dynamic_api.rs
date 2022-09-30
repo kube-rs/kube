@@ -2,7 +2,7 @@
 
 use kube::{
     api::{Api, DynamicObject, ResourceExt},
-    discovery::{verbs, Discovery, Scope},
+    discovery::{verbs, Discovery},
     Client,
 };
 use tracing::*;
@@ -14,14 +14,14 @@ async fn main() -> anyhow::Result<()> {
 
     let discovery = Discovery::new(client.clone()).run().await?;
     for group in discovery.groups() {
-        for (ar, caps) in group.recommended_resources() {
-            if !caps.supports_operation(verbs::LIST) {
+        for ar in group.recommended_resources() {
+            if !ar.supports_operation(verbs::LIST) {
                 continue;
             }
-            let api: Api<DynamicObject> = if caps.scope == Scope::Cluster {
-                Api::all_with(client.clone(), &ar)
-            } else {
+            let api: Api<DynamicObject> = if ar.namespaced {
                 Api::default_namespaced_with(client.clone(), &ar)
+            } else {
+                Api::all_with(client.clone(), &ar)
             };
 
             info!("{}/{} : {}", group.name(), ar.version, ar.kind);

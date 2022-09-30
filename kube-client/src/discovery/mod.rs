@@ -1,7 +1,7 @@
 //! High-level utilities for runtime API discovery.
 
 use crate::{Client, Result};
-pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
+pub use kube_core::discovery::{verbs, ApiResource};
 use kube_core::gvk::GroupVersionKind;
 use std::collections::HashMap;
 mod apigroup;
@@ -87,14 +87,14 @@ impl Discovery {
     /// causing `N+2` queries to the api server (where `N` is number of api groups).
     ///
     /// ```no_run
-    /// use kube::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs, Scope}, ResourceExt};
+    /// use kube::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs}, ResourceExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let discovery = Discovery::new(client.clone()).run().await?;
     ///     for group in discovery.groups() {
-    ///         for (ar, caps) in group.recommended_resources() {
-    ///             if !caps.supports_operation(verbs::LIST) {
+    ///         for ar in group.recommended_resources() {
+    ///             if !ar.supports_operation(verbs::LIST) {
     ///                 continue;
     ///             }
     ///             let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
@@ -161,10 +161,10 @@ impl Discovery {
     ///
     /// This is for quick extraction after having done a complete discovery.
     /// If you are only interested in a single kind, consider [`oneshot::pinned_kind`](crate::discovery::pinned_kind).
-    pub fn resolve_gvk(&self, gvk: &GroupVersionKind) -> Option<(ApiResource, ApiCapabilities)> {
+    pub fn resolve_gvk(&self, gvk: &GroupVersionKind) -> Option<ApiResource> {
         self.get(&gvk.group)?
             .versioned_resources(&gvk.version)
             .into_iter()
-            .find(|res| res.0.kind == gvk.kind)
+            .find(|res| res.kind == gvk.kind)
     }
 }

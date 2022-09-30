@@ -153,6 +153,7 @@ where
     }
 }
 
+
 /// Helper methods for resources.
 pub trait ResourceExt: Resource {
     /// Deprecated fn equivalent to [`name_unchecked`](ResourceExt::name_unchecked)

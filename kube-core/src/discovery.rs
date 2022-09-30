@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// Enough information to use it like a `Resource` by passing it to the dynamic `Api`
 /// constructors like `Api::all_with` and `Api::namespaced_with`.
+///
+/// Note that this can be constructed in many ways, and all information
+/// is only guaranteed to be present through discovery.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ApiResource {
     /// Resource group, empty for core group.
@@ -17,12 +20,34 @@ pub struct ApiResource {
     pub api_version: String,
     /// Singular PascalCase name of the resource
     pub kind: String,
-    /// Plural name of the resource
+
+    /// Resource name / plural name
     pub plural: String,
+
+    /// Whether the resource is namespaced or not
+    ///
+    /// Note: only populated through kube-derive and discovery.
+    pub namespaced: bool,
+
+    /// Supported verbs
+    ///
+    /// Note: only populated when constructed through discovery.
+    pub verbs: Vec<String>,
+
+    /// Supported subresources
+    ///
+    /// Note: only populated when constructed through discovery.
+    /// TODO: populate through kube-derive
+    pub subresources: Vec<ApiResource>,
 }
+
 
 impl ApiResource {
     /// Creates an ApiResource by type-erasing a Resource
+    ///
+    /// Note that this variant of constructing an `ApiResource` does not
+    /// get you verbs and available subresources.
+    /// If you need this, construct via discovery.
     pub fn erase<K: Resource>(dt: &K::DynamicType) -> Self {
         ApiResource {
             group: K::group(dt).to_string(),
@@ -30,6 +55,9 @@ impl ApiResource {
             api_version: K::api_version(dt).to_string(),
             kind: K::kind(dt).to_string(),
             plural: K::plural(dt).to_string(),
+            verbs: vec![],
+            namespaced: false,
+            subresources: vec![],
         }
     }
 
@@ -41,6 +69,9 @@ impl ApiResource {
             version: gvk.version.clone(),
             kind: gvk.kind.clone(),
             plural: plural.to_string(),
+            verbs: vec![],
+            namespaced: false,
+            subresources: vec![],
         }
     }
 
@@ -57,16 +88,7 @@ impl ApiResource {
     }
 }
 
-/// Resource scope
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum Scope {
-    /// Objects are global
-    Cluster,
-    /// Each object lives in namespace.
-    Namespaced,
-}
-
-/// Rbac verbs for ApiCapabilities
+/// Rbac verbs
 pub mod verbs {
     /// Create a resource
     pub const CREATE: &str = "create";
@@ -86,25 +108,10 @@ pub mod verbs {
     pub const PATCH: &str = "patch";
 }
 
-/// Contains the capabilities of an API resource
-#[derive(Debug, Clone)]
-pub struct ApiCapabilities {
-    /// Scope of the resource
-    pub scope: Scope,
-    /// Available subresources.
-    ///
-    /// Please note that returned ApiResources are not standalone resources.
-    /// Their name will be of form `subresource_name`, not `resource_name/subresource_name`.
-    /// To work with subresources, use `Request` methods for now.
-    pub subresources: Vec<(ApiResource, ApiCapabilities)>,
-    /// Supported operations on this resource
-    pub operations: Vec<String>,
-}
-
-impl ApiCapabilities {
+impl ApiResource {
     /// Checks that given verb is supported on this resource.
     pub fn supports_operation(&self, operation: &str) -> bool {
-        self.operations.iter().any(|op| op == operation)
+        self.verbs.iter().any(|op| op == operation)
     }
 }
 
