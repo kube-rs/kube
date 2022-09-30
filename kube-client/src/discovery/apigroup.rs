@@ -1,13 +1,12 @@
 use super::parse::{self, GroupVersionData};
 use crate::{error::DiscoveryError, Client, Error, Result};
-use itertools::Itertools;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
 use kube_core::{
     gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
     Version,
 };
-use std::cmp::Reverse;
+use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 
 /// Describes one API groups collected resources and capabilities.
 ///
@@ -240,12 +239,42 @@ impl ApiGroup {
     ///
     /// This is equivalent to taking the [`ApiGroup::versioned_resources`] at the [`ApiGroup::preferred_version_or_latest`].
     pub fn recommended_resources(&self) -> Vec<(ApiResource, ApiCapabilities)> {
-        self.data
-            .iter()
-            .map(|gvd| gvd.resources.clone())
-            .concat()
-            .iter()
-            .into_group_map_by(|(ar, _)| ar.kind.clone())
+        let ver = self.preferred_version_or_latest();
+        self.versioned_resources(ver)
+    }
+
+    ///  Returns all (including the lost in the lower group version) resources having the most stable version.
+    ///
+    /// ```no_run
+    /// use kube::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let client = Client::try_default().await?;
+    ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
+    ///     for (ar, caps) in apigroup.resources_by_stability() {
+    ///         if !caps.supports_operation(verbs::LIST) {
+    ///             continue;
+    ///         }
+    ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+    ///         for inst in api.list(&Default::default()).await? {
+    ///             println!("Found {}: {}", ar.kind, inst.name());
+    ///         }
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    /// See an example in [examples/kubectl.rs](https://github.com/kube-rs/kube/blob/main/examples/kubectl.rs)
+    pub fn resources_by_stability(&self) -> Vec<(ApiResource, ApiCapabilities)> {
+        let mut lookup = HashMap::new();
+        self.data.iter().for_each(|gvd| {
+            gvd.resources.iter().for_each(|resource| {
+                lookup
+                    .entry(resource.0.kind.clone())
+                    .or_insert_with(Vec::new)
+                    .push(resource);
+            })
+        });
+        lookup
             .into_iter()
             .map(|(_, mut v)| {
                 v.sort_by_cached_key(|(ar, _)| Reverse(Version::parse(ar.version.as_str()).priority()));

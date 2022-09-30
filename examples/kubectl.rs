@@ -64,7 +64,7 @@ fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResourc
         .groups()
         .flat_map(|group| {
             group
-                .recommended_resources()
+                .resources_by_stability()
                 .into_iter()
                 .map(move |res| (group, res))
         })

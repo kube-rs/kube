@@ -247,11 +247,14 @@ mod test {
         let foos: Api<Foo> = Api::default_namespaced(client.clone());
         // Apply from generated struct
         {
-            let foo = Foo::new("baz", FooSpec {
-                name: "baz".into(),
-                info: Some("old baz".into()),
-                replicas: 1,
-            });
+            let foo = Foo::new(
+                "baz",
+                FooSpec {
+                    name: "baz".into(),
+                    info: Some("old baz".into()),
+                    replicas: 1,
+                },
+            );
             let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
             assert_eq!(o.spec.name, "baz");
             let oref = o.object_ref(&());
@@ -428,6 +431,103 @@ mod test {
 
         // cleanup
         crds.delete("testcrs.kube.rs", &DeleteParams::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // needs cluster (fetches api resources, and lists all)
+    #[cfg(all(feature = "derive"))]
+    async fn derived_resources_by_stability_discoverable() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            discovery::{self, Discovery},
+            runtime::wait::{await_condition, conditions},
+        };
+        use kube_core::crd::merge_crds;
+
+        mod v1alpha1 {
+            use super::*;
+
+            #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+            #[kube(
+                group = "kube.rs",
+                version = "v1alpha1",
+                kind = "TestLowVersionCr",
+                namespaced
+            )]
+            #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
+            pub struct TestLowVersionCrSpec {}
+        }
+
+        mod v1 {
+            use super::*;
+
+            #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+            #[kube(group = "kube.rs", version = "v1", kind = "TestCr", namespaced)]
+            #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
+            pub struct TestCrSpec {}
+        }
+
+        mod v2alpha1 {
+            use super::*;
+
+            #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+            #[kube(group = "kube.rs", version = "v2alpha1", kind = "TestCr", namespaced)]
+            #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
+            pub struct TestCrSpec {}
+        }
+
+        async fn apply_crd(
+            client: Client,
+            name: &str,
+            crd: CustomResourceDefinition,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+            let ssapply = PatchParams::apply("kube").force();
+            crds.patch(name, &ssapply, &Patch::Apply(&crd)).await?;
+            let establish = await_condition(crds.clone(), name, conditions::is_crd_established());
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
+            Ok(())
+        }
+
+        let client = Client::try_default().await?;
+        let test_lowversion_crd = v1alpha1::TestLowVersionCr::crd();
+        let testcrd_v1 = v1::TestCr::crd();
+        let testcrd_v2alpha1 = v2alpha1::TestCr::crd();
+        let all_crds = vec![testcrd_v1.clone(), testcrd_v2alpha1.clone()];
+
+        apply_crd(client.clone(), "testlowversioncrs.kube.rs", test_lowversion_crd).await?;
+        apply_crd(client.clone(), "testcrs.kube.rs", merge_crds(all_crds, "v1")?).await?;
+
+        // run (almost) full discovery
+        let discovery = Discovery::new(client.clone())
+            // skip something in discovery (clux.dev crd being mutated in other tests)
+            .exclude(&["rbac.authorization.k8s.io", "clux.dev"])
+            .run()
+            .await?;
+
+        // check our custom resource first by resolving within groups
+        assert!(discovery.has_group("kube.rs"), "missing group kube.rs");
+
+        let group = discovery::group(&client, "kube.rs").await?;
+        let resources = group.resources_by_stability();
+        assert!(
+            resources
+                .iter()
+                .any(|(ar, _)| ar.kind == "TestCr" && ar.version == "v1"),
+            "wrong stable version"
+        );
+        assert!(
+            resources
+                .iter()
+                .any(|(ar, _)| ar.kind == "TestLowVersionCr" && ar.version == "v1alpha1"),
+            "lost low version resource"
+        );
+
+        // cleanup
+        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+        crds.delete("testcrs.kube.rs", &DeleteParams::default()).await?;
+        crds.delete("testlowversioncrs.kube.rs", &DeleteParams::default())
+            .await?;
         Ok(())
     }
 
