@@ -311,3 +311,74 @@ impl ApiGroup {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resources_by_stability() {
+        let ac = ApiCapabilities {
+            scope: Scope::Namespaced,
+            subresources: vec![],
+            operations: vec![],
+        };
+
+        let testlowversioncr_v1alpha1 = ApiResource {
+            group: String::from("kube.rs"),
+            version: String::from("v1alpha1"),
+            kind: String::from("TestLowVersionCr"),
+            api_version: String::from("kube.rs/v1alpha1"),
+            plural: String::from("testlowversioncrs"),
+        };
+
+        let testcr_v1 = ApiResource {
+            group: String::from("kube.rs"),
+            version: String::from("v1"),
+            kind: String::from("TestCr"),
+            api_version: String::from("kube.rs/v1"),
+            plural: String::from("testcrs"),
+        };
+
+        let testcr_v2alpha1 = ApiResource {
+            group: String::from("kube.rs"),
+            version: String::from("v2alpha1"),
+            kind: String::from("TestCr"),
+            api_version: String::from("kube.rs/v2alpha1"),
+            plural: String::from("testcrs"),
+        };
+
+        let group = ApiGroup {
+            name: "kube.rs".to_string(),
+            data: vec![
+                GroupVersionData {
+                    version: "v1alpha1".to_string(),
+                    resources: vec![(testlowversioncr_v1alpha1.clone(), ac.clone())],
+                },
+                GroupVersionData {
+                    version: "v1".to_string(),
+                    resources: vec![(testcr_v1.clone(), ac.clone())],
+                },
+                GroupVersionData {
+                    version: "v2alpha1".to_string(),
+                    resources: vec![(testcr_v2alpha1.clone(), ac.clone())],
+                },
+            ],
+            preferred: Some(String::from("v1")),
+        };
+
+        let resources = group.resources_by_stability();
+        assert!(
+            resources
+                .iter()
+                .any(|(ar, _)| ar.kind == "TestCr" && ar.version == "v1"),
+            "wrong stable version"
+        );
+        assert!(
+            resources
+                .iter()
+                .any(|(ar, _)| ar.kind == "TestLowVersionCr" && ar.version == "v1alpha1"),
+            "lost low version resource"
+        );
+    }
+}
