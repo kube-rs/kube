@@ -446,7 +446,7 @@ mod test {
 
             #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
             #[kube(
-                group = "kube.rs",
+                group = "test.kube.rs",
                 version = "v1alpha1",
                 kind = "TestLowVersionCr",
                 namespaced
@@ -459,7 +459,7 @@ mod test {
             use super::*;
 
             #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
-            #[kube(group = "kube.rs", version = "v1", kind = "TestCr", namespaced)]
+            #[kube(group = "test.kube.rs", version = "v1", kind = "TestCr", namespaced)]
             #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
             pub struct TestCrSpec {}
         }
@@ -468,7 +468,7 @@ mod test {
             use super::*;
 
             #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
-            #[kube(group = "kube.rs", version = "v2alpha1", kind = "TestCr", namespaced)]
+            #[kube(group = "test.kube.rs", version = "v2alpha1", kind = "TestCr", namespaced)]
             #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
             pub struct TestCrSpec {}
         }
@@ -492,20 +492,30 @@ mod test {
         let testcrd_v2alpha1 = v2alpha1::TestCr::crd();
         let all_crds = vec![testcrd_v1.clone(), testcrd_v2alpha1.clone()];
 
-        apply_crd(client.clone(), "testlowversioncrs.kube.rs", test_lowversion_crd).await?;
-        apply_crd(client.clone(), "testcrs.kube.rs", merge_crds(all_crds, "v1")?).await?;
+        apply_crd(
+            client.clone(),
+            "testlowversioncrs.test.kube.rs",
+            test_lowversion_crd,
+        )
+        .await?;
+        apply_crd(
+            client.clone(),
+            "testcrs.test.kube.rs",
+            merge_crds(all_crds, "v1")?,
+        )
+        .await?;
 
         // run (almost) full discovery
         let discovery = Discovery::new(client.clone())
-            // only include kube.rs in discovery
-            .filter(&["kube.rs"])
+            // only include test.kube.rs in discovery
+            .filter(&["test.kube.rs"])
             .run()
             .await?;
 
         // check our custom resource first by resolving within groups
-        assert!(discovery.has_group("kube.rs"), "missing group kube.rs");
+        assert!(discovery.has_group("test.kube.rs"), "missing group kube.rs");
 
-        let group = discovery::group(&client, "kube.rs").await?;
+        let group = discovery::group(&client, "test.kube.rs").await?;
         let resources = group.resources_by_stability();
         assert!(
             resources
@@ -522,8 +532,9 @@ mod test {
 
         // cleanup
         let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-        crds.delete("testcrs.kube.rs", &DeleteParams::default()).await?;
-        crds.delete("testlowversioncrs.kube.rs", &DeleteParams::default())
+        crds.delete("testcrs.test.kube.rs", &DeleteParams::default())
+            .await?;
+        crds.delete("testlowversioncrs.test.kube.rs", &DeleteParams::default())
             .await?;
         Ok(())
     }
