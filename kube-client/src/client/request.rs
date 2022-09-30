@@ -60,27 +60,6 @@ where
     Request::new(url)
 }
 
-// TODO: remove these i think they are not necessary
-fn cluster_subresource_request<K, S>() -> Request
-where
-    K: Resource<Scope = ClusterResourceScope>,
-    S: Resource<Scope = SubResourceScope>,
-    <K as Resource>::DynamicType: Default,
-{
-    let url = K::url_path(&K::DynamicType::default(), None);
-    Request::new(url)
-}
-fn namespaced_subresource_request<K, S>(ns: &Namespace) -> Request
-where
-    K: Resource<Scope = NamespaceResourceScope>,
-    S: Resource<Scope = SubResourceScope>,
-    <K as Resource>::DynamicType: Default,
-{
-    let url = K::url_path(&K::DynamicType::default(), Some(&ns.0));
-    Request::new(url)
-}
-
-
 /// Unconstrained private helpers for any Resource implementor
 impl Client {
     async fn create_raw<K>(&self, r: Request, pp: &PostParams, data: &K) -> Result<K>
@@ -93,24 +72,25 @@ impl Client {
         self.request::<K>(req).await
     }
 
-    async fn create_raw_subresource<K>(
+    async fn create_raw_subresource<K, S>(
         &self,
         r: Request,
         name: &str,
-        subresource_name: &str,
         pp: &PostParams,
-        data: &K,
-    ) -> Result<K>
+        data: &S,
+    ) -> Result<S>
     where
-        K: Resource + Serialize + DeserializeOwned + Clone + Debug,
+        K: Resource,
+        S: Resource<Scope = SubResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
+        S::DynamicType: Default, // limited to static queries
     {
         let bytes = serde_json::to_vec(&data).map_err(Error::SerdeError)?;
-        // TODO: figure out why create_subresource needs a name, but create does not
+        let subname = S::plural(&S::DynamicType::default()).to_string();
         let mut req = r
-            .create_subresource(subresource_name, name, pp, bytes)
+            .create_subresource(&subname, name, pp, bytes)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("create_subresource");
-        self.request::<K>(req).await
+        self.request::<S>(req).await
     }
 
     async fn delete_raw<K>(&self, r: Request, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>>
@@ -174,11 +154,50 @@ impl Client {
     }
 }
 
+/// Methods for SubResourceScope
+///
+/// These methods are generic over two Resource types;
+/// K: The root type the subresource is attached to (e.g. ServiceAccount)
+/// S: The sub type sitting ontop of a resource (e.g. TokenReview)
+impl Client {
+    /// Create an arbitrary subresource under a resource
+    pub async fn create_subresource<K, S>(&self, name: &str, pp: &PostParams, data: &S) -> Result<S>
+    where
+        K: Resource<Scope = ClusterResourceScope>,
+        S: Resource<Scope = SubResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
+        <K as Resource>::DynamicType: Default,
+        <S as Resource>::DynamicType: Default,
+    {
+        let request = cluster_request::<K>();
+        self.create_raw_subresource::<K, S>(request, name, pp, data).await
+    }
+
+    /// Create an arbitrary namespaced subresource under a resource
+    pub async fn create_namespaced_subresource<K, S>(
+        &self,
+        name: &str,
+        ns: &Namespace,
+        pp: &PostParams,
+        data: &S,
+    ) -> Result<S>
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+        S: Resource<Scope = SubResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
+        <K as Resource>::DynamicType: Default,
+        <S as Resource>::DynamicType: Default,
+    {
+        let request = namespaced_request::<K>(ns);
+        self.create_raw_subresource::<K, S>(request, name, pp, data).await
+    }
+}
+
+
 /// Methods for DynamicResourceScope
 /// These resources can be Namespaced or Cluster scoped, so we implement both methods.
+/// NB: We do not handle Dynamically scoped subresources at the moment
 impl Client {
     /// Create a cluster resource
-    pub async fn create_with<K>(&self, pp: &PostParams, data: &K, dt: &K::DynamicType) -> Result<K>
+    pub async fn create_dyn<K>(&self, pp: &PostParams, data: &K, dt: &K::DynamicType) -> Result<K>
     where
         K: Resource<Scope = DynamicResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
     {
@@ -201,7 +220,7 @@ impl Client {
     }
 
     /// Create a namespaced resource
-    pub async fn create_namespaced_with<K>(
+    pub async fn create_namespaced_dyn<K>(
         &self,
         ns: &Namespace,
         pp: &PostParams,
@@ -211,12 +230,15 @@ impl Client {
     where
         K: Resource<Scope = DynamicResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
     {
+        // TODO: need to block on wrong scope at runtime via DynamicType
+        // but it's currently hidden in ApiCapabilities
+        // See https://github.com/kube-rs/kube/issues/1036
         let request = dynamic_namespaced_request::<K>(dt, ns);
         self.create_raw(request, pp, data).await
     }
 
     /// Delete a namespaced resource
-    pub async fn delete_namespaced_with<K>(
+    pub async fn delete_namespaced_dyn<K>(
         &self,
         name: &str,
         ns: &Namespace,
@@ -226,48 +248,10 @@ impl Client {
     where
         K: Resource<Scope = DynamicResourceScope> + DeserializeOwned + Clone + Debug,
     {
+        // TODO: need to block on wrong scope at runtime via DynamicType
+        // but it's currently hidden in ApiCapabilities
+        // See https://github.com/kube-rs/kube/issues/1036
         let request = dynamic_namespaced_request::<K>(dt, ns);
         self.delete_raw(request, name, dp).await
-    }
-}
-
-
-/// Methods for DynamicResourceScope
-/// NB: Currently not handling Dynamically scoped subresources...
-/// ...maybe this is a sign that Dynamic scopes are disjoint from scopes
-impl Client {
-    /// Create an arbitrary subresource under a resource
-    pub async fn create_subresource<K, S>(&self, name: &str, pp: &PostParams, data: &S) -> Result<S>
-    where
-        K: Resource<Scope = ClusterResourceScope>,
-        S: Resource<Scope = SubResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
-        <K as Resource>::DynamicType: Default,
-        <S as Resource>::DynamicType: Default,
-    {
-        let request = cluster_request::<K>();
-        let subresource_name = S::plural(&S::DynamicType::default()).to_string();
-        self.create_raw_subresource(request, &subresource_name, name, pp, data)
-            .await
-    }
-
-    /// Create an arbitrary namespaced subresource under a resource
-    pub async fn create_namespaced_subresource<K, S>(
-        &self,
-        name: &str,
-        ns: &Namespace,
-        pp: &PostParams,
-        data: &S,
-    ) -> Result<S>
-    where
-        K: Resource<Scope = NamespaceResourceScope>,
-        S: Resource<Scope = SubResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
-        <K as Resource>::DynamicType: Default,
-        <S as Resource>::DynamicType: Default,
-    {
-        let request = namespaced_request::<K>(ns);
-        // this is the subresource name in subresource scope
-        let subresource_name = S::plural(&S::DynamicType::default()).to_string();
-        self.create_raw_subresource(request, &subresource_name, name, pp, data)
-            .await
     }
 }

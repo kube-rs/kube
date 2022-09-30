@@ -59,6 +59,8 @@ pub trait Resource {
     /// Returns the plural name of the kind
     ///
     /// This is known as the resource in apimachinery, we rename it for disambiguation.
+    /// In the case where the Resource is of SubResourceScope, this is its resource name.
+    /// TODO: rename to resource...
     fn plural(dt: &Self::DynamicType) -> Cow<'_, str>;
 
     /// Creates a url path for http requests for this resource
