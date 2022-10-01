@@ -96,16 +96,23 @@ impl ApiResource {
         }
     }
 
-    /// Infer a minimal ApiResource from a GVK and whether it's namespaced
+    /// Infer a minimal ApiResource from a GVK as cluster scoped
     ///
     /// # Warning
-    /// This function will **guess** the resource plural name.
-    /// Usually, this is ok, but for CRDs with complex pluralisations it can fail.
+    /// This function will **guess** the resource plural name which can fail
+    /// for CRDs with complex pluralisations it can fail. It will also assume cluster scope.
+    ///
     /// If you are getting your values from `kube_derive` use the generated method for giving you an [`ApiResource`].
-    /// Otherwise consider using [`ApiResource::new`](crate::discovery::ApiResource::from_gvk_with_plural)
-    /// to explicitly set the plural, or run api discovery on it via `kube::discovery`.
-    pub fn from_gvk(gvk: &GroupVersionKind, namespaced: bool) -> Self {
-        ApiResource::new(gvk, &to_plural(&gvk.kind.to_ascii_lowercase()), namespaced)
+    /// Otherwise consider using [`ApiResource::new`](crate::discovery::ApiResource::new)
+    /// to explicitly set the plural and scope, or run api discovery on it via `kube::discovery`.
+    pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
+        ApiResource::new(gvk, &to_plural(&gvk.kind.to_ascii_lowercase()), false)
+    }
+
+    /// Set the whether the resource is namsepace scoped
+    pub fn namespaced(mut self, namespaced: bool) -> Self {
+        self.namespaced = namespaced;
+        self
     }
 
     /// Set the shortnames
