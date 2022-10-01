@@ -313,13 +313,13 @@ mod tests {
     #[test]
     fn test_resources_by_stability() {
         let cr_low = GVK::gvk("kube.rs", "v1alpha1", "LowCr");
-        let testcr_low = ApiResource::from_gvk_with_plural(&cr_low, "lowcrs");
+        let testcr_low = ApiResource::new(&cr_low, "lowcrs", true);
 
         let cr_v1 = GVK::gvk("kube.rs", "v1", "TestCr");
-        let testcr_v1 = ApiResource::from_gvk_with_plural(&cr_v1, "testcrs");
+        let testcr_v1 = ApiResource::new(&cr_v1, "testcrs", true);
 
         let cr_v2a1 = GVK::gvk("kube.rs", "v2alpha1", "TestCr");
-        let testcr_v2alpha1 = ApiResource::from_gvk_with_plural(&cr_v2a1, "testcrs");
+        let testcr_v2alpha1 = ApiResource::new(&cr_v2a1, "testcrs", true);
 
         let group = ApiGroup {
             name: "kube.rs".into(),
