@@ -157,7 +157,7 @@ impl Discovery {
         self.groups.contains_key(group)
     }
 
-    /// Finds an [`ApiResource`] and its [`ApiCapabilities`] after discovery by matching a GVK
+    /// Finds an [`ApiResource`] after discovery by matching a GVK
     ///
     /// This is for quick extraction after having done a complete discovery.
     /// If you are only interested in a single kind, consider [`oneshot::pinned_kind`](crate::discovery::pinned_kind).
