@@ -39,13 +39,15 @@ pub mod request;
 pub use request::Request;
 
 mod resource;
-pub use resource::{
-    ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource, ResourceExt, ResourceScope,
-    SubResourceScope,
-};
+pub use resource::{Resource, ResourceExt};
 
 pub mod response;
 pub use response::Status;
+
+mod scope;
+pub use scope::{
+    ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Scope, SubResourceScope,
+};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
 #[cfg(feature = "schema")]

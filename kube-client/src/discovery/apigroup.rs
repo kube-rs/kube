@@ -30,12 +30,9 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 ///
 /// But if you do not know this information, you can use [`ApiGroup::preferred_version_or_latest`].
 ///
-/// Whichever way you choose the end result is something describing a resource and its abilities:
-/// - `Vec<(ApiResource, `ApiCapabilities)>` :: for all resources in a versioned ApiGroup
-/// - `(ApiResource, ApiCapabilities)` :: for a single kind under a versioned ApiGroud
-///
-/// These two types: [`ApiResource`], and [`ApiCapabilities`]
-/// should contain the information needed to construct an [`Api`](crate::Api) and start querying the kubernetes API.
+/// Whichever way you choose the end result is a vector of [`ApiResource`] entries per kind.
+/// This [`ApiResource`] type contains the information needed to construct an [`Api`](crate::Api)
+/// and start querying the kubernetes API.
 /// You will likely need to use [`DynamicObject`] as the generic type for Api to do this,
 /// as well as the [`ApiResource`] for the `DynamicType` for the [`Resource`] trait.
 ///
@@ -54,7 +51,6 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 /// }
 /// ```
 /// [`ApiResource`]: crate::discovery::ApiResource
-/// [`ApiCapabilities`]: crate::discovery::ApiCapabilities
 /// [`DynamicObject`]: crate::api::DynamicObject
 /// [`Resource`]: crate::Resource
 /// [`ApiGroup::preferred_version_or_latest`]: crate::discovery::ApiGroup::preferred_version_or_latest
@@ -311,18 +307,18 @@ impl ApiGroup {
 
 #[cfg(test)]
 mod tests {
-    use super::{GroupVersionKind, *};
+    use super::{GroupVersionKind as GVK, *};
 
 
     #[test]
     fn test_resources_by_stability() {
-        let cr_low = GroupVersionKind::gvk("kube.rs", "v1alpha1", "LowCr");
+        let cr_low = GVK::gvk("kube.rs", "v1alpha1", "LowCr");
         let testcr_low = ApiResource::from_gvk_with_plural(&cr_low, "lowcrs");
 
-        let cr_v1 = GroupVersionKind::gvk("kube.rs", "v1", "TestCr");
+        let cr_v1 = GVK::gvk("kube.rs", "v1", "TestCr");
         let testcr_v1 = ApiResource::from_gvk_with_plural(&cr_v1, "testcrs");
 
-        let cr_v2a1 = GroupVersionKind::gvk("kube.rs", "v2alpha1", "TestCr");
+        let cr_v2a1 = GVK::gvk("kube.rs", "v2alpha1", "TestCr");
         let testcr_v2alpha1 = ApiResource::from_gvk_with_plural(&cr_v2a1, "testcrs");
 
         let group = ApiGroup {

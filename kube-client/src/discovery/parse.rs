@@ -21,6 +21,7 @@ pub(crate) fn parse_apiresource(
         plural: ar.name.clone(),
         namespaced: ar.namespaced,
         verbs: ar.verbs.clone(),
+        shortnames: ar.short_names.clone().unwrap_or_default(),
         subresources: vec![],
     })
 }
@@ -55,7 +56,7 @@ impl GroupVersionData {
     pub(crate) fn new(version: String, list: APIResourceList) -> Result<Self> {
         let mut resources = vec![];
         for res in &list.resources {
-            // skip subresources
+            // skip subresources (attach those to the root ar)
             if res.name.contains('/') {
                 continue;
             }

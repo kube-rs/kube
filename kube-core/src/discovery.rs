@@ -1,5 +1,5 @@
 //! Type information structs for API discovery
-use crate::{gvk::GroupVersionKind, resource::Resource};
+use crate::{gvk::GroupVersionKind, resource::Resource, scope::Scope};
 use serde::{Deserialize, Serialize};
 
 /// Information about a Kubernetes API resource
@@ -34,13 +34,17 @@ pub struct ApiResource {
     /// Note: only populated when constructed through discovery.
     pub verbs: Vec<String>,
 
+    /// Supported shortnames
+    ///
+    /// Note: only populated when constructed through discovery or kube-derive.
+    pub shortnames: Vec<String>,
+
     /// Supported subresources
     ///
     /// Note: only populated when constructed through discovery.
     /// TODO: populate through kube-derive
     pub subresources: Vec<ApiResource>,
 }
-
 
 impl ApiResource {
     /// Creates an ApiResource by type-erasing a Resource
@@ -55,13 +59,17 @@ impl ApiResource {
             api_version: K::api_version(dt).to_string(),
             kind: K::kind(dt).to_string(),
             plural: K::plural(dt).to_string(),
+            namespaced: <K as Resource>::Scope::is_namespaced(),
+            // discovery/derive-only properties left blank
             verbs: vec![],
-            namespaced: false,
             subresources: vec![],
+            shortnames: vec![],
         }
     }
 
-    /// Creates an ApiResource from group, version, kind and plural name.
+    /// Creates a minimal ApiResource from group, version, kind and plural name
+    ///
+    /// This is the minimal `ApiVersion` needed to communicate
     pub fn from_gvk_with_plural(gvk: &GroupVersionKind, plural: &str) -> Self {
         ApiResource {
             api_version: gvk.api_version(),
@@ -69,13 +77,15 @@ impl ApiResource {
             version: gvk.version.clone(),
             kind: gvk.kind.clone(),
             plural: plural.to_string(),
+            // discovery/derive-only properties left blank
+            namespaced: false, // TODO: force users to set this?
             verbs: vec![],
-            namespaced: false,
             subresources: vec![],
+            shortnames: vec![],
         }
     }
 
-    /// Creates an ApiResource from group, version and kind.
+    /// Infer a minimal ApiResource from group, version and kind
     ///
     /// # Warning
     /// This function will **guess** the resource plural name.
@@ -85,6 +95,12 @@ impl ApiResource {
     /// to explicitly set the plural, or run api discovery on it via `kube::discovery`.
     pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
         ApiResource::from_gvk_with_plural(gvk, &to_plural(&gvk.kind.to_ascii_lowercase()))
+    }
+
+    /// Set the shortnames of an ApiResource
+    pub fn shortnames(mut self, shortnames: &[&'static str]) -> Self {
+        self.shortnames = shortnames.iter().map(|x| x.to_string()).collect();
+        self
     }
 }
 

@@ -3,10 +3,7 @@
 //! For concrete usage see [examples prefixed with dynamic_](https://github.com/kube-rs/kube/tree/main/examples).
 
 pub use crate::discovery::ApiResource;
-use crate::{
-    metadata::TypeMeta,
-    resource::{DynamicResourceScope, Resource},
-};
+use crate::{metadata::TypeMeta, resource::Resource, scope::DynamicResourceScope};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use std::borrow::Cow;
 

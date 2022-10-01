@@ -454,6 +454,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
             fn api_resource() -> #kube_core::dynamic::ApiResource {
                 #kube_core::dynamic::ApiResource::erase::<Self>(&())
+                    .shortnames(#shortnames_slice)
             }
 
             fn shortnames() -> &'static [&'static str] {

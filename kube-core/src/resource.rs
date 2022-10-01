@@ -4,13 +4,9 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ManagedFieldsEntry, OwnerReference, Time},
 };
 
+use crate::scope::Scope;
 use std::{borrow::Cow, collections::BTreeMap};
 
-pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScope, SubResourceScope};
-
-/// Indicates that a [`Resource`] is of an indeterminate dynamic scope.
-pub struct DynamicResourceScope {}
-impl ResourceScope for DynamicResourceScope {}
 
 /// An accessor trait for a kubernetes Resource.
 ///
@@ -37,7 +33,7 @@ pub trait Resource {
     ///
     /// Types from k8s_openapi come with an explicit k8s_openapi::ResourceScope
     /// Dynamic types should select `Scope = DynamicResourceScope`
-    type Scope;
+    type Scope: Scope;
 
     /// Returns kind of this object
     fn kind(dt: &Self::DynamicType) -> Cow<'_, str>;
@@ -120,6 +116,7 @@ impl<K, S> Resource for K
 where
     K: k8s_openapi::Metadata<Ty = ObjectMeta>,
     K: k8s_openapi::Resource<Scope = S>,
+    S: Scope,
 {
     type DynamicType = ();
     type Scope = S;

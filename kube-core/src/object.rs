@@ -2,7 +2,8 @@
 use crate::{
     discovery::ApiResource,
     metadata::{ListMeta, ObjectMeta, TypeMeta},
-    resource::{DynamicResourceScope, Resource},
+    resource::Resource,
+    scope::DynamicResourceScope,
 };
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
