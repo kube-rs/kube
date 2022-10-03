@@ -111,14 +111,14 @@ fn hoist_subschema_properties(
                                 continue;
                             }
 
-                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another untagged enum variant. The schemas for a property used in multiple untagged enum variants must be identical",
+                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
                                 entry.key(),
                                 &property,
                                 entry.get());
                         }
 
                         panic!(
-                            "Property {:?} is already defined in another tagged enum variant",
+                            "Property {:?} was already defined in another subschema",
                             entry.key()
                         )
                     }
