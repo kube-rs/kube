@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// - `discovery` module in kube/kube-client
 /// - `CustomResource` derive in kube-derive
 ///
-/// Will have ALL the extraneous data about shortnames, verbs, and resources.
+/// will have ALL the extraneous data about shortnames, verbs, and resources.
 ///
 /// # Warning
 ///
@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 /// Are **minimal** conveniences that will work with the Api, but will not have all the extraneous data.
 ///
 /// Shorter construction methods (such as manually filling in data), or fallibly converting from GVKs,
-/// may fail to query. Provide accurate `plural` and `namespaced` data to be safe.
+/// may even fail to query. Provide accurate `plural` and `namespaced` data to be safe.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ApiResource {
     /// Resource group, empty for core group.
@@ -88,7 +88,7 @@ impl ApiResource {
             version: gvk.version.clone(),
             kind: gvk.kind.clone(),
             plural: plural.to_string(),
-            namespaced: namespaced,
+            namespaced,
             // non-essential properties left blank
             verbs: vec![],
             subresources: vec![],
