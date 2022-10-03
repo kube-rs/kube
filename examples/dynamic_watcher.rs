@@ -30,8 +30,8 @@ async fn main() -> anyhow::Result<()> {
     // Fully compatible with kube-runtime
     let mut items = watcher(api, ListParams::default()).applied_objects().boxed();
     while let Some(p) = items.try_next().await? {
-        if ar.namespaced {
-            info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
+        if let Some(ns) = p.namespace() {
+            info!("saw {} in {}", p.name_any(), ns);
         } else {
             info!("saw {}", p.name_any());
         }
