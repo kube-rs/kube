@@ -335,7 +335,6 @@ mod tests {
                 GroupVersionData {
                     version: "v2alpha1".into(),
                     resources: vec![testcr_v2alpha1],
-
                 },
             ],
             preferred: Some(String::from("v1")),
