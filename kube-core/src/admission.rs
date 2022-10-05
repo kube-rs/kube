@@ -234,7 +234,7 @@ pub enum Operation {
 ///     .into_review();
 ///
 /// ```
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AdmissionResponse {

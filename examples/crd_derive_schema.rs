@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable
 
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
 #[kube(
     group = "clux.dev",
     version = "v1",

@@ -275,8 +275,8 @@ impl ApiGroup {
             })
         });
         lookup
-            .into_iter()
-            .map(|(_, mut v)| {
+            .into_values()
+            .map(|mut v| {
                 v.sort_by_cached_key(|(ar, _)| Reverse(Version::parse(ar.version.as_str()).priority()));
                 v[0].to_owned()
             })
@@ -353,15 +353,15 @@ mod tests {
             data: vec![
                 GroupVersionData {
                     version: "v1alpha1".to_string(),
-                    resources: vec![(testlowversioncr_v1alpha1.clone(), ac.clone())],
+                    resources: vec![(testlowversioncr_v1alpha1, ac.clone())],
                 },
                 GroupVersionData {
                     version: "v1".to_string(),
-                    resources: vec![(testcr_v1.clone(), ac.clone())],
+                    resources: vec![(testcr_v1, ac.clone())],
                 },
                 GroupVersionData {
                     version: "v2alpha1".to_string(),
-                    resources: vec![(testcr_v2alpha1.clone(), ac.clone())],
+                    resources: vec![(testcr_v2alpha1, ac)],
                 },
             ],
             preferred: Some(String::from("v1")),
