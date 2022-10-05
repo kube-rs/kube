@@ -20,12 +20,12 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let pods: Api<Pod> = Api::<Pod>::all(client);
-    let list_params = ListParams::default().fields(&*field_selector);
+    let list_params = ListParams::default().fields(&field_selector);
     let list = pods.list(&list_params).await?;
 
     // Use the given JSONPATH to filter the ObjectList
     let list_json = serde_json::to_value(&list)?;
-    let res = jsonpath_lib::select(&list_json, &*jsonpath).unwrap();
+    let res = jsonpath_lib::select(&list_json, &jsonpath).unwrap();
     info!("\t\t {:?}", res);
     Ok(())
 }
