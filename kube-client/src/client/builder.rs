@@ -143,9 +143,9 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
                     })
                     .on_response(|res: &Response<hyper::Body>, _latency: Duration, span: &Span| {
                         let status = res.status();
-                        span.record("http.status_code", &status.as_u16());
+                        span.record("http.status_code", status.as_u16());
                         if status.is_client_error() || status.is_server_error() {
-                            span.record("otel.status_code", &"ERROR");
+                            span.record("otel.status_code", "ERROR");
                         }
                     })
                     // Explicitly disable `on_body_chunk`. The default does nothing.
@@ -159,10 +159,10 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
                         // - Polling `Body` errored
                         // - the response was classified as failure (5xx)
                         // - End of stream was classified as failure
-                        span.record("otel.status_code", &"ERROR");
+                        span.record("otel.status_code", "ERROR");
                         match ec {
                             ServerErrorsFailureClass::StatusCode(status) => {
-                                span.record("http.status_code", &status.as_u16());
+                                span.record("http.status_code", status.as_u16());
                                 tracing::error!("failed with status {}", status)
                             }
                             ServerErrorsFailureClass::Error(err) => {

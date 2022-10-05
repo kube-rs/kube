@@ -209,7 +209,7 @@ pub struct AuthInfo {
 #[cfg(test)]
 impl PartialEq for AuthInfo {
     fn eq(&self, other: &Self) -> bool {
-        serde_json::to_value(&self).unwrap() == serde_json::to_value(&other).unwrap()
+        serde_json::to_value(self).unwrap() == serde_json::to_value(other).unwrap()
     }
 }
 
