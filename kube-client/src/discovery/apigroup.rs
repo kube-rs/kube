@@ -275,8 +275,8 @@ impl ApiGroup {
             })
         });
         lookup
-            .into_iter()
-            .map(|(_, mut v)| {
+            .into_values()
+            .map(|mut v| {
                 v.sort_by_cached_key(|(ar, _)| Reverse(Version::parse(ar.version.as_str()).priority()));
                 v[0].to_owned()
             })
