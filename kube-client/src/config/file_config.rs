@@ -51,7 +51,7 @@ pub struct Kubeconfig {
 
 /// Preferences stores extensions for cli.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Preferences {
     /// Enable colors
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,7 +63,7 @@ pub struct Preferences {
 
 /// NamedExtention associates name with extension.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedExtension {
     /// Name of extension
     pub name: String,
@@ -73,7 +73,7 @@ pub struct NamedExtension {
 
 /// NamedCluster associates name with cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedCluster {
     /// Name of cluster
     pub name: String,
@@ -83,7 +83,7 @@ pub struct NamedCluster {
 
 /// Cluster stores information to connect Kubernetes cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
     pub server: String,
@@ -215,7 +215,7 @@ impl PartialEq for AuthInfo {
 
 /// AuthProviderConfig stores auth for specified cloud provider.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct AuthProviderConfig {
     /// Name of the auth provider
     pub name: String,
@@ -225,7 +225,7 @@ pub struct AuthProviderConfig {
 
 /// ExecConfig stores credential-plugin configuration.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct ExecConfig {
     /// Preferred input version of the ExecInfo.
     ///
@@ -247,7 +247,7 @@ pub struct ExecConfig {
 
 /// NamedContext associates name with context.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedContext {
     /// Name of the context
     pub name: String,
@@ -257,7 +257,7 @@ pub struct NamedContext {
 
 /// Context stores tuple of cluster and user information.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Context {
     /// Name of the cluster for this context
     pub cluster: String,
