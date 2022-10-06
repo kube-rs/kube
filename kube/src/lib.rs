@@ -390,7 +390,7 @@ mod test {
         let apigroup = discovery::oneshot::pinned_group(&client, &gv).await?;
         let ar1 = apigroup.recommended_kind("TestCr").unwrap();
         let ar2 = discovery::pinned_kind(&client, &gvk).await?;
-        assert_eq!(ar1.verbs.len(), ar2.verbs.len(), "unequal verbs");
+        assert_eq!(ar1.capabilities, ar2.capabilities, "unequal caps");
         assert_eq!(ar1, ar2, "unequal apiresource");
         assert_eq!(DynamicObject::api_version(&ar2), "kube.rs/v1", "unequal dynver");
 
@@ -414,7 +414,8 @@ mod test {
         assert_eq!(firstgroup.name(), ApiGroup::CORE_GROUP, "core not first");
         for group in groups {
             for ar in group.recommended_resources() {
-                if !ar.supports_operation(verbs::LIST) {
+                let caps = ar.capabilities.as_ref().unwrap();
+                if !caps.supports_operation(verbs::LIST) {
                     continue;
                 }
                 let api: Api<DynamicObject> = if ar.namespaced {

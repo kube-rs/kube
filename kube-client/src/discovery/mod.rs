@@ -94,13 +94,13 @@ impl Discovery {
     ///     let discovery = Discovery::new(client.clone()).run().await?;
     ///     for group in discovery.groups() {
     ///         for ar in group.recommended_resources() {
-    ///             if !ar.supports_operation(verbs::LIST) {
+    ///             if !ar.supports_operation(verbs::LIST).unwrap() {
     ///                 continue;
     ///             }
     ///             let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///             // can now api.list() to emulate kubectl get all --all
     ///             for obj in api.list(&Default::default()).await? {
-    ///                 println!("{} {}: {}", ar.api_version, ar.kind, obj.name());
+    ///                 println!("{} {}: {}", ar.api_version, ar.kind, obj.name_any());
     ///             }
     ///         }
     ///     }

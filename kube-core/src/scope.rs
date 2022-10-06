@@ -61,6 +61,10 @@ impl Scope for SubResourceScope {
 pub struct DynamicResourceScope {}
 impl ResourceScope for DynamicResourceScope {}
 
+// These implementations checks for namespace/subresource are false here
+// because we cannot know the true scope from this struct alone.
+// Refer to [`Resource::is_namespaced`] instead, which will inspect the
+// DynamicType to find the discovered scope
 impl Scope for DynamicResourceScope {
     fn is_namespaced() -> bool {
         false

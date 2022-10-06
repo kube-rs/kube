@@ -129,7 +129,9 @@ impl ApiGroup {
                 let mut ar = parse::parse_apiresource(res, &list.group_version).map_err(
                     |ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)),
                 )?;
-                ar.subresources = parse::find_subresources(&list, &res.name)?;
+                if let Some(caps) = &mut ar.capabilities {
+                    caps.subresources = parse::find_subresources(&list, &res.name)?;
+                }
                 return Ok(ar);
             }
         }
@@ -218,7 +220,8 @@ impl ApiGroup {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for ar in apigroup.recommended_resources() {
-    ///         if !ar.supports_operation(verbs::LIST) {
+    ///         let caps = ar.capabilities.as_ref().unwrap();
+    ///         if !caps.supports_operation(verbs::LIST) {
     ///             continue;
     ///         }
     ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
@@ -245,12 +248,12 @@ impl ApiGroup {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for ar in apigroup.resources_by_stability() {
-    ///         if !ar.supports_operation(verbs::LIST) {
+    ///         if !ar.supports_operation(verbs::LIST).unwrap() {
     ///             continue;
     ///         }
     ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///         for inst in api.list(&Default::default()).await? {
-    ///             println!("Found {}: {}", ar.kind, inst.name());
+    ///             println!("Found {}: {}", ar.kind, inst.name_any());
     ///         }
     ///     }
     ///     Ok(())
@@ -313,13 +316,13 @@ mod tests {
     #[test]
     fn test_resources_by_stability() {
         let cr_low = GVK::gvk("kube.rs", "v1alpha1", "LowCr");
-        let testcr_low = ApiResource::new(&cr_low, "lowcrs", true);
+        let testcr_low = ApiResource::new(&cr_low, "lowcrs");
 
         let cr_v1 = GVK::gvk("kube.rs", "v1", "TestCr");
-        let testcr_v1 = ApiResource::new(&cr_v1, "testcrs", true);
+        let testcr_v1 = ApiResource::new(&cr_v1, "testcrs");
 
         let cr_v2a1 = GVK::gvk("kube.rs", "v2alpha1", "TestCr");
-        let testcr_v2alpha1 = ApiResource::new(&cr_v2a1, "testcrs", true);
+        let testcr_v2alpha1 = ApiResource::new(&cr_v2a1, "testcrs");
 
         let group = ApiGroup {
             name: "kube.rs".into(),

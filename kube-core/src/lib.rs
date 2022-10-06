@@ -17,6 +17,7 @@ pub mod admission;
 pub mod conversion;
 
 pub mod discovery;
+pub use discovery::ApiCapabilities;
 
 pub mod dynamic;
 pub use dynamic::{ApiResource, DynamicObject};

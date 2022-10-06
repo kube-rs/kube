@@ -87,6 +87,10 @@ impl Resource for DynamicObject {
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
     }
+
+    fn is_namespaced(dt: &ApiResource) -> bool {
+        dt.namespaced
+    }
 }
 
 #[cfg(test)]

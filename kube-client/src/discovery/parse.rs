@@ -2,7 +2,7 @@
 use crate::{error::DiscoveryError, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList};
 use kube_core::{
-    discovery::ApiResource,
+    discovery::{ApiCapabilities, ApiResource},
     gvk::{GroupVersion, ParseGroupVersionError},
 };
 
@@ -12,6 +12,11 @@ pub(crate) fn parse_apiresource(
     group_version: &str,
 ) -> Result<ApiResource, ParseGroupVersionError> {
     let gv: GroupVersion = group_version.parse()?;
+    let caps = ApiCapabilities {
+        verbs: ar.verbs.clone(),
+        shortnames: ar.short_names.clone().unwrap_or_default(),
+        subresources: vec![], // filled in in outer fn
+    };
     // NB: not safe to use this with subresources (they don't have api_versions)
     Ok(ApiResource {
         group: ar.group.clone().unwrap_or_else(|| gv.group.clone()),
@@ -20,9 +25,7 @@ pub(crate) fn parse_apiresource(
         kind: ar.kind.to_string(),
         plural: ar.name.clone(),
         namespaced: ar.namespaced,
-        verbs: ar.verbs.clone(),
-        shortnames: ar.short_names.clone().unwrap_or_default(),
-        subresources: vec![],
+        capabilities: Some(caps),
     })
 }
 
@@ -65,7 +68,9 @@ impl GroupVersionData {
                 parse_apiresource(res, &list.group_version).map_err(|ParseGroupVersionError(s)| {
                     Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
                 })?;
-            ar.subresources = find_subresources(&list, &res.name)?;
+            if let Some(caps) = &mut ar.capabilities {
+                caps.subresources = find_subresources(&list, &res.name)?;
+            }
             resources.push(ar);
         }
         Ok(GroupVersionData { version, resources })

@@ -246,6 +246,10 @@ where
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
     }
+
+    fn is_namespaced(dt: &ApiResource) -> bool {
+        dt.namespaced
+    }
 }
 
 impl<P, U> HasSpec for Object<P, U>

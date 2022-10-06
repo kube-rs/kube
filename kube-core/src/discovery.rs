@@ -1,5 +1,5 @@
 //! Type information structs for API discovery
-use crate::{gvk::GroupVersionKind, resource::Resource, scope::Scope};
+use crate::{gvk::GroupVersionKind, resource::Resource};
 use serde::{Deserialize, Serialize};
 
 /// Information about a Kubernetes API resource
@@ -37,23 +37,11 @@ pub struct ApiResource {
     pub kind: String,
     /// Resource name / plural name
     pub plural: String,
-    /// Whether the resource is namespaced or not
+    /// Whether the resource is namespaced
     pub namespaced: bool,
 
-    /// Supported verbs
-    ///
-    /// Note: only populated when constructed through discovery or kube-derive
-    pub verbs: Vec<String>,
-
-    /// Supported shortnames
-    ///
-    /// Note: only populated when constructed through discovery or kube-derive.
-    pub shortnames: Vec<String>,
-
-    /// Supported subresources
-    ///
-    /// Note: only populated when constructed through discovery.
-    pub subresources: Vec<ApiResource>,
+    /// Capabilities from kube-derive or api discovery
+    pub capabilities: Option<ApiCapabilities>,
 }
 
 impl ApiResource {
@@ -63,50 +51,59 @@ impl ApiResource {
     /// get you verbs and available subresources.
     /// If you need this, construct via discovery.
     pub fn erase<K: Resource>(dt: &K::DynamicType) -> Self {
+        // TODO: if Scope::is_dynamic() we could have the scope
         ApiResource {
             group: K::group(dt).to_string(),
             version: K::version(dt).to_string(),
             api_version: K::api_version(dt).to_string(),
             kind: K::kind(dt).to_string(),
             plural: K::plural(dt).to_string(),
-            namespaced: <K as Resource>::Scope::is_namespaced(),
-            // discovery/derive-only properties left blank
-            verbs: vec![],
-            subresources: vec![],
-            shortnames: vec![],
+            namespaced: K::is_namespaced(dt),
+            capabilities: None,
         }
     }
 
-    /// Creates a new ApiResource from a GVK, plural and a namespaced bool
+    /// Creates a new ApiResource from a GVK and a plural name
     ///
-    /// This is the **minimal** variant needed to use with the dynamic api
-    /// It does not contain information abut verbs, subresources and shortnames.
-    pub fn new(gvk: &GroupVersionKind, plural: &str, namespaced: bool) -> Self {
+    /// If you are getting your values from `kube_derive` use the generated method for giving you an [`ApiResource`]
+    /// on [`CustomResourceExt`], or run api discovery on it via `kube::discovery`.
+    ///
+    /// This is a **minimal** test variant needed to use with the dynamic api
+    /// It does not know about capabilites such as verbs, subresources or shortnames.
+    pub fn new(gvk: &GroupVersionKind, plural: &str) -> Self {
         ApiResource {
             api_version: gvk.api_version(),
             group: gvk.group.clone(),
             version: gvk.version.clone(),
             kind: gvk.kind.clone(),
             plural: plural.to_string(),
-            namespaced,
-            // non-essential properties left blank
-            verbs: vec![],
-            subresources: vec![],
-            shortnames: vec![],
+            namespaced: false,
+            capabilities: None,
         }
     }
 
-    /// Infer a minimal ApiResource from a GVK as cluster scoped
+    /// Create a minimal ApiResource from a GVK as cluster scoped
+    ///
+    /// If you have a CRD via `kube_derive` use the generated method for giving you an [`ApiResource`]
+    /// on [`CustomResourceExt`], or consider running api discovery on it via `kube::discovery`.
+    ///
+    /// The resulting `ApiResource` **will not contain capabilities**.
     ///
     /// # Warning
+    /// This function is a convenience utility intended for quick experiments.
     /// This function will **guess** the resource plural name which can fail
-    /// for CRDs with complex pluralisations it can fail. It will also assume cluster scope.
+    /// for CRDs with complex pluralisations.
     ///
-    /// If you are getting your values from `kube_derive` use the generated method for giving you an [`ApiResource`].
-    /// Otherwise consider using [`ApiResource::new`](crate::discovery::ApiResource::new)
-    /// to explicitly set the plural and scope, or run api discovery on it via `kube::discovery`.
+    /// Consider using [`ApiResource::new`](crate::discovery::ApiResource::new)
+    /// to explicitly set the plural instead.
     pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
-        ApiResource::new(gvk, &to_plural(&gvk.kind.to_ascii_lowercase()), false)
+        ApiResource::new(gvk, &to_plural(&gvk.kind.to_ascii_lowercase()))
+    }
+
+    /// Attach capabilities to a manually constructed [`ApiResource`]
+    pub fn with_caps(mut self, caps: ApiCapabilities) -> Self {
+        self.capabilities = Some(caps);
+        self
     }
 
     /// Set the whether the resource is namsepace scoped
@@ -114,24 +111,19 @@ impl ApiResource {
         self.namespaced = namespaced;
         self
     }
+}
 
-    /// Set the shortnames
-    pub fn shortnames(mut self, shortnames: &[&str]) -> Self {
-        self.shortnames = shortnames.iter().map(|x| x.to_string()).collect();
-        self
-    }
-
-    /// Set the allowed verbs
-    pub fn verbs(mut self, verbs: &[&str]) -> Self {
-        self.verbs = verbs.iter().map(|x| x.to_string()).collect();
-        self
-    }
-
-    /// Set the default verbs
-    pub fn default_verbs(mut self) -> Self {
-        self.verbs = verbs::DEFAULT_VERBS.iter().map(|x| x.to_string()).collect();
-        self
-    }
+/// The capabilities part of an [`ApiResource`]
+///
+/// This struct is populated when populated through discovery or kube-derive.
+#[derive(Debug, Default, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ApiCapabilities {
+    /// Supported verbs that are queryable
+    pub verbs: Vec<String>,
+    /// Supported shortnames
+    pub shortnames: Vec<String>,
+    /// Supported subresources
+    pub subresources: Vec<ApiResource>,
 }
 
 /// Rbac verbs
@@ -159,6 +151,38 @@ pub mod verbs {
 }
 
 impl ApiResource {
+    /// Checks that given verb is supported on this resource.
+    ///
+    /// If verbs are missing, we return a None to indicate
+    /// that we do not have enough information to say true or false.
+    pub fn supports_operation(&self, operation: &str) -> Option<bool> {
+        if let Some(caps) = &self.capabilities {
+            Some(caps.verbs.iter().any(|op| op == operation))
+        } else {
+            None
+        }
+    }
+}
+
+impl ApiCapabilities {
+    /// Set the shortnames
+    pub fn shortnames(mut self, shortnames: &[&str]) -> Self {
+        self.shortnames = shortnames.iter().map(|x| x.to_string()).collect();
+        self
+    }
+
+    /// Set the allowed verbs
+    pub fn verbs(mut self, verbs: &[&str]) -> Self {
+        self.verbs = verbs.iter().map(|x| x.to_string()).collect();
+        self
+    }
+
+    /// Set the default verbs
+    pub fn default_verbs(mut self) -> Self {
+        self.verbs = verbs::DEFAULT_VERBS.iter().map(|x| x.to_string()).collect();
+        self
+    }
+
     /// Checks that given verb is supported on this resource.
     pub fn supports_operation(&self, operation: &str) -> bool {
         self.verbs.iter().any(|op| op == operation)

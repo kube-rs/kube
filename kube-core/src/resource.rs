@@ -7,7 +7,6 @@ use k8s_openapi::{
 use crate::scope::Scope;
 use std::{borrow::Cow, collections::BTreeMap};
 
-
 /// An accessor trait for a kubernetes Resource.
 ///
 /// This is for a subset of Kubernetes type that do not end in `List`.
@@ -56,6 +55,12 @@ pub trait Resource {
     ///
     /// This is known as the resource in apimachinery, we rename it for disambiguation.
     fn plural(dt: &Self::DynamicType) -> Cow<'_, str>;
+
+    /// Returns whether the scope is namespaced
+    ///
+    /// This will dig into the DynamicType if Scope::is_dynamic
+    /// otherwise it will defer to Scope::is_namespaced
+    fn is_namespaced(dt: &Self::DynamicType) -> bool;
 
     /// Creates a url path for http requests for this resource
     fn url_path(dt: &Self::DynamicType, namespace: Option<&str>) -> String {
@@ -148,8 +153,11 @@ where
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         self.metadata_mut()
     }
-}
 
+    fn is_namespaced(_: &()) -> bool {
+        K::Scope::is_namespaced()
+    }
+}
 
 /// Helper methods for resources.
 pub trait ResourceExt: Resource {

@@ -81,7 +81,6 @@ async fn main() -> anyhow::Result<()> {
     let newvarv2_2 = v2api.patch("new", &ssapply, &Patch::Apply(&v2m)).await?;
     info!("new on v2 correct on reapply to v2: {:?}", newvarv2_2.spec);
 
-
     // note we can apply old versions without them being truncated to the v2 schema
     // in our case this means we cannot fetch them with our v1 schema (breaking change to not have oldprop)
     let v1m2 = v1::ManyDerive::new("old", v1::ManyDeriveSpec {
@@ -100,7 +99,6 @@ async fn main() -> anyhow::Result<()> {
     cleanup(client.clone()).await?;
     Ok(())
 }
-
 
 async fn apply_crd(client: Client, crd: CustomResourceDefinition) -> anyhow::Result<()> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
