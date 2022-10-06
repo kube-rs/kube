@@ -51,7 +51,6 @@ impl ApiResource {
     /// get you verbs and available subresources.
     /// If you need this, construct via discovery.
     pub fn erase<K: Resource>(dt: &K::DynamicType) -> Self {
-        // TODO: if Scope::is_dynamic() we could have the scope
         ApiResource {
             group: K::group(dt).to_string(),
             version: K::version(dt).to_string(),
