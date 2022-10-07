@@ -608,6 +608,6 @@ mod tests {
         assert_eq!(kube_attrs.group, "clux.dev".to_string());
         assert_eq!(kube_attrs.version, "v1".to_string());
         assert_eq!(kube_attrs.kind, "Foo".to_string());
-        assert_eq!(kube_attrs.namespaced, true);
+        assert!(kube_attrs.namespaced);
     }
 }

@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A Kubernetes status object
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct Status {
     /// Status of the operation
     ///
@@ -95,7 +95,7 @@ pub enum StatusSummary {
 }
 
 /// Status details object on the [`Status`] object
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusDetails {
     /// The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)
@@ -133,7 +133,7 @@ pub struct StatusDetails {
 }
 
 /// Status cause object on the [`StatusDetails`] object
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct StatusCause {
     /// A machine-readable description of the cause of the error. If this value is empty there is no information available.
     #[serde(default, skip_serializing_if = "String::is_empty")]

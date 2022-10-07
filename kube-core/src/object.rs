@@ -47,7 +47,7 @@ impl<T: Clone> ObjectList<T> {
     /// let first = objectlist.iter().next();
     /// println!("First element: {:?}", first); // prints "First element: Some(1)"
     /// ```
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &T> + 'a {
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.items.iter()
     }
 
@@ -70,7 +70,7 @@ impl<T: Clone> ObjectList<T> {
     ///     println!("First element: {:?}", elem); // prints "First element: 2"
     /// }
 
-    pub fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = &mut T> + 'a {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
         self.items.iter_mut()
     }
 }
