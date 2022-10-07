@@ -218,7 +218,7 @@ async fn main() -> Result<()> {
 }
 
 fn dynamic_api(ar: ApiResource, client: Client, ns: &Option<String>, all: bool) -> Api<DynamicObject> {
-    if !ar.namespaced || all {
+    if !ar.namespaced() || all {
         Api::all_with(client, &ar)
     } else if let Some(namespace) = ns {
         Api::namespaced_with(client, namespace, &ar)

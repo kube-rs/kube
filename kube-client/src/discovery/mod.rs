@@ -94,7 +94,7 @@ impl Discovery {
     ///     let discovery = Discovery::new(client.clone()).run().await?;
     ///     for group in discovery.groups() {
     ///         for ar in group.recommended_resources() {
-    ///             if !ar.supports_operation(verbs::LIST).unwrap() {
+    ///             if !ar.supports_operation(verbs::LIST) {
     ///                 continue;
     ///             }
     ///             let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);

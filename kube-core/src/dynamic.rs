@@ -89,7 +89,7 @@ impl Resource for DynamicObject {
     }
 
     fn is_namespaced(dt: &ApiResource) -> bool {
-        dt.namespaced
+        dt.capabilities.namespaced
     }
 }
 

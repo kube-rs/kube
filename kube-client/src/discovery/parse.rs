@@ -13,6 +13,7 @@ pub(crate) fn parse_apiresource(
 ) -> Result<ApiResource, ParseGroupVersionError> {
     let gv: GroupVersion = group_version.parse()?;
     let caps = ApiCapabilities {
+        namespaced: ar.namespaced,
         verbs: ar.verbs.clone(),
         shortnames: ar.short_names.clone().unwrap_or_default(),
         subresources: vec![], // filled in in outer fn
@@ -24,8 +25,7 @@ pub(crate) fn parse_apiresource(
         api_version: gv.api_version(),
         kind: ar.kind.to_string(),
         plural: ar.name.clone(),
-        namespaced: ar.namespaced,
-        capabilities: Some(caps),
+        capabilities: caps,
     })
 }
 
@@ -68,9 +68,7 @@ impl GroupVersionData {
                 parse_apiresource(res, &list.group_version).map_err(|ParseGroupVersionError(s)| {
                     Error::Discovery(DiscoveryError::InvalidGroupVersion(s))
                 })?;
-            if let Some(caps) = &mut ar.capabilities {
-                caps.subresources = find_subresources(&list, &res.name)?;
-            }
+            ar.capabilities.subresources = find_subresources(&list, &res.name)?;
             resources.push(ar);
         }
         Ok(GroupVersionData { version, resources })

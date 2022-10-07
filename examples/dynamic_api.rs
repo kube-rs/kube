@@ -15,12 +15,11 @@ async fn main() -> anyhow::Result<()> {
     let discovery = Discovery::new(client.clone()).run().await?;
     for group in discovery.groups() {
         for ar in group.recommended_resources() {
-            let caps = ar.capabilities.as_ref().unwrap();
-            if !caps.supports_operation(verbs::LIST) {
+            if !ar.supports_operation(verbs::LIST) {
                 continue;
             }
 
-            let api: Api<DynamicObject> = if ar.namespaced {
+            let api: Api<DynamicObject> = if ar.namespaced() {
                 Api::default_namespaced_with(client.clone(), &ar)
             } else {
                 Api::all_with(client.clone(), &ar)

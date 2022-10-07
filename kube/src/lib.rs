@@ -414,11 +414,10 @@ mod test {
         assert_eq!(firstgroup.name(), ApiGroup::CORE_GROUP, "core not first");
         for group in groups {
             for ar in group.recommended_resources() {
-                let caps = ar.capabilities.as_ref().unwrap();
-                if !caps.supports_operation(verbs::LIST) {
+                if !ar.supports_operation(verbs::LIST) {
                     continue;
                 }
-                let api: Api<DynamicObject> = if ar.namespaced {
+                let api: Api<DynamicObject> = if ar.namespaced() {
                     Api::default_namespaced_with(client.clone(), &ar)
                 } else {
                     Api::all_with(client.clone(), &ar)

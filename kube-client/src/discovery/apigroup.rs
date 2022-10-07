@@ -129,9 +129,7 @@ impl ApiGroup {
                 let mut ar = parse::parse_apiresource(res, &list.group_version).map_err(
                     |ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)),
                 )?;
-                if let Some(caps) = &mut ar.capabilities {
-                    caps.subresources = parse::find_subresources(&list, &res.name)?;
-                }
+                ar.capabilities.subresources = parse::find_subresources(&list, &res.name)?;
                 return Ok(ar);
             }
         }
@@ -220,8 +218,7 @@ impl ApiGroup {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for ar in apigroup.recommended_resources() {
-    ///         let caps = ar.capabilities.as_ref().unwrap();
-    ///         if !caps.supports_operation(verbs::LIST) {
+    ///         if !ar.supports_operation(verbs::LIST) {
     ///             continue;
     ///         }
     ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
@@ -248,7 +245,7 @@ impl ApiGroup {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for ar in apigroup.resources_by_stability() {
-    ///         if !ar.supports_operation(verbs::LIST).unwrap() {
+    ///         if !ar.supports_operation(verbs::LIST) {
     ///             continue;
     ///         }
     ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);

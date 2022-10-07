@@ -457,10 +457,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             }
 
             fn api_resource() -> #kube_core::ApiResource {
-                let caps = #kube_core::ApiCapabilities::default().shortnames(#shortnames_slice).default_verbs();
                 // TODO: populate subresources
                 #kube_core::ApiResource::erase::<Self>(&())
-                    .with_caps(caps)
+                    .set_shortnames(#shortnames_slice).set_default_verbs()
 
             }
 

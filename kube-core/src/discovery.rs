@@ -37,28 +37,31 @@ pub struct ApiResource {
     pub kind: String,
     /// Resource name / plural name
     pub plural: String,
-    /// Whether the resource is namespaced
-    pub namespaced: bool,
 
-    /// Capabilities from kube-derive or api discovery
-    pub capabilities: Option<ApiCapabilities>,
+    /// Capabilities of the resource
+    ///
+    /// NB: This is only fully populated from kube-derive or api discovery
+    pub capabilities: ApiCapabilities,
 }
 
 impl ApiResource {
     /// Creates an ApiResource by type-erasing a Resource
     ///
-    /// Note that this variant of constructing an `ApiResource` does not
+    /// Note that this variant of constructing an `ApiResource` dodes not
     /// get you verbs and available subresources.
     /// If you need this, construct via discovery.
     pub fn erase<K: Resource>(dt: &K::DynamicType) -> Self {
+        let caps = ApiCapabilities {
+            namespaced: K::is_namespaced(dt),
+            ..ApiCapabilities::default()
+        };
         ApiResource {
             group: K::group(dt).to_string(),
             version: K::version(dt).to_string(),
             api_version: K::api_version(dt).to_string(),
             kind: K::kind(dt).to_string(),
             plural: K::plural(dt).to_string(),
-            namespaced: K::is_namespaced(dt),
-            capabilities: None,
+            capabilities: caps,
         }
     }
 
@@ -76,8 +79,7 @@ impl ApiResource {
             version: gvk.version.clone(),
             kind: gvk.kind.clone(),
             plural: plural.to_string(),
-            namespaced: false,
-            capabilities: None,
+            capabilities: ApiCapabilities::default(),
         }
     }
 
@@ -99,15 +101,32 @@ impl ApiResource {
         ApiResource::new(gvk, &to_plural(&gvk.kind.to_ascii_lowercase()))
     }
 
-    /// Attach capabilities to a manually constructed [`ApiResource`]
-    pub fn with_caps(mut self, caps: ApiCapabilities) -> Self {
-        self.capabilities = Some(caps);
-        self
+    /// Get the namespaced property
+    pub fn namespaced(&self) -> bool {
+        self.capabilities.namespaced
     }
 
     /// Set the whether the resource is namsepace scoped
-    pub fn namespaced(mut self, namespaced: bool) -> Self {
-        self.namespaced = namespaced;
+    pub fn set_namespaced(mut self, namespaced: bool) -> Self {
+        self.capabilities.namespaced = namespaced;
+        self
+    }
+
+    /// Set the shortnames
+    pub fn set_shortnames(mut self, shortnames: &[&str]) -> Self {
+        self.capabilities.shortnames = shortnames.iter().map(|x| x.to_string()).collect();
+        self
+    }
+
+    /// Set the allowed verbs
+    pub fn set_verbs(mut self, verbs: &[&str]) -> Self {
+        self.capabilities.verbs = verbs.iter().map(|x| x.to_string()).collect();
+        self
+    }
+
+    /// Set the default verbs
+    pub fn set_default_verbs(mut self) -> Self {
+        self.capabilities.verbs = verbs::DEFAULT_VERBS.iter().map(|x| x.to_string()).collect();
         self
     }
 }
@@ -117,6 +136,8 @@ impl ApiResource {
 /// This struct is populated when populated through discovery or kube-derive.
 #[derive(Debug, Default, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ApiCapabilities {
+    /// Whether the resource is namespaced
+    pub namespaced: bool,
     /// Supported verbs that are queryable
     pub verbs: Vec<String>,
     /// Supported shortnames
@@ -152,39 +173,10 @@ pub mod verbs {
 impl ApiResource {
     /// Checks that given verb is supported on this resource.
     ///
-    /// If verbs are missing, we return a None to indicate
-    /// that we do not have enough information to say true or false.
-    pub fn supports_operation(&self, operation: &str) -> Option<bool> {
-        if let Some(caps) = &self.capabilities {
-            Some(caps.verbs.iter().any(|op| op == operation))
-        } else {
-            None
-        }
-    }
-}
-
-impl ApiCapabilities {
-    /// Set the shortnames
-    pub fn shortnames(mut self, shortnames: &[&str]) -> Self {
-        self.shortnames = shortnames.iter().map(|x| x.to_string()).collect();
-        self
-    }
-
-    /// Set the allowed verbs
-    pub fn verbs(mut self, verbs: &[&str]) -> Self {
-        self.verbs = verbs.iter().map(|x| x.to_string()).collect();
-        self
-    }
-
-    /// Set the default verbs
-    pub fn default_verbs(mut self) -> Self {
-        self.verbs = verbs::DEFAULT_VERBS.iter().map(|x| x.to_string()).collect();
-        self
-    }
-
-    /// Checks that given verb is supported on this resource.
+    /// Note that this fn can only answer if the ApiResource
+    /// was constructed via kube-derive/api discovery.
     pub fn supports_operation(&self, operation: &str) -> bool {
-        self.verbs.iter().any(|op| op == operation)
+        self.capabilities.verbs.iter().any(|op| op == operation)
     }
 }
 
