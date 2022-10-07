@@ -55,9 +55,6 @@ jobs:
         run: cargo build -j4 -p kube-examples
 
       # Feature tests
-      - name: Test kube with features native-tls,ws,oauth
-        run: cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
-        if: matrix.os == 'ubuntu-latest'
       - name: Test kube with features rustls-tls,ws,oauth
         run: cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
         if: matrix.os == 'ubuntu-latest'

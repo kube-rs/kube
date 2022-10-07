@@ -4,8 +4,7 @@ use http::{header::HeaderName, HeaderValue};
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
-#[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
-use super::tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},
@@ -27,23 +26,6 @@ pub trait ConfigExt: private::Sealed {
     /// Layer to add non-authn HTTP headers depending on the config.
     fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer>;
 
-    /// Create [`hyper_tls::HttpsConnector`] based on config.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use kube::{client::ConfigExt, Config};
-    /// let config = Config::infer().await?;
-    /// let https = config.native_tls_https_connector()?;
-    /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
-    #[cfg(feature = "native-tls")]
-    fn native_tls_https_connector(&self) -> Result<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>;
-
     /// Create [`hyper_rustls::HttpsConnector`] based on config.
     ///
     /// # Example
@@ -60,29 +42,6 @@ pub trait ConfigExt: private::Sealed {
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
     fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
-
-    /// Create [`native_tls::TlsConnector`](tokio_native_tls::native_tls::TlsConnector) based on config.
-    /// # Example
-    ///
-    /// ```rust
-    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use hyper::client::HttpConnector;
-    /// # use kube::{client::ConfigExt, Client, Config};
-    /// let config = Config::infer().await?;
-    /// let https = {
-    ///     let tls = tokio_native_tls::TlsConnector::from(
-    ///         config.native_tls_connector()?
-    ///     );
-    ///     let mut http = HttpConnector::new();
-    ///     http.enforce_http(false);
-    ///     hyper_tls::HttpsConnector::from((http, tls))
-    /// };
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
-    #[cfg(feature = "native-tls")]
-    fn native_tls_connector(&self) -> Result<tokio_native_tls::native_tls::TlsConnector>;
 
     /// Create [`rustls::ClientConfig`] based on config.
     /// # Example
@@ -211,24 +170,6 @@ impl ConfigExt for Config {
         Ok(ExtraHeadersLayer {
             headers: Arc::new(headers),
         })
-    }
-
-    #[cfg(feature = "native-tls")]
-    fn native_tls_connector(&self) -> Result<tokio_native_tls::native_tls::TlsConnector> {
-        tls::native_tls::native_tls_connector(
-            self.identity_pem().as_ref(),
-            self.root_cert.as_ref(),
-            self.accept_invalid_certs,
-        )
-        .map_err(Error::NativeTls)
-    }
-
-    #[cfg(feature = "native-tls")]
-    fn native_tls_https_connector(&self) -> Result<hyper_tls::HttpsConnector<hyper::client::HttpConnector>> {
-        let tls = tokio_native_tls::TlsConnector::from(self.native_tls_connector()?);
-        let mut http = hyper::client::HttpConnector::new();
-        http.enforce_http(false);
-        Ok(hyper_tls::HttpsConnector::from((http, tls)))
     }
 
     #[cfg(feature = "rustls-tls")]

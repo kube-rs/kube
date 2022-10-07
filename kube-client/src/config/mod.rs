@@ -308,13 +308,10 @@ impl Config {
             .clone()
             .unwrap_or_else(|| String::from("default"));
 
-        let mut accept_invalid_certs = loader.cluster.insecure_skip_tls_verify.unwrap_or(false);
+        let accept_invalid_certs = loader.cluster.insecure_skip_tls_verify.unwrap_or(false);
         let mut root_cert = None;
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
-            for ca in &ca_bundle {
-                accept_invalid_certs = hacky_cert_lifetime_for_macos(ca);
-            }
             root_cert = Some(ca_bundle);
         }
 
@@ -395,22 +392,6 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
-
-// temporary catalina hack for openssl only
-#[cfg(all(target_os = "macos", feature = "native-tls"))]
-fn hacky_cert_lifetime_for_macos(ca: &[u8]) -> bool {
-    use openssl::x509::X509;
-    let ca = X509::from_der(ca).expect("valid der is a der");
-    ca.not_before()
-        .diff(ca.not_after())
-        .map(|d| d.days.abs() > 824)
-        .unwrap_or(false)
-}
-
-#[cfg(any(not(target_os = "macos"), not(feature = "native-tls")))]
-fn hacky_cert_lifetime_for_macos(_: &[u8]) -> bool {
-    false
-}
 
 // Expose raw config structs
 pub use file_config::{

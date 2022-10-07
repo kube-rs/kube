@@ -59,12 +59,6 @@ pub enum Error {
     #[error("Error from discovery: {0}")]
     Discovery(#[source] DiscoveryError),
 
-    /// Errors from Native TLS
-    #[cfg(feature = "native-tls")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
-    #[error("native tls error: {0}")]
-    NativeTls(#[source] crate::client::NativeTlsError),
-
     /// Errors from OpenSSL TLS
     #[cfg(feature = "openssl-tls")]
     #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
