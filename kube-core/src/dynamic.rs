@@ -13,7 +13,7 @@ use std::borrow::Cow;
 /// A dynamic representation of a kubernetes object
 ///
 /// This will work with any non-list type object.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct DynamicObject {
     /// The type fields, not always present
     #[serde(flatten, default)]
