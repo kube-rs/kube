@@ -1,4 +1,4 @@
-// Custom client supporting both native-tls and rustls-tls
+// Custom client supporting both openssl-tls and rustls-tls
 // Must enable `rustls-tls` feature to run this.
 // Run with `USE_RUSTLS=1` to pick rustls.
 use k8s_openapi::api::core::v1::Pod;
