@@ -31,3 +31,4 @@ schemars = { version = "0.8.6", features = ["chrono"] }
 validator = { version = "0.16.0", features = ["derive"] }
 chrono = { version = "0.4.19", default-features = false }
 trybuild = "1.0.48"
+assert-json-diff = "2.0.2"

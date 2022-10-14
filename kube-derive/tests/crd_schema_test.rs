@@ -1,5 +1,6 @@
 #![recursion_limit = "256"]
 
+use assert_json_diff::assert_json_eq;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
@@ -105,6 +106,7 @@ struct SexAndDateOfBirth {
 enum Sex {
     Female,
     Male,
+    /// This variant has a comment!
     Other,
 }
 
@@ -122,7 +124,7 @@ fn test_shortnames() {
 
 #[test]
 fn test_serialized_matches_expected() {
-    assert_eq!(
+    assert_json_eq!(
         serde_json::to_value(Foo::new("bar", FooSpec {
             non_nullable: "asdf".to_string(),
             non_nullable_with_default: "asdf".to_string(),
@@ -167,9 +169,9 @@ fn test_serialized_matches_expected() {
 #[test]
 fn test_crd_schema_matches_expected() {
     use kube::core::CustomResourceExt;
-    assert_eq!(
+    assert_json_eq!(
         Foo::crd(),
-        serde_json::from_value(serde_json::json!({
+        serde_json::json!({
             "apiVersion": "apiextensions.k8s.io/v1",
             "kind": "CustomResourceDefinition",
             "metadata": {
@@ -318,8 +320,7 @@ fn test_crd_schema_matches_expected() {
                     }
                 ]
             }
-        }))
-        .unwrap()
+        })
     );
 }
 
