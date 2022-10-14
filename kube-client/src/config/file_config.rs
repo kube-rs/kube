@@ -480,7 +480,7 @@ fn load_from_base64_or_file<P: AsRef<Path>>(
     let data = value
         .map(load_from_base64)
         .or_else(|| file.as_ref().map(load_from_file))
-        .unwrap_or(Err(LoadDataError::NoBase64DataOrFile))?;
+        .unwrap_or_else(|| Err(LoadDataError::NoBase64DataOrFile))?;
     Ok(ensure_trailing_newline(data))
 }
 

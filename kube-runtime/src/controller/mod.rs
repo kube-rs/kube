@@ -194,7 +194,7 @@ impl Display for ReconcileReason {
             ReconcileReason::Unknown => f.write_str("unknown"),
             ReconcileReason::ObjectUpdated => f.write_str("object updated"),
             ReconcileReason::RelatedObjectUpdated { obj_ref: object } => {
-                f.write_fmt(format_args!("related object updated: {}", object))
+                f.write_fmt(format_args!("related object updated: {object}"))
             }
             ReconcileReason::BulkReconcile => f.write_str("bulk reconcile requested"),
             ReconcileReason::ReconcilerRequestedRetry => f.write_str("reconciler requested retry"),
