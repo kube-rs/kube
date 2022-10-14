@@ -63,6 +63,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
+// Nightly clippy (0.1.64) considers Drop a side effect, see https://github.com/rust-lang/rust-clippy/issues/9608
+#![allow(clippy::unnecessary_lazy_evaluations)]
 
 macro_rules! cfg_client {
     ($($item:item)*) => {

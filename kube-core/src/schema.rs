@@ -72,7 +72,7 @@ fn hoist_subschema_properties(
     common_obj: &mut Option<Box<ObjectValidation>>,
     instance_type: &mut Option<SingleOrVec<InstanceType>>,
 ) {
-    let common_obj = common_obj.get_or_insert_with(|| Box::new(ObjectValidation::default()));
+    let common_obj = common_obj.get_or_insert_with(Box::<ObjectValidation>::default);
 
     for variant in subschemas {
         if let Schema::Object(SchemaObject {
@@ -90,7 +90,7 @@ fn hoist_subschema_properties(
                     {
                         let metadata = variant_object
                             .metadata
-                            .get_or_insert_with(|| Box::new(Metadata::default()));
+                            .get_or_insert_with(Box::<Metadata>::default);
                         metadata.description = Some(description);
                     }
                 }
