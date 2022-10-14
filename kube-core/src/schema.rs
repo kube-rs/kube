@@ -2,14 +2,13 @@
 //!
 //! [`CustomResourceDefinition`]: `k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition`
 
-use std::collections::btree_map::Entry;
-
 // Used in docs
 #[allow(unused_imports)] use schemars::gen::SchemaSettings;
 
 use schemars::{
     schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},
     visit::Visitor,
+    MapEntry,
 };
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
@@ -101,10 +100,10 @@ fn hoist_subschema_properties(
             let variant_properties = std::mem::take(&mut variant_obj.properties);
             for (property_name, property) in variant_properties {
                 match common_obj.properties.entry(property_name) {
-                    Entry::Vacant(entry) => {
+                    MapEntry::Vacant(entry) => {
                         entry.insert(property);
                     }
-                    Entry::Occupied(entry) => {
+                    MapEntry::Occupied(entry) => {
                         if &property != entry.get() {
                             panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
                             entry.key(),
