@@ -284,7 +284,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
     watcher(api, ListParams {
-        field_selector: Some(format!("metadata.name={}", name)),
+        field_selector: Some(format!("metadata.name={name}")),
         ..Default::default()
     })
     .map(|event| match event? {

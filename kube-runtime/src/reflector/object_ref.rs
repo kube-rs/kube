@@ -201,7 +201,7 @@ impl<K: Resource> Display for ObjectRef<K> {
             self.name
         )?;
         if let Some(namespace) = &self.namespace {
-            write!(f, ".{}", namespace)?;
+            write!(f, ".{namespace}")?;
         }
         Ok(())
     }
@@ -251,11 +251,11 @@ mod tests {
     #[test]
     fn display_should_be_transparent_to_representation() {
         let pod_ref = ObjectRef::<Pod>::new("my-pod").within("my-namespace");
-        assert_eq!(format!("{}", pod_ref), format!("{}", pod_ref.erase()));
+        assert_eq!(format!("{pod_ref}"), format!("{}", pod_ref.erase()));
         let deploy_ref = ObjectRef::<Deployment>::new("my-deploy").within("my-namespace");
-        assert_eq!(format!("{}", deploy_ref), format!("{}", deploy_ref.erase()));
+        assert_eq!(format!("{deploy_ref}"), format!("{}", deploy_ref.erase()));
         let node_ref = ObjectRef::<Node>::new("my-node");
-        assert_eq!(format!("{}", node_ref), format!("{}", node_ref.erase()));
+        assert_eq!(format!("{node_ref}"), format!("{}", node_ref.erase()));
     }
 
     #[test]

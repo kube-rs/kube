@@ -129,7 +129,7 @@ where
                 // Short-circuit, so that we keep the finalizer if cleanup fails
                 .map_err(Error::CleanupFailed)?;
             // Cleanup was successful, remove the finalizer so that deletion can continue
-            let finalizer_path = format!("/metadata/finalizers/{}", finalizer_i);
+            let finalizer_path = format!("/metadata/finalizers/{finalizer_i}");
             api.patch::<K>(
                 &name,
                 &PatchParams::default(),

@@ -2,14 +2,13 @@
 //!
 //! [`CustomResourceDefinition`]: `k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition`
 
-use std::collections::btree_map::Entry;
-
 // Used in docs
 #[allow(unused_imports)] use schemars::gen::SchemaSettings;
 
 use schemars::{
     schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},
     visit::Visitor,
+    MapEntry,
 };
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
@@ -118,7 +117,7 @@ fn hoist_subschema_properties(
             ..
         }) = variant
         {
-            let common_obj = common_obj.get_or_insert_with(|| Box::new(ObjectValidation::default()));
+            let common_obj = common_obj.get_or_insert_with(Box::<ObjectValidation>::default);
 
             if let Some(variant_metadata) = variant_metadata {
                 // Move enum variant description from oneOf clause to its corresponding property
@@ -128,7 +127,7 @@ fn hoist_subschema_properties(
                     {
                         let metadata = variant_object
                             .metadata
-                            .get_or_insert_with(|| Box::new(Metadata::default()));
+                            .get_or_insert_with(Box::<Metadata>::default);
                         metadata.description = Some(description);
                     }
                 }
@@ -138,10 +137,10 @@ fn hoist_subschema_properties(
             let variant_properties = std::mem::take(&mut variant_obj.properties);
             for (property_name, property) in variant_properties {
                 match common_obj.properties.entry(property_name) {
-                    Entry::Vacant(entry) => {
+                    MapEntry::Vacant(entry) => {
                         entry.insert(property);
                     }
-                    Entry::Occupied(entry) => {
+                    MapEntry::Occupied(entry) => {
                         if &property != entry.get() {
                             panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
                             entry.key(),
