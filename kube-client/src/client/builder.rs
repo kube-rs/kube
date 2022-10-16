@@ -79,21 +79,12 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
 
             // Current TLS feature precedence when more than one are set:
             // 1. openssl-tls
-            // 2. native-tls
-            // 3. rustls-tls
+            // 2. rustls-tls
             // Create a custom client to use something else.
             // If TLS features are not enabled, http connector will be used.
             #[cfg(feature = "openssl-tls")]
             let connector = config.openssl_https_connector_with_connector(connector)?;
-            #[cfg(all(not(feature = "openssl-tls"), feature = "native-tls"))]
-            let connector = hyper_tls::HttpsConnector::from((
-                connector,
-                tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
-            ));
-            #[cfg(all(
-                not(any(feature = "openssl-tls", feature = "native-tls")),
-                feature = "rustls-tls"
-            ))]
+            #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
             let connector = hyper_rustls::HttpsConnector::from((
                 connector,
                 std::sync::Arc::new(config.rustls_client_config()?),
