@@ -32,22 +32,23 @@ impl Visitor for StructuralSchemaRewriter {
     fn visit_schema_object(&mut self, schema: &mut schemars::schema::SchemaObject) {
         schemars::visit::visit_schema_object(self, schema);
 
-        if let Some(one_of) = schema
-            .subschemas
-            .as_mut()
-            .and_then(|subschemas| subschemas.one_of.as_mut())
-        {
-            // Tagged enums are serialized using `one_of`
-            hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type);
-        }
+        if let Some(subschemas) = &mut schema.subschemas {
+            if let Some(one_of) = subschemas.one_of.as_mut() {
+                // Tagged enums are serialized using `one_of`
+                hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type);
 
-        if let Some(any_of) = schema
-            .subschemas
-            .as_mut()
-            .and_then(|subschemas| subschemas.any_of.as_mut())
-        {
-            // Untagged enums are serialized using `any_of`
-            hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type);
+                // "Plain" enums are serialized using `one_of` if they have doc tags
+                hoist_subschema_enum_values(one_of, &mut schema.enum_values, &mut schema.instance_type);
+
+                if one_of.is_empty() {
+                    subschemas.one_of = None;
+                }
+            }
+
+            if let Some(any_of) = &mut subschemas.any_of {
+                // Untagged enums are serialized using `any_of`
+                hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type);
+            }
         }
 
         // check for maps without with properties (i.e. flattened maps)
@@ -65,6 +66,42 @@ impl Visitor for StructuralSchemaRewriter {
     }
 }
 
+/// Bring all plain enum values up to the root schema,
+/// since Kubernetes doesn't allow subschemas to define enum options.
+///
+/// (Enum here means a list of hard-coded values, not a tagged union.)
+fn hoist_subschema_enum_values(
+    subschemas: &mut Vec<Schema>,
+    common_enum_values: &mut Option<Vec<serde_json::Value>>,
+    instance_type: &mut Option<SingleOrVec<InstanceType>>,
+) {
+    subschemas.retain(|variant| {
+        if let Schema::Object(SchemaObject {
+            instance_type: variant_type,
+            enum_values: Some(variant_enum_values),
+            ..
+        }) = variant
+        {
+            if let Some(variant_type) = variant_type {
+                match instance_type {
+                    None => *instance_type = Some(variant_type.clone()),
+                    Some(tpe) => {
+                        if tpe != variant_type {
+                            panic!("Enum variant set {variant_enum_values:?} has type {variant_type:?} but was already defined as {instance_type:?}. The instance type must be equal for all subschema variants.")
+                        }
+                    }
+                }
+            }
+            common_enum_values
+                .get_or_insert_with(Vec::new)
+                .extend(variant_enum_values.iter().cloned());
+            false
+        } else {
+            true
+        }
+    })
+}
+
 /// Bring all property definitions from subschemas up to the root schema,
 /// since Kubernetes doesn't allow subschemas to define properties.
 fn hoist_subschema_properties(
@@ -72,8 +109,6 @@ fn hoist_subschema_properties(
     common_obj: &mut Option<Box<ObjectValidation>>,
     instance_type: &mut Option<SingleOrVec<InstanceType>>,
 ) {
-    let common_obj = common_obj.get_or_insert_with(Box::<ObjectValidation>::default);
-
     for variant in subschemas {
         if let Schema::Object(SchemaObject {
             instance_type: variant_type,
@@ -82,6 +117,8 @@ fn hoist_subschema_properties(
             ..
         }) = variant
         {
+            let common_obj = common_obj.get_or_insert_with(Box::<ObjectValidation>::default);
+
             if let Some(variant_metadata) = variant_metadata {
                 // Move enum variant description from oneOf clause to its corresponding property
                 if let Some(description) = std::mem::take(&mut variant_metadata.description) {

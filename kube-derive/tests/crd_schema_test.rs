@@ -1,5 +1,6 @@
 #![recursion_limit = "256"]
 
+use assert_json_diff::assert_json_eq;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
@@ -78,33 +79,34 @@ enum ComplexEnum {
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 enum UntaggedEnumPerson {
-    SexAndAge(SexAndAge),
-    SexAndDateOfBirth(SexAndDateOfBirth),
+    GenderAndAge(GenderAndAge),
+    GenderAndDateOfBirth(GenderAndDateOfBirth),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct SexAndAge {
-    /// Sex of the person
-    sex: Sex,
+struct GenderAndAge {
+    /// Gender of the person
+    gender: Gender,
     /// Age of the person in years
     age: i32,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct SexAndDateOfBirth {
-    /// Sex of the person
-    sex: Sex,
+struct GenderAndDateOfBirth {
+    /// Gender of the person
+    gender: Gender,
     /// Date of birth of the person as ISO 8601 date
     date_of_birth: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
-enum Sex {
+enum Gender {
     Female,
     Male,
+    /// This variant has a comment!
     Other,
 }
 
@@ -122,7 +124,7 @@ fn test_shortnames() {
 
 #[test]
 fn test_serialized_matches_expected() {
-    assert_eq!(
+    assert_json_eq!(
         serde_json::to_value(Foo::new("bar", FooSpec {
             non_nullable: "asdf".to_string(),
             non_nullable_with_default: "asdf".to_string(),
@@ -132,9 +134,9 @@ fn test_serialized_matches_expected() {
             nullable_with_default: None,
             timestamp: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
             complex_enum: ComplexEnum::VariantOne { int: 23 },
-            untagged_enum_person: UntaggedEnumPerson::SexAndAge(SexAndAge {
+            untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
                 age: 42,
-                sex: Sex::Male,
+                gender: Gender::Male,
             })
         }))
         .unwrap(),
@@ -157,7 +159,7 @@ fn test_serialized_matches_expected() {
                 },
                 "untaggedEnumPerson": {
                     "age": 42,
-                    "sex": "Male"
+                    "gender": "Male"
                 }
             }
         })
@@ -167,9 +169,9 @@ fn test_serialized_matches_expected() {
 #[test]
 fn test_crd_schema_matches_expected() {
     use kube::core::CustomResourceExt;
-    assert_eq!(
+    assert_json_eq!(
         Foo::crd(),
-        serde_json::from_value(serde_json::json!({
+        serde_json::json!({
             "apiVersion": "apiextensions.k8s.io/v1",
             "kind": "CustomResourceDefinition",
             "metadata": {
@@ -281,18 +283,18 @@ fn test_crd_schema_matches_expected() {
                                                         "type": "string",
                                                         "description": "Date of birth of the person as ISO 8601 date"
                                                     },
-                                                    "sex": {
+                                                    "gender": {
                                                         "type": "string",
                                                         "enum": ["Female", "Male", "Other"],
-                                                        "description": "Sex of the person"
+                                                        "description": "Gender of the person"
                                                     }
                                                 },
                                                 "anyOf": [
                                                     {
-                                                        "required": ["age", "sex"]
+                                                        "required": ["age", "gender"]
                                                     },
                                                     {
-                                                        "required": ["dateOfBirth", "sex"]
+                                                        "required": ["dateOfBirth", "gender"]
                                                     }
                                                 ],
                                                 "description": "This is a untagged enum with a description"
@@ -318,8 +320,7 @@ fn test_crd_schema_matches_expected() {
                     }
                 ]
             }
-        }))
-        .unwrap()
+        })
     );
 }
 
