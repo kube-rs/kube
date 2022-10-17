@@ -6,7 +6,7 @@ use kube_client::Resource;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
-type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
+type Cache<K> = Arc<RwLock<AHashMap<ObjectRef, Arc<K>>>>;
 
 /// A writable Store handle
 ///
@@ -52,23 +52,18 @@ where
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = ObjectRef::from_obj(obj);
                 let obj = Arc::new(obj.clone());
                 self.store.write().insert(key, obj);
             }
             watcher::Event::Deleted(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = ObjectRef::from_obj(obj);
                 self.store.write().remove(&key);
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| {
-                        (
-                            ObjectRef::from_obj_with(obj, self.dyntype.clone()),
-                            Arc::new(obj.clone()),
-                        )
-                    })
+                    .map(|obj| (ObjectRef::from_obj(obj), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
                 *self.store.write() = new_objs;
             }
@@ -105,7 +100,7 @@ where
     /// If you use `kube_rt::controller` then you can do this by returning an error and specifying a
     /// reasonable `error_policy`.
     #[must_use]
-    pub fn get(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
+    pub fn get(&self, key: &ObjectRef) -> Option<Arc<K>> {
         let store = self.store.read();
         store
             .get(key)

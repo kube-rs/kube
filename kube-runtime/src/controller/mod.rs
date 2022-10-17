@@ -18,7 +18,7 @@ use futures::{
     future::{self, BoxFuture},
     ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube_client::api::{Api, DynamicObject, ListParams, Resource};
+use kube_client::api::{Api, ListParams, Resource};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
@@ -39,9 +39,9 @@ mod runner;
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
-    ObjectNotFound(ObjectRef<DynamicObject>),
+    ObjectNotFound(ObjectRef),
     #[error("reconciler for object {1} failed")]
-    ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
+    ReconcilerFailed(#[source] ReconcilerErr, ObjectRef),
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
 }
@@ -85,15 +85,14 @@ impl Action {
 }
 
 /// Helper for building custom trigger filters, see the implementations of [`trigger_self`] and [`trigger_owners`] for some examples.
-pub fn trigger_with<T, K, I, S>(
+pub fn trigger_with<T, I, S>(
     stream: S,
     mapper: impl Fn(T) -> I,
-) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
+) -> impl Stream<Item = Result<ReconcileRequest, S::Error>>
 where
     S: TryStream<Ok = T>,
     I: IntoIterator,
-    I::Item: Into<ReconcileRequest<K>>,
-    K: Resource,
+    I::Item: Into<ReconcileRequest>,
 {
     stream
         .map_ok(move |obj| stream::iter(mapper(obj).into_iter().map(Into::into).map(Ok)))
@@ -101,18 +100,14 @@ where
 }
 
 /// Enqueues the object itself for reconciliation
-pub fn trigger_self<K, S>(
-    stream: S,
-    dyntype: K::DynamicType,
-) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
+pub fn trigger_self<K, S>(stream: S) -> impl Stream<Item = Result<ReconcileRequest, S::Error>>
 where
     S: TryStream<Ok = K>,
     K: Resource,
-    K::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
         Some(ReconcileRequest {
-            obj_ref: ObjectRef::from_obj_with(&obj, dyntype.clone()),
+            obj_ref: ObjectRef::from_obj(&obj),
             reason: ReconcileReason::ObjectUpdated,
         })
     })
@@ -122,12 +117,10 @@ where
 pub fn trigger_owners<KOwner, S>(
     stream: S,
     owner_type: KOwner::DynamicType,
-    child_type: <S::Ok as Resource>::DynamicType,
-) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
+) -> impl Stream<Item = Result<ReconcileRequest, S::Error>>
 where
     S: TryStream,
     S::Ok: Resource,
-    <S::Ok as Resource>::DynamicType: Clone,
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
@@ -135,11 +128,16 @@ where
         let meta = obj.meta().clone();
         let ns = meta.namespace;
         let owner_type = owner_type.clone();
-        let child_ref = ObjectRef::from_obj_with(&obj, child_type.clone()).erase();
+        let child_ref = ObjectRef::from_obj(&obj);
         meta.owner_references
             .into_iter()
             .flatten()
-            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
+            // Filter out ownerrefs not matching the owning GVK
+            .filter(move |owner| {
+                owner.api_version == KOwner::api_version(&owner_type)
+                    && owner.kind == KOwner::kind(&owner_type)
+            })
+            .map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
             .map(move |owner_ref| ReconcileRequest {
                 obj_ref: owner_ref,
                 reason: ReconcileReason::RelatedObjectUpdated {
@@ -155,21 +153,17 @@ where
 /// an object can only occupy one scheduler slot, even if it has been scheduled for multiple reasons.
 /// In this case, only *the first* reason is stored.
 #[derive(Derivative)]
-#[derivative(
-    Debug(bound = "K::DynamicType: Debug"),
-    Clone(bound = "K::DynamicType: Clone"),
-    PartialEq(bound = "K::DynamicType: PartialEq"),
-    Eq(bound = "K::DynamicType: Eq"),
-    Hash(bound = "K::DynamicType: Hash")
-)]
-pub struct ReconcileRequest<K: Resource> {
-    pub obj_ref: ObjectRef<K>,
+#[derivative(Clone, PartialEq, Debug, Hash, Eq)]
+pub struct ReconcileRequest {
+    pub obj_ref: ObjectRef,
     #[derivative(PartialEq = "ignore", Hash = "ignore")]
     pub reason: ReconcileReason,
+    // TODO: include GVK data here for better formatting?
 }
 
-impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
-    fn from(obj_ref: ObjectRef<K>) -> Self {
+// ..that means this would have to get extra data somehow
+impl From<ObjectRef> for ReconcileRequest {
+    fn from(obj_ref: ObjectRef) -> Self {
         ReconcileRequest {
             obj_ref,
             reason: ReconcileReason::Unknown,
@@ -181,7 +175,7 @@ impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
 pub enum ReconcileReason {
     Unknown,
     ObjectUpdated,
-    RelatedObjectUpdated { obj_ref: Box<ObjectRef<DynamicObject>> },
+    RelatedObjectUpdated { obj_ref: Box<ObjectRef> },
     ReconcilerRequestedRetry,
     ErrorPolicyRequestedRetry,
     BulkReconcile,
@@ -223,19 +217,19 @@ pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
     context: Arc<Ctx>,
     store: Store<K>,
     queue: QueueStream,
-) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, QueueStream::Error>>>
+) -> impl Stream<Item = Result<(ObjectRef, Action), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
     K: Clone + Resource + 'static,
     K::DynamicType: Debug + Eq + Hash + Clone + Unpin,
     ReconcilerFut: TryFuture<Ok = Action> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
     QueueStream: TryStream,
-    QueueStream::Ok: Into<ReconcileRequest<K>>,
+    QueueStream::Ok: Into<ReconcileRequest>,
     QueueStream::Error: std::error::Error + 'static,
 {
     let (scheduler_shutdown_tx, scheduler_shutdown_rx) = channel::oneshot::channel();
     let (scheduler_tx, scheduler_rx) =
-        channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(APPLIER_REQUEUE_BUF_SIZE);
+        channel::mpsc::channel::<ScheduleRequest<ReconcileRequest>>(APPLIER_REQUEUE_BUF_SIZE);
     let error_policy = Arc::new(error_policy);
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
@@ -291,7 +285,7 @@ where
                             .instrument(reconciler_span)
                             .left_future()
                     }
-                    None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
+                    None => future::err(Error::ObjectNotFound(request.obj_ref)).right_future(),
                 }
             })
             .on_complete(async { tracing::debug!("applier runner terminated") })
@@ -302,7 +296,7 @@ where
     .and_then(move |(obj_ref, reconciler_result)| async move {
         match reconciler_result {
             Ok(action) => Ok((obj_ref, action)),
-            Err(err) => Err(Error::ReconcilerFailed(err, obj_ref.erase())),
+            Err(err) => Err(Error::ReconcilerFailed(err, obj_ref)),
         }
     })
     .on_complete(async { tracing::debug!("applier terminated") })
@@ -313,22 +307,19 @@ where
 /// This could be an `async fn`, but isn't because we want it to be [`Unpin`]
 #[pin_project]
 #[must_use]
-struct RescheduleReconciliation<K: Resource, ReconcilerErr> {
-    reschedule_tx: channel::mpsc::Sender<ScheduleRequest<ReconcileRequest<K>>>,
+struct RescheduleReconciliation<ReconcilerErr> {
+    reschedule_tx: channel::mpsc::Sender<ScheduleRequest<ReconcileRequest>>,
 
-    reschedule_request: Option<ScheduleRequest<ReconcileRequest<K>>>,
+    reschedule_request: Option<ScheduleRequest<ReconcileRequest>>,
     result: Option<Result<Action, ReconcilerErr>>,
 }
 
-impl<K, ReconcilerErr> RescheduleReconciliation<K, ReconcilerErr>
-where
-    K: Resource,
-{
+impl<ReconcilerErr> RescheduleReconciliation<ReconcilerErr> {
     fn new(
         result: Result<Action, ReconcilerErr>,
         error_policy: impl FnOnce(&ReconcilerErr) -> Action,
-        obj_ref: ObjectRef<K>,
-        reschedule_tx: channel::mpsc::Sender<ScheduleRequest<ReconcileRequest<K>>>,
+        obj_ref: ObjectRef,
+        reschedule_tx: channel::mpsc::Sender<ScheduleRequest<ReconcileRequest>>,
     ) -> Self {
         let reconciler_finished_at = Instant::now();
 
@@ -351,10 +342,7 @@ where
     }
 }
 
-impl<K, ReconcilerErr> Future for RescheduleReconciliation<K, ReconcilerErr>
-where
-    K: Resource,
-{
+impl<ReconcilerErr> Future for RescheduleReconciliation<ReconcilerErr> {
     type Output = Result<Action, ReconcilerErr>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
@@ -453,7 +441,7 @@ where
     K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
-    trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
+    trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest, watcher::Error>>>,
     trigger_backoff: Box<dyn Backoff + Send>,
     /// [`run`](crate::Controller::run) starts a graceful shutdown when any of these [`Future`]s complete,
     /// refusing to start any new reconciliations but letting any existing ones finish.
@@ -505,11 +493,7 @@ where
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
-        let self_watcher = trigger_self(
-            reflector(writer, watcher(owned_api, lp)).applied_objects(),
-            dyntype.clone(),
-        )
-        .boxed();
+        let self_watcher = trigger_self(reflector(writer, watcher(owned_api, lp)).applied_objects()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
@@ -555,28 +539,12 @@ where
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
     #[must_use]
-    pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
-        self,
+    pub fn owns<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
+        mut self,
         api: Api<Child>,
         lp: ListParams,
     ) -> Self {
-        self.owns_with(api, (), lp)
-    }
-
-    /// Specify `Child` objects which `K` owns and should be watched
-    ///
-    /// Same as [`Controller::owns`], but accepts a `DynamicType` so it can be used with dynamic resources.
-    #[must_use]
-    pub fn owns_with<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
-        mut self,
-        api: Api<Child>,
-        dyntype: Child::DynamicType,
-        lp: ListParams,
-    ) -> Self
-    where
-        Child::DynamicType: Debug + Eq + Hash + Clone,
-    {
-        let child_watcher = trigger_owners(watcher(api, lp).touched_objects(), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners::<K, _>(watcher(api, lp).touched_objects(), self.dyntype.clone());
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -648,40 +616,19 @@ where
     /// [Operator-SDK]: https://sdk.operatorframework.io/docs/building-operators/ansible/reference/retroactively-owned-resources/
     #[must_use]
     pub fn watches<
-        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
-        I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    >(
-        self,
-        api: Api<Other>,
-        lp: ListParams,
-        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
-    ) -> Self
-    where
-        I::IntoIter: Send,
-    {
-        self.watches_with(api, (), lp, mapper)
-    }
-
-    /// Specify `Watched` object which `K` has a custom relation to and should be watched
-    ///
-    /// Same as [`Controller::watches`], but accepts a `DynamicType` so it can be used with dynamic resources.
-    #[must_use]
-    pub fn watches_with<
         Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
-        I: 'static + IntoIterator<Item = ObjectRef<K>>,
+        I: 'static + IntoIterator<Item = ObjectRef>,
     >(
         mut self,
         api: Api<Other>,
-        dyntype: Other::DynamicType,
         lp: ListParams,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
         I::IntoIter: Send,
-        Other::DynamicType: Clone,
     {
         let other_watcher = trigger_with(watcher(api, lp).touched_objects(), move |obj| {
-            let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
+            let watched_obj_ref = ObjectRef::from_obj(&obj);
             mapper(obj)
                 .into_iter()
                 .map(move |mapped_obj_ref| ReconcileRequest {
@@ -741,14 +688,12 @@ where
     #[must_use]
     pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
         let store = self.store();
-        let dyntype = self.dyntype.clone();
         self.trigger_selector.push(
             trigger
                 .flat_map(move |()| {
-                    let dyntype = dyntype.clone();
                     stream::iter(store.state().into_iter().map(move |obj| {
                         Ok(ReconcileRequest {
-                            obj_ref: ObjectRef::from_obj_with(&*obj, dyntype.clone()),
+                            obj_ref: ObjectRef::from_obj(&*obj),
                             reason: ReconcileReason::BulkReconcile,
                         })
                     }))
@@ -864,7 +809,7 @@ where
         mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
         error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
         context: Arc<Ctx>,
-    ) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, watcher::Error>>>
+    ) -> impl Stream<Item = Result<(ObjectRef, Action), Error<ReconcilerFut::Error, watcher::Error>>>
     where
         K::DynamicType: Debug + Unpin,
         ReconcilerFut: TryFuture<Ok = Action> + Send + 'static,

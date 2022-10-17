@@ -1,28 +1,12 @@
 use derivative::Derivative;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
-use kube_client::{
-    api::{DynamicObject, Resource},
-    core::ObjectMeta,
-    ResourceExt,
-};
-use std::{
-    fmt::{Debug, Display},
-    hash::Hash,
-};
+use kube_client::{api::Resource, core::ObjectMeta, ResourceExt};
+use std::fmt::{Debug, Display};
 
 #[derive(Derivative)]
-#[derivative(
-    Debug(bound = "K::DynamicType: Debug"),
-    PartialEq(bound = "K::DynamicType: PartialEq"),
-    Eq(bound = "K::DynamicType: Eq"),
-    Hash(bound = "K::DynamicType: Hash"),
-    Clone(bound = "K::DynamicType: Clone")
-)]
+#[derivative(Debug, PartialEq, Eq, Hash, Clone)]
+
 /// A typed and namedspaced (if relevant) reference to a Kubernetes object
-///
-/// `K` may be either the object type or `DynamicObject`, in which case the
-/// type is stored at runtime. Erased `ObjectRef`s pointing to different types
-/// are still considered different.
 ///
 /// ```
 /// use kube_runtime::reflector::ObjectRef;
@@ -33,8 +17,7 @@ use std::{
 /// );
 /// ```
 #[non_exhaustive]
-pub struct ObjectRef<K: Resource> {
-    pub dyntype: K::DynamicType,
+pub struct ObjectRef {
     /// The name of the object
     pub name: String,
     /// The namespace of the object
@@ -69,29 +52,10 @@ pub struct Extra {
     pub uid: Option<String>,
 }
 
-impl<K: Resource> ObjectRef<K>
-where
-    K::DynamicType: Default,
-{
+impl ObjectRef {
     #[must_use]
     pub fn new(name: &str) -> Self {
-        Self::new_with(name, Default::default())
-    }
-
-    #[must_use]
-    pub fn from_obj(obj: &K) -> Self
-    where
-        K: Resource,
-    {
-        Self::from_obj_with(obj, Default::default())
-    }
-}
-
-impl<K: Resource> ObjectRef<K> {
-    #[must_use]
-    pub fn new_with(name: &str, dyntype: K::DynamicType) -> Self {
         Self {
-            dyntype,
             name: name.into(),
             namespace: None,
             extra: Extra::default(),
@@ -104,15 +68,11 @@ impl<K: Resource> ObjectRef<K> {
         self
     }
 
-    /// Creates `ObjectRef` from the resource and dynamic type.
+    /// Creates `ObjectRef` from the resource
     #[must_use]
-    pub fn from_obj_with(obj: &K, dyntype: K::DynamicType) -> Self
-    where
-        K: Resource,
-    {
+    pub fn from_obj<K: Resource>(obj: &K) -> Self {
         let meta = obj.meta();
         Self {
-            dyntype,
             name: obj.name_unchecked(),
             namespace: meta.namespace.clone(),
             extra: Extra::from_obj_meta(meta),
@@ -120,86 +80,46 @@ impl<K: Resource> ObjectRef<K> {
     }
 
     /// Create an `ObjectRef` from an `OwnerReference`
-    ///
-    /// Returns `None` if the types do not match.
     #[must_use]
-    pub fn from_owner_ref(
-        namespace: Option<&str>,
-        owner: &OwnerReference,
-        dyntype: K::DynamicType,
-    ) -> Option<Self> {
-        if owner.api_version == K::api_version(&dyntype) && owner.kind == K::kind(&dyntype) {
-            Some(Self {
-                dyntype,
-                name: owner.name.clone(),
-                namespace: namespace.map(String::from),
-                extra: Extra {
-                    resource_version: None,
-                    uid: Some(owner.uid.clone()),
-                },
-            })
-        } else {
-            None
-        }
-    }
-
-    /// Convert into a reference to `K2`
-    ///
-    /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
-    /// has a corresponding `Endpoints`, but it wouldn't make sense to convert a `Pod` into a `Deployment`.
-    #[must_use]
-    pub fn into_kind_unchecked<K2: Resource>(self, dt2: K2::DynamicType) -> ObjectRef<K2> {
-        ObjectRef {
-            dyntype: dt2,
-            name: self.name,
-            namespace: self.namespace,
-            extra: self.extra,
-        }
-    }
-
-    pub fn erase(self) -> ObjectRef<DynamicObject> {
-        ObjectRef {
-            dyntype: kube_client::api::ApiResource::erase::<K>(&self.dyntype),
-            name: self.name,
-            namespace: self.namespace,
-            extra: self.extra,
-        }
-    }
-}
-
-impl<K: Resource> From<ObjectRef<K>> for ObjectReference {
-    fn from(val: ObjectRef<K>) -> Self {
-        let ObjectRef {
-            dyntype: dt,
-            name,
-            namespace,
+    pub fn from_owner_ref(namespace: Option<&str>, owner: &OwnerReference) -> Self {
+        Self {
+            name: owner.name.clone(),
+            namespace: namespace.map(String::from),
             extra: Extra {
-                resource_version,
-                uid,
+                resource_version: None,
+                uid: Some(owner.uid.clone()),
             },
-        } = val;
-        ObjectReference {
-            api_version: Some(K::api_version(&dt).into_owned()),
-            kind: Some(K::kind(&dt).into_owned()),
-            field_path: None,
-            name: Some(name),
-            namespace,
-            resource_version,
-            uid,
         }
     }
 }
 
-impl<K: Resource> Display for ObjectRef<K> {
+// NB: impossible to upcast from ObjectRef to ObjectReference now without DynamicType
+// impl<K: Resource> From<ObjectRef> for ObjectReference {
+//     fn from(val: ObjectRef) -> Self {
+//         let ObjectRef {
+//             name,
+//             namespace,
+//             extra: Extra {
+//                 resource_version,
+//                 uid,
+//             },
+//         } = val;
+//         ObjectReference {
+//             api_version: Some(K::api_version(&dt).into_owned()),
+//             kind: Some(K::kind(&dt).into_owned()),
+//             field_path: None,
+//             name: Some(name),
+//             namespace,
+//             resource_version,
+//             uid,
+//         }
+//     }
+// }
+
+impl Display for ObjectRef {
+    // TODO: fmt should be combined with reflector fmt so it can include the GVK
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}.{}.{}/{}",
-            K::kind(&self.dyntype),
-            K::version(&self.dyntype),
-            K::group(&self.dyntype),
-            self.name
-        )?;
+        write!(f, "{}", self.name)?;
         if let Some(namespace) = &self.namespace {
             write!(f, ".{namespace}")?;
         }
