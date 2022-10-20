@@ -184,10 +184,17 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "rustls-tls")]
     fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
-        let rustls_config = std::sync::Arc::new(self.rustls_client_config()?);
+        let rustls_config = self.rustls_client_config()?;
         let mut http = hyper::client::HttpConnector::new();
         http.enforce_http(false);
-        Ok(hyper_rustls::HttpsConnector::from((http, rustls_config)))
+        let mut b = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_tls_config(rustls_config)
+            .https_or_http();
+        if let Some(tsn) = self.tls_server_name.as_ref() {
+            b = b.with_server_name(tsn.clone());
+        }
+        
+        Ok(b.enable_http1().wrap_connector(http))
     }
 
     #[cfg(feature = "openssl-tls")]
