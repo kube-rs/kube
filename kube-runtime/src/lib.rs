@@ -20,6 +20,7 @@
 #![allow(clippy::let_underscore_untyped)]
 
 pub mod controller;
+pub mod coordination;
 pub mod events;
 
 pub mod finalizer;
