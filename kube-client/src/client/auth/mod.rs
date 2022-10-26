@@ -474,6 +474,11 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
             });
         cmd.envs(envs);
     }
+    if let Some(envs) = &auth.drop_env {
+        for env in envs {
+            cmd.env_remove(env);
+        }
+    }
     let out = cmd.output().map_err(Error::AuthExecStart)?;
     if !out.status.success() {
         return Err(Error::AuthExecRun {
