@@ -99,10 +99,6 @@ pub enum DiscoveryError {
     #[error("Missing Api Group: {0}")]
     MissingApiGroup(String),
 
-    /// MissingResource
-    #[error("Missing Resource: {0}")]
-    MissingResource(String),
-
     /// Empty ApiGroup
     #[error("Empty Api Group: {0}")]
     EmptyApiGroup(String),

@@ -4,13 +4,8 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ManagedFieldsEntry, OwnerReference, Time},
 };
 
+use crate::scope::Scope;
 use std::{borrow::Cow, collections::BTreeMap};
-
-pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScope, SubResourceScope};
-
-/// Indicates that a [`Resource`] is of an indeterminate dynamic scope.
-pub struct DynamicResourceScope {}
-impl ResourceScope for DynamicResourceScope {}
 
 /// An accessor trait for a kubernetes Resource.
 ///
@@ -37,7 +32,7 @@ pub trait Resource {
     ///
     /// Types from k8s_openapi come with an explicit k8s_openapi::ResourceScope
     /// Dynamic types should select `Scope = DynamicResourceScope`
-    type Scope;
+    type Scope: Scope;
 
     /// Returns kind of this object
     fn kind(dt: &Self::DynamicType) -> Cow<'_, str>;
@@ -60,6 +55,12 @@ pub trait Resource {
     ///
     /// This is known as the resource in apimachinery, we rename it for disambiguation.
     fn plural(dt: &Self::DynamicType) -> Cow<'_, str>;
+
+    /// Returns whether the scope is namespaced
+    ///
+    /// This will dig into the DynamicType if Scope::is_dynamic
+    /// otherwise it will defer to Scope::is_namespaced
+    fn is_namespaced(dt: &Self::DynamicType) -> bool;
 
     /// Creates a url path for http requests for this resource
     fn url_path(dt: &Self::DynamicType, namespace: Option<&str>) -> String {
@@ -120,6 +121,7 @@ impl<K, S> Resource for K
 where
     K: k8s_openapi::Metadata<Ty = ObjectMeta>,
     K: k8s_openapi::Resource<Scope = S>,
+    S: Scope,
 {
     type DynamicType = ();
     type Scope = S;
@@ -150,6 +152,10 @@ where
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         self.metadata_mut()
+    }
+
+    fn is_namespaced(_: &()) -> bool {
+        K::Scope::is_namespaced()
     }
 }
 

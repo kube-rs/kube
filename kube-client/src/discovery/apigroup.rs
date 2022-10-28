@@ -1,7 +1,7 @@
 use super::parse::{self, GroupVersionData};
 use crate::{error::DiscoveryError, Client, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
-pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
+pub use kube_core::discovery::{verbs, ApiResource};
 use kube_core::{
     gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
     Version,
@@ -21,7 +21,7 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
-///      for (apiresource, caps) in apigroup.versioned_resources("v1") {
+///      for apiresource in apigroup.versioned_resources("v1") {
 ///          println!("Found ApiResource {}", apiresource.kind);
 ///      }
 ///     Ok(())
@@ -30,12 +30,9 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 ///
 /// But if you do not know this information, you can use [`ApiGroup::preferred_version_or_latest`].
 ///
-/// Whichever way you choose the end result is something describing a resource and its abilities:
-/// - `Vec<(ApiResource, `ApiCapabilities)>` :: for all resources in a versioned ApiGroup
-/// - `(ApiResource, ApiCapabilities)` :: for a single kind under a versioned ApiGroud
-///
-/// These two types: [`ApiResource`], and [`ApiCapabilities`]
-/// should contain the information needed to construct an [`Api`](crate::Api) and start querying the kubernetes API.
+/// Whichever way you choose the end result is a vector of [`ApiResource`] entries per kind.
+/// This [`ApiResource`] type contains the information needed to construct an [`Api`](crate::Api)
+/// and start querying the kubernetes API.
 /// You will likely need to use [`DynamicObject`] as the generic type for Api to do this,
 /// as well as the [`ApiResource`] for the `DynamicType` for the [`Resource`] trait.
 ///
@@ -45,7 +42,7 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
-///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
+///     let ar = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
 ///         println!("Found APIService: {}", service.name());
@@ -54,7 +51,6 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 /// }
 /// ```
 /// [`ApiResource`]: crate::discovery::ApiResource
-/// [`ApiCapabilities`]: crate::discovery::ApiCapabilities
 /// [`DynamicObject`]: crate::api::DynamicObject
 /// [`Resource`]: crate::Resource
 /// [`ApiGroup::preferred_version_or_latest`]: crate::discovery::ApiGroup::preferred_version_or_latest
@@ -121,10 +117,7 @@ impl ApiGroup {
     }
 
     // shortcut method to give cheapest return for a single GVK
-    pub(crate) async fn query_gvk(
-        client: &Client,
-        gvk: &GroupVersionKind,
-    ) -> Result<(ApiResource, ApiCapabilities)> {
+    pub(crate) async fn query_gvk(client: &Client, gvk: &GroupVersionKind) -> Result<ApiResource> {
         let apiver = gvk.api_version();
         let list = if gvk.group.is_empty() {
             client.list_core_api_resources(&apiver).await?
@@ -133,11 +126,11 @@ impl ApiGroup {
         };
         for res in &list.resources {
             if res.kind == gvk.kind && !res.name.contains('/') {
-                let ar = parse::parse_apiresource(res, &list.group_version).map_err(
+                let mut ar = parse::parse_apiresource(res, &list.group_version).map_err(
                     |ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)),
                 )?;
-                let caps = parse::parse_apicapabilities(&list, &res.name)?;
-                return Ok((ar, caps));
+                ar.capabilities.subresources = parse::find_subresources(&list, &res.name)?;
+                return Ok(ar);
             }
         }
         Err(Error::Discovery(DiscoveryError::MissingKind(format!(
@@ -208,7 +201,7 @@ impl ApiGroup {
     ///
     /// If you are looking for the api recommended list of resources, or just on particular kind
     /// consider [`ApiGroup::recommended_resources`] or [`ApiGroup::recommended_kind`] instead.
-    pub fn versioned_resources(&self, ver: &str) -> Vec<(ApiResource, ApiCapabilities)> {
+    pub fn versioned_resources(&self, ver: &str) -> Vec<ApiResource> {
         self.data
             .iter()
             .find(|gvd| gvd.version == ver)
@@ -224,8 +217,8 @@ impl ApiGroup {
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
-    ///     for (ar, caps) in apigroup.recommended_resources() {
-    ///         if !caps.supports_operation(verbs::LIST) {
+    ///     for ar in apigroup.recommended_resources() {
+    ///         if !ar.supports_operation(verbs::LIST) {
     ///             continue;
     ///         }
     ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
@@ -238,7 +231,7 @@ impl ApiGroup {
     /// ```
     ///
     /// This is equivalent to taking the [`ApiGroup::versioned_resources`] at the [`ApiGroup::preferred_version_or_latest`].
-    pub fn recommended_resources(&self) -> Vec<(ApiResource, ApiCapabilities)> {
+    pub fn recommended_resources(&self) -> Vec<ApiResource> {
         let ver = self.preferred_version_or_latest();
         self.versioned_resources(ver)
     }
@@ -251,25 +244,25 @@ impl ApiGroup {
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
-    ///     for (ar, caps) in apigroup.resources_by_stability() {
-    ///         if !caps.supports_operation(verbs::LIST) {
+    ///     for ar in apigroup.resources_by_stability() {
+    ///         if !ar.supports_operation(verbs::LIST) {
     ///             continue;
     ///         }
     ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///         for inst in api.list(&Default::default()).await? {
-    ///             println!("Found {}: {}", ar.kind, inst.name());
+    ///             println!("Found {}: {}", ar.kind, inst.name_any());
     ///         }
     ///     }
     ///     Ok(())
     /// }
     /// ```
     /// See an example in [examples/kubectl.rs](https://github.com/kube-rs/kube/blob/main/examples/kubectl.rs)
-    pub fn resources_by_stability(&self) -> Vec<(ApiResource, ApiCapabilities)> {
+    pub fn resources_by_stability(&self) -> Vec<ApiResource> {
         let mut lookup = HashMap::new();
         self.data.iter().for_each(|gvd| {
             gvd.resources.iter().for_each(|resource| {
                 lookup
-                    .entry(resource.0.kind.clone())
+                    .entry(resource.kind.clone())
                     .or_insert_with(Vec::new)
                     .push(resource);
             })
@@ -277,7 +270,7 @@ impl ApiGroup {
         lookup
             .into_values()
             .map(|mut v| {
-                v.sort_by_cached_key(|(ar, _)| Reverse(Version::parse(ar.version.as_str()).priority()));
+                v.sort_by_cached_key(|ar| Reverse(Version::parse(ar.version.as_str()).priority()));
                 v[0].to_owned()
             })
             .collect()
@@ -291,7 +284,7 @@ impl ApiGroup {
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
-    ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
+    ///     let ar = apigroup.recommended_kind("APIService").unwrap();
     ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///     for service in api.list(&Default::default()).await? {
     ///         println!("Found APIService: {}", service.name());
@@ -301,11 +294,11 @@ impl ApiGroup {
     /// ```
     ///
     /// This is equivalent to filtering the [`ApiGroup::versioned_resources`] at [`ApiGroup::preferred_version_or_latest`] against a chosen `kind`.
-    pub fn recommended_kind(&self, kind: &str) -> Option<(ApiResource, ApiCapabilities)> {
+    pub fn recommended_kind(&self, kind: &str) -> Option<ApiResource> {
         let ver = self.preferred_version_or_latest();
-        for (ar, caps) in self.versioned_resources(ver) {
+        for ar in self.versioned_resources(ver) {
             if ar.kind == kind {
-                return Some((ar, caps));
+                return Some(ar);
             }
         }
         None
@@ -314,54 +307,34 @@ impl ApiGroup {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{GroupVersionKind as GVK, *};
+
 
     #[test]
     fn test_resources_by_stability() {
-        let ac = ApiCapabilities {
-            scope: Scope::Namespaced,
-            subresources: vec![],
-            operations: vec![],
-        };
+        let cr_low = GVK::gvk("kube.rs", "v1alpha1", "LowCr");
+        let testcr_low = ApiResource::new(&cr_low, "lowcrs");
 
-        let testlowversioncr_v1alpha1 = ApiResource {
-            group: String::from("kube.rs"),
-            version: String::from("v1alpha1"),
-            kind: String::from("TestLowVersionCr"),
-            api_version: String::from("kube.rs/v1alpha1"),
-            plural: String::from("testlowversioncrs"),
-        };
+        let cr_v1 = GVK::gvk("kube.rs", "v1", "TestCr");
+        let testcr_v1 = ApiResource::new(&cr_v1, "testcrs");
 
-        let testcr_v1 = ApiResource {
-            group: String::from("kube.rs"),
-            version: String::from("v1"),
-            kind: String::from("TestCr"),
-            api_version: String::from("kube.rs/v1"),
-            plural: String::from("testcrs"),
-        };
-
-        let testcr_v2alpha1 = ApiResource {
-            group: String::from("kube.rs"),
-            version: String::from("v2alpha1"),
-            kind: String::from("TestCr"),
-            api_version: String::from("kube.rs/v2alpha1"),
-            plural: String::from("testcrs"),
-        };
+        let cr_v2a1 = GVK::gvk("kube.rs", "v2alpha1", "TestCr");
+        let testcr_v2alpha1 = ApiResource::new(&cr_v2a1, "testcrs");
 
         let group = ApiGroup {
-            name: "kube.rs".to_string(),
+            name: "kube.rs".into(),
             data: vec![
                 GroupVersionData {
-                    version: "v1alpha1".to_string(),
-                    resources: vec![(testlowversioncr_v1alpha1, ac.clone())],
+                    version: "v1alpha1".into(),
+                    resources: vec![testcr_low],
                 },
                 GroupVersionData {
-                    version: "v1".to_string(),
-                    resources: vec![(testcr_v1, ac.clone())],
+                    version: "v1".into(),
+                    resources: vec![testcr_v1],
                 },
                 GroupVersionData {
-                    version: "v2alpha1".to_string(),
-                    resources: vec![(testcr_v2alpha1, ac)],
+                    version: "v2alpha1".into(),
+                    resources: vec![testcr_v2alpha1],
                 },
             ],
             preferred: Some(String::from("v1")),
@@ -371,14 +344,14 @@ mod tests {
         assert!(
             resources
                 .iter()
-                .any(|(ar, _)| ar.kind == "TestCr" && ar.version == "v1"),
-            "wrong stable version"
+                .any(|ar| ar.kind == "TestCr" && ar.version == "v1"),
+            "picked right stable version"
         );
         assert!(
             resources
                 .iter()
-                .any(|(ar, _)| ar.kind == "TestLowVersionCr" && ar.version == "v1alpha1"),
-            "lost low version resource"
+                .any(|ar| ar.kind == "LowCr" && ar.version == "v1alpha1"),
+            "got alpha resource below preferred"
         );
     }
 }

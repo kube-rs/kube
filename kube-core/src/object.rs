@@ -2,7 +2,8 @@
 use crate::{
     discovery::ApiResource,
     metadata::{ListMeta, ObjectMeta, TypeMeta},
-    resource::{DynamicResourceScope, Resource},
+    resource::Resource,
+    scope::DynamicResourceScope,
 };
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -244,6 +245,10 @@ where
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
+    }
+
+    fn is_namespaced(dt: &ApiResource) -> bool {
+        dt.capabilities.namespaced
     }
 }
 

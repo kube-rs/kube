@@ -25,7 +25,6 @@ use std::{
 use stream::IntoStream;
 use tokio::{runtime::Handle, task::JoinHandle};
 
-
 /// Allows splitting a `Stream` into several streams that each emit a disjoint subset of the input stream's items,
 /// like a streaming variant of pattern matching.
 ///

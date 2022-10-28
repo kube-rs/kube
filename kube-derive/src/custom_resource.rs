@@ -320,6 +320,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             fn meta_mut(&mut self) -> &mut #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                 &mut self.metadata
             }
+
+            fn is_namespaced(_: &()) -> bool {
+                #namespaced
+            }
         }
     };
 
@@ -452,8 +456,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 #crd_meta_name
             }
 
-            fn api_resource() -> #kube_core::dynamic::ApiResource {
-                #kube_core::dynamic::ApiResource::erase::<Self>(&())
+            fn api_resource() -> #kube_core::ApiResource {
+                // TODO: populate subresources
+                #kube_core::ApiResource::erase::<Self>(&())
+                    .set_shortnames(#shortnames_slice).set_default_verbs()
+
             }
 
             fn shortnames() -> &'static [&'static str] {

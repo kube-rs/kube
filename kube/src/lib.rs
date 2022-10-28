@@ -361,7 +361,7 @@ mod test {
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
-            discovery::{self, verbs, ApiGroup, Discovery, Scope},
+            discovery::{self, verbs, ApiGroup, Discovery},
             runtime::wait::{await_condition, conditions, Condition},
         };
 
@@ -388,9 +388,9 @@ mod test {
 
         // discover by both (recommended kind on groupversion) and (pinned gvk) and they should equal
         let apigroup = discovery::oneshot::pinned_group(&client, &gv).await?;
-        let (ar1, caps1) = apigroup.recommended_kind("TestCr").unwrap();
-        let (ar2, caps2) = discovery::pinned_kind(&client, &gvk).await?;
-        assert_eq!(caps1.operations.len(), caps2.operations.len(), "unequal caps");
+        let ar1 = apigroup.recommended_kind("TestCr").unwrap();
+        let ar2 = discovery::pinned_kind(&client, &gvk).await?;
+        assert_eq!(ar1.capabilities, ar2.capabilities, "unequal caps");
         assert_eq!(ar1, ar2, "unequal apiresource");
         assert_eq!(DynamicObject::api_version(&ar2), "kube.rs/v1", "unequal dynver");
 
@@ -403,7 +403,7 @@ mod test {
 
         // check our custom resource first by resolving within groups
         assert!(discovery.has_group("kube.rs"), "missing group kube.rs");
-        let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
+        let ar = discovery.resolve_gvk(&gvk).unwrap();
         assert_eq!(ar.group, gvk.group, "unexpected discovered group");
         assert_eq!(ar.version, gvk.version, "unexcepted discovered ver");
         assert_eq!(ar.kind, gvk.kind, "unexpected discovered kind");
@@ -413,11 +413,11 @@ mod test {
         let firstgroup = groups.next().unwrap();
         assert_eq!(firstgroup.name(), ApiGroup::CORE_GROUP, "core not first");
         for group in groups {
-            for (ar, caps) in group.recommended_resources() {
-                if !caps.supports_operation(verbs::LIST) {
+            for ar in group.recommended_resources() {
+                if !ar.supports_operation(verbs::LIST) {
                     continue;
                 }
-                let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
+                let api: Api<DynamicObject> = if ar.namespaced() {
                     Api::default_namespaced_with(client.clone(), &ar)
                 } else {
                     Api::all_with(client.clone(), &ar)

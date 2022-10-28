@@ -1,7 +1,7 @@
 use futures::{StreamExt, TryStreamExt};
 use kube::{
     api::{Api, DynamicObject, GroupVersionKind, ListParams, ResourceExt},
-    discovery::{self, Scope},
+    discovery,
     runtime::{watcher, WatchStreamExt},
     Client,
 };
@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     // Turn them into a GVK
     let gvk = GroupVersionKind::gvk(&group, &version, &kind);
     // Use API discovery to identify more information about the type (like its plural)
-    let (ar, caps) = discovery::pinned_kind(&client, &gvk).await?;
+    let ar = discovery::pinned_kind(&client, &gvk).await?;
 
     // Use the full resource info to create an Api with the ApiResource as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &ar);
@@ -30,10 +30,10 @@ async fn main() -> anyhow::Result<()> {
     // Fully compatible with kube-runtime
     let mut items = watcher(api, ListParams::default()).applied_objects().boxed();
     while let Some(p) = items.try_next().await? {
-        if caps.scope == Scope::Cluster {
-            info!("saw {}", p.name_any());
+        if let Some(ns) = p.namespace() {
+            info!("saw {} in {}", p.name_any(), ns);
         } else {
-            info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
+            info!("saw {}", p.name_any());
         }
     }
     Ok(())

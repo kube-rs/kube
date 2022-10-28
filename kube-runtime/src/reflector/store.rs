@@ -129,7 +129,6 @@ where
     }
 }
 
-
 /// Create a (Reader, Writer) for a `Store<K>` for a typed resource `K`
 ///
 /// The `Writer` should be passed to a [`reflector`](crate::reflector()),
@@ -144,7 +143,6 @@ where
     let r = w.as_reader();
     (r, w)
 }
-
 
 #[cfg(test)]
 mod tests {

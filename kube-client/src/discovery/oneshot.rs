@@ -14,7 +14,7 @@
 use super::ApiGroup;
 use crate::{error::DiscoveryError, Client, Error, Result};
 use kube_core::{
-    discovery::{ApiCapabilities, ApiResource},
+    discovery::ApiResource,
     gvk::{GroupVersion, GroupVersionKind},
 };
 
@@ -29,7 +29,7 @@ use kube_core::{
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
-///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
+///     let ar = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
 ///         println!("Found APIService: {}", service.name());
@@ -66,7 +66,7 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
 ///     let client = Client::try_default().await?;
 ///     let gv = "apiregistration.k8s.io/v1".parse()?;
 ///     let apigroup = discovery::pinned_group(&client, &gv).await?;
-///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
+///     let ar = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
 ///         println!("Found APIService: {}", service.name());
@@ -93,7 +93,7 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let client = Client::try_default().await?;
 ///     let gvk = GroupVersionKind::gvk("apiregistration.k8s.io", "v1", "APIService");
-///     let (ar, caps) = discovery::pinned_kind(&client, &gvk).await?;
+///     let ar = discovery::pinned_kind(&client, &gvk).await?;
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
 ///         println!("Found APIService: {}", service.name());
@@ -101,6 +101,6 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 ///     Ok(())
 /// }
 /// ```
-pub async fn pinned_kind(client: &Client, gvk: &GroupVersionKind) -> Result<(ApiResource, ApiCapabilities)> {
+pub async fn pinned_kind(client: &Client, gvk: &GroupVersionKind) -> Result<ApiResource> {
     ApiGroup::query_gvk(client, gvk).await
 }

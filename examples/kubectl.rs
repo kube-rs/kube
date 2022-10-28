@@ -10,7 +10,7 @@ use k8s_openapi::{
 use kube::{
     api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
     core::GroupVersionKind,
-    discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
+    discovery::{ApiResource, Discovery},
     runtime::{
         wait::{await_condition, conditions::is_deleted},
         watcher, WatchStreamExt,
@@ -66,7 +66,7 @@ enum Verb {
     Apply,
 }
 
-fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResource, ApiCapabilities)> {
+fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<ApiResource> {
     // iterate through groups to find matching kind/plural names at recommended versions
     // and then take the minimal match by group.name (equivalent to sorting groups by group.name).
     // this is equivalent to kubectl's api group preference
@@ -78,7 +78,7 @@ fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResourc
                 .into_iter()
                 .map(move |res| (group, res))
         })
-        .filter(|(_, (res, _))| {
+        .filter(|(_, res)| {
             // match on both resource name and kind name
             // ideally we should allow shortname matches as well
             name.eq_ignore_ascii_case(&res.kind) || name.eq_ignore_ascii_case(&res.plural)
@@ -169,8 +169,8 @@ impl App {
                 bail!("cannot apply object without valid TypeMeta {:?}", obj);
             };
             let name = obj.name_any();
-            if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
-                let api = dynamic_api(ar, caps, client.clone(), &self.namespace, false);
+            if let Some(ar) = discovery.resolve_gvk(&gvk) {
+                let api = dynamic_api(ar, client.clone(), &self.namespace, false);
                 trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
                 let data: serde_json::Value = serde_json::to_value(&obj)?;
                 let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
@@ -195,13 +195,13 @@ async fn main() -> Result<()> {
     // Defer to methods for verbs
     if let Some(resource) = &app.resource {
         // Common discovery, parameters, and api configuration for a single resource
-        let (ar, caps) = resolve_api_resource(&discovery, resource)
+        let ar = resolve_api_resource(&discovery, resource)
             .with_context(|| format!("resource {:?} not found in cluster", resource))?;
         let mut lp = ListParams::default();
         if let Some(label) = &app.selector {
             lp = lp.labels(label);
         }
-        let api = dynamic_api(ar, caps, client, &app.namespace, app.all);
+        let api = dynamic_api(ar, client, &app.namespace, app.all);
 
         tracing::info!(?app.verb, ?resource, name = ?app.name.clone().unwrap_or_default(), "requested objects");
         match app.verb {
@@ -217,14 +217,8 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn dynamic_api(
-    ar: ApiResource,
-    caps: ApiCapabilities,
-    client: Client,
-    ns: &Option<String>,
-    all: bool,
-) -> Api<DynamicObject> {
-    if caps.scope == Scope::Cluster || all {
+fn dynamic_api(ar: ApiResource, client: Client, ns: &Option<String>, all: bool) -> Api<DynamicObject> {
+    if !ar.namespaced() || all {
         Api::all_with(client, &ar)
     } else if let Some(namespace) = ns {
         Api::namespaced_with(client, namespace, &ar)
