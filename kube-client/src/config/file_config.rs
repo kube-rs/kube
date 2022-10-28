@@ -243,6 +243,11 @@ pub struct ExecConfig {
     /// TODO: These are unioned with the host's environment, as well as variables client-go uses to pass argument to the plugin.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env: Option<Vec<HashMap<String, String>>>,
+    /// drop_env specifies which environment arguments of the host process shouldn't
+    /// pass to the auth plugin.
+    /// This doesn't exist upstream (yet?)
+    #[serde(skip)]
+    pub drop_env: Option<Vec<String>>,
 }
 
 /// NamedContext associates name with context.
