@@ -5,7 +5,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.75.0...main
+ * see https://github.com/kube-rs/kube/compare/0.76.0...main
+
+0.76.0 / 2022-10-28
+===================
 
 [0.75.0](https://github.com/kube-rs/kube/releases/tag/0.75.0) / 2022-09-21
 ===================
@@ -16,7 +19,7 @@ UNRELEASED
 ### [Upgrade `k8s-openapi` to 0.16 for Kubernetes 1.25](https://github.com/kube-rs/kube/pull/1008)
 
 The update to [k8s-openapi@0.16.0](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0160-2022-09-15) makes this the first release with **tentative** Kubernetes 1.25 support.
-While the new structs and apis now exist, we **recommend holding off** on using 1.25 until a [deserialization bug in the apiserver](https://github.com/kubernetes/kubernetes/issues/111985) is resolved upstream. See #997 / #1008 for details.
+While the new structs and apis now exist, we **recommend holding off** on using 1.25 until a [deserialization bug in the apiserver](https://github.com/kubernetes/kubernetes/issues/111985) is resolved upstream. See [#997](https://github.com/kube-rs/kube/issues/997) / [#1008](https://github.com/kube-rs/kube/issues/1008) for details.
 
 To upgrade, ensure you bump both `kube` and `k8s-openapi`:
 
