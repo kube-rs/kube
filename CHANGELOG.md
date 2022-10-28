@@ -7,8 +7,34 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.76.0...main
 
-0.76.0 / 2022-10-28
+[0.76.0](https://github.com/kube-rs/kube/releases/tag/0.76.0) / 2022-10-28
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.76.0 -->
+
+## Highlights
+
+### [`#[derive(CustomResource)]` now supports schemas with untagged enums](https://github.com/kube-rs/kube/pull/1028)
+
+Expanding on our existing support for storing Rust's struct enums in CRDs, Kube will now try to convert `#[serde(untagged)]` enums as well. Note that if the same field is present in multiple untagged variants then they must all have the same shape.
+
+### [Removed deprecated `try_flatten_*` functions](https://github.com/kube-rs/kube/pull/1019)
+
+These have been deprecated since 0.72, and are replaced by the equivalent `WatchStreamExt` methods.
+
+## What's Changed
+### Added
+* Adds example to `Controller::watches` by @Dav1dde in https://github.com/kube-rs/kube/pull/1026
+* Discovery: Add `ApiGroup::resources_by_stability` by @imuxin in https://github.com/kube-rs/kube/pull/1022
+* Add support for untagged enums in CRDs by @sbernauer in https://github.com/kube-rs/kube/pull/1028
+* Derive PartialEq for DynamicObject by @pbzweihander in https://github.com/kube-rs/kube/pull/1048
+### Removed
+* Runtime: Remove deprecated util `try_flatten_` helpers by @clux in https://github.com/kube-rs/kube/pull/1019
+* Remove `native-tls` feature by @kazk in https://github.com/kube-rs/kube/pull/1044
+### Fixed
+* add fieldManager querystring to all operations by @goenning in https://github.com/kube-rs/kube/pull/1031
+* Add verify_tls1x_signature for NoCertVerification by @rvql in https://github.com/kube-rs/kube/pull/1034
+* Fix compatibility with schemars' preserve_order feature by @teozkr in https://github.com/kube-rs/kube/pull/1050
+* Hoist enum values from subschemas by @teozkr in https://github.com/kube-rs/kube/pull/1051
 
 [0.75.0](https://github.com/kube-rs/kube/releases/tag/0.75.0) / 2022-09-21
 ===================
