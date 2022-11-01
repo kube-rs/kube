@@ -234,6 +234,7 @@ impl AttachedProcess {
     }
 }
 
+// theses values come from here: https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/cri/streaming/remotecommand/websocket.go#L34
 const STDIN_CHANNEL: u8 = 0;
 const STDOUT_CHANNEL: u8 = 1;
 const STDERR_CHANNEL: u8 = 2;

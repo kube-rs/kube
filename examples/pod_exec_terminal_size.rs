@@ -67,6 +67,8 @@ async fn main() -> anyhow::Result<()> {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(15), running).await?;
 
     {
+        // Here we we put the teerminal in 'raw' mode to directly get the input from the user and sending it to the server and getting the result from the server to disploy directly.
+        // We also watch for change in your terminal size and send it to the server so that application that use the size work properly.
         crossterm::terminal::enable_raw_mode()?;
         let mut attached: AttachedProcess = pods
             .exec(
