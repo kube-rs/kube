@@ -20,6 +20,7 @@ pub struct Writer<K: 'static + Resource> {
 
 impl<K: 'static + Resource + TypeInfo + Clone> Writer<K> {
     /// Creates a new Writer with the specified dynamic type.
+    #[must_use]
     pub fn new() -> Self {
         Writer {
             store: Default::default(),

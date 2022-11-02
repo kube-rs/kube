@@ -1,10 +1,6 @@
 use derivative::Derivative;
-use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
-use kube_client::{
-    api::Resource,
-    core::{ObjectMeta, TypeInfo, TypeMeta},
-    ResourceExt,
-};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
+use kube_client::core::{ObjectMeta, TypeInfo, TypeMeta};
 use std::fmt::{Debug, Display};
 
 #[derive(Derivative)]
@@ -79,7 +75,7 @@ impl ObjectRef {
             name: meta.name.clone().unwrap(),
             namespace: meta.namespace.clone(),
             types: obj.types(),
-            extra: Extra::from_objectmeta(&meta),
+            extra: Extra::from_objectmeta(meta),
         }
     }
 
@@ -103,6 +99,7 @@ impl ObjectRef {
         self
     }
 
+    #[must_use]
     pub fn with_namespace(mut self, namespace: Option<&str>) -> Self {
         self.namespace = namespace.map(String::from);
         self
@@ -114,6 +111,7 @@ impl ObjectRef {
         self
     }
 
+    #[must_use]
     pub fn with_types(mut self, types: &TypeMeta) -> Self {
         self.types = Some(types.clone());
         self

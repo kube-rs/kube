@@ -20,7 +20,7 @@ use futures::{
 };
 use kube_client::{
     api::{Api, ListParams, Resource},
-    core::{TypeInfo, TypeMeta},
+    core::TypeInfo,
 };
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
