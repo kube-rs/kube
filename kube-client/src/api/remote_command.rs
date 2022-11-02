@@ -321,9 +321,10 @@ where
             Some(terminal_size_message) = terminal_size_next, if have_terminal_size_rx => {
                 match terminal_size_message {
                     Some(new_size) => {
-                        let mut vec = vec![RESIZE_CHANNEL];
-                        let mut serde_vec = serde_json::to_vec(&new_size).map_err(Error::SerializeTerminalSize)?;
-                        vec.append(&mut serde_vec);
+                        let new_size = serde_json::to_vec(&new_size).map_err(Error::SerializeTerminalSize)?;
+                        let mut vec = Vec::with_capacity(new_size.len() + 1);
+                        vec.push(RESIZE_CHANNEL);
+                        vec.extend_from_slice(&new_size[..]);
                         server_send.send(ws::Message::Binary(vec)).await.map_err(Error::SendTerminalSize)?;
                     },
                     None => {
