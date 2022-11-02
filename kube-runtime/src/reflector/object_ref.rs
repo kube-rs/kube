@@ -72,7 +72,7 @@ impl ObjectRef {
     pub fn from_obj<K: TypeInfo>(obj: &K) -> Self {
         let meta = obj.meta();
         Self {
-            name: meta.name.clone().unwrap(),
+            name: meta.name.clone().unwrap_or_default(),
             namespace: meta.namespace.clone(),
             types: obj.types(),
             extra: Extra::from_objectmeta(meta),
