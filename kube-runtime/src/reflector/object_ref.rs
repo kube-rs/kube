@@ -1,7 +1,8 @@
 use derivative::Derivative;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
+use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
 use kube_client::core::{ObjectMeta, TypeInfo, TypeMeta};
 use std::fmt::{Debug, Display};
+use thiserror::Error;
 
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash, Clone)]
@@ -118,28 +119,41 @@ impl ObjectRef {
     }
 }
 
-// NB: impossible to upcast from ObjectReference to ObjectRef now without DynamicType
-// impl<K: Resource> From<ObjectRef> for ObjectReference {
-//     fn from(val: ObjectRef) -> Self {
-//         let ObjectRef {
-//             name,
-//             namespace,
-//             extra: Extra {
-//                 resource_version,
-//                 uid,
-//             },
-//         } = val;
-//         ObjectReference {
-//             api_version: Some(K::api_version(&dt).into_owned()),
-//             kind: Some(K::kind(&dt).into_owned()),
-//             field_path: None,
-//             name: Some(name),
-//             namespace,
-//             resource_version,
-//             uid,
-//         }
-//     }
-// }
+#[derive(Debug, Error)]
+#[error("failed to find type information")]
+/// Failed to parse group version
+pub struct MissingTypeInfo;
+
+
+impl TryFrom<ObjectRef> for ObjectReference {
+    type Error = MissingTypeInfo;
+
+    fn try_from(val: ObjectRef) -> Result<Self, Self::Error> {
+        if let Some(t) = &val.types {
+            let ObjectRef {
+                name,
+                namespace,
+                extra:
+                    Extra {
+                        resource_version,
+                        uid,
+                    },
+                ..
+            } = val;
+            Ok(ObjectReference {
+                api_version: Some(t.api_version.clone()),
+                kind: Some(t.kind.clone()),
+                field_path: None,
+                name: Some(name),
+                namespace,
+                resource_version,
+                uid,
+            })
+        } else {
+            Err(MissingTypeInfo)
+        }
+    }
+}
 
 impl Display for ObjectRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
