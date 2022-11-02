@@ -2,7 +2,7 @@ use super::ObjectRef;
 use crate::watcher;
 use ahash::AHashMap;
 use derivative::Derivative;
-use kube_client::Resource;
+use kube_client::{core::TypeInfo, Resource};
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
@@ -13,27 +13,16 @@ type Cache<K> = Arc<RwLock<AHashMap<ObjectRef, Arc<K>>>>;
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
-#[derivative(Default(bound = "K::DynamicType: Default"))]
-pub struct Writer<K: 'static + Resource>
-where
-    K::DynamicType: Eq + Hash,
-{
+#[derivative(Default(bound = ""))]
+pub struct Writer<K: 'static + Resource> {
     store: Cache<K>,
-    dyntype: K::DynamicType,
 }
 
-impl<K: 'static + Resource + Clone> Writer<K>
-where
-    K::DynamicType: Eq + Hash + Clone,
-{
+impl<K: 'static + Resource + TypeInfo + Clone> Writer<K> {
     /// Creates a new Writer with the specified dynamic type.
-    ///
-    /// If the dynamic type is default-able (for example when writer is used with
-    /// `k8s_openapi` types) you can use `Default` instead.
-    pub fn new(dyntype: K::DynamicType) -> Self {
+    pub fn new() -> Self {
         Writer {
             store: Default::default(),
-            dyntype,
         }
     }
 
@@ -77,16 +66,14 @@ where
 ///
 /// Cannot be constructed directly since one writer handle is required,
 /// use `Writer::as_reader()` instead.
+
 #[derive(Derivative)]
-#[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
-pub struct Store<K: 'static + Resource>
-where
-    K::DynamicType: Hash + Eq,
-{
+#[derivative(Debug(bound = "K: Debug"), Clone)]
+pub struct Store<K: 'static + Resource> {
     store: Cache<K>,
 }
 
-impl<K: 'static + Clone + Resource> Store<K>
+impl<K: 'static + Clone + Resource + TypeInfo> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -132,8 +119,7 @@ where
 #[must_use]
 pub fn store<K>() -> (Store<K>, Writer<K>)
 where
-    K: Resource + Clone + 'static,
-    K::DynamicType: Eq + Hash + Clone + Default,
+    K: Resource + TypeInfo + Clone + 'static,
 {
     let w = Writer::<K>::default();
     let r = w.as_reader();

@@ -18,7 +18,10 @@ use futures::{
     future::{self, BoxFuture},
     ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube_client::api::{Api, ListParams, Resource};
+use kube_client::{
+    api::{Api, ListParams, Resource},
+    core::{TypeInfo, TypeMeta},
+};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
@@ -103,7 +106,7 @@ where
 pub fn trigger_self<K, S>(stream: S) -> impl Stream<Item = Result<ReconcileRequest, S::Error>>
 where
     S: TryStream<Ok = K>,
-    K: Resource,
+    K: Resource + TypeInfo,
 {
     trigger_with(stream, move |obj| {
         Some(ReconcileRequest {
@@ -120,12 +123,13 @@ pub fn trigger_owners<KOwner, S>(
 ) -> impl Stream<Item = Result<ReconcileRequest, S::Error>>
 where
     S: TryStream,
-    S::Ok: Resource,
+    S::Ok: Resource + TypeInfo,
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
-        let meta = obj.meta().clone();
+        let meta = TypeInfo::meta(&obj).clone();
+        let types = obj.types_unchecked();
         let ns = meta.namespace;
         let owner_type = owner_type.clone();
         let child_ref = ObjectRef::from_obj(&obj);
@@ -134,10 +138,14 @@ where
             .flatten()
             // Filter out ownerrefs not matching the owning GVK
             .filter(move |owner| {
-                owner.api_version == KOwner::api_version(&owner_type)
-                    && owner.kind == KOwner::kind(&owner_type)
+                owner.api_version == <KOwner as Resource>::api_version(&owner_type)
+                    && owner.kind == <KOwner as Resource>::kind(&owner_type)
             })
-            .map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner))
+            .map(move |owner| {
+                ObjectRef::from_owner(&owner)
+                    .with_namespace(ns.as_deref())
+                    .with_types(&types)
+            })
             .map(move |owner_ref| ReconcileRequest {
                 obj_ref: owner_ref,
                 reason: ReconcileReason::RelatedObjectUpdated {
@@ -158,7 +166,6 @@ pub struct ReconcileRequest {
     pub obj_ref: ObjectRef,
     #[derivative(PartialEq = "ignore", Hash = "ignore")]
     pub reason: ReconcileReason,
-    // TODO: include GVK data here for better formatting?
 }
 
 // ..that means this would have to get extra data somehow
@@ -219,7 +226,7 @@ pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
     queue: QueueStream,
 ) -> impl Stream<Item = Result<(ObjectRef, Action), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
-    K: Clone + Resource + 'static,
+    K: Clone + Resource + TypeInfo + 'static,
     K::DynamicType: Debug + Eq + Hash + Clone + Unpin,
     ReconcilerFut: TryFuture<Ok = Action> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
@@ -437,7 +444,7 @@ impl<ReconcilerErr> Future for RescheduleReconciliation<ReconcilerErr> {
 /// ```
 pub struct Controller<K>
 where
-    K: Clone + Resource + Debug + 'static,
+    K: Clone + Resource + TypeInfo + Debug + 'static,
     K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
@@ -457,7 +464,7 @@ where
 
 impl<K> Controller<K>
 where
-    K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
+    K: Clone + Resource + TypeInfo + DeserializeOwned + Debug + Send + Sync + 'static,
     K::DynamicType: Eq + Hash + Clone,
 {
     /// Create a Controller on a type `K`
@@ -490,7 +497,7 @@ where
     /// [`dynamic`]: kube_client::core::dynamic
     /// [`ListParams::default`]: kube_client::api::ListParams::default
     pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
-        let writer = Writer::<K>::new(dyntype.clone());
+        let writer = Writer::<K>::default();
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(reflector(writer, watcher(owned_api, lp)).applied_objects()).boxed();
@@ -539,7 +546,7 @@ where
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
     #[must_use]
-    pub fn owns<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
+    pub fn owns<Child: Clone + Resource + TypeInfo + DeserializeOwned + Debug + Send + 'static>(
         mut self,
         api: Api<Child>,
         lp: ListParams,
@@ -616,7 +623,7 @@ where
     /// [Operator-SDK]: https://sdk.operatorframework.io/docs/building-operators/ansible/reference/retroactively-owned-resources/
     #[must_use]
     pub fn watches<
-        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource + TypeInfo + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef>,
     >(
         mut self,
@@ -844,7 +851,10 @@ mod tests {
     };
     use futures::{pin_mut, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::ConfigMap;
-    use kube_client::{core::ObjectMeta, Api};
+    use kube_client::{
+        core::{ObjectMeta, ResourceExt},
+        Api,
+    };
     use tokio::time::timeout;
 
     fn assert_send<T: Send>(x: T) -> T {
@@ -880,13 +890,13 @@ mod tests {
         // Assume that everything's OK if we can reconcile every object 3 times on average
         let reconciles = items * 3;
 
-        let (queue_tx, queue_rx) = futures::channel::mpsc::unbounded::<ObjectRef<ConfigMap>>();
+        let (queue_tx, queue_rx) = futures::channel::mpsc::unbounded::<ObjectRef>();
         let (store_rx, mut store_tx) = reflector::store();
         let applier = applier(
-            |obj, _| {
+            |obj: Arc<ConfigMap>, _| {
                 Box::pin(async move {
                     // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
-                    println!("reconciling {:?}", obj.metadata.name);
+                    println!("reconciling {:?}", obj.name_any());
                     Ok(Action::requeue(Duration::ZERO))
                 })
             },

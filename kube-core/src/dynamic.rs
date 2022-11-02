@@ -106,6 +106,10 @@ impl Resource for DynamicObject {
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
     }
+
+    fn typemeta() -> Option<TypeMeta> {
+        None
+    }
 }
 
 #[cfg(test)]

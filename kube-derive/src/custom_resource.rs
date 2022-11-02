@@ -320,10 +320,50 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             fn meta_mut(&mut self) -> &mut #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                 &mut self.metadata
             }
+
+            fn typemeta() -> Option<#kube_core::TypeMeta> {
+                Some(#kube_core::TypeMeta {
+                    api_version: #api_ver.into(),
+                    kind: #kind.into(),
+                })
+            }
         }
     };
 
-    // 3. Implement Default if requested
+    // 3. implement typeinfo trait
+    let impl_typeinfo = quote! {
+        impl #kube_core::TypeInfo for #rootident {
+
+            fn types(&self) -> Option<#kube_core::TypeMeta> {
+                Some(#kube_core::TypeMeta {
+                    api_version: #api_ver.into(),
+                    kind: #kind.into(),
+                })
+            }
+
+            fn types_unchecked(&self) ->  #kube_core::TypeMeta {
+                self.types().unwrap()
+            }
+
+            fn kind(&self) -> Option<String> {
+                Some(#kind.to_string())
+            }
+
+            fn api_version(&self) -> Option<String> {
+                Some(#api_ver.to_string())
+            }
+
+            fn meta(&self) -> &#k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                &self.metadata
+            }
+
+            fn meta_mut(&mut self) -> &mut #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                &mut self.metadata
+            }
+        }
+    };
+
+    // 4. Implement Default if requested
     let impl_default = if has_default {
         quote! {
             impl Default for #rootident {
@@ -340,7 +380,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         quote! {}
     };
 
-    // 4. Implement CustomResource
+    // 5. Implement CustomResource
 
     // Compute a bunch of crd props
     let printers = format!("[ {} ]", printcolums.join(",")); // hacksss
@@ -468,6 +508,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     quote! {
         #root_obj
         #impl_resource
+        #impl_typeinfo
         #impl_default
         #impl_crd
         #impl_hasspec

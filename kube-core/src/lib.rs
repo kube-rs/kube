@@ -28,7 +28,7 @@ pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 
 pub mod metadata;
-pub use metadata::{ListMeta, ObjectMeta, TypeMeta};
+pub use metadata::{ListMeta, ObjectMeta, TypeInfo, TypeMeta};
 
 pub mod object;
 pub use object::{NotUsed, Object, ObjectList};
