@@ -66,7 +66,7 @@ tame-oauth = { version = "0.7.0", features = ["gcp"], optional = true }
 pin-project = { version = "1.0.4", optional = true }
 rand = { version = "0.8.3", optional = true }
 secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
-tracing = { version = "0.1.29", features = ["log"], optional = true }
+tracing = { version = "0.1.36", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
 
 [dependencies.k8s-openapi]
