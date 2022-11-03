@@ -25,7 +25,7 @@ openssl = ["kube/openssl-tls"]
 
 [dependencies]
 anyhow = "1.0.44"
-tracing = "0.1.29"
+tracing = "0.1.36"
 tracing-subscriber = "0.3.3"
 futures = "0.3.17"
 kube = { path = "../kube", version = "^0.76.0", default-features = false, features = ["client", "runtime", "ws", "admission", "gzip"] }
