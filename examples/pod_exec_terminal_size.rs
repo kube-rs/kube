@@ -7,42 +7,33 @@ use kube::{
     },
     Client, runtime::wait::{await_condition, conditions::is_pod_running},
 };
-use tokio::{io::AsyncWriteExt, select};
+use tokio::{io::AsyncWriteExt, select, signal};
 use crossterm::event::{EventStream, Event};
 
 // send the new terminal size to channel when it change
 async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), anyhow::Error> {
-    // get event stream to get resize event
-    let mut reader = EventStream::new();
-
     let (width, height) = crossterm::terminal::size()?;
     channel
         .send(TerminalSize { height, width })
         .await?;
 
+    // create a stream to catch SIGWINCH signal
+    let mut sig = signal::unix::signal(signal::unix::SignalKind::window_change())?;
     loop {
-        // wait for a change
-        let maybe_event = reader.next().await;
-        match maybe_event {
-            Some(Ok(Event::Resize(width, height))) => {
-                channel
-                .send(TerminalSize { height, width })
-                .await?
-            },
-            // we don't care about other events type
-            Some(Ok(_)) => {},
-            Some(Err(err)) => {
-                return Err(err.into());
-            }
-            None => break,
+        if sig.recv().await == None {
+            return Ok(())
         }
+
+        let (width, height) = crossterm::terminal::size()?;
+        channel
+            .send(TerminalSize { height, width })
+            .await?;
     }
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
     let pods: Api<Pod> = Api::default_namespaced(client);
