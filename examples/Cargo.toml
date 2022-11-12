@@ -205,5 +205,5 @@ name = "secret_syncer"
 path = "secret_syncer.rs"
 
 [[example]]
-name = "pod_exec_terminal_size"
-path = "pod_exec_terminal_size.rs"
+name = "pod_shell_crossterm"
+path = "pod_shell_crossterm.rs"
