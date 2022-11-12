@@ -3,10 +3,7 @@ use std::future::Future;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
 use futures::{
-    channel::{
-        mpsc,
-        oneshot,
-    },
+    channel::{mpsc, oneshot},
     FutureExt, SinkExt, StreamExt,
 };
 use serde::{Deserialize, Serialize};

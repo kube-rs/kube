@@ -1,36 +1,43 @@
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
 use k8s_openapi::api::core::v1::Pod;
 
+#[cfg(unix)] use crossterm::event::Event;
 use kube::{
-    api::{
-        Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, TerminalSize,
-    },
-    Client, runtime::wait::{await_condition, conditions::is_pod_running},
+    api::{Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, TerminalSize},
+    runtime::wait::{await_condition, conditions::is_pod_running},
+    Client,
 };
-use tokio::{io::AsyncWriteExt, select, signal};
-use crossterm::event::{EventStream, Event};
+#[cfg(unix)] use tokio::signal;
+use tokio::{io::AsyncWriteExt, select};
 
-// send the new terminal size to channel when it change
+#[cfg(unix)]
+// Send the new terminal size to channel when it change
 async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), anyhow::Error> {
     let (width, height) = crossterm::terminal::size()?;
-    channel
-        .send(TerminalSize { height, width })
-        .await?;
+    channel.send(TerminalSize { height, width }).await?;
 
     // create a stream to catch SIGWINCH signal
     let mut sig = signal::unix::signal(signal::unix::SignalKind::window_change())?;
     loop {
         if sig.recv().await == None {
-            return Ok(())
+            return Ok(());
         }
 
         let (width, height) = crossterm::terminal::size()?;
-        channel
-            .send(TerminalSize { height, width })
-            .await?;
+        channel.send(TerminalSize { height, width }).await?;
     }
+}
+
+#[cfg(windows)]
+// We don't support window for terminal size change, we only send the initial size
+async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), anyhow::Error> {
+    let (width, height) = crossterm::terminal::size()?;
+    channel.send(TerminalSize { height, width }).await?;
+    let mut ctrl_c = tokio::signal::windows::ctrl_c()?;
+    ctrl_c.recv().await;
     Ok(())
 }
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

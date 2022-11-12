@@ -53,7 +53,7 @@ backoff = "0.4.0"
 clap = { version = "4.0", default-features = false, features = ["std", "cargo", "derive"] }
 edit = "0.1.3"
 tokio-stream = { version = "0.1.9", features = ["net"] }
-crossterm = {version = "0.25.0", features = ["event-stream"]}
+crossterm = {version = "0.25.0" }
 
 [[example]]
 name = "configmapgen_controller"
@@ -211,3 +211,4 @@ path = "secret_syncer.rs"
 [[example]]
 name = "pod_shell_crossterm"
 path = "pod_shell_crossterm.rs"
+required-features = ["ws"]
