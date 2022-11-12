@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
     // Write the data to pod
     {
         let mut header = tar::Header::new_gnu();
-        header.set_path(&file_name).unwrap();
+        header.set_path(file_name).unwrap();
         header.set_size(data.len() as u64);
         header.set_cksum();
 

@@ -36,10 +36,8 @@ mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
-#[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
-mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
-#[cfg(feature = "native-tls")] pub use tls::native_tls::Error as NativeTlsError;
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
 #[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
@@ -144,16 +142,13 @@ impl Client {
             .call(request)
             .await
             .map_err(|err| {
-                if err.is::<Error>() {
-                    // Error decorating request
-                    *err.downcast::<Error>().expect("kube_client::Error")
-                } else if err.is::<hyper::Error>() {
+                // Error decorating request
+                err.downcast::<Error>()
+                    .map(|e| *e)
                     // Error requesting
-                    Error::HyperError(*err.downcast::<hyper::Error>().expect("hyper::Error"))
-                } else {
-                    // Errors from other middlewares
-                    Error::Service(err)
-                }
+                    .or_else(|err| err.downcast::<hyper::Error>().map(|err| Error::HyperError(*err)))
+                    // Error from another middleware
+                    .unwrap_or_else(|err| Error::Service(err))
             })?;
         Ok(res)
     }

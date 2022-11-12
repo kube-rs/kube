@@ -13,6 +13,6 @@ See the **[kube-client API Docs](https://docs.rs/kube-client/)**
 
 ## Development
 Help very welcome! To help out on this crate check out these labels:
-- https://github.com/kube-rs/kube-rs/labels/client
-- https://github.com/kube-rs/kube-rs/labels/api
-- https://github.com/kube-rs/kube-rs/labels/config
+- https://github.com/kube-rs/kube/labels/client
+- https://github.com/kube-rs/kube/labels/api
+- https://github.com/kube-rs/kube/labels/config

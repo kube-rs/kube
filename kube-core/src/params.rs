@@ -118,7 +118,7 @@ impl ListParams {
     /// Disables watch bookmarks to simplify watch handling
     ///
     /// This is not recommended to use with production watchers as it can cause desyncs.
-    /// See [#219](https://github.com/kube-rs/kube-rs/issues/219) for details.
+    /// See [#219](https://github.com/kube-rs/kube/issues/219) for details.
     #[must_use]
     pub fn disable_bookmarks(mut self) -> Self {
         self.bookmarks = false;
@@ -183,6 +183,15 @@ pub struct PostParams {
 }
 
 impl PostParams {
+    pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
+        if self.dry_run {
+            qp.append_pair("dryRun", "All");
+        }
+        if let Some(ref fm) = self.field_manager {
+            qp.append_pair("fieldManager", fm);
+        }
+    }
+
     pub(crate) fn validate(&self) -> Result<(), Error> {
         if let Some(field_manager) = &self.field_manager {
             // Implement the easy part of validation, in future this may be extended to provide validation as in go code
@@ -476,6 +485,13 @@ impl DeleteParams {
         self.preconditions = Some(preconditions);
         self
     }
+
+    pub(crate) fn is_default(&self) -> bool {
+        !self.dry_run
+            && self.grace_period_seconds.is_none()
+            && self.propagation_policy.is_none()
+            && self.preconditions.is_none()
+    }
 }
 
 // dryRun serialization differ when used as body parameters and query strings:
@@ -501,7 +517,7 @@ where
 }
 #[cfg(test)]
 mod test {
-    use super::{DeleteParams, PatchParams, ValidationDirective};
+    use super::{DeleteParams, PatchParams};
     #[test]
     fn delete_param_serialize() {
         let mut dp = DeleteParams::default();

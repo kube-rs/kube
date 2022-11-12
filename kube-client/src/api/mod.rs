@@ -254,6 +254,6 @@ mod test {
         let _: Api<corev1::Node> = Api::all(client.clone());
         let _: Api<corev1::Pod> = Api::default_namespaced(client.clone());
         let _: Api<corev1::PersistentVolume> = Api::all(client.clone());
-        let _: Api<corev1::ConfigMap> = Api::namespaced(client.clone(), "default");
+        let _: Api<corev1::ConfigMap> = Api::namespaced(client, "default");
     }
 }
