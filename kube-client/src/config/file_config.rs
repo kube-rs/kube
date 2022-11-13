@@ -6,6 +6,7 @@ use std::{
 
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::serde_as;
 
 use super::{KubeconfigError, LoadDataError};
 
@@ -72,20 +73,24 @@ pub struct NamedExtension {
 }
 
 /// NamedCluster associates name with cluster.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedCluster {
     /// Name of cluster
+    #[serde(default)]
     pub name: String,
     /// Information about how to communicate with a kubernetes cluster
+    #[serde_as(as = "serde_with::DefaultOnNull")]
     pub cluster: Cluster,
 }
 
 /// Cluster stores information to connect Kubernetes cluster.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
+    #[serde(default)]
     pub server: String,
     /// Skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
     #[serde(rename = "insecure-skip-tls-verify")]
@@ -109,13 +114,16 @@ pub struct Cluster {
 }
 
 /// NamedAuthInfo associates name with authentication.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct NamedAuthInfo {
     /// Name of the user
+    #[serde(default)]
     pub name: String,
     /// Information that describes identity of the user
-    #[serde(rename = "user")]
+    #[serde(rename = "user", default)]
+    #[serde_as(as = "serde_with::DefaultOnNull")]
     pub auth_info: AuthInfo,
 }
 
@@ -214,12 +222,16 @@ impl PartialEq for AuthInfo {
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct AuthProviderConfig {
     /// Name of the auth provider
+    #[serde(default)]
     pub name: String,
     /// Auth provider configuration
+    #[serde(default)]
+    #[serde_as(as = "serde_with::DefaultOnNull")]
     pub config: HashMap<String, String>,
 }
 
@@ -252,22 +264,26 @@ pub struct ExecConfig {
 }
 
 /// NamedContext associates name with context.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedContext {
     /// Name of the context
+    #[serde(default)]
     pub name: String,
     /// Associations for the context
+    #[serde(default)]
     pub context: Context,
 }
 
 /// Context stores tuple of cluster and user information.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Context {
     /// Name of the cluster for this context
+    #[serde(default)]
     pub cluster: String,
     /// Name of the `AuthInfo` for this context
+    #[serde(default)]
     pub user: String,
     /// The default namespace to use on unspecified requests
     #[serde(skip_serializing_if = "Option::is_none")]
