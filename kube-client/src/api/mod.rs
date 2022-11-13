@@ -5,7 +5,7 @@ mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 use std::fmt::Debug;
 
-#[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
+#[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
 #[cfg(feature = "ws")] mod portforward;
 #[cfg(feature = "ws")] pub use portforward::Portforwarder;
 
