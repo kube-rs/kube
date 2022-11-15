@@ -1,7 +1,6 @@
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
 use k8s_openapi::api::core::v1::Pod;
 
-#[cfg(unix)] use crossterm::event::Event;
 use kube::{
     api::{Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, TerminalSize},
     runtime::wait::{await_condition, conditions::is_pod_running},
