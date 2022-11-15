@@ -107,7 +107,7 @@ impl ObjectRef {
     }
 
     #[must_use]
-    pub fn with_owner(mut self, owner: &OwnerReference) -> Self {
+    pub fn with_uid(mut self, owner: &OwnerReference) -> Self {
         self.extra.uid = Some(owner.uid.clone());
         self
     }
@@ -160,7 +160,7 @@ impl Display for ObjectRef {
         if let Some(tm) = &self.types {
             write!(f, "{}.{}/{}", tm.kind, tm.api_version, self.name)?;
         } else {
-            write!(f, "{}", self.name)?;
+            write!(f, "unknown/{}", self.name)?;
         }
         if let Some(namespace) = &self.namespace {
             write!(f, ".{namespace}")?;
