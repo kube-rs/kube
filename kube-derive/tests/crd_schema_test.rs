@@ -132,7 +132,7 @@ fn test_serialized_matches_expected() {
             nullable: None,
             nullable_skipped_with_default: None,
             nullable_with_default: None,
-            timestamp: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+            timestamp: DateTime::from_utc(NaiveDateTime::from_timestamp_opt(0, 0).unwrap(), Utc),
             complex_enum: ComplexEnum::VariantOne { int: 23 },
             untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
                 age: 42,
