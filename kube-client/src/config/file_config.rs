@@ -120,7 +120,7 @@ pub struct NamedAuthInfo {
     #[serde(default)]
     pub name: String,
     /// Information that describes identity of the user
-    #[serde(rename = "user", default)]
+    #[serde(rename = "user")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth_info: Option<AuthInfo>,
 }
