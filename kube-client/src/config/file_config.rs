@@ -662,33 +662,6 @@ users:
         );
     }
 
-//     #[test]
-//     fn kubeconfig_deserialize_emptystrings() {
-//         let config_yaml = "apiVersion: v1
-// clusters:
-// - cluster:
-//     certificate-authority: /home/kevin/.minikube/ca.crt
-//     server: d
-//   name: minikube
-// contexts:
-// - context:
-//     cluster: minikube
-//     user: minikube
-//   name: minikube
-// current-context: minikube
-// kind: Config
-// preferences: {}
-// users:
-// - name: minikube
-//   user:
-//     client-certificate: /home/kevin/.minikube/profiles/minikube/client.crt
-//     client-key: /home/kevin/.minikube/profiles/minikube/client.key";
-
-//         let config = Kubeconfig::from_yaml(config_yaml).unwrap();
-
-//         assert_eq!(config.clusters[0].cluster.as_ref().unwrap().server, "");
-//     }
-
     #[test]
     fn kubeconfig_multi_document_merge() -> Result<(), KubeconfigError> {
         let config_yaml = r#"---
