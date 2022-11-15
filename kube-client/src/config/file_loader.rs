@@ -91,8 +91,8 @@ impl ConfigLoader {
 
         Ok(ConfigLoader {
             current_context: current_context.clone(),
-            cluster: cluster.clone(),
-            user: user.clone(),
+            cluster: cluster.clone().unwrap_or_default(),
+            user: user.clone().unwrap_or_default(),
         })
     }
 

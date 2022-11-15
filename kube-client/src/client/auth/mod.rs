@@ -533,7 +533,7 @@ mod test {
         );
 
         let config: Kubeconfig = serde_yaml::from_str(&test_file).unwrap();
-        let auth_info = &config.auth_infos[0].auth_info;
+        let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
         match Auth::try_from(auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
