@@ -78,7 +78,7 @@ impl ConfigLoader {
             .clusters
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
-            .map(|named_cluster| &named_cluster.cluster)
+            .and_then(|named_cluster| named_cluster.cluster.clone())
             .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
         let user_name = user.unwrap_or(&current_context.user);
@@ -86,13 +86,13 @@ impl ConfigLoader {
             .auth_infos
             .iter()
             .find(|named_user| &named_user.name == user_name)
-            .map(|named_user| &named_user.auth_info)
+            .and_then(|named_user| named_user.auth_info.clone())
             .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
 
         Ok(ConfigLoader {
             current_context: current_context.clone(),
-            cluster: cluster.clone().unwrap_or_default(),
-            user: user.clone().unwrap_or_default(),
+            cluster,
+            user,
         })
     }
 
