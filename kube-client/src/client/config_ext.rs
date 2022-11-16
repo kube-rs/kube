@@ -192,6 +192,8 @@ impl ConfigExt for Config {
             .https_or_http();
         if let Some(tsn) = self.tls_server_name.as_ref() {
             b = b.with_server_name(tsn.clone());
+        } else {
+            b = b.with_server_name("kubernetes.default.svc".to_string());
         }
         
         Ok(b.enable_http1().wrap_connector(http))
@@ -215,6 +217,7 @@ impl ConfigExt for Config {
         &self,
         connector: hyper::client::HttpConnector,
     ) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>> {
+        // TODO: pass tls_server_name to hyper-openssl
         let mut https =
             hyper_openssl::HttpsConnector::with_connector(connector, self.openssl_ssl_connector_builder()?)
                 .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateHttpsConnector(e)))?;

@@ -12,8 +12,6 @@ pub struct KubeConfigOptions {
     pub cluster: Option<String>,
     /// The user to load
     pub user: Option<String>,
-    /// Disable rustls-specific override for `tls-server-name`
-    pub disable_rustls_override: bool
 }
 
 /// ConfigLoader loads current context, cluster, and authentication information
@@ -76,13 +74,12 @@ impl ConfigLoader {
             .ok_or_else(|| KubeconfigError::LoadContext(context_name.clone()))?;
 
         let cluster_name = cluster.unwrap_or(&current_context.cluster);
-        let mut cluster = config
+        let cluster = config
             .clusters
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
             .map(|named_cluster| &named_cluster.cluster)
-            .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?
-            .clone();
+            .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
         let user_name = user.unwrap_or(&current_context.user);
         let user = config
@@ -91,11 +88,6 @@ impl ConfigLoader {
             .find(|named_user| &named_user.name == user_name)
             .map(|named_user| &named_user.auth_info)
             .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
-
-        // TODO: docs
-        if cfg!(feature = "rustls-tls") && true && cluster.tls_server_name.is_none() {
-            cluster.tls_server_name = Some("kubernetes.default.svc".to_string());
-        }
 
         Ok(ConfigLoader {
             current_context: current_context.clone(),
