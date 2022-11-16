@@ -103,8 +103,9 @@ pub struct Cluster {
     #[serde(rename = "proxy-url")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxy_url: Option<String>,
-    /// If set, apiserver certificate will be validated to contain this string
-    /// (instead of hostname or IP address from the url).
+    /// Name used to check server certificate.
+    ///
+    /// If `tls_server_name` is `None`, the hostname used to contact the server is used.
     #[serde(rename = "tls-server-name")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tls_server_name: Option<String>,
