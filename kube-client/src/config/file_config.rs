@@ -249,6 +249,22 @@ pub struct ExecConfig {
     /// It has been suggested in client-go via https://github.com/kubernetes/client-go/issues/1177
     #[serde(skip)]
     pub drop_env: Option<Vec<String>>,
+
+    /// Interative mode of the auth plugins
+    #[serde(rename = "interactiveMode")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interactive_mode: Option<ExecInteractiveMode>,
+}
+
+/// ExecInteractiveMode define the interactity of the child process
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum ExecInteractiveMode {
+    /// Never get interactive
+    Never,
+    /// If available et interactive
+    IfAvailable,
+    /// Alwayes get interactive
+    Always,
 }
 
 /// NamedContext associates name with context.

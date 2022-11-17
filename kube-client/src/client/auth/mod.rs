@@ -17,7 +17,7 @@ use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
 use tower::{filter::AsyncPredicate, BoxError};
 
-use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
+use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig, ExecInteractiveMode};
 
 #[cfg(feature = "oauth")] mod oauth;
 #[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
@@ -63,6 +63,10 @@ pub enum Error {
     /// Failed to parse auth exec output
     #[error("failed to parse auth exec output: {0}")]
     AuthExecParse(#[source] serde_json::Error),
+
+    /// Fail to serialize input
+    #[error("fail to serialize input: {0}")]
+    AuthExecSerialize(#[source] serde_json::Error),
 
     /// Failed to exec auth
     #[error("failed exec auth: {0}")]
@@ -440,13 +444,17 @@ pub struct ExecCredential {
     #[serde(rename = "apiVersion")]
     pub api_version: Option<String>,
     pub spec: Option<ExecCredentialSpec>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ExecCredentialStatus>,
 }
 
 /// ExecCredenitalSpec holds request and runtime specific information provided
 /// by transport.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ExecCredentialSpec {}
+pub struct ExecCredentialSpec {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interactive: Option<bool>,
+}
 
 /// ExecCredentialStatus holds credentials for the transport to use.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -474,6 +482,25 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
             });
         cmd.envs(envs);
     }
+
+    let interactive = auth.interactive_mode != Some(ExecInteractiveMode::Never);
+    if interactive {
+        cmd.stdin(std::process::Stdio::inherit());
+    } else {
+        cmd.stdin(std::process::Stdio::piped());
+    }
+
+    // Provide exec info to child process
+    let exec_info = serde_json::to_string(&ExecCredential {
+        api_version: auth.api_version.clone(),
+        kind: None,
+        spec: Some(ExecCredentialSpec {
+            interactive: Some(interactive),
+        }),
+        status: None,
+    })
+    .map_err(Error::AuthExecSerialize)?;
+    cmd.env("KUBERNETES_EXEC_INFO", exec_info);
 
     if let Some(envs) = &auth.drop_env {
         for env in envs {

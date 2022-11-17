@@ -395,8 +395,8 @@ const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
 
 // Expose raw config structs
 pub use file_config::{
-    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedAuthInfo, NamedCluster,
-    NamedContext, NamedExtension, Preferences,
+    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, ExecInteractiveMode, Kubeconfig,
+    NamedAuthInfo, NamedCluster, NamedContext, NamedExtension, Preferences,
 };
 
 #[cfg(test)]
