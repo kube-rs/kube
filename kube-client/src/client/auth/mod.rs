@@ -324,6 +324,9 @@ fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderToken, E
     match provider.name.as_ref() {
         "oidc" => token_from_oidc_provider(provider),
         "gcp" => token_from_gcp_provider(provider),
+        "azure" => Err(Error::AuthExec(
+            "The azure auth plugin is not supported; use https://github.com/Azure/kubelogin instead".into()
+        )),
         _ => Err(Error::AuthExec(format!(
             "Authentication with provider {:} not supported",
             provider.name
