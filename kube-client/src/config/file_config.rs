@@ -258,6 +258,7 @@ pub struct ExecConfig {
 
 /// ExecInteractiveMode define the interactity of the child process
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(test, derive(Eq))]
 pub enum ExecInteractiveMode {
     /// Never get interactive
     Never,
