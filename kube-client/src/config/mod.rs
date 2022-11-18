@@ -299,6 +299,8 @@ impl Config {
         let cluster_url = loader
             .cluster
             .server
+            .clone()
+            .unwrap_or_default()
             .parse::<http::Uri>()
             .map_err(KubeconfigError::ParseClusterUrl)?;
 

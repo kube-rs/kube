@@ -66,7 +66,6 @@ pub struct Preferences {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedExtension {
     /// Name of extension
-    #[serde(default)]
     pub name: String,
     /// Additional information for extenders so that reads and writes don't clobber unknown fields
     pub extension: serde_json::Value,
@@ -77,7 +76,6 @@ pub struct NamedExtension {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedCluster {
     /// Name of cluster
-    #[serde(default)]
     pub name: String,
     /// Information about how to communicate with a kubernetes cluster
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -89,8 +87,8 @@ pub struct NamedCluster {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
-    #[serde(default)]
-    pub server: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
     /// Skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
     #[serde(rename = "insecure-skip-tls-verify")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,7 +115,6 @@ pub struct Cluster {
 #[cfg_attr(test, derive(PartialEq))]
 pub struct NamedAuthInfo {
     /// Name of the user
-    #[serde(default)]
     pub name: String,
     /// Information that describes identity of the user
     #[serde(rename = "user")]
@@ -243,8 +240,8 @@ pub struct ExecConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<String>,
     /// Command to execute.
-    #[serde(default)]
-    pub command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
     /// Arguments to pass to the command when executing it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<String>>,
@@ -266,7 +263,6 @@ pub struct ExecConfig {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedContext {
     /// Name of the context
-    #[serde(default)]
     pub name: String,
     /// Associations for the context
     #[serde(default)]
