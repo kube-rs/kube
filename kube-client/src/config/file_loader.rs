@@ -59,12 +59,11 @@ impl ConfigLoader {
         cluster: Option<&String>,
         user: Option<&String>,
     ) -> Result<Self, KubeconfigError> {
+        let current_context_name = &config.current_context.clone().unwrap_or_default();
         let context_name = if let Some(name) = context {
             name
-        } else if let Some(name) = &config.current_context {
-            name
         } else {
-            return Err(KubeconfigError::CurrentContextNotSet);
+            current_context_name
         };
 
         let current_context = config

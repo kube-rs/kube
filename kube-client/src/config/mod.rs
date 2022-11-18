@@ -29,10 +29,6 @@ pub struct InferConfigError {
 /// Possible errors when loading kubeconfig
 #[derive(Error, Debug)]
 pub enum KubeconfigError {
-    /// Failed to determine current context
-    #[error("failed to determine current context")]
-    CurrentContextNotSet,
-
     /// Kubeconfigs with mismatching kind cannot be merged
     #[error("kubeconfigs with mismatching kind cannot be merged")]
     KindMismatch,
