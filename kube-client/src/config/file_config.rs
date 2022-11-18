@@ -305,7 +305,7 @@ impl Kubeconfig {
         for mut config in kubeconfig_from_yaml(&data)? {
             if let Some(dir) = path.as_ref().parent() {
                 for named in config.clusters.iter_mut() {
-                    if let Some(cluster) =  &mut named.cluster {
+                    if let Some(cluster) = &mut named.cluster {
                         if let Some(path) = &cluster.certificate_authority {
                             if let Some(abs_path) = to_absolute(dir, path) {
                                 cluster.certificate_authority = Some(abs_path);
@@ -314,7 +314,7 @@ impl Kubeconfig {
                     }
                 }
                 for named in config.auth_infos.iter_mut() {
-                    if let Some(auth_info) =  &mut named.auth_info {
+                    if let Some(auth_info) = &mut named.auth_info {
                         if let Some(path) = &auth_info.client_certificate {
                             if let Some(abs_path) = to_absolute(dir, path) {
                                 auth_info.client_certificate = Some(abs_path);
@@ -654,10 +654,10 @@ users:
 
         assert_eq!(config.clusters[0].name.as_ref().unwrap(), "eks");
         assert_eq!(config.clusters[1].name.as_ref().unwrap(), "minikube");
+
+        let cluster1 = config.clusters[1].cluster.as_ref().unwrap();
         assert_eq!(
-            config.clusters[1].cluster.as_ref().unwrap().extensions.as_ref().unwrap()[0]
-                .extension
-                .get("provider"),
+            cluster1.extensions.as_ref().unwrap()[0].extension.get("provider"),
             Some(&Value::String("minikube.sigs.k8s.io".to_owned()))
         );
     }
