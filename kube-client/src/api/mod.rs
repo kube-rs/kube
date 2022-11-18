@@ -5,7 +5,7 @@ mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 use std::fmt::Debug;
 
-#[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
+#[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
 #[cfg(feature = "ws")] mod portforward;
 #[cfg(feature = "ws")] pub use portforward::Portforwarder;
 
@@ -254,6 +254,6 @@ mod test {
         let _: Api<corev1::Node> = Api::all(client.clone());
         let _: Api<corev1::Pod> = Api::default_namespaced(client.clone());
         let _: Api<corev1::PersistentVolume> = Api::all(client.clone());
-        let _: Api<corev1::ConfigMap> = Api::namespaced(client.clone(), "default");
+        let _: Api<corev1::ConfigMap> = Api::namespaced(client, "default");
     }
 }

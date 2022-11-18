@@ -179,14 +179,15 @@ impl Config {
         }
     }
 
-    /// Infer the configuration from the environment
+    /// Infer a Kubernetes client configuration.
     ///
-    /// Done by attempting to load the local kubec-config first, and
-    /// then if that fails, trying the in-cluster environment variables .
+    /// First, a user's kubeconfig is loaded from `KUBECONFIG` or
+    /// `~/.kube/config`. If that fails, an in-cluster config is loaded via
+    /// [`Config::incluster`]. If inference from both sources fails, then an
+    /// error is returned.
     ///
-    /// Fails if inference from both sources fails
-    ///
-    /// Applies debug overrides, see [`Config::apply_debug_overrides`] for more details
+    /// [`Config::apply_debug_overrides`] is used to augment the loaded
+    /// configuration based on the environment.
     pub async fn infer() -> Result<Self, InferConfigError> {
         let mut config = match Self::from_kubeconfig(&KubeConfigOptions::default()).await {
             Err(kubeconfig_err) => {
@@ -195,8 +196,8 @@ impl Config {
                     "no local config found, falling back to local in-cluster config"
                 );
 
-                Self::from_cluster_env().map_err(|in_cluster_err| InferConfigError {
-                    in_cluster: in_cluster_err,
+                Self::incluster().map_err(|in_cluster| InferConfigError {
+                    in_cluster,
                     kubeconfig: kubeconfig_err,
                 })?
             }
@@ -206,13 +207,52 @@ impl Config {
         Ok(config)
     }
 
-    /// Create configuration from the cluster's environment variables
+    /// Load an in-cluster Kubernetes client configuration using
+    /// [`Config::incluster_env`].
+    #[cfg(not(feature = "rustls-tls"))]
+    pub fn incluster() -> Result<Self, InClusterError> {
+        Self::incluster_env()
+    }
+
+    /// Load an in-cluster Kubernetes client configuration using
+    /// [`Config::incluster_dns`].
     ///
-    /// This follows the standard [API Access from a Pod](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod)
-    /// and relies on you having the service account's token mounted,
-    /// as well as having given the service account rbac access to do what you need.
-    pub fn from_cluster_env() -> Result<Self, InClusterError> {
-        let cluster_url = incluster_config::kube_dns();
+    /// The `rustls-tls` feature is currently incompatible with
+    /// [`Config::incluster_env`]. See
+    /// <https://github.com/kube-rs/kube/issues/1003>.
+    #[cfg(feature = "rustls-tls")]
+    pub fn incluster() -> Result<Self, InClusterError> {
+        Self::incluster_dns()
+    }
+
+    /// Load an in-cluster config using the `KUBERNETES_SERVICE_HOST` and
+    /// `KUBERNETES_SERVICE_PORT` environment variables.
+    ///
+    /// A service account's token must be available in
+    /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
+    ///
+    /// This method matches the behavior of the official Kubernetes client
+    /// libraries, but it is not compatible with the `rustls-tls` feature . When
+    /// this feature is enabled, [`Config::incluster_dns`] should be used
+    /// instead. See <https://github.com/kube-rs/kube/issues/1003>.
+    pub fn incluster_env() -> Result<Self, InClusterError> {
+        let uri = incluster_config::try_kube_from_env()?;
+        Self::incluster_with_uri(uri)
+    }
+
+    /// Load an in-cluster config using the API server at
+    /// `https://kubernetes.default.svc`.
+    ///
+    /// A service account's token must be available in
+    /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
+    ///
+    /// This behavior does not match that of the official Kubernetes clients,
+    /// but this approach is compatible with the `rustls-tls` feature.
+    pub fn incluster_dns() -> Result<Self, InClusterError> {
+        Self::incluster_with_uri(incluster_config::kube_dns())
+    }
+
+    fn incluster_with_uri(cluster_url: http::uri::Uri) -> Result<Self, InClusterError> {
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
 
@@ -268,13 +308,10 @@ impl Config {
             .clone()
             .unwrap_or_else(|| String::from("default"));
 
-        let mut accept_invalid_certs = loader.cluster.insecure_skip_tls_verify.unwrap_or(false);
+        let accept_invalid_certs = loader.cluster.insecure_skip_tls_verify.unwrap_or(false);
         let mut root_cert = None;
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
-            for ca in &ca_bundle {
-                accept_invalid_certs = hacky_cert_lifetime_for_macos(ca);
-            }
             root_cert = Some(ca_bundle);
         }
 
@@ -350,34 +387,17 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
         .collect::<Vec<_>>())
 }
 
-// https://github.com/kube-rs/kube-rs/issues/146#issuecomment-590924397
+// https://github.com/kube-rs/kube/issues/146#issuecomment-590924397
 /// Default Timeout
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
-
-// temporary catalina hack for openssl only
-#[cfg(all(target_os = "macos", feature = "native-tls"))]
-fn hacky_cert_lifetime_for_macos(ca: &[u8]) -> bool {
-    use openssl::x509::X509;
-    let ca = X509::from_der(ca).expect("valid der is a der");
-    ca.not_before()
-        .diff(ca.not_after())
-        .map(|d| d.days.abs() > 824)
-        .unwrap_or(false)
-}
-
-#[cfg(any(not(target_os = "macos"), not(feature = "native-tls")))]
-fn hacky_cert_lifetime_for_macos(_: &[u8]) -> bool {
-    false
-}
 
 // Expose raw config structs
 pub use file_config::{
     AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedAuthInfo, NamedCluster,
     NamedContext, NamedExtension, Preferences,
 };
-
 
 #[cfg(test)]
 mod tests {

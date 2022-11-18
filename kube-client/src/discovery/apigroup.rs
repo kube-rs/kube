@@ -6,8 +6,7 @@ use kube_core::{
     gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
     Version,
 };
-use std::cmp::Reverse;
-
+use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 
 /// Describes one API groups collected resources and capabilities.
 ///
@@ -244,6 +243,46 @@ impl ApiGroup {
         self.versioned_resources(ver)
     }
 
+    ///  Returns all resources in the group at their the most stable respective version
+    ///
+    /// ```no_run
+    /// use kube::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let client = Client::try_default().await?;
+    ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
+    ///     for (ar, caps) in apigroup.resources_by_stability() {
+    ///         if !caps.supports_operation(verbs::LIST) {
+    ///             continue;
+    ///         }
+    ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+    ///         for inst in api.list(&Default::default()).await? {
+    ///             println!("Found {}: {}", ar.kind, inst.name());
+    ///         }
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    /// See an example in [examples/kubectl.rs](https://github.com/kube-rs/kube/blob/main/examples/kubectl.rs)
+    pub fn resources_by_stability(&self) -> Vec<(ApiResource, ApiCapabilities)> {
+        let mut lookup = HashMap::new();
+        self.data.iter().for_each(|gvd| {
+            gvd.resources.iter().for_each(|resource| {
+                lookup
+                    .entry(resource.0.kind.clone())
+                    .or_insert_with(Vec::new)
+                    .push(resource);
+            })
+        });
+        lookup
+            .into_values()
+            .map(|mut v| {
+                v.sort_by_cached_key(|(ar, _)| Reverse(Version::parse(ar.version.as_str()).priority()));
+                v[0].to_owned()
+            })
+            .collect()
+    }
+
     /// Returns the recommended version of the `kind` in the recommended resources (if found)
     ///
     /// ```no_run
@@ -270,5 +309,76 @@ impl ApiGroup {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resources_by_stability() {
+        let ac = ApiCapabilities {
+            scope: Scope::Namespaced,
+            subresources: vec![],
+            operations: vec![],
+        };
+
+        let testlowversioncr_v1alpha1 = ApiResource {
+            group: String::from("kube.rs"),
+            version: String::from("v1alpha1"),
+            kind: String::from("TestLowVersionCr"),
+            api_version: String::from("kube.rs/v1alpha1"),
+            plural: String::from("testlowversioncrs"),
+        };
+
+        let testcr_v1 = ApiResource {
+            group: String::from("kube.rs"),
+            version: String::from("v1"),
+            kind: String::from("TestCr"),
+            api_version: String::from("kube.rs/v1"),
+            plural: String::from("testcrs"),
+        };
+
+        let testcr_v2alpha1 = ApiResource {
+            group: String::from("kube.rs"),
+            version: String::from("v2alpha1"),
+            kind: String::from("TestCr"),
+            api_version: String::from("kube.rs/v2alpha1"),
+            plural: String::from("testcrs"),
+        };
+
+        let group = ApiGroup {
+            name: "kube.rs".to_string(),
+            data: vec![
+                GroupVersionData {
+                    version: "v1alpha1".to_string(),
+                    resources: vec![(testlowversioncr_v1alpha1, ac.clone())],
+                },
+                GroupVersionData {
+                    version: "v1".to_string(),
+                    resources: vec![(testcr_v1, ac.clone())],
+                },
+                GroupVersionData {
+                    version: "v2alpha1".to_string(),
+                    resources: vec![(testcr_v2alpha1, ac)],
+                },
+            ],
+            preferred: Some(String::from("v1")),
+        };
+
+        let resources = group.resources_by_stability();
+        assert!(
+            resources
+                .iter()
+                .any(|(ar, _)| ar.kind == "TestCr" && ar.version == "v1"),
+            "wrong stable version"
+        );
+        assert!(
+            resources
+                .iter()
+                .any(|(ar, _)| ar.kind == "TestLowVersionCr" && ar.version == "v1alpha1"),
+            "lost low version resource"
+        );
     }
 }

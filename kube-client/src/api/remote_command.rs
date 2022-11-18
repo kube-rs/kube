@@ -3,21 +3,37 @@ use std::future::Future;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
 use futures::{
-    channel::oneshot,
-    future::{
-        select,
-        Either::{Left, Right},
-    },
+    channel::{mpsc, oneshot},
     FutureExt, SinkExt, StreamExt,
 };
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
-use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
+use tokio::{
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream},
+    select,
+};
+use tokio_tungstenite::{
+    tungstenite::{self as ws},
+    WebSocketStream,
+};
 
 use super::AttachParams;
 
 type StatusReceiver = oneshot::Receiver<Status>;
 type StatusSender = oneshot::Sender<Status>;
+
+type TerminalSizeReceiver = mpsc::Receiver<TerminalSize>;
+type TerminalSizeSender = mpsc::Sender<TerminalSize>;
+
+/// TerminalSize define the size of a terminal
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+pub struct TerminalSize {
+    /// width of the terminal
+    pub width: u16,
+    /// height of the terminal
+    pub height: u16,
+}
 
 /// Errors from attaching to a pod.
 #[derive(Debug, Error)]
@@ -57,6 +73,18 @@ pub enum Error {
     /// Failed to send status object
     #[error("failed to send status object")]
     SendStatus,
+
+    /// Fail to serialize Terminalsize object
+    #[error("failed to serialize TerminalSize object: {0}")]
+    SerializeTerminalSize(#[source] serde_json::Error),
+
+    /// Fail to send terminal size message
+    #[error("failed to send terminal size message")]
+    SendTerminalSize(#[source] ws::Error),
+
+    /// Failed to set terminal size, tty need to be true to resize the terminal
+    #[error("failed to set terminal size, tty need to be true to resize the terminal")]
+    TtyNeedToBeTrue,
 }
 
 const MAX_BUF_SIZE: usize = 1024;
@@ -78,6 +106,7 @@ pub struct AttachedProcess {
     stdout_reader: Option<DuplexStream>,
     stderr_reader: Option<DuplexStream>,
     status_rx: Option<StatusReceiver>,
+    terminal_resize_tx: Option<TerminalSizeSender>,
     task: tokio::task::JoinHandle<Result<(), Error>>,
 }
 
@@ -102,6 +131,12 @@ impl AttachedProcess {
             (None, None)
         };
         let (status_tx, status_rx) = oneshot::channel();
+        let (terminal_resize_tx, terminal_resize_rx) = if ap.tty {
+            let (w, r) = mpsc::channel(10);
+            (Some(w), Some(r))
+        } else {
+            (None, None)
+        };
 
         let task = tokio::spawn(start_message_loop(
             stream,
@@ -109,6 +144,7 @@ impl AttachedProcess {
             stdout_writer,
             stderr_writer,
             status_tx,
+            terminal_resize_rx,
         ));
 
         AttachedProcess {
@@ -119,6 +155,7 @@ impl AttachedProcess {
             stdin_writer: Some(stdin_writer),
             stdout_reader,
             stderr_reader,
+            terminal_resize_tx,
             status_rx: Some(status_rx),
         }
     }
@@ -179,14 +216,29 @@ impl AttachedProcess {
     pub fn take_status(&mut self) -> Option<impl Future<Output = Option<Status>>> {
         self.status_rx.take().map(|recv| recv.map(|res| res.ok()))
     }
+
+    /// Async writer to change the terminal size
+    /// ```ignore
+    /// let mut terminal_size_writer = attached.terminal_size().unwrap();
+    /// terminal_size_writer.send(TerminalSize{
+    ///     height: 100,
+    ///     width: 200,
+    /// }).await?;
+    /// ```
+    /// Only available if [`AttachParams`](super::AttachParams) had `tty`.
+    pub fn terminal_size(&mut self) -> Option<TerminalSizeSender> {
+        self.terminal_resize_tx.take()
+    }
 }
 
+// theses values come from here: https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/cri/streaming/remotecommand/websocket.go#L34
 const STDIN_CHANNEL: u8 = 0;
 const STDOUT_CHANNEL: u8 = 1;
 const STDERR_CHANNEL: u8 = 2;
 // status channel receives `Status` object on exit.
 const STATUS_CHANNEL: u8 = 3;
-// const RESIZE_CHANNEL: u8 = 4;
+// resize channel is use to send TerminalSize object to change the size of the terminal
+const RESIZE_CHANNEL: u8 = 4;
 
 async fn start_message_loop<S>(
     stream: WebSocketStream<S>,
@@ -194,6 +246,7 @@ async fn start_message_loop<S>(
     mut stdout: Option<impl AsyncWrite + Unpin>,
     mut stderr: Option<impl AsyncWrite + Unpin>,
     status_tx: StatusSender,
+    mut terminal_size_rx: Option<TerminalSizeReceiver>,
 ) -> Result<(), Error>
 where
     S: AsyncRead + AsyncWrite + Unpin + Sized + Send + 'static,
@@ -202,71 +255,80 @@ where
     let (mut server_send, raw_server_recv) = stream.split();
     // Work with filtered messages to reduce noise.
     let mut server_recv = raw_server_recv.filter_map(filter_message).boxed();
-    let mut server_msg = server_recv.next();
-    let mut next_stdin = stdin_stream.next();
+    let have_terminal_size_rx = terminal_size_rx.is_some();
 
     loop {
-        match select(server_msg, next_stdin).await {
-            // from server
-            Left((Some(message), p_next_stdin)) => {
-                match message {
-                    Ok(Message::Stdout(bin)) => {
+        let terminal_size_next = async {
+            match terminal_size_rx.as_mut() {
+                Some(tmp) => Some(tmp.next().await),
+                None => None,
+            }
+        };
+        select! {
+            server_message = server_recv.next() => {
+                match server_message {
+                    Some(Ok(Message::Stdout(bin))) => {
                         if let Some(stdout) = stdout.as_mut() {
                             stdout.write_all(&bin[1..]).await.map_err(Error::WriteStdout)?;
                         }
-                    }
-
-                    Ok(Message::Stderr(bin)) => {
+                    },
+                    Some(Ok(Message::Stderr(bin))) => {
                         if let Some(stderr) = stderr.as_mut() {
                             stderr.write_all(&bin[1..]).await.map_err(Error::WriteStderr)?;
                         }
-                    }
-
-                    Ok(Message::Status(bin)) => {
-                        let status =
-                            serde_json::from_slice::<Status>(&bin[1..]).map_err(Error::DeserializeStatus)?;
+                    },
+                    Some(Ok(Message::Status(bin))) => {
+                        let status = serde_json::from_slice::<Status>(&bin[1..]).map_err(Error::DeserializeStatus)?;
                         status_tx.send(status).map_err(|_| Error::SendStatus)?;
+                        break
+                    },
+                    Some(Err(err)) => {
+                        return Err(Error::ReceiveWebSocketMessage(err));
+                    },
+                    None => {
+                        // Connection closed properly
+                        break
+                    },
+                }
+            },
+            stdin_message = stdin_stream.next() => {
+                match stdin_message {
+                    Some(Ok(bytes)) => {
+                        if !bytes.is_empty() {
+                            let mut vec = Vec::with_capacity(bytes.len() + 1);
+                            vec.push(STDIN_CHANNEL);
+                            vec.extend_from_slice(&bytes[..]);
+                            server_send
+                                .send(ws::Message::binary(vec))
+                                .await
+                                .map_err(Error::SendStdin)?;
+                        }
+                    },
+                    Some(Err(err)) => {
+                        return Err(Error::ReadStdin(err));
+                    }
+                    None => {
+                        // Stdin closed (writer half dropped).
+                        // Let the server know and disconnect.
+                        server_send.close().await.map_err(Error::SendClose)?;
                         break;
                     }
-
-                    Err(err) => {
-                        return Err(Error::ReceiveWebSocketMessage(err));
+                }
+            },
+            Some(terminal_size_message) = terminal_size_next, if have_terminal_size_rx => {
+                match terminal_size_message {
+                    Some(new_size) => {
+                        let new_size = serde_json::to_vec(&new_size).map_err(Error::SerializeTerminalSize)?;
+                        let mut vec = Vec::with_capacity(new_size.len() + 1);
+                        vec.push(RESIZE_CHANNEL);
+                        vec.extend_from_slice(&new_size[..]);
+                        server_send.send(ws::Message::Binary(vec)).await.map_err(Error::SendTerminalSize)?;
+                    },
+                    None => {
+                        break
                     }
                 }
-                server_msg = server_recv.next();
-                next_stdin = p_next_stdin;
-            }
-
-            Left((None, _)) => {
-                // Connection closed properly
-                break;
-            }
-
-            // from stdin
-            Right((Some(Ok(bytes)), p_server_msg)) => {
-                if !bytes.is_empty() {
-                    let mut vec = Vec::with_capacity(bytes.len() + 1);
-                    vec.push(STDIN_CHANNEL);
-                    vec.extend_from_slice(&bytes[..]);
-                    server_send
-                        .send(ws::Message::binary(vec))
-                        .await
-                        .map_err(Error::SendStdin)?;
-                }
-                server_msg = p_server_msg;
-                next_stdin = stdin_stream.next();
-            }
-
-            Right((Some(Err(err)), _)) => {
-                return Err(Error::ReadStdin(err));
-            }
-
-            Right((None, _)) => {
-                // Stdin closed (writer half dropped).
-                // Let the server know and disconnect.
-                server_send.close().await.map_err(Error::SendClose)?;
-                break;
-            }
+            },
         }
     }
 

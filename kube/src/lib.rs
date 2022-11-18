@@ -14,7 +14,7 @@
 //! - [`runtime`](crate::runtime) with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
 //! - [`core`](crate::core) with generics from `apimachinery`
 //!
-//! You can use each of these as you need with the help of the [exported features](https://github.com/kube-rs/kube-rs/blob/master/kube/Cargo.toml#L18).
+//! You can use each of these as you need with the help of the [exported features](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
 //!
 //! # Using the Client
 //! ```no_run
@@ -103,7 +103,7 @@
 //! - [`runtime`](crate::runtime) for abstractions that help with more complicated Kubernetes application
 //!
 //! # Examples
-//! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube-rs/tree/master/examples).
+//! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube/tree/main/examples).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
@@ -243,7 +243,6 @@ mod test {
             .await?;
         let establish = await_condition(crds.clone(), "foos.clux.dev", conditions::is_crd_established());
         let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
-
         // Use it
         let foos: Api<Foo> = Api::default_namespaced(client.clone());
         // Apply from generated struct
@@ -270,12 +269,14 @@ mod test {
                 }
             });
             let o = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
-            assert_eq!(o.spec.replicas, 2);
+            assert_eq!(o.spec.replicas, 2, "patching spec updated spec.replicas");
         }
         // check subresource
         {
-            assert_eq!(foos.get_scale("baz").await?.spec.unwrap().replicas, Some(2));
-            assert!(foos.get_status("baz").await?.status.is_none()); // nothing has set this
+            let scale = foos.get_scale("baz").await?;
+            assert_eq!(scale.spec.unwrap().replicas, Some(2));
+            let status = foos.get_status("baz").await?;
+            assert!(status.status.is_none(), "nothing has set status");
         }
         // set status subresource
         {
@@ -283,7 +284,7 @@ mod test {
             let o = foos
                 .patch_status("baz", &Default::default(), &Patch::Merge(&fs))
                 .await?;
-            assert!(o.status.is_some());
+            assert!(o.status.is_some(), "status set after patch_status");
         }
         // set scale subresource
         {
@@ -291,8 +292,9 @@ mod test {
             let o = foos
                 .patch_scale("baz", &Default::default(), &Patch::Merge(&fs))
                 .await?;
-            assert_eq!(o.status.unwrap().replicas, 1); // something needs to set the status for this
-            assert_eq!(o.spec.unwrap().replicas.unwrap(), 3); // what we asked for got updated
+            assert_eq!(o.status.unwrap().replicas, 1, "scale replicas got patched");
+            let linked_replicas = o.spec.unwrap().replicas.unwrap();
+            assert_eq!(linked_replicas, 3, "patch_scale updates linked spec.replicas");
         }
 
         // cleanup
@@ -465,7 +467,10 @@ mod test {
         }))?;
 
         let pp = PostParams::default();
-        assert_eq!(data.name(), pods.create(&pp, &data).await?.name());
+        assert_eq!(
+            data.name_unchecked(),
+            pods.create(&pp, &data).await?.name_unchecked()
+        );
 
         // Watch it phase for a few seconds
         let is_running = await_condition(pods.clone(), "busybox-kube4", conditions::is_pod_running());

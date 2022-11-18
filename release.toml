@@ -4,7 +4,7 @@
 #
 # 0. (optional) cargo release minor ; verify readme + changelog bumped; then git reset --hard
 # 1. PUBLISH_GRACE_SLEEP=20 cargo release minor --execute
-# 1X.  - on failure: follow plan manually, cd into next dirs and publish insequence with cargo publish --features=k8s-openapi/v1_24
+# 1X.  - on failure: follow plan manually, cd into next dirs and publish insequence with cargo publish --features=k8s-openapi/v1_25
 # 2. check consolidated commit
 # 2X.  - on failure: git commit --amend and insert version
 # 3. ./scripts/release-post.sh
@@ -21,4 +21,4 @@ push = false
 tag = false
 # A Kubernetes version is normally supplied by the application consuming the library in the end.
 # Since we don't have that when verifying, supply one ourselves.
-enable-features = ["k8s-openapi/v1_24"]
+enable-features = ["k8s-openapi/v1_25"]

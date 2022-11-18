@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Our spec for Foo
 ///
 /// A struct with our chosen Kind will be created for us, using the following kube attrs
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
 #[kube(
     group = "clux.dev",
     version = "v1",

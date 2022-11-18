@@ -6,7 +6,7 @@ Add the `derive` feature to `kube`:
 
 ```toml
 [dependencies]
-kube = { version = "0.74.0", feature = ["derive"] }
+kube = { version = "0.76.0", feature = ["derive"] }
 ```
 
 ## Usage
@@ -16,4 +16,4 @@ See the **[kube-derive API Docs](https://docs.rs/kube-derive/)**
 See the `crd_` prefixed [examples](../examples) for more.
 
 ## Development
-Help very welcome! Kubebuilder like features, testing improvement, openapi feature. See https://github.com/kube-rs/kube-rs/labels/derive
+Help very welcome! Kubebuilder like features, testing improvement, openapi feature. See https://github.com/kube-rs/kube/labels/derive

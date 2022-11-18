@@ -115,9 +115,7 @@ impl Request {
         pp.validate()?;
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
@@ -148,9 +146,15 @@ impl Request {
             qp.append_pair("labelSelector", labels);
         }
         let urlstr = qp.finish();
-        let body = serde_json::to_vec(&dp).map_err(Error::SerializeBody)?;
+
+        let data = if dp.is_default() {
+            vec![] // default serialize needs to be empty body
+        } else {
+            serde_json::to_vec(&dp).map_err(Error::SerializeBody)?
+        };
+
         let req = http::Request::delete(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
-        req.body(body).map_err(Error::BuildRequest)
+        req.body(data).map_err(Error::BuildRequest)
     }
 
     /// Patch an instance of a resource
@@ -186,9 +190,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
@@ -208,6 +210,22 @@ impl Request {
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::BuildRequest)
+    }
+
+    /// Create an instance of the subresource
+    pub fn create_subresource(
+        &self,
+        subresource_name: &str,
+        name: &str,
+        pp: &PostParams,
+        data: Vec<u8>,
+    ) -> Result<http::Request<Vec<u8>>, Error> {
+        let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
+        let mut qp = form_urlencoded::Serializer::new(target);
+        pp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        let req = http::Request::post(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
+        req.body(data).map_err(Error::BuildRequest)
     }
 
     /// Patch an instance of the subresource
@@ -241,9 +259,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
-        if pp.dry_run {
-            qp.append_pair("dryRun", "All");
-        }
+        pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::put(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
         req.body(data).map_err(Error::BuildRequest)
@@ -258,11 +274,10 @@ mod test {
     use crate::{params::PostParams, request::Request, resource::Resource};
     use k8s::{
         admissionregistration::v1 as adregv1, apps::v1 as appsv1, authorization::v1 as authv1,
-        autoscaling::v1 as autoscalingv1, batch::v1beta1 as batchv1beta1, core::v1 as corev1,
+        autoscaling::v1 as autoscalingv1, batch::v1 as batchv1, core::v1 as corev1,
         networking::v1 as networkingv1, rbac::v1 as rbacv1, storage::v1 as storagev1,
     };
     use k8s_openapi::api as k8s;
-    // use k8s::batch::v1 as batchv1;
 
     // NB: stable requires >= 1.17
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiextsv1;
@@ -297,9 +312,9 @@ mod test {
 
     #[test]
     fn api_url_cj() {
-        let url = batchv1beta1::CronJob::url_path(&(), Some("ns"));
+        let url = batchv1::CronJob::url_path(&(), Some("ns"));
         let req = Request::new(url).create(&PostParams::default(), vec![]).unwrap();
-        assert_eq!(req.uri(), "/apis/batch/v1beta1/namespaces/ns/cronjobs?");
+        assert_eq!(req.uri(), "/apis/batch/v1/namespaces/ns/cronjobs?");
     }
     #[test]
     fn api_url_hpa() {
@@ -527,6 +542,17 @@ mod test {
             .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/scale?");
         assert_eq!(req.method(), "PUT");
+    }
+
+    #[test]
+    fn create_subresource_path() {
+        let url = corev1::ServiceAccount::url_path(&(), Some("ns"));
+        let pp = PostParams::default();
+        let data = vec![];
+        let req = Request::new(url)
+            .create_subresource("token", "sa", &pp, data)
+            .unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/serviceaccounts/sa/token");
     }
 
     // TODO: reinstate if we get scoping in trait

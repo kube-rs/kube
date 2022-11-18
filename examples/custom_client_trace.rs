@@ -42,9 +42,9 @@ async fn main() -> anyhow::Result<()> {
                 })
                 .on_response(|response: &Response<Body>, latency: Duration, span: &Span| {
                     let status = response.status();
-                    span.record("http.status_code", &status.as_u16());
+                    span.record("http.status_code", status.as_u16());
                     if status.is_client_error() || status.is_server_error() {
-                        span.record("otel.status_code", &"ERROR");
+                        span.record("otel.status_code", "ERROR");
                     }
                     tracing::debug!("finished in {}ms", latency.as_millis())
                 }),

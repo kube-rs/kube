@@ -8,7 +8,7 @@ main() {
     exit 1
   fi
   local -r RELNAME="$1"
-  local -r RELEASE="$(curl -sSL -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/kube-rs/kube-rs/releases/tags/${RELNAME}")"
+  local -r RELEASE="$(curl -sSL -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/kube-rs/kube/releases/tags/${RELNAME}")"
   local -r RELREG="$(echo "${RELNAME}" | sd -s "." "\.")"
   local -r HURL="$(echo "${RELEASE}" | jq '.html_url' -r)"
   # Skipping New Contributors highight from CHANGELOG + across repos for brevity and to avoid pinging them excessively

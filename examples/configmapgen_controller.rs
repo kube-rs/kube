@@ -1,3 +1,6 @@
+// Nightly clippy (0.1.64) considers Drop a side effect, see https://github.com/rust-lang/rust-clippy/issues/9608
+#![allow(clippy::unnecessary_lazy_evaluations)]
+
 use anyhow::Result;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
@@ -50,14 +53,14 @@ async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Arc<Data>) -> Result
             .metadata
             .namespace
             .as_ref()
-            .ok_or(Error::MissingObjectKey(".metadata.namespace"))?,
+            .ok_or_else(|| Error::MissingObjectKey(".metadata.namespace"))?,
     );
     cm_api
         .patch(
             cm.metadata
                 .name
                 .as_ref()
-                .ok_or(Error::MissingObjectKey(".metadata.name"))?,
+                .ok_or_else(|| Error::MissingObjectKey(".metadata.name"))?,
             &PatchParams::apply("configmapgenerator.kube-rt.nullable.se"),
             &Patch::Apply(&cm),
         )
@@ -67,7 +70,7 @@ async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Arc<Data>) -> Result
 }
 
 /// The controller triggers this on reconcile errors
-fn error_policy(_error: &Error, _ctx: Arc<Data>) -> Action {
+fn error_policy(_object: Arc<ConfigMapGenerator>, _error: &Error, _ctx: Arc<Data>) -> Action {
     Action::requeue(Duration::from_secs(1))
 }
 

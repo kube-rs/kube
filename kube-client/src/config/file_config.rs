@@ -51,7 +51,7 @@ pub struct Kubeconfig {
 
 /// Preferences stores extensions for cli.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Preferences {
     /// Enable colors
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,7 +63,7 @@ pub struct Preferences {
 
 /// NamedExtention associates name with extension.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedExtension {
     /// Name of extension
     pub name: String,
@@ -73,7 +73,7 @@ pub struct NamedExtension {
 
 /// NamedCluster associates name with cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedCluster {
     /// Name of cluster
     pub name: String,
@@ -83,7 +83,7 @@ pub struct NamedCluster {
 
 /// Cluster stores information to connect Kubernetes cluster.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
     pub server: String,
@@ -209,13 +209,13 @@ pub struct AuthInfo {
 #[cfg(test)]
 impl PartialEq for AuthInfo {
     fn eq(&self, other: &Self) -> bool {
-        serde_json::to_value(&self).unwrap() == serde_json::to_value(&other).unwrap()
+        serde_json::to_value(self).unwrap() == serde_json::to_value(other).unwrap()
     }
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct AuthProviderConfig {
     /// Name of the auth provider
     pub name: String,
@@ -225,7 +225,7 @@ pub struct AuthProviderConfig {
 
 /// ExecConfig stores credential-plugin configuration.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct ExecConfig {
     /// Preferred input version of the ExecInfo.
     ///
@@ -243,11 +243,17 @@ pub struct ExecConfig {
     /// TODO: These are unioned with the host's environment, as well as variables client-go uses to pass argument to the plugin.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env: Option<Vec<HashMap<String, String>>>,
+    /// Specifies which environment variables the host should avoid passing to the auth plugin.
+    ///
+    /// This does currently not exist upstream and cannot be specified on disk.
+    /// It has been suggested in client-go via https://github.com/kubernetes/client-go/issues/1177
+    #[serde(skip)]
+    pub drop_env: Option<Vec<String>>,
 }
 
 /// NamedContext associates name with context.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedContext {
     /// Name of the context
     pub name: String,
@@ -257,7 +263,7 @@ pub struct NamedContext {
 
 /// Context stores tuple of cluster and user information.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Context {
     /// Name of the cluster for this context
     pub cluster: String,
@@ -480,16 +486,16 @@ fn load_from_base64_or_file<P: AsRef<Path>>(
     let data = value
         .map(load_from_base64)
         .or_else(|| file.as_ref().map(load_from_file))
-        .unwrap_or(Err(LoadDataError::NoBase64DataOrFile))?;
+        .unwrap_or_else(|| Err(LoadDataError::NoBase64DataOrFile))?;
     Ok(ensure_trailing_newline(data))
 }
 
 fn load_from_base64(value: &str) -> Result<Vec<u8>, LoadDataError> {
-    base64::decode(&value).map_err(LoadDataError::DecodeBase64)
+    base64::decode(value).map_err(LoadDataError::DecodeBase64)
 }
 
 fn load_from_file<P: AsRef<Path>>(file: &P) -> Result<Vec<u8>, LoadDataError> {
-    fs::read(&file).map_err(|source| LoadDataError::ReadFile(source, file.as_ref().into()))
+    fs::read(file).map_err(|source| LoadDataError::ReadFile(source, file.as_ref().into()))
 }
 
 // Ensure there is a trailing newline in the blob

@@ -12,8 +12,6 @@ pub use predicate::{predicates, PredicateFilter};
 pub use stream_backoff::StreamBackoff;
 pub use watch_ext::WatchStreamExt;
 
-
-use crate::watcher;
 use futures::{
     pin_mut,
     stream::{self, Peekable},
@@ -29,31 +27,6 @@ use std::{
 use stream::IntoStream;
 use tokio::{runtime::Handle, task::JoinHandle};
 
-/// Flattens each item in the list following the rules of [`watcher::Event::into_iter_applied`].
-#[deprecated(
-    since = "0.72.0",
-    note = "fn replaced with the WatchStreamExt::applied_objects which can be chained onto watcher. Add `use kube::runtime::WatchStreamExt;` and call `stream.applied_objects()` instead. This function will be removed in 0.75.0."
-)]
-pub fn try_flatten_applied<K, S: TryStream<Ok = watcher::Event<K>>>(
-    stream: S,
-) -> impl Stream<Item = Result<K, S::Error>> {
-    stream
-        .map_ok(|event| stream::iter(event.into_iter_applied().map(Ok)))
-        .try_flatten()
-}
-
-/// Flattens each item in the list following the rules of [`watcher::Event::into_iter_touched`].
-#[deprecated(
-    since = "0.72.0",
-    note = "fn replaced with the WatchStreamExt::touched_objects which can be chained onto watcher. Add `use kube::runtime::WatchStreamExt;` and call `stream.touched_objects()` instead. This function will be removed in 0.75.0."
-)]
-pub fn try_flatten_touched<K, S: TryStream<Ok = watcher::Event<K>>>(
-    stream: S,
-) -> impl Stream<Item = Result<K, S::Error>> {
-    stream
-        .map_ok(|event| stream::iter(event.into_iter_touched().map(Ok)))
-        .try_flatten()
-}
 
 /// Allows splitting a `Stream` into several streams that each emit a disjoint subset of the input stream's items,
 /// like a streaming variant of pattern matching.
@@ -85,11 +58,15 @@ where
 {
     type Item = Case;
 
+    #[allow(clippy::mut_mutex_lock)]
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = self.project();
+        // this code triggers false positive in Clippy
+        // https://github.com/rust-lang/rust-clippy/issues/9415
+        // TODO: remove #[allow] once fix reaches nightly.
         let inner = this.inner.lock().unwrap();
         let mut inner = Pin::new(inner);
         let inner_peek = inner.as_mut().peek();

@@ -37,7 +37,7 @@ mod future_hash_map;
 mod runner;
 
 #[derive(Debug, Error)]
-pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error::Error + 'static> {
+pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
     #[error("reconciler for object {1} failed")]
@@ -47,7 +47,7 @@ pub enum Error<ReconcilerErr: std::error::Error + 'static, QueueErr: std::error:
 }
 
 /// Results of the reconciliation attempt
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Action {
     /// Whether (and when) to next trigger the reconciliation if no external watch triggers hit
     ///
@@ -194,7 +194,7 @@ impl Display for ReconcileReason {
             ReconcileReason::Unknown => f.write_str("unknown"),
             ReconcileReason::ObjectUpdated => f.write_str("object updated"),
             ReconcileReason::RelatedObjectUpdated { obj_ref: object } => {
-                f.write_fmt(format_args!("related object updated: {}", object))
+                f.write_fmt(format_args!("related object updated: {object}"))
             }
             ReconcileReason::BulkReconcile => f.write_str("bulk reconcile requested"),
             ReconcileReason::ReconcilerRequestedRetry => f.write_str("reconciler requested retry"),
@@ -219,7 +219,7 @@ const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
 pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
     mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
-    error_policy: impl Fn(&ReconcilerFut::Error, Arc<Ctx>) -> Action,
+    error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
     context: Arc<Ctx>,
     store: Store<K>,
     queue: QueueStream,
@@ -274,13 +274,13 @@ where
                             object.reason = %request.reason
                         );
                         reconciler_span
-                            .in_scope(|| reconciler(obj, context.clone()))
+                            .in_scope(|| reconciler(Arc::clone(&obj), context.clone()))
                             .into_future()
                             .then(move |res| {
                                 let error_policy = error_policy;
                                 RescheduleReconciliation::new(
                                     res,
-                                    |err| error_policy(err, error_policy_ctx),
+                                    |err| error_policy(obj, err, error_policy_ctx),
                                     request.obj_ref.clone(),
                                     scheduler_tx,
                                 )
@@ -421,8 +421,9 @@ where
 ///     // see configmapgen_controller example for full info
 ///     Ok(Action::requeue(Duration::from_secs(300)))
 /// }
-/// /// an error handler that will be called when the reconciler fails
-/// fn error_policy(_error: &Error, _ctx: Arc<()>) -> Action {
+/// /// an error handler that will be called when the reconciler fails with access to both the
+/// /// object that caused the failure and the actual error
+/// fn error_policy(obj: Arc<ConfigMapGenerator>, _error: &Error, _ctx: Arc<()>) -> Action {
 ///     Action::requeue(Duration::from_secs(60))
 /// }
 ///
@@ -592,6 +593,59 @@ where
     /// The [`ListParams`] refer to the possible subset of `Watched` objects that you want the [`Api`]
     /// to watch - in the Api's configured scope - and run through the custom mapper.
     /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`ListParams::default`].
+    ///
+    /// # Example
+    ///
+    /// Tracking cross cluster references using the [Operator-SDK] annotations.
+    ///
+    /// ```
+    /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef};
+    /// # use kube::api::{Api, ListParams};
+    /// # use kube::ResourceExt;
+    /// # use k8s_openapi::api::core::v1::{ConfigMap, Namespace};
+    /// # use futures::StreamExt;
+    /// # use std::sync::Arc;
+    /// # type WatchedResource = Namespace;
+    /// # struct Context;
+    /// # async fn reconcile(_: Arc<ConfigMap>, _: Arc<Context>) -> Result<Action, kube::Error> {
+    /// #     Ok(Action::await_change())
+    /// # };
+    /// # fn error_policy(_: Arc<ConfigMap>, _: &kube::Error, _: Arc<Context>) -> Action {
+    /// #     Action::await_change()
+    /// # }
+    /// # async fn doc(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// # let memcached = Api::<ConfigMap>::all(client.clone());
+    /// # let context = Arc::new(Context);
+    /// Controller::new(memcached, ListParams::default())
+    ///     .watches(
+    ///         Api::<WatchedResource>::all(client.clone()),
+    ///         ListParams::default(),
+    ///         |ar| {
+    ///             let prt = ar
+    ///                 .annotations()
+    ///                 .get("operator-sdk/primary-resource-type")
+    ///                 .map(String::as_str);
+    ///
+    ///             if prt != Some("Memcached.cache.example.com") {
+    ///                 return None;
+    ///             }
+    ///
+    ///             let (namespace, name) = ar
+    ///                 .annotations()
+    ///                 .get("operator-sdk/primary-resource")?
+    ///                 .split_once('/')?;
+    ///
+    ///             Some(ObjectRef::new(name).within(namespace))
+    ///         }
+    ///     )
+    ///     .run(reconcile, error_policy, context)
+    ///     .for_each(|_| futures::future::ready(()))
+    ///     .await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [Operator-SDK]: https://sdk.operatorframework.io/docs/building-operators/ansible/reference/retroactively-owned-resources/
     #[must_use]
     pub fn watches<
         Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
@@ -675,7 +729,7 @@ where
     ///         println!("Reconciling {}", o.name());
     ///         Ok(Action::await_change())
     ///     },
-    ///     |err: &Infallible, _| Err(err).unwrap(),
+    ///     |_object: Arc<ConfigMap>, err: &Infallible, _| Err(err).unwrap(),
     ///     Arc::new(()),
     /// );
     /// # };
@@ -730,7 +784,7 @@ where
     ///         println!("Reconciling {}", o.name());
     ///         Ok(Action::await_change())
     ///     },
-    ///     |err: &Infallible, _| Err(err).unwrap(),
+    ///     |_, err: &Infallible, _| Err(err).unwrap(),
     ///     Arc::new(()),
     /// );
     /// # };
@@ -808,7 +862,7 @@ where
     pub fn run<ReconcilerFut, Ctx>(
         self,
         mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
-        error_policy: impl Fn(&ReconcilerFut::Error, Arc<Ctx>) -> Action,
+        error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
         context: Arc<Ctx>,
     ) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, watcher::Error>>>
     where
@@ -864,7 +918,7 @@ mod tests {
         assert_send(
             Controller::new(mock_type::<Api<ConfigMap>>(), Default::default()).run(
                 |_, _| async { Ok(mock_type::<Action>()) },
-                |_: &std::io::Error, _| mock_type::<Action>(),
+                |_: Arc<ConfigMap>, _: &std::io::Error, _| mock_type::<Action>(),
                 Arc::new(()),
             ),
         );
@@ -873,7 +927,7 @@ mod tests {
     #[tokio::test]
     async fn applier_must_not_deadlock_if_reschedule_buffer_fills() {
         // This tests that `applier` handles reschedule queue backpressure correctly, by trying to flood it with no-op reconciles
-        // This is intended to avoid regressing on https://github.com/kube-rs/kube-rs/issues/926
+        // This is intended to avoid regressing on https://github.com/kube-rs/kube/issues/926
 
         // Assume that we can keep APPLIER_REQUEUE_BUF_SIZE flooded if we have 100x the number of objects "in rotation"
         // On my (@teozkr)'s 3900X I can reliably trigger this with 10x, but let's have some safety margin to avoid false negatives
@@ -891,7 +945,7 @@ mod tests {
                     Ok(Action::requeue(Duration::ZERO))
                 })
             },
-            |_: &Infallible, _| todo!(),
+            |_: Arc<ConfigMap>, _: &Infallible, _| todo!(),
             Arc::new(()),
             store_rx,
             queue_rx.map(Result::<_, Infallible>::Ok),
