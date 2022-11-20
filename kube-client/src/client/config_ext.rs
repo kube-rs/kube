@@ -23,6 +23,9 @@ pub trait ConfigExt: private::Sealed {
     /// Optional layer to set up `Authorization` header depending on the config.
     fn auth_layer(&self) -> Result<Option<AuthLayer>>;
 
+    /// Use certificate data from exec
+    fn exec_identity_pem(&self) -> Option<Vec<u8>>;
+
     /// Layer to add non-authn HTTP headers depending on the config.
     fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer>;
 
@@ -144,7 +147,23 @@ impl ConfigExt for Config {
             Auth::RefreshableToken(refreshable) => {
                 Some(AuthLayer(Either::B(AsyncFilterLayer::new(refreshable))))
             }
+            Auth::Certificate(_client_certificate_data, _client_key_data) => None,
         })
+    }
+
+    fn exec_identity_pem(&self) -> Option<Vec<u8>> {
+       let exec_auth = Auth::try_from(&self.auth_info);
+       if exec_auth.is_err() {
+           return None
+       }
+        match exec_auth.unwrap() {
+            Auth::Certificate(client_certificate_data, client_key_data) => {
+                let mut buffer = client_key_data.as_bytes().to_vec();
+                buffer.extend_from_slice(client_certificate_data.as_bytes());
+                Some(buffer)
+            }
+            _ => None
+        }
     }
 
     fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer> {
@@ -174,8 +193,12 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
+        let mut identity = self.exec_identity_pem();
+        if identity.is_none() {
+            identity = self.identity_pem();
+        }
         tls::rustls_tls::rustls_client_config(
-            self.identity_pem().as_deref(),
+            identity.as_deref(),
             self.root_cert.as_deref(),
             self.accept_invalid_certs,
         )
@@ -192,7 +215,11 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
-        tls::openssl_tls::ssl_connector_builder(self.identity_pem().as_ref(), self.root_cert.as_ref())
+        let mut identity = self.exec_identity_pem();
+        if identity.is_none() {
+            identity = self.identity_pem();
+        }
+        tls::openssl_tls::ssl_connector_builder(identity.as_ref(), self.root_cert.as_ref())
             .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
     }
 

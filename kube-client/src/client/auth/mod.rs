@@ -90,6 +90,7 @@ pub(crate) enum Auth {
     Basic(String, SecretString),
     Bearer(SecretString),
     RefreshableToken(RefreshableToken),
+    Certificate(String, String)
 }
 
 // Token file reference. Reloads at least once per minute.
@@ -184,7 +185,7 @@ impl RefreshableToken {
                 if Utc::now() + Duration::seconds(60) >= locked_data.1 {
                     // TODO Improve refreshing exec to avoid `Auth::try_from`
                     match Auth::try_from(&locked_data.2)? {
-                        Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) => {
+                        Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) | Auth::Certificate(_, _) => {
                             return Err(Error::UnrefreshableTokenResponse);
                         }
 
@@ -291,6 +292,9 @@ impl TryFrom<&AuthInfo> for Auth {
         if let Some(exec) = &auth_info.exec {
             let creds = auth_exec(exec)?;
             let status = creds.status.ok_or(Error::ExecPluginFailed)?;
+            if let (Some(client_certificate_data), Some(client_key_data)) = (status.client_certificate_data, status.client_key_data) {
+                return Ok(Self::Certificate(client_certificate_data, client_key_data))
+            }
             let expiration = status
                 .expiration_timestamp
                 .map(|ts| ts.parse())
