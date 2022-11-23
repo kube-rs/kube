@@ -137,9 +137,9 @@ mod test {
         Api, Client, Config, ResourceExt,
     };
     use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
-    use k8s_openapi::api::core::v1::Pod;
+    use k8s_openapi::api::core::v1::{EphemeralContainer, Pod, PodSpec};
     use kube_core::{
-        params::{DeleteParams, Patch, WatchParams},
+        params::{DeleteParams, Patch, PatchParams, PostParams, WatchParams},
         response::StatusSummary,
     };
     use serde_json::json;
@@ -608,6 +608,155 @@ mod test {
             approval_type.to_string()
         );
         csr.delete(csr_name, &DeleteParams::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "needs cluster for ephemeral containers operations"]
+    async fn can_operate_on_ephemeral_containers() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+
+        // Ephemeral containers were stabilized in Kubernetes v1.25.
+        // This test therefore exits early if the current cluster version is older than v1.25.
+        let api_version = client.apiserver_version().await?;
+        if api_version.major.parse::<i32>()? < 1 || api_version.minor.parse::<i32>()? < 25 {
+            return Ok(());
+        }
+
+        let pod: Pod = serde_json::from_value(serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "ephemeral-container-test",
+                "labels": { "app": "kube-rs-test" },
+            },
+            "spec": {
+                "restartPolicy": "Never",
+                "containers": [{
+                  "name": "busybox",
+                  "image": "busybox:1.34.1",
+                  "command": ["sh", "-c", "sleep 2"],
+                }],
+            }
+        }))?;
+
+        let pod_name = pod.name_any();
+        let pods = Api::<Pod>::default_namespaced(client);
+
+        // If cleanup failed and a pod already exists, we attempt to remove it
+        // before proceeding. This is important as ephemeral containers can't
+        // be removed from a Pod's spec. Therefore this test must start with a fresh
+        // Pod every time.
+        let _ = pods
+            .delete(&pod.name_any(), &DeleteParams::default())
+            .await
+            .map(|v| v.map_left(|pdel| assert_eq!(pdel.name_any(), pod.name_any())));
+
+        // Ephemeral containes can only be applied to a running pod, so one must
+        // be created before any operations are tested.
+        match pods.create(&Default::default(), &pod).await {
+            Ok(o) => assert_eq!(pod.name_unchecked(), o.name_unchecked()),
+            Err(e) => return Err(e.into()), // any other case if a failure
+        }
+
+        let current_ephemeral_containers = pods
+            .get_ephemeral_containers(&pod.name_any())
+            .await?
+            .spec
+            .unwrap()
+            .ephemeral_containers;
+
+        // We expect no ephemeral containers initially, get_ephemeral_containers should
+        // reflect that.
+        assert_eq!(current_ephemeral_containers, None);
+
+        let mut busybox_eph: EphemeralContainer = serde_json::from_value(json!(
+            {
+                "name": "myephemeralcontainer1",
+                "image": "busybox:1.34.1",
+                "command": ["sh", "-c", "sleep 2"],
+            }
+        ))?;
+
+        // Attempt to replace ephemeral containers.
+
+        let patch: Pod = serde_json::from_value(json!({
+            "metadata": { "name": pod_name },
+            "spec":{ "ephemeralContainers": [ busybox_eph ] }
+        }))?;
+
+        let current_containers = pods
+            .replace_ephemeral_containers(&pod_name, &PostParams::default(), &patch)
+            .await?
+            .spec
+            .unwrap()
+            .ephemeral_containers
+            .expect("could find ephemeral container");
+
+        // Note that we can't compare the whole ephemeral containers object, as some fields
+        // are set by the cluster. We therefore compare the fields specified in the patch.
+        assert_eq!(current_containers.len(), 1);
+        assert_eq!(current_containers[0].name, busybox_eph.name);
+        assert_eq!(current_containers[0].image, busybox_eph.image);
+        assert_eq!(current_containers[0].command, busybox_eph.command);
+
+        // Attempt to patch ephemeral containers.
+
+        // The new ephemeral container will have different values from the
+        // first to ensure we can test for its presence.
+        busybox_eph = serde_json::from_value(json!(
+            {
+                "name": "myephemeralcontainer2",
+                "image": "busybox:1.35.0",
+                "command": ["sh", "-c", "sleep 1"],
+            }
+        ))?;
+
+        let patch: Pod =
+            serde_json::from_value(json!({ "spec": { "ephemeralContainers": [ busybox_eph ] }}))?;
+
+        let current_containers = pods
+            .patch_ephemeral_containers(&pod_name, &PatchParams::default(), &Patch::Strategic(patch))
+            .await?
+            .spec
+            .unwrap()
+            .ephemeral_containers
+            .expect("could find ephemeral container");
+
+        // There should only be 2 ephemeral containers at this point,
+        // one from each patch
+        assert_eq!(current_containers.len(), 2);
+
+        let new_container = current_containers
+            .iter()
+            .find(|c| c.name == busybox_eph.name)
+            .expect("could find myephemeralcontainer2");
+
+        // Note that we can't compare the whole ephemeral container object, as some fields
+        // get set in the cluster. We therefore compare the fields specified in the patch.
+        assert_eq!(new_container.image, busybox_eph.image);
+        assert_eq!(new_container.command, busybox_eph.command);
+
+        // Attempt to get ephemeral containers.
+
+        let expected_containers = current_containers;
+
+        let current_containers = pods
+            .get_ephemeral_containers(&pod.name_any())
+            .await?
+            .spec
+            .unwrap()
+            .ephemeral_containers
+            .unwrap();
+
+        assert_eq!(current_containers, expected_containers);
+
+        pods.delete(&pod.name_any(), &DeleteParams::default())
+            .await?
+            .map_left(|pdel| {
+                assert_eq!(pdel.name_any(), pod.name_any());
+            });
+
         Ok(())
     }
 }

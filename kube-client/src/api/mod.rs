@@ -14,6 +14,11 @@ mod subresource;
 pub use subresource::{Attach, AttachParams, Execute, Portforward};
 pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
 
+// Ephemeral containers were stabilized in Kubernetes 1.25.
+k8s_openapi::k8s_if_ge_1_25! {
+    pub use subresource::Ephemeral;
+}
+
 mod util;
 
 pub mod entry;
