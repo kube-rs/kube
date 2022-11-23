@@ -23,9 +23,6 @@ pub trait ConfigExt: private::Sealed {
     /// Optional layer to set up `Authorization` header depending on the config.
     fn auth_layer(&self) -> Result<Option<AuthLayer>>;
 
-    /// Use certificate data from exec
-    fn exec_identity_pem(&self) -> Option<Vec<u8>>;
-
     /// Layer to add non-authn HTTP headers depending on the config.
     fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer>;
 
@@ -151,21 +148,6 @@ impl ConfigExt for Config {
         })
     }
 
-    fn exec_identity_pem(&self) -> Option<Vec<u8>> {
-       let exec_auth = Auth::try_from(&self.auth_info);
-       if exec_auth.is_err() {
-           return None
-       }
-        match exec_auth.unwrap() {
-            Auth::Certificate(client_certificate_data, client_key_data) => {
-                let mut buffer = client_key_data.as_bytes().to_vec();
-                buffer.extend_from_slice(client_certificate_data.as_bytes());
-                Some(buffer)
-            }
-            _ => None
-        }
-    }
-
     fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer> {
         let mut headers = Vec::new();
         if let Some(impersonate_user) = &self.auth_info.impersonate {
@@ -193,10 +175,7 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
-        let mut identity = self.exec_identity_pem();
-        if identity.is_none() {
-            identity = self.identity_pem();
-        }
+        let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
         tls::rustls_tls::rustls_client_config(
             identity.as_deref(),
             self.root_cert.as_deref(),
@@ -215,10 +194,7 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
-        let mut identity = self.exec_identity_pem();
-        if identity.is_none() {
-            identity = self.identity_pem();
-        }
+        let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
         tls::openssl_tls::ssl_connector_builder(identity.as_ref(), self.root_cert.as_ref())
             .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
     }
@@ -245,5 +221,18 @@ impl ConfigExt for Config {
             });
         }
         Ok(https)
+    }
+}
+
+impl Config {
+    fn exec_identity_pem(&self) -> Option<Vec<u8>> {
+       match Auth::try_from(&self.auth_info) {
+           Ok(Auth::Certificate(client_certificate_data, client_key_data)) => {
+                let mut buffer = client_key_data.as_bytes().to_vec();
+                buffer.extend_from_slice(client_certificate_data.as_bytes());
+                Some(buffer)
+           }
+           _ => None,
+       }
     }
 }
