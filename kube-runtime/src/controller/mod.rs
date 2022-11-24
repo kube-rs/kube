@@ -262,7 +262,28 @@ where
 ///
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
-pub fn applier<K, QueueStream, ReconcilerFut, Ctx, T>(
+pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
+    reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
+    error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
+    context: Arc<Ctx>,
+    store: Store<K>,
+    queue: QueueStream,
+) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, QueueStream::Error>>>
+where
+    K: Clone + Resource + 'static,
+    K::DynamicType: Debug + Eq + Hash + Clone + Unpin,
+    ReconcilerFut: TryFuture<Ok = Action> + Unpin,
+    ReconcilerFut::Error: std::error::Error + 'static,
+    QueueStream: TryStream,
+    QueueStream::Ok: Into<ReconcileRequest<K>>,
+    QueueStream::Error: std::error::Error + 'static,
+{
+    applier_with_injection(reconciler, error_policy, context, store, queue)
+}
+
+/// This is another version of [`applier`], and its `reconciler` accepts the injected parameter
+/// [`Option<Box<ObjectRef<DynamicObject>>>`] or [`ReconcileRequest`].
+pub fn applier_with_injection<K, QueueStream, ReconcilerFut, Ctx, T>(
     mut reconciler: impl Reconciler<T, ReconcilerFut, K, Ctx>,
     error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
     context: Arc<Ctx>,
@@ -904,7 +925,23 @@ where
     /// This creates a stream from all builder calls and starts an applier with
     /// a specified `reconciler` and `error_policy` callbacks. Each of these will be called
     /// with a configurable `context`.
-    pub fn run<ReconcilerFut, Ctx, T>(
+    pub fn run<ReconcilerFut, Ctx>(
+        self,
+        reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
+        error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
+        context: Arc<Ctx>,
+    ) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, watcher::Error>>>
+    where
+        K::DynamicType: Debug + Unpin,
+        ReconcilerFut: TryFuture<Ok = Action> + Send + 'static,
+        ReconcilerFut::Error: std::error::Error + Send + 'static,
+    {
+        self.run_with_injection(reconciler, error_policy, context)
+    }
+
+    /// This is another version of [`Controller::run`], and its `reconciler` accepts the injected parameter
+    /// [`Option<Box<ObjectRef<DynamicObject>>>`] or [`ReconcileRequest`].
+    pub fn run_with_injection<ReconcilerFut, Ctx, T>(
         self,
         mut reconciler: impl Reconciler<T, ReconcilerFut, K, Ctx>,
         error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
@@ -915,7 +952,7 @@ where
         ReconcilerFut: TryFuture<Ok = Action> + Send + 'static,
         ReconcilerFut::Error: std::error::Error + Send + 'static,
     {
-        applier(
+        applier_with_injection(
             move |obj, ctx, request| {
                 CancelableJoinHandle::spawn(
                     reconciler.call(obj, ctx, request).into_future().in_current_span(),
