@@ -223,7 +223,6 @@ impl PartialEq for AuthInfo {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct AuthProviderConfig {
     /// Name of the auth provider
-    #[serde(default)]
     pub name: String,
     /// Auth provider configuration
     #[serde(default)]

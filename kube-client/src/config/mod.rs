@@ -69,6 +69,10 @@ pub enum KubeconfigError {
     #[error("the structure of the parsed kubeconfig is invalid: {0}")]
     InvalidStructure(#[source] serde_yaml::Error),
 
+    /// Cluster url is missing on selected cluster
+    #[error("cluster url is missing on selected cluster")]
+    MissingClusterUrl,
+
     /// Failed to parse cluster url
     #[error("failed to parse cluster url: {0}")]
     ParseClusterUrl(#[source] http::uri::InvalidUri),
@@ -300,7 +304,7 @@ impl Config {
             .cluster
             .server
             .clone()
-            .unwrap_or_default()
+            .ok_or(KubeconfigError::MissingClusterUrl)?
             .parse::<http::Uri>()
             .map_err(KubeconfigError::ParseClusterUrl)?;
 
