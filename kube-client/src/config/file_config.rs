@@ -77,8 +77,7 @@ pub struct NamedExtension {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedCluster {
     /// Name of cluster
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: String,
     /// Information about how to communicate with a kubernetes cluster
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cluster: Option<Cluster>,
@@ -117,8 +116,7 @@ pub struct Cluster {
 #[cfg_attr(test, derive(PartialEq))]
 pub struct NamedAuthInfo {
     /// Name of the user
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: String,
     /// Information that describes identity of the user
     #[serde(rename = "user")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -266,8 +264,7 @@ pub struct ExecConfig {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedContext {
     /// Name of the context
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: String,
     /// Associations for the context
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<Context>,
@@ -278,11 +275,9 @@ pub struct NamedContext {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Context {
     /// Name of the cluster for this context
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cluster: Option<String>,
+    pub cluster: String,
     /// Name of the `AuthInfo` for this context
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub user: Option<String>,
+    pub user: String,
     /// The default namespace to use on unspecified requests
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
@@ -432,7 +427,7 @@ fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> 
 #[allow(clippy::redundant_closure)]
 fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
 where
-    F: Fn(&T) -> &Option<String>,
+    F: Fn(&T) -> &String,
 {
     use std::collections::HashSet;
     base.extend({
@@ -542,7 +537,7 @@ mod tests {
         let kubeconfig1 = Kubeconfig {
             current_context: Some("default".into()),
             auth_infos: vec![NamedAuthInfo {
-                name: Some("red-user".into()),
+                name: "red-user".into(),
                 auth_info: Some(AuthInfo {
                     token: Some(SecretString::from_str("first-token").unwrap()),
                     ..Default::default()
@@ -554,7 +549,7 @@ mod tests {
             current_context: Some("dev".into()),
             auth_infos: vec![
                 NamedAuthInfo {
-                    name: Some("red-user".into()),
+                    name: "red-user".into(),
                     auth_info: Some(AuthInfo {
                         token: Some(SecretString::from_str("second-token").unwrap()),
                         username: Some("red-user".into()),
@@ -562,7 +557,7 @@ mod tests {
                     }),
                 },
                 NamedAuthInfo {
-                    name: Some("green-user".into()),
+                    name: "green-user".into(),
                     auth_info: Some(AuthInfo {
                         token: Some(SecretString::from_str("new-token").unwrap()),
                         ..Default::default()
@@ -576,7 +571,7 @@ mod tests {
         // Preserves first `current_context`
         assert_eq!(merged.current_context, Some("default".into()));
         // Auth info with the same name does not overwrite
-        assert_eq!(merged.auth_infos[0].name.as_ref().unwrap(), "red-user");
+        assert_eq!(merged.auth_infos[0].name, "red-user");
         assert_eq!(
             merged.auth_infos[0]
                 .auth_info
@@ -590,7 +585,7 @@ mod tests {
         // Even if it's not conflicting
         assert_eq!(merged.auth_infos[0].auth_info.as_ref().unwrap().username, None);
         // New named auth info is appended
-        assert_eq!(merged.auth_infos[1].name.as_ref().unwrap(), "green-user");
+        assert_eq!(merged.auth_infos[1].name, "green-user");
     }
 
     #[test]
@@ -652,8 +647,8 @@ users:
 
         let config = Kubeconfig::from_yaml(config_yaml).unwrap();
 
-        assert_eq!(config.clusters[0].name.as_ref().unwrap(), "eks");
-        assert_eq!(config.clusters[1].name.as_ref().unwrap(), "minikube");
+        assert_eq!(config.clusters[0].name, "eks");
+        assert_eq!(config.clusters[1].name, "minikube");
 
         let cluster1 = config.clusters[1].cluster.as_ref().unwrap();
         assert_eq!(
@@ -708,8 +703,8 @@ users:
         let cfg = Kubeconfig::from_yaml(config_yaml)?;
 
         // Ensure we have data from both documents:
-        assert_eq!(cfg.clusters[0].name.as_ref().unwrap(), "k3d-promstack");
-        assert_eq!(cfg.clusters[1].name.as_ref().unwrap(), "k3d-k3s-default");
+        assert_eq!(cfg.clusters[0].name, "k3d-promstack");
+        assert_eq!(cfg.clusters[1].name, "k3d-k3s-default");
 
         Ok(())
     }

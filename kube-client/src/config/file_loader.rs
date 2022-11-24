@@ -59,42 +59,41 @@ impl ConfigLoader {
         cluster: Option<&String>,
         user: Option<&String>,
     ) -> Result<Self, KubeconfigError> {
-        let current_context_name = &config.current_context.clone().unwrap_or_default();
         let context_name = if let Some(name) = context {
             name
+        } else if let Some(name) = &config.current_context {
+            name
         } else {
-            current_context_name
+            return Err(KubeconfigError::CurrentContextNotSet);
         };
 
         let current_context = config
             .contexts
             .iter()
-            .find(|named_context| &named_context.name.clone().unwrap_or_default() == context_name)
+            .find(|named_context| &named_context.name == context_name)
             .and_then(|named_context| named_context.context.clone())
             .ok_or_else(|| KubeconfigError::LoadContext(context_name.clone()))?;
 
-        let current_cluster_name = &current_context.cluster.clone().unwrap_or_default();
-        let cluster_name = cluster.unwrap_or(current_cluster_name);
+        let cluster_name = cluster.unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
             .iter()
-            .find(|named_cluster| &named_cluster.name.clone().unwrap_or_default() == cluster_name)
+            .find(|named_cluster| &named_cluster.name == cluster_name)
             .and_then(|named_cluster| named_cluster.cluster.clone())
             .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
-        let current_user_name = &current_context.user.clone().unwrap_or_default();
-        let user_name = user.unwrap_or(&current_user_name);
+        let user_name = user.unwrap_or(&current_context.user);
         let user = config
             .auth_infos
             .iter()
-            .find(|named_user| &named_user.name.clone().unwrap_or_default() == user_name)
+            .find(|named_user| &named_user.name == user_name)
             .and_then(|named_user| named_user.auth_info.clone())
             .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
 
         Ok(ConfigLoader {
-            current_context: current_context.clone(),
-            cluster,
-            user,
+            current_context: current_context,
+            cluster: cluster,
+            user: user,
         })
     }
 
