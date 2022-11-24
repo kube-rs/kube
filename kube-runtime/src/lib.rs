@@ -28,7 +28,7 @@ pub mod utils;
 pub mod wait;
 pub mod watcher;
 
-pub use controller::{applier, Controller};
+pub use controller::{applier, applier_with_injection, Controller};
 pub use finalizer::finalizer;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
