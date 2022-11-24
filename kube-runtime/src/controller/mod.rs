@@ -206,6 +206,51 @@ impl Display for ReconcileReason {
 
 const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
 
+pub trait Reconciler<T, ReconcilerFut, K, Ctx>
+where
+    K: Resource,
+{
+    fn call(&mut self, obj: Arc<K>, ctx: Arc<Ctx>, request: ReconcileRequest<K>) -> ReconcilerFut;
+}
+
+impl<ReconcilerFut, K, Ctx, F> Reconciler<(Arc<K>, Arc<Ctx>), ReconcilerFut, K, Ctx> for F
+where
+    F: FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
+    K: Resource,
+{
+    fn call(&mut self, obj: Arc<K>, ctx: Arc<Ctx>, _: ReconcileRequest<K>) -> ReconcilerFut {
+        self(obj, ctx)
+    }
+}
+
+impl<ReconcilerFut, K, Ctx, F>
+    Reconciler<(Arc<K>, Arc<Ctx>, Option<Box<ObjectRef<DynamicObject>>>), ReconcilerFut, K, Ctx> for F
+where
+    F: FnMut(Arc<K>, Arc<Ctx>, Option<Box<ObjectRef<DynamicObject>>>) -> ReconcilerFut,
+    K: Resource,
+{
+    fn call(&mut self, obj: Arc<K>, ctx: Arc<Ctx>, request: ReconcileRequest<K>) -> ReconcilerFut {
+        let related_obj = if let ReconcileReason::RelatedObjectUpdated { obj_ref } = request.reason {
+            Some(obj_ref)
+        } else {
+            None
+        };
+        self(obj, ctx, related_obj)
+    }
+}
+
+impl<ReconcilerFut, K, Ctx, F> Reconciler<(Arc<K>, Arc<Ctx>, ReconcileRequest<K>), ReconcilerFut, K, Ctx>
+    for F
+where
+    F: FnMut(Arc<K>, Arc<Ctx>, ReconcileRequest<K>) -> ReconcilerFut,
+    K: Resource,
+{
+    fn call(&mut self, obj: Arc<K>, ctx: Arc<Ctx>, request: ReconcileRequest<K>) -> ReconcilerFut {
+        self(obj, ctx, request)
+    }
+}
+
+
 /// Apply a reconciler to an input stream, with a given retry policy
 ///
 /// Takes a `store` parameter for the core objects, which should usually be updated by a [`reflector`].
@@ -217,8 +262,8 @@ const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
 ///
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
-pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
-    mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
+pub fn applier<K, QueueStream, ReconcilerFut, Ctx, T>(
+    mut reconciler: impl Reconciler<T, ReconcilerFut, K, Ctx>,
     error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
     context: Arc<Ctx>,
     store: Store<K>,
@@ -274,7 +319,7 @@ where
                             object.reason = %request.reason
                         );
                         reconciler_span
-                            .in_scope(|| reconciler(Arc::clone(&obj), context.clone()))
+                            .in_scope(|| reconciler.call(Arc::clone(&obj), context.clone(), request.clone()))
                             .into_future()
                             .then(move |res| {
                                 let error_policy = error_policy;
@@ -859,9 +904,9 @@ where
     /// This creates a stream from all builder calls and starts an applier with
     /// a specified `reconciler` and `error_policy` callbacks. Each of these will be called
     /// with a configurable `context`.
-    pub fn run<ReconcilerFut, Ctx>(
+    pub fn run<ReconcilerFut, Ctx, T>(
         self,
-        mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
+        mut reconciler: impl Reconciler<T, ReconcilerFut, K, Ctx>,
         error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
         context: Arc<Ctx>,
     ) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<ReconcilerFut::Error, watcher::Error>>>
@@ -871,9 +916,9 @@ where
         ReconcilerFut::Error: std::error::Error + Send + 'static,
     {
         applier(
-            move |obj, ctx| {
+            move |obj, ctx, request| {
                 CancelableJoinHandle::spawn(
-                    reconciler(obj, ctx).into_future().in_current_span(),
+                    reconciler.call(obj, ctx, request).into_future().in_current_span(),
                     &Handle::current(),
                 )
             },
