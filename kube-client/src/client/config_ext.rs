@@ -4,7 +4,8 @@ use http::{header::HeaderName, HeaderValue};
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] use super::tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
+use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},
@@ -225,14 +226,18 @@ impl ConfigExt for Config {
 }
 
 impl Config {
+    // This is necessary to retrieve an identity when an exec plugin
+    // returns a client certificate and key instead of a token.
+    // This has be to be checked on TLS configuration vs tokens
+    // which can be added in as an AuthLayer.
     fn exec_identity_pem(&self) -> Option<Vec<u8>> {
-       match Auth::try_from(&self.auth_info) {
-           Ok(Auth::Certificate(client_certificate_data, client_key_data)) => {
+        match Auth::try_from(&self.auth_info) {
+            Ok(Auth::Certificate(client_certificate_data, client_key_data)) => {
                 let mut buffer = client_key_data.as_bytes().to_vec();
                 buffer.extend_from_slice(client_certificate_data.as_bytes());
                 Some(buffer)
-           }
-           _ => None,
-       }
+            }
+            _ => None,
+        }
     }
 }
