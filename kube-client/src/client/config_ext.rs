@@ -233,7 +233,7 @@ impl Config {
     fn exec_identity_pem(&self) -> Option<Vec<u8>> {
         match Auth::try_from(&self.auth_info) {
             Ok(Auth::Certificate(client_certificate_data, client_key_data)) => {
-                let mut buffer = client_key_data.as_bytes().to_vec();
+                let mut buffer = client_key_data.expose_secret().as_bytes().to_vec();
                 buffer.extend_from_slice(client_certificate_data.as_bytes());
                 Some(buffer)
             }

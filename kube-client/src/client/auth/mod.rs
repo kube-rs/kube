@@ -19,8 +19,10 @@ use tower::{filter::AsyncPredicate, BoxError};
 
 use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
 
-#[cfg(feature = "oauth")] mod oauth;
-#[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
+#[cfg(feature = "oauth")]
+mod oauth;
+#[cfg(feature = "oauth")]
+pub use oauth::Error as OAuthError;
 
 #[derive(Error, Debug)]
 /// Client auth errors
@@ -90,7 +92,7 @@ pub(crate) enum Auth {
     Basic(String, SecretString),
     Bearer(SecretString),
     RefreshableToken(RefreshableToken),
-    Certificate(String, String)
+    Certificate(String, SecretString),
 }
 
 // Token file reference. Reloads at least once per minute.
@@ -292,8 +294,10 @@ impl TryFrom<&AuthInfo> for Auth {
         if let Some(exec) = &auth_info.exec {
             let creds = auth_exec(exec)?;
             let status = creds.status.ok_or(Error::ExecPluginFailed)?;
-            if let (Some(client_certificate_data), Some(client_key_data)) = (status.client_certificate_data, status.client_key_data) {
-                return Ok(Self::Certificate(client_certificate_data, client_key_data))
+            if let (Some(client_certificate_data), Some(client_key_data)) =
+                (status.client_certificate_data, status.client_key_data)
+            {
+                return Ok(Self::Certificate(client_certificate_data, client_key_data.into()));
             }
             let expiration = status
                 .expiration_timestamp
