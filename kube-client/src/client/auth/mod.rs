@@ -371,9 +371,16 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     // Command-based token source
     if let Some(cmd) = provider.config.get("cmd-path") {
         let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
-
+        // NB: This property does currently not exist upstream in client-go
+        // See https://github.com/kube-rs/kube/issues/1060
+        let drop_env = provider.config.get("cmd-drop-env").cloned().unwrap_or_default();
         // TODO splitting args by space is not safe
-        let output = Command::new(cmd)
+        let mut command = Command::new(cmd);
+        // Do not pass the following env vars to the command
+        for env in drop_env.trim().split(' ') {
+            command.env_remove(env);
+        }
+        let output = command
             .args(params.trim().split(' '))
             .output()
             .map_err(|e| Error::AuthExec(format!("Executing {:} failed: {:?}", cmd, e)))?;
