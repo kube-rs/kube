@@ -4,8 +4,7 @@ use http::{header::HeaderName, HeaderValue};
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
-use super::tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},

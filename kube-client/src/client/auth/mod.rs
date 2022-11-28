@@ -19,10 +19,8 @@ use tower::{filter::AsyncPredicate, BoxError};
 
 use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
 
-#[cfg(feature = "oauth")]
-mod oauth;
-#[cfg(feature = "oauth")]
-pub use oauth::Error as OAuthError;
+#[cfg(feature = "oauth")] mod oauth;
+#[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
 
 #[derive(Error, Debug)]
 /// Client auth errors
