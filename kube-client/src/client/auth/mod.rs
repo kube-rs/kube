@@ -65,7 +65,7 @@ pub enum Error {
     AuthExecParse(#[source] serde_json::Error),
 
     /// Fail to serialize input
-    #[error("fail to serialize input: {0}")]
+    #[error("failed to serialize input: {0}")]
     AuthExecSerialize(#[source] serde_json::Error),
 
     /// Failed to exec auth
