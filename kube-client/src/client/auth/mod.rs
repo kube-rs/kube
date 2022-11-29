@@ -94,6 +94,7 @@ pub(crate) enum Auth {
     Basic(String, SecretString),
     Bearer(SecretString),
     RefreshableToken(RefreshableToken),
+    Certificate(String, SecretString),
 }
 
 // Token file reference. Reloads at least once per minute.
@@ -188,7 +189,7 @@ impl RefreshableToken {
                 if Utc::now() + Duration::seconds(60) >= locked_data.1 {
                     // TODO Improve refreshing exec to avoid `Auth::try_from`
                     match Auth::try_from(&locked_data.2)? {
-                        Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) => {
+                        Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) | Auth::Certificate(_, _) => {
                             return Err(Error::UnrefreshableTokenResponse);
                         }
 
@@ -295,6 +296,11 @@ impl TryFrom<&AuthInfo> for Auth {
         if let Some(exec) = &auth_info.exec {
             let creds = auth_exec(exec)?;
             let status = creds.status.ok_or(Error::ExecPluginFailed)?;
+            if let (Some(client_certificate_data), Some(client_key_data)) =
+                (status.client_certificate_data, status.client_key_data)
+            {
+                return Ok(Self::Certificate(client_certificate_data, client_key_data.into()));
+            }
             let expiration = status
                 .expiration_timestamp
                 .map(|ts| ts.parse())
@@ -328,6 +334,9 @@ fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderToken, E
     match provider.name.as_ref() {
         "oidc" => token_from_oidc_provider(provider),
         "gcp" => token_from_gcp_provider(provider),
+        "azure" => Err(Error::AuthExec(
+            "The azure auth plugin is not supported; use https://github.com/Azure/kubelogin instead".into(),
+        )),
         _ => Err(Error::AuthExec(format!(
             "Authentication with provider {:} not supported",
             provider.name
@@ -364,9 +373,16 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     // Command-based token source
     if let Some(cmd) = provider.config.get("cmd-path") {
         let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
-
+        // NB: This property does currently not exist upstream in client-go
+        // See https://github.com/kube-rs/kube/issues/1060
+        let drop_env = provider.config.get("cmd-drop-env").cloned().unwrap_or_default();
         // TODO splitting args by space is not safe
-        let output = Command::new(cmd)
+        let mut command = Command::new(cmd);
+        // Do not pass the following env vars to the command
+        for env in drop_env.trim().split(' ') {
+            command.env_remove(env);
+        }
+        let output = command
             .args(params.trim().split(' '))
             .output()
             .map_err(|e| Error::AuthExec(format!("Executing {:} failed: {:?}", cmd, e)))?;
