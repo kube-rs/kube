@@ -4,7 +4,6 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(target_os = "windows")] use std::os::windows::process::CommandExt;
 
 use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
@@ -23,6 +22,7 @@ use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
 
 #[cfg(feature = "oauth")] mod oauth;
 #[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
+#[cfg(target_os = "windows")] use std::os::windows::process::CommandExt;
 
 #[derive(Error, Debug)]
 /// Client auth errors
