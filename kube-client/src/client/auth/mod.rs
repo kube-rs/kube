@@ -4,8 +4,7 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+#[cfg(target_os = "windows")] use std::os::windows::process::CommandExt;
 
 use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
@@ -505,7 +504,7 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
         static CREATE_NO_WINDOW: u32 = 0x08000000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    
+
     let out = cmd.output().map_err(Error::AuthExecStart)?;
     if !out.status.success() {
         return Err(Error::AuthExecRun {
