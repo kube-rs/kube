@@ -66,7 +66,7 @@ pub struct Preferences {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedExtension {
     /// Name of extension
-    pub name: Option<String>,
+    pub name: String,
     /// Additional information for extenders so that reads and writes don't clobber unknown fields
     pub extension: serde_json::Value,
 }
