@@ -501,7 +501,7 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 
     #[cfg(target_os = "windows")]
     {
-        static CREATE_NO_WINDOW: u32 = 0x08000000;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
