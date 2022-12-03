@@ -66,7 +66,6 @@ pub struct Preferences {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedExtension {
     /// Name of extension
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// Additional information for extenders so that reads and writes don't clobber unknown fields
     pub extension: serde_json::Value,
