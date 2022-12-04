@@ -350,7 +350,17 @@ impl Kubeconfig {
     ///
     /// Panics if `KUBECONFIG` value contains the NUL character.
     pub fn from_env() -> Result<Option<Self>, KubeconfigError> {
-        match std::env::var_os(KUBECONFIG) {
+        Self::from_custom_env(KUBECONFIG)
+    }
+
+    /// Create `Kubeconfig` from a given environment variable.
+    /// Supports list of files to be merged.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the environment variable value contains the NUL character.
+    pub fn from_custom_env(env_name: &str) -> Result<Option<Self>, KubeconfigError> {
+        match std::env::var_os(env_name) {
             Some(value) => {
                 let paths = std::env::split_paths(&value)
                     .filter(|p| !p.as_os_str().is_empty())
