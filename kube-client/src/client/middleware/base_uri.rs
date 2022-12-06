@@ -70,7 +70,7 @@ fn set_base_uri(base_uri: &http::Uri, req_pandq: Option<&uri::PathAndQuery>) -> 
             // Remove any trailing slashes and join.
             // `PathAndQuery` always starts with a slash.
             let base_path = pandq.path().trim_end_matches('/');
-            builder.path_and_query(format!("{}{}", base_path, req_pandq))
+            builder.path_and_query(format!("{base_path}{req_pandq}"))
         } else {
             builder.path_and_query(pandq.as_str())
         };
