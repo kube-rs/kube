@@ -179,8 +179,7 @@ fn merge_metadata(
         (Some(common_type), Some(variant_type)) => {
             if *common_type != variant_type {
                 panic!(
-                    "variant defined type {:?}, conflicting with existing type {:?}",
-                    variant_type, common_type
+                    "variant defined type {variant_type:?}, conflicting with existing type {common_type:?}"
                 );
             }
         }

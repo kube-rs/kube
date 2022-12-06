@@ -1,7 +1,6 @@
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
 use k8s_openapi::api::core::v1::Pod;
 
-#[cfg(unix)] use crossterm::event::Event;
 use kube::{
     api::{Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, TerminalSize},
     runtime::wait::{await_condition, conditions::is_pod_running},
@@ -19,7 +18,7 @@ async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), a
     // create a stream to catch SIGWINCH signal
     let mut sig = signal::unix::signal(signal::unix::SignalKind::window_change())?;
     loop {
-        if sig.recv().await == None {
+        if (sig.recv().await).is_none() {
             return Ok(());
         }
 
@@ -127,6 +126,6 @@ async fn main() -> anyhow::Result<()> {
             assert_eq!(pdel.name_any(), "example");
         });
 
-    println!("");
+    println!();
     Ok(())
 }
