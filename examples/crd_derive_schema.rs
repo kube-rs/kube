@@ -250,7 +250,7 @@ async fn delete_crd(client: Client) -> Result<()> {
                 return Ok(());
             }
         }
-        Err(anyhow!(format!("CRD not deleted after {} seconds", timeout_secs)))
+        Err(anyhow!(format!("CRD not deleted after {timeout_secs} seconds")))
     } else {
         Ok(())
     }
