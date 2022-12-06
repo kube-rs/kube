@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+
 use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
 use http::{
@@ -21,6 +22,7 @@ use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
 
 #[cfg(feature = "oauth")] mod oauth;
 #[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
+#[cfg(target_os = "windows")] use std::os::windows::process::CommandExt;
 
 #[derive(Error, Debug)]
 /// Client auth errors
@@ -502,6 +504,12 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
         for env in envs {
             cmd.env_remove(env);
         }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
     let out = cmd.output().map_err(Error::AuthExecStart)?;
