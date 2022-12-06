@@ -392,7 +392,7 @@ impl Kubeconfig {
     /// >   Example: Preserve the context of the first file to set `current-context`.
     /// >   Example: If two files specify a `red-user`, use only values from the first file's `red-user`.
     /// >            Even if the second file has non-conflicting entries under `red-user`, discard them.
-    fn merge(mut self, next: Kubeconfig) -> Result<Self, KubeconfigError> {
+    pub fn merge(mut self, next: Kubeconfig) -> Result<Self, KubeconfigError> {
         if self.kind.is_some() && next.kind.is_some() && self.kind != next.kind {
             return Err(KubeconfigError::KindMismatch);
         }
