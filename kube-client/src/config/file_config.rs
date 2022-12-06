@@ -708,7 +708,7 @@ username: user
 password: kube_rs
 "#;
         let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
-        let authinfo_debug_output = format!("{:?}", authinfo);
+        let authinfo_debug_output = format!("{authinfo:?}");
         let expected_output = "AuthInfo { \
         username: Some(\"user\"), \
         password: Some(Secret([REDACTED alloc::string::String])), \

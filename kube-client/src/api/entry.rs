@@ -429,11 +429,11 @@ mod tests {
 
         let mut entry = match api.entry(object_name).await? {
             Entry::Occupied(entry) => entry,
-            entry => panic!("entry for existing object must be occupied: {:?}", entry),
+            entry => panic!("entry for existing object must be occupied: {entry:?}"),
         };
         let mut entry2 = match api.entry(object_name).await? {
             Entry::Occupied(entry) => entry,
-            entry => panic!("entry for existing object must be occupied: {:?}", entry),
+            entry => panic!("entry for existing object must be occupied: {entry:?}"),
         };
 
         // Entry is up-to-date, modify cleanly

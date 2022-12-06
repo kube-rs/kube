@@ -141,8 +141,7 @@ impl ApiGroup {
             }
         }
         Err(Error::Discovery(DiscoveryError::MissingKind(format!(
-            "{:?}",
-            gvk
+            "{gvk:?}"
         ))))
     }
 
