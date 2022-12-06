@@ -76,6 +76,10 @@ pub enum Error {
     #[error("failed to parse token-key")]
     ParseTokenKey(#[source] serde_json::Error),
 
+    /// command was missing from exec config
+    #[error("command must be specified to use exec authentication plugin")]
+    MissingCommand,
+
     /// OAuth error
     #[cfg(feature = "oauth")]
     #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -476,7 +480,11 @@ pub struct ExecCredentialStatus {
 }
 
 fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
-    let mut cmd = Command::new(&auth.command);
+    let mut cmd = match &auth.command {
+        Some(cmd) => Command::new(cmd),
+        None => return Err(Error::MissingCommand),
+    };
+
     if let Some(args) = &auth.args {
         cmd.args(args);
     }
@@ -547,7 +555,7 @@ mod test {
         );
 
         let config: Kubeconfig = serde_yaml::from_str(&test_file).unwrap();
-        let auth_info = &config.auth_infos[0].auth_info;
+        let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
         match Auth::try_from(auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
