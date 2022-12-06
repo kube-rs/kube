@@ -161,8 +161,7 @@ mod test {
         assert_eq!(
             tokenreviewstatus.user.unwrap().username,
             Some(format!(
-                "system:serviceaccount:{}:{}",
-                serviceaccount_namespace, serviceaccount_name
+                "system:serviceaccount:{serviceaccount_namespace}:{serviceaccount_name}"
             ))
         );
 

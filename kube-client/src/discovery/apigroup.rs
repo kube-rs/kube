@@ -140,10 +140,7 @@ impl ApiGroup {
                 return Ok((ar, caps));
             }
         }
-        Err(Error::Discovery(DiscoveryError::MissingKind(format!(
-            "{:?}",
-            gvk
-        ))))
+        Err(Error::Discovery(DiscoveryError::MissingKind(format!("{gvk:?}"))))
     }
 
     // shortcut method to give cheapest return for a pinned group

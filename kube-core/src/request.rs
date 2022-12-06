@@ -567,6 +567,6 @@ mod test {
         let lp = ListParams::default().limit(5);
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let err = Request::new(url).watch(&lp, "0").unwrap_err();
-        assert!(format!("{}", err).contains("limit cannot be used with a watch"));
+        assert!(format!("{err}").contains("limit cannot be used with a watch"));
     }
 }

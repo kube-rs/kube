@@ -382,7 +382,7 @@ impl Client {
     /// # }
     /// ```
     pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
-        let url = format!("/apis/{}", apiversion);
+        let url = format!("/apis/{apiversion}");
         self.request(
             Request::builder()
                 .uri(url)
@@ -405,7 +405,7 @@ impl Client {
 
     /// Lists resources served in particular `core` group version.
     pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
-        let url = format!("/api/{}", version);
+        let url = format!("/api/{version}");
         self.request(
             Request::builder()
                 .uri(url)
@@ -435,7 +435,7 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
             let ae = ErrorResponse {
                 status: s.to_string(),
                 code: s.as_u16(),
-                message: format!("{:?}", text),
+                message: format!("{text:?}"),
                 reason: "Failed to parse error data".into(),
             };
             tracing::debug!("Unsuccessful: {:?} (reconstruct)", ae);

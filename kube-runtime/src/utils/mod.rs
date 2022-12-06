@@ -78,8 +78,7 @@ where
                             "`try_extract_item_case` returned `None` despite `should_consume_item` returning `true`",
                         ))),
                         res => panic!(
-                    "Peekable::poll_next() returned {:?} when Peekable::peek() returned Ready(Some(_))",
-                    res
+                    "Peekable::poll_next() returned {res:?} when Peekable::peek() returned Ready(Some(_))"
                 ),
                     }
                 } else {
