@@ -125,7 +125,7 @@ impl App {
 
     async fn watch(&self, api: Api<DynamicObject>, mut lp: ListParams) -> Result<()> {
         if let Some(n) = &self.name {
-            lp = lp.fields(&format!("metadata.name={}", n));
+            lp = lp.fields(&format!("metadata.name={n}"));
         }
         // present a dumb table for it for now. kubectl does not do this anymore.
         let mut stream = watcher(api, lp).applied_objects().boxed();
@@ -196,7 +196,7 @@ async fn main() -> Result<()> {
     if let Some(resource) = &app.resource {
         // Common discovery, parameters, and api configuration for a single resource
         let (ar, caps) = resolve_api_resource(&discovery, resource)
-            .with_context(|| format!("resource {:?} not found in cluster", resource))?;
+            .with_context(|| format!("resource {resource:?} not found in cluster"))?;
         let mut lp = ListParams::default();
         if let Some(label) = &app.selector {
             lp = lp.labels(label);
@@ -238,9 +238,9 @@ fn format_creation_since(time: Option<Time>) -> String {
 }
 fn format_duration(dur: Duration) -> String {
     match (dur.num_days(), dur.num_hours(), dur.num_minutes()) {
-        (days, _, _) if days > 0 => format!("{}d", days),
-        (_, hours, _) if hours > 0 => format!("{}h", hours),
-        (_, _, mins) => format!("{}m", mins),
+        (days, _, _) if days > 0 => format!("{days}d"),
+        (_, hours, _) if hours > 0 => format!("{hours}h"),
+        (_, _, mins) => format!("{mins}m"),
     }
 }
 

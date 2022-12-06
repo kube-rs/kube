@@ -39,7 +39,7 @@ pub(crate) fn parse_apicapabilities(list: &APIResourceList, name: &str) -> Resul
         Scope::Cluster
     };
 
-    let subresource_name_prefix = format!("{}/", name);
+    let subresource_name_prefix = format!("{name}/");
     let mut subresources = vec![];
     for res in &list.resources {
         if let Some(subresource_name) = res.name.strip_prefix(&subresource_name_prefix) {
