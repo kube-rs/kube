@@ -25,7 +25,7 @@ pub enum Error {
     WatchError(#[source] kube_client::error::ErrorResponse),
     #[error("watch stream failed: {0}")]
     WatchFailed(#[source] kube_client::Error),
-    #[error("No metadata.resourceVersion in watch result (does kind support watch?)")]
+    #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
     NoResourceVersion,
     #[error("too many objects matched search criteria")]
     TooManyObjects,
