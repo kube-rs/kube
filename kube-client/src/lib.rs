@@ -234,7 +234,7 @@ mod test {
         let mut stream = pods.watch(&lp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
             // can debug format watch event
-            let _ = format!("we: {:?}", ev);
+            let _ = format!("we: {ev:?}");
             match ev {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
@@ -243,7 +243,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }
@@ -321,7 +321,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }
@@ -361,7 +361,7 @@ mod test {
             let next_stdout = stdout_stream.next();
             stdin_writer.write_all(b"echo test string 1\n").await?;
             let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
-            println!("{}", stdout);
+            println!("{stdout}");
             assert_eq!(stdout, "test string 1\n");
 
             // AttachedProcess resolves with status object.
@@ -369,7 +369,7 @@ mod test {
             stdin_writer.write_all(b"exit 1\n").await?;
             let status = attached.take_status().unwrap();
             if let Some(status) = status.await {
-                println!("{:?}", status);
+                println!("{status:?}");
                 assert_eq!(status.status, Some("Failure".to_owned()));
                 assert_eq!(status.reason, Some("NonZeroExitCode".to_owned()));
             }
@@ -435,7 +435,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }

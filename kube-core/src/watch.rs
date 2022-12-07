@@ -34,7 +34,7 @@ impl<K> Debug for WatchEvent<K> {
             WatchEvent::Modified(_) => write!(f, "Modified event"),
             WatchEvent::Deleted(_) => write!(f, "Deleted event"),
             WatchEvent::Bookmark(_) => write!(f, "Bookmark event"),
-            WatchEvent::Error(e) => write!(f, "Error event: {:?}", e),
+            WatchEvent::Error(e) => write!(f, "Error event: {e:?}"),
         }
     }
 }

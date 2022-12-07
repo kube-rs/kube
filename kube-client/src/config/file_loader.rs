@@ -66,11 +66,12 @@ impl ConfigLoader {
         } else {
             return Err(KubeconfigError::CurrentContextNotSet);
         };
+
         let current_context = config
             .contexts
             .iter()
             .find(|named_context| &named_context.name == context_name)
-            .map(|named_context| &named_context.context)
+            .and_then(|named_context| named_context.context.clone())
             .ok_or_else(|| KubeconfigError::LoadContext(context_name.clone()))?;
 
         let cluster_name = cluster.unwrap_or(&current_context.cluster);
@@ -78,7 +79,7 @@ impl ConfigLoader {
             .clusters
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
-            .map(|named_cluster| &named_cluster.cluster)
+            .and_then(|named_cluster| named_cluster.cluster.clone())
             .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
         let user_name = user.unwrap_or(&current_context.user);
@@ -86,13 +87,13 @@ impl ConfigLoader {
             .auth_infos
             .iter()
             .find(|named_user| &named_user.name == user_name)
-            .map(|named_user| &named_user.auth_info)
+            .and_then(|named_user| named_user.auth_info.clone())
             .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
 
         Ok(ConfigLoader {
-            current_context: current_context.clone(),
-            cluster: cluster.clone(),
-            user: user.clone(),
+            current_context: current_context,
+            cluster: cluster,
+            user: user,
         })
     }
 
