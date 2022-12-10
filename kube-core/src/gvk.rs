@@ -132,7 +132,7 @@ impl GroupVersionResource {
         let api_version = if group.is_empty() {
             version.to_string()
         } else {
-            format!("{}/{}", group, version)
+            format!("{group}/{version}")
         };
 
         Self {

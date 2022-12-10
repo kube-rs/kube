@@ -72,21 +72,23 @@ pub struct NamedExtension {
 }
 
 /// NamedCluster associates name with cluster.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedCluster {
     /// Name of cluster
     pub name: String,
     /// Information about how to communicate with a kubernetes cluster
-    pub cluster: Cluster,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<Cluster>,
 }
 
 /// Cluster stores information to connect Kubernetes cluster.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Cluster {
     /// The address of the kubernetes cluster (https://hostname:port).
-    pub server: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
     /// Skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
     #[serde(rename = "insecure-skip-tls-verify")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -109,14 +111,15 @@ pub struct Cluster {
 }
 
 /// NamedAuthInfo associates name with authentication.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct NamedAuthInfo {
     /// Name of the user
     pub name: String,
     /// Information that describes identity of the user
     #[serde(rename = "user")]
-    pub auth_info: AuthInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_info: Option<AuthInfo>,
 }
 
 fn serialize_secretstring<S>(pw: &Option<SecretString>, serializer: S) -> Result<S::Ok, S::Error>
@@ -133,8 +136,9 @@ fn deserialize_secretstring<'de, D>(deserializer: D) -> Result<Option<SecretStri
 where
     D: Deserializer<'de>,
 {
-    match String::deserialize(deserializer) {
-        Ok(secret) => Ok(Some(SecretString::new(secret))),
+    match Option::<String>::deserialize(deserializer) {
+        Ok(Some(secret)) => Ok(Some(SecretString::new(secret))),
+        Ok(None) => Ok(None),
         Err(e) => Err(e),
     }
 }
@@ -220,6 +224,7 @@ pub struct AuthProviderConfig {
     /// Name of the auth provider
     pub name: String,
     /// Auth provider configuration
+    #[serde(default)]
     pub config: HashMap<String, String>,
 }
 
@@ -234,7 +239,8 @@ pub struct ExecConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<String>,
     /// Command to execute.
-    pub command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
     /// Arguments to pass to the command when executing it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<String>>,
@@ -269,17 +275,18 @@ pub enum ExecInteractiveMode {
 }
 
 /// NamedContext associates name with context.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedContext {
     /// Name of the context
     pub name: String,
     /// Associations for the context
-    pub context: Context,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<Context>,
 }
 
 /// Context stores tuple of cluster and user information.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Context {
     /// Name of the cluster for this context
@@ -308,26 +315,30 @@ impl Kubeconfig {
         for mut config in kubeconfig_from_yaml(&data)? {
             if let Some(dir) = path.as_ref().parent() {
                 for named in config.clusters.iter_mut() {
-                    if let Some(path) = &named.cluster.certificate_authority {
-                        if let Some(abs_path) = to_absolute(dir, path) {
-                            named.cluster.certificate_authority = Some(abs_path);
+                    if let Some(cluster) = &mut named.cluster {
+                        if let Some(path) = &cluster.certificate_authority {
+                            if let Some(abs_path) = to_absolute(dir, path) {
+                                cluster.certificate_authority = Some(abs_path);
+                            }
                         }
                     }
                 }
                 for named in config.auth_infos.iter_mut() {
-                    if let Some(path) = &named.auth_info.client_certificate {
-                        if let Some(abs_path) = to_absolute(dir, path) {
-                            named.auth_info.client_certificate = Some(abs_path);
+                    if let Some(auth_info) = &mut named.auth_info {
+                        if let Some(path) = &auth_info.client_certificate {
+                            if let Some(abs_path) = to_absolute(dir, path) {
+                                auth_info.client_certificate = Some(abs_path);
+                            }
                         }
-                    }
-                    if let Some(path) = &named.auth_info.client_key {
-                        if let Some(abs_path) = to_absolute(dir, path) {
-                            named.auth_info.client_key = Some(abs_path);
+                        if let Some(path) = &auth_info.client_key {
+                            if let Some(abs_path) = to_absolute(dir, path) {
+                                auth_info.client_key = Some(abs_path);
+                            }
                         }
-                    }
-                    if let Some(path) = &named.auth_info.token_file {
-                        if let Some(abs_path) = to_absolute(dir, path) {
-                            named.auth_info.token_file = Some(abs_path);
+                        if let Some(path) = &auth_info.token_file {
+                            if let Some(abs_path) = to_absolute(dir, path) {
+                                auth_info.token_file = Some(abs_path);
+                            }
                         }
                     }
                 }
@@ -398,7 +409,7 @@ impl Kubeconfig {
     /// >   Example: Preserve the context of the first file to set `current-context`.
     /// >   Example: If two files specify a `red-user`, use only values from the first file's `red-user`.
     /// >            Even if the second file has non-conflicting entries under `red-user`, discard them.
-    fn merge(mut self, next: Kubeconfig) -> Result<Self, KubeconfigError> {
+    pub fn merge(mut self, next: Kubeconfig) -> Result<Self, KubeconfigError> {
         if self.kind.is_some() && next.kind.is_some() && self.kind != next.kind {
             return Err(KubeconfigError::KindMismatch);
         }
@@ -542,10 +553,10 @@ mod tests {
             current_context: Some("default".into()),
             auth_infos: vec![NamedAuthInfo {
                 name: "red-user".into(),
-                auth_info: AuthInfo {
+                auth_info: Some(AuthInfo {
                     token: Some(SecretString::from_str("first-token").unwrap()),
                     ..Default::default()
-                },
+                }),
             }],
             ..Default::default()
         };
@@ -554,18 +565,18 @@ mod tests {
             auth_infos: vec![
                 NamedAuthInfo {
                     name: "red-user".into(),
-                    auth_info: AuthInfo {
+                    auth_info: Some(AuthInfo {
                         token: Some(SecretString::from_str("second-token").unwrap()),
                         username: Some("red-user".into()),
                         ..Default::default()
-                    },
+                    }),
                 },
                 NamedAuthInfo {
                     name: "green-user".into(),
-                    auth_info: AuthInfo {
+                    auth_info: Some(AuthInfo {
                         token: Some(SecretString::from_str("new-token").unwrap()),
                         ..Default::default()
-                    },
+                    }),
                 },
             ],
             ..Default::default()
@@ -575,19 +586,21 @@ mod tests {
         // Preserves first `current_context`
         assert_eq!(merged.current_context, Some("default".into()));
         // Auth info with the same name does not overwrite
-        assert_eq!(merged.auth_infos[0].name, "red-user".to_owned());
+        assert_eq!(merged.auth_infos[0].name, "red-user");
         assert_eq!(
             merged.auth_infos[0]
                 .auth_info
+                .as_ref()
+                .unwrap()
                 .token
                 .as_ref()
                 .map(|t| t.expose_secret().to_string()),
             Some("first-token".to_string())
         );
         // Even if it's not conflicting
-        assert_eq!(merged.auth_infos[0].auth_info.username, None);
+        assert_eq!(merged.auth_infos[0].auth_info.as_ref().unwrap().username, None);
         // New named auth info is appended
-        assert_eq!(merged.auth_infos[1].name, "green-user".to_owned());
+        assert_eq!(merged.auth_infos[1].name, "green-user");
     }
 
     #[test]
@@ -651,10 +664,10 @@ users:
 
         assert_eq!(config.clusters[0].name, "eks");
         assert_eq!(config.clusters[1].name, "minikube");
+
+        let cluster1 = config.clusters[1].cluster.as_ref().unwrap();
         assert_eq!(
-            config.clusters[1].cluster.extensions.as_ref().unwrap()[0]
-                .extension
-                .get("provider"),
+            cluster1.extensions.as_ref().unwrap()[0].extension.get("provider"),
             Some(&Value::String("minikube.sigs.k8s.io".to_owned()))
         );
     }
@@ -719,13 +732,24 @@ users:
     }
 
     #[test]
+    fn authinfo_deserialize_null_secret() {
+        let authinfo_yaml = r#"
+username: user
+password: 
+"#;
+        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
+        assert_eq!(authinfo.username, Some("user".to_string()));
+        assert!(authinfo.password.is_none());
+    }
+
+    #[test]
     fn authinfo_debug_does_not_output_password() {
         let authinfo_yaml = r#"
 username: user
 password: kube_rs
 "#;
         let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
-        let authinfo_debug_output = format!("{:?}", authinfo);
+        let authinfo_debug_output = format!("{authinfo:?}");
         let expected_output = "AuthInfo { \
         username: Some(\"user\"), \
         password: Some(Secret([REDACTED alloc::string::String])), \
