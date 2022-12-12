@@ -345,12 +345,12 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 self.types().unwrap()
             }
 
-            fn kind(&self) -> Option<String> {
-                Some(#kind.to_string())
+            fn kind(&self) -> Option<std::borrow::Cow<_, str>> {
+                Some(#kind.into())
             }
 
-            fn api_version(&self) -> Option<String> {
-                Some(#api_ver.to_string())
+            fn api_version(&self) -> Option<std::borrow::Cow<_, str>> {
+                Some(#api_ver.into())
             }
 
             fn meta(&self) -> &#k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
