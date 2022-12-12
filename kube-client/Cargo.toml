@@ -16,7 +16,7 @@ rust-version = "1.60.0"
 edition = "2021"
 
 [features]
-default = ["client", "rustls-tls"]
+default = ["client", "openssl-tls"]
 rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls"]
 openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
