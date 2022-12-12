@@ -24,7 +24,7 @@ jobs:
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Install OpenSSL Libraries for Windows
       - name: install openssl
@@ -82,7 +82,7 @@ jobs:
         toolchain: ${{ steps.msrv.outputs.msrv }}
         profile: minimal
         override: true
-    - uses: Swatinem/rust-cache@v1
+    - uses: Swatinem/rust-cache@v2
     - name: Check
       uses: actions-rs/cargo@v1
       with:
@@ -131,7 +131,7 @@ jobs:
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
@@ -195,7 +195,7 @@ jobs:
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
