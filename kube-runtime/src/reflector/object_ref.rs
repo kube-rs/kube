@@ -68,7 +68,7 @@ impl ObjectRef {
         }
     }
 
-    /// Creates `ObjectRef` from the resource
+    /// Creates an `ObjectRef` from a `TypeInfo`
     #[must_use]
     pub fn from_obj<K: TypeInfo>(obj: &K) -> Self {
         let meta = obj.meta();
@@ -80,13 +80,16 @@ impl ObjectRef {
         }
     }
 
-    /// Creates a partial `ObjectRef` from an `OwnerReference`
+    /// Creates an `ObjectRef` from an `OwnerReference`
     #[must_use]
     pub fn from_owner(owner: &OwnerReference) -> Self {
         Self {
             name: owner.name.clone(),
             namespace: None,
-            types: None,
+            types: Some(TypeMeta {
+                api_version: owner.api_version.clone(),
+                kind: owner.kind.clone(),
+            }),
             extra: Extra {
                 resource_version: None,
                 uid: Some(owner.uid.clone()),
