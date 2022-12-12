@@ -345,11 +345,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 self.types().unwrap()
             }
 
-            fn kind(&self) -> Option<std::borrow::Cow<_, str>> {
+            fn kind(&self) -> Option<std::borrow::Cow<'_, str>> {
                 Some(#kind.into())
             }
 
-            fn api_version(&self) -> Option<std::borrow::Cow<_, str>> {
+            fn api_version(&self) -> Option<std::borrow::Cow<'_, str>> {
                 Some(#api_ver.into())
             }
 
