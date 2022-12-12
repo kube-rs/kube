@@ -554,7 +554,7 @@ where
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
     ///
     /// To define the `Watched` relation with `K`, you **must** define a custom relation mapper, which,
-    /// when given a `Watched` object, returns an option or iterator of relevant `ObjectRef<K>` to reconcile.
+    /// when given a `Watched` object, returns an option or iterator of relevant `ObjectRef` to reconcile.
     ///
     /// If the relation `K` has to `Watched` is that `K` owns `Watched`, consider using [`Controller::owns`].
     ///
@@ -604,8 +604,8 @@ where
     ///                 .annotations()
     ///                 .get("operator-sdk/primary-resource")?
     ///                 .split_once('/')?;
-    ///
-    ///             Some(ObjectRef::new(name).within(namespace))
+    ///             
+    ///             Some(ObjectRef::from_resource::<WatchedResource>(name).within(namespace))
     ///         }
     ///     )
     ///     .run(reconcile, error_policy, context)

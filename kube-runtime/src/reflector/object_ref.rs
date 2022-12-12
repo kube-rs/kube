@@ -1,21 +1,39 @@
 use derivative::Derivative;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
-use kube_client::core::{ObjectMeta, TypeInfo, TypeMeta};
+use kube_client::core::{ObjectMeta, Resource, TypeInfo, TypeMeta};
 use std::fmt::{Debug, Display};
 use thiserror::Error;
 
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Eq, Hash, Clone)]
 
-/// A named, typed and namedspaced reference to a Kubernetes object
+/// A dynamically typed reference to an object along with its namespace
+///
+/// Intended to be constructed from one of three sources:
+/// 1. an object returned by the apiserver through the `TypeInfo` trait
+/// 2. an `OwnerReference` found on an object returned by the apiserver
+/// 3. a type implementing `TypeInfo` but with only a `name` pointing to the type
 ///
 /// ```
-/// use kube_client::core::{Resource};
-/// use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
-/// use kube_runtime::reflector::ObjectRef;
-/// assert_ne!(
-///     ObjectRef::new("a").within("ns").with_types(&<Deployment as Resource>::typemeta().unwrap()),
-///     ObjectRef::new("a").within("ns").with_types(&<Pod as Resource>::typemeta().unwrap()),
+/// use kube_client::core::Resource;
+/// use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
+/// # use k8s_openapi::api::core::v1::Pod;
+/// # use kube_runtime::reflector::ObjectRef;
+/// let mut pod = Pod::default();
+/// pod.meta_mut().name = Some("foo".into());
+/// let oref = OwnerReference {
+///    api_version: "v1".into(),
+///    kind: "Pod".into(),
+///    name: "foo".into(),
+///    ..OwnerReference::default()
+/// };
+/// assert_eq!(
+///     ObjectRef::from_obj(&pod).within("ns"),
+///     ObjectRef::from_owner(&oref).within("ns"),
+/// );
+/// assert_eq!(
+///     ObjectRef::from_obj(&pod).within("ns"),
+///     ObjectRef::from_resource::<Pod>("foo").within("ns")
 /// );
 /// ```
 #[non_exhaustive]
@@ -25,14 +43,11 @@ pub struct ObjectRef {
     /// The namespace of the object
     ///
     /// May only be `None` if the kind is cluster-scoped (not located in a namespace).
-    /// Note that it *is* acceptable for an `ObjectRef` to a cluster-scoped resource to
-    /// have a namespace. These are, however, not considered equal:
     ///
-    /// ```
-    /// # use kube_runtime::reflector::ObjectRef;
-    /// # use k8s_openapi::api::core::v1::ConfigMap;
-    /// assert_ne!(ObjectRef::new("foo"), ObjectRef::new("foo").within("bar"));
-    /// ```
+    /// When constructing an `ObjectRef` be sure to either:
+    ///
+    /// 1. supply a **known** namespace using `ObjectRef::within`
+    /// 2. supply an **optional** namespace using `ObjectRef::with_namespace` (when being generic over kinds)
     pub namespace: Option<String>,
     /// The TypeMeta of the object
     pub types: Option<TypeMeta>,
@@ -57,19 +72,7 @@ pub struct Extra {
 }
 
 impl ObjectRef {
-    /// Create a blank `ObjectRef` with a name
-    /// TODO: remove in favour of better doc construction (unused internally)
-    #[must_use]
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.into(),
-            namespace: None,
-            types: None,
-            extra: Extra::default(),
-        }
-    }
-
-    /// Creates an `ObjectRef` from a `TypeInfo`
+    /// Creates an `ObjectRef` from an object implementing `TypeInfo`
     #[must_use]
     pub fn from_obj<K: TypeInfo>(obj: &K) -> Self {
         let meta = obj.meta();
@@ -95,6 +98,17 @@ impl ObjectRef {
                 resource_version: None,
                 uid: Some(owner.uid.clone()),
             },
+        }
+    }
+
+    /// Creates an `ObjectRef` from a `Resource` along with name
+    #[must_use]
+    pub fn from_resource<K: Resource>(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            namespace: None,
+            types: K::typemeta(),
+            extra: Extra::default(),
         }
     }
 
@@ -187,34 +201,20 @@ mod tests {
     use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
     use kube_client::{core::TypeMeta, Resource};
 
-
     #[test]
     fn display_should_follow_expected_format() {
-        let pod_type = <Pod as Resource>::typemeta().unwrap();
-        assert_eq!(
-            format!(
-                "{}",
-                ObjectRef::new("my-pod")
-                    .within("my-namespace")
-                    .with_types(&pod_type)
-            ),
-            "Pod.v1/my-pod.my-namespace"
-        );
-        let deploy_type = <Deployment as Resource>::typemeta().unwrap();
-        assert_eq!(
-            format!(
-                "{}",
-                ObjectRef::new("my-deploy")
-                    .within("my-namespace")
-                    .with_types(&deploy_type)
-            ),
-            "Deployment.apps/v1/my-deploy.my-namespace"
-        );
+        let pod = ObjectRef::from_resource::<Pod>("my-pod").within("my-ns");
+        assert_eq!(format!("{}", pod), "Pod.v1/my-pod.my-ns");
+        let deploy = ObjectRef::from_resource::<Deployment>("my-dep").within("my-ns");
+        assert_eq!(format!("{}", deploy), "Deployment.apps/v1/my-dep.my-ns");
     }
 
     #[test]
     fn comparison_should_ignore_extra() {
-        let minimal = ObjectRef::new("my-pod").within("my-namespace");
+        let mut pod = Pod::default();
+        pod.meta_mut().name = Some("my-pod".into());
+        pod.meta_mut().namespace = Some("my-namespace".into());
+        let minimal = ObjectRef::from_obj(&pod);
         let with_extra = ObjectRef {
             extra: Extra {
                 resource_version: Some("123".to_string()),
