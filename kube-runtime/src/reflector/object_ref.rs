@@ -58,6 +58,7 @@ pub struct Extra {
 
 impl ObjectRef {
     /// Create a blank `ObjectRef` with a name
+    /// TODO: remove in favour of better doc construction (unused internally)
     #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
@@ -106,12 +107,6 @@ impl ObjectRef {
     #[must_use]
     pub fn with_namespace(mut self, namespace: Option<&str>) -> Self {
         self.namespace = namespace.map(String::from);
-        self
-    }
-
-    #[must_use]
-    pub fn with_uid(mut self, owner: &OwnerReference) -> Self {
-        self.extra.uid = Some(owner.uid.clone());
         self
     }
 

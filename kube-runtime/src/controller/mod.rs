@@ -106,7 +106,7 @@ where
 pub fn trigger_self<K, S>(stream: S) -> impl Stream<Item = Result<ReconcileRequest, S::Error>>
 where
     S: TryStream<Ok = K>,
-    K: Resource + TypeInfo,
+    K: TypeInfo,
 {
     trigger_with(stream, move |obj| {
         Some(ReconcileRequest {
@@ -129,7 +129,6 @@ where
 {
     trigger_with(stream, move |obj| {
         let meta = TypeInfo::meta(&obj).clone();
-        let types = obj.types_unchecked();
         let ns = meta.namespace;
         let owner_type = owner_type.clone();
         let child_ref = ObjectRef::from_obj(&obj);
@@ -141,11 +140,7 @@ where
                 owner.api_version == <KOwner as Resource>::api_version(&owner_type)
                     && owner.kind == <KOwner as Resource>::kind(&owner_type)
             })
-            .map(move |owner| {
-                ObjectRef::from_owner(&owner)
-                    .with_namespace(ns.as_deref())
-                    .with_types(&types)
-            })
+            .map(move |owner| ObjectRef::from_owner(&owner).with_namespace(ns.as_deref()))
             .map(move |owner_ref| ReconcileRequest {
                 obj_ref: owner_ref,
                 reason: ReconcileReason::RelatedObjectUpdated {
