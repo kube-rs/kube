@@ -69,6 +69,10 @@ pub enum KubeconfigError {
     #[error("the structure of the parsed kubeconfig is invalid: {0}")]
     InvalidStructure(#[source] serde_yaml::Error),
 
+    /// Cluster url is missing on selected cluster
+    #[error("cluster url is missing on selected cluster")]
+    MissingClusterUrl,
+
     /// Failed to parse cluster url
     #[error("failed to parse cluster url: {0}")]
     ParseClusterUrl(#[source] http::uri::InvalidUri),
@@ -316,6 +320,8 @@ impl Config {
         let cluster_url = loader
             .cluster
             .server
+            .clone()
+            .ok_or(KubeconfigError::MissingClusterUrl)?
             .parse::<http::Uri>()
             .map_err(KubeconfigError::ParseClusterUrl)?;
 
@@ -413,8 +419,8 @@ const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
 
 // Expose raw config structs
 pub use file_config::{
-    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedAuthInfo, NamedCluster,
-    NamedContext, NamedExtension, Preferences,
+    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, ExecInteractiveMode, Kubeconfig,
+    NamedAuthInfo, NamedCluster, NamedContext, NamedExtension, Preferences,
 };
 
 #[cfg(test)]

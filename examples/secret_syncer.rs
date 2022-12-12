@@ -32,7 +32,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
     let name = cm.metadata.name.as_deref().ok_or(Error::NoName)?;
-    Ok(format!("cmsyncer-{}", name))
+    Ok(format!("cmsyncer-{name}"))
 }
 
 async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {

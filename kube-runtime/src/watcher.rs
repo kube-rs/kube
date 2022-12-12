@@ -25,6 +25,8 @@ pub enum Error {
     WatchError(#[source] kube_client::error::ErrorResponse),
     #[error("watch stream failed: {0}")]
     WatchFailed(#[source] kube_client::Error),
+    #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
+    NoResourceVersion,
     #[error("too many objects matched search criteria")]
     TooManyObjects,
 }
@@ -139,9 +141,15 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
         State::Empty => match api.list(list_params).await {
-            Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                resource_version: list.metadata.resource_version.unwrap(),
-            }),
+            Ok(list) => {
+                if let Some(resource_version) = list.metadata.resource_version {
+                    (Some(Ok(Event::Restarted(list.items))), State::InitListed {
+                        resource_version,
+                    })
+                } else {
+                    (Some(Err(Error::NoResourceVersion)), State::Empty)
+                }
+            }
             Err(err) => (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty),
         },
         State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {

@@ -1,6 +1,6 @@
 [package]
 name = "kube-client"
-version = "0.75.0"
+version = "0.76.0"
 description = "Kubernetes client"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -37,7 +37,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 base64 = { version = "0.13.0", optional = true }
-chrono = { version = "0.4.19", optional = true, default-features = false }
+chrono = { version = "0.4.23", optional = true, default-features = false }
 dirs = { package = "dirs-next", optional = true, version = "2.0.0" }
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
@@ -53,12 +53,12 @@ rustls = { version = "0.20.3", features = ["dangerous_configuration"], optional 
 rustls-pemfile = { version = "1.0.0", optional = true }
 bytes = { version = "1.1.0", optional = true }
 tokio = { version = "1.14.0", features = ["time", "signal", "sync"], optional = true }
-kube-core = { path = "../kube-core", version = "=0.75.0" }
+kube-core = { path = "../kube-core", version = "=0.76.0" }
 jsonpath_lib = { version = "0.3.0", optional = true }
 tokio-util = { version = "0.7.0", optional = true, features = ["io", "codec"] }
 hyper = { version = "0.14.13", optional = true, features = ["client", "http1", "stream", "tcp"] }
 hyper-rustls = { version = "0.23.1", optional = true }
-tokio-tungstenite = { version = "0.17.1", optional = true }
+tokio-tungstenite = { version = "0.18.0", optional = true }
 tower = { version = "0.4.6", optional = true, features = ["buffer", "filter", "util"] }
 tower-http = { version = "0.3.2", optional = true, features = ["auth", "map-response-body", "trace"] }
 hyper-timeout = {version = "0.4.1", optional = true }
@@ -66,7 +66,7 @@ tame-oauth = { version = "0.7.0", features = ["gcp"], optional = true }
 pin-project = { version = "1.0.4", optional = true }
 rand = { version = "0.8.3", optional = true }
 secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
-tracing = { version = "0.1.29", features = ["log"], optional = true }
+tracing = { version = "0.1.36", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
 
 [dependencies.k8s-openapi]
