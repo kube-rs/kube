@@ -2,6 +2,7 @@
 use crate::{DynamicObject, Object};
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 /// Type information that is flattened into every kubernetes object
 #[derive(Deserialize, Serialize, Clone, Default, Debug, Eq, PartialEq, Hash)]
@@ -32,9 +33,9 @@ pub trait TypeInfo {
     fn types_unchecked(&self) -> TypeMeta;
 
     /// Get the `kind` of an object
-    fn kind(&self) -> Option<String>;
+    fn kind(&self) -> Option<Cow<'_, str>>;
     /// Get the `apiVersion` of any object
-    fn api_version(&self) -> Option<String>;
+    fn api_version(&self) -> Option<Cow<'_, str>>;
     /// Get a reference to the `ObjectMeta` of an object
     fn meta(&self) -> &ObjectMeta;
     /// Get a mutable reference to the `ObjectMeta` of an Object
@@ -59,11 +60,11 @@ where
         }
     }
 
-    fn kind(&self) -> Option<String> {
+    fn kind(&self) -> Option<Cow<'_, str>> {
         Some(K::KIND.into())
     }
 
-    fn api_version(&self) -> Option<String> {
+    fn api_version(&self) -> Option<Cow<'_, str>> {
         Some(K::API_VERSION.into())
     }
 
@@ -90,12 +91,12 @@ where
         self.types.clone().unwrap()
     }
 
-    fn kind(&self) -> Option<String> {
-        self.types.as_ref().map(|t| t.kind.clone())
+    fn kind(&self) -> Option<Cow<'_, str>> {
+        self.types.as_ref().map(|t| Cow::Borrowed(t.kind.as_ref()))
     }
 
-    fn api_version(&self) -> Option<String> {
-        self.types.as_ref().map(|t| t.api_version.clone())
+    fn api_version(&self) -> Option<Cow<'_, str>> {
+        self.types.as_ref().map(|t| Cow::Borrowed(t.api_version.as_ref()))
     }
 
     fn meta(&self) -> &ObjectMeta {
@@ -116,12 +117,12 @@ impl TypeInfo for DynamicObject {
         self.types.clone().unwrap()
     }
 
-    fn kind(&self) -> Option<String> {
-        self.types.as_ref().map(|t| t.kind.clone())
+    fn kind(&self) -> Option<Cow<'_, str>> {
+        self.types.as_ref().map(|t| Cow::Borrowed(t.kind.as_ref()))
     }
 
-    fn api_version(&self) -> Option<String> {
-        self.types.as_ref().map(|t| t.api_version.clone())
+    fn api_version(&self) -> Option<Cow<'_, str>> {
+        self.types.as_ref().map(|t| Cow::Borrowed(t.api_version.as_ref()))
     }
 
     fn meta(&self) -> &ObjectMeta {
