@@ -224,15 +224,22 @@ impl Config {
     }
 
     /// Load an in-cluster Kubernetes client configuration using
-    /// [`Config::incluster_dns`].
+    /// [`Config::incluster_env`].
     ///
-    /// The `rustls-tls` feature is currently incompatible with
-    /// [`Config::incluster_env`]. See
-    /// <https://github.com/kube-rs/kube/issues/1003>.
+    /// # Rustls-specific behavior
+    /// Rustls does not support validating IP addresses (see
+    /// <https://github.com/kube-rs/kube/issues/1003>).
+    /// To work around this, when rustls is configured, this function automatically appends
+    /// `tls-server-name = "kubernetes.default.svc"` to the resulting configuration.
+    /// To opt out of this behavior, use [`Config::incluster_env`] or
+    /// [`Config::incluster_dns`] instead.
     #[cfg(feature = "rustls-tls")]
     pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_dns()
+        let mut cfg = Self::incluster_env()?;
+        cfg.tls_server_name = Some("kubernetes.default.svc".to_string());
+        Ok(cfg)
     }
+
 
     /// Load an in-cluster config using the `KUBERNETES_SERVICE_HOST` and
     /// `KUBERNETES_SERVICE_PORT` environment variables.
