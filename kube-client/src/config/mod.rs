@@ -231,8 +231,7 @@ impl Config {
     /// <https://github.com/kube-rs/kube/issues/1003>).
     /// To work around this, when rustls is configured, this function automatically appends
     /// `tls-server-name = "kubernetes.default.svc"` to the resulting configuration.
-    /// To opt out of this behavior, use [`Config::incluster_env`] or
-    /// [`Config::incluster_dns`] instead.
+    /// Overriding or unsetting `Config::tls_server_name` can be done to opt out of this behaviour.
     #[cfg(feature = "rustls-tls")]
     pub fn incluster() -> Result<Self, InClusterError> {
         let mut cfg = Self::incluster_env()?;
@@ -247,9 +246,7 @@ impl Config {
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     ///
     /// This method matches the behavior of the official Kubernetes client
-    /// libraries, but it is not compatible with the `rustls-tls` feature . When
-    /// this feature is enabled, [`Config::incluster_dns`] should be used
-    /// instead. See <https://github.com/kube-rs/kube/issues/1003>.
+    /// libraries and is the default for both TLS stacks.
     pub fn incluster_env() -> Result<Self, InClusterError> {
         let uri = incluster_config::try_kube_from_env()?;
         Self::incluster_with_uri(uri)
@@ -262,7 +259,9 @@ impl Config {
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     ///
     /// This behavior does not match that of the official Kubernetes clients,
-    /// but this approach is compatible with the `rustls-tls` feature.
+    /// but this approach is compatible with the `rustls-tls` feature
+    /// without setting `tls_server_name`.
+    /// See <https://github.com/kube-rs/kube/issues/1003>.
     pub fn incluster_dns() -> Result<Self, InClusterError> {
         Self::incluster_with_uri(incluster_config::kube_dns())
     }
