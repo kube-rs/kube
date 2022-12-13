@@ -246,7 +246,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 ///     watcher(pods, ListParams::default()).applied_objects()
 ///         .try_for_each(|p| async move {
-///          println!("Applied: {}", p.name());
+///          println!("Applied: {}", p.name_any());
 ///             Ok(())
 ///         })
 ///         .await?;
