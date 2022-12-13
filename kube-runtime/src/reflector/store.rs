@@ -2,7 +2,7 @@ use super::ObjectRef;
 use crate::watcher;
 use ahash::AHashMap;
 use derivative::Derivative;
-use kube_client::{core::TypeInfo, Resource};
+use kube_client::{core::Inspect, Resource};
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
@@ -18,7 +18,7 @@ pub struct Writer<K: 'static + Resource> {
     store: Cache<K>,
 }
 
-impl<K: 'static + Resource + TypeInfo + Clone> Writer<K> {
+impl<K: 'static + Resource + Inspect + Clone> Writer<K> {
     /// Creates a new Writer with the specified dynamic type.
     #[must_use]
     pub fn new() -> Self {
@@ -74,7 +74,7 @@ pub struct Store<K: 'static + Resource> {
     store: Cache<K>,
 }
 
-impl<K: 'static + Clone + Resource + TypeInfo> Store<K>
+impl<K: 'static + Clone + Resource + Inspect> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -120,7 +120,7 @@ where
 #[must_use]
 pub fn store<K>() -> (Store<K>, Writer<K>)
 where
-    K: Resource + TypeInfo + Clone + 'static,
+    K: Resource + Inspect + Clone + 'static,
 {
     let w = Writer::<K>::default();
     let r = w.as_reader();

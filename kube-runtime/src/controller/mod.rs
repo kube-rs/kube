@@ -20,7 +20,7 @@ use futures::{
 };
 use kube_client::{
     api::{Api, ListParams, Resource},
-    core::TypeInfo,
+    core::Inspect,
 };
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
@@ -106,7 +106,7 @@ where
 pub fn trigger_self<K, S>(stream: S) -> impl Stream<Item = Result<ReconcileRequest, S::Error>>
 where
     S: TryStream<Ok = K>,
-    K: TypeInfo,
+    K: Inspect,
 {
     trigger_with(stream, move |obj| {
         Some(ReconcileRequest {
@@ -123,12 +123,12 @@ pub fn trigger_owners<KOwner, S>(
 ) -> impl Stream<Item = Result<ReconcileRequest, S::Error>>
 where
     S: TryStream,
-    S::Ok: Resource + TypeInfo,
+    S::Ok: Resource + Inspect,
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
-        let meta = TypeInfo::meta(&obj).clone();
+        let meta = Inspect::meta(&obj).clone();
         let ns = meta.namespace;
         let owner_type = owner_type.clone();
         let child_ref = ObjectRef::from_obj(&obj);
@@ -221,7 +221,7 @@ pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
     queue: QueueStream,
 ) -> impl Stream<Item = Result<(ObjectRef, Action), Error<ReconcilerFut::Error, QueueStream::Error>>>
 where
-    K: Clone + Resource + TypeInfo + 'static,
+    K: Clone + Resource + Inspect + 'static,
     K::DynamicType: Debug + Eq + Hash + Clone + Unpin,
     ReconcilerFut: TryFuture<Ok = Action> + Unpin,
     ReconcilerFut::Error: std::error::Error + 'static,
@@ -439,7 +439,7 @@ impl<ReconcilerErr> Future for RescheduleReconciliation<ReconcilerErr> {
 /// ```
 pub struct Controller<K>
 where
-    K: Clone + Resource + TypeInfo + Debug + 'static,
+    K: Clone + Resource + Inspect + Debug + 'static,
     K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
@@ -459,7 +459,7 @@ where
 
 impl<K> Controller<K>
 where
-    K: Clone + Resource + TypeInfo + DeserializeOwned + Debug + Send + Sync + 'static,
+    K: Clone + Resource + Inspect + DeserializeOwned + Debug + Send + Sync + 'static,
     K::DynamicType: Eq + Hash + Clone,
 {
     /// Create a Controller on a type `K`
@@ -541,7 +541,7 @@ where
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
     #[must_use]
-    pub fn owns<Child: Clone + Resource + TypeInfo + DeserializeOwned + Debug + Send + 'static>(
+    pub fn owns<Child: Clone + Resource + Inspect + DeserializeOwned + Debug + Send + 'static>(
         mut self,
         api: Api<Child>,
         lp: ListParams,
@@ -618,7 +618,7 @@ where
     /// [Operator-SDK]: https://sdk.operatorframework.io/docs/building-operators/ansible/reference/retroactively-owned-resources/
     #[must_use]
     pub fn watches<
-        Other: Clone + Resource + TypeInfo + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource + Inspect + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef>,
     >(
         mut self,

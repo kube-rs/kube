@@ -118,7 +118,7 @@ pub trait Resource {
     /// Return `TypeMeta` of a Resource where it can be statically determined
     ///
     /// This is only possible on static types.
-    /// Dynamic types need to find these via discovery or through the `TypeInfo` trait.
+    /// Dynamic types need to find these via discovery or through the `Inspect` trait.
     fn typemeta() -> Option<TypeMeta>;
 }
 

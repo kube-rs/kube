@@ -1,6 +1,6 @@
 use derivative::Derivative;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
-use kube_client::core::{ObjectMeta, Resource, TypeInfo, TypeMeta};
+use kube_client::core::{Inspect, ObjectMeta, Resource, TypeMeta};
 use std::fmt::{Debug, Display};
 use thiserror::Error;
 
@@ -10,9 +10,9 @@ use thiserror::Error;
 /// A dynamically typed reference to an object along with its namespace
 ///
 /// Intended to be constructed from one of three sources:
-/// 1. an object returned by the apiserver through the `TypeInfo` trait
+/// 1. an object returned by the apiserver through the `Inspect` trait
 /// 2. an `OwnerReference` found on an object returned by the apiserver
-/// 3. a type implementing `TypeInfo` but with only a `name` pointing to the type
+/// 3. a type implementing `Inspect` but with only a `name` pointing to the type
 ///
 /// ```
 /// use kube_client::core::Resource;
@@ -72,9 +72,9 @@ pub struct Extra {
 }
 
 impl ObjectRef {
-    /// Creates an `ObjectRef` from an object implementing `TypeInfo`
+    /// Creates an `ObjectRef` from an object implementing `Inspect`
     #[must_use]
-    pub fn from_obj<K: TypeInfo>(obj: &K) -> Self {
+    pub fn from_obj<K: Inspect>(obj: &K) -> Self {
         let meta = obj.meta();
         Self {
             name: meta.name.clone().unwrap_or_default(),
@@ -132,8 +132,8 @@ impl ObjectRef {
 }
 
 #[derive(Debug, Error)]
-#[error("failed to find type information")]
-/// Failed to parse group version
+#[error("missing type information from ObjectRef")]
+/// ObjectRef does not have TypeMeta
 pub struct MissingTypeInfo;
 
 

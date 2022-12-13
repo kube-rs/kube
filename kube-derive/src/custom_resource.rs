@@ -332,7 +332,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     // 3. implement typeinfo trait
     let impl_typeinfo = quote! {
-        impl #kube_core::TypeInfo for #rootident {
+        impl #kube_core::Inspect for #rootident {
 
             fn types(&self) -> Option<#kube_core::TypeMeta> {
                 Some(#kube_core::TypeMeta {

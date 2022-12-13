@@ -15,16 +15,15 @@ pub struct TypeMeta {
     pub kind: String,
 }
 
-/// A runtime accessor trait for TypeMeta
+/// A runtime accessor trait for `TypeMeta`
 ///
-/// This trait can be thought of as a limited variant of the `Resource` trait that reads from runtime properties.
-/// It cannot retrieve the plural, nor the scope of a resource and requires an `ApiResource` for this instead.
-///
-/// For static types is generally leans on the static information, but for dynamic types, it inspects the object.
-pub trait TypeInfo {
+/// This trait is a runtime subset of the `Resource` trait that can read the object directly.
+/// It **cannot** retrieve the plural, **nor** the scope of a resource (which requires an `ApiResource`).
+pub trait Inspect {
     /// Get the `TypeMeta` of an object
     ///
     /// This is a safe `TypeMeta` getter for all object types
+    /// While it is generally safe to unwrap this option, do note that a few endpoints can elide it.
     fn types(&self) -> Option<TypeMeta>;
 
     /// Get the `TypeMeta` of an object that is guaranteed to have it
@@ -42,9 +41,8 @@ pub trait TypeInfo {
     fn meta_mut(&mut self) -> &mut ObjectMeta;
 }
 
-
-// static types always have type info
-impl<K> TypeInfo for K
+// lean on static info on k8s_openapi generated types (safer than runtime lookups)
+impl<K> Inspect for K
 where
     K: k8s_openapi::Resource,
     K: k8s_openapi::Metadata<Ty = ObjectMeta>,
@@ -77,8 +75,8 @@ where
     }
 }
 
-// dynamic types generally have typeinfo, but certain api endpoints can omit it
-impl<P, U> TypeInfo for Object<P, U>
+// always lookup from object in dynamic cases
+impl<P, U> Inspect for Object<P, U>
 where
     P: Clone,
     U: Clone,
@@ -108,7 +106,8 @@ where
     }
 }
 
-impl TypeInfo for DynamicObject {
+// always lookup from object in dynamic cases
+impl Inspect for DynamicObject {
     fn types(&self) -> Option<TypeMeta> {
         self.types.clone()
     }
@@ -133,5 +132,3 @@ impl TypeInfo for DynamicObject {
         &mut self.metadata
     }
 }
-
-// NB: we can implement ResourceExt for things that impl TypeInfo but not Resource
