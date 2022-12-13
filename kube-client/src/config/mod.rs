@@ -218,24 +218,19 @@ impl Config {
 
     /// Load an in-cluster Kubernetes client configuration using
     /// [`Config::incluster_env`].
-    #[cfg(not(feature = "rustls-tls"))]
-    pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_env()
-    }
-
-    /// Load an in-cluster Kubernetes client configuration using
-    /// [`Config::incluster_env`].
     ///
     /// # Rustls-specific behavior
     /// Rustls does not support validating IP addresses (see
     /// <https://github.com/kube-rs/kube/issues/1003>).
     /// To work around this, when rustls is configured, this function automatically appends
     /// `tls-server-name = "kubernetes.default.svc"` to the resulting configuration.
-    /// Overriding or unsetting `Config::tls_server_name` can be done to opt out of this behaviour.
-    #[cfg(feature = "rustls-tls")]
+    /// Overriding or unsetting `Config::tls_server_name` will avoid this behaviour.
     pub fn incluster() -> Result<Self, InClusterError> {
         let mut cfg = Self::incluster_env()?;
-        cfg.tls_server_name = Some("kubernetes.default.svc".to_string());
+        if cfg!(all(not(feature = "openssl-tls"), feature = "rustls-tls")) {
+            // openssl takes precedence when both features present, so only do it when only rustls is there
+            cfg.tls_server_name = Some("kubernetes.default.svc".to_string());
+        }
         Ok(cfg)
     }
 
