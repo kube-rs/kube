@@ -133,7 +133,7 @@ impl ObjectRef {
 
 #[derive(Debug, Error)]
 #[error("missing type information from ObjectRef")]
-/// ObjectRef does not have TypeMeta
+/// Source does not have `TypeMeta`
 pub struct MissingTypeInfo;
 
 
