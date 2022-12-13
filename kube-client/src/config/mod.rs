@@ -159,6 +159,10 @@ pub struct Config {
     // TODO Actually support proxy or create an example with custom client
     /// Optional proxy URL.
     pub proxy_url: Option<http::Uri>,
+    /// If set, apiserver certificate will be validated to contain this string
+    ///
+    /// If not set, the `cluster_url` is used instead
+    pub tls_server_name: Option<String>,
 }
 
 impl Config {
@@ -180,6 +184,7 @@ impl Config {
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
             proxy_url: None,
+            tls_server_name: None,
         }
     }
 
@@ -275,6 +280,7 @@ impl Config {
                 ..Default::default()
             },
             proxy_url: None,
+            tls_server_name: None,
         })
     }
 
@@ -333,6 +339,7 @@ impl Config {
             accept_invalid_certs,
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
+            tls_server_name: loader.cluster.tls_server_name,
         })
     }
 
