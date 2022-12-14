@@ -85,7 +85,7 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
             #[cfg(feature = "openssl-tls")]
             let connector = config.openssl_https_connector_with_connector(connector)?;
             #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
-            let connector = config.rustls_https_connector()?;
+            let connector = config.rustls_https_connector_with_connector(connector)?;
 
             let mut connector = TimeoutConnector::new(connector);
 
