@@ -167,16 +167,8 @@ where
     }
 }
 
-/// Helper getters/setters for the ObjectMeta of a resource
-/// TODO: lift to ObjectMetaExt trait
-pub trait ResourceExt {
-    /// Deprecated fn equivalent to [`name_unchecked`](ResourceExt::name_unchecked)
-    #[deprecated(
-        since = "0.74.0",
-        note = "ResourceExt::name can panic and has been replaced by `ResourceExt::name_any` and `ResourceExt::name_unchecked`. This fn will be removed in 0.77.0."
-    )]
-    fn name(&self) -> String;
-
+/// Helper methods for resources.
+pub trait ResourceExt: Resource {
     /// Returns the name of the resource, panicking if it is unset
     ///
     /// Only use this function if you know that name is set; for example when
@@ -239,10 +231,6 @@ use once_cell::sync::Lazy;
 static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(BTreeMap::new);
 
 impl<K: Resource> ResourceExt for K {
-    fn name(&self) -> String {
-        self.meta().name.clone().expect(".metadata.name missing")
-    }
-
     fn name_unchecked(&self) -> String {
         self.meta().name.clone().expect(".metadata.name missing")
     }

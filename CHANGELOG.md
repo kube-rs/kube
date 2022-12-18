@@ -5,7 +5,38 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.76.0...main
+ * see https://github.com/kube-rs/kube/compare/0.77.0...main
+
+[0.77.0](https://github.com/kube-rs/kube/releases/tag/0.77.0) / 2022-12-15
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.77.0 -->
+## Highlights
+
+This release saw numerous improvements across various parts of the codebase with lots of help from external contributors. Look for improvements in error handling, client exec behaviour, dynamic object conversion, certificate handling, and last, but not least; lots of enhancements in the `config` module. Huge thanks to everyone who contributed!
+
+### `Config` Enhancements
+Kubeconfigs relying on [`ExecConfig`](https://docs.rs/kube/0.77.0/kube/config/struct.ExecConfig.html) for auth should now work with a lot more cases (with improvements to script interactivity, cert passing, env-drop, and windows behaviour). We further aligned our [`Kubeconfig`](https://docs.rs/kube/0.77.0/kube/config/struct.Kubeconfig.html) parsing with client-go's behaviour, and also exposed [`Kubeconfig::merge`](https://docs.rs/kube/0.77.0/kube/config/struct.Kubeconfig.html#method.merge). Finally, we now pass [`Config::tls_server_name`](https://docs.rs/kube/0.77.0/kube/struct.Config.html#structfield.tls_server_name) through to the `Client`, which has let us include [a better **rustls** workaround](https://docs.rs/kube/0.77.0/kube/struct.Config.html#method.incluster) for the long-standing ip issue (enabled by default).
+
+## What's Changed
+### Added
+* Add `DynamicObjects::try_parse` for typed object conversion by @jmintb in https://github.com/kube-rs/kube/pull/1061
+* Add `ExecConfig::drop_env` to filter host evars for auth providers by @aviramha in https://github.com/kube-rs/kube/pull/1062
+* Add support for terminal size when executing command inside a container by @armandpicard in https://github.com/kube-rs/kube/pull/983
+* add cmd-drop-env to AuthProviderConfig by @aviramha in https://github.com/kube-rs/kube/pull/1074
+* Check for client cert with exec by @rcanderson23 in https://github.com/kube-rs/kube/pull/1089
+* Change `Kubeconfig::merge` fn to public. by @goenning in https://github.com/kube-rs/kube/pull/1100
+* Fix interactivity in auth exec by @armandpicard in https://github.com/kube-rs/kube/pull/1083
+### Changed
+* [windows] skip window creation on auth exec by @goenning in https://github.com/kube-rs/kube/pull/1095
+* Add `Config::tls_server_name` and validate when using rustls by @clux in https://github.com/kube-rs/kube/pull/1104
+### Removed
+* Remove deprecated `ResourceExt::name` by @clux in https://github.com/kube-rs/kube/pull/1105
+### Fixed
+* Bump tracing dependency to 0.1.36 by @teozkr in https://github.com/kube-rs/kube/pull/1070
+* Improve error message on azure auth not being supported by @goenning in https://github.com/kube-rs/kube/pull/1082
+* exec: ensure certs always end with a new line by @goenning in https://github.com/kube-rs/kube/pull/1096
+* fix: align kube-rs with client-go config parsing by @goenning in https://github.com/kube-rs/kube/pull/1077
+* Return error from `watcher` when kinds do not support watch by @clux in https://github.com/kube-rs/kube/pull/1101
 
 [0.76.0](https://github.com/kube-rs/kube/releases/tag/0.76.0) / 2022-10-28
 ===================

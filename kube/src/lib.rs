@@ -30,7 +30,7 @@
 //!     // Read pods in the configured namespace into the typed interface from k8s-openapi
 //!     let pods: Api<Pod> = Api::default_namespaced(client);
 //!     for p in pods.list(&ListParams::default()).await? {
-//!         println!("found pod {}", p.name());
+//!         println!("found pod {}", p.name_any());
 //!     }
 //!     Ok(())
 //! }
@@ -90,7 +90,7 @@
 //!     let lp = ListParams::default();
 //!     let mut apply_stream = watcher(foos, lp).applied_objects().boxed();
 //!     while let Some(f) = apply_stream.try_next().await? {
-//!         println!("saw apply to {}", f.name());
+//!         println!("saw apply to {}", f.name_any());
 //!     }
 //!     Ok(())
 //! }

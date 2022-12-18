@@ -159,6 +159,10 @@ pub struct Config {
     // TODO Actually support proxy or create an example with custom client
     /// Optional proxy URL.
     pub proxy_url: Option<http::Uri>,
+    /// If set, apiserver certificate will be validated to contain this string
+    ///
+    /// If not set, the `cluster_url` is used instead
+    pub tls_server_name: Option<String>,
 }
 
 impl Config {
@@ -180,6 +184,7 @@ impl Config {
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
             proxy_url: None,
+            tls_server_name: None,
         }
     }
 
@@ -213,20 +218,20 @@ impl Config {
 
     /// Load an in-cluster Kubernetes client configuration using
     /// [`Config::incluster_env`].
-    #[cfg(not(feature = "rustls-tls"))]
-    pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_env()
-    }
-
-    /// Load an in-cluster Kubernetes client configuration using
-    /// [`Config::incluster_dns`].
     ///
-    /// The `rustls-tls` feature is currently incompatible with
-    /// [`Config::incluster_env`]. See
-    /// <https://github.com/kube-rs/kube/issues/1003>.
-    #[cfg(feature = "rustls-tls")]
+    /// # Rustls-specific behavior
+    /// Rustls does not support validating IP addresses (see
+    /// <https://github.com/kube-rs/kube/issues/1003>).
+    /// To work around this, when rustls is configured, this function automatically appends
+    /// `tls-server-name = "kubernetes.default.svc"` to the resulting configuration.
+    /// Overriding or unsetting `Config::tls_server_name` will avoid this behaviour.
     pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_dns()
+        let mut cfg = Self::incluster_env()?;
+        if cfg!(all(not(feature = "openssl-tls"), feature = "rustls-tls")) {
+            // openssl takes precedence when both features present, so only do it when only rustls is there
+            cfg.tls_server_name = Some("kubernetes.default.svc".to_string());
+        }
+        Ok(cfg)
     }
 
     /// Load an in-cluster config using the `KUBERNETES_SERVICE_HOST` and
@@ -236,9 +241,7 @@ impl Config {
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     ///
     /// This method matches the behavior of the official Kubernetes client
-    /// libraries, but it is not compatible with the `rustls-tls` feature . When
-    /// this feature is enabled, [`Config::incluster_dns`] should be used
-    /// instead. See <https://github.com/kube-rs/kube/issues/1003>.
+    /// libraries and is the default for both TLS stacks.
     pub fn incluster_env() -> Result<Self, InClusterError> {
         let uri = incluster_config::try_kube_from_env()?;
         Self::incluster_with_uri(uri)
@@ -251,7 +254,9 @@ impl Config {
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     ///
     /// This behavior does not match that of the official Kubernetes clients,
-    /// but this approach is compatible with the `rustls-tls` feature.
+    /// but this approach is compatible with the `rustls-tls` feature
+    /// without setting `tls_server_name`.
+    /// See <https://github.com/kube-rs/kube/issues/1003>.
     pub fn incluster_dns() -> Result<Self, InClusterError> {
         Self::incluster_with_uri(incluster_config::kube_dns())
     }
@@ -275,6 +280,7 @@ impl Config {
                 ..Default::default()
             },
             proxy_url: None,
+            tls_server_name: None,
         })
     }
 
@@ -333,6 +339,7 @@ impl Config {
             accept_invalid_certs,
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
+            tls_server_name: loader.cluster.tls_server_name,
         })
     }
 

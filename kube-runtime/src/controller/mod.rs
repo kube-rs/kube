@@ -675,7 +675,7 @@ where
     /// .reconcile_all_on(reload_rx.map(|_| ()))
     /// .run(
     ///     |o, _| async move {
-    ///         println!("Reconciling {}", o.name());
+    ///         println!("Reconciling {}", o.name_any());
     ///         Ok(Action::await_change())
     ///     },
     ///     |_object: Arc<ConfigMap>, err: &Infallible, _| Err(err).unwrap(),
@@ -728,7 +728,7 @@ where
     /// .graceful_shutdown_on(tokio::signal::ctrl_c().map(|_| ()))
     /// .run(
     ///     |o, _| async move {
-    ///         println!("Reconciling {}", o.name());
+    ///         println!("Reconciling {}", o.name_any());
     ///         Ok(Action::await_change())
     ///     },
     ///     |_, err: &Infallible, _| Err(err).unwrap(),

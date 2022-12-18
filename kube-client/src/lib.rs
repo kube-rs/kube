@@ -47,7 +47,7 @@
 //!
 //!     // List pods in the configured namespace
 //!     for p in pods.list(&ListParams::default()).await? {
-//!         println!("found pod {}", p.name());
+//!         println!("found pod {}", p.name_any());
 //!     }
 //!
 //!     Ok(())

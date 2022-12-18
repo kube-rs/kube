@@ -32,7 +32,7 @@ use kube_core::{
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
-///         println!("Found APIService: {}", service.name());
+///         println!("Found APIService: {}", service.name_any());
 ///     }
 ///     Ok(())
 /// }
@@ -69,7 +69,7 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
-///         println!("Found APIService: {}", service.name());
+///         println!("Found APIService: {}", service.name_any());
 ///     }
 ///     Ok(())
 /// }
@@ -96,7 +96,7 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 ///     let (ar, caps) = discovery::pinned_kind(&client, &gvk).await?;
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
-///         println!("Found APIService: {}", service.name());
+///         println!("Found APIService: {}", service.name_any());
 ///     }
 ///     Ok(())
 /// }
