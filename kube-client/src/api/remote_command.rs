@@ -255,7 +255,7 @@ where
     let (mut server_send, raw_server_recv) = stream.split();
     // Work with filtered messages to reduce noise.
     let mut server_recv = raw_server_recv.filter_map(filter_message).boxed();
-    let have_terminal_size_rx = terminal_size_rx.is_some();
+    let mut have_terminal_size_rx = terminal_size_rx.is_some();
 
     loop {
         let terminal_size_next = async {
@@ -325,7 +325,7 @@ where
                         server_send.send(ws::Message::Binary(vec)).await.map_err(Error::SendTerminalSize)?;
                     },
                     None => {
-                        break
+                        have_terminal_size_rx = false;
                     }
                 }
             },
