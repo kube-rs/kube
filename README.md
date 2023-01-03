@@ -108,7 +108,7 @@ This now gives a continual stream of events and you do not need to care about th
 
 ```rust
 while let Some(event) = stream.try_next().await? {
-    println!("Applied: {}", event.name());
+    println!("Applied: {}", event.name_any());
 }
 ```
 
