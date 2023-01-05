@@ -108,3 +108,8 @@ version = "0.36"
 # ahash -> getrandom -> wasi old
 # tokio -> mio -> wasi new
 name = "wasi"
+
+[[bans.skip]]
+# waiting for pem to bump base64
+# https://github.com/jcreekmore/pem-rs/blob/master/Cargo.toml#L16
+name = "base64"
