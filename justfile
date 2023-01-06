@@ -13,7 +13,7 @@ fmt:
   rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
 
 doc:
-  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_25 --open
+  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_26 --open
 
 # Unit tests
 test:
@@ -117,6 +117,7 @@ bump-k8s:
   # bump mk8sv badge
   badge="[![Tested against Kubernetes ${mk8svnew} and above](https://img.shields.io/badge/MK8SV-${mk8svnew}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
+  echo "remember to bump kubernetes-version.md in kube-rs/website"
 
 # mode: makefile
 # End:

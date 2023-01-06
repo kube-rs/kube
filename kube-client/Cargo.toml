@@ -31,12 +31,12 @@ config = ["__non_core", "pem", "dirs"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_25"]
+features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_26"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-base64 = { version = "0.13.0", optional = true }
+base64 = { version = "0.20.0", optional = true }
 chrono = { version = "0.4.23", optional = true, default-features = false }
 dirs = { package = "dirs-next", optional = true, version = "2.0.0" }
 serde = { version = "1.0.130", features = ["derive"] }
@@ -47,7 +47,7 @@ http-body = { version = "0.4.2", optional = true }
 either = { version = "1.6.1", optional = true }
 thiserror = "1.0.29"
 futures = { version = "0.3.17", optional = true }
-pem = { version = "1.0.1", optional = true }
+pem = { version = "1.1.0", optional = true }
 openssl = { version = "0.10.36", optional = true }
 rustls = { version = "0.20.3", features = ["dangerous_configuration"], optional = true }
 rustls-pemfile = { version = "1.0.0", optional = true }
@@ -70,7 +70,7 @@ tracing = { version = "0.1.36", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
 
 [dependencies.k8s-openapi]
-version = "0.16.0"
+version = "0.17.0"
 default-features = false
 features = []
 
@@ -83,6 +83,6 @@ tokio-test = "0.4.0"
 tower-test = "0.4.0"
 
 [dev-dependencies.k8s-openapi]
-version = "0.16.0"
+version = "0.17.0"
 default-features = false
-features = ["v1_25"]
+features = ["v1_26"]
