@@ -7,8 +7,28 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.78.0...main
 
-0.78.0 / 2023-01-06
+[0.78.0](https://github.com/kube-rs/kube/releases/tag/0.78.0) / 2023-01-06
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.78.0 -->
+
+## Kubernetes Bump
+
+This release brings in the new [`k8s-openapi` release](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.17.0) for `1.26` structs, and sets our [MK8SV](https://kube.rs/kubernetes-version/) to `1.21`.
+Be sure to upgrade `k8s-openapi` and `kube` **simultaneously** to avoid multiple version errors:
+
+```sh
+cargo upgrade -p k8s-openapi -p kube -i
+```
+
+## What's Changed
+### Added
+* reflector: add helper function to the `Store` by @eliad-wiz in https://github.com/kube-rs/kube/pull/1111
+### Changed
+* Bump `k8s-openapi@0.17.0` and MK8SV by @clux in https://github.com/kube-rs/kube/pull/1116
+### Removed
+* Remove deprecated `Config::timeout` by @clux in https://github.com/kube-rs/kube/pull/1113
+### Fixed
+* fix shell exec exiting message loop when terminalSizeReceiver is dropped by @erebe in https://github.com/kube-rs/kube/pull/1112
 
 [0.77.0](https://github.com/kube-rs/kube/releases/tag/0.77.0) / 2022-12-15
 ===================
