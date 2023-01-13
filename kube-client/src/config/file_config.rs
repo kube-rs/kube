@@ -25,12 +25,15 @@ pub struct Kubeconfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferences: Option<Preferences>,
     /// Referencable names to cluster configs
-    pub clusters: Vec<NamedCluster>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clusters: Option<Vec<NamedCluster>>,
     /// Referencable names to user configs
     #[serde(rename = "users")]
-    pub auth_infos: Vec<NamedAuthInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_infos: Option<Vec<NamedAuthInfo>>,
     /// Referencable names to context configs
-    pub contexts: Vec<NamedContext>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contexts: Option<Vec<NamedContext>>,
     /// The name of the context that you would like to use by default
     #[serde(rename = "current-context")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -320,35 +323,41 @@ impl Kubeconfig {
         let mut merged_docs = None;
         for mut config in kubeconfig_from_yaml(&data)? {
             if let Some(dir) = path.as_ref().parent() {
-                for named in config.clusters.iter_mut() {
-                    if let Some(cluster) = &mut named.cluster {
-                        if let Some(path) = &cluster.certificate_authority {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                cluster.certificate_authority = Some(abs_path);
+                if let Some(clusters) = config.clusters.as_mut() {
+                    for named in clusters.iter_mut() {
+                        if let Some(cluster) = &mut named.cluster {
+                            if let Some(path) = &cluster.certificate_authority {
+                                if let Some(abs_path) = to_absolute(dir, path) {
+                                    cluster.certificate_authority = Some(abs_path);
+                                }
                             }
                         }
                     }
                 }
-                for named in config.auth_infos.iter_mut() {
-                    if let Some(auth_info) = &mut named.auth_info {
-                        if let Some(path) = &auth_info.client_certificate {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.client_certificate = Some(abs_path);
+
+                if let Some(auth_infos) = config.auth_infos.as_mut() {
+                    for named in auth_infos.iter_mut() {
+                        if let Some(auth_info) = &mut named.auth_info {
+                            if let Some(path) = &auth_info.client_certificate {
+                                if let Some(abs_path) = to_absolute(dir, path) {
+                                    auth_info.client_certificate = Some(abs_path);
+                                }
                             }
-                        }
-                        if let Some(path) = &auth_info.client_key {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.client_key = Some(abs_path);
+                            if let Some(path) = &auth_info.client_key {
+                                if let Some(abs_path) = to_absolute(dir, path) {
+                                    auth_info.client_key = Some(abs_path);
+                                }
                             }
-                        }
-                        if let Some(path) = &auth_info.token_file {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.token_file = Some(abs_path);
+                            if let Some(path) = &auth_info.token_file {
+                                if let Some(abs_path) = to_absolute(dir, path) {
+                                    auth_info.token_file = Some(abs_path);
+                                }
                             }
                         }
                     }
                 }
             }
+
             if let Some(c) = merged_docs {
                 merged_docs = Some(Kubeconfig::merge(c, config)?);
             } else {
@@ -446,17 +455,26 @@ fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> 
 }
 
 #[allow(clippy::redundant_closure)]
-fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
+fn append_new_named<T, F>(base: &mut Option<Vec<T>>, next: Option<Vec<T>>, f: F)
 where
     F: Fn(&T) -> &String,
 {
     use std::collections::HashSet;
-    base.extend({
-        let existing = base.iter().map(|x| f(x)).collect::<HashSet<_>>();
-        next.into_iter()
-            .filter(|x| !existing.contains(f(x)))
-            .collect::<Vec<_>>()
-    });
+
+    match base {
+        Some(base) => {
+            base.extend({
+                let existing = base.iter().map(|x| f(x)).collect::<HashSet<_>>();
+                next.unwrap_or_default()
+                    .into_iter()
+                    .filter(|x| !existing.contains(f(x)))
+                    .collect::<Vec<_>>()
+            });
+        }
+        None => {
+            *base = next;
+        }
+    }
 }
 
 fn to_absolute(dir: &Path, file: &str) -> Option<String> {
@@ -557,18 +575,18 @@ mod tests {
     fn kubeconfig_merge() {
         let kubeconfig1 = Kubeconfig {
             current_context: Some("default".into()),
-            auth_infos: vec![NamedAuthInfo {
+            auth_infos: Some(vec![NamedAuthInfo {
                 name: "red-user".into(),
                 auth_info: Some(AuthInfo {
                     token: Some(SecretString::from_str("first-token").unwrap()),
                     ..Default::default()
                 }),
-            }],
+            }]),
             ..Default::default()
         };
         let kubeconfig2 = Kubeconfig {
             current_context: Some("dev".into()),
-            auth_infos: vec![
+            auth_infos: Some(vec![
                 NamedAuthInfo {
                     name: "red-user".into(),
                     auth_info: Some(AuthInfo {
@@ -584,17 +602,18 @@ mod tests {
                         ..Default::default()
                     }),
                 },
-            ],
+            ]),
             ..Default::default()
         };
 
         let merged = kubeconfig1.merge(kubeconfig2).unwrap();
+        let auth_infos = merged.auth_infos.unwrap();
         // Preserves first `current_context`
         assert_eq!(merged.current_context, Some("default".into()));
         // Auth info with the same name does not overwrite
-        assert_eq!(merged.auth_infos[0].name, "red-user");
+        assert_eq!(auth_infos[0].name, "red-user");
         assert_eq!(
-            merged.auth_infos[0]
+            auth_infos[0]
                 .auth_info
                 .as_ref()
                 .unwrap()
@@ -604,9 +623,9 @@ mod tests {
             Some("first-token".to_string())
         );
         // Even if it's not conflicting
-        assert_eq!(merged.auth_infos[0].auth_info.as_ref().unwrap().username, None);
+        assert_eq!(auth_infos[0].auth_info.as_ref().unwrap().username, None);
         // New named auth info is appended
-        assert_eq!(merged.auth_infos[1].name, "green-user");
+        assert_eq!(auth_infos[1].name, "green-user");
     }
 
     #[test]
@@ -667,11 +686,12 @@ users:
     client-key: /home/kevin/.minikube/profiles/minikube/client.key";
 
         let config = Kubeconfig::from_yaml(config_yaml).unwrap();
+        let clusters = config.clusters.unwrap();
 
-        assert_eq!(config.clusters[0].name, "eks");
-        assert_eq!(config.clusters[1].name, "minikube");
+        assert_eq!(clusters[0].name, "eks");
+        assert_eq!(clusters[1].name, "minikube");
 
-        let cluster1 = config.clusters[1].cluster.as_ref().unwrap();
+        let cluster1 = clusters[1].cluster.as_ref().unwrap();
         assert_eq!(
             cluster1.extensions.as_ref().unwrap()[0].extension.get("provider"),
             Some(&Value::String("minikube.sigs.k8s.io".to_owned()))
@@ -722,10 +742,55 @@ users:
     client-key-data: aGVsbG8K
 "#;
         let cfg = Kubeconfig::from_yaml(config_yaml)?;
+        let clusters = cfg.clusters.unwrap();
 
         // Ensure we have data from both documents:
-        assert_eq!(cfg.clusters[0].name, "k3d-promstack");
-        assert_eq!(cfg.clusters[1].name, "k3d-k3s-default");
+        assert_eq!(clusters[0].name, "k3d-promstack");
+        assert_eq!(clusters[1].name, "k3d-k3s-default");
+
+        Ok(())
+    }
+
+    #[test]
+    fn kubeconfig_split_sections_merge() -> Result<(), KubeconfigError> {
+        let config1 = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: aGVsbG8K
+    server: https://0.0.0.0:6443
+  name: k3d-promstack
+contexts:
+- context:
+    cluster: k3d-promstack
+    user: admin@k3d-promstack
+  name: k3d-promstack
+current-context: k3d-promstack
+kind: Config
+preferences: {}
+"#;
+
+        let config2 = r#"
+users:
+- name: admin@k3d-k3s-default
+  user:
+    client-certificate-data: aGVsbG8K
+    client-key-data: aGVsbG8K
+"#;
+
+
+        let kubeconfig1 = Kubeconfig::from_yaml(config1)?;
+        let kubeconfig2 = Kubeconfig::from_yaml(config2)?;
+        let merged = kubeconfig1.merge(kubeconfig2).unwrap();
+
+        // Ensure we have data from both files:
+        let clusters = merged.clusters.unwrap();
+        let auth_infos = merged.auth_infos.unwrap();
+        let contexts = merged.contexts.unwrap();
+
+        assert_eq!(clusters[0].name, "k3d-promstack");
+        assert_eq!(contexts[0].name, "k3d-promstack");
+        assert_eq!(auth_infos[0].name, "admin@k3d-k3s-default");
 
         Ok(())
     }

@@ -69,6 +69,7 @@ impl ConfigLoader {
 
         let current_context = config
             .contexts
+            .unwrap_or_default()
             .iter()
             .find(|named_context| &named_context.name == context_name)
             .and_then(|named_context| named_context.context.clone())
@@ -77,6 +78,7 @@ impl ConfigLoader {
         let cluster_name = cluster.unwrap_or(&current_context.cluster);
         let cluster = config
             .clusters
+            .unwrap_or_default()
             .iter()
             .find(|named_cluster| &named_cluster.name == cluster_name)
             .and_then(|named_cluster| named_cluster.cluster.clone())
@@ -85,6 +87,7 @@ impl ConfigLoader {
         let user_name = user.unwrap_or(&current_context.user);
         let user = config
             .auth_infos
+            .unwrap_or_default()
             .iter()
             .find(|named_user| &named_user.name == user_name)
             .and_then(|named_user| named_user.auth_info.clone())
