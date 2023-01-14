@@ -11,6 +11,9 @@ rust-version = "1.60.0"
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
+keywords = ["kubernetes", "macro", "customresource", "crd"]
+categories = ["api-bindings", "encoding"]
+
 
 [dependencies]
 proc-macro2 = "1.0.29"
