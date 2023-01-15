@@ -25,11 +25,14 @@ pub struct Kubeconfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferences: Option<Preferences>,
     /// Referencable names to cluster configs
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub clusters: Vec<NamedCluster>,
     /// Referencable names to user configs
     #[serde(rename = "users")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub auth_infos: Vec<NamedAuthInfo>,
     /// Referencable names to context configs
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub contexts: Vec<NamedContext>,
     /// The name of the context that you would like to use by default
     #[serde(rename = "current-context")]
@@ -726,6 +729,46 @@ users:
         // Ensure we have data from both documents:
         assert_eq!(cfg.clusters[0].name, "k3d-promstack");
         assert_eq!(cfg.clusters[1].name, "k3d-k3s-default");
+
+        Ok(())
+    }
+
+    #[test]
+    fn kubeconfig_split_sections_merge() -> Result<(), KubeconfigError> {
+        let config1 = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: aGVsbG8K
+    server: https://0.0.0.0:6443
+  name: k3d-promstack
+contexts:
+- context:
+    cluster: k3d-promstack
+    user: admin@k3d-promstack
+  name: k3d-promstack
+current-context: k3d-promstack
+kind: Config
+preferences: {}
+"#;
+
+        let config2 = r#"
+users:
+- name: admin@k3d-k3s-default
+  user:
+    client-certificate-data: aGVsbG8K
+    client-key-data: aGVsbG8K
+"#;
+
+
+        let kubeconfig1 = Kubeconfig::from_yaml(config1)?;
+        let kubeconfig2 = Kubeconfig::from_yaml(config2)?;
+        let merged = kubeconfig1.merge(kubeconfig2).unwrap();
+
+        // Ensure we have data from both files:
+        assert_eq!(merged.clusters[0].name, "k3d-promstack");
+        assert_eq!(merged.contexts[0].name, "k3d-promstack");
+        assert_eq!(merged.auth_infos[0].name, "admin@k3d-k3s-default");
 
         Ok(())
     }
