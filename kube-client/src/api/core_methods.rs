@@ -62,7 +62,7 @@ where
 
     /// Get a list of resources
     ///
-    /// You get use this to get everything, or a subset matching fields/labels, say:
+    /// You use this to get everything, or a subset matching fields/labels, say:
     ///
     /// ```no_run
     /// use kube::{api::{Api, ListParams, ResourceExt}, Client};
