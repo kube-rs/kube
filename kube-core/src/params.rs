@@ -3,7 +3,7 @@ use crate::request::Error;
 use serde::Serialize;
 
 /// Common query parameters used in watch/list/delete calls on collections
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///

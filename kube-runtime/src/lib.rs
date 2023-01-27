@@ -26,6 +26,7 @@ pub mod scheduler;
 pub mod utils;
 pub mod wait;
 pub mod watcher;
+pub mod shared_store;
 
 pub use controller::{applier, Controller};
 pub use finalizer::finalizer;
