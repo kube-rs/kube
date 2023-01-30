@@ -14,11 +14,12 @@ use crate::{
     utils::{CancelableJoinHandle, StreamBackoff, WatchStreamExt},
     watcher::{self, watcher},
 };
-use futures::{stream, Stream, StreamExt, TryFuture, TryFutureExt, TryStreamExt};
+use futures::{stream, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt};
 use kube_client::api::ListParams;
 use kube_client::{Api, Resource};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use stream::BoxStream;
 use tokio::runtime::Handle;
@@ -32,7 +33,13 @@ where
     W: CreateWatcher<K>,
 {
     watcher_provider: W,
-    reflectors: HashMap<ListParams, (Store<K>, StreamSubscribable<K>)>,
+    reflectors: HashMap<
+        ListParams,
+        (
+            Store<K>,
+            StreamSubscribable<BoxStream<'static, watcher::Result<Event<K>>>>,
+        ),
+    >,
     controllers: Vec<BoxStream<'static, ControllerResult<K>>>,
     ready_token: ReadyToken,
 }
@@ -139,7 +146,9 @@ where
 
         let ready_state = self.ready_token.child();
 
-        let reflector = reflector(store_writer, watcher).inspect_ok(move |_| ready_state.ready());
+        let reflector = reflector(store_writer, watcher)
+            .inspect_ok(move |_| ready_state.ready())
+            .boxed();
 
         let subscribable_reflector = reflector.subscribable();
         let event_stream = subscribable_reflector.subscribe_ok();

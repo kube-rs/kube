@@ -41,7 +41,7 @@ pub trait WatchStreamExt: Stream {
     /// Create a subscribable stream from a [`watcher()`] stream
     ///
     /// This allows multiple consumers to subscribe to the same stream of events.
-    fn subscribable<K: Clone>(self) -> StreamSubscribable<K>
+    fn subscribable<K: Clone>(self) -> StreamSubscribable<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,
     {

@@ -1,46 +1,57 @@
-use crate::watcher;
 use core::{
     pin::Pin,
     task::{Context, Poll},
 };
 use futures::stream::BoxStream;
-use futures::{stream, Stream, StreamExt};
-use std::fmt::Debug;
+use futures::{stream, Stream, StreamExt, TryStream};
+use pin_project::pin_project;
 use tokio::sync::broadcast;
 
-pub struct StreamSubscribable<K> {
-    reflector: BoxStream<'static, watcher::Result<watcher::Event<K>>>,
-    sender: broadcast::Sender<watcher::Event<K>>,
+#[pin_project]
+/// todo - docs
+#[must_use = "streams do nothing unless polled"]
+pub struct StreamSubscribable<S>
+where
+    S: TryStream,
+{
+    #[pin]
+    stream: S,
+    sender: broadcast::Sender<S::Ok>,
 }
 
-impl<K: Clone> StreamSubscribable<K> {
-    pub fn new(reflector: impl Stream<Item = watcher::Result<watcher::Event<K>>> + Send + 'static) -> Self {
+impl<S: TryStream> StreamSubscribable<S>
+where
+    S::Ok: Clone,
+{
+    pub fn new(stream: S) -> Self {
         let (sender, _) = broadcast::channel(100);
 
-        StreamSubscribable {
-            reflector: reflector.boxed(),
-            sender,
-        }
+        Self { stream, sender }
     }
 
-    pub fn subscribe_ok(&self) -> impl Stream<Item = watcher::Event<K>> {
+    /// Subscribe to non-error events from this stream.
+    pub fn subscribe_ok(&self) -> impl Stream<Item = S::Ok> {
         stream::unfold(self.sender.subscribe(), |mut rx| async move {
             match rx.recv().await {
-                Ok(event) => Some((event, rx)),
+                Ok(obj) => Some((obj, rx)),
                 Err(_) => None,
             }
         })
     }
 }
 
-impl<K: Clone + Debug> Stream for StreamSubscribable<K> {
-    type Item = watcher::Result<watcher::Event<K>>;
+impl<S: TryStream> Stream for StreamSubscribable<S>
+where
+    S::Ok: Clone,
+{
+    type Item = Result<S::Ok, S::Error>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let item = self.reflector.poll_next_unpin(cx);
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        let item = this.stream.try_poll_next(cx);
 
-        if let Poll::Ready(Some(Ok(event))) = &item {
-            self.sender.send((*event).clone()).ok();
+        if let Poll::Ready(Some(Ok(item))) = &item {
+            this.sender.send((*item).clone()).ok();
         }
 
         item
