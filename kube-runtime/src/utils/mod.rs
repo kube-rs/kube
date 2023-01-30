@@ -3,11 +3,13 @@
 mod backoff_reset_timer;
 mod event_flatten;
 mod stream_backoff;
+mod stream_subscribable;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use event_flatten::EventFlatten;
 pub use stream_backoff::StreamBackoff;
+pub use stream_subscribable::StreamSubscribable;
 pub use watch_ext::WatchStreamExt;
 
 use futures::{
@@ -24,7 +26,6 @@ use std::{
 };
 use stream::IntoStream;
 use tokio::{runtime::Handle, task::JoinHandle};
-
 
 /// Allows splitting a `Stream` into several streams that each emit a disjoint subset of the input stream's items,
 /// like a streaming variant of pattern matching.

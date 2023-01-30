@@ -29,7 +29,7 @@ impl ReadyState {
         Self(Arc::new(RwLock::new(false)))
     }
 
-    pub fn ready(&mut self) {
+    pub fn ready(&self) {
         *(self.0.write()) = true;
     }
 }

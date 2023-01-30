@@ -4,6 +4,7 @@ use crate::{
 };
 use backoff::backoff::Backoff;
 
+use crate::utils::stream_subscribable::StreamSubscribable;
 use futures::{Stream, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
@@ -35,6 +36,16 @@ pub trait WatchStreamExt: Stream {
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
         EventFlatten::new(self, true)
+    }
+
+    /// Create a subscribable stream from a [`watcher()`] stream
+    ///
+    /// This allows multiple consumers to subscribe to the same stream of events.
+    fn subscribable<K: Clone>(self) -> StreamSubscribable<K>
+    where
+        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,
+    {
+        StreamSubscribable::new(self)
     }
 }
 impl<St: ?Sized> WatchStreamExt for St where St: Stream {}

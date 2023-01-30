@@ -1,9 +1,8 @@
-mod prism;
 mod ready_token;
 
 use crate::controller::{trigger_self, Action};
-use crate::shared_store::prism::Prism;
 use crate::shared_store::ready_token::ReadyToken;
+use crate::utils::StreamSubscribable;
 use crate::watcher::Event;
 use crate::{
     applier,
@@ -15,7 +14,7 @@ use crate::{
     utils::{CancelableJoinHandle, StreamBackoff, WatchStreamExt},
     watcher::{self, watcher},
 };
-use futures::{stream, Stream, StreamExt, TryFuture, TryFutureExt};
+use futures::{stream, Stream, StreamExt, TryFuture, TryFutureExt, TryStreamExt};
 use kube_client::api::ListParams;
 use kube_client::{Api, Resource};
 use serde::de::DeserializeOwned;
@@ -33,7 +32,7 @@ where
     W: CreateWatcher<K>,
 {
     watcher_provider: W,
-    reflectors: HashMap<ListParams, (Store<K>, Prism<K>)>,
+    reflectors: HashMap<ListParams, (Store<K>, StreamSubscribable<K>)>,
     controllers: Vec<BoxStream<'static, ControllerResult<K>>>,
     ready_token: ReadyToken,
 }
@@ -131,20 +130,24 @@ where
 
     fn reflector(&mut self, list_params: ListParams) -> (Store<K>, impl Stream<Item = Event<K>>) {
         if let Some((store, prism)) = self.reflectors.get(&list_params) {
-            return (store.clone(), prism.subscribe());
+            return (store.clone(), prism.subscribe_ok());
         }
 
         let watcher = self.watcher_provider.watcher(list_params.clone());
         let store_writer = Writer::default();
         let store_reader = store_writer.as_reader();
 
-        let reflector = reflector(store_writer, watcher);
+        let ready_state = self.ready_token.child();
 
-        let prism = Prism::new(reflector, self.ready_token.child());
-        let event_stream = prism.subscribe();
+        let reflector = reflector(store_writer, watcher).inspect_ok(move |_| ready_state.ready());
 
-        self.reflectors
-            .insert(list_params.clone(), (store_reader.clone(), prism));
+        let subscribable_reflector = reflector.subscribable();
+        let event_stream = subscribable_reflector.subscribe_ok();
+
+        self.reflectors.insert(
+            list_params.clone(),
+            (store_reader.clone(), subscribable_reflector),
+        );
 
         (store_reader, event_stream)
     }
