@@ -2,8 +2,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use futures::stream::BoxStream;
-use futures::{stream, Stream, StreamExt, TryStream};
+use futures::{stream, Stream, TryFutureExt, TryStream};
 use pin_project::pin_project;
 use tokio::sync::broadcast;
 
@@ -29,7 +28,7 @@ where
         Self { stream, sender }
     }
 
-    /// Subscribe to non-error events from this stream.
+    /// Subscribe to success events from this stream
     pub fn subscribe_ok(&self) -> impl Stream<Item = S::Ok> {
         stream::unfold(self.sender.subscribe(), |mut rx| async move {
             match rx.recv().await {

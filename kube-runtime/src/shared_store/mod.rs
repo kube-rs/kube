@@ -1,7 +1,9 @@
 mod ready_token;
+mod safe_store;
 
 use crate::controller::{trigger_self, Action};
 use crate::shared_store::ready_token::ReadyToken;
+use crate::shared_store::safe_store::SafeStore;
 use crate::utils::StreamSubscribable;
 use crate::watcher::Event;
 use crate::{
@@ -15,15 +17,14 @@ use crate::{
     watcher::{self, watcher},
 };
 use futures::{stream, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt};
+use k8s_openapi::NamespaceResourceScope;
 use kube_client::api::ListParams;
-use kube_client::{Api, Resource};
+use kube_client::{Api, Client, Resource};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
-use std::pin::Pin;
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::fmt::Debug;
+use std::hash::Hash;
 use stream::BoxStream;
-use tokio::runtime::Handle;
-use tracing::Instrument;
 
 // TODO - Not sure this is the right name?
 pub struct SharedStore<K, W = WatcherProvider<K>>
@@ -33,31 +34,20 @@ where
     W: CreateWatcher<K>,
 {
     watcher_provider: W,
-    reflectors: HashMap<
-        ListParams,
-        (
-            Store<K>,
-            StreamSubscribable<BoxStream<'static, watcher::Result<Event<K>>>>,
-        ),
-    >,
-    controllers: Vec<BoxStream<'static, ControllerResult<K>>>,
-    ready_token: ReadyToken,
+    reflectors: HashMap<ListParams, (SafeStore<K>, SubscribableBoxStream<K>)>,
 }
 
-// TODO - not sure about the error type here, we might not need to box it?
-type ControllerResult<K> = Result<(ObjectRef<K>, Action), Box<dyn std::error::Error>>;
+type SubscribableBoxStream<K> = StreamSubscribable<BoxStream<'static, watcher::Result<Event<K>>>>;
 
 impl<K> SharedStore<K>
 where
     K: 'static + Resource + Clone + DeserializeOwned + Debug + Send + Sync,
     K::DynamicType: Default + Eq + Hash + Clone,
 {
-    pub fn new(api: Api<K>, ready_token: &ReadyToken) -> Self {
+    pub fn new(api: Api<K>) -> Self {
         Self {
             watcher_provider: WatcherProvider::new(api),
             reflectors: HashMap::new(),
-            controllers: Vec::new(),
-            ready_token: ready_token.clone(),
         }
     }
 }
@@ -68,74 +58,15 @@ where
     K::DynamicType: Default + Eq + Hash + Clone,
     W: CreateWatcher<K> + 'static,
 {
-    pub fn run(self) -> impl Stream<Item = ProviderResult<K>> {
-        let reflectors = stream::select_all(self.reflectors.into_iter().map(|(_, (_, reflector))| reflector));
-
-        let have_controllers = !self.controllers.is_empty();
-        let controllers = stream::select_all(self.controllers);
-
-        // todo - make sure that if ANY stream dies we die
-
-        stream::unfold(
-            (reflectors, controllers, self.ready_token),
-            move |(mut reflectors, mut controllers, ready_token)| async move {
-                tokio::select!(
-                    result = reflectors.next() => {
-                        result.map(|r| (ProviderResult::Reflector(r), (reflectors, controllers, ready_token)))
-                    },
-                    result = controllers.next(), if have_controllers && ready_token.is_ready() => {
-                        result.map(|r| (ProviderResult::Controller(r), (reflectors, controllers, ready_token)))
-                    }
-                )
-            },
-        )
+    pub fn run(self) -> impl Stream<Item = watcher::Result<Event<K>>> {
+        stream::select_all(self.reflectors.into_iter().map(|(_, (_, reflector))| reflector))
     }
 
-    // todo - we still need to be able to setup "watches" and "owns"
-    pub fn controller<ReconcilerFut, Ctx>(
-        &mut self,
-        list_params: ListParams,
-        mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut + Send + 'static,
-        error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action + Send + Sync + 'static,
-        context: Arc<Ctx>,
-    ) where
-        K::DynamicType: Debug + Unpin,
-        ReconcilerFut: TryFuture<Ok = Action> + Send + 'static,
-        ReconcilerFut::Error: std::error::Error + Send + 'static,
-        Ctx: Send + Sync + 'static,
-    {
-        let dyntype = K::DynamicType::default();
-
-        let (store, event_stream) = self.reflector(list_params.clone().into());
-        let self_watcher = trigger_self(event_stream.map(Ok).applied_objects(), dyntype).boxed();
-
-        let mut trigger_selector = stream::SelectAll::new();
-        trigger_selector.push(self_watcher);
-
-        let trigger_backoff = Box::new(watcher::default_backoff());
-
-        let stream = applier(
-            move |obj, ctx| {
-                CancelableJoinHandle::spawn(
-                    reconciler(obj, ctx).into_future().in_current_span(),
-                    &Handle::current(),
-                )
-            },
-            error_policy,
-            context,
-            store,
-            StreamBackoff::new(trigger_selector, trigger_backoff),
-        )
-        .map(|result| result.map_err(|e| Box::new(e) as Box<dyn std::error::Error>));
-
-        self.controllers.push(stream.boxed());
-    }
-
-    pub fn store(&mut self, list_params: ListParams) -> Store<K> {
+    pub fn store(&mut self, list_params: ListParams) -> SafeStore<K> {
         self.reflector(list_params).0
     }
 
-    fn reflector(&mut self, list_params: ListParams) -> (Store<K>, impl Stream<Item = Event<K>>) {
+    fn reflector(&mut self, list_params: ListParams) -> (SafeStore<K>, impl Stream<Item = Event<K>>) {
         if let Some((store, prism)) = self.reflectors.get(&list_params) {
             return (store.clone(), prism.subscribe_ok());
         }
@@ -144,21 +75,19 @@ where
         let store_writer = Writer::default();
         let store_reader = store_writer.as_reader();
 
-        let ready_state = self.ready_token.child();
+        let safe_store = SafeStore::new(store_reader);
 
-        let reflector = reflector(store_writer, watcher)
-            .inspect_ok(move |_| ready_state.ready())
-            .boxed();
+        // todo - maybe we want a "safe_reflector" ?
+        let safe_store_clone = safe_store.clone();
+        let reflector = reflector(store_writer, watcher).inspect_ok(move |_| safe_store_clone.make_ready());
 
-        let subscribable_reflector = reflector.subscribable();
+        let subscribable_reflector = reflector.boxed().subscribable();
         let event_stream = subscribable_reflector.subscribe_ok();
 
-        self.reflectors.insert(
-            list_params.clone(),
-            (store_reader.clone(), subscribable_reflector),
-        );
+        self.reflectors
+            .insert(list_params.clone(), (safe_store.clone(), subscribable_reflector));
 
-        (store_reader, event_stream)
+        (safe_store, event_stream)
     }
 }
 
@@ -203,26 +132,19 @@ pub enum ProviderResult<K: Resource> {
 #[allow(clippy::expect_used, clippy::expect_used)]
 mod test {
     use super::*;
+    use async_trait::async_trait;
     use futures::stream;
     use k8s_openapi::api::core::v1::{ConfigMap, Pod};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use maplit::hashmap;
     use std::collections::VecDeque;
     use std::fmt::{Display, Formatter};
+    use std::sync::Arc;
     use std::sync::Mutex;
     use std::time::Duration;
 
     mod store {
         use super::*;
-
-        #[tokio::test]
-        async fn it_returns_a_store() {
-            let lp = ListParams::default();
-            let mut provider =
-                TestProvider::<Pod>::new(hashmap!(lp.clone().into() => vec![]), &ReadyToken::new());
-            let store = provider.store(lp);
-            assert_eq!(store.state().len(), 0);
-        }
 
         #[tokio::test]
         async fn it_returns_stores_that_updates_on_events() {
@@ -236,7 +158,7 @@ mod test {
 
             kp.spawn().await;
 
-            assert_eq!(store.cloned_state(), expected_state);
+            assert_eq!(store.cloned_state().await, expected_state);
         }
 
         #[tokio::test]
@@ -253,8 +175,8 @@ mod test {
 
             provider.spawn().await;
 
-            assert_eq!(store1.cloned_state(), expected_state);
-            assert_eq!(store2.cloned_state(), expected_state);
+            assert_eq!(store1.cloned_state().await, expected_state);
+            assert_eq!(store2.cloned_state().await, expected_state);
         }
 
         #[tokio::test]
@@ -276,152 +198,8 @@ mod test {
 
             kp.spawn().await;
 
-            assert_eq!(store1.cloned_state(), expected_state1, "Store 1");
-            assert_eq!(store2.cloned_state(), expected_state2, "Store 2");
-        }
-    }
-
-    mod controller {
-        use super::*;
-        use futures::stream::select_all;
-        use k8s_openapi::api::core::v1::ConfigMap;
-
-        #[tokio::test]
-        async fn it_creates_a_controller() {
-            let lp = ListParams::default().labels("foo=baz");
-            let expected_state = vec![test_pod(2)];
-            let mut provider = TestProvider::<Pod>::new(
-                hashmap!(
-                    lp.clone().into() => vec![Event::Restarted(vec![expected_state[0].clone()])],
-                ),
-                &ReadyToken::new(),
-            );
-
-            let context = Arc::new(Mutex::new(vec![]));
-            provider.controller(
-                lp.clone(),
-                |pod, ctx| async move {
-                    ctx.lock().unwrap().push(pod.clone());
-                    Ok::<_, TestError>(Action::await_change())
-                },
-                |_, _, _| Action::await_change(),
-                context.clone(),
-            );
-
-            let store = provider.store(lp.clone());
-
-            provider.spawn().await;
-
-            assert_eq!(store.cloned_state(), expected_state, "Store");
-            assert_eq!(context.cloned_state(), expected_state, "Context");
-        }
-
-        #[tokio::test]
-        async fn it_doesnt_run_the_controller_until_the_store_has_received_a_first_event() {
-            let lp = ListParams::default().labels("foo=baz");
-            let mut kp = TestProvider::<Pod>::new(
-                hashmap!(
-                    lp.clone().into() => vec![],
-
-                ),
-                &ReadyToken::new(),
-            );
-
-            let context = kp.test_controller(lp.clone());
-
-            kp.spawn().await;
-
-            assert!(!context.reconciled());
-        }
-
-        #[tokio::test]
-        async fn many_controllers_wait_until_every_store_is_ready() {
-            let lp = ListParams::default().labels("foo=baz");
-            let ready_token = ReadyToken::new();
-            let mut kp1 = TestProvider::<Pod>::new(
-                hashmap!(
-                    lp.clone().into() => vec![],
-                ),
-                &ready_token,
-            );
-            let mut kp2 = TestProvider::<ConfigMap>::new(
-                hashmap!(
-                    lp.clone().into() => vec![],
-                ),
-                &ready_token,
-            );
-
-            let context1 = kp1.test_controller(lp.clone());
-            let context2 = kp2.test_controller(lp.clone());
-
-            kp1.spawn().await;
-            kp2.spawn().await;
-
-            assert!(!context1.reconciled());
-            assert!(!context2.reconciled());
-        }
-
-        #[tokio::test]
-        async fn it_doesnt_run_a_controller_if_a_store_from_another_provider_isnt_ready() {
-            let lp = ListParams::default().labels("foo=baz");
-            let ready_token = ReadyToken::new();
-            let mut kp1 = TestProvider::<Pod>::new(
-                hashmap!(
-                    lp.clone().into() => vec![Event::Restarted(vec![test_pod(1).clone()])],
-                ),
-                &ready_token,
-            );
-            let mut kp2 = TestProvider::<ConfigMap>::new(
-                hashmap!(
-                    lp.clone().into() => vec![],
-                ),
-                &ready_token,
-            );
-
-            let context = kp1.test_controller(lp.clone());
-            let _store = kp2.store(lp.clone());
-
-            kp1.spawn().await;
-            kp2.spawn().await;
-
-            assert!(!ready_token.is_ready(), "Ready token");
-            assert!(!context.reconciled(), "Context");
-        }
-
-        #[tokio::test]
-        async fn many_controllers_run_after_all_stores_are_ready() {
-            let lp = ListParams::default().labels("foo=baz");
-            let ready_token = ReadyToken::new();
-            let mut provider1 = TestProvider::<Pod>::new(
-                hashmap!(
-                    lp.clone().into() => vec![Event::Restarted(vec![test_pod(1).clone()])],
-                ),
-                &ready_token,
-            );
-            let mut provider2 = TestProvider::<ConfigMap>::new(
-                hashmap!(
-                    lp.clone().into() => vec![Event::Restarted(vec![test_cm(1)])],
-                ),
-                &ready_token,
-            );
-
-            let context1 = provider1.test_controller(lp.clone());
-            let context2 = provider2.test_controller(lp.clone());
-
-            tokio::spawn(async move {
-                select_all(vec![
-                    provider1.run().map(|_| ()).boxed(),
-                    provider2.run().map(|_| ()).boxed(),
-                ])
-                .for_each(|_| async {})
-                .await;
-            });
-
-            tokio::time::sleep(Duration::from_millis(10)).await;
-
-            assert!(ready_token.is_ready(), "ReadyToken");
-            assert!(context1.reconciled(), "Context 1");
-            assert!(context2.reconciled(), "Context 2");
+            assert_eq!(store1.cloned_state().await, expected_state1, "Store 1");
+            assert_eq!(store2.cloned_state().await, expected_state2, "Store 2");
         }
     }
 
@@ -460,23 +238,7 @@ mod test {
                     events: Mutex::new(events.into_iter().map(|(k, v)| (k, v.into())).collect()),
                 },
                 reflectors: HashMap::new(),
-                controllers: Vec::new(),
-                ready_token: ready_token.clone(),
             }
-        }
-
-        fn test_controller(&mut self, list_params: ListParams) -> TestContext {
-            let context = TestContext::new();
-            self.controller(
-                list_params,
-                |_, ctx| async move {
-                    *(ctx.reconciled.lock().unwrap()) = true;
-                    Ok::<_, TestError>(Action::await_change())
-                },
-                |_, _, _| Action::await_change(),
-                Arc::new(context.clone()),
-            );
-            context
         }
 
         async fn spawn(self) {
@@ -535,22 +297,29 @@ mod test {
         }
     }
 
+    #[async_trait]
     trait ClonedState<K> {
-        fn cloned_state(&self) -> Vec<K>;
+        async fn cloned_state(&self) -> Vec<K>;
     }
 
-    impl<K> ClonedState<K> for Store<K>
+    #[async_trait]
+    impl<K> ClonedState<K> for SafeStore<K>
     where
         K: 'static + Resource + Clone + DeserializeOwned + Debug + Send + Sync,
         K::DynamicType: Clone + Default + Eq + Hash,
     {
-        fn cloned_state(&self) -> Vec<K> {
-            self.state().into_iter().map(|k| (*k).clone()).collect::<Vec<_>>()
+        async fn cloned_state(&self) -> Vec<K> {
+            self.state()
+                .await
+                .into_iter()
+                .map(|k| (*k).clone())
+                .collect::<Vec<_>>()
         }
     }
 
-    impl<K: Clone> ClonedState<K> for Arc<Mutex<Vec<Arc<K>>>> {
-        fn cloned_state(&self) -> Vec<K> {
+    #[async_trait]
+    impl<K: Clone + Send + Sync> ClonedState<K> for Arc<Mutex<Vec<Arc<K>>>> {
+        async fn cloned_state(&self) -> Vec<K> {
             self.lock()
                 .unwrap()
                 .iter()

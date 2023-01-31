@@ -3,9 +3,10 @@ use crate::{
     watcher,
 };
 use backoff::backoff::Backoff;
+use std::future::Future;
 
 use crate::utils::stream_subscribable::StreamSubscribable;
-use futures::{Stream, TryStream};
+use futures::{Stream, StreamExt, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
