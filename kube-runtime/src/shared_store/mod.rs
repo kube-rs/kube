@@ -1,13 +1,11 @@
 mod ready_token;
 mod safe_store;
 
-use crate::controller::{trigger_self, Action};
-use crate::shared_store::ready_token::ReadyToken;
+use crate::controller::Action;
 use crate::shared_store::safe_store::SafeStore;
 use crate::utils::StreamSubscribable;
 use crate::watcher::Event;
 use crate::{
-    applier,
     reflector::{
         reflector,
         store::{Store, Writer},
@@ -26,8 +24,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use stream::BoxStream;
 
-// TODO - Not sure this is the right name?
-pub struct SharedStore<K, W = WatcherProvider<K>>
+pub struct SharedStore<K, W = WatcherFactory<K>>
 where
     K: 'static + Resource + Clone + DeserializeOwned + Debug + Send,
     K::DynamicType: Hash + Eq,
@@ -44,9 +41,9 @@ where
     K: 'static + Resource + Clone + DeserializeOwned + Debug + Send + Sync,
     K::DynamicType: Default + Eq + Hash + Clone,
 {
-    pub fn new(api: Api<K>) -> Self {
+    pub fn new(client: Client) -> Self {
         Self {
-            watcher_provider: WatcherProvider::new(api),
+            watcher_provider: WatcherFactory::new(client),
             reflectors: HashMap::new(),
         }
     }
@@ -62,16 +59,78 @@ where
         stream::select_all(self.reflectors.into_iter().map(|(_, (_, reflector))| reflector))
     }
 
-    pub fn store(&mut self, list_params: ListParams) -> SafeStore<K> {
-        self.reflector(list_params).0
-    }
-
-    fn reflector(&mut self, list_params: ListParams) -> (SafeStore<K>, impl Stream<Item = Event<K>>) {
-        if let Some((store, prism)) = self.reflectors.get(&list_params) {
-            return (store.clone(), prism.subscribe_ok());
+    pub fn namespaced(&mut self, namespace: &str, list_params: ListParams) -> SafeStore<K>
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+    {
+        if let Some((store, _)) = self.reflectors.get(&list_params) {
+            return store.clone();
         }
 
-        let watcher = self.watcher_provider.watcher(list_params.clone());
+        let watcher = self.watcher_provider.namespaced(namespace, list_params.clone());
+
+        self.reflector(watcher, list_params)
+    }
+
+    pub fn all(&mut self, list_params: ListParams) -> SafeStore<K> {
+        if let Some((store, _)) = self.reflectors.get(&list_params) {
+            return store.clone();
+        }
+
+        let watcher = self.watcher_provider.all(list_params.clone());
+
+        self.reflector(watcher, list_params)
+    }
+
+    pub fn subscribe_namespaced(
+        &mut self,
+        namespace: &str,
+        list_params: ListParams,
+    ) -> impl Stream<Item = Event<K>>
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+    {
+        if let Some((_, reflector)) = self.reflectors.get(&list_params) {
+            return reflector.subscribe_ok();
+        }
+
+        let watcher = self.watcher_provider.namespaced(namespace, list_params.clone());
+
+        self.reflector(watcher, list_params.clone());
+
+        // todo -We can safely unwrap here because we know we just created it ... but it's horrible, so we should fix it
+        self.reflectors
+            .get(&list_params)
+            .expect("reflector must exist")
+            .1
+            .subscribe_ok()
+    }
+
+    pub fn subscribe_all(&mut self, list_params: ListParams) -> impl Stream<Item = Event<K>>
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+    {
+        if let Some((_, reflector)) = self.reflectors.get(&list_params) {
+            return reflector.subscribe_ok();
+        }
+
+        let watcher = self.watcher_provider.all(list_params.clone());
+
+        self.reflector(watcher, list_params.clone());
+
+        // todo -We can safely unwrap here because we know we just created it ... but it's horrible, so we should fix it
+        self.reflectors
+            .get(&list_params)
+            .expect("reflector must exist")
+            .1
+            .subscribe_ok()
+    }
+
+    fn reflector(&mut self, pending_watcher: PendingWatcher<K>, list_params: ListParams) -> SafeStore<K> {
+        if let Some((store, prism)) = self.reflectors.get(&list_params) {
+            return store.clone();
+        }
+
         let store_writer = Writer::default();
         let store_reader = store_writer.as_reader();
 
@@ -79,7 +138,8 @@ where
 
         // todo - maybe we want a "safe_reflector" ?
         let safe_store_clone = safe_store.clone();
-        let reflector = reflector(store_writer, watcher).inspect_ok(move |_| safe_store_clone.make_ready());
+        let reflector =
+            reflector(store_writer, pending_watcher.run()).inspect_ok(move |_| safe_store_clone.make_ready());
 
         let subscribable_reflector = reflector.boxed().subscribable();
         let event_stream = subscribable_reflector.subscribe_ok();
@@ -87,39 +147,65 @@ where
         self.reflectors
             .insert(list_params.clone(), (safe_store.clone(), subscribable_reflector));
 
-        (safe_store, event_stream)
+        safe_store
     }
 }
 
-pub trait CreateWatcher<K>
-where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-{
-    fn watcher(&self, list_params: ListParams) -> BoxStream<'static, watcher::Result<Event<K>>>;
+pub trait CreateWatcher<K> {
+    fn all(&self, list_params: ListParams) -> PendingWatcher<K>;
+
+    fn namespaced(&self, namespace: &str, list_params: ListParams) -> PendingWatcher<K>
+    where
+        K: Resource<Scope = NamespaceResourceScope>;
 }
 
-pub struct WatcherProvider<K>
-where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-{
-    api: Api<K>,
-}
+pub struct PendingWatcher<K>(BoxStream<'static, watcher::Result<Event<K>>>);
 
-impl<K> WatcherProvider<K>
-where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-{
-    fn new(api: Api<K>) -> Self {
-        Self { api }
+impl<K> PendingWatcher<K> {
+    fn new<S>(stream: S) -> Self
+    where
+        S: Stream<Item = watcher::Result<Event<K>>> + Send + 'static,
+    {
+        Self(stream.boxed())
+    }
+
+    fn run(self) -> impl Stream<Item = watcher::Result<Event<K>>> {
+        self.0
     }
 }
 
-impl<K> CreateWatcher<K> for WatcherProvider<K>
+pub struct WatcherFactory<K> {
+    client: Client,
+    _phantom: std::marker::PhantomData<K>,
+}
+
+impl<K> WatcherFactory<K> {
+    fn new(client: Client) -> Self {
+        Self {
+            client,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<K> CreateWatcher<K> for WatcherFactory<K>
 where
     K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
+    <K as Resource>::DynamicType: Default,
 {
-    fn watcher(&self, list_params: ListParams) -> BoxStream<'static, watcher::Result<Event<K>>> {
-        watcher(self.api.clone(), list_params).boxed()
+    fn all(&self, list_params: ListParams) -> PendingWatcher<K> {
+        // is it worth catching the APIs within the provider?
+        PendingWatcher::new(watcher(Api::all(self.client.clone()), list_params))
+    }
+
+    fn namespaced(&self, namespace: &str, list_params: ListParams) -> PendingWatcher<K>
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+    {
+        PendingWatcher::new(watcher(
+            Api::namespaced(self.client.clone(), namespace),
+            list_params,
+        ))
     }
 }
 
@@ -150,13 +236,12 @@ mod test {
         async fn it_returns_stores_that_updates_on_events() {
             let lp = ListParams::default();
             let expected_state = vec![test_pod(1)];
-            let mut kp = TestProvider::<Pod>::new(
+            let mut ss = TestProvider::<Pod>::new(
                 hashmap!(lp.clone().into() => vec![Event::Restarted(expected_state.clone())]),
-                &ReadyToken::new(),
             );
-            let store = kp.store(lp);
+            let store = ss.all(lp);
 
-            kp.spawn().await;
+            ss.spawn().await;
 
             assert_eq!(store.cloned_state().await, expected_state);
         }
@@ -165,15 +250,14 @@ mod test {
         async fn it_returns_the_same_store_for_the_same_list_params() {
             let lp = ListParams::default().labels("foo=bar");
             let expected_state = vec![test_pod(1)];
-            let mut provider = TestProvider::<Pod>::new(
+            let mut ss = TestProvider::<Pod>::new(
                 hashmap!(lp.clone().into() => vec![Event::Restarted(expected_state.clone())]),
-                &ReadyToken::new(),
             );
 
-            let store1 = provider.store(lp.clone());
-            let store2 = provider.store(lp);
+            let store1 = ss.all(lp.clone());
+            let store2 = ss.all(lp);
 
-            provider.spawn().await;
+            ss.spawn().await;
 
             assert_eq!(store1.cloned_state().await, expected_state);
             assert_eq!(store2.cloned_state().await, expected_state);
@@ -185,18 +269,15 @@ mod test {
             let lp2 = ListParams::default().labels("foo=baz");
             let expected_state1 = vec![test_pod(1)];
             let expected_state2 = vec![test_pod(2)];
-            let mut kp = TestProvider::<Pod>::new(
-                hashmap!(
-                    lp1.clone().into() => vec![Event::Restarted(expected_state1.clone())],
-                    lp2.clone().into() => vec![Event::Restarted(expected_state2.clone())],
-                ),
-                &ReadyToken::new(),
-            );
+            let mut ss = TestProvider::<Pod>::new(hashmap!(
+                lp1.clone().into() => vec![Event::Restarted(expected_state1.clone())],
+                lp2.clone().into() => vec![Event::Restarted(expected_state2.clone())],
+            ));
 
-            let store1 = kp.store(lp1);
-            let store2 = kp.store(lp2);
+            let store1 = ss.all(lp1);
+            let store2 = ss.all(lp2);
 
-            kp.spawn().await;
+            ss.spawn().await;
 
             assert_eq!(store1.cloned_state().await, expected_state1, "Store 1");
             assert_eq!(store2.cloned_state().await, expected_state2, "Store 2");
@@ -232,7 +313,7 @@ mod test {
         K: 'static + Resource + Clone + DeserializeOwned + Debug + Send + Sync,
         K::DynamicType: Clone + Debug + Default + Eq + Hash + Unpin,
     {
-        fn new(events: HashMap<ListParams, Vec<Event<K>>>, ready_token: &ReadyToken) -> Self {
+        fn new(events: HashMap<ListParams, Vec<Event<K>>>) -> Self {
             Self {
                 watcher_provider: TestWatcherProvider {
                     events: Mutex::new(events.into_iter().map(|(k, v)| (k, v.into())).collect()),
@@ -278,7 +359,24 @@ mod test {
         K: 'static + Resource + Clone + DeserializeOwned + Debug + Send,
         K::DynamicType: Hash + Eq,
     {
-        fn watcher(&self, list_params: ListParams) -> BoxStream<'static, watcher::Result<Event<K>>> {
+        fn all(&self, list_params: ListParams) -> PendingWatcher<K> {
+            self.watcher(list_params)
+        }
+
+        fn namespaced(&self, _namespace: &str, list_params: ListParams) -> PendingWatcher<K>
+        where
+            K: Resource<Scope = NamespaceResourceScope>,
+        {
+            self.watcher(list_params)
+        }
+    }
+
+    impl<K> TestWatcherProvider<K>
+    where
+        K: 'static + Resource + Clone + DeserializeOwned + Debug + Send,
+        K::DynamicType: Hash + Eq,
+    {
+        fn watcher(&self, list_params: ListParams) -> PendingWatcher<K> {
             let events = self
                 .events
                 .lock()
@@ -286,14 +384,13 @@ mod test {
                 .remove(&list_params.into())
                 .expect("There can be only one stream per ListParams");
 
-            stream::unfold(events, |mut events| async move {
+            PendingWatcher::new(stream::unfold(events, |mut events| async move {
                 match events.pop_front() {
                     Some(event) => Some((Ok(event), events)),
                     // if there's nothing left we block to simulate waiting for a change
                     None => futures::future::pending().await,
                 }
-            })
-            .boxed()
+            }))
         }
     }
 
