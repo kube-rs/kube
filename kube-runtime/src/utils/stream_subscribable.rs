@@ -2,7 +2,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use futures::{stream, Stream, TryFutureExt, TryStream};
+use futures::{stream, Stream, TryStream};
 use pin_project::pin_project;
 use tokio::sync::broadcast;
 

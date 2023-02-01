@@ -31,7 +31,7 @@ where
     W: CreateWatcher<K>,
 {
     watcher_provider: W,
-    reflectors: HashMap<ListParams, (SafeStore<K>, SubscribableBoxStream<K>)>,
+    reflectors: HashMap<(Option<String>, ListParams), (SafeStore<K>, SubscribableBoxStream<K>)>,
 }
 
 type SubscribableBoxStream<K> = StreamSubscribable<BoxStream<'static, watcher::Result<Event<K>>>>;
@@ -63,23 +63,26 @@ where
     where
         K: Resource<Scope = NamespaceResourceScope>,
     {
-        if let Some((store, _)) = self.reflectors.get(&list_params) {
+        if let Some((store, _)) = self
+            .reflectors
+            .get(&(Some(namespace.to_string()), list_params.clone()))
+        {
             return store.clone();
         }
 
         let watcher = self.watcher_provider.namespaced(namespace, list_params.clone());
 
-        self.reflector(watcher, list_params)
+        self.reflector(watcher, Some(namespace.to_string()), list_params)
     }
 
     pub fn all(&mut self, list_params: ListParams) -> SafeStore<K> {
-        if let Some((store, _)) = self.reflectors.get(&list_params) {
+        if let Some((store, _)) = self.reflectors.get(&(None, list_params.clone())) {
             return store.clone();
         }
 
         let watcher = self.watcher_provider.all(list_params.clone());
 
-        self.reflector(watcher, list_params)
+        self.reflector(watcher, None, list_params)
     }
 
     pub fn subscribe_namespaced(
@@ -90,17 +93,20 @@ where
     where
         K: Resource<Scope = NamespaceResourceScope>,
     {
-        if let Some((_, reflector)) = self.reflectors.get(&list_params) {
+        if let Some((_, reflector)) = self
+            .reflectors
+            .get(&(Some(namespace.to_string()), list_params.clone()))
+        {
             return reflector.subscribe_ok();
         }
 
         let watcher = self.watcher_provider.namespaced(namespace, list_params.clone());
 
-        self.reflector(watcher, list_params.clone());
+        self.reflector(watcher, Some(namespace.to_string()), list_params.clone());
 
-        // todo -We can safely unwrap here because we know we just created it ... but it's horrible, so we should fix it
+        // todo - We can safely unwrap here because we know we just created it ... but it's horrible, so we should fix it
         self.reflectors
-            .get(&list_params)
+            .get(&(Some(namespace.to_string()), list_params))
             .expect("reflector must exist")
             .1
             .subscribe_ok()
@@ -110,27 +116,28 @@ where
     where
         K: Resource<Scope = NamespaceResourceScope>,
     {
-        if let Some((_, reflector)) = self.reflectors.get(&list_params) {
+        if let Some((_, reflector)) = self.reflectors.get(&(None, list_params.clone())) {
             return reflector.subscribe_ok();
         }
 
         let watcher = self.watcher_provider.all(list_params.clone());
 
-        self.reflector(watcher, list_params.clone());
+        self.reflector(watcher, None, list_params.clone());
 
-        // todo -We can safely unwrap here because we know we just created it ... but it's horrible, so we should fix it
+        // todo - We can safely unwrap here because we know we just created it ... but it's horrible, so we should fix it
         self.reflectors
-            .get(&list_params)
+            .get(&(None, list_params))
             .expect("reflector must exist")
             .1
             .subscribe_ok()
     }
 
-    fn reflector(&mut self, pending_watcher: PendingWatcher<K>, list_params: ListParams) -> SafeStore<K> {
-        if let Some((store, prism)) = self.reflectors.get(&list_params) {
-            return store.clone();
-        }
-
+    fn reflector(
+        &mut self,
+        pending_watcher: PendingWatcher<K>,
+        scope: Option<String>,
+        list_params: ListParams,
+    ) -> SafeStore<K> {
         let store_writer = Writer::default();
         let store_reader = store_writer.as_reader();
 
@@ -145,7 +152,7 @@ where
         let event_stream = subscribable_reflector.subscribe_ok();
 
         self.reflectors
-            .insert(list_params.clone(), (safe_store.clone(), subscribable_reflector));
+            .insert((scope, list_params), (safe_store.clone(), subscribable_reflector));
 
         safe_store
     }
@@ -237,7 +244,7 @@ mod test {
             let lp = ListParams::default();
             let expected_state = vec![test_pod(1)];
             let mut ss = TestProvider::<Pod>::new(
-                hashmap!(lp.clone().into() => vec![Event::Restarted(expected_state.clone())]),
+                hashmap!((None, lp.clone().into()) => vec![Event::Restarted(expected_state.clone())]),
             );
             let store = ss.all(lp);
 
@@ -251,7 +258,7 @@ mod test {
             let lp = ListParams::default().labels("foo=bar");
             let expected_state = vec![test_pod(1)];
             let mut ss = TestProvider::<Pod>::new(
-                hashmap!(lp.clone().into() => vec![Event::Restarted(expected_state.clone())]),
+                hashmap!((None, lp.clone().into()) => vec![Event::Restarted(expected_state.clone())]),
             );
 
             let store1 = ss.all(lp.clone());
@@ -270,8 +277,8 @@ mod test {
             let expected_state1 = vec![test_pod(1)];
             let expected_state2 = vec![test_pod(2)];
             let mut ss = TestProvider::<Pod>::new(hashmap!(
-                lp1.clone().into() => vec![Event::Restarted(expected_state1.clone())],
-                lp2.clone().into() => vec![Event::Restarted(expected_state2.clone())],
+                (None, lp1.clone().into()) => vec![Event::Restarted(expected_state1.clone())],
+                (None, lp2.clone().into()) => vec![Event::Restarted(expected_state2.clone())],
             ));
 
             let store1 = ss.all(lp1);
@@ -281,6 +288,36 @@ mod test {
 
             assert_eq!(store1.cloned_state().await, expected_state1, "Store 1");
             assert_eq!(store2.cloned_state().await, expected_state2, "Store 2");
+        }
+
+        #[tokio::test]
+        async fn it_returns_different_stores_by_scope() {
+            let lp = ListParams::default().labels("foo=bar");
+            let ns = "ns1";
+            let expected_state1 = vec![test_pod(1)];
+            let expected_state2 = vec![test_pod(2)];
+            let mut ss = TestProvider::<Pod>::new(hashmap!(
+                (None, lp.clone().into()) => vec![Event::Restarted(expected_state1.clone())],
+                (Some(ns.to_string()), lp.clone().into()) => vec![Event::Restarted(expected_state2.clone())],
+            ));
+
+            let cluster_store1 = ss.all(lp.clone());
+            let ns_store1 = ss.namespaced(ns, lp.clone());
+            let cluster_store2 = ss.all(lp);
+
+            ss.spawn().await;
+
+            assert_eq!(
+                cluster_store1.cloned_state().await,
+                expected_state1,
+                "ClusterStore 1"
+            );
+            assert_eq!(ns_store1.cloned_state().await, expected_state2, "NS Store 1");
+            assert_eq!(
+                cluster_store2.cloned_state().await,
+                expected_state1,
+                "Cluster Store 2"
+            );
         }
     }
 
@@ -313,7 +350,7 @@ mod test {
         K: 'static + Resource + Clone + DeserializeOwned + Debug + Send + Sync,
         K::DynamicType: Clone + Debug + Default + Eq + Hash + Unpin,
     {
-        fn new(events: HashMap<ListParams, Vec<Event<K>>>) -> Self {
+        fn new(events: HashMap<(Option<String>, ListParams), Vec<Event<K>>>) -> Self {
             Self {
                 watcher_provider: TestWatcherProvider {
                     events: Mutex::new(events.into_iter().map(|(k, v)| (k, v.into())).collect()),
@@ -351,7 +388,7 @@ mod test {
     }
 
     struct TestWatcherProvider<K> {
-        events: Mutex<HashMap<ListParams, VecDeque<Event<K>>>>,
+        events: Mutex<HashMap<(Option<String>, ListParams), VecDeque<Event<K>>>>,
     }
 
     impl<K> CreateWatcher<K> for TestWatcherProvider<K>
@@ -360,14 +397,14 @@ mod test {
         K::DynamicType: Hash + Eq,
     {
         fn all(&self, list_params: ListParams) -> PendingWatcher<K> {
-            self.watcher(list_params)
+            self.watcher(None, list_params)
         }
 
-        fn namespaced(&self, _namespace: &str, list_params: ListParams) -> PendingWatcher<K>
+        fn namespaced(&self, namespace: &str, list_params: ListParams) -> PendingWatcher<K>
         where
             K: Resource<Scope = NamespaceResourceScope>,
         {
-            self.watcher(list_params)
+            self.watcher(Some(namespace.to_string()), list_params)
         }
     }
 
@@ -376,12 +413,12 @@ mod test {
         K: 'static + Resource + Clone + DeserializeOwned + Debug + Send,
         K::DynamicType: Hash + Eq,
     {
-        fn watcher(&self, list_params: ListParams) -> PendingWatcher<K> {
+        fn watcher(&self, scope: Option<String>, list_params: ListParams) -> PendingWatcher<K> {
             let events = self
                 .events
                 .lock()
                 .unwrap()
-                .remove(&list_params.into())
+                .remove(&(scope, list_params.into()))
                 .expect("There can be only one stream per ListParams");
 
             PendingWatcher::new(stream::unfold(events, |mut events| async move {
