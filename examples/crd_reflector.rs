@@ -34,11 +34,6 @@ async fn main() -> anyhow::Result<()> {
 
     // 1. Run a reflector against the installed CRD
     let (reader, writer) = reflector::store::<Foo>();
-
-    let foos: Api<Foo> = Api::default_namespaced(client);
-    let lp = ListParams::default().timeout(20); // low timeout in this example
-    let rf = reflector(writer, watcher(foos, lp));
-
     tokio::spawn(async move {
         loop {
             // Periodically read our state
@@ -48,6 +43,9 @@ async fn main() -> anyhow::Result<()> {
             info!("Current crds: {:?}", crds);
         }
     });
+    let foos: Api<Foo> = Api::default_namespaced(client);
+     let lp = ListParams::default().timeout(20); // low timeout in this example
+    let rf = reflector(writer, watcher(foos, lp));
     let mut rfa = rf.applied_objects().boxed();
     while let Some(event) = rfa.try_next().await? {
         info!("saw {}", event.name_any());
