@@ -3,11 +3,13 @@
 mod backoff_reset_timer;
 mod event_flatten;
 mod stream_backoff;
+mod stream_subscribe;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use event_flatten::EventFlatten;
 pub use stream_backoff::StreamBackoff;
+pub use stream_subscribe::StreamSubscribe;
 pub use watch_ext::WatchStreamExt;
 
 use futures::{
