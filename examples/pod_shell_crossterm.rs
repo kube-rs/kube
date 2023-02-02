@@ -37,7 +37,6 @@ async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), a
     Ok(())
 }
 
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
