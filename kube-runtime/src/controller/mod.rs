@@ -930,7 +930,7 @@ mod tests {
         // This is intended to avoid regressing on https://github.com/kube-rs/kube/issues/926
 
         // Assume that we can keep APPLIER_REQUEUE_BUF_SIZE flooded if we have 100x the number of objects "in rotation"
-        // On my (@teozkr)'s 3900X I can reliably trigger this with 10x, but let's have some safety margin to avoid false negatives
+        // On my (@nightkr)'s 3900X I can reliably trigger this with 10x, but let's have some safety margin to avoid false negatives
         let items = APPLIER_REQUEUE_BUF_SIZE * 50;
         // Assume that everything's OK if we can reconcile every object 3 times on average
         let reconciles = items * 3;

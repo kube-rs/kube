@@ -3,7 +3,7 @@ name = "kube-examples"
 version = "0.1.0"
 authors = [
   "clux <sszynrae@gmail.com>",
-  "Teo Klestrup Röijezon <teo@nullable.se>",
+  "Natalie Klestrup Röijezon <nat@nullable.se>",
   "kazk <kazk.dev@gmail.com>",
 ]
 publish = false
