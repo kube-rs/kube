@@ -15,7 +15,7 @@ use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
 use std::{clone::Clone, fmt::Debug, time::Duration};
 use thiserror::Error;
-use tracing::*;
+use tracing::{debug, error, warn};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -228,7 +228,7 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
                     stream,
                 })
             }
-            None => (None, State::InitListed { resource_version })
+            None => (None, State::InitListed { resource_version }),
         },
     }
 }
