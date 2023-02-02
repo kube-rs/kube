@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
     let foos: Api<Foo> = Api::default_namespaced(client);
-     let lp = ListParams::default().timeout(20); // low timeout in this example
+    let lp = ListParams::default().timeout(20); // low timeout in this example
     let rf = reflector(writer, watcher(foos, lp));
     let mut rfa = rf.applied_objects().boxed();
     while let Some(event) = rfa.try_next().await? {
