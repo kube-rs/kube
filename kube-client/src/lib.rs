@@ -125,7 +125,6 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from kube_core
 pub use kube_core as core;
 
-
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube-client --lib features=rustls-tls,ws -- --ignored`
 #[cfg(all(feature = "client", feature = "config"))]
@@ -470,6 +469,66 @@ mod test {
         Ok(())
     }
 
+    #[tokio::test]
+    #[ignore] // requires a cluster
+    async fn can_get_pod_metadata() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
+            core::subresource::LogParams,
+        };
+        use kube_core::{ObjectList, ObjectMeta};
+
+        let client = Client::try_default().await?;
+        let pods: Api<Pod> = Api::default_namespaced(client);
+
+        // create busybox pod that's alive for at most 30s
+        let p: Pod = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "busybox-kube-meta",
+                "labels": { "app": "kube-rs-test" },
+            },
+            "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
+                "containers": [{
+                  "name": "busybox",
+                  "image": "busybox:1.34.1",
+                  "command": ["sh", "-c", "sleep 30s"],
+                }],
+            }
+        }))?;
+
+        match pods.create(&Default::default(), &p).await {
+            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
+            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(e) => return Err(e.into()),                         // any other case if a failure
+        }
+
+        let pod_metadata: kube_core::ObjectMeta = pods.get_metadata("busybox-kube-meta").await?.into();
+        assert_eq!(
+            "busybox-kube-meta",
+            pod_metadata
+                .name
+                .expect("Expected metadata to have a 'name' field")
+        );
+        assert_eq!(
+            Some((&"app".to_string(), &"kube-rs-test".to_string())),
+            pod_metadata
+                .labels
+                .expect("Expected metadata to have a 'name' field")
+                .get_key_value("app")
+        );
+
+        // Clean-up
+        let dp = DeleteParams::default();
+        pods.delete("busybox-kube-meta", &dp).await?.map_left(|pdel| {
+            assert_eq!(pdel.name_any(), "busybox-kube-meta");
+        });
+
+        Ok(())
+    }
     #[tokio::test]
     #[ignore] // needs cluster (will create a CertificateSigningRequest)
     async fn csr_can_be_approved() -> Result<(), Box<dyn std::error::Error>> {

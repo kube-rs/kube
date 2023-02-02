@@ -4,7 +4,13 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 use crate::{api::Api, Error, Result};
-use kube_core::{object::ObjectList, params::*, response::Status, ErrorResponse, WatchEvent};
+use kube_core::{
+    metadata::{PartialObjectMeta, PartialObjectMetaList},
+    object::ObjectList,
+    params::*,
+    response::Status,
+    ErrorResponse, WatchEvent,
+};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
@@ -33,6 +39,34 @@ where
         let mut req = self.request.get(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get");
         self.client.request::<K>(req).await
+    }
+
+    /// Get metadata (to-fill-in-later)
+    pub async fn get_metadata(&self, name: &str) -> Result<PartialObjectMeta> {
+        let mut req = self.request.get_metadata(name).map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("get");
+        self.client.request::<PartialObjectMeta>(req).await
+    }
+
+    /// List metadata (to-fill-in-later)
+    pub async fn list_metadata(&self, lp: &ListParams) -> Result<PartialObjectMetaList> {
+        let mut req = self.request.list_metadata(lp).map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("list");
+        self.client.request::<PartialObjectMetaList>(req).await
+    }
+
+    /// Watch meta
+    pub async fn watch_metadata(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> Result<impl Stream<Item = Result<WatchEvent<PartialObjectMeta>>>> {
+        let mut req = self
+            .request
+            .watch_metadata(lp, version)
+            .map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("watch");
+        self.client.request_events::<PartialObjectMeta>(req).await
     }
 
     /// [Get](`Api::get`) a named resource if it exists, returns [`None`] if it doesn't exist
