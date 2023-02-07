@@ -15,7 +15,9 @@ pub struct TypeMeta {
     pub kind: String,
 }
 
-/// TODO: fill me in
+/// Generic representation of any object with ObjectMeta. Allows clients to get
+/// access to a particular ObjectMeta schema without knowing the details of the
+/// version
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialObjectMeta {
@@ -27,17 +29,17 @@ pub struct PartialObjectMeta {
     pub metadata: ObjectMeta,
 }
 
-/// TODO: fill me in
+/// Represents a list of objects and contains only the ObjectMeta
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
 pub struct PartialObjectMetaList {
     /// The type fields
     #[serde(flatten, default)]
     pub types: Option<TypeMeta>,
 
-    ///
+    /// List metadata
     pub metadata: ListMeta,
 
-    ///
+    /// ObjectMeta for contained objects
     pub items: Vec<PartialObjectMeta>,
 }
 
