@@ -471,7 +471,7 @@ mod test {
 
     #[tokio::test]
     #[ignore] // requires a cluster
-    async fn can_get_pod_metadata() -> Result<(), Box<dyn std::error::Error>> {
+    async fn can_operate_on_pod_metadata() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
             core::subresource::LogParams,
@@ -506,6 +506,8 @@ mod test {
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
 
+        // Test we can get a pod as a PartialObjectMeta and convert to
+        // ObjectMeta
         let pod_metadata: kube_core::ObjectMeta = pods.get_metadata("busybox-kube-meta").await?.into();
         assert_eq!(
             "busybox-kube-meta",
@@ -519,6 +521,42 @@ mod test {
                 .labels
                 .expect("Expected metadata to have a 'name' field")
                 .get_key_value("app")
+        );
+
+        // Test we can get a list of PartialObjectMeta for pods
+        let p_list = pods.list_metadata(&ListParams::default()).await?;
+
+        // Find only pod we are concerned with in this test and fail eagerly if
+        // name doesn't exist
+        let pod_metadata = p_list
+            .items
+            .into_iter()
+            .find(|p| p.metadata.name.as_ref().expect("Pod must have a name") == "busybox-kube-meta")
+            .and_then(|pm| Some(ObjectMeta::from(pm)))
+            .unwrap();
+        assert_eq!(
+            pod_metadata.labels.as_ref().unwrap().get("app"),
+            Some(&"kube-rs-test".to_string())
+        );
+
+        // Attempt to patch pod
+        let patch = json!({
+            "metadata": {
+                "annotations": {
+                    "test": "123"
+                },
+            },
+            "spec": {
+                "activeDeadlineSeconds": 5
+            }
+        });
+        let patchparams = PatchParams::default();
+        let p_patched = pods
+            .patch_metadata("busybox-kube-meta", &patchparams, &Patch::Merge(&patch))
+            .await?;
+        assert_eq!(
+            p_patched.metadata.annotations.as_ref().unwrap().get("test"),
+            Some(&"123".to_string())
         );
 
         // Clean-up
