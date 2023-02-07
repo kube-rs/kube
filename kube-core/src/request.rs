@@ -527,7 +527,7 @@ mod test {
     fn list_metadata_path() {
         let url = appsv1::Deployment::url_path(&(), Some("ns"));
         let gp = ListParams::default();
-        let req = Request::new(url).list(&gp).unwrap();
+        let req = Request::new(url).list_metadata(&gp).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
         assert_eq!(
             req.headers().get(http::header::CONTENT_TYPE).unwrap(),
