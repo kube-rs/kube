@@ -144,12 +144,9 @@ where
     }
 
     /// Get a list of resources that contains only their metadata as
-    /// [`kube_core::metadata::PartialObjectMetaList`]
     ///
     /// Similar to [list](`Api::list`), you use this to get everything, or a
-    /// subset matching fields/labels. A `PartialObjectMetaList` may be
-    /// converted to an `ObjectList<ObjectMeta>` through conversion traits. For
-    /// example
+    /// subset matching fields/labels. For example
     ///
     /// ```no_run
     /// use kube::{core::{metadata::PartialObjectMeta, object::ObjectList}, api::{Api, ListParams, ResourceExt}, Client};
