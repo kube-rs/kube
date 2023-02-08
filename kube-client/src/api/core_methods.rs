@@ -5,11 +5,7 @@ use std::fmt::Debug;
 
 use crate::{api::Api, Error, Result};
 use kube_core::{
-    metadata::{PartialObjectMeta, PartialObjectMetaList},
-    object::ObjectList,
-    params::*,
-    response::Status,
-    ErrorResponse, WatchEvent,
+    metadata::PartialObjectMeta, object::ObjectList, params::*, response::Status, ErrorResponse, WatchEvent,
 };
 
 /// PUSH/PUT/POST/GET abstractions
@@ -46,13 +42,13 @@ where
     ///
     ///
     /// ```no_run
-    /// use kube::{Api, Client};
+    /// use kube::{Api, Client, core::metadata::PartialObjectMeta};
     /// use k8s_openapi::api::core::v1::Pod;
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let p: Pod = pods.get_metadata("blog").await?;
+    ///     let p: PartialObjectMeta = pods.get_metadata("blog").await?;
     ///     Ok(())
     /// }
     /// ```
@@ -156,24 +152,25 @@ where
     /// example
     ///
     /// ```no_run
-    /// use kube::{core::object::ObjectList, api::{Api, ListParams, ResourceExt}, Client};
+    /// use kube::{core::{metadata::PartialObjectMeta, object::ObjectList}, api::{Api, ListParams, ResourceExt}, Client};
     /// use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, api::core::v1::Pod};
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
-    ///     let list: ObjectList<ObjectMeta> = pods.list_metadata(&lp).await?.into();
+    ///     let list: ObjectList<PartialObjectMeta> = pods.list_metadata(&lp).await?;
     ///     for p in list {
-    ///         println!("Found Pod: {}", p.name.unwrap());
+    ///         let metadata = ObjectMeta::from(p);
+    ///         println!("Found Pod: {}", metadata.name.unwrap());
     ///     }
     ///     Ok(())
     /// }
     /// ```
-    pub async fn list_metadata(&self, lp: &ListParams) -> Result<PartialObjectMetaList> {
+    pub async fn list_metadata(&self, lp: &ListParams) -> Result<ObjectList<PartialObjectMeta>> {
         let mut req = self.request.list_metadata(lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("list");
-        self.client.request::<PartialObjectMetaList>(req).await
+        self.client.request::<ObjectList<PartialObjectMeta>>(req).await
     }
 
     /// Create a resource
@@ -332,7 +329,7 @@ where
     ///         "apiVersion": "v1",
     ///         "kind": "Pod",
     ///         "metadata": {
-    ///             "name": "blog"
+    ///             "name": "blog",
     ///             "labels": {
     ///                 "key": "value"
     ///             },
