@@ -13,8 +13,9 @@ pub struct TypeMeta {
     pub kind: String,
 }
 
-/// PartialObjectMetadata is a generic representation of any object with
-/// ObjectMeta. It allows clients to get access to a particular ObjectMeta
+/// A generic representation of any object with `ObjectMeta`.
+///
+/// It allows clients to get access to a particular `ObjectMeta`
 /// schema without knowing the details of the version.
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
 #[serde(rename_all = "camelCase")]
