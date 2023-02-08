@@ -508,19 +508,11 @@ mod test {
 
         // Test we can get a pod as a PartialObjectMeta and convert to
         // ObjectMeta
-        let pod_metadata: kube_core::ObjectMeta = pods.get_metadata("busybox-kube-meta").await?.into();
-        assert_eq!(
-            "busybox-kube-meta",
-            pod_metadata
-                .name
-                .expect("Expected metadata to have a 'name' field")
-        );
+        let pod_metadata = pods.get_metadata("busybox-kube-meta").await?;
+        assert_eq!("busybox-kube-meta", pod_metadata.name_any());
         assert_eq!(
             Some((&"app".to_string(), &"kube-rs-test".to_string())),
-            pod_metadata
-                .labels
-                .expect("Expected metadata to have a 'name' field")
-                .get_key_value("app")
+            pod_metadata.labels().get_key_value("app")
         );
 
         // Test we can get a list of PartialObjectMeta for pods
@@ -531,11 +523,10 @@ mod test {
         let pod_metadata = p_list
             .items
             .into_iter()
-            .find(|p| p.metadata.name.as_ref().expect("Pod must have a name") == "busybox-kube-meta")
-            .and_then(|pm| Some(ObjectMeta::from(pm)))
+            .find(|p| p.name_any() == "busybox-kube-meta")
             .unwrap();
         assert_eq!(
-            pod_metadata.labels.as_ref().unwrap().get("app"),
+            pod_metadata.labels().get("app"),
             Some(&"kube-rs-test".to_string())
         );
 
@@ -554,10 +545,7 @@ mod test {
         let p_patched = pods
             .patch_metadata("busybox-kube-meta", &patchparams, &Patch::Merge(&patch))
             .await?;
-        assert_eq!(
-            p_patched.metadata.annotations.as_ref().unwrap().get("test"),
-            Some(&"123".to_string())
-        );
+        assert_eq!(p_patched.annotations().get("test"), Some(&"123".to_string()));
 
         // Clean-up
         let dp = DeleteParams::default();
