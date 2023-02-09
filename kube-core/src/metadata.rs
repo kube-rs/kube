@@ -40,7 +40,6 @@ impl From<PartialObjectMeta> for ObjectMeta {
 
 impl Resource for PartialObjectMeta {
     type DynamicType = ApiResource;
-
     type Scope = DynamicResourceScope;
 
     fn kind(dt: &ApiResource) -> Cow<'_, str> {
