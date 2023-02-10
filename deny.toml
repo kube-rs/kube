@@ -83,34 +83,10 @@ multiple-versions = "deny"
 name = "idna"
 version = "0.2"
 
-# waiting on hyper-rustls and below to bump its chain
-[[bans.skip]]
-name = "windows_i686_msvc"
-version = "0.36"
-[[bans.skip]]
-name = "windows_aarch64_msvc"
-version = "0.36"
-[[bans.skip]]
-name = "windows-sys"
-version = "0.36"
-[[bans.skip]]
-name = "windows_i686_gnu"
-version = "0.36"
-[[bans.skip]]
-name = "windows_x86_64_msvc"
-version = "0.36"
-[[bans.skip]]
-name = "windows_x86_64_gnu"
-version = "0.36"
+# windows sys comes through tokio
 [[bans.skip]]
 name = "windows-sys"
 version = "0.42"
-
-[[bans.skip]]
-# waiting for ahash/getrandom to bump wasi as we have two branches:
-# ahash -> getrandom -> wasi old
-# tokio -> mio -> wasi new
-name = "wasi"
 
 [[bans.skip]]
 # waiting for pem to bump base64
