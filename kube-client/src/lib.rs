@@ -470,6 +470,92 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore] // requires a cluster
+    async fn can_operate_on_pod_metadata() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
+            core::subresource::LogParams,
+        };
+        use kube_core::{ObjectList, ObjectMeta};
+
+        let client = Client::try_default().await?;
+        let pods: Api<Pod> = Api::default_namespaced(client);
+
+        // create busybox pod that's alive for at most 30s
+        let p: Pod = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "busybox-kube-meta",
+                "labels": { "app": "kube-rs-test" },
+            },
+            "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
+                "containers": [{
+                  "name": "busybox",
+                  "image": "busybox:1.34.1",
+                  "command": ["sh", "-c", "sleep 30s"],
+                }],
+            }
+        }))?;
+
+        match pods.create(&Default::default(), &p).await {
+            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
+            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(e) => return Err(e.into()),                         // any other case if a failure
+        }
+
+        // Test we can get a pod as a PartialObjectMeta and convert to
+        // ObjectMeta
+        let pod_metadata = pods.get_metadata("busybox-kube-meta").await?;
+        assert_eq!("busybox-kube-meta", pod_metadata.name_any());
+        assert_eq!(
+            Some((&"app".to_string(), &"kube-rs-test".to_string())),
+            pod_metadata.labels().get_key_value("app")
+        );
+
+        // Test we can get a list of PartialObjectMeta for pods
+        let p_list = pods.list_metadata(&ListParams::default()).await?;
+
+        // Find only pod we are concerned with in this test and fail eagerly if
+        // name doesn't exist
+        let pod_metadata = p_list
+            .items
+            .into_iter()
+            .find(|p| p.name_any() == "busybox-kube-meta")
+            .unwrap();
+        assert_eq!(
+            pod_metadata.labels().get("app"),
+            Some(&"kube-rs-test".to_string())
+        );
+
+        // Attempt to patch pod
+        let patch = json!({
+            "metadata": {
+                "annotations": {
+                    "test": "123"
+                },
+            },
+            "spec": {
+                "activeDeadlineSeconds": 5
+            }
+        });
+        let patchparams = PatchParams::default();
+        let p_patched = pods
+            .patch_metadata("busybox-kube-meta", &patchparams, &Patch::Merge(&patch))
+            .await?;
+        assert_eq!(p_patched.annotations().get("test"), Some(&"123".to_string()));
+
+        // Clean-up
+        let dp = DeleteParams::default();
+        pods.delete("busybox-kube-meta", &dp).await?.map_left(|pdel| {
+            assert_eq!(pdel.name_any(), "busybox-kube-meta");
+        });
+
+        Ok(())
+    }
+    #[tokio::test]
     #[ignore] // needs cluster (will create a CertificateSigningRequest)
     async fn csr_can_be_approved() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::PostParams;
