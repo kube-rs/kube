@@ -83,7 +83,7 @@ multiple-versions = "deny"
 name = "idna"
 version = "0.2"
 
-# windows sys comes through tokio
+# tokio 1.25 pulls in mio which pulls in older an windows-sys than parking-lot
 [[bans.skip]]
 name = "windows-sys"
 version = "0.42"
