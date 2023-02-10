@@ -1,7 +1,8 @@
 VERSION := `git rev-parse HEAD`
 
+[private]
 default:
-  @just --list --unsorted --color=always | rg -v "    default"
+  @just --list --unsorted
 
 clippy:
   #rustup component add clippy --toolchain nightly
@@ -15,6 +16,10 @@ fmt:
 doc:
   RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_26 --open
 
+deny:
+  # might require rm Cargo.lock first to match CI
+  cargo deny --workspace --all-features check bans licenses sources
+
 # Unit tests
 test:
   cargo test --lib --all
@@ -24,6 +29,7 @@ test:
   cargo test -p kube --lib --no-default-features --features=openssl-tls,ws,oauth
   cargo test -p kube --lib --no-default-features
 
+# Integration tests (will modify your current context's cluster)
 test-integration:
   kubectl delete pod -lapp=kube-rs-test
   cargo test --lib --all -- --ignored # also run tests that fail on github actions
@@ -35,10 +41,6 @@ test-integration:
 coverage:
   cargo tarpaulin --out=Html --output-dir=.
   #xdg-open tarpaulin-report.html
-
-deny:
-  # might require rm Cargo.lock first to match CI
-  cargo deny --workspace --all-features check bans licenses sources
 
 readme:
   rustdoc README.md --test --edition=2021
