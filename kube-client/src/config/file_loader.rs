@@ -91,9 +91,9 @@ impl ConfigLoader {
             .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
 
         Ok(ConfigLoader {
-            current_context: current_context,
-            cluster: cluster,
-            user: user,
+            current_context,
+            cluster,
+            user,
         })
     }
 

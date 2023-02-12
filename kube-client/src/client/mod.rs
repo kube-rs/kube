@@ -126,7 +126,12 @@ impl Client {
         Self::try_from(Config::infer().await.map_err(Error::InferConfig)?)
     }
 
-    pub(crate) fn default_ns(&self) -> &str {
+    /// Get the default namespace for the client
+    ///
+    /// The namespace is either configured on `context` in the kubeconfig,
+    /// falls back to `default` when running locally,
+    /// or uses the service account's namespace when deployed in-cluster.
+    pub fn default_namespace(&self) -> &str {
         &self.default_ns
     }
 
@@ -464,6 +469,13 @@ mod tests {
     use hyper::Body;
     use k8s_openapi::api::core::v1::Pod;
     use tower_test::mock;
+
+    #[tokio::test]
+    async fn test_default_ns() {
+        let (mock_service, _) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "test-namespace");
+        assert_eq!(client.default_namespace(), "test-namespace");
+    }
 
     #[tokio::test]
     async fn test_mock() {
