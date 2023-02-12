@@ -199,7 +199,7 @@ mod tests {
 
     use super::{Extra, ObjectRef};
     use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
-    use kube_client::{core::TypeMeta, Resource};
+    use kube_client::Resource;
 
     #[test]
     fn display_should_follow_expected_format() {

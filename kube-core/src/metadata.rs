@@ -1,7 +1,8 @@
 //! Metadata structs used in traits, lists, and dynamic objects.
+use crate::{ApiResource, DynamicObject, DynamicResourceScope, Object, Resource};
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
-use crate::{ApiResource, DynamicResourceScope, Object, Resource};
+use std::borrow::Cow;
 
 /// Type information that is flattened into every kubernetes object
 #[derive(Deserialize, Serialize, Clone, Default, Debug, Eq, PartialEq, Hash)]
@@ -53,6 +54,18 @@ impl Resource for PartialObjectMeta {
 
     fn plural(dt: &ApiResource) -> Cow<'_, str> {
         dt.plural.as_str().into()
+    }
+
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn meta_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
+    }
+
+    fn typemeta() -> Option<TypeMeta> {
+        None
     }
 }
 
