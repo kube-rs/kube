@@ -39,18 +39,25 @@ async fn main() -> anyhow::Result<()> {
     let lp = ListParams::default().timeout(20); // low timeout in this example
     let rf = reflector(writer, watcher(foos, lp));
 
+    let mut rfa = rf.applied_objects().boxed();
+    // keep polling the reflector stream in a background task
     tokio::spawn(async move {
         loop {
-            // Periodically read our state
-            // while this runs you can kubectl apply -f crd-baz.yaml or crd-qux.yaml and see it works
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let crds = reader.state().iter().map(|r| r.name_any()).collect::<Vec<_>>();
-            info!("Current crds: {:?}", crds);
+            match rfa.try_next().await {
+                Ok(Some(event)) => info!("saw {}", event.name_any()),
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Kubernetes stream failure: {}", e);
+                    panic!("Kubernetes stream exited");
+                }
+            }
         }
     });
-    let mut rfa = rf.applied_objects().boxed();
-    while let Some(event) = rfa.try_next().await? {
-        info!("saw {}", event.name_any());
+
+    // Periodically dump state
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        let foos = reader.state().iter().map(|r| r.name_any()).collect::<Vec<_>>();
+        info!("Current {} foos: {:?}", foos.len(), foos);
     }
-    Ok(())
 }

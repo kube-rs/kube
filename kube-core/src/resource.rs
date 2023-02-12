@@ -1,3 +1,4 @@
+use crate::TypeMeta;
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::{
     api::core::v1::ObjectReference,
@@ -39,13 +40,13 @@ pub trait Resource {
     /// Dynamic types should select `Scope = DynamicResourceScope`
     type Scope;
 
-    /// Returns kind of this object
+    /// Returns the static kind of this Resource
     fn kind(dt: &Self::DynamicType) -> Cow<'_, str>;
-    /// Returns group of this object
+    /// Returns the static group of this Resource
     fn group(dt: &Self::DynamicType) -> Cow<'_, str>;
-    /// Returns version of this object
+    /// Returns the static version of this Resource
     fn version(dt: &Self::DynamicType) -> Cow<'_, str>;
-    /// Returns apiVersion of this object
+    /// Returns the static apiVersion of this Resource
     fn api_version(dt: &Self::DynamicType) -> Cow<'_, str> {
         let group = Self::group(dt);
         if group.is_empty() {
@@ -56,7 +57,7 @@ pub trait Resource {
         group.push_str(&Self::version(dt));
         group.into()
     }
-    /// Returns the plural name of the kind
+    /// Returns the static plural name of this Resource
     ///
     /// This is known as the resource in apimachinery, we rename it for disambiguation.
     fn plural(dt: &Self::DynamicType) -> Cow<'_, str>;
@@ -113,6 +114,12 @@ pub trait Resource {
             ..OwnerReference::default()
         })
     }
+
+    /// Return `TypeMeta` of a Resource where it can be statically determined
+    ///
+    /// This is only possible on static types.
+    /// Dynamic types need to find these via discovery or through the `Inspect` trait.
+    fn typemeta() -> Option<TypeMeta>;
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
@@ -150,6 +157,13 @@ where
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         self.metadata_mut()
+    }
+
+    fn typemeta() -> Option<TypeMeta> {
+        Some(TypeMeta {
+            api_version: K::API_VERSION.into(),
+            kind: K::KIND.into(),
+        })
     }
 }
 

@@ -2,38 +2,28 @@ use super::ObjectRef;
 use crate::watcher;
 use ahash::AHashMap;
 use derivative::Derivative;
-use kube_client::Resource;
+use kube_client::{core::Inspect, Resource};
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
-type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
+type Cache<K> = Arc<RwLock<AHashMap<ObjectRef, Arc<K>>>>;
 
 /// A writable Store handle
 ///
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug, Derivative)]
-#[derivative(Default(bound = "K::DynamicType: Default"))]
-pub struct Writer<K: 'static + Resource>
-where
-    K::DynamicType: Eq + Hash,
-{
+#[derivative(Default(bound = ""))]
+pub struct Writer<K: 'static + Resource> {
     store: Cache<K>,
-    dyntype: K::DynamicType,
 }
 
-impl<K: 'static + Resource + Clone> Writer<K>
-where
-    K::DynamicType: Eq + Hash + Clone,
-{
+impl<K: 'static + Resource + Inspect + Clone> Writer<K> {
     /// Creates a new Writer with the specified dynamic type.
-    ///
-    /// If the dynamic type is default-able (for example when writer is used with
-    /// `k8s_openapi` types) you can use `Default` instead.
-    pub fn new(dyntype: K::DynamicType) -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Writer {
             store: Default::default(),
-            dyntype,
         }
     }
 
@@ -52,23 +42,18 @@ where
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = ObjectRef::from_obj(obj);
                 let obj = Arc::new(obj.clone());
                 self.store.write().insert(key, obj);
             }
             watcher::Event::Deleted(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = ObjectRef::from_obj(obj);
                 self.store.write().remove(&key);
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| {
-                        (
-                            ObjectRef::from_obj_with(obj, self.dyntype.clone()),
-                            Arc::new(obj.clone()),
-                        )
-                    })
+                    .map(|obj| (ObjectRef::from_obj(obj), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
                 *self.store.write() = new_objs;
             }
@@ -82,16 +67,14 @@ where
 ///
 /// Cannot be constructed directly since one writer handle is required,
 /// use `Writer::as_reader()` instead.
+
 #[derive(Derivative)]
-#[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
-pub struct Store<K: 'static + Resource>
-where
-    K::DynamicType: Hash + Eq,
-{
+#[derivative(Debug(bound = "K: Debug"), Clone)]
+pub struct Store<K: 'static + Resource> {
     store: Cache<K>,
 }
 
-impl<K: 'static + Clone + Resource> Store<K>
+impl<K: 'static + Clone + Resource + Inspect> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -105,7 +88,7 @@ where
     /// If you use `kube_rt::controller` then you can do this by returning an error and specifying a
     /// reasonable `error_policy`.
     #[must_use]
-    pub fn get(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
+    pub fn get(&self, key: &ObjectRef) -> Option<Arc<K>> {
         let store = self.store.read();
         store
             .get(key)
@@ -162,8 +145,7 @@ where
 #[must_use]
 pub fn store<K>() -> (Store<K>, Writer<K>)
 where
-    K: Resource + Clone + 'static,
-    K::DynamicType: Eq + Hash + Clone + Default,
+    K: Resource + Inspect + Clone + 'static,
 {
     let w = Writer::<K>::default();
     let r = w.as_reader();

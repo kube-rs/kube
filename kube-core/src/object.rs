@@ -245,6 +245,10 @@ where
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
     }
+
+    fn typemeta() -> Option<TypeMeta> {
+        None
+    }
 }
 
 impl<P, U> HasSpec for Object<P, U>
