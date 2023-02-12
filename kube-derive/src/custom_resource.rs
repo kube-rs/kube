@@ -238,7 +238,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }
 
-    let docstr = format!(" Auto-generated derived type for {} via `CustomResource`", ident);
+    let docstr = format!(" Auto-generated derived type for {ident} via `CustomResource`");
     let root_obj = quote! {
         #[doc = #docstr]
         #[automatically_derived]
@@ -287,7 +287,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         ("Cluster", quote! { #kube_core::ClusterResourceScope })
     };
 
-    let api_ver = format!("{}/{}", group, version);
+    let api_ver = format!("{group}/{version}");
     let impl_resource = quote! {
         impl #kube_core::Resource for #rootident {
             type DynamicType = ();
@@ -364,7 +364,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     let categories_json = serde_json::to_string(&categories).unwrap();
     let short_json = serde_json::to_string(&shortnames).unwrap();
-    let crd_meta_name = format!("{}.{}", plural, group);
+    let crd_meta_name = format!("{plural}.{group}");
     let crd_meta = quote! { { "name": #crd_meta_name } };
 
     let schemagen = if schema_mode.use_in_crd() {
@@ -571,7 +571,7 @@ fn to_plural(word: &str) -> String {
         || word.ends_with("ch")
         || word.ends_with("sh")
     {
-        return format!("{}es", word);
+        return format!("{word}es");
     }
 
     // Words ending in y that are preceded by a consonant will be pluralized by
@@ -588,7 +588,7 @@ fn to_plural(word: &str) -> String {
     }
 
     // All other words will have "s" added to the end (eg. days).
-    format!("{}s", word)
+    format!("{word}s")
 }
 
 #[cfg(test)]
@@ -608,6 +608,6 @@ mod tests {
         assert_eq!(kube_attrs.group, "clux.dev".to_string());
         assert_eq!(kube_attrs.version, "v1".to_string());
         assert_eq!(kube_attrs.kind, "Foo".to_string());
-        assert_eq!(kube_attrs.namespaced, true);
+        assert!(kube_attrs.namespaced);
     }
 }

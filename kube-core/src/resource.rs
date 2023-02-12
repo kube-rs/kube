@@ -66,7 +66,7 @@ pub trait Resource {
     /// Creates a url path for http requests for this resource
     fn url_path(dt: &Self::DynamicType, namespace: Option<&str>) -> String {
         let n = if let Some(ns) = namespace {
-            format!("namespaces/{}/", ns)
+            format!("namespaces/{ns}/")
         } else {
             "".into()
         };
@@ -157,13 +157,6 @@ where
 
 /// Helper methods for resources.
 pub trait ResourceExt: Resource {
-    /// Deprecated fn equivalent to [`name_unchecked`](ResourceExt::name_unchecked)
-    #[deprecated(
-        since = "0.74.0",
-        note = "ResourceExt::name can panic and has been replaced by `ResourceExt::name_any` and `ResourceExt::name_unchecked`. This fn will be removed in 0.77.0."
-    )]
-    fn name(&self) -> String;
-
     /// Returns the name of the resource, panicking if it is unset
     ///
     /// Only use this function if you know that name is set; for example when
@@ -226,10 +219,6 @@ use once_cell::sync::Lazy;
 static EMPTY_MAP: Lazy<BTreeMap<String, String>> = Lazy::new(BTreeMap::new);
 
 impl<K: Resource> ResourceExt for K {
-    fn name(&self) -> String {
-        self.meta().name.clone().expect(".metadata.name missing")
-    }
-
     fn name_unchecked(&self) -> String {
         self.meta().name.clone().expect(".metadata.name missing")
     }

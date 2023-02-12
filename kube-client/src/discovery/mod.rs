@@ -100,7 +100,7 @@ impl Discovery {
     ///             let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///             // can now api.list() to emulate kubectl get all --all
     ///             for obj in api.list(&Default::default()).await? {
-    ///                 println!("{} {}: {}", ar.api_version, ar.kind, obj.name());
+    ///                 println!("{} {}: {}", ar.api_version, ar.kind, obj.name_any());
     ///             }
     ///         }
     ///     }

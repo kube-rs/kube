@@ -194,7 +194,7 @@ impl Display for ReconcileReason {
             ReconcileReason::Unknown => f.write_str("unknown"),
             ReconcileReason::ObjectUpdated => f.write_str("object updated"),
             ReconcileReason::RelatedObjectUpdated { obj_ref: object } => {
-                f.write_fmt(format_args!("related object updated: {}", object))
+                f.write_fmt(format_args!("related object updated: {object}"))
             }
             ReconcileReason::BulkReconcile => f.write_str("bulk reconcile requested"),
             ReconcileReason::ReconcilerRequestedRetry => f.write_str("reconciler requested retry"),
@@ -726,7 +726,7 @@ where
     /// .reconcile_all_on(reload_rx.map(|_| ()))
     /// .run(
     ///     |o, _| async move {
-    ///         println!("Reconciling {}", o.name());
+    ///         println!("Reconciling {}", o.name_any());
     ///         Ok(Action::await_change())
     ///     },
     ///     |_object: Arc<ConfigMap>, err: &Infallible, _| Err(err).unwrap(),
@@ -781,7 +781,7 @@ where
     /// .graceful_shutdown_on(tokio::signal::ctrl_c().map(|_| ()))
     /// .run(
     ///     |o, _| async move {
-    ///         println!("Reconciling {}", o.name());
+    ///         println!("Reconciling {}", o.name_any());
     ///         Ok(Action::await_change())
     ///     },
     ///     |_, err: &Infallible, _| Err(err).unwrap(),
@@ -930,7 +930,7 @@ mod tests {
         // This is intended to avoid regressing on https://github.com/kube-rs/kube/issues/926
 
         // Assume that we can keep APPLIER_REQUEUE_BUF_SIZE flooded if we have 100x the number of objects "in rotation"
-        // On my (@teozkr)'s 3900X I can reliably trigger this with 10x, but let's have some safety margin to avoid false negatives
+        // On my (@nightkr)'s 3900X I can reliably trigger this with 10x, but let's have some safety margin to avoid false negatives
         let items = APPLIER_REQUEUE_BUF_SIZE * 50;
         // Assume that everything's OK if we can reconcile every object 3 times on average
         let reconciles = items * 3;

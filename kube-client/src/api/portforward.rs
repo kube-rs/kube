@@ -278,7 +278,7 @@ where
         match msg {
             Message::FromPod(ch, mut bytes) => {
                 let ch = ch as usize;
-                let channel = chan_state.get_mut(ch).ok_or(Error::InvalidChannel(ch))?;
+                let channel = chan_state.get_mut(ch).ok_or_else(|| Error::InvalidChannel(ch))?;
 
                 let port_index = ch / 2;
                 // Initialization
@@ -327,7 +327,7 @@ where
             }
             Message::ToPodClose(ch) => {
                 let ch = ch as usize;
-                let channel = chan_state.get_mut(ch).ok_or(Error::InvalidChannel(ch))?;
+                let channel = chan_state.get_mut(ch).ok_or_else(|| Error::InvalidChannel(ch))?;
                 let port_index = ch / 2;
 
                 if !channel.shutdown {

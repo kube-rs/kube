@@ -79,35 +79,20 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
 
             // Current TLS feature precedence when more than one are set:
             // 1. openssl-tls
-            // 2. native-tls
-            // 3. rustls-tls
+            // 2. rustls-tls
             // Create a custom client to use something else.
             // If TLS features are not enabled, http connector will be used.
             #[cfg(feature = "openssl-tls")]
             let connector = config.openssl_https_connector_with_connector(connector)?;
-            #[cfg(all(not(feature = "openssl-tls"), feature = "native-tls"))]
-            let connector = hyper_tls::HttpsConnector::from((
-                connector,
-                tokio_native_tls::TlsConnector::from(config.native_tls_connector()?),
-            ));
-            #[cfg(all(
-                not(any(feature = "openssl-tls", feature = "native-tls")),
-                feature = "rustls-tls"
-            ))]
-            let connector = hyper_rustls::HttpsConnector::from((
-                connector,
-                std::sync::Arc::new(config.rustls_client_config()?),
-            ));
+            #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+            let connector = config.rustls_https_connector_with_connector(connector)?;
 
             let mut connector = TimeoutConnector::new(connector);
 
-            // Set the timeout for the client and fallback to default deprecated timeout until it's removed
-            #[allow(deprecated)]
-            {
-                connector.set_connect_timeout(config.connect_timeout.or(config.timeout));
-                connector.set_read_timeout(config.read_timeout.or(config.timeout));
-                connector.set_write_timeout(config.write_timeout);
-            }
+            // Set the timeouts for the client
+            connector.set_connect_timeout(config.connect_timeout);
+            connector.set_read_timeout(config.read_timeout);
+            connector.set_write_timeout(config.write_timeout);
 
             hyper::Client::builder().build(connector)
         };
@@ -143,9 +128,9 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
                     })
                     .on_response(|res: &Response<hyper::Body>, _latency: Duration, span: &Span| {
                         let status = res.status();
-                        span.record("http.status_code", &status.as_u16());
+                        span.record("http.status_code", status.as_u16());
                         if status.is_client_error() || status.is_server_error() {
-                            span.record("otel.status_code", &"ERROR");
+                            span.record("otel.status_code", "ERROR");
                         }
                     })
                     // Explicitly disable `on_body_chunk`. The default does nothing.
@@ -159,10 +144,10 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
                         // - Polling `Body` errored
                         // - the response was classified as failure (5xx)
                         // - End of stream was classified as failure
-                        span.record("otel.status_code", &"ERROR");
+                        span.record("otel.status_code", "ERROR");
                         match ec {
                             ServerErrorsFailureClass::StatusCode(status) => {
-                                span.record("http.status_code", &status.as_u16());
+                                span.record("http.status_code", status.as_u16());
                                 tracing::error!("failed with status {}", status)
                             }
                             ServerErrorsFailureClass::Error(err) => {

@@ -8,12 +8,14 @@ use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
-    Api,
+    error::ErrorResponse,
+    Api, Error as ClientErr,
 };
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
 use std::{clone::Clone, fmt::Debug, time::Duration};
 use thiserror::Error;
+use tracing::{debug, error, warn};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -22,9 +24,11 @@ pub enum Error {
     #[error("failed to start watching object: {0}")]
     WatchStartFailed(#[source] kube_client::Error),
     #[error("error returned by apiserver during watch: {0}")]
-    WatchError(#[source] kube_client::error::ErrorResponse),
+    WatchError(#[source] ErrorResponse),
     #[error("watch stream failed: {0}")]
     WatchFailed(#[source] kube_client::Error),
+    #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
+    NoResourceVersion,
     #[error("too many objects matched search criteria")]
     TooManyObjects,
 }
@@ -139,20 +143,40 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
         State::Empty => match api.list(list_params).await {
-            Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                resource_version: list.metadata.resource_version.unwrap(),
-            }),
-            Err(err) => (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty),
+            Ok(list) => {
+                if let Some(resource_version) = list.metadata.resource_version {
+                    (Some(Ok(Event::Restarted(list.items))), State::InitListed {
+                        resource_version,
+                    })
+                } else {
+                    (Some(Err(Error::NoResourceVersion)), State::Empty)
+                }
+            }
+            Err(err) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watch list error with 403: {err:?}");
+                } else {
+                    debug!("watch list error: {err:?}");
+                }
+                (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
+            }
         },
         State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
             Ok(stream) => (None, State::Watching {
                 resource_version,
                 stream: stream.boxed(),
             }),
-            Err(err) => (
-                Some(Err(err).map_err(Error::WatchStartFailed)),
-                State::InitListed { resource_version },
-            ),
+            Err(err) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watch initlist error with 403: {err:?}");
+                } else {
+                    debug!("watch initlist error: {err:?}");
+                }
+                (
+                    Some(Err(err).map_err(Error::WatchStartFailed)),
+                    State::InitListed { resource_version },
+                )
+            }
         },
         State::Watching {
             resource_version,
@@ -186,12 +210,24 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
                         stream,
                     }
                 };
+                if err.code == 403 {
+                    warn!("watcher watchevent error 403: {err:?}");
+                } else {
+                    debug!("error watchevent error: {err:?}");
+                }
                 (Some(Err(err).map_err(Error::WatchError)), new_state)
             }
-            Some(Err(err)) => (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
-                resource_version,
-                stream,
-            }),
+            Some(Err(err)) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watcher error 403: {err:?}");
+                } else {
+                    debug!("watcher error: {err:?}");
+                }
+                (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
+                    resource_version,
+                    stream,
+                })
+            }
             None => (None, State::InitListed { resource_version }),
         },
     }
@@ -238,7 +274,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 ///     watcher(pods, ListParams::default()).applied_objects()
 ///         .try_for_each(|p| async move {
-///          println!("Applied: {}", p.name());
+///          println!("Applied: {}", p.name_any());
 ///             Ok(())
 ///         })
 ///         .await?;
@@ -284,7 +320,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
     watcher(api, ListParams {
-        field_selector: Some(format!("metadata.name={}", name)),
+        field_selector: Some(format!("metadata.name={name}")),
         ..Default::default()
     })
     .map(|event| match event? {

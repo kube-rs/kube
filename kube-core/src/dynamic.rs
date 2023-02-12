@@ -1,19 +1,28 @@
 //! Contains types for using resource kinds not known at compile-time.
 //!
 //! For concrete usage see [examples prefixed with dynamic_](https://github.com/kube-rs/kube/tree/main/examples).
-
 pub use crate::discovery::ApiResource;
 use crate::{
     metadata::TypeMeta,
     resource::{DynamicResourceScope, Resource},
 };
+
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use std::borrow::Cow;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+#[error("failed to parse this DynamicObject into a Resource: {source}")]
+/// Failed to parse `DynamicObject` into `Resource`
+pub struct ParseDynamicObjectError {
+    #[from]
+    source: serde_json::Error,
+}
 
 /// A dynamic representation of a kubernetes object
 ///
 /// This will work with any non-list type object.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct DynamicObject {
     /// The type fields, not always present
     #[serde(flatten, default)]
@@ -56,6 +65,13 @@ impl DynamicObject {
     pub fn within(mut self, ns: &str) -> Self {
         self.metadata.namespace = Some(ns.into());
         self
+    }
+
+    /// Attempt to convert this `DynamicObject` to a `Resource`
+    pub fn try_parse<K: Resource + for<'a> serde::Deserialize<'a>>(
+        self,
+    ) -> Result<K, ParseDynamicObjectError> {
+        Ok(serde_json::from_value(serde_json::to_value(self)?)?)
     }
 }
 
@@ -101,6 +117,8 @@ mod test {
         request::Request,
         resource::Resource,
     };
+    use k8s_openapi::api::core::v1::Pod;
+
     #[test]
     fn raw_custom_resource() {
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
@@ -126,5 +144,28 @@ mod test {
         let pp = PostParams::default();
         let req = Request::new(url).create(&pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/services?");
+    }
+
+    #[test]
+    fn can_parse_dynamic_object_into_pod() -> Result<(), serde_json::Error> {
+        let original_pod: Pod = serde_json::from_value(serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": { "name": "example" },
+            "spec": {
+                "containers": [{
+                    "name": "example",
+                    "image": "alpine",
+                    // Do nothing
+                    "command": ["tail", "-f", "/dev/null"],
+                }],
+            }
+        }))?;
+        let dynamic_pod: DynamicObject = serde_json::from_str(&serde_json::to_string(&original_pod)?)?;
+        let parsed_pod: Pod = dynamic_pod.try_parse().unwrap();
+
+        assert_eq!(parsed_pod, original_pod);
+
+        Ok(())
     }
 }

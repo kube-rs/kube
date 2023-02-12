@@ -5,7 +5,7 @@ mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 use std::fmt::Debug;
 
-#[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
+#[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
 #[cfg(feature = "ws")] mod portforward;
 #[cfg(feature = "ws")] pub use portforward::Portforwarder;
 
@@ -104,7 +104,7 @@ impl<K: Resource> Api<K> {
     where
         K: Resource<Scope = DynamicResourceScope>,
     {
-        let ns = client.default_ns().to_string();
+        let ns = client.default_namespace().to_string();
         Self::namespaced_with(client, &ns, dyntype)
     }
 
@@ -208,7 +208,7 @@ where
     where
         K: Resource<Scope = NamespaceResourceScope>,
     {
-        let ns = client.default_ns().to_string();
+        let ns = client.default_namespace().to_string();
         Self::namespaced(client, &ns)
     }
 }
@@ -254,6 +254,6 @@ mod test {
         let _: Api<corev1::Node> = Api::all(client.clone());
         let _: Api<corev1::Pod> = Api::default_namespaced(client.clone());
         let _: Api<corev1::PersistentVolume> = Api::all(client.clone());
-        let _: Api<corev1::ConfigMap> = Api::namespaced(client.clone(), "default");
+        let _: Api<corev1::ConfigMap> = Api::namespaced(client, "default");
     }
 }

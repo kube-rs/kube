@@ -83,8 +83,12 @@ multiple-versions = "deny"
 name = "idna"
 version = "0.2"
 
+# tokio 1.25 pulls in mio which pulls in older an windows-sys than parking-lot
 [[bans.skip]]
-# waiting for ahash/getrandom to bump wasi as we have two branches:
-# ahash -> getrandom -> wasi old
-# tokio -> mio -> wasi new
-name = "wasi"
+name = "windows-sys"
+version = "0.42"
+
+[[bans.skip]]
+# waiting for pem to bump base64
+# https://github.com/jcreekmore/pem-rs/blob/master/Cargo.toml#L16
+name = "base64"

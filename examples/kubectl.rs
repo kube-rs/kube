@@ -21,33 +21,43 @@ use tracing::*;
 
 #[derive(clap::Parser)]
 struct App {
-    #[clap(long, short, arg_enum, default_value_t)]
+    #[arg(long, short, default_value_t = OutputMode::Pretty)]
     output: OutputMode,
-    #[clap(long, short)]
+    #[arg(long, short)]
     file: Option<std::path::PathBuf>,
-    #[clap(long, short = 'l')]
+    #[arg(long, short = 'l')]
     selector: Option<String>,
-    #[clap(long, short)]
+    #[arg(long, short)]
     namespace: Option<String>,
-    #[clap(long, short = 'A')]
+    #[arg(long, short = 'A')]
     all: bool,
-    #[clap(arg_enum)]
     verb: Verb,
     resource: Option<String>,
     name: Option<String>,
 }
 
-#[derive(clap::ArgEnum, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, clap::ValueEnum)]
 enum OutputMode {
     Pretty,
     Yaml,
 }
-impl Default for OutputMode {
-    fn default() -> Self {
-        Self::Pretty
+
+impl OutputMode {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pretty => "pretty",
+            Self::Yaml => "yaml",
+        }
     }
 }
-#[derive(clap::ArgEnum, Clone, PartialEq, Eq, Debug)]
+
+impl std::fmt::Display for OutputMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.pad(self.as_str())
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
 enum Verb {
     Get,
     Delete,
@@ -64,7 +74,7 @@ fn resolve_api_resource(discovery: &Discovery, name: &str) -> Option<(ApiResourc
         .groups()
         .flat_map(|group| {
             group
-                .recommended_resources()
+                .resources_by_stability()
                 .into_iter()
                 .map(move |res| (group, res))
         })
@@ -115,7 +125,7 @@ impl App {
 
     async fn watch(&self, api: Api<DynamicObject>, mut lp: ListParams) -> Result<()> {
         if let Some(n) = &self.name {
-            lp = lp.fields(&format!("metadata.name={}", n));
+            lp = lp.fields(&format!("metadata.name={n}"));
         }
         // present a dumb table for it for now. kubectl does not do this anymore.
         let mut stream = watcher(api, lp).applied_objects().boxed();
@@ -186,7 +196,7 @@ async fn main() -> Result<()> {
     if let Some(resource) = &app.resource {
         // Common discovery, parameters, and api configuration for a single resource
         let (ar, caps) = resolve_api_resource(&discovery, resource)
-            .with_context(|| format!("resource {:?} not found in cluster", resource))?;
+            .with_context(|| format!("resource {resource:?} not found in cluster"))?;
         let mut lp = ListParams::default();
         if let Some(label) = &app.selector {
             lp = lp.labels(label);
@@ -228,9 +238,9 @@ fn format_creation_since(time: Option<Time>) -> String {
 }
 fn format_duration(dur: Duration) -> String {
     match (dur.num_days(), dur.num_hours(), dur.num_minutes()) {
-        (days, _, _) if days > 0 => format!("{}d", days),
-        (_, hours, _) if hours > 0 => format!("{}h", hours),
-        (_, _, mins) => format!("{}m", mins),
+        (days, _, _) if days > 0 => format!("{days}d"),
+        (_, hours, _) if hours > 0 => format!("{hours}h"),
+        (_, _, mins) => format!("{mins}m"),
     }
 }
 

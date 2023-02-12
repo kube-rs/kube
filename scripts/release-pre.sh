@@ -11,8 +11,8 @@ replace-docs() {
   # This may link to an issue when it's a pull, but github redirects
   # shellcheck disable=SC2016
   sd ' \#(\d+)' ' [#$1](https://github.com/kube-rs/kube/issues/$1)' CHANGELOG.md
-  sed -i "s/${PREV_VERSION}/${NEW_VERSION}/g" kube-derive/README.md
-  sed -i "s/${PREV_VERSION}/${NEW_VERSION}/g" README.md
+  sd "${PREV_VERSION}" "${NEW_VERSION}" kube-derive/README.md
+  sd "${PREV_VERSION}" "${NEW_VERSION}" README.md
 }
 
 sanity() {

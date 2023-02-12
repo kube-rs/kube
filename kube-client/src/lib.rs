@@ -47,7 +47,7 @@
 //!
 //!     // List pods in the configured namespace
 //!     for p in pods.list(&ListParams::default()).await? {
-//!         println!("found pod {}", p.name());
+//!         println!("found pod {}", p.name_any());
 //!     }
 //!
 //!     Ok(())
@@ -63,6 +63,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
+// Nightly clippy (0.1.64) considers Drop a side effect, see https://github.com/rust-lang/rust-clippy/issues/9608
+#![allow(clippy::unnecessary_lazy_evaluations)]
 
 macro_rules! cfg_client {
     ($($item:item)*) => {
@@ -123,7 +125,6 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from kube_core
 pub use kube_core as core;
 
-
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube-client --lib features=rustls-tls,ws -- --ignored`
 #[cfg(all(feature = "client", feature = "config"))]
@@ -152,21 +153,6 @@ mod test {
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
         let https = config.rustls_https_connector()?;
-        let service = ServiceBuilder::new()
-            .layer(config.base_uri_layer())
-            .service(hyper::Client::builder().build(https));
-        let client = Client::new(service, config.default_namespace);
-        let pods: Api<Pod> = Api::default_namespaced(client);
-        pods.list(&Default::default()).await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    #[ignore] // needs cluster (lists pods)
-    #[cfg(all(feature = "native-tls"))]
-    async fn custom_client_native_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
-        let config = Config::infer().await?;
-        let https = config.native_tls_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
             .service(hyper::Client::builder().build(https));
@@ -247,7 +233,7 @@ mod test {
         let mut stream = pods.watch(&lp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
             // can debug format watch event
-            let _ = format!("we: {:?}", ev);
+            let _ = format!("we: {ev:?}");
             match ev {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
@@ -256,7 +242,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }
@@ -334,7 +320,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }
@@ -374,7 +360,7 @@ mod test {
             let next_stdout = stdout_stream.next();
             stdin_writer.write_all(b"echo test string 1\n").await?;
             let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
-            println!("{}", stdout);
+            println!("{stdout}");
             assert_eq!(stdout, "test string 1\n");
 
             // AttachedProcess resolves with status object.
@@ -382,7 +368,7 @@ mod test {
             stdin_writer.write_all(b"exit 1\n").await?;
             let status = attached.take_status().unwrap();
             if let Some(status) = status.await {
-                println!("{:?}", status);
+                println!("{status:?}");
                 assert_eq!(status.status, Some("Failure".to_owned()));
                 assert_eq!(status.reason, Some("NonZeroExitCode".to_owned()));
             }
@@ -448,7 +434,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }
@@ -483,6 +469,92 @@ mod test {
         Ok(())
     }
 
+    #[tokio::test]
+    #[ignore] // requires a cluster
+    async fn can_operate_on_pod_metadata() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
+            core::subresource::LogParams,
+        };
+        use kube_core::{ObjectList, ObjectMeta};
+
+        let client = Client::try_default().await?;
+        let pods: Api<Pod> = Api::default_namespaced(client);
+
+        // create busybox pod that's alive for at most 30s
+        let p: Pod = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "busybox-kube-meta",
+                "labels": { "app": "kube-rs-test" },
+            },
+            "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
+                "containers": [{
+                  "name": "busybox",
+                  "image": "busybox:1.34.1",
+                  "command": ["sh", "-c", "sleep 30s"],
+                }],
+            }
+        }))?;
+
+        match pods.create(&Default::default(), &p).await {
+            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
+            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(e) => return Err(e.into()),                         // any other case if a failure
+        }
+
+        // Test we can get a pod as a PartialObjectMeta and convert to
+        // ObjectMeta
+        let pod_metadata = pods.get_metadata("busybox-kube-meta").await?;
+        assert_eq!("busybox-kube-meta", pod_metadata.name_any());
+        assert_eq!(
+            Some((&"app".to_string(), &"kube-rs-test".to_string())),
+            pod_metadata.labels().get_key_value("app")
+        );
+
+        // Test we can get a list of PartialObjectMeta for pods
+        let p_list = pods.list_metadata(&ListParams::default()).await?;
+
+        // Find only pod we are concerned with in this test and fail eagerly if
+        // name doesn't exist
+        let pod_metadata = p_list
+            .items
+            .into_iter()
+            .find(|p| p.name_any() == "busybox-kube-meta")
+            .unwrap();
+        assert_eq!(
+            pod_metadata.labels().get("app"),
+            Some(&"kube-rs-test".to_string())
+        );
+
+        // Attempt to patch pod
+        let patch = json!({
+            "metadata": {
+                "annotations": {
+                    "test": "123"
+                },
+            },
+            "spec": {
+                "activeDeadlineSeconds": 5
+            }
+        });
+        let patchparams = PatchParams::default();
+        let p_patched = pods
+            .patch_metadata("busybox-kube-meta", &patchparams, &Patch::Merge(&patch))
+            .await?;
+        assert_eq!(p_patched.annotations().get("test"), Some(&"123".to_string()));
+
+        // Clean-up
+        let dp = DeleteParams::default();
+        pods.delete("busybox-kube-meta", &dp).await?.map_left(|pdel| {
+            assert_eq!(pdel.name_any(), "busybox-kube-meta");
+        });
+
+        Ok(())
+    }
     #[tokio::test]
     #[ignore] // needs cluster (will create a CertificateSigningRequest)
     async fn csr_can_be_approved() -> Result<(), Box<dyn std::error::Error>> {

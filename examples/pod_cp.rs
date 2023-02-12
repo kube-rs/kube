@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
     // Write the data to pod
     {
         let mut header = tar::Header::new_gnu();
-        header.set_path(&file_name).unwrap();
+        header.set_path(file_name).unwrap();
         header.set_size(data.len() as u64);
         header.set_cksum();
 
@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
     {
         let ap = AttachParams::default().stderr(false);
         let mut cat = pods
-            .exec("example", vec!["cat", &format!("/{}", file_name)], &ap)
+            .exec("example", vec!["cat", &format!("/{file_name}")], &ap)
             .await?;
         let mut cat_out = tokio_util::io::ReaderStream::new(cat.stdout().unwrap());
         let next_stdout = cat_out.next().await.unwrap()?;

@@ -222,7 +222,6 @@ pub mod v1 {
                 served: true
                 storage: false"#;
 
-
             let c1: Crd = serde_yaml::from_str(crd1).unwrap();
             let c2: Crd = serde_yaml::from_str(crd2).unwrap();
             let ce: Crd = serde_yaml::from_str(expected).unwrap();

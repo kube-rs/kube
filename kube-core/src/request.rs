@@ -4,6 +4,17 @@ use thiserror::Error;
 use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 
 pub(crate) const JSON_MIME: &str = "application/json";
+/// Extended Accept Header
+///
+/// Requests a meta.k8s.io/v1 PartialObjectMetadata resource (efficiently
+/// retrieves object metadata)
+///
+/// API Servers running Kubernetes v1.14 and below will retrieve the object and then
+/// convert the metadata.
+pub(crate) const JSON_METADATA_MIME: &str = "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1";
+
+pub(crate) const JSON_METADATA_LIST_MIME: &str =
+    "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1";
 
 /// Possible errors when building a request.
 #[derive(Debug, Error)]
@@ -266,6 +277,111 @@ impl Request {
     }
 }
 
+/// Metadata-only request implementations
+///
+/// Requests set an extended Accept header compromised of JSON media type and
+/// additional parameters that retrieve only necessary metadata from an object.
+impl Request {
+    /// Get a single metadata instance for a named resource
+    pub fn get_metadata(&self, name: &str) -> Result<http::Request<Vec<u8>>, Error> {
+        let target = format!("{}/{}", self.url_path, name);
+        let mut qp = form_urlencoded::Serializer::new(target);
+        let urlstr = qp.finish();
+        let req = http::Request::get(urlstr)
+            .header(http::header::ACCEPT, JSON_METADATA_MIME)
+            .header(http::header::CONTENT_TYPE, JSON_MIME);
+        req.body(vec![]).map_err(Error::BuildRequest)
+    }
+
+    /// List a collection of metadata of a resource
+    pub fn list_metadata(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>, Error> {
+        let target = format!("{}?", self.url_path);
+        let mut qp = form_urlencoded::Serializer::new(target);
+
+        if let Some(fields) = &lp.field_selector {
+            qp.append_pair("fieldSelector", fields);
+        }
+        if let Some(labels) = &lp.label_selector {
+            qp.append_pair("labelSelector", labels);
+        }
+        if let Some(limit) = &lp.limit {
+            qp.append_pair("limit", &limit.to_string());
+        }
+        if let Some(continue_token) = &lp.continue_token {
+            qp.append_pair("continue", continue_token);
+        }
+
+        let urlstr = qp.finish();
+        let req = http::Request::get(urlstr)
+            .header(http::header::ACCEPT, JSON_METADATA_LIST_MIME)
+            .header(http::header::CONTENT_TYPE, JSON_MIME);
+
+        req.body(vec![]).map_err(Error::BuildRequest)
+    }
+
+    /// Watch metadata of a resource at a given version
+    pub fn watch_metadata(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>, Error> {
+        let target = format!("{}?", self.url_path);
+        let mut qp = form_urlencoded::Serializer::new(target);
+        lp.validate()?;
+        if lp.limit.is_some() {
+            return Err(Error::Validation(
+                "ListParams::limit cannot be used with a watch.".into(),
+            ));
+        }
+
+        if lp.continue_token.is_some() {
+            return Err(Error::Validation(
+                "ListParams::continue_token cannot be used with a watch.".into(),
+            ));
+        }
+
+        qp.append_pair("watch", "true");
+        qp.append_pair("resourceVersion", ver);
+
+        qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(290).to_string());
+
+        if let Some(fields) = &lp.field_selector {
+            qp.append_pair("fieldSelector", fields);
+        }
+        if let Some(labels) = &lp.label_selector {
+            qp.append_pair("labelSelector", labels);
+        }
+        if lp.bookmarks {
+            qp.append_pair("allowWatchBookmarks", "true");
+        }
+
+        let urlstr = qp.finish();
+        http::Request::get(urlstr)
+            .header(http::header::ACCEPT, JSON_METADATA_MIME)
+            .header(http::header::CONTENT_TYPE, JSON_MIME)
+            .body(vec![])
+            .map_err(Error::BuildRequest)
+    }
+
+    /// Patch an instance of a resource and receive its metadata only
+    ///
+    /// Requires a serialized merge-patch+json at the moment
+    pub fn patch_metadata<P: serde::Serialize>(
+        &self,
+        name: &str,
+        pp: &PatchParams,
+        patch: &Patch<P>,
+    ) -> Result<http::Request<Vec<u8>>, Error> {
+        pp.validate(patch)?;
+        let target = format!("{}/{}?", self.url_path, name);
+        let mut qp = form_urlencoded::Serializer::new(target);
+        pp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+
+        http::Request::patch(urlstr)
+            .header(http::header::ACCEPT, JSON_METADATA_MIME)
+            .header(http::header::CONTENT_TYPE, patch.content_type())
+            .body(patch.serialize().map_err(Error::SerializeBody)?)
+            .map_err(Error::BuildRequest)
+    }
+}
+
 /// Extensive tests for Request of k8s_openapi::Resource structs
 ///
 /// Cheap sanity check to ensure type maps work as expected
@@ -386,11 +502,41 @@ mod test {
     use crate::params::{DeleteParams, ListParams, Patch, PatchParams};
 
     #[test]
+    fn get_metadata_path() {
+        let url = appsv1::Deployment::url_path(&(), Some("ns"));
+        let req = Request::new(url).get_metadata("mydeploy").unwrap();
+        assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments/mydeploy");
+        assert_eq!(req.method(), "GET");
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            super::JSON_MIME
+        );
+        assert_eq!(
+            req.headers().get(http::header::ACCEPT).unwrap(),
+            super::JSON_METADATA_MIME
+        );
+    }
+    #[test]
     fn list_path() {
         let url = appsv1::Deployment::url_path(&(), Some("ns"));
         let gp = ListParams::default();
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
+    }
+    #[test]
+    fn list_metadata_path() {
+        let url = appsv1::Deployment::url_path(&(), Some("ns"));
+        let gp = ListParams::default();
+        let req = Request::new(url).list_metadata(&gp).unwrap();
+        assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            super::JSON_MIME
+        );
+        assert_eq!(
+            req.headers().get(http::header::ACCEPT).unwrap(),
+            super::JSON_METADATA_LIST_MIME
+        );
     }
     #[test]
     fn watch_path() {
@@ -400,6 +546,24 @@ mod test {
         assert_eq!(
             req.uri(),
             "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290&allowWatchBookmarks=true"
+        );
+    }
+    #[test]
+    fn watch_metadata_path() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let gp = ListParams::default();
+        let req = Request::new(url).watch_metadata(&gp, "0").unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290&allowWatchBookmarks=true"
+            );
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            super::JSON_MIME
+        );
+        assert_eq!(
+            req.headers().get(http::header::ACCEPT).unwrap(),
+            super::JSON_METADATA_MIME
         );
     }
     #[test]
@@ -467,6 +631,24 @@ mod test {
         assert_eq!(
             req.headers().get("Content-Type").unwrap().to_str().unwrap(),
             Patch::Merge(()).content_type()
+        );
+        assert_eq!(req.method(), "PATCH");
+    }
+    #[test]
+    fn patch_pod_metadata() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let pp = PatchParams::default();
+        let req = Request::new(url)
+            .patch_metadata("mypod", &pp, &Patch::Merge(()))
+            .unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/mypod?");
+        assert_eq!(
+            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            Patch::Merge(()).content_type()
+        );
+        assert_eq!(
+            req.headers().get(http::header::ACCEPT).unwrap(),
+            super::JSON_METADATA_MIME
         );
         assert_eq!(req.method(), "PATCH");
     }
@@ -567,6 +749,6 @@ mod test {
         let lp = ListParams::default().limit(5);
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let err = Request::new(url).watch(&lp, "0").unwrap_err();
-        assert!(format!("{}", err).contains("limit cannot be used with a watch"));
+        assert!(format!("{err}").contains("limit cannot be used with a watch"));
     }
 }

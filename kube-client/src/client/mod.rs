@@ -37,10 +37,8 @@ mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
-#[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
-mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
-#[cfg(feature = "native-tls")] pub use tls::native_tls::Error as NativeTlsError;
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
 #[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
@@ -129,7 +127,12 @@ impl Client {
         Self::try_from(Config::infer().await.map_err(Error::InferConfig)?)
     }
 
-    pub(crate) fn default_ns(&self) -> &str {
+    /// Get the default namespace for the client
+    ///
+    /// The namespace is either configured on `context` in the kubeconfig,
+    /// falls back to `default` when running locally,
+    /// or uses the service account's namespace when deployed in-cluster.
+    pub fn default_namespace(&self) -> &str {
         &self.default_ns
     }
 
@@ -385,7 +388,7 @@ impl Client {
     /// # }
     /// ```
     pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
-        let url = format!("/apis/{}", apiversion);
+        let url = format!("/apis/{apiversion}");
         self.request(
             Request::builder()
                 .uri(url)
@@ -408,7 +411,7 @@ impl Client {
 
     /// Lists resources served in particular `core` group version.
     pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
-        let url = format!("/api/{}", version);
+        let url = format!("/api/{version}");
         self.request(
             Request::builder()
                 .uri(url)
@@ -438,7 +441,7 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
             let ae = ErrorResponse {
                 status: s.to_string(),
                 code: s.as_u16(),
-                message: format!("{:?}", text),
+                message: format!("{text:?}"),
                 reason: "Failed to parse error data".into(),
             };
             tracing::debug!("Unsuccessful: {:?} (reconstruct)", ae);
@@ -467,6 +470,13 @@ mod tests {
     use hyper::Body;
     use k8s_openapi::api::core::v1::Pod;
     use tower_test::mock;
+
+    #[tokio::test]
+    async fn test_default_ns() {
+        let (mock_service, _) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "test-namespace");
+        assert_eq!(client.default_namespace(), "test-namespace");
+    }
 
     #[tokio::test]
     async fn test_mock() {

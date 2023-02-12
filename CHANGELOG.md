@@ -5,7 +5,90 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.75.0...main
+ * see https://github.com/kube-rs/kube/compare/0.78.0...main
+
+[0.78.0](https://github.com/kube-rs/kube/releases/tag/0.78.0) / 2023-01-06
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.78.0 -->
+
+## Kubernetes Bump
+
+This release brings in the new [`k8s-openapi` release](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.17.0) for `1.26` structs, and sets our [MK8SV](https://kube.rs/kubernetes-version/) to `1.21`.
+Be sure to upgrade `k8s-openapi` and `kube` **simultaneously** to avoid multiple version errors:
+
+```sh
+cargo upgrade -p k8s-openapi -p kube -i
+```
+
+## What's Changed
+### Added
+* reflector: add helper function to the `Store` by @eliad-wiz in https://github.com/kube-rs/kube/pull/1111
+### Changed
+* Bump `k8s-openapi@0.17.0` and MK8SV by @clux in https://github.com/kube-rs/kube/pull/1116
+### Removed
+* Remove deprecated `Config::timeout` by @clux in https://github.com/kube-rs/kube/pull/1113
+### Fixed
+* fix shell exec exiting message loop when terminalSizeReceiver is dropped by @erebe in https://github.com/kube-rs/kube/pull/1112
+
+[0.77.0](https://github.com/kube-rs/kube/releases/tag/0.77.0) / 2022-12-15
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.77.0 -->
+## Highlights
+
+This release saw numerous improvements across various parts of the codebase with lots of help from external contributors. Look for improvements in error handling, client exec behaviour, dynamic object conversion, certificate handling, and last, but not least; lots of enhancements in the `config` module. Huge thanks to everyone who contributed!
+
+### `Config` Enhancements
+Kubeconfigs relying on [`ExecConfig`](https://docs.rs/kube/0.77.0/kube/config/struct.ExecConfig.html) for auth should now work with a lot more cases (with improvements to script interactivity, cert passing, env-drop, and windows behaviour). We further aligned our [`Kubeconfig`](https://docs.rs/kube/0.77.0/kube/config/struct.Kubeconfig.html) parsing with client-go's behaviour, and also exposed [`Kubeconfig::merge`](https://docs.rs/kube/0.77.0/kube/config/struct.Kubeconfig.html#method.merge). Finally, we now pass [`Config::tls_server_name`](https://docs.rs/kube/0.77.0/kube/struct.Config.html#structfield.tls_server_name) through to the `Client`, which has let us include [a better **rustls** workaround](https://docs.rs/kube/0.77.0/kube/struct.Config.html#method.incluster) for the long-standing ip issue (enabled by default).
+
+## What's Changed
+### Added
+* Add `DynamicObjects::try_parse` for typed object conversion by @jmintb in https://github.com/kube-rs/kube/pull/1061
+* Add `ExecConfig::drop_env` to filter host evars for auth providers by @aviramha in https://github.com/kube-rs/kube/pull/1062
+* Add support for terminal size when executing command inside a container by @armandpicard in https://github.com/kube-rs/kube/pull/983
+* add cmd-drop-env to AuthProviderConfig by @aviramha in https://github.com/kube-rs/kube/pull/1074
+* Check for client cert with exec by @rcanderson23 in https://github.com/kube-rs/kube/pull/1089
+* Change `Kubeconfig::merge` fn to public. by @goenning in https://github.com/kube-rs/kube/pull/1100
+* Fix interactivity in auth exec by @armandpicard in https://github.com/kube-rs/kube/pull/1083
+### Changed
+* [windows] skip window creation on auth exec by @goenning in https://github.com/kube-rs/kube/pull/1095
+* Add `Config::tls_server_name` and validate when using rustls by @clux in https://github.com/kube-rs/kube/pull/1104
+### Removed
+* Remove deprecated `ResourceExt::name` by @clux in https://github.com/kube-rs/kube/pull/1105
+### Fixed
+* Bump tracing dependency to 0.1.36 by @teozkr in https://github.com/kube-rs/kube/pull/1070
+* Improve error message on azure auth not being supported by @goenning in https://github.com/kube-rs/kube/pull/1082
+* exec: ensure certs always end with a new line by @goenning in https://github.com/kube-rs/kube/pull/1096
+* fix: align kube-rs with client-go config parsing by @goenning in https://github.com/kube-rs/kube/pull/1077
+* Return error from `watcher` when kinds do not support watch by @clux in https://github.com/kube-rs/kube/pull/1101
+
+[0.76.0](https://github.com/kube-rs/kube/releases/tag/0.76.0) / 2022-10-28
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.76.0 -->
+
+## Highlights
+
+### [`#[derive(CustomResource)]` now supports schemas with untagged enums](https://github.com/kube-rs/kube/pull/1028)
+
+Expanding on our existing support for storing Rust's struct enums in CRDs, Kube will now try to convert `#[serde(untagged)]` enums as well. Note that if the same field is present in multiple untagged variants then they must all have the same shape.
+
+### [Removed deprecated `try_flatten_*` functions](https://github.com/kube-rs/kube/pull/1019)
+
+These have been deprecated since 0.72, and are replaced by the equivalent `WatchStreamExt` methods.
+
+## What's Changed
+### Added
+* Adds example to `Controller::watches` by @Dav1dde in https://github.com/kube-rs/kube/pull/1026
+* Discovery: Add `ApiGroup::resources_by_stability` by @imuxin in https://github.com/kube-rs/kube/pull/1022
+* Add support for untagged enums in CRDs by @sbernauer in https://github.com/kube-rs/kube/pull/1028
+* Derive PartialEq for DynamicObject by @pbzweihander in https://github.com/kube-rs/kube/pull/1048
+### Removed
+* Runtime: Remove deprecated util `try_flatten_` helpers by @clux in https://github.com/kube-rs/kube/pull/1019
+* Remove `native-tls` feature by @kazk in https://github.com/kube-rs/kube/pull/1044
+### Fixed
+* add fieldManager querystring to all operations by @goenning in https://github.com/kube-rs/kube/pull/1031
+* Add verify_tls1x_signature for NoCertVerification by @rvql in https://github.com/kube-rs/kube/pull/1034
+* Fix compatibility with schemars' preserve_order feature by @teozkr in https://github.com/kube-rs/kube/pull/1050
+* Hoist enum values from subschemas by @teozkr in https://github.com/kube-rs/kube/pull/1051
 
 [0.75.0](https://github.com/kube-rs/kube/releases/tag/0.75.0) / 2022-09-21
 ===================
@@ -16,7 +99,7 @@ UNRELEASED
 ### [Upgrade `k8s-openapi` to 0.16 for Kubernetes 1.25](https://github.com/kube-rs/kube/pull/1008)
 
 The update to [k8s-openapi@0.16.0](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0160-2022-09-15) makes this the first release with **tentative** Kubernetes 1.25 support.
-While the new structs and apis now exist, we **recommend holding off** on using 1.25 until a [deserialization bug in the apiserver](https://github.com/kubernetes/kubernetes/issues/111985) is resolved upstream. See #997 / #1008 for details.
+While the new structs and apis now exist, we **recommend holding off** on using 1.25 until a [deserialization bug in the apiserver](https://github.com/kubernetes/kubernetes/issues/111985) is resolved upstream. See [#997](https://github.com/kube-rs/kube/issues/997) / [#1008](https://github.com/kube-rs/kube/issues/1008) for details.
 
 To upgrade, ensure you bump both `kube` and `k8s-openapi`:
 

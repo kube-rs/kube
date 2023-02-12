@@ -534,15 +534,15 @@ mod test {
     #[test]
     fn delete_param_constructors() {
         let dp_background = DeleteParams::background();
-        let ser = serde_json::to_value(&dp_background).unwrap();
+        let ser = serde_json::to_value(dp_background).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Background"}));
 
         let dp_foreground = DeleteParams::foreground();
-        let ser = serde_json::to_value(&dp_foreground).unwrap();
+        let ser = serde_json::to_value(dp_foreground).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Foreground"}));
 
         let dp_orphan = DeleteParams::orphan();
-        let ser = serde_json::to_value(&dp_orphan).unwrap();
+        let ser = serde_json::to_value(dp_orphan).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Orphan"}));
     }
 

@@ -4,8 +4,7 @@ use http::{header::HeaderName, HeaderValue};
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
-#[cfg(any(feature = "native-tls", feature = "rustls-tls", feature = "openssl-tls"))]
-use super::tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},
@@ -27,23 +26,6 @@ pub trait ConfigExt: private::Sealed {
     /// Layer to add non-authn HTTP headers depending on the config.
     fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer>;
 
-    /// Create [`hyper_tls::HttpsConnector`] based on config.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use kube::{client::ConfigExt, Config};
-    /// let config = Config::infer().await?;
-    /// let https = config.native_tls_https_connector()?;
-    /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
-    #[cfg(feature = "native-tls")]
-    fn native_tls_https_connector(&self) -> Result<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>;
-
     /// Create [`hyper_rustls::HttpsConnector`] based on config.
     ///
     /// # Example
@@ -61,28 +43,28 @@ pub trait ConfigExt: private::Sealed {
     #[cfg(feature = "rustls-tls")]
     fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
 
-    /// Create [`native_tls::TlsConnector`](tokio_native_tls::native_tls::TlsConnector) based on config.
+    /// Create [`hyper_rustls::HttpsConnector`] based on config and `connector`.
+    ///
     /// # Example
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use kube::{client::ConfigExt, Config};
     /// # use hyper::client::HttpConnector;
-    /// # use kube::{client::ConfigExt, Client, Config};
     /// let config = Config::infer().await?;
-    /// let https = {
-    ///     let tls = tokio_native_tls::TlsConnector::from(
-    ///         config.native_tls_connector()?
-    ///     );
-    ///     let mut http = HttpConnector::new();
-    ///     http.enforce_http(false);
-    ///     hyper_tls::HttpsConnector::from((http, tls))
-    /// };
+    /// let mut connector = HttpConnector::new();
+    /// connector.enforce_http(false);
+    /// let https = config.rustls_https_connector_with_connector(connector)?;
+    /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
     /// # Ok(())
     /// # }
     /// ```
-    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
-    #[cfg(feature = "native-tls")]
-    fn native_tls_connector(&self) -> Result<tokio_native_tls::native_tls::TlsConnector>;
+    #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
+    #[cfg(feature = "rustls-tls")]
+    fn rustls_https_connector_with_connector(
+        &self,
+        connector: hyper::client::HttpConnector,
+    ) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
 
     /// Create [`rustls::ClientConfig`] based on config.
     /// # Example
@@ -185,6 +167,7 @@ impl ConfigExt for Config {
             Auth::RefreshableToken(refreshable) => {
                 Some(AuthLayer(Either::B(AsyncFilterLayer::new(refreshable))))
             }
+            Auth::Certificate(_client_certificate_data, _client_key_data) => None,
         })
     }
 
@@ -213,28 +196,11 @@ impl ConfigExt for Config {
         })
     }
 
-    #[cfg(feature = "native-tls")]
-    fn native_tls_connector(&self) -> Result<tokio_native_tls::native_tls::TlsConnector> {
-        tls::native_tls::native_tls_connector(
-            self.identity_pem().as_ref(),
-            self.root_cert.as_ref(),
-            self.accept_invalid_certs,
-        )
-        .map_err(Error::NativeTls)
-    }
-
-    #[cfg(feature = "native-tls")]
-    fn native_tls_https_connector(&self) -> Result<hyper_tls::HttpsConnector<hyper::client::HttpConnector>> {
-        let tls = tokio_native_tls::TlsConnector::from(self.native_tls_connector()?);
-        let mut http = hyper::client::HttpConnector::new();
-        http.enforce_http(false);
-        Ok(hyper_tls::HttpsConnector::from((http, tls)))
-    }
-
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
+        let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
         tls::rustls_tls::rustls_client_config(
-            self.identity_pem().as_deref(),
+            identity.as_deref(),
             self.root_cert.as_deref(),
             self.accept_invalid_certs,
         )
@@ -243,15 +209,31 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "rustls-tls")]
     fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
-        let rustls_config = std::sync::Arc::new(self.rustls_client_config()?);
-        let mut http = hyper::client::HttpConnector::new();
-        http.enforce_http(false);
-        Ok(hyper_rustls::HttpsConnector::from((http, rustls_config)))
+        let mut connector = hyper::client::HttpConnector::new();
+        connector.enforce_http(false);
+        self.rustls_https_connector_with_connector(connector)
+    }
+
+    #[cfg(feature = "rustls-tls")]
+    fn rustls_https_connector_with_connector(
+        &self,
+        connector: hyper::client::HttpConnector,
+    ) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
+        let rustls_config = self.rustls_client_config()?;
+        let mut builder = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_tls_config(rustls_config)
+            .https_or_http();
+        if let Some(tsn) = self.tls_server_name.as_ref() {
+            builder = builder.with_server_name(tsn.clone());
+        }
+        Ok(builder.enable_http1().wrap_connector(connector))
     }
 
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
-        tls::openssl_tls::ssl_connector_builder(self.identity_pem().as_ref(), self.root_cert.as_ref())
+        let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
+        // TODO: pass self.tls_server_name for openssl
+        tls::openssl_tls::ssl_connector_builder(identity.as_ref(), self.root_cert.as_ref())
             .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
     }
 
@@ -277,5 +259,26 @@ impl ConfigExt for Config {
             });
         }
         Ok(https)
+    }
+}
+
+impl Config {
+    // This is necessary to retrieve an identity when an exec plugin
+    // returns a client certificate and key instead of a token.
+    // This has be to be checked on TLS configuration vs tokens
+    // which can be added in as an AuthLayer.
+    fn exec_identity_pem(&self) -> Option<Vec<u8>> {
+        match Auth::try_from(&self.auth_info) {
+            Ok(Auth::Certificate(client_certificate_data, client_key_data)) => {
+                const NEW_LINE: u8 = b'\n';
+
+                let mut buffer = client_key_data.expose_secret().as_bytes().to_vec();
+                buffer.push(NEW_LINE);
+                buffer.extend_from_slice(client_certificate_data.as_bytes());
+                buffer.push(NEW_LINE);
+                Some(buffer)
+            }
+            _ => None,
+        }
     }
 }

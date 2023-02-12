@@ -1,7 +1,8 @@
 VERSION := `git rev-parse HEAD`
 
+[private]
 default:
-  @just --list --unsorted --color=always | rg -v "    default"
+  @just --list --unsorted
 
 clippy:
   #rustup component add clippy --toolchain nightly
@@ -13,7 +14,11 @@ fmt:
   rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
 
 doc:
-  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_25 --open
+  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_26 --open
+
+deny:
+  # might require rm Cargo.lock first to match CI
+  cargo deny --workspace --all-features check bans licenses sources
 
 # Unit tests
 test:
@@ -21,10 +26,10 @@ test:
   cargo test --doc --all
   cargo test -p kube-examples --examples
   cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
-  cargo test -p kube --lib --no-default-features --features=native-tls,ws,oauth
   cargo test -p kube --lib --no-default-features --features=openssl-tls,ws,oauth
   cargo test -p kube --lib --no-default-features
 
+# Integration tests (will modify your current context's cluster)
 test-integration:
   kubectl delete pod -lapp=kube-rs-test
   cargo test --lib --all -- --ignored # also run tests that fail on github actions
@@ -36,10 +41,6 @@ test-integration:
 coverage:
   cargo tarpaulin --out=Html --output-dir=.
   #xdg-open tarpaulin-report.html
-
-deny:
-  # might require rm Cargo.lock first to match CI
-  cargo deny --workspace --all-features check bans licenses sources
 
 readme:
   rustdoc README.md --test --edition=2021
@@ -118,6 +119,7 @@ bump-k8s:
   # bump mk8sv badge
   badge="[![Tested against Kubernetes ${mk8svnew} and above](https://img.shields.io/badge/MK8SV-${mk8svnew}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
+  echo "remember to bump kubernetes-version.md in kube-rs/website"
 
 # mode: makefile
 # End:
