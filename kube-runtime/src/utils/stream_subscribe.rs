@@ -14,7 +14,7 @@ const CHANNEL_CAPACITY: usize = 128;
 /// Exposes the [`StreamSubscribe::subscribe()`] method which allows additional
 /// consumers of events from a stream without consuming the stream itself.
 ///
-/// If a subscriber beings to lag behind the stream, it will receive a [`StreamSubscribeError::Lagged`]
+/// If a subscriber beings to lag behind the stream, it will receive a [`Error::Lagged`]
 /// error. The subscriber can then decide to abort its or tolerate the lost events.
 ///
 /// If the [`Stream`] is dropped or ends, any [`StreamSubscribe::subscribe()`] streams
@@ -39,11 +39,11 @@ impl<S: Stream> StreamSubscribe<S> {
 
     /// Subscribe to events from this stream
     #[must_use = "streams do nothing unless polled"]
-    pub fn subscribe(&self) -> impl Stream<Item = Result<Arc<S::Item>, StreamSubscribeError>> {
+    pub fn subscribe(&self) -> impl Stream<Item = Result<Arc<S::Item>, Error>> {
         stream::unfold(self.sender.subscribe(), |mut rx| async move {
             match rx.recv().await {
                 Ok(Some(obj)) => Some((Ok(obj), rx)),
-                Err(RecvError::Lagged(amt)) => Some((Err(StreamSubscribeError::Lagged(amt)), rx)),
+                Err(RecvError::Lagged(amt)) => Some((Err(Error::Lagged(amt)), rx)),
                 _ => None,
             }
         })
@@ -74,7 +74,7 @@ impl<S: Stream> Stream for StreamSubscribe<S> {
 
 /// An error returned from the inner stream of a [`StreamSubscribe`].
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum StreamSubscribeError {
+pub enum Error {
     /// The subscriber lagged too far behind. Polling again will return
     /// the oldest event still retained.
     ///
@@ -82,15 +82,15 @@ pub enum StreamSubscribeError {
     Lagged(u64),
 }
 
-impl fmt::Display for StreamSubscribeError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StreamSubscribeError::Lagged(amt) => write!(f, "subscriber lagged by {}", amt),
+            Error::Lagged(amt) => write!(f, "subscriber lagged by {amt}"),
         }
     }
 }
 
-impl std::error::Error for StreamSubscribeError {}
+impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
@@ -114,7 +114,7 @@ mod tests {
     #[tokio::test]
     async fn all_subscribers_get_events() {
         let events = [Ok(0), Ok(1), Err(2), Ok(3), Ok(4)];
-        let rx = stream::iter(events.clone());
+        let rx = stream::iter(events);
         let rx = StreamSubscribe::new(rx);
 
         let rx_s1 = rx.subscribe();
@@ -181,12 +181,12 @@ mod tests {
 
         // Consume the entire stream, overflowing the inner channel
         for _ in events {
-            let _ = poll!(rx.next());
+            rx.next().await;
         }
 
         assert_eq!(
             poll!(rx_s1.next()),
-            Poll::Ready(Some(Err(StreamSubscribeError::Lagged(overflow as u64)))),
+            Poll::Ready(Some(Err(Error::Lagged(overflow as u64)))),
         );
 
         let expected_next_event = overflow;
@@ -213,7 +213,8 @@ mod tests {
         pin_mut!(rx_s2);
 
         for event in events {
-            let _ = poll!(rx.next());
+            rx.next().await;
+
             assert_eq!(
                 poll!(rx_s1.next()),
                 Poll::Ready(Some(Ok(Arc::new(event)))),
@@ -223,7 +224,7 @@ mod tests {
 
         assert_eq!(
             poll!(rx_s2.next()),
-            Poll::Ready(Some(Err(StreamSubscribeError::Lagged(overflow as u64)))),
+            Poll::Ready(Some(Err(Error::Lagged(overflow as u64)))),
             "rx_s2"
         );
 
