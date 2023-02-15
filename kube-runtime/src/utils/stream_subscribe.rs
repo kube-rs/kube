@@ -14,8 +14,8 @@ const CHANNEL_CAPACITY: usize = 128;
 /// Exposes the [`StreamSubscribe::subscribe()`] method which allows additional
 /// consumers of events from a stream without consuming the stream itself.
 ///
-/// If a subscriber beings to lag behind the stream, it will receive a [`Error::Lagged`]
-/// error. The subscriber can then decide to abort its or tolerate the lost events.
+/// If a subscriber begins to lag behind the stream, it will receive an [`Error::Lagged`]
+/// error. The subscriber can then decide to abort its task or tolerate the lost events.
 ///
 /// If the [`Stream`] is dropped or ends, any [`StreamSubscribe::subscribe()`] streams
 /// will also end.
