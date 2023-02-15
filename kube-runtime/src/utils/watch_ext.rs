@@ -41,7 +41,7 @@ pub trait WatchStreamExt: Stream {
     /// Create a [`StreamSubscribe`] from a [`watcher()`] stream
     ///
     /// Allows additional consumers to subscribe to the stream, without consuming the stream itself.
-    fn subscribable<K>(self) -> StreamSubscribe<Self>
+    fn subscribe<K>(self) -> StreamSubscribe<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,
     {
