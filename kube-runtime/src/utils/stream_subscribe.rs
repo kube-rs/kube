@@ -4,10 +4,8 @@ use core::{
 };
 use futures::{stream, Stream};
 use pin_project::pin_project;
-use std::fmt;
-use std::sync::Arc;
-use tokio::sync::broadcast;
-use tokio::sync::broadcast::error::RecvError;
+use std::{fmt, sync::Arc};
+use tokio::sync::{broadcast, broadcast::error::RecvError};
 
 const CHANNEL_CAPACITY: usize = 128;
 
@@ -40,7 +38,7 @@ impl<S: Stream> StreamSubscribe<S> {
     /// Subscribe to events from this stream
     #[must_use = "streams do nothing unless polled"]
     pub fn subscribe(&self) -> impl Stream<Item = Result<Arc<S::Item>, Error>> {
-        stream::unfold(self.sender.subscribe(), |mut rx| async move {
+        stream::unfold(self.sender.subscribe(), |mut rx| async {
             match rx.recv().await {
                 Ok(Some(obj)) => Some((Ok(obj), rx)),
                 Err(RecvError::Lagged(amt)) => Some((Err(Error::Lagged(amt)), rx)),
