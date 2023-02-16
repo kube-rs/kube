@@ -326,7 +326,7 @@ mod tests {
     };
 
     #[tokio::test]
-    #[ignore] // needs cluster (gets and writes cms)
+    #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_create_missing_object() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);
@@ -407,7 +407,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (gets and writes cms)
+    #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_update_existing_object() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);
@@ -478,7 +478,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (gets and writes cms)
+    #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_create_dry_run() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);
