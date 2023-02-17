@@ -1,10 +1,10 @@
+#[cfg(feature = "unstable_runtime_subscribe")]
+use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
     utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
     watcher,
 };
 use backoff::backoff::Backoff;
-
-use crate::utils::stream_subscribe::StreamSubscribe;
 use futures::{Stream, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
@@ -93,6 +93,7 @@ pub trait WatchStreamExt: Stream {
     ///     (stream_subscribe, explain_stream)
     /// }
     /// ```
+    #[cfg(feature = "unstable_runtime_subscribe")]
     fn stream_subscribe<K>(self) -> StreamSubscribe<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,

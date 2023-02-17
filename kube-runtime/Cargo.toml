@@ -14,8 +14,12 @@ categories = ["web-programming::http-client", "caching", "network-programming"]
 rust-version = "1.60.0"
 edition = "2021"
 
+[features]
+unstable-runtime = ["unstable-runtime-subscribe"]
+unstable-runtime-subscribe = []
+
 [package.metadata.docs.rs]
-features = ["k8s-openapi/v1_26"]
+features = ["k8s-openapi/v1_26", "unstable-runtime"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
