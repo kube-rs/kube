@@ -1,4 +1,4 @@
-#[cfg(feature = "unstable_runtime_subscribe")]
+#[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
     utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
@@ -93,7 +93,7 @@ pub trait WatchStreamExt: Stream {
     ///     (stream_subscribe, explain_stream)
     /// }
     /// ```
-    #[cfg(feature = "unstable_runtime_subscribe")]
+    #[cfg(feature = "unstable-runtime-subscribe")]
     fn stream_subscribe<K>(self) -> StreamSubscribe<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,
