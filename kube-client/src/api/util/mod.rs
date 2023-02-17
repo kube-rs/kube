@@ -73,7 +73,7 @@ mod test {
     use serde_json::json;
 
     #[tokio::test]
-    #[ignore] // needs kubeconfig
+    #[ignore = "needs kubeconfig"]
     async fn node_cordon_and_uncordon_works() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 
@@ -105,7 +105,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // requires a cluster
+    #[ignore = "requires a cluster"]
     async fn create_token_request() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 
