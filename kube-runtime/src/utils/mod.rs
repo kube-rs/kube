@@ -3,6 +3,7 @@
 mod backoff_reset_timer;
 mod event_flatten;
 mod stream_backoff;
+#[cfg(feature = "unstable_runtime_subscribe")]
 mod stream_subscribe;
 mod watch_ext;
 
