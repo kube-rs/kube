@@ -17,6 +17,11 @@ const CHANNEL_CAPACITY: usize = 128;
 ///
 /// If the [`Stream`] is dropped or ends, any [`StreamSubscribe::subscribe()`] streams
 /// will also end.
+///
+/// ## Warning
+///
+/// If the primary [`Stream`] is not polled, the [`StreamSubscribe::subscribe()`] streams
+/// will never receive any events.
 #[pin_project]
 #[must_use = "subscribers will not get events unless this stream is polled"]
 pub struct StreamSubscribe<S>
@@ -211,6 +216,8 @@ mod tests {
         pin_mut!(rx_s2);
 
         for event in events {
+            assert_eq!(poll!(rx_s1.next()), Poll::Pending, "rx_s1");
+
             rx.next().await;
 
             assert_eq!(
