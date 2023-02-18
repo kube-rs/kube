@@ -45,9 +45,9 @@ The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](ht
 
 ### Unit Tests & Documentation Tests
 
-**Most** unit/doc tests are run from `cargo test --lib --doc --all`, but because of feature-sets, and examples, you will need a couple of extra invocations to replicate our CI.
+Unit and doc tests are run against a particular crate with `cargo test -p KUBECRATE --all`, but because of feature-sets, you will need a couple of extra flags and invocations to replicate all our CI conditions.
 
-For the complete variations, run the `just test` target in the `justfile`.
+To run **all** unit tests, call: `just test`
 
 All public interfaces must be documented, and most should have minor documentation examples to show usage.
 
@@ -57,7 +57,9 @@ Slower set of tests within the crates marked with an **`#[ignore]`** attribute.
 
 :warning: These  **WILL** try to modify resources in your current cluster :warning:
 
-Most integration tests are run with `cargo test --all --lib -- --ignored`, but because of feature-sets, you will need a few invocations of these to replicate our CI. See `just test-integration`
+Integration tests are run against a crate with `cargo test -p KUBECRATE --lib -- --ignored`, but because of feature-sets, you will need a few invocations of these to replicate our CI.
+
+To run **all** integration tests, call: `just test-integration`
 
 ### End to End Tests
 

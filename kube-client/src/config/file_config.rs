@@ -261,7 +261,7 @@ pub struct ExecConfig {
     /// Specifies which environment variables the host should avoid passing to the auth plugin.
     ///
     /// This does currently not exist upstream and cannot be specified on disk.
-    /// It has been suggested in client-go via https://github.com/kubernetes/client-go/issues/1177
+    /// It has been suggested in client-go via <https://github.com/kubernetes/client-go/issues/1177>
     #[serde(skip)]
     pub drop_env: Option<Vec<String>>,
 
