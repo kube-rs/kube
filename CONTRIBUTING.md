@@ -45,7 +45,7 @@ The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](ht
 
 ### Unit Tests & Documentation Tests
 
-Unit and doc tests are run against a particular crate with `cargo test -p KUBECRATE --all`, but because of feature-sets, you will need a couple of extra flags and invocations to replicate all our CI conditions.
+Unit and doc tests are run against a particular crate with `cargo test -p KUBECRATE --lib --doc`, but because of feature-sets, you will need a couple of extra flags and invocations to replicate all our CI conditions.
 
 To run **all** unit tests, call: `just test`
 
