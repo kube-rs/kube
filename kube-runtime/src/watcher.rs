@@ -5,9 +5,10 @@
 use crate::utils::ResetTimerBackoff;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
-use futures::{stream::BoxStream, Stream, StreamExt};
+use futures::{stream::BoxStream, Future, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
+    core::{metadata::PartialObjectMeta, ObjectList},
     error::ErrorResponse,
     Api, Error as ClientErr,
 };
@@ -132,104 +133,88 @@ enum State<K: Resource + Clone> {
     },
 }
 
+/// Helper to express nested `impl` return types in factories
+trait AsyncFn<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>:
+    Fn(String) -> Self::Future
+{
+    type Future: Future<Output = (Option<Result<Event<K>>>, State<K>)> + Send;
+}
+
+/// Allows factories to return closures that are used to drive the watcher's state
+/// machine
+///
+/// Closures may take any argument and must return an (event, state)
+impl<F, K, Fut> AsyncFn<K> for F
+where
+    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
+    F: Fn(String) -> Fut,
+    Fut: Future<Output = (Option<Result<Event<K>>>, State<K>)> + Send,
+{
+    type Future = Fut;
+}
+
+/// Factory that returns two closures used to drive the watcher's state machine
+///
+/// Used as an indirection mechanism to call `list` and `watch` on the
+/// underlying Api type.
+fn make_step_api<'a, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+    api: &'a Api<K>,
+    list_params: &'a ListParams,
+) -> (impl AsyncFn<K> + 'a, impl AsyncFn<K> + 'a) {
+    let list = move |_| async {
+        let list = api.list(list_params).await;
+        step_list(list)
+    };
+
+    let watch = move |resource_version: String| async {
+        let watch = api.watch(list_params, &resource_version).await;
+        step_watch(watch, resource_version)
+    };
+
+    (list, watch)
+}
+
+/// Factory that returns two closures used to drive the watcher's state machine
+///
+/// Used as an indirection mechanism to call `list_metadata` and
+/// `watch_metadata` on the underlying Api type. Closures returned are
+/// specialized for use with metadata only.
+fn make_step_metadata_api<'a, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+    api: &'a Api<K>,
+    list_params: &'a ListParams,
+) -> (
+    impl AsyncFn<PartialObjectMeta> + 'a,
+    impl AsyncFn<PartialObjectMeta> + 'a,
+) {
+    let list = move |_| async {
+        let list = api.list_metadata(list_params).await;
+        step_list::<PartialObjectMeta>(list)
+    };
+
+    let watch = move |resource_version: String| async {
+        let watch = api.watch_metadata(list_params, &resource_version).await;
+        step_watch::<PartialObjectMeta>(watch, resource_version)
+    };
+
+    (list, watch)
+}
+
 /// Progresses the watcher a single step, returning (event, state)
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
 async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    api: &Api<K>,
-    list_params: &ListParams,
+    step_list_fn: impl AsyncFn<K>,
+    step_watch_fn: impl AsyncFn<K>,
     state: State<K>,
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
-        State::Empty => match api.list(list_params).await {
-            Ok(list) => {
-                if let Some(resource_version) = list.metadata.resource_version {
-                    (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                        resource_version,
-                    })
-                } else {
-                    (Some(Err(Error::NoResourceVersion)), State::Empty)
-                }
-            }
-            Err(err) => {
-                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                    warn!("watch list error with 403: {err:?}");
-                } else {
-                    debug!("watch list error: {err:?}");
-                }
-                (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
-            }
-        },
-        State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
-            Ok(stream) => (None, State::Watching {
-                resource_version,
-                stream: stream.boxed(),
-            }),
-            Err(err) => {
-                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                    warn!("watch initlist error with 403: {err:?}");
-                } else {
-                    debug!("watch initlist error: {err:?}");
-                }
-                (
-                    Some(Err(err).map_err(Error::WatchStartFailed)),
-                    State::InitListed { resource_version },
-                )
-            }
-        },
+        State::Empty => step_list_fn(String::new()).await,
+        State::InitListed { resource_version } => step_watch_fn(resource_version).await,
         State::Watching {
             resource_version,
-            mut stream,
-        } => match stream.next().await {
-            Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
-                let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Applied(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
-            }
-            Some(Ok(WatchEvent::Deleted(obj))) => {
-                let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Deleted(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
-            }
-            Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
-                resource_version: bm.metadata.resource_version,
-                stream,
-            }),
-            Some(Ok(WatchEvent::Error(err))) => {
-                // HTTP GONE, means we have desynced and need to start over and re-list :(
-                let new_state = if err.code == 410 {
-                    State::Empty
-                } else {
-                    State::Watching {
-                        resource_version,
-                        stream,
-                    }
-                };
-                if err.code == 403 {
-                    warn!("watcher watchevent error 403: {err:?}");
-                } else {
-                    debug!("error watchevent error: {err:?}");
-                }
-                (Some(Err(err).map_err(Error::WatchError)), new_state)
-            }
-            Some(Err(err)) => {
-                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                    warn!("watcher error 403: {err:?}");
-                } else {
-                    debug!("watcher error: {err:?}");
-                }
-                (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
-                    resource_version,
-                    stream,
-                })
-            }
-            None => (None, State::InitListed { resource_version }),
-        },
+            stream,
+        } => step_next(resource_version, stream).await,
     }
 }
 
@@ -240,9 +225,145 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     mut state: State<K>,
 ) -> (Result<Event<K>>, State<K>) {
     loop {
-        match step_trampolined(api, list_params, state).await {
+        let (list_fn, watch_fn) = make_step_api(api, list_params);
+        match step_trampolined(list_fn, watch_fn, state).await {
             (Some(result), new_state) => return (result, new_state),
             (None, new_state) => state = new_state,
+        }
+    }
+}
+
+/// Trampoline helper for `step_trampolined` that returns a concrete type
+async fn step_metadata<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+    api: &Api<K>,
+    list_params: &ListParams,
+    mut state: State<PartialObjectMeta>,
+) -> (Result<Event<PartialObjectMeta>>, State<PartialObjectMeta>) {
+    loop {
+        let (list_fn, watch_fn) = make_step_metadata_api(api, list_params);
+        match step_trampolined::<PartialObjectMeta>(list_fn, watch_fn, state).await {
+            (Some(result), new_state) => return (result, new_state),
+            (None, new_state) => state = new_state,
+        }
+    }
+}
+
+/// Helper for `step_trampolined` to process the next element in a watch stream
+async fn step_next<K>(
+    resource_version: String,
+    mut stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
+) -> (Option<Result<Event<K>>>, State<K>)
+where
+    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
+{
+    match stream.next().await {
+        Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
+            let resource_version = obj.resource_version().unwrap();
+            (Some(Ok(Event::Applied(obj))), State::Watching {
+                resource_version,
+                stream,
+            })
+        }
+        Some(Ok(WatchEvent::Deleted(obj))) => {
+            let resource_version = obj.resource_version().unwrap();
+            (Some(Ok(Event::Deleted(obj))), State::Watching {
+                resource_version,
+                stream,
+            })
+        }
+        Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
+            resource_version: bm.metadata.resource_version,
+            stream,
+        }),
+        Some(Ok(WatchEvent::Error(err))) => {
+            // HTTP GONE, means we have desynced and need to start over and re-list :(
+            let new_state = if err.code == 410 {
+                State::Empty
+            } else {
+                State::Watching {
+                    resource_version,
+                    stream,
+                }
+            };
+            if err.code == 403 {
+                warn!("watcher watchevent error 403: {err:?}");
+            } else {
+                debug!("error watchevent error: {err:?}");
+            }
+            (Some(Err(err).map_err(Error::WatchError)), new_state)
+        }
+        Some(Err(err)) => {
+            if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                warn!("watcher error 403: {err:?}");
+            } else {
+                debug!("watcher error: {err:?}");
+            }
+            (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
+                resource_version,
+                stream,
+            })
+        }
+        None => (None, State::InitListed { resource_version }),
+    }
+}
+
+/// Helper for `step_trampolined` to initialize the watch with a LIST
+///
+/// Used by closures that are returned from factories to provide indirection and
+/// specialization where needed.
+fn step_list<K>(list_result: kube_client::Result<ObjectList<K>>) -> (Option<Result<Event<K>>>, State<K>)
+where
+    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
+{
+    match list_result {
+        Ok(list) => {
+            if let Some(resource_version) = list.metadata.resource_version {
+                (Some(Ok(Event::Restarted(list.items))), State::InitListed {
+                    resource_version,
+                })
+            } else {
+                (Some(Err(Error::NoResourceVersion)), State::Empty)
+            }
+        }
+        Err(err) => {
+            if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                warn!("watch list error with 403: {err:?}");
+            } else {
+                debug!("watch list error: {err:?}");
+            }
+            (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
+        }
+    }
+}
+
+/// Helper for `step_trampolined` to itialize the watch with a LIST
+///
+/// Used by closures that are returned from factories to provide indirection and
+/// specialization where needed.
+fn step_watch<K>(
+    watch_event: kube_client::Result<impl Stream<Item = kube_client::Result<WatchEvent<K>>> + Send + 'static>,
+    resource_version: String,
+) -> (Option<Result<Event<K>>>, State<K>)
+where
+    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
+{
+    match watch_event {
+        Ok(stream) => (None, State::Watching {
+            resource_version,
+            stream: stream.boxed(),
+        }),
+        Err(err) => {
+            if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                warn!("watch initlist error with 403: {err:?}");
+            } else {
+                debug!("watch initlist error: {err:?}");
+            }
+            (
+                Some(Err(err).map_err(Error::WatchStartFailed)),
+                State::InitListed {
+                    resource_version: resource_version.to_string(),
+                },
+            )
         }
     }
 }
@@ -304,6 +425,70 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {
             let (event, state) = step(&api, &list_params, state).await;
+            Some((event, (api, list_params, state)))
+        },
+    )
+}
+
+/// Watches a Kubernetes Resource for changes continuously and receives only the
+/// metadata
+///
+/// Compared to [`Api::watch`], this automatically tries to recover the stream upon errors.
+///
+/// Errors from the underlying watch are propagated, after which the stream will go into recovery mode on the next poll.
+/// You can apply your own backoff by not polling the stream for a duration after errors.
+/// Keep in mind that some [`TryStream`](futures::TryStream) combinators (such as
+/// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
+/// will terminate eagerly as soon as they receive an [`Err`].
+///
+/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
+/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+///
+/// ```no_run
+/// use kube::{
+///   api::{Api, ListParams, ResourceExt}, Client,
+///   runtime::{watcher, WatchStreamExt}
+/// };
+/// use k8s_openapi::api::core::v1::Pod;
+/// use futures::{StreamExt, TryStreamExt};
+/// #[tokio::main]
+/// async fn main() -> Result<(), watcher::Error> {
+///     let client = Client::try_default().await.unwrap();
+///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+///     metadata_watcher(pods, ListParams::default()).applied_objects()
+///         .try_for_each(|p| async move {
+///          println!("Applied: {}", p.name_any());
+///             Ok(())
+///         })
+///         .await?;
+///    Ok(())
+/// }
+/// ```
+/// [`WatchStreamExt`]: super::WatchStreamExt
+/// [`reflector`]: super::reflector::reflector
+/// [`Api::watch`]: kube_client::Api::watch
+///
+/// # Recovery
+///
+/// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
+/// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
+/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+///
+/// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
+/// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
+/// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
+/// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
+/// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
+
+pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+    api: Api<K>,
+    list_params: ListParams,
+) -> impl Stream<Item = Result<Event<PartialObjectMeta>>> + Send {
+    futures::stream::unfold(
+        (api, list_params, State::Empty),
+        |(api, list_params, state)| async {
+            let (event, state) = step_metadata(&api, &list_params, state).await;
             Some((event, (api, list_params, state)))
         },
     )
