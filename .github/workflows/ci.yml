@@ -54,7 +54,7 @@ jobs:
       # Workspace documentation (all features only)
       - name: Run workspace doc tests
         run: cargo test --workspace --doc --all-features --exclude kube-examples --exclude e2e -j6
-      - name: Doc test verification (should never be ignored)
+      - name: Run ad-hoc doc test verification
         run: |
           if rg "\`\`\`ignored"; then
             echo "ignored doctests are not allowed, use compile_fail or no_run"
