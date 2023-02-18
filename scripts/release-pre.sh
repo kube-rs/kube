@@ -29,7 +29,7 @@ sanity() {
 main() {
   # We only want this to run ONCE at workspace level
   cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. # aka $WORKSPACE_ROOT
-  local -r CURRENT_VER="$(rg "kube =" README.md | head -n 1 | rg 'version = "(\S*)"' -or '$1')"
+  local -r CURRENT_VER="$(rg 'kube = \{ version = "(\S*)"' -or '$1' README.md | head -n1)"
 
   # If the main README has been bumped, assume we are done:
   if [[ "${NEW_VERSION}" = "${CURRENT_VER}" ]]; then
