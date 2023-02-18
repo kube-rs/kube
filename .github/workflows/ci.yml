@@ -148,18 +148,14 @@ jobs:
         run: cargo build
 
       # Run the equivalent of `just integration`
-      - name: Run all default features integration library tests
-        run: cargo test --lib --all -- --ignored
-      - name: Run all facade integration library tests with extra features
-        run: cargo test -p kube --lib --features=derive,runtime -- --ignored --nocapture
+      - name: Run all integration library tests
+        run: cargo test --lib --workspace --exclude examples --exclude e2e --all-features -- --ignored
+      - name: Run all integration doc tests
+        run: cargo test --doc --workspace --exclude examples --exclude e2e --all-features -- --ignored
       - name: Run crd example tests
         run: cargo run -p kube-examples --example crd_api
-      - name: Run all client integration library tests with rustls and ws
-        run: cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
       - name: Run derive example tests
         run: cargo run -p kube-examples --example crd_derive
-      - name: Run crd example tests
-        run: cargo run -p kube-examples --example crd_api
 
   mk8sv:
     # comile check e2e tests against mk8sv

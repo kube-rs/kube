@@ -75,7 +75,7 @@ All public interfaces should have doc tests with examples for [docs.rs](https://
 
 When adding new non-trivial pieces of logic that results in a drop in coverage you should add a test.
 
-Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube/branch/main/graph/badge.svg?token=9FCqEcyDTZ)](https://codecov.io/gh/kube-rs/kube) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](https://github.com/kube-rs/kube/blob/main/tarpaulin.toml) config, and **will run both unit and integration** tests.
+Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube/branch/main/graph/badge.svg?token=9FCqEcyDTZ)](https://app.codecov.io/gh/kube-rs/kube/tree/main) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](https://github.com/kube-rs/kube/blob/main/tarpaulin.toml) config, and **will run both unit and integration** tests.
 
 #### What type of test
 

@@ -1,4 +1,5 @@
 VERSION := `git rev-parse HEAD`
+open := if os() == "macos" { "open" } else { "xdg-open" }
 
 [private]
 default:
@@ -32,15 +33,15 @@ test:
 # Integration tests (will modify your current context's cluster)
 test-integration:
   kubectl delete pod -lapp=kube-rs-test
-  cargo test --lib --all -- --ignored # also run tests that fail on github actions
-  cargo test -p kube --lib --features=derive,runtime -- --ignored
-  cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
+  cargo test --lib --workspace --exclude e2e --all-features -- --ignored
+  cargo test --doc --workspace --exclude e2e --all-features -- --ignored
+  # some examples are canonical tests
   cargo run -p kube-examples --example crd_derive
   cargo run -p kube-examples --example crd_api
 
 coverage:
   cargo tarpaulin --out=Html --output-dir=.
-  #xdg-open tarpaulin-report.html
+  {{open}} tarpaulin-report.html
 
 readme:
   rustdoc README.md --test --edition=2021

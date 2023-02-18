@@ -29,6 +29,6 @@ jobs:
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
-          version: '0.18.5'
+          version: '0.25.0'
           out-type: Xml
       - uses: codecov/codecov-action@v3
