@@ -162,8 +162,14 @@ impl AttachedProcess {
 
     /// Async writer to stdin.
     /// ```ignore
+    /// # use kube_client::api::AttachedProcess;
+    /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let attached: AttachedProcess = todo!();
     /// let mut stdin_writer = attached.stdin().unwrap();
     /// stdin_writer.write(b"foo\n").await?;
+    /// # Ok(())
+    /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stdin`.
     pub fn stdin(&mut self) -> Option<impl AsyncWrite + Unpin> {
@@ -175,8 +181,15 @@ impl AttachedProcess {
 
     /// Async reader for stdout outputs.
     /// ```ignore
+    /// # use kube_client::api::AttachedProcess;
+    /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let attached: AttachedProcess = todo!();
     /// let mut stdout_reader = attached.stdout().unwrap();
-    /// let next_stdout = stdout_reader.read().await?;
+    /// let mut buf = [0u8; 4];
+    /// stdout_reader.read_exact(&mut buf).await?;
+    /// # Ok(())
+    /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stdout`.
     pub fn stdout(&mut self) -> Option<impl AsyncRead + Unpin> {
@@ -188,8 +201,15 @@ impl AttachedProcess {
 
     /// Async reader for stderr outputs.
     /// ```ignore
+    /// # use kube_client::api::AttachedProcess;
+    /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let attached: AttachedProcess = todo!();
     /// let mut stderr_reader = attached.stderr().unwrap();
-    /// let next_stderr = stderr_reader.read().await?;
+    /// let mut buf = [0u8; 4];
+    /// stderr_reader.read_exact(&mut buf).await?;
+    /// # Ok(())
+    /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stderr`.
     pub fn stderr(&mut self) -> Option<impl AsyncRead + Unpin> {
@@ -219,11 +239,18 @@ impl AttachedProcess {
 
     /// Async writer to change the terminal size
     /// ```ignore
+    /// # use kube_client::api::{AttachedProcess, TerminalSize};
+    /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    /// # use futures::SinkExt;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let attached: AttachedProcess = todo!();
     /// let mut terminal_size_writer = attached.terminal_size().unwrap();
     /// terminal_size_writer.send(TerminalSize{
     ///     height: 100,
     ///     width: 200,
     /// }).await?;
+    /// # Ok(())
+    /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `tty`.
     pub fn terminal_size(&mut self) -> Option<TerminalSizeSender> {
