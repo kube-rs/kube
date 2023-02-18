@@ -149,9 +149,9 @@ jobs:
 
       # Run the equivalent of `just integration`
       - name: Run all integration library tests
-        run: cargo test --lib --workspace --exclude examples --exclude e2e --all-features -- --ignored
+        run: cargo test --lib --workspace --exclude e2e --all-features -- --ignored
       - name: Run all integration doc tests
-        run: cargo test --doc --workspace --exclude examples --exclude e2e --all-features -- --ignored
+        run: cargo test --doc --workspace --exclude e2e --all-features -- --ignored
       - name: Run crd example tests
         run: cargo run -p kube-examples --example crd_api
       - name: Run derive example tests
