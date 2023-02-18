@@ -47,10 +47,10 @@ jobs:
         run: cargo test --workspace --lib --no-default-features -j6
         if: matrix.os == 'ubuntu-latest'
       - name: Run workspace unit tests (default features)
-        run: cargo test --workspace --lib --exclude kube-examples --exclude e2e
+        run: cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
         if: matrix.os == 'ubuntu-latest'
       - name: Run workspace unit tests (all features)
-        run: cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e
+        run: cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e -j6
       # Workspace documentation (all features only)
       - name: Run workspace doc tests
         run: cargo test --workspace --doc --all-features --exclude kube-examples --exclude e2e -j6
@@ -148,7 +148,7 @@ jobs:
 
       # Run the equivalent of `just integration`
       - name: Run all integration library tests
-        run: cargo test --lib --workspace --exclude e2e --all-features -- --ignored
+        run: cargo test --lib --workspace --exclude e2e --all-features -j6 -- --ignored
       - name: Run crd example tests
         run: cargo run -p kube-examples --example crd_api
       - name: Run derive example tests
