@@ -9,12 +9,14 @@ on:
 jobs:
   tarpaulin-codecov:
     runs-on: ubuntu-latest
-    container:
-      image: xd009642/tarpaulin:0.25.0-slim
-      options: --security-opt seccomp=unconfined
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
       - uses: Swatinem/rust-cache@v2
       - uses: AbsaOSS/k3d-action@v2
         name: "Create Single Cluster"
@@ -24,5 +26,9 @@ jobs:
             --agents 1
             --image docker.io/rancher/k3s:v1.22.4-k3s1
             --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
-      - run: cargo +nightly tarpaulin --out Xml
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: '0.22.0'
+          out-type: Xml
       - uses: codecov/codecov-action@v3

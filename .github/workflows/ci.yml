@@ -58,6 +58,7 @@ jobs:
             echo "ignored doctests are not allowed, use compile_fail or no_run"
             exit 1
           fi
+        if: matrix.os == 'ubuntu-latest'
       # Examples
       - name: Test examples
         run: cargo test -p kube-examples --examples -j6
