@@ -45,8 +45,10 @@ jobs:
       # Workspace unit tests with various feature sets
       - name: Run workspace unit tests (no default features)
         run: cargo test --workspace --lib --no-default-features -j6
+        if: matrix.os == 'ubuntu-latest'
       - name: Run workspace unit tests (default features)
         run: cargo test --workspace --lib --all --exclude kube-examples --exclude e2e
+        if: matrix.os == 'ubuntu-latest'
       - name: Run workspace unit tests (all features)
         run: cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e
       # Workspace documentation (all features only)
