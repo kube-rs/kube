@@ -161,7 +161,7 @@ impl AttachedProcess {
     }
 
     /// Async writer to stdin.
-    /// ```ignore
+    /// ```no_run
     /// # use kube_client::api::AttachedProcess;
     /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
@@ -180,7 +180,7 @@ impl AttachedProcess {
     }
 
     /// Async reader for stdout outputs.
-    /// ```ignore
+    /// ```no_run
     /// # use kube_client::api::AttachedProcess;
     /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
@@ -200,7 +200,7 @@ impl AttachedProcess {
     }
 
     /// Async reader for stderr outputs.
-    /// ```ignore
+    /// ```no_run
     /// # use kube_client::api::AttachedProcess;
     /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
@@ -238,7 +238,7 @@ impl AttachedProcess {
     }
 
     /// Async writer to change the terminal size
-    /// ```ignore
+    /// ```no_run
     /// # use kube_client::api::{AttachedProcess, TerminalSize};
     /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
     /// # use futures::SinkExt;
