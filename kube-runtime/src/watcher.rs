@@ -360,9 +360,7 @@ where
             }
             (
                 Some(Err(err).map_err(Error::WatchStartFailed)),
-                State::InitListed {
-                    resource_version: resource_version.to_string(),
-                },
+                State::InitListed { resource_version },
             )
         }
     }
@@ -447,7 +445,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// ```no_run
 /// use kube::{
 ///   api::{Api, ListParams, ResourceExt}, Client,
-///   runtime::{watcher, WatchStreamExt}
+///   runtime::{watch_metadata, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::{StreamExt, TryStreamExt};
@@ -456,7 +454,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     metadata_watcher(pods, ListParams::default()).applied_objects()
+///     watch_metadata(pods, ListParams::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
@@ -481,7 +479,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
 /// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
 
-pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+pub fn watch_metadata<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
 ) -> impl Stream<Item = Result<Event<PartialObjectMeta>>> + Send {
