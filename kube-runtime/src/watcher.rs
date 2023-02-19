@@ -134,8 +134,8 @@ enum State<K: Resource + Clone> {
 }
 
 /// Helper to express nested `impl` return types in factories
-trait AsyncFn<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>:
-    Fn(String) -> Self::Future
+trait AsyncFn<A: Send, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>:
+    Fn(A) -> Self::Future
 {
     type Future: Future<Output = (Option<Result<Event<K>>>, State<K>)> + Send;
 }
@@ -144,10 +144,11 @@ trait AsyncFn<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>:
 /// machine
 ///
 /// Closures may take any argument and must return an (event, state)
-impl<F, K, Fut> AsyncFn<K> for F
+impl<A, F, K, Fut> AsyncFn<A, K> for F
 where
+    A: Send,
     K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-    F: Fn(String) -> Fut,
+    F: Fn(A) -> Fut,
     Fut: Future<Output = (Option<Result<Event<K>>>, State<K>)> + Send,
 {
     type Future = Fut;
@@ -160,7 +161,7 @@ where
 fn make_step_api<'a, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: &'a Api<K>,
     list_params: &'a ListParams,
-) -> (impl AsyncFn<K> + 'a, impl AsyncFn<K> + 'a) {
+) -> (impl AsyncFn<(), K> + 'a, impl AsyncFn<String, K> + 'a) {
     let list = move |_| async {
         let list = api.list(list_params).await;
         step_list(list)
@@ -183,8 +184,8 @@ fn make_step_metadata_api<'a, K: Resource + Clone + DeserializeOwned + Debug + S
     api: &'a Api<K>,
     list_params: &'a ListParams,
 ) -> (
-    impl AsyncFn<PartialObjectMeta> + 'a,
-    impl AsyncFn<PartialObjectMeta> + 'a,
+    impl AsyncFn<(), PartialObjectMeta> + 'a,
+    impl AsyncFn<String, PartialObjectMeta> + 'a,
 ) {
     let list = move |_| async {
         let list = api.list_metadata(list_params).await;
@@ -204,12 +205,12 @@ fn make_step_metadata_api<'a, K: Resource + Clone + DeserializeOwned + Debug + S
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
 async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    step_list_fn: impl AsyncFn<K>,
-    step_watch_fn: impl AsyncFn<K>,
+    step_list_fn: impl AsyncFn<(), K>,
+    step_watch_fn: impl AsyncFn<String, K>,
     state: State<K>,
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
-        State::Empty => step_list_fn(String::new()).await,
+        State::Empty => step_list_fn(()).await,
         State::InitListed { resource_version } => step_watch_fn(resource_version).await,
         State::Watching {
             resource_version,
