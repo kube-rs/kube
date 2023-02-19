@@ -249,7 +249,7 @@ mod test {
     use super::{Event, EventType, Recorder};
 
     #[tokio::test]
-    #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
+    #[ignore = "needs cluster (creates an event for the default kubernetes service)"]
     async fn event_recorder_attaches_events() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 
@@ -278,7 +278,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (creates a pointless event on the kubernetes main service)
+    #[ignore = "needs cluster (creates an event for the default kubernetes service)"]
     async fn event_recorder_attaches_events_without_namespace() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 

@@ -148,7 +148,7 @@ mod test {
     // hard disabled test atm due to k3d rustls issues: https://github.com/kube-rs/kube/issues?q=is%3Aopen+is%3Aissue+label%3Arustls
     #[cfg(feature = "when_rustls_works_with_k3d")]
     #[tokio::test]
-    #[ignore] // needs cluster (lists pods)
+    #[ignore = "needs cluster (lists pods)"]
     #[cfg(all(feature = "rustls-tls"))]
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
@@ -163,7 +163,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (lists pods)
+    #[ignore = "needs cluster (lists pods)"]
     #[cfg(all(feature = "openssl-tls"))]
     async fn custom_client_openssl_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
@@ -178,7 +178,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (lists api resources)
+    #[ignore = "needs cluster (lists api resources)"]
     #[cfg(all(feature = "discovery"))]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{core::DynamicObject, discovery};
@@ -192,7 +192,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create and edit a pod)
+    #[ignore = "needs cluster (will create and edit a pod)"]
     async fn pod_can_use_core_apis() -> Result<(), Box<dyn std::error::Error>> {
         use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchEvent};
 
@@ -272,7 +272,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create and attach to a pod)
+    #[ignore = "needs cluster (will create and attach to a pod)"]
     #[cfg(all(feature = "ws"))]
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
@@ -384,7 +384,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create and tail logs from a pod)
+    #[ignore = "needs cluster (will create and tail logs from a pod)"]
     async fn can_get_pod_logs_and_evict() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
@@ -470,7 +470,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // requires a cluster
+    #[ignore = "requires a cluster"]
     async fn can_operate_on_pod_metadata() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
@@ -556,7 +556,7 @@ mod test {
         Ok(())
     }
     #[tokio::test]
-    #[ignore] // needs cluster (will create a CertificateSigningRequest)
+    #[ignore = "needs cluster (will create a CertificateSigningRequest)"]
     async fn csr_can_be_approved() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::PostParams;
         use k8s_openapi::api::certificates::v1::{
