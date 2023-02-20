@@ -1,6 +1,7 @@
 //! Caches objects in memory
 
 mod object_ref;
+#[cfg(feature = "unstable-runtime-shared-store")] pub mod shared_store;
 pub mod store;
 
 pub use self::object_ref::{Extra as ObjectRefExtra, ObjectRef};
