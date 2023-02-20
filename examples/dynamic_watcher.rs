@@ -14,6 +14,12 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
+    // If set will receive only the metadata for watched resources
+    let should_watch_meta = {
+        let v = env::var("WATCH_METADATA").unwrap_or_else(|_| "false".into());
+        v.parse::<bool>().ok().unwrap_or_else(|| false)
+    };
+
     // Take dynamic resource identifiers:
     let group = env::var("GROUP").unwrap_or_else(|_| "clux.dev".into());
     let version = env::var("VERSION").unwrap_or_else(|_| "v1".into());
@@ -28,13 +34,28 @@ async fn main() -> anyhow::Result<()> {
     let api = Api::<DynamicObject>::all_with(client, &ar);
 
     // Fully compatible with kube-runtime
-    let mut items = watcher(api, ListParams::default()).applied_objects().boxed();
-    while let Some(p) = items.try_next().await? {
-        if caps.scope == Scope::Cluster {
-            info!("saw {}", p.name_any());
-        } else {
-            info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
+    if should_watch_meta {
+        let mut items = watcher::watch_metadata(api, ListParams::default())
+            .applied_objects()
+            .boxed();
+
+        while let Some(p) = items.try_next().await? {
+            if caps.scope == Scope::Cluster {
+                info!("saw {}", p.name_any());
+            } else {
+                info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
+            }
         }
-    }
+    } else {
+        let mut items = watcher(api, ListParams::default()).applied_objects().boxed();
+        while let Some(p) = items.try_next().await? {
+            if caps.scope == Scope::Cluster {
+                info!("saw {}", p.name_any());
+            } else {
+                info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
+            }
+        }
+    };
+
     Ok(())
 }

@@ -895,14 +895,26 @@ mod tests {
     use crate::{
         applier,
         reflector::{self, ObjectRef},
-        watcher, Controller,
+        watcher::{self, watch_metadata, watcher, Event},
+        Controller,
     };
-    use futures::{pin_mut, StreamExt, TryStreamExt};
+    use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::ConfigMap;
-    use kube_client::{core::ObjectMeta, Api};
+    use kube_client::{core::ObjectMeta, Api, Resource};
+    use serde::de::DeserializeOwned;
     use tokio::time::timeout;
 
     fn assert_send<T: Send>(x: T) -> T {
+        x
+    }
+
+    // Used to typecheck that a type T is a generic type that implements Stream
+    // and returns a WatchEvent generic over a resource `K`
+    fn assert_stream<T, K>(x: T) -> T
+    where
+        T: Stream<Item = watcher::Result<Event<K>>> + Send,
+        K: Resource + Clone + DeserializeOwned + std::fmt::Debug + Send + 'static,
+    {
         x
     }
 
@@ -922,6 +934,17 @@ mod tests {
                 Arc::new(()),
             ),
         );
+    }
+
+    // not #[test] because we don't want to actually run it, we just want to
+    // assert that it typechecks
+    //
+    // will check return types for `watcher` and `watch_metadata` do not drift
+    // given an arbitrary K that implements `Resource` (e.g ConfigMap)
+    #[allow(dead_code, unused_must_use)]
+    fn test_watcher_stream_type_drift() {
+        assert_stream(watcher(mock_type::<Api<ConfigMap>>(), Default::default()));
+        assert_stream(watch_metadata(mock_type::<Api<ConfigMap>>(), Default::default()));
     }
 
     #[tokio::test]
