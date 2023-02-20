@@ -134,7 +134,7 @@ enum State<K: Resource + Clone> {
 }
 
 /// Helper to express nested `impl` return types in factories
-trait AsyncFn<A: Send, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>:
+trait StepFn<A: Send, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>:
     Fn(A) -> Self::Future
 {
     type Future: Future<Output = (Option<Result<Event<K>>>, State<K>)> + Send;
@@ -144,7 +144,7 @@ trait AsyncFn<A: Send, K: Resource + Clone + DeserializeOwned + Debug + Send + '
 /// machine
 ///
 /// Closures may take any argument and must return an (event, state)
-impl<A, F, K, Fut> AsyncFn<A, K> for F
+impl<A, F, K, Fut> StepFn<A, K> for F
 where
     A: Send,
     K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
@@ -161,7 +161,7 @@ where
 fn make_step_api<'a, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: &'a Api<K>,
     list_params: &'a ListParams,
-) -> (impl AsyncFn<(), K> + 'a, impl AsyncFn<String, K> + 'a) {
+) -> (impl StepFn<(), K> + 'a, impl StepFn<String, K> + 'a) {
     let list = move |_| async {
         let list = api.list(list_params).await;
         step_list(list)
@@ -184,8 +184,8 @@ fn make_step_metadata_api<'a, K: Resource + Clone + DeserializeOwned + Debug + S
     api: &'a Api<K>,
     list_params: &'a ListParams,
 ) -> (
-    impl AsyncFn<(), PartialObjectMeta> + 'a,
-    impl AsyncFn<String, PartialObjectMeta> + 'a,
+    impl StepFn<(), PartialObjectMeta> + 'a,
+    impl StepFn<String, PartialObjectMeta> + 'a,
 ) {
     let list = move |_| async {
         let list = api.list_metadata(list_params).await;
@@ -205,8 +205,8 @@ fn make_step_metadata_api<'a, K: Resource + Clone + DeserializeOwned + Debug + S
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
 async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    step_list_fn: impl AsyncFn<(), K>,
-    step_watch_fn: impl AsyncFn<String, K>,
+    step_list_fn: impl StepFn<(), K>,
+    step_watch_fn: impl StepFn<String, K>,
     state: State<K>,
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
