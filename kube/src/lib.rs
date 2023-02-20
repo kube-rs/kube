@@ -210,7 +210,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs kubeconfig
+    #[ignore = "needs kubeconfig"]
     async fn custom_resource_generates_correct_core_structs() {
         use crate::core::{ApiResource, DynamicObject, GroupVersionKind};
         let client = Client::try_default().await.unwrap();
@@ -229,7 +229,7 @@ mod test {
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
     #[tokio::test]
-    #[ignore] // needs cluster (creates + patches foo crd)
+    #[ignore = "needs cluster (creates + patches foo crd)"]
     #[cfg(all(feature = "derive", feature = "runtime"))]
     async fn derived_resource_queriable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
         use crate::runtime::wait::{await_condition, conditions};
@@ -305,7 +305,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (lists pods)
+    #[ignore = "needs cluster (lists pods)"]
     async fn custom_serialized_objects_are_queryable_and_iterable() -> Result<(), Box<dyn std::error::Error>>
     {
         use crate::core::{
@@ -356,7 +356,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (fetches api resources, and lists all)
+    #[ignore = "needs cluster (fetches api resources, and lists all)"]
     #[cfg(all(feature = "derive"))]
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
@@ -432,7 +432,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create await a pod)
+    #[ignore = "needs cluster (will create await a pod)"]
     #[cfg(all(feature = "runtime"))]
     async fn pod_can_await_conditions() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
@@ -514,7 +514,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (lists cms)
+    #[ignore = "needs cluster (lists cms)"]
     async fn api_get_opt_handles_404() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);
