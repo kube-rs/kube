@@ -16,7 +16,7 @@ replace-docs() {
 }
 
 sanity() {
-  CARGO_TREE_OPENAPI="$(cargo tree -i k8s-openapi | head -n 1 | choose 1)"
+  CARGO_TREE_OPENAPI="$(cargo tree -i k8s-openapi --depth=0 -e=normal | choose 1)"
   USED_K8S_OPENAPI="${CARGO_TREE_OPENAPI:1}"
   RECOMMENDED_K8S_OPENAPI="$(rg "k8s-openapi =" README.md | head -n 1)" # only check first instance
   if ! [[ $RECOMMENDED_K8S_OPENAPI =~ $USED_K8S_OPENAPI ]]; then
