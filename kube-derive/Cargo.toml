@@ -7,7 +7,7 @@ authors = [
   "kazk <kazk.dev@gmail.com>",
 ]
 edition = "2021"
-rust-version = "1.60.0"
+rust-version = "1.63.0"
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
