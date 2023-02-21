@@ -7,7 +7,7 @@ authors = [
   "kazk <kazk.dev@gmail.com>",
 ]
 edition = "2021"
-rust-version = "1.60.0"
+rust-version = "1.63.0"
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
@@ -28,7 +28,7 @@ proc-macro = true
 [dev-dependencies]
 serde = { version = "1.0.130", features = ["derive"] }
 serde_yaml = "0.8.21"
-kube = { path = "../kube", default-features = false, version = "<1.0.0, >=0.61.0", features = ["derive"] }
+kube = { path = "../kube", version = "<1.0.0, >=0.61.0", features = ["derive", "client"] }
 k8s-openapi = { version = "0.17.0", default-features = false, features = ["v1_26"] }
 schemars = { version = "0.8.6", features = ["chrono"] }
 validator = { version = "0.16.0", features = ["derive"] }
