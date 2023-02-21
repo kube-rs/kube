@@ -3,9 +3,10 @@
 //! See [`watcher`] for the primary entry point.
 
 use crate::utils::ResetTimerBackoff;
+use async_trait::async_trait;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
-use futures::{stream::BoxStream, Future, Stream, StreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
     core::{metadata::PartialObjectMeta, ObjectList},
@@ -115,7 +116,7 @@ impl<K> Event<K> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 /// The internal finite state machine driving the [`watcher`]
-enum State<K: Resource + Clone> {
+enum State<K> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
     Empty,
     /// The initial LIST was successful, so we should move on to starting the actual watch.
@@ -133,236 +134,191 @@ enum State<K: Resource + Clone> {
     },
 }
 
-/// Helper to express nested `impl` return types in factories
-trait StepFn<A: Send, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>:
-    Fn(A) -> Self::Future
-{
-    type Future: Future<Output = (Option<Result<Event<K>>>, State<K>)> + Send;
+/// Used to control whether the watcher receives the full object, or only the
+/// metadata
+#[async_trait]
+trait ApiMode {
+    type Value: Clone;
+
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>>;
+    async fn watch(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>>;
 }
 
-/// Allows factories to return closures that are used to drive the watcher's state
-/// machine
-///
-/// Closures may take any argument and must return an (event, state)
-impl<A, F, K, Fut> StepFn<A, K> for F
+/// A wrapper around the `Api` of a `Resource` type that when used by the
+/// watcher will return the entire (full) object
+struct FullObject<'a, K> {
+    api: &'a Api<K>,
+}
+
+#[async_trait]
+impl<K> ApiMode for FullObject<'_, K>
 where
-    A: Send,
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-    F: Fn(A) -> Fut,
-    Fut: Future<Output = (Option<Result<Event<K>>>, State<K>)> + Send,
+    K: Clone + Debug + DeserializeOwned + Send + 'static,
 {
-    type Future = Fut;
+    type Value = K;
+
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
+        self.api.list(lp).await
+    }
+
+    async fn watch(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
+        self.api.watch(lp, version).await.map(StreamExt::boxed)
+    }
 }
 
-/// Factory that returns two closures used to drive the watcher's state machine
-///
-/// Used as an indirection mechanism to call `list` and `watch` on the
-/// underlying Api type.
-fn make_step_api<'a, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+/// A wrapper around the `Api` of a `Resource` type that when used by the
+/// watcher will return only the metadata associated with an object
+struct MetaOnly<'a, K> {
     api: &'a Api<K>,
-    list_params: &'a ListParams,
-) -> (impl StepFn<(), K> + 'a, impl StepFn<String, K> + 'a) {
-    let list = move |_| async {
-        let list = api.list(list_params).await;
-        step_list(list)
-    };
-
-    let watch = move |resource_version: String| async {
-        let watch = api.watch(list_params, &resource_version).await;
-        step_watch(watch, resource_version)
-    };
-
-    (list, watch)
 }
 
-/// Factory that returns two closures used to drive the watcher's state machine
-///
-/// Used as an indirection mechanism to call `list_metadata` and
-/// `watch_metadata` on the underlying Api type. Closures returned are
-/// specialized for use with metadata only.
-fn make_step_metadata_api<'a, K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    api: &'a Api<K>,
-    list_params: &'a ListParams,
-) -> (
-    impl StepFn<(), PartialObjectMeta> + 'a,
-    impl StepFn<String, PartialObjectMeta> + 'a,
-) {
-    let list = move |_| async {
-        let list = api.list_metadata(list_params).await;
-        step_list::<PartialObjectMeta>(list)
-    };
+#[async_trait]
+impl<K> ApiMode for MetaOnly<'_, K>
+where
+    K: Clone + Debug + DeserializeOwned + Send + 'static,
+{
+    type Value = PartialObjectMeta;
 
-    let watch = move |resource_version: String| async {
-        let watch = api.watch_metadata(list_params, &resource_version).await;
-        step_watch::<PartialObjectMeta>(watch, resource_version)
-    };
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
+        self.api.list_metadata(lp).await
+    }
 
-    (list, watch)
+    async fn watch(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
+        self.api.watch_metadata(lp, version).await.map(StreamExt::boxed)
+    }
 }
 
 /// Progresses the watcher a single step, returning (event, state)
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
-async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    step_list_fn: impl StepFn<(), K>,
-    step_watch_fn: impl StepFn<String, K>,
-    state: State<K>,
-) -> (Option<Result<Event<K>>>, State<K>) {
+async fn step_trampolined<A>(
+    api: &A,
+    list_params: &ListParams,
+    state: State<A::Value>,
+) -> (Option<Result<Event<A::Value>>>, State<A::Value>)
+where
+    A: ApiMode,
+    A::Value: Resource + 'static,
+{
     match state {
-        State::Empty => step_list_fn(()).await,
-        State::InitListed { resource_version } => step_watch_fn(resource_version).await,
+        State::Empty => match api.list(list_params).await {
+            Ok(list) => {
+                if let Some(resource_version) = list.metadata.resource_version {
+                    (Some(Ok(Event::Restarted(list.items))), State::InitListed {
+                        resource_version,
+                    })
+                } else {
+                    (Some(Err(Error::NoResourceVersion)), State::Empty)
+                }
+            }
+            Err(err) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watch list error with 403: {err:?}");
+                } else {
+                    debug!("watch list error: {err:?}");
+                }
+                (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
+            }
+        },
+        State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
+            Ok(stream) => (None, State::Watching {
+                resource_version,
+                stream,
+            }),
+            Err(err) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watch initlist error with 403: {err:?}");
+                } else {
+                    debug!("watch initlist error: {err:?}");
+                }
+                (
+                    Some(Err(err).map_err(Error::WatchStartFailed)),
+                    State::InitListed { resource_version },
+                )
+            }
+        },
         State::Watching {
             resource_version,
-            stream,
-        } => step_next(resource_version, stream).await,
+            mut stream,
+        } => match stream.next().await {
+            Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
+                let resource_version = obj.resource_version().unwrap();
+                (Some(Ok(Event::Applied(obj))), State::Watching {
+                    resource_version,
+                    stream,
+                })
+            }
+            Some(Ok(WatchEvent::Deleted(obj))) => {
+                let resource_version = obj.resource_version().unwrap();
+                (Some(Ok(Event::Deleted(obj))), State::Watching {
+                    resource_version,
+                    stream,
+                })
+            }
+            Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
+                resource_version: bm.metadata.resource_version,
+                stream,
+            }),
+            Some(Ok(WatchEvent::Error(err))) => {
+                // HTTP GONE, means we have desynced and need to start over and re-list :(
+                let new_state = if err.code == 410 {
+                    State::Empty
+                } else {
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    }
+                };
+                if err.code == 403 {
+                    warn!("watcher watchevent error 403: {err:?}");
+                } else {
+                    debug!("error watchevent error: {err:?}");
+                }
+                (Some(Err(err).map_err(Error::WatchError)), new_state)
+            }
+            Some(Err(err)) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watcher error 403: {err:?}");
+                } else {
+                    debug!("watcher error: {err:?}");
+                }
+                (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
+                    resource_version,
+                    stream,
+                })
+            }
+            None => (None, State::InitListed { resource_version }),
+        },
     }
 }
 
 /// Trampoline helper for `step_trampolined`
-async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    api: &Api<K>,
+async fn step<A>(
+    api: &A,
     list_params: &ListParams,
-    mut state: State<K>,
-) -> (Result<Event<K>>, State<K>) {
+    mut state: State<A::Value>,
+) -> (Result<Event<A::Value>>, State<A::Value>)
+where
+    A: ApiMode,
+    A::Value: Resource + 'static,
+{
     loop {
-        let (list_fn, watch_fn) = make_step_api(api, list_params);
-        match step_trampolined(list_fn, watch_fn, state).await {
+        match step_trampolined(api, list_params, state).await {
             (Some(result), new_state) => return (result, new_state),
             (None, new_state) => state = new_state,
-        }
-    }
-}
-
-/// Trampoline helper for `step_trampolined` that returns a concrete type
-async fn step_metadata<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    api: &Api<K>,
-    list_params: &ListParams,
-    mut state: State<PartialObjectMeta>,
-) -> (Result<Event<PartialObjectMeta>>, State<PartialObjectMeta>) {
-    loop {
-        let (list_fn, watch_fn) = make_step_metadata_api(api, list_params);
-        match step_trampolined::<PartialObjectMeta>(list_fn, watch_fn, state).await {
-            (Some(result), new_state) => return (result, new_state),
-            (None, new_state) => state = new_state,
-        }
-    }
-}
-
-/// Helper for `step_trampolined` to process the next element in a watch stream
-async fn step_next<K>(
-    resource_version: String,
-    mut stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
-) -> (Option<Result<Event<K>>>, State<K>)
-where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-{
-    match stream.next().await {
-        Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
-            let resource_version = obj.resource_version().unwrap();
-            (Some(Ok(Event::Applied(obj))), State::Watching {
-                resource_version,
-                stream,
-            })
-        }
-        Some(Ok(WatchEvent::Deleted(obj))) => {
-            let resource_version = obj.resource_version().unwrap();
-            (Some(Ok(Event::Deleted(obj))), State::Watching {
-                resource_version,
-                stream,
-            })
-        }
-        Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
-            resource_version: bm.metadata.resource_version,
-            stream,
-        }),
-        Some(Ok(WatchEvent::Error(err))) => {
-            // HTTP GONE, means we have desynced and need to start over and re-list :(
-            let new_state = if err.code == 410 {
-                State::Empty
-            } else {
-                State::Watching {
-                    resource_version,
-                    stream,
-                }
-            };
-            if err.code == 403 {
-                warn!("watcher watchevent error 403: {err:?}");
-            } else {
-                debug!("error watchevent error: {err:?}");
-            }
-            (Some(Err(err).map_err(Error::WatchError)), new_state)
-        }
-        Some(Err(err)) => {
-            if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                warn!("watcher error 403: {err:?}");
-            } else {
-                debug!("watcher error: {err:?}");
-            }
-            (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
-                resource_version,
-                stream,
-            })
-        }
-        None => (None, State::InitListed { resource_version }),
-    }
-}
-
-/// Helper for `step_trampolined` to initialize the watch with a LIST
-///
-/// Used by closures that are returned from factories to provide indirection and
-/// specialization where needed.
-fn step_list<K>(list_result: kube_client::Result<ObjectList<K>>) -> (Option<Result<Event<K>>>, State<K>)
-where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-{
-    match list_result {
-        Ok(list) => {
-            if let Some(resource_version) = list.metadata.resource_version {
-                (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                    resource_version,
-                })
-            } else {
-                (Some(Err(Error::NoResourceVersion)), State::Empty)
-            }
-        }
-        Err(err) => {
-            if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                warn!("watch list error with 403: {err:?}");
-            } else {
-                debug!("watch list error: {err:?}");
-            }
-            (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
-        }
-    }
-}
-
-/// Helper for `step_trampolined` to itialize the watch with a LIST
-///
-/// Used by closures that are returned from factories to provide indirection and
-/// specialization where needed.
-fn step_watch<K>(
-    watch_event: kube_client::Result<impl Stream<Item = kube_client::Result<WatchEvent<K>>> + Send + 'static>,
-    resource_version: String,
-) -> (Option<Result<Event<K>>>, State<K>)
-where
-    K: Resource + Clone + DeserializeOwned + Debug + Send + 'static,
-{
-    match watch_event {
-        Ok(stream) => (None, State::Watching {
-            resource_version,
-            stream: stream.boxed(),
-        }),
-        Err(err) => {
-            if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                warn!("watch initlist error with 403: {err:?}");
-            } else {
-                debug!("watch initlist error: {err:?}");
-            }
-            (
-                Some(Err(err).map_err(Error::WatchStartFailed)),
-                State::InitListed { resource_version },
-            )
         }
     }
 }
@@ -423,7 +379,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     futures::stream::unfold(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {
-            let (event, state) = step(&api, &list_params, state).await;
+            let (event, state) = step(&FullObject { api: &api }, &list_params, state).await;
             Some((event, (api, list_params, state)))
         },
     )
@@ -487,7 +443,7 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
     futures::stream::unfold(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {
-            let (event, state) = step_metadata(&api, &list_params, state).await;
+            let (event, state) = step(&MetaOnly { api: &api }, &list_params, state).await;
             Some((event, (api, list_params, state)))
         },
     )
