@@ -1,4 +1,4 @@
-# When pushed to main, run `cargo +nightly fmt --all` and open a PR.
+# When pushed to main, run `cargo +nightly fmt` against all files and open a PR.
 name: rustfmt
 on:
   push:
