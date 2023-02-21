@@ -1,4 +1,5 @@
 VERSION := `git rev-parse HEAD`
+open := if os() == "macos" { "open" } else { "xdg-open" }
 
 [private]
 default:
@@ -22,25 +23,31 @@ deny:
 
 # Unit tests
 test:
-  cargo test --lib --all
-  cargo test --doc --all
+  #!/usr/bin/env bash
+  if rg "\`\`\`ignored"; then
+    echo "ignored doctests are not allowed, use compile_fail or no_run"
+    exit 1
+  fi
+  # no default features
+  cargo test --workspace --lib --no-default-features
+  # default features
+  cargo test --workspace --lib --exclude kube-examples --exclude e2e
+  # all features
+  cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e
+  cargo test --workspace --doc --all-features --exclude kube-examples --exclude e2e
   cargo test -p kube-examples --examples
-  cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
-  cargo test -p kube --lib --no-default-features --features=openssl-tls,ws,oauth
-  cargo test -p kube --lib --no-default-features
 
 # Integration tests (will modify your current context's cluster)
 test-integration:
-  kubectl delete pod -lapp=kube-rs-test
-  cargo test --lib --all -- --ignored # also run tests that fail on github actions
-  cargo test -p kube --lib --features=derive,runtime -- --ignored
-  cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
+  kubectl delete pod -lapp=kube-rs-test > /dev/null
+  cargo test --lib --workspace --exclude e2e --all-features -- --ignored
+  # some examples are canonical tests
   cargo run -p kube-examples --example crd_derive
   cargo run -p kube-examples --example crd_api
 
 coverage:
   cargo tarpaulin --out=Html --output-dir=.
-  #xdg-open tarpaulin-report.html
+  {{open}} tarpaulin-report.html
 
 readme:
   rustdoc README.md --test --edition=2021

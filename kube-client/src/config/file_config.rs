@@ -25,14 +25,14 @@ pub struct Kubeconfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferences: Option<Preferences>,
     /// Referencable names to cluster configs
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub clusters: Vec<NamedCluster>,
     /// Referencable names to user configs
     #[serde(rename = "users")]
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub auth_infos: Vec<NamedAuthInfo>,
     /// Referencable names to context configs
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub contexts: Vec<NamedContext>,
     /// The name of the context that you would like to use by default
     #[serde(rename = "current-context")]
@@ -152,6 +152,15 @@ where
     }
 }
 
+fn deserialize_null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
+
 /// AuthInfo stores information to tell cluster who you are.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct AuthInfo {
@@ -261,7 +270,7 @@ pub struct ExecConfig {
     /// Specifies which environment variables the host should avoid passing to the auth plugin.
     ///
     /// This does currently not exist upstream and cannot be specified on disk.
-    /// It has been suggested in client-go via https://github.com/kubernetes/client-go/issues/1177
+    /// It has been suggested in client-go via <https://github.com/kubernetes/client-go/issues/1177>
     #[serde(skip)]
     pub drop_env: Option<Vec<String>>,
 
