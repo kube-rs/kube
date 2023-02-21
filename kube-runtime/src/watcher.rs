@@ -446,7 +446,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// ```no_run
 /// use kube::{
 ///   api::{Api, ListParams, ResourceExt}, Client,
-///   runtime::{watcher, watcher::watch_metadata, WatchStreamExt}
+///   runtime::{watcher, metadata_watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::{StreamExt, TryStreamExt};
@@ -455,7 +455,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     watch_metadata(pods, ListParams::default()).applied_objects()
+///     metadata_watcher(pods, ListParams::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
@@ -479,7 +479,8 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
 /// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
-pub fn watch_metadata<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+#[allow(clippy::module_name_repetitions)]
+pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
 ) -> impl Stream<Item = Result<Event<PartialObjectMeta>>> + Send {

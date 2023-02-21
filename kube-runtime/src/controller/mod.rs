@@ -895,7 +895,7 @@ mod tests {
     use crate::{
         applier,
         reflector::{self, ObjectRef},
-        watcher::{self, watch_metadata, watcher, Event},
+        watcher::{self, metadata_watcher, watcher, Event},
         Controller,
     };
     use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
@@ -944,7 +944,10 @@ mod tests {
     #[allow(dead_code, unused_must_use)]
     fn test_watcher_stream_type_drift() {
         assert_stream(watcher(mock_type::<Api<ConfigMap>>(), Default::default()));
-        assert_stream(watch_metadata(mock_type::<Api<ConfigMap>>(), Default::default()));
+        assert_stream(metadata_watcher(
+            mock_type::<Api<ConfigMap>>(),
+            Default::default(),
+        ));
     }
 
     #[tokio::test]

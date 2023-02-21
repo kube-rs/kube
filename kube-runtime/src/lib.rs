@@ -32,4 +32,4 @@ pub use finalizer::finalizer;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
-pub use watcher::watcher;
+pub use watcher::{metadata_watcher, watcher};
