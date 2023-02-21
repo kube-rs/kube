@@ -2,7 +2,7 @@ use futures::{StreamExt, TryStreamExt};
 use kube::{
     api::{Api, DynamicObject, GroupVersionKind, ListParams, ResourceExt},
     discovery::{self, Scope},
-    runtime::{watcher, WatchStreamExt},
+    runtime::{metadata_watcher, watcher, WatchStreamExt},
     Client,
 };
 use tracing::*;
@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Fully compatible with kube-runtime
     if should_watch_meta {
-        let mut items = watcher::watch_metadata(api, ListParams::default())
+        let mut items = metadata_watcher(api, ListParams::default())
             .applied_objects()
             .boxed();
 
