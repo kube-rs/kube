@@ -15,10 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     // If set will receive only the metadata for watched resources
-    let should_watch_meta = {
-        let v = env::var("WATCH_METADATA").unwrap_or_else(|_| "false".into());
-        v.parse::<bool>().ok().unwrap_or_else(|| false)
-    };
+    let watch_metadata = env::var("WATCH_METADATA").map(|s| s == "1").unwrap_or(false);
 
     // Take dynamic resource identifiers:
     let group = env::var("GROUP").unwrap_or_else(|_| "clux.dev".into());
@@ -34,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     let api = Api::<DynamicObject>::all_with(client, &ar);
 
     // Fully compatible with kube-runtime
-    if should_watch_meta {
+    if watch_metadata {
         let mut items = metadata_watcher(api, ListParams::default())
             .applied_objects()
             .boxed();
