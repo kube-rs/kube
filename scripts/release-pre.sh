@@ -16,7 +16,7 @@ replace-docs() {
 }
 
 sanity() {
-  CARGO_TREE_OPENAPI="$(cargo tree -i k8s-openapi | head -n 1 | choose 1)"
+  CARGO_TREE_OPENAPI="$(cargo tree -i k8s-openapi --depth=0 -e=normal | choose 1)"
   USED_K8S_OPENAPI="${CARGO_TREE_OPENAPI:1}"
   RECOMMENDED_K8S_OPENAPI="$(rg "k8s-openapi =" README.md | head -n 1)" # only check first instance
   if ! [[ $RECOMMENDED_K8S_OPENAPI =~ $USED_K8S_OPENAPI ]]; then
@@ -29,7 +29,7 @@ sanity() {
 main() {
   # We only want this to run ONCE at workspace level
   cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. # aka $WORKSPACE_ROOT
-  local -r CURRENT_VER="$(rg "kube =" README.md | head -n 1 | rg 'version = "(\S*)"' -or '$1')"
+  local -r CURRENT_VER="$(rg 'kube = \{ version = "(\S*)"' -or '$1' README.md | head -n1)"
 
   # If the main README has been bumped, assume we are done:
   if [[ "${NEW_VERSION}" = "${CURRENT_VER}" ]]; then

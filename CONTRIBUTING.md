@@ -45,9 +45,9 @@ The easiest way set up a minimal Kubernetes cluster for these is with [`k3d`](ht
 
 ### Unit Tests & Documentation Tests
 
-**Most** unit/doc tests are run from `cargo test --lib --doc --all`, but because of feature-sets, and examples, you will need a couple of extra invocations to replicate our CI.
+Unit and doc tests are run against a particular crate with `cargo test -p KUBECRATE --lib --doc`, but because of feature-sets, you will need a couple of extra flags and invocations to replicate all our CI conditions.
 
-For the complete variations, run the `just test` target in the `justfile`.
+To run **all** unit tests, call: `just test`
 
 All public interfaces must be documented, and most should have minor documentation examples to show usage.
 
@@ -57,7 +57,9 @@ Slower set of tests within the crates marked with an **`#[ignore]`** attribute.
 
 :warning: These  **WILL** try to modify resources in your current cluster :warning:
 
-Most integration tests are run with `cargo test --all --lib -- --ignored`, but because of feature-sets, you will need a few invocations of these to replicate our CI. See `just test-integration`
+Integration tests are run against a crate with `cargo test -p KUBECRATE --lib -- --ignored`, but because of feature-sets, you will need a few invocations of these to replicate our CI.
+
+To run **all** integration tests, call: `just test-integration`
 
 ### End to End Tests
 
@@ -75,7 +77,7 @@ All public interfaces should have doc tests with examples for [docs.rs](https://
 
 When adding new non-trivial pieces of logic that results in a drop in coverage you should add a test.
 
-Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube/branch/main/graph/badge.svg?token=9FCqEcyDTZ)](https://codecov.io/gh/kube-rs/kube) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](https://github.com/kube-rs/kube/blob/main/tarpaulin.toml) config, and **will run both unit and integration** tests.
+Cross-reference with the coverage build [![coverage build](https://codecov.io/gh/kube-rs/kube/branch/main/graph/badge.svg?token=9FCqEcyDTZ)](https://app.codecov.io/gh/kube-rs/kube/tree/main) and go to your branch. Coverage can also be run locally with [`cargo tarpaulin`](https://github.com/xd009642/tarpaulin) at project root. This will use our [tarpaulin.toml](https://github.com/kube-rs/kube/blob/main/tarpaulin.toml) config, and **will run both unit and integration** tests.
 
 #### What type of test
 
