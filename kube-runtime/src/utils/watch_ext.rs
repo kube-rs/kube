@@ -79,7 +79,7 @@ pub trait WatchStreamExt: Stream {
     ///     // Create a stream of descriptions of the events
     ///     let explain_stream = subscription.filter_map(|event| async move {
     ///         // We don't care about lagged events so we can throw that error away
-    ///         match event.ok()?.as_deref() {
+    ///         match event.ok()?.as_ref() {
     ///             Ok(watcher::Event::Applied(event)) => {
     ///                 Some(format!("An object was added or modified: {event:?}"))
     ///             }
