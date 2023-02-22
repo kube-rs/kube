@@ -3,11 +3,14 @@
 mod backoff_reset_timer;
 mod event_flatten;
 mod stream_backoff;
+#[cfg(feature = "unstable-runtime-subscribe")] pub mod stream_subscribe;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use event_flatten::EventFlatten;
 pub use stream_backoff::StreamBackoff;
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub use stream_subscribe::StreamSubscribe;
 pub use watch_ext::WatchStreamExt;
 
 use futures::{
