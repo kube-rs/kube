@@ -1,13 +1,14 @@
-use futures::{StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use kube::{
     api::{Api, DynamicObject, GroupVersionKind, ListParams, ResourceExt},
-    discovery::{self, Scope},
+    discovery::{self, ApiCapabilities, Scope},
     runtime::{metadata_watcher, watcher, WatchStreamExt},
     Client,
 };
+use serde::de::DeserializeOwned;
 use tracing::*;
 
-use std::env;
+use std::{env, fmt::Debug};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -30,29 +31,29 @@ async fn main() -> anyhow::Result<()> {
     // Use the full resource info to create an Api with the ApiResource as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &ar);
 
-    // Fully compatible with kube-runtime
+    // Start a metadata or a full resource watch
     if watch_metadata {
-        let mut items = metadata_watcher(api, ListParams::default())
-            .applied_objects()
-            .boxed();
-
-        while let Some(p) = items.try_next().await? {
-            if caps.scope == Scope::Cluster {
-                info!("saw {}", p.name_any());
-            } else {
-                info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
-            }
-        }
+        handle_events(metadata_watcher(api, ListParams::default()), caps).await?
     } else {
-        let mut items = watcher(api, ListParams::default()).applied_objects().boxed();
-        while let Some(p) = items.try_next().await? {
-            if caps.scope == Scope::Cluster {
-                info!("saw {}", p.name_any());
-            } else {
-                info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
-            }
+        handle_events(watcher(api, ListParams::default()), caps).await?
+    }
+
+    Ok(())
+}
+
+async fn handle_events<K: kube::Resource + Clone + Debug + Send + DeserializeOwned + 'static>(
+    stream: impl Stream<Item = watcher::Result<watcher::Event<K>>> + Send + 'static,
+    api_caps: ApiCapabilities,
+) -> anyhow::Result<()> {
+    // Fully compatible with kube-runtime
+    let mut items = stream.applied_objects().boxed();
+    while let Some(p) = items.try_next().await? {
+        if api_caps.scope == Scope::Cluster {
+            info!("saw {}", p.name_any());
+        } else {
+            info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
         }
-    };
+    }
 
     Ok(())
 }
