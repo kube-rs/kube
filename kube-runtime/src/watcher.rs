@@ -3,11 +3,13 @@
 //! See [`watcher`] for the primary entry point.
 
 use crate::utils::ResetTimerBackoff;
+use async_trait::async_trait;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, WatchEvent},
+    core::{metadata::PartialObjectMeta, ObjectList},
     error::ErrorResponse,
     Api, Error as ClientErr,
 };
@@ -114,7 +116,7 @@ impl<K> Event<K> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 /// The internal finite state machine driving the [`watcher`]
-enum State<K: Resource + Clone> {
+enum State<K> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
     Empty,
     /// The initial LIST was successful, so we should move on to starting the actual watch.
@@ -132,15 +134,85 @@ enum State<K: Resource + Clone> {
     },
 }
 
+/// Used to control whether the watcher receives the full object, or only the
+/// metadata
+#[async_trait]
+trait ApiMode {
+    type Value: Clone;
+
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>>;
+    async fn watch(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>>;
+}
+
+/// A wrapper around the `Api` of a `Resource` type that when used by the
+/// watcher will return the entire (full) object
+struct FullObject<'a, K> {
+    api: &'a Api<K>,
+}
+
+#[async_trait]
+impl<K> ApiMode for FullObject<'_, K>
+where
+    K: Clone + Debug + DeserializeOwned + Send + 'static,
+{
+    type Value = K;
+
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
+        self.api.list(lp).await
+    }
+
+    async fn watch(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
+        self.api.watch(lp, version).await.map(StreamExt::boxed)
+    }
+}
+
+/// A wrapper around the `Api` of a `Resource` type that when used by the
+/// watcher will return only the metadata associated with an object
+struct MetaOnly<'a, K> {
+    api: &'a Api<K>,
+}
+
+#[async_trait]
+impl<K> ApiMode for MetaOnly<'_, K>
+where
+    K: Clone + Debug + DeserializeOwned + Send + 'static,
+{
+    type Value = PartialObjectMeta;
+
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
+        self.api.list_metadata(lp).await
+    }
+
+    async fn watch(
+        &self,
+        lp: &ListParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
+        self.api.watch_metadata(lp, version).await.map(StreamExt::boxed)
+    }
+}
+
 /// Progresses the watcher a single step, returning (event, state)
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
-async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    api: &Api<K>,
+async fn step_trampolined<A>(
+    api: &A,
     list_params: &ListParams,
-    state: State<K>,
-) -> (Option<Result<Event<K>>>, State<K>) {
+    state: State<A::Value>,
+) -> (Option<Result<Event<A::Value>>>, State<A::Value>)
+where
+    A: ApiMode,
+    A::Value: Resource + 'static,
+{
     match state {
         State::Empty => match api.list(list_params).await {
             Ok(list) => {
@@ -164,7 +236,7 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
         State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
             Ok(stream) => (None, State::Watching {
                 resource_version,
-                stream: stream.boxed(),
+                stream,
             }),
             Err(err) => {
                 if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
@@ -234,11 +306,15 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
 }
 
 /// Trampoline helper for `step_trampolined`
-async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    api: &Api<K>,
+async fn step<A>(
+    api: &A,
     list_params: &ListParams,
-    mut state: State<K>,
-) -> (Result<Event<K>>, State<K>) {
+    mut state: State<A::Value>,
+) -> (Result<Event<A::Value>>, State<A::Value>)
+where
+    A: ApiMode,
+    A::Value: Resource + 'static,
+{
     loop {
         match step_trampolined(api, list_params, state).await {
             (Some(result), new_state) => return (result, new_state),
@@ -303,7 +379,71 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     futures::stream::unfold(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {
-            let (event, state) = step(&api, &list_params, state).await;
+            let (event, state) = step(&FullObject { api: &api }, &list_params, state).await;
+            Some((event, (api, list_params, state)))
+        },
+    )
+}
+
+/// Watches a Kubernetes Resource for changes continuously and receives only the
+/// metadata
+///
+/// Compared to [`Api::watch`], this automatically tries to recover the stream upon errors.
+///
+/// Errors from the underlying watch are propagated, after which the stream will go into recovery mode on the next poll.
+/// You can apply your own backoff by not polling the stream for a duration after errors.
+/// Keep in mind that some [`TryStream`](futures::TryStream) combinators (such as
+/// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
+/// will terminate eagerly as soon as they receive an [`Err`].
+///
+/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
+/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+///
+/// ```no_run
+/// use kube::{
+///   api::{Api, ListParams, ResourceExt}, Client,
+///   runtime::{watcher, metadata_watcher, WatchStreamExt}
+/// };
+/// use k8s_openapi::api::core::v1::Pod;
+/// use futures::{StreamExt, TryStreamExt};
+/// #[tokio::main]
+/// async fn main() -> Result<(), watcher::Error> {
+///     let client = Client::try_default().await.unwrap();
+///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+///     metadata_watcher(pods, ListParams::default()).applied_objects()
+///         .try_for_each(|p| async move {
+///          println!("Applied: {}", p.name_any());
+///             Ok(())
+///         })
+///         .await?;
+///    Ok(())
+/// }
+/// ```
+/// [`WatchStreamExt`]: super::WatchStreamExt
+/// [`reflector`]: super::reflector::reflector
+/// [`Api::watch`]: kube_client::Api::watch
+///
+/// # Recovery
+///
+/// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
+/// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
+/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+///
+/// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
+/// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
+/// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
+/// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
+/// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
+#[allow(clippy::module_name_repetitions)]
+pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+    api: Api<K>,
+    list_params: ListParams,
+) -> impl Stream<Item = Result<Event<PartialObjectMeta>>> + Send {
+    futures::stream::unfold(
+        (api, list_params, State::Empty),
+        |(api, list_params, state)| async {
+            let (event, state) = step(&MetaOnly { api: &api }, &list_params, state).await;
             Some((event, (api, list_params, state)))
         },
     )
