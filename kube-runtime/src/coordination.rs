@@ -96,6 +96,8 @@ pub enum Error {
     TimeoutError,
     #[error("client error from api call: {0}")]
     ClientError(kube_client::error::Error),
+    #[error("error from the leader elector task: {0}")]
+    TaskError(String),
 }
 
 /// Coordination result type.
@@ -122,7 +124,7 @@ pub struct ConfigBuilder {
     ///
     /// Typically this value corresponds to the name of the group of controllers of which this
     /// leader elector is a part. **Note well** that this value should be the same across the
-    /// entire management group and is distrinct from the `identity` parameter.
+    /// entire management group and should be distinct from the `identity` parameter.
     pub manager: String,
     /// The duration that non-leader candidates will wait to force acquire leadership.
     /// This is measured against time of last observed ack.
@@ -132,7 +134,7 @@ pub struct ConfigBuilder {
     /// shutdown and a new set of clients are started with different names against
     /// the same leader record, they must wait the full `lease_duration` before
     /// attempting to acquire the lease. Thus `lease_duration` should be as short as
-    /// possible (within your tolerance for clock skew rate) to avoid a possible
+    /// possible (within your tolerance for clock skew rate) to avoid possible
     /// long waits in such a scenario.
     ///
     /// Core clients default this value to 15 seconds.
@@ -145,6 +147,8 @@ pub struct ConfigBuilder {
     ///
     /// Core clients default this value to 2 seconds.
     pub retry_period: Duration,
+    /// API timeout to use for interacting with the K8s API.
+    pub api_timeout: Duration,
 }
 
 impl ConfigBuilder {
@@ -160,6 +164,7 @@ impl ConfigBuilder {
     /// - `lease_duration` must be >= 1 second;
     /// - `renew_deadline` must be >= 1 second;
     /// - `retry_period` must be >= 1 second;
+    /// - `apu_timeout` must be >= 1 second;
     pub fn finish(self) -> Result<Config> {
         if self.identity.is_empty() {
             return Err(Error::ConfigError("identity may not be empty".into()));
@@ -172,11 +177,9 @@ impl ConfigBuilder {
                 "lease_duration must be greater than renew_deadline".into(),
             ));
         }
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         if self.renew_deadline <= Duration::from_secs_f64(JITTER_FACTOR * self.retry_period.as_secs_f64()) {
             return Err(Error::ConfigError(format!(
-                "renew_deadline must be greater than retry_period*{}",
-                JITTER_FACTOR
+                "renew_deadline must be greater than retry_period*{JITTER_FACTOR}"
             )));
         }
         if self.lease_duration.as_secs() < 1 {
@@ -194,6 +197,9 @@ impl ConfigBuilder {
                 "retry_period must be at least 1 second".into(),
             ));
         }
+        if self.api_timeout.as_secs() < 1 {
+            return Err(Error::ConfigError("api_timeout must be at least 1 second".into()));
+        }
         Ok(Config(self))
     }
 }
@@ -201,7 +207,7 @@ impl ConfigBuilder {
 /// A task which is responsible for acquiring and maintaining a `coordination.k8s.io/v1` `Lease`
 /// to establish leadership.
 pub struct LeaderElector {
-    /// An K8s API wrapper around the client.
+    /// A K8s API wrapper around the client.
     api: Api<Lease>,
     /// Leader election config.
     config: ConfigBuilder,
@@ -310,7 +316,7 @@ impl LeaderElector {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn k8s_fetch_lease_and_update(&mut self) -> Result<()> {
         // Attempt to fetch the target lease, updating our last observed info on the lease.
-        let lease_opt = timeout(Self::timeout(), self.api.get_opt(&self.config.name))
+        let lease_opt = timeout(self.config.api_timeout, self.api.get_opt(&self.config.name))
             .await
             .map_err(|_err| Error::TimeoutError)?
             .map_err(Error::ClientError)?;
@@ -361,12 +367,16 @@ impl LeaderElector {
 
         // 3. Now we need to create or patch the lease in K8s with the updated lease value here.
         let lease_res = if let State::Standby = &self.state {
-            timeout(Self::timeout(), self.api.create(&Default::default(), &lease)).await
+            timeout(
+                self.config.api_timeout,
+                self.api.create(&Default::default(), &lease),
+            )
+            .await
         } else {
             let mut params = PatchParams::apply(&self.config.manager);
             params.force = true; // This will still be blocked by the server if we do not have the most up-to-date lease info.
             timeout(
-                Self::timeout(),
+                self.config.api_timeout,
                 self.api.patch(&self.config.name, &params, &Patch::Apply(lease)),
             )
             .await
@@ -460,7 +470,7 @@ impl LeaderElector {
             // If we are a follower, then we just wait to check based on configuration lease duration
             // and the last observed change. We also jitter to mitigate contention.
             State::Following { last_updated, .. } => {
-                let rand_val: f64 = rand::thread_rng().gen_range(0.0..1.0);
+                let rand_val: f64 = rand::thread_rng().gen_range(0.01..1.0);
                 let jitter = rand_val * JITTER_FACTOR * self.config.lease_duration.as_secs_f64();
                 let delay = self.config.lease_duration + Duration::from_secs_f64(jitter);
                 (last_updated, delay)
@@ -468,7 +478,7 @@ impl LeaderElector {
             // If an error recently took place, then we use the configured retry period plus a bit of jitter.
             State::Standby if self.had_error_on_last_try => {
                 self.had_error_on_last_try = false;
-                let rand_val: f64 = rand::thread_rng().gen_range(0.0..1.0);
+                let rand_val: f64 = rand::thread_rng().gen_range(0.5..1.5);
                 let jitter = rand_val * JITTER_FACTOR * self.config.retry_period.as_secs_f64();
                 return Duration::from_secs_f64(jitter);
             }
@@ -499,11 +509,6 @@ impl LeaderElector {
             }
             State::Standby => true,
         }
-    }
-
-    /// The default timeout to use for interacting with the K8s API.
-    fn timeout() -> Duration {
-        Duration::from_secs(4) // TODO: probably make this configurable.
     }
 }
 
@@ -591,8 +596,8 @@ impl LeaderElectorHandle {
 
     /// Shutdown this leader elector task and return its underlying join handle.
     #[allow(clippy::must_use_candidate)]
-    pub fn shutdown(self) -> JoinHandle<()> {
+    pub fn shutdown(self) -> impl Future<Output = Result<()>> {
         let _res = self.shutdown.send(());
-        self.handle
+        self.handle.map_err(|res| Error::TaskError(res.to_string()))
     }
 }
