@@ -72,17 +72,20 @@
 use std::time::{Duration, Instant};
 
 use futures::prelude::*;
-use k8s_openapi::api::coordination::v1::Lease;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::MicroTime;
+use k8s_openapi::{api::coordination::v1::Lease, apimachinery::pkg::apis::meta::v1::MicroTime};
 use rand::Rng;
 use thiserror::Error;
-use tokio::sync::{oneshot, watch};
-use tokio::task::JoinHandle;
-use tokio::time::timeout;
+use tokio::{
+    sync::{oneshot, watch},
+    task::JoinHandle,
+    time::timeout,
+};
 
 use crate::watcher::{watcher, Event, Result as WatcherResult};
-use kube_client::api::{Api, ListParams, Patch, PatchParams};
-use kube_client::{Client, Resource};
+use kube_client::{
+    api::{Api, ListParams, Patch, PatchParams},
+    Client, Resource,
+};
 
 /// The jitter factor to use while attempting to acquire the lease.
 const JITTER_FACTOR: f64 = 1.2;
@@ -254,13 +257,10 @@ impl LeaderElector {
         }
         tracing::info!("finished initial call to try_acquire_or_renew");
 
-        let lease_watcher = watcher(
-            self.api.clone(),
-            ListParams {
-                field_selector: Some(format!("metadata.name={}", self.config.name)),
-                ..Default::default()
-            },
-        );
+        let lease_watcher = watcher(self.api.clone(), ListParams {
+            field_selector: Some(format!("metadata.name={}", self.config.name)),
+            ..Default::default()
+        });
         tokio::pin!(lease_watcher);
 
         loop {
