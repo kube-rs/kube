@@ -61,7 +61,7 @@ where
     /// Consider using [`Api::get_metadata_opt`] if you need to handle missing objects.
     pub async fn get_metadata(&self, name: &str) -> Result<PartialObjectMeta<K>> {
         let mut req = self.request.get_metadata(name).map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("get");
+        req.extensions_mut().insert("get_metadata");
         self.client.request::<PartialObjectMeta<K>>(req).await
     }
 
@@ -156,7 +156,7 @@ where
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
-    ///     let list: ObjectList<PartialObjectMeta<K>> = pods.list_metadata(&lp).await?;
+    ///     let list: ObjectList<PartialObjectMeta<Pod>> = pods.list_metadata(&lp).await?;
     ///     for p in list {
     ///         let metadata = ObjectMeta::from(p);
     ///         println!("Found Pod: {}", metadata.name.unwrap());
@@ -166,7 +166,7 @@ where
     /// ```
     pub async fn list_metadata(&self, lp: &ListParams) -> Result<ObjectList<PartialObjectMeta<K>>> {
         let mut req = self.request.list_metadata(lp).map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("list");
+        req.extensions_mut().insert("list_metadata");
         self.client.request::<ObjectList<PartialObjectMeta<K>>>(req).await
     }
 
@@ -357,7 +357,7 @@ where
             .request
             .patch_metadata(name, pp, patch)
             .map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("patch");
+        req.extensions_mut().insert("patch_metadata");
         self.client.request::<PartialObjectMeta<K>>(req).await
     }
 
@@ -515,7 +515,7 @@ where
             .request
             .watch_metadata(lp, version)
             .map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("watch");
+        req.extensions_mut().insert("watch_metadata");
         self.client.request_events::<PartialObjectMeta<K>>(req).await
     }
 }
