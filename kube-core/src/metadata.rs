@@ -1,5 +1,5 @@
 //! Metadata structs used in traits, lists, and dynamic objects.
-use std::borrow::Cow;
+use std::{borrow::Cow, marker::PhantomData};
 
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
@@ -32,12 +32,27 @@ pub struct PartialObjectMeta<K> {
     pub metadata: ObjectMeta,
     /// Type information for static dispatch
     #[serde(skip, default)]
-    pub _phantom: std::marker::PhantomData<K>,
+    pub _phantom: PhantomData<K>,
 }
 
+// Users usually want the inner metadata on returns
 impl<K> From<PartialObjectMeta<K>> for ObjectMeta {
     fn from(obj: PartialObjectMeta<K>) -> Self {
         ObjectMeta { ..obj.metadata }
+    }
+}
+
+// Unit tests often convert the other way
+impl<K> From<ObjectMeta> for PartialObjectMeta<K> {
+    fn from(meta: ObjectMeta) -> Self {
+        PartialObjectMeta {
+            types: Some(TypeMeta {
+                api_version: "meta.k8s.io/v1".to_string(),
+                kind: "PartialObjectMetadata".to_string(),
+            }),
+            metadata: meta,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -67,5 +82,27 @@ impl<K: Resource> Resource for PartialObjectMeta<K> {
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{ObjectMeta, PartialObjectMeta};
+    use crate::Resource;
+    use k8s_openapi::api::core::v1::Pod;
+
+    #[test]
+    fn can_convert_and_derive_partial_metadata() {
+        let partial: PartialObjectMeta<Pod> = ObjectMeta {
+            name: Some("mypod".into()),
+            ..Default::default()
+        }
+        .into();
+        // created type uses verbatim serialization
+        assert_eq!(partial.types.as_ref().unwrap().kind, "PartialObjectMetadata");
+        assert_eq!(partial.types.as_ref().unwrap().api_version, "meta.k8s.io/v1");
+        // resource impl follows the underlying type
+        assert_eq!(PartialObjectMeta::<Pod>::kind(&()), "Pod");
+        assert_eq!(PartialObjectMeta::<Pod>::api_version(&()), "v1");
     }
 }
