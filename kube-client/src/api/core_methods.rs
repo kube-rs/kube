@@ -48,7 +48,7 @@ where
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let p: PartialObjectMeta = pods.get_metadata("blog").await?;
+    ///     let p: PartialObjectMeta<Pod> = pods.get_metadata("blog").await?;
     ///     Ok(())
     /// }
     /// ```
@@ -59,10 +59,10 @@ where
     ///
     /// This function assumes that the object is expected to always exist, and returns [`Error`] if it does not.
     /// Consider using [`Api::get_metadata_opt`] if you need to handle missing objects.
-    pub async fn get_metadata(&self, name: &str) -> Result<PartialObjectMeta> {
+    pub async fn get_metadata(&self, name: &str) -> Result<PartialObjectMeta<K>> {
         let mut req = self.request.get_metadata(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get");
-        self.client.request::<PartialObjectMeta>(req).await
+        self.client.request::<PartialObjectMeta<K>>(req).await
     }
 
     /// [Get](`Api::get`) a named resource if it exists, returns [`None`] if it doesn't exist
@@ -111,7 +111,7 @@ where
     ///
     /// Note that [kube_core::metadata::PartialObjectMeta] may be converted to `ObjectMeta`
     /// through the usual conversion traits.
-    pub async fn get_metadata_opt(&self, name: &str) -> Result<Option<PartialObjectMeta>> {
+    pub async fn get_metadata_opt(&self, name: &str) -> Result<Option<PartialObjectMeta<K>>> {
         match self.get_metadata(name).await {
             Ok(meta) => Ok(Some(meta)),
             Err(Error::Api(ErrorResponse { reason, .. })) if &reason == "NotFound" => Ok(None),
@@ -156,7 +156,7 @@ where
     ///     let client = Client::try_default().await?;
     ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
-    ///     let list: ObjectList<PartialObjectMeta> = pods.list_metadata(&lp).await?;
+    ///     let list: ObjectList<PartialObjectMeta<K>> = pods.list_metadata(&lp).await?;
     ///     for p in list {
     ///         let metadata = ObjectMeta::from(p);
     ///         println!("Found Pod: {}", metadata.name.unwrap());
@@ -164,10 +164,10 @@ where
     ///     Ok(())
     /// }
     /// ```
-    pub async fn list_metadata(&self, lp: &ListParams) -> Result<ObjectList<PartialObjectMeta>> {
+    pub async fn list_metadata(&self, lp: &ListParams) -> Result<ObjectList<PartialObjectMeta<K>>> {
         let mut req = self.request.list_metadata(lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("list");
-        self.client.request::<ObjectList<PartialObjectMeta>>(req).await
+        self.client.request::<ObjectList<PartialObjectMeta<K>>>(req).await
     }
 
     /// Create a resource
@@ -352,13 +352,13 @@ where
         name: &str,
         pp: &PatchParams,
         patch: &Patch<P>,
-    ) -> Result<PartialObjectMeta> {
+    ) -> Result<PartialObjectMeta<K>> {
         let mut req = self
             .request
             .patch_metadata(name, pp, patch)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch");
-        self.client.request::<PartialObjectMeta>(req).await
+        self.client.request::<PartialObjectMeta<K>>(req).await
     }
 
     /// Replace a resource entirely with a new one
@@ -510,12 +510,12 @@ where
         &self,
         lp: &ListParams,
         version: &str,
-    ) -> Result<impl Stream<Item = Result<WatchEvent<PartialObjectMeta>>>> {
+    ) -> Result<impl Stream<Item = Result<WatchEvent<PartialObjectMeta<K>>>>> {
         let mut req = self
             .request
             .watch_metadata(lp, version)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch");
-        self.client.request_events::<PartialObjectMeta>(req).await
+        self.client.request_events::<PartialObjectMeta<K>>(req).await
     }
 }

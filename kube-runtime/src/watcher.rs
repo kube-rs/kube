@@ -185,7 +185,7 @@ impl<K> ApiMode for MetaOnly<'_, K>
 where
     K: Clone + Debug + DeserializeOwned + Send + 'static,
 {
-    type Value = PartialObjectMeta;
+    type Value = PartialObjectMeta<K>;
 
     async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
         self.api.list_metadata(lp).await
@@ -439,7 +439,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     list_params: ListParams,
-) -> impl Stream<Item = Result<Event<PartialObjectMeta>>> + Send {
+) -> impl Stream<Item = Result<Event<PartialObjectMeta<K>>>> + Send {
     futures::stream::unfold(
         (api, list_params, State::Empty),
         |(api, list_params, state)| async {

@@ -4,7 +4,7 @@ use std::borrow::Cow;
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
 
-use crate::{ApiResource, DynamicResourceScope, Resource};
+use crate::Resource;
 
 /// Type information that is flattened into every kubernetes object
 #[derive(Deserialize, Serialize, Clone, Default, Debug, Eq, PartialEq, Hash)]
@@ -23,39 +23,42 @@ pub struct TypeMeta {
 /// schema without knowing the details of the version.
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct PartialObjectMeta {
+pub struct PartialObjectMeta<K> {
     /// The type fields, not always present
     #[serde(flatten, default)]
     pub types: Option<TypeMeta>,
     /// Standard object's metadata
     #[serde(default)]
     pub metadata: ObjectMeta,
+    /// Type information for static dispatch
+    #[serde(skip, default)]
+    pub _phantom: std::marker::PhantomData<K>
 }
 
-impl From<PartialObjectMeta> for ObjectMeta {
-    fn from(obj: PartialObjectMeta) -> Self {
+impl<K> From<PartialObjectMeta<K>> for ObjectMeta {
+    fn from(obj: PartialObjectMeta<K>) -> Self {
         ObjectMeta { ..obj.metadata }
     }
 }
 
-impl Resource for PartialObjectMeta {
-    type DynamicType = ApiResource;
-    type Scope = DynamicResourceScope;
+impl<K: Resource> Resource for PartialObjectMeta<K> {
+    type DynamicType = K::DynamicType;
+    type Scope = K::Scope;
 
-    fn kind(dt: &ApiResource) -> Cow<'_, str> {
-        dt.kind.as_str().into()
+    fn kind(dt: &Self::DynamicType) -> Cow<'_, str> {
+        K::kind(dt)
     }
 
-    fn group(dt: &ApiResource) -> Cow<'_, str> {
-        dt.group.as_str().into()
+    fn group(dt: &Self::DynamicType) -> Cow<'_, str> {
+        K::group(dt)
     }
 
-    fn version(dt: &ApiResource) -> Cow<'_, str> {
-        dt.version.as_str().into()
+    fn version(dt: &Self::DynamicType) -> Cow<'_, str> {
+        K::version(dt)
     }
 
-    fn plural(dt: &ApiResource) -> Cow<'_, str> {
-        dt.plural.as_str().into()
+    fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
+        K::plural(dt)
     }
 
     fn meta(&self) -> &ObjectMeta {
