@@ -98,6 +98,7 @@ mod test {
             ..Default::default()
         }
         .into();
+        assert_eq!(partial.metadata.name, Some("mypod".to_string()));
         // created type uses verbatim serialization
         assert_eq!(partial.types.as_ref().unwrap().kind, "PartialObjectMetadata");
         assert_eq!(partial.types.as_ref().unwrap().api_version, "meta.k8s.io/v1");
