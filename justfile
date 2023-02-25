@@ -8,7 +8,7 @@ default:
 clippy:
   #rustup component add clippy --toolchain nightly
   cargo +nightly clippy --workspace
-  cargo +nightly clippy --no-default-features --features=rustls-tls
+  cargo +nightly clippy --all-features
 
 fmt:
   #rustup component add rustfmt --toolchain nightly

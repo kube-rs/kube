@@ -32,7 +32,7 @@ pub struct PartialObjectMeta<K> {
     pub metadata: ObjectMeta,
     /// Type information for static dispatch
     #[serde(skip, default)]
-    pub _phantom: std::marker::PhantomData<K>
+    pub _phantom: std::marker::PhantomData<K>,
 }
 
 impl<K> From<PartialObjectMeta<K>> for ObjectMeta {
