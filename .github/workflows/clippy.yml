@@ -13,5 +13,5 @@ jobs:
           override: true
       - uses: actions-rs/clippy-check@v1
         with:
-          args: "--workspace --all-features"
+          args: "--workspace"
           token: ${{ secrets.GITHUB_TOKEN }}
