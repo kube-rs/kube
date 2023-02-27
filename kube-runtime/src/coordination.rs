@@ -106,15 +106,9 @@ pub enum Error {
 /// Coordination result type.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// Fully validated configuration for use by a `LeaderElector` instance.
-///
-/// Construct an instance via `ConfigBuilder::finish()`.
-#[derive(Clone, Debug)]
-pub struct Config(ConfigBuilder);
-
 /// Configuration for leader election.
 #[derive(Clone, Debug)]
-pub struct ConfigBuilder {
+pub struct Config {
     /// The name of the lease object.
     pub name: String,
     /// The namespace of the lease object.
@@ -154,12 +148,86 @@ pub struct ConfigBuilder {
     pub api_timeout: Duration,
 }
 
-impl ConfigBuilder {
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            namespace: String::new(),
+            identity: String::new(),
+            manager: String::new(),
+            lease_duration: Duration::from_secs(15),
+            renew_deadline: Duration::from_secs(10),
+            retry_period: Duration::from_secs(2),
+            api_timeout: Duration::from_secs(5),
+        }
+    }
+}
+
+impl Config {
+    /// Set the name of the lease object.
+    #[must_use]
+    pub fn name(mut self, val: &str) -> Self {
+        self.name = val.to_string();
+        self
+    }
+
+    /// Set the namespace of the lease object.
+    #[must_use]
+    pub fn namespace(mut self, val: &str) -> Self {
+        self.namespace = val.to_string();
+        self
+    }
+
+    /// Set the identity to use when the lease is acquired.
+    #[must_use]
+    pub fn identity(mut self, val: &str) -> Self {
+        self.identity = val.to_string();
+        self
+    }
+
+    /// Set the name to use for Server-Side Apply management group.
+    #[must_use]
+    pub fn manager(mut self, val: &str) -> Self {
+        self.manager = val.to_string();
+        self
+    }
+
+    /// Set the duration that non-leader candidates will wait to force acquire leadership.
+    /// This is measured against time of last observed ack.
+    #[must_use]
+    pub fn lease_duration(mut self, val: Duration) -> Self {
+        self.lease_duration = val;
+        self
+    }
+
+    /// Set the duration that the current lease holder will retry refreshing the lease.
+    #[must_use]
+    pub fn renew_deadline(mut self, val: Duration) -> Self {
+        self.renew_deadline = val;
+        self
+    }
+
+    /// Set the duration which leader elector clients should wait between tries of actions.
+    #[must_use]
+    pub fn retry_period(mut self, val: Duration) -> Self {
+        self.retry_period = val;
+        self
+    }
+
+    /// Set the API timeout to use for interacting with the K8s API.
+    #[must_use]
+    pub fn api_timeout(mut self, val: Duration) -> Self {
+        self.api_timeout = val;
+        self
+    }
+
     /// Finish building leader elector config by validating this config builder.
     ///
     /// # Errors
     /// Will return `Error::ConfigError` if this member's fields are invalid according to the
     /// following constraints:
+    /// - `name` must not be an empty string;
+    /// - `namespace` must not be an empty string;
     /// - `identity` must not be an empty string;
     /// - `manager` must not be an empty string;
     /// - `lease_duration` must be greater than `renew_deadline`;
@@ -168,7 +236,13 @@ impl ConfigBuilder {
     /// - `renew_deadline` must be >= 1 second;
     /// - `retry_period` must be >= 1 second;
     /// - `apu_timeout` must be >= 1 second;
-    pub fn finish(self) -> Result<Config> {
+    pub fn validate(&self) -> Result<()> {
+        if self.name.is_empty() {
+            return Err(Error::ConfigError("name may not be empty".into()));
+        }
+        if self.namespace.is_empty() {
+            return Err(Error::ConfigError("namespace may not be empty".into()));
+        }
         if self.identity.is_empty() {
             return Err(Error::ConfigError("identity may not be empty".into()));
         }
@@ -203,7 +277,7 @@ impl ConfigBuilder {
         if self.api_timeout.as_secs() < 1 {
             return Err(Error::ConfigError("api_timeout must be at least 1 second".into()));
         }
-        Ok(Config(self))
+        Ok(())
     }
 }
 
@@ -213,7 +287,7 @@ pub struct LeaderElector {
     /// A K8s API wrapper around the client.
     api: Api<Lease>,
     /// Leader election config.
-    config: ConfigBuilder,
+    config: Config,
     /// The internal state of this task.
     state: State,
     /// The state signal, which always reflects the current internal state of this task.
@@ -228,24 +302,28 @@ pub struct LeaderElector {
 
 impl LeaderElector {
     /// Create a new `LeaderElector` instance & spawn it onto the runtime for execution.
+    ///
+    /// ## Errors
+    /// This function will return an error if the given config is invalid.
     #[must_use = "handle must be used for observing state changes and graceful shutdown"]
-    pub fn spawn(config: Config, client: Client) -> LeaderElectorHandle {
+    pub fn spawn(config: Config, client: Client) -> Result<LeaderElectorHandle> {
+        config.validate()?;
         let (state_tx, state_rx) = watch::channel(LeaderState::Standby);
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let this = LeaderElector {
-            api: Api::namespaced(client, &config.0.namespace),
-            config: config.0,
+            api: Api::namespaced(client, &config.namespace),
+            config,
             state_tx,
             state: State::Standby,
             shutdown: shutdown_rx,
             had_error_on_last_try: false,
         };
         let handle = tokio::spawn(this.run());
-        LeaderElectorHandle {
+        Ok(LeaderElectorHandle {
             shutdown: shutdown_tx,
             state: state_rx,
             handle,
-        }
+        })
     }
 
     async fn run(mut self) {
@@ -257,10 +335,13 @@ impl LeaderElector {
         }
         tracing::info!("finished initial call to try_acquire_or_renew");
 
-        let lease_watcher = watcher(self.api.clone(), ListParams {
-            field_selector: Some(format!("metadata.name={}", self.config.name)),
-            ..Default::default()
-        });
+        let lease_watcher = watcher(
+            self.api.clone(),
+            ListParams {
+                field_selector: Some(format!("metadata.name={}", self.config.name)),
+                ..Default::default()
+            },
+        );
         tokio::pin!(lease_watcher);
 
         loop {
