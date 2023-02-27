@@ -282,6 +282,25 @@ impl Config {
         }
         Ok(())
     }
+
+    /// Create a lease object from this config.
+    #[allow(clippy::cast_possible_truncation)]
+    fn lease(&self) -> Lease {
+        let mut lease = Lease::default();
+        let meta = lease.meta_mut();
+        meta.name = Some(self.name.clone());
+        meta.namespace = Some(self.namespace.clone());
+
+        let now = chrono::Utc::now();
+        let spec = lease.spec.get_or_insert_with(Default::default);
+        spec.lease_duration_seconds = Some(self.lease_duration.as_secs() as i32);
+        spec.renew_time = Some(MicroTime(now));
+        spec.holder_identity = Some(self.identity.clone());
+        spec.acquire_time = Some(MicroTime(now));
+        spec.lease_transitions = Some(0);
+
+        lease
+    }
 }
 
 /// A task which is responsible for acquiring and maintaining a `coordination.k8s.io/v1` `Lease`
@@ -409,18 +428,15 @@ impl LeaderElector {
         }
         // Else, we need to patch the lease. Build up changeset.
         let now = chrono::Utc::now();
-        let mut lease = self.state.get_lease().cloned().unwrap_or_default();
-        lease
-            .meta_mut()
-            .name
-            .get_or_insert_with(|| self.config.name.clone());
-        lease
-            .meta_mut()
-            .namespace
-            .get_or_insert_with(|| self.config.namespace.clone());
+        let mut lease = self
+            .state
+            .get_lease()
+            .cloned()
+            .unwrap_or_else(|| self.config.lease());
         let spec = lease.spec.get_or_insert_with(Default::default);
-        spec.lease_duration_seconds = Some(self.config.lease_duration.as_secs_f32() as i32);
-        spec.renew_time = Some(MicroTime(chrono::Utc::now()));
+        spec.lease_duration_seconds = Some(self.config.lease_duration.as_secs() as i32);
+        spec.renew_time = Some(MicroTime(now));
+        // Only update the following if we are NOT currently the leader.
         if matches!(&self.state, State::Following { .. } | State::Standby) {
             spec.holder_identity = Some(self.config.identity.clone());
             spec.acquire_time = Some(MicroTime(now));
