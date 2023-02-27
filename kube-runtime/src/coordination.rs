@@ -81,9 +81,12 @@ use tokio::{
     time::timeout,
 };
 
-use crate::watcher::{watcher, Event, Result as WatcherResult};
+use crate::{
+    watcher::{default_backoff, watch_object, Result as WatcherResult},
+    WatchStreamExt,
+};
 use kube_client::{
-    api::{Api, ListParams, Patch, PatchParams},
+    api::{Api, Patch, PatchParams},
     Client, Resource,
 };
 
@@ -335,13 +338,7 @@ impl LeaderElector {
         }
         tracing::info!("finished initial call to try_acquire_or_renew");
 
-        let lease_watcher = watcher(
-            self.api.clone(),
-            ListParams {
-                field_selector: Some(format!("metadata.name={}", self.config.name)),
-                ..Default::default()
-            },
-        );
+        let lease_watcher = watch_object(self.api.clone(), &self.config.name).backoff(default_backoff());
         tokio::pin!(lease_watcher);
 
         loop {
@@ -367,7 +364,7 @@ impl LeaderElector {
 
     /// Handle a change event from the lease watcher.
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn k8s_handle_lease_event(&mut self, res: WatcherResult<Event<Lease>>) {
+    async fn k8s_handle_lease_event(&mut self, res: WatcherResult<Option<Lease>>) {
         let event = match res {
             Ok(event) => event,
             Err(err) => {
@@ -375,22 +372,7 @@ impl LeaderElector {
                 return;
             }
         };
-        match event {
-            Event::Applied(lease) => self.update_state(Some(lease)),
-            Event::Restarted(leases) => {
-                for lease in leases {
-                    self.update_state(Some(lease));
-                }
-            }
-            Event::Deleted(_) => {
-                tracing::warn!(
-                    "lease {}/{} unexpectedly deleted, will re-create",
-                    self.config.namespace,
-                    self.config.name
-                );
-                self.update_state(None);
-            }
-        };
+        self.update_state(event);
     }
 
     /// Fetch the target lease from the API, and update observation info as needed.
