@@ -445,21 +445,15 @@ impl LeaderElector {
         lease.metadata.managed_fields = None; // Can not pass this along for update.
 
         // 3. Now we need to create or patch the lease in K8s with the updated lease value here.
-        let lease_res = if let State::Standby = &self.state {
-            timeout(
-                self.config.api_timeout,
-                self.api.create(&Default::default(), &lease),
-            )
-            .await
-        } else {
-            let mut params = PatchParams::apply(&self.config.manager);
-            params.force = true; // This will still be blocked by the server if we do not have the most up-to-date lease info.
-            timeout(
-                self.config.api_timeout,
-                self.api.patch(&self.config.name, &params, &Patch::Apply(lease)),
-            )
-            .await
-        };
+        // `force = true` is the recommended pattern for controllers: https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts
+        // This will still be blocked by the server if we do not have the most up-to-date lease info via `resourceVersion`.
+        let mut params = PatchParams::apply(&self.config.manager);
+        params.force = true;
+        let lease_res = timeout(
+            self.config.api_timeout,
+            self.api.patch(&self.config.name, &params, &Patch::Apply(lease)),
+        )
+        .await;
         let lease = lease_res
             .map_err(|_err| Error::TimeoutError)?
             .map_err(Error::ClientError)?;
