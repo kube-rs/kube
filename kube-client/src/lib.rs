@@ -476,7 +476,7 @@ mod test {
             api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
             core::subresource::LogParams,
         };
-        use kube_core::{ObjectList, ObjectMeta};
+        use kube_core::{ObjectList, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt};
 
         let client = Client::try_default().await?;
         let pods: Api<Pod> = Api::default_namespaced(client);
@@ -530,22 +530,20 @@ mod test {
             Some(&"kube-rs-test".to_string())
         );
 
-        // Attempt to patch pod
-        let patch = json!({
-            "metadata": {
-                "annotations": {
-                    "test": "123"
-                },
-            },
-            "spec": {
-                "activeDeadlineSeconds": 5
-            }
-        });
+        // Attempt to patch pod metadata
+        let patch = ObjectMeta {
+            annotations: Some([("test".to_string(), "123".to_string())].into()),
+            ..Default::default()
+        }
+        .into_request_partial::<Pod>();
+
         let patchparams = PatchParams::default();
         let p_patched = pods
             .patch_metadata("busybox-kube-meta", &patchparams, &Patch::Merge(&patch))
             .await?;
         assert_eq!(p_patched.annotations().get("test"), Some(&"123".to_string()));
+        assert_eq!(p_patched.types.as_ref().unwrap().kind, "PartialObjectMetadata");
+        assert_eq!(p_patched.types.as_ref().unwrap().api_version, "meta.k8s.io/v1");
 
         // Clean-up
         let dp = DeleteParams::default();

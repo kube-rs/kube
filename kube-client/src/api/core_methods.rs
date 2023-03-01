@@ -158,8 +158,7 @@ where
     ///     let lp = ListParams::default().labels("app=blog"); // for this app only
     ///     let list: ObjectList<PartialObjectMeta<Pod>> = pods.list_metadata(&lp).await?;
     ///     for p in list {
-    ///         let metadata = ObjectMeta::from(p);
-    ///         println!("Found Pod: {}", metadata.name.unwrap());
+    ///         println!("Found Pod: {}", p.name_any());
     ///     }
     ///     Ok(())
     /// }
@@ -330,9 +329,6 @@ where
     ///             "labels": {
     ///                 "key": "value"
     ///             },
-    ///         },
-    ///         "spec": {
-    ///             "activeDeadlineSeconds": 5
     ///         }
     ///     });
     ///     let params = PatchParams::apply("myapp");
@@ -345,8 +341,13 @@ where
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
     ///
-    /// Note that this method cannot write to the status object (when it exists) of a resource.
-    /// To set status objects please see [`Api::replace_status`] or [`Api::patch_status`].
+    /// ### Warnings
+    ///
+    /// The `TypeMeta` (apiVersion + kind) of a patch request (required for apply patches)
+    /// must match the underlying type that is being patched (e.g. "v1" + "Pod").
+    /// The returned `TypeMeta` will always be {"meta.k8s.io/v1", "PartialObjectMetadata"}.
+    ///
+    /// This method can write to non-metadata fields such as spec if included in the patch.
     pub async fn patch_metadata<P: Serialize + Debug>(
         &self,
         name: &str,
