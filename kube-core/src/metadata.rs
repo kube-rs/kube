@@ -54,19 +54,15 @@ pub trait PartialObjectMetaExt: private::Sealed {
     /// because it contains erased `TypeMeta` (and the apiserver is doing the erasing).
     ///
     /// This method is useful when unit testing local behaviour.
-    fn into_response_partial<K: Resource>(self) -> PartialObjectMeta<K>;
+    fn into_response_partial<K>(self) -> PartialObjectMeta<K>;
 }
 
 impl PartialObjectMetaExt for ObjectMeta {
-    fn into_request_partial<K: Resource<DynamicType = ()>>(self) -> PartialObjectMeta<K>
-    where
-        K::DynamicType: Default,
-    {
-        let dyntype: K::DynamicType = Default::default();
+    fn into_request_partial<K: Resource<DynamicType = ()>>(self) -> PartialObjectMeta<K> {
         PartialObjectMeta {
             types: Some(TypeMeta {
-                api_version: K::api_version(&dyntype).into(),
-                kind: K::kind(&dyntype).into(),
+                api_version: K::api_version(&()).into(),
+                kind: K::kind(&()).into(),
             }),
             metadata: self,
             _phantom: PhantomData,
