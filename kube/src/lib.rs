@@ -168,14 +168,14 @@ cfg_error! {
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-/// Re-exports from [`kube-runtime`](kube_runtime)
+/// Re-exports from `kube-runtime`
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 #[doc(inline)]
 pub use kube_runtime as runtime;
 
 pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
-/// Re-exports from [`kube_core`](kube_core)
+/// Re-exports from `kube_core`
 #[doc(inline)]
 pub use kube_core as core;
 
