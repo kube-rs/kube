@@ -16,6 +16,8 @@
 #![allow(clippy::type_repetition_in_bounds)]
 // Triggered by Tokio macros
 #![allow(clippy::semicolon_if_nothing_returned)]
+// Triggered by nightly clippy on idiomatic code
+#![allow(clippy::let_underscore_untyped)]
 
 pub mod controller;
 pub mod events;
