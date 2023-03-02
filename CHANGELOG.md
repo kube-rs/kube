@@ -7,9 +7,23 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.80.0...main
 
-0.80.0 / 2023-03-02
+[0.80.0](https://github.com/kube-rs/kube/releases/tag/0.80.0) / 2023-03-02
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.80.0 -->
+## Notes
 
+The `PartialObjectMeta` struct has been changed to allow static dispatch through a new generic parameter. It comes with a new `PartialObjectMetaExt` trait to help construct it.
+
+Early release for the above change to the new metadata api, plus a trigger for our currently broken docs.rs.
+
+## What's Changed
+### Changed
+* Genericize `PartialObjectMeta` over the underlying `Resource` by @clux in https://github.com/kube-rs/kube/pull/1152
+### Fixed
+* Bypass nightly ICE in docs build by @clux in https://github.com/kube-rs/kube/pull/1155
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/0.79.0...0.80.0
 [0.79.0](https://github.com/kube-rs/kube/releases/tag/0.79.0) / 2023-02-23
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.79.0 -->
