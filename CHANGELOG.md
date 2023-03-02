@@ -5,17 +5,20 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.79.0...main
+ * see https://github.com/kube-rs/kube/compare/0.80.0...main
+
+0.80.0 / 2023-03-02
+===================
 
 [0.79.0](https://github.com/kube-rs/kube/releases/tag/0.79.0) / 2023-02-23
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.79.0 -->
 ## Watch Improvements
-A big feature this time around is the added support for the metadata api via #1137. This is a variant api that **only** returns the `ObjectMeta` and `TypeMeta` to reduce network load, and has a low-level watch analogue available at `Api::watch_metadata`. Most users will generally want an infinite watch stream rather than the low-level method, so `kube::runtime::metadata_watcher` has been added as a direct analogue of `watcher` via #1145. The [dynamic_watcher example](https://github.com/kube-rs/kube/blob/0f632eaa88b8eef2a232ca7c7dd1f841d32f6454/examples/dynamic_watcher.rs#L33-L54) shows how to switch between the two to get up and running.
+A big feature this time around is the added support for the metadata api via [#1137](https://github.com/kube-rs/kube/issues/1137). This is a variant api that **only** returns the `ObjectMeta` and `TypeMeta` to reduce network load, and has a low-level watch analogue available at `Api::watch_metadata`. Most users will generally want an infinite watch stream rather than the low-level method, so `kube::runtime::metadata_watcher` has been added as a direct analogue of `watcher` via [#1145](https://github.com/kube-rs/kube/issues/1145). The [dynamic_watcher example](https://github.com/kube-rs/kube/blob/0f632eaa88b8eef2a232ca7c7dd1f841d32f6454/examples/dynamic_watcher.rs#L33-L54) shows how to switch between the two to get up and running.
 
 The `watcher` also [emits warnings](https://github.com/kube-rs/kube/pull/1134/files#diff-5078d84d257800c4fba86a30c501afa5fd4612473832bce7a02cd95099b1b474) now when HTTP `403`s are encountered from Kubernetes, as this usually indicates a non-transient misconfiguration that must be fixed on the administrator side with RBAC.
 
-Finally, there is work in progress on shared streams via `WatchStreamExt` from #1131 under an unstable feature.
+Finally, there is work in progress on shared streams via `WatchStreamExt` from [#1131](https://github.com/kube-rs/kube/issues/1131) under an unstable feature.
 
 ## What's Changed
 ### Added
