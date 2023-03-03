@@ -46,14 +46,43 @@ pub trait PartialObjectMetaExt: private::Sealed {
     /// Convert `ObjectMeta` into a Patch-serializable `PartialObjectMeta`
     ///
     /// This object can be passed to `Patch::Apply` and used with `Api::patch_metadata`,
-    /// for an `Api<K>` using the underlying types `TypeMeta`
+    /// for an `Api<K>` using the underlying types `TypeMeta`:
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # use kube::core::{ObjectMeta, PartialObjectMetaExt, ResourceExt};
+    /// let partial = ObjectMeta {
+    ///     labels: Some([("key".to_string(), "value".to_string())].into()),
+    ///     ..Default::default()
+    /// }.into_request_partial::<Pod>();
+    ///
+    /// // request partials are generally closer to patches than fully valid resources:
+    /// assert_eq!(partial.name_any(), "");
+    ///
+    /// // typemeta is re-used from K:
+    /// assert_eq!(partial.types.unwrap().kind, "Pod");
+    /// ```
     fn into_request_partial<K: Resource<DynamicType = ()>>(self) -> PartialObjectMeta<K>;
+
     /// Convert `ObjectMeta` into a response object for a specific `Resource`
     ///
     /// This object emulates a response object and **cannot** be used in request bodies
     /// because it contains erased `TypeMeta` (and the apiserver is doing the erasing).
     ///
-    /// This method is useful when unit testing local behaviour.
+    /// This method is **mostly useful for unit testing** behaviour.
+    ///
+    /// ```
+    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # use kube::core::{ObjectMeta, PartialObjectMetaExt, ResourceExt};
+    /// let partial = ObjectMeta {
+    ///     name: Some("my-deploy".to_string()),
+    ///     namespace: Some("default".to_string()),
+    ///     ..Default::default()
+    /// }.into_response_partial::<Deployment>();
+    ///
+    /// assert_eq!(partial.name_any(), "my-deploy");
+    /// assert_eq!(partial.types.unwrap().kind, "PartialObjectMetadata"); // NB: Pod erased
+    /// ```
     fn into_response_partial<K>(self) -> PartialObjectMeta<K>;
 }
 
