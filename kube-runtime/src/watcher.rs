@@ -388,7 +388,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// Watches a Kubernetes Resource for changes continuously and receives only the
 /// metadata
 ///
-/// Compared to [`Api::watch`], this automatically tries to recover the stream upon errors.
+/// Compared to [`Api::watch_metadata`], this automatically tries to recover the stream upon errors.
 ///
 /// Errors from the underlying watch are propagated, after which the stream will go into recovery mode on the next poll.
 /// You can apply your own backoff by not polling the stream for a duration after errors.

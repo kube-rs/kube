@@ -479,7 +479,7 @@ where
     /// have to be re-issued with the last seen resource version when or if it
     /// closes.
     ///
-    /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
+    /// Consider using a managed [`metadata_watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
     /// use kube::{api::{Api, ListParams, ResourceExt, WatchEvent}, Client};
@@ -506,7 +506,7 @@ where
     /// }
     /// ```
     /// [`ListParams::timeout`]: super::ListParams::timeout
-    /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
+    /// [`metadata_watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.metadata_watcher.html
     pub async fn watch_metadata(
         &self,
         lp: &ListParams,
