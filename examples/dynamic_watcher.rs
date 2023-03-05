@@ -17,9 +17,9 @@ async fn main() -> anyhow::Result<()> {
     let watch_metadata = env::var("WATCH_METADATA").map(|s| s == "1").unwrap_or(false);
 
     // Take dynamic resource identifiers:
-    let group = env::var("GROUP").unwrap_or_else(|_| "clux.dev".into());
+    let group = env::var("GROUP").unwrap_or_else(|_| "".into());
     let version = env::var("VERSION").unwrap_or_else(|_| "v1".into());
-    let kind = env::var("KIND").unwrap_or_else(|_| "Foo".into());
+    let kind = env::var("KIND").unwrap_or_else(|_| "Pod".into());
 
     // Turn them into a GVK
     let gvk = GroupVersionKind::gvk(&group, &version, &kind);

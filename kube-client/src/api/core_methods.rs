@@ -16,15 +16,15 @@ where
     /// Get a named resource
     ///
     /// ```no_run
-    /// use kube::{Api, Client};
+    /// # use kube::Api;
     /// use k8s_openapi::api::core::v1::Pod;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let p: Pod = pods.get("blog").await?;
-    ///     Ok(())
-    /// }
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let p: Pod = pods.get("blog").await?;
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// # Errors
@@ -37,20 +37,18 @@ where
         self.client.request::<K>(req).await
     }
 
-    ///  Get only the metadata for a named resource as
-    ///  [`kube_core::metadata::PartialObjectMeta`]
-    ///
+    ///  Get only the metadata for a named resource as [`PartialObjectMeta`]
     ///
     /// ```no_run
-    /// use kube::{Api, Client, core::metadata::PartialObjectMeta};
+    /// use kube::{Api, core::PartialObjectMeta};
     /// use k8s_openapi::api::core::v1::Pod;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let p: PartialObjectMeta<Pod> = pods.get_metadata("blog").await?;
-    ///     Ok(())
-    /// }
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let p: PartialObjectMeta<Pod> = pods.get_metadata("blog").await?;
+    /// # Ok(())
+    /// # }
     /// ```
     /// Note that the type may be converted to `ObjectMeta` through the usual
     /// conversion traits.
@@ -68,19 +66,19 @@ where
     /// [Get](`Api::get`) a named resource if it exists, returns [`None`] if it doesn't exist
     ///
     /// ```no_run
-    /// use kube::{Api, Client};
+    /// # use kube::Api;
     /// use k8s_openapi::api::core::v1::Pod;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     if let Some(pod) = pods.get_opt("blog").await? {
-    ///         // Pod was found
-    ///     } else {
-    ///         // Pod was not found
-    ///     }
-    ///     Ok(())
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// if let Some(pod) = pods.get_opt("blog").await? {
+    ///     // Pod was found
+    /// } else {
+    ///     // Pod was not found
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn get_opt(&self, name: &str) -> Result<Option<K>> {
         match self.get(name).await {
@@ -90,27 +88,25 @@ where
         }
     }
 
-    /// [Get PartialObjectMeta](`Api::get_metadata`) for a named resource if it
-    /// exists, returns [`None`] if it doesn't exit
+    /// [Get Metadata](`Api::get_metadata`) for a named resource if it exists, returns [`None`] if it doesn't exit
     ///
     /// ```no_run
-    /// use kube::{Api, Client};
+    /// # use kube::Api;
     /// use k8s_openapi::api::core::v1::Pod;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     if let Some(pod) = pods.get_metadata_opt("blog").await? {
-    ///         // Pod was found
-    ///     } else {
-    ///         // Pod was not found
-    ///     }
-    ///     Ok(())
+
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// if let Some(pod) = pods.get_metadata_opt("blog").await? {
+    ///     // Pod was found
+    /// } else {
+    ///     // Pod was not found
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     ///
-    /// Note that [kube_core::metadata::PartialObjectMeta] may be converted to `ObjectMeta`
-    /// through the usual conversion traits.
+    /// Note that [`PartialObjectMeta`] embeds the raw `ObjectMeta`.
     pub async fn get_metadata_opt(&self, name: &str) -> Result<Option<PartialObjectMeta<K>>> {
         match self.get_metadata(name).await {
             Ok(meta) => Ok(Some(meta)),
@@ -124,18 +120,18 @@ where
     /// You use this to get everything, or a subset matching fields/labels, say:
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, ResourceExt}, Client};
+    /// use kube::api::{Api, ListParams, ResourceExt};
     /// use k8s_openapi::api::core::v1::Pod;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let lp = ListParams::default().labels("app=blog"); // for this app only
-    ///     for p in pods.list(&lp).await? {
-    ///         println!("Found Pod: {}", p.name_any());
-    ///     }
-    ///     Ok(())
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let lp = ListParams::default().labels("app=blog"); // for this app only
+    /// for p in pods.list(&lp).await? {
+    ///     println!("Found Pod: {}", p.name_any());
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
         let mut req = self.request.list(lp).map_err(Error::BuildRequest)?;
@@ -149,19 +145,20 @@ where
     /// subset matching fields/labels. For example
     ///
     /// ```no_run
-    /// use kube::{core::{metadata::PartialObjectMeta, object::ObjectList}, api::{Api, ListParams, ResourceExt}, Client};
-    /// use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, api::core::v1::Pod};
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let lp = ListParams::default().labels("app=blog"); // for this app only
-    ///     let list: ObjectList<PartialObjectMeta<Pod>> = pods.list_metadata(&lp).await?;
-    ///     for p in list {
-    ///         println!("Found Pod: {}", p.name_any());
-    ///     }
-    ///     Ok(())
+    /// use kube::api::{Api, ListParams, ResourceExt};
+    /// use kube::core::{ObjectMeta, ObjectList, PartialObjectMeta};
+    /// use k8s_openapi::api::core::v1::Pod;
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let lp = ListParams::default().labels("app=blog"); // for this app only
+    /// let list: ObjectList<PartialObjectMeta<Pod>> = pods.list_metadata(&lp).await?;
+    /// for p in list {
+    ///     println!("Found Pod: {}", p.name_any());
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn list_metadata(&self, lp: &ListParams) -> Result<ObjectList<PartialObjectMeta<K>>> {
         let mut req = self.request.list_metadata(lp).map_err(Error::BuildRequest)?;
@@ -173,7 +170,7 @@ where
     ///
     /// This function requires a type that Serializes to `K`, which can be:
     /// 1. Raw string YAML
-    ///     - easy to port from existing files
+    /// - easy to port from existing files
     ///     - error prone (run-time errors on typos due to failed serialize attempts)
     ///     - very error prone (can write invalid YAML)
     /// 2. An instance of the struct itself
@@ -207,18 +204,19 @@ where
     /// 4XX and 5XX status types are returned as an [`Err(kube_client::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
-    /// use kube::{api::{Api, DeleteParams}, Client};
+    /// use kube::api::{Api, DeleteParams};
     /// use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
     /// use apiexts::CustomResourceDefinition;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let crds: Api<CustomResourceDefinition> = Api::all(client);
-    ///     crds.delete("foos.clux.dev", &DeleteParams::default()).await?
-    ///         .map_left(|o| println!("Deleting CRD: {:?}", o.status))
-    ///         .map_right(|s| println!("Deleted CRD: {:?}", s));
-    ///     Ok(())
-    /// }
+
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+
+    /// let crds: Api<CustomResourceDefinition> = Api::all(client);
+    /// crds.delete("foos.clux.dev", &DeleteParams::default()).await?
+    ///     .map_left(|o| println!("Deleting CRD: {:?}", o.status))
+    ///     .map_right(|s| println!("Deleted CRD: {:?}", s));
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
         let mut req = self.request.delete(name, dp).map_err(Error::BuildRequest)?;
@@ -235,23 +233,23 @@ where
     /// 4XX and 5XX status types are returned as an [`Err(kube_client::Error::Api)`](crate::Error::Api).
     ///
     /// ```no_run
-    /// use kube::{api::{Api, DeleteParams, ListParams, ResourceExt}, Client};
+    /// use kube::api::{Api, DeleteParams, ListParams, ResourceExt};
     /// use k8s_openapi::api::core::v1::Pod;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
-    ///         either::Left(list) => {
-    ///             let names: Vec<_> = list.iter().map(ResourceExt::name_any).collect();
-    ///             println!("Deleting collection of pods: {:?}", names);
-    ///         },
-    ///         either::Right(status) => {
-    ///             println!("Deleted collection of pods: status={:?}", status);
-    ///         }
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    ///
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// match pods.delete_collection(&DeleteParams::default(), &ListParams::default()).await? {
+    ///     either::Left(list) => {
+    ///         let names: Vec<_> = list.iter().map(ResourceExt::name_any).collect();
+    ///         println!("Deleting collection of pods: {:?}", names);
+    ///     },
+    ///     either::Right(status) => {
+    ///         println!("Deleted collection of pods: status={:?}", status);
     ///     }
-    ///     Ok(())
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn delete_collection(
         &self,
@@ -271,27 +269,27 @@ where
     /// Takes a [`Patch`] along with [`PatchParams`] for the call.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PatchParams, Patch, Resource}, Client};
+    /// use kube::api::{Api, PatchParams, Patch, Resource};
     /// use k8s_openapi::api::core::v1::Pod;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let patch = serde_json::json!({
-    ///         "apiVersion": "v1",
-    ///         "kind": "Pod",
-    ///         "metadata": {
-    ///             "name": "blog"
-    ///         },
-    ///         "spec": {
-    ///             "activeDeadlineSeconds": 5
-    ///         }
-    ///     });
-    ///     let params = PatchParams::apply("myapp");
-    ///     let patch = Patch::Apply(&patch);
-    ///     let o_patched = pods.patch("blog", &params, &patch).await?;
-    ///     Ok(())
-    /// }
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    ///
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let patch = serde_json::json!({
+    ///     "apiVersion": "v1",
+    ///     "kind": "Pod",
+    ///     "metadata": {
+    ///         "name": "blog"
+    ///     },
+    ///     "spec": {
+    ///         "activeDeadlineSeconds": 5
+    ///     }
+    /// });
+    /// let params = PatchParams::apply("myapp");
+    /// let patch = Patch::Apply(&patch);
+    /// let o_patched = pods.patch("blog", &params, &patch).await?;
+    /// # Ok(())
+    /// # }
     /// ```
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
@@ -309,43 +307,40 @@ where
         self.client.request::<K>(req).await
     }
 
-    /// Patch a subset of a resource's properties and get back the resource
-    /// metadata as [`kube_core::metadata::PartialObjectMeta`]
+    /// Patch a metadata subset of a resource's properties from [`PartialObjectMeta`]
     ///
     /// Takes a [`Patch`] along with [`PatchParams`] for the call.
+    /// Patches can be constructed raw using `serde_json::json!` or from `ObjectMeta` via [`PartialObjectMetaExt`].
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PatchParams, Patch, Resource}, Client};
+    /// use kube::api::{Api, PatchParams, Patch, Resource};
+    /// use kube::core::{PartialObjectMetaExt, ObjectMeta};
     /// use k8s_openapi::api::core::v1::Pod;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
-    ///     let patch = serde_json::json!({
-    ///         "apiVersion": "v1",
-    ///         "kind": "Pod",
-    ///         "metadata": {
-    ///             "name": "blog",
-    ///             "labels": {
-    ///                 "key": "value"
-    ///             },
-    ///         }
-    ///     });
-    ///     let params = PatchParams::apply("myapp");
-    ///     let patch = Patch::Apply(&patch);
-    ///     let o_patched = pods.patch_metadata("blog", &params, &patch).await?;
-    ///     println!("Patched {}", o_patched.metadata.name.unwrap());
-    ///     Ok(())
-    /// }
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let metadata = ObjectMeta {
+    ///     labels: Some([("key".to_string(), "value".to_string())].into()),
+    ///     ..Default::default()
+    /// }.into_request_partial::<Pod>();
+    ///
+    /// let params = PatchParams::apply("myapp");
+    /// let o_patched = pods.patch_metadata("blog", &params, &Patch::Apply(&metadata)).await?;
+    /// println!("Patched {}", o_patched.metadata.name.unwrap());
+    /// # Ok(())
+    /// # }
     /// ```
     /// [`Patch`]: super::Patch
     /// [`PatchParams`]: super::PatchParams
+    /// [`PartialObjectMetaExt`]: crate::core::PartialObjectMetaExt
     ///
     /// ### Warnings
     ///
     /// The `TypeMeta` (apiVersion + kind) of a patch request (required for apply patches)
     /// must match the underlying type that is being patched (e.g. "v1" + "Pod").
     /// The returned `TypeMeta` will always be {"meta.k8s.io/v1", "PartialObjectMetadata"}.
+    /// These constraints are encoded into [`PartialObjectMetaExt`].
     ///
     /// This method can write to non-metadata fields such as spec if included in the patch.
     pub async fn patch_metadata<P: Serialize + Debug>(
@@ -371,38 +366,38 @@ where
     /// Thus, to use this function, you need to do a `get` then a `replace` with its result.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, PostParams, ResourceExt}, Client};
+    /// use kube::api::{Api, PostParams, ResourceExt};
     /// use k8s_openapi::api::batch::v1::Job;
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
-    ///     let j = jobs.get("baz").await?;
-    ///     let j_new: Job = serde_json::from_value(serde_json::json!({
-    ///         "apiVersion": "batch/v1",
-    ///         "kind": "Job",
-    ///         "metadata": {
-    ///             "name": "baz",
-    ///             "resourceVersion": j.resource_version(),
-    ///         },
-    ///         "spec": {
-    ///             "template": {
-    ///                 "metadata": {
-    ///                     "name": "empty-job-pod"
-    ///                 },
-    ///                 "spec": {
-    ///                     "containers": [{
-    ///                         "name": "empty",
-    ///                         "image": "alpine:latest"
-    ///                     }],
-    ///                     "restartPolicy": "Never",
-    ///                 }
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let jobs: Api<Job> = Api::namespaced(client, "apps");
+    /// let j = jobs.get("baz").await?;
+    /// let j_new: Job = serde_json::from_value(serde_json::json!({
+    ///     "apiVersion": "batch/v1",
+    ///     "kind": "Job",
+    ///     "metadata": {
+    ///         "name": "baz",
+    ///         "resourceVersion": j.resource_version(),
+    ///     },
+    ///     "spec": {
+    ///         "template": {
+    ///             "metadata": {
+    ///                 "name": "empty-job-pod"
+    ///             },
+    ///             "spec": {
+    ///                 "containers": [{
+    ///                     "name": "empty",
+    ///                     "image": "alpine:latest"
+    ///                 }],
+    ///                 "restartPolicy": "Never",
     ///             }
     ///         }
-    ///     }))?;
-    ///     jobs.replace("baz", &PostParams::default(), &j_new).await?;
-    ///     Ok(())
-    /// }
+    ///     }
+    /// }))?;
+    /// jobs.replace("baz", &PostParams::default(), &j_new).await?;
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// Consider mutating the result of `api.get` rather than recreating it.
@@ -434,28 +429,28 @@ where
     /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, ResourceExt, WatchEvent}, Client};
+    /// use kube::api::{Api, ListParams, ResourceExt, WatchEvent};
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
-    ///     let lp = ListParams::default()
-    ///         .fields("metadata.name=my_job")
-    ///         .timeout(20); // upper bound of how long we watch for
-    ///     let mut stream = jobs.watch(&lp, "0").await?.boxed();
-    ///     while let Some(status) = stream.try_next().await? {
-    ///         match status {
-    ///             WatchEvent::Added(s) => println!("Added {}", s.name_any()),
-    ///             WatchEvent::Modified(s) => println!("Modified: {}", s.name_any()),
-    ///             WatchEvent::Deleted(s) => println!("Deleted {}", s.name_any()),
-    ///             WatchEvent::Bookmark(s) => {},
-    ///             WatchEvent::Error(s) => println!("{}", s),
-    ///         }
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let jobs: Api<Job> = Api::namespaced(client, "apps");
+    /// let lp = ListParams::default()
+    ///     .fields("metadata.name=my_job")
+    ///     .timeout(20); // upper bound of how long we watch for
+    /// let mut stream = jobs.watch(&lp, "0").await?.boxed();
+    /// while let Some(status) = stream.try_next().await? {
+    ///     match status {
+    ///         WatchEvent::Added(s) => println!("Added {}", s.name_any()),
+    ///         WatchEvent::Modified(s) => println!("Modified: {}", s.name_any()),
+    ///         WatchEvent::Deleted(s) => println!("Deleted {}", s.name_any()),
+    ///         WatchEvent::Bookmark(s) => {},
+    ///         WatchEvent::Error(s) => println!("{}", s),
     ///     }
-    ///     Ok(())
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     /// [`ListParams::timeout`]: super::ListParams::timeout
     /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
@@ -479,34 +474,35 @@ where
     /// have to be re-issued with the last seen resource version when or if it
     /// closes.
     ///
-    /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
+    /// Consider using a managed [`metadata_watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
-    /// use kube::{api::{Api, ListParams, ResourceExt, WatchEvent}, Client};
+    /// use kube::api::{Api, ListParams, ResourceExt, WatchEvent};
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
-    ///     let jobs: Api<Job> = Api::namespaced(client, "apps");
-    ///     let lp = ListParams::default()
-    ///         .fields("metadata.name=my_job")
-    ///         .timeout(20); // upper bound of how long we watch for
-    ///     let mut stream = jobs.watch(&lp, "0").await?.boxed();
-    ///     while let Some(status) = stream.try_next().await? {
-    ///         match status {
-    ///             WatchEvent::Added(s) => println!("Added {}", s.metadata.name.unwrap()),
-    ///             WatchEvent::Modified(s) => println!("Modified: {}", s.metadata.name.unwrap()),
-    ///             WatchEvent::Deleted(s) => println!("Deleted {}", s.metadata.name.unwrap()),
-    ///             WatchEvent::Bookmark(s) => {},
-    ///             WatchEvent::Error(s) => println!("{}", s),
-    ///         }
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let jobs: Api<Job> = Api::namespaced(client, "apps");
+    ///
+    /// let lp = ListParams::default()
+    ///     .fields("metadata.name=my_job")
+    ///     .timeout(20); // upper bound of how long we watch for
+    /// let mut stream = jobs.watch(&lp, "0").await?.boxed();
+    /// while let Some(status) = stream.try_next().await? {
+    ///     match status {
+    ///         WatchEvent::Added(s) => println!("Added {}", s.metadata.name.unwrap()),
+    ///         WatchEvent::Modified(s) => println!("Modified: {}", s.metadata.name.unwrap()),
+    ///         WatchEvent::Deleted(s) => println!("Deleted {}", s.metadata.name.unwrap()),
+    ///         WatchEvent::Bookmark(s) => {},
+    ///         WatchEvent::Error(s) => println!("{}", s),
     ///     }
-    ///     Ok(())
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     /// [`ListParams::timeout`]: super::ListParams::timeout
-    /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
+    /// [`metadata_watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.metadata_watcher.html
     pub async fn watch_metadata(
         &self,
         lp: &ListParams,
