@@ -1011,6 +1011,22 @@ where
         self
     }
 
+    #[must_use]
+    pub fn reconcile_on(
+        mut self,
+        trigger: impl Stream<Item = Result<ObjectRef<K>, watcher::Error>> + Send + 'static,
+    ) -> Self {
+        self.trigger_selector.push(
+            trigger
+                .map_ok(move |obj| ReconcileRequest {
+                    obj_ref: obj,
+                    reason: ReconcileReason::Unknown,
+                })
+                .boxed(),
+        );
+        self
+    }
+
     /// Start a graceful shutdown when `trigger` resolves. Once a graceful shutdown has been initiated:
     ///
     /// - No new reconciliations are started from the scheduler
