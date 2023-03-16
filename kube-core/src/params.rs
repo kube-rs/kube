@@ -1,6 +1,29 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
+use std::fmt;
+
 use crate::request::Error;
 use serde::Serialize;
+
+/// Specifies how the resourceVersion parameter is applied. resourceVersionMatch may only be set if resourceVersion is also set.
+/// "NotOlderThan" matches data at least as new as the provided resourceVersion. "Exact" matches data at the exact resourceVersion provided.
+///
+/// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.
+#[derive(Clone, Debug)]
+pub enum ResourceVersionMatch {
+    /// Matches data at least as new as the provided resourceVersion.
+    NotOlderThan,
+    /// Matches data at the exact resourceVersion provided.
+    Exact,
+}
+
+impl fmt::Display for ResourceVersionMatch {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ResourceVersionMatch::NotOlderThan => write!(f, "NotOlderThan"),
+            ResourceVersionMatch::Exact => write!(f, "Exact"),
+        }
+    }
+}
 
 /// Common query parameters used in watch/list/delete calls on collections
 #[derive(Clone, Debug)]
@@ -44,6 +67,18 @@ pub struct ListParams {
     ///
     /// After listing results with a limit, a continue token can be used to fetch another page of results.
     pub continue_token: Option<String>,
+
+	/// Sets a constraint on what resource versions a request may be served from.
+	/// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+	/// details.
+    pub resource_version: Option<String>,
+
+    /// Determines how resourceVersion is applied to list calls.
+	/// It is highly recommended that resourceVersionMatch be set for list calls where
+	/// resourceVersion is set
+	/// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+	/// details.
+	pub resource_version_match: Option<ResourceVersionMatch>,
 }
 
 impl Default for ListParams {
@@ -58,6 +93,8 @@ impl Default for ListParams {
             timeout: None,
             limit: None,
             continue_token: None,
+            resource_version: None,
+            resource_version_match: None,
         }
     }
 }
@@ -136,6 +173,20 @@ impl ListParams {
     #[must_use]
     pub fn continue_token(mut self, token: &str) -> Self {
         self.continue_token = Some(token.to_string());
+        self
+    }
+
+    /// Sets a resource version.
+    #[must_use]
+    pub fn resource_version(mut self, version: &str) -> Self {
+        self.resource_version = Some(version.to_string());
+        self
+    }
+
+    /// Sets a continue token.
+    #[must_use]
+    pub fn resource_version_match(mut self, version_match: ResourceVersionMatch) -> Self {
+        self.resource_version_match = Some(version_match);
         self
     }
 }

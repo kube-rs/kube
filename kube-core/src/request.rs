@@ -70,6 +70,12 @@ impl Request {
         if let Some(continue_token) = &lp.continue_token {
             qp.append_pair("continue", continue_token);
         }
+        if let Some(resource_version) = &lp.resource_version {
+            qp.append_pair("resourceVersion", resource_version);
+        }
+        if let Some(resource_version_match) = &lp.resource_version_match {
+            qp.append_pair("resourceVersionMatch", &resource_version_match.to_string());
+        }
 
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
@@ -89,6 +95,16 @@ impl Request {
         if lp.continue_token.is_some() {
             return Err(Error::Validation(
                 "ListParams::continue_token cannot be used with a watch.".into(),
+            ));
+        }
+        if lp.resource_version.is_some() {
+            return Err(Error::Validation(
+                "ListParams::resource_version cannot be used with a watch.".into(),
+            ));
+        }
+        if lp.resource_version_match.is_some() {
+            return Err(Error::Validation(
+                "ListParams::resource_version_match cannot be used with a watch.".into(),
             ));
         }
 
@@ -310,6 +326,12 @@ impl Request {
         if let Some(continue_token) = &lp.continue_token {
             qp.append_pair("continue", continue_token);
         }
+        if let Some(resource_version) = &lp.resource_version {
+            qp.append_pair("resourceVersion", resource_version);
+        }
+        if let Some(resource_version_match) = &lp.resource_version_match {
+            qp.append_pair("resourceVersionMatch", &resource_version_match.to_string());
+        }
 
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr)
@@ -329,10 +351,19 @@ impl Request {
                 "ListParams::limit cannot be used with a watch.".into(),
             ));
         }
-
         if lp.continue_token.is_some() {
             return Err(Error::Validation(
                 "ListParams::continue_token cannot be used with a watch.".into(),
+            ));
+        }
+        if lp.resource_version.is_some() {
+            return Err(Error::Validation(
+                "ListParams::resource_version cannot be used with a watch.".into(),
+            ));
+        }
+        if lp.resource_version_match.is_some() {
+            return Err(Error::Validation(
+                "ListParams::resource_version_match cannot be used with a watch.".into(),
             ));
         }
 
@@ -387,7 +418,11 @@ impl Request {
 /// Cheap sanity check to ensure type maps work as expected
 #[cfg(test)]
 mod test {
-    use crate::{params::PostParams, request::Request, resource::Resource};
+    use crate::{
+        params::{PostParams, ResourceVersionMatch},
+        request::Request,
+        resource::Resource,
+    };
     use k8s::{
         admissionregistration::v1 as adregv1, apps::v1 as appsv1, authorization::v1 as authv1,
         autoscaling::v1 as autoscalingv1, batch::v1 as batchv1, core::v1 as corev1,
@@ -750,5 +785,29 @@ mod test {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let err = Request::new(url).watch(&lp, "0").unwrap_err();
         assert!(format!("{err}").contains("limit cannot be used with a watch"));
+    }
+
+    #[test]
+    fn list_pods_from_cache() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let gp = ListParams::default().resource_version("0").resource_version_match(ResourceVersionMatch::NotOlderThan);
+        let req = Request::new(url).list(&gp).unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods?&resourceVersion=0&resourceVersionMatch=NotOlderThan");
+    }
+
+    #[test]
+    fn watches_cannot_have_resource_version() {
+        let lp = ListParams::default().resource_version("0");
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let err = Request::new(url).watch(&lp, "0").unwrap_err();
+        assert!(format!("{err}").contains("resource_version cannot be used with a watch"));
+    }
+
+    #[test]
+    fn watches_cannot_have_resource_version_match() {
+        let lp = ListParams::default().resource_version_match(ResourceVersionMatch::Exact);
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let err = Request::new(url).watch(&lp, "0").unwrap_err();
+        assert!(format!("{err}").contains("resource_version_match cannot be used with a watch"));
     }
 }
