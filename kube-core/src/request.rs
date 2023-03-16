@@ -790,9 +790,14 @@ mod test {
     #[test]
     fn list_pods_from_cache() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().resource_version("0").resource_version_match(ResourceVersionMatch::NotOlderThan);
+        let gp = ListParams::default()
+            .resource_version("0")
+            .resource_version_match(ResourceVersionMatch::NotOlderThan);
         let req = Request::new(url).list(&gp).unwrap();
-        assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods?&resourceVersion=0&resourceVersionMatch=NotOlderThan");
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods?&resourceVersion=0&resourceVersionMatch=NotOlderThan"
+        );
     }
 
     #[test]

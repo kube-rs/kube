@@ -68,17 +68,17 @@ pub struct ListParams {
     /// After listing results with a limit, a continue token can be used to fetch another page of results.
     pub continue_token: Option<String>,
 
-	/// Sets a constraint on what resource versions a request may be served from.
-	/// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
-	/// details.
+    /// Sets a constraint on what resource versions a request may be served from.
+    /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+    /// details.
     pub resource_version: Option<String>,
 
     /// Determines how resourceVersion is applied to list calls.
-	/// It is highly recommended that resourceVersionMatch be set for list calls where
-	/// resourceVersion is set
-	/// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
-	/// details.
-	pub resource_version_match: Option<ResourceVersionMatch>,
+    /// It is highly recommended that resourceVersionMatch be set for list calls where
+    /// resourceVersion is set
+    /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+    /// details.
+    pub resource_version_match: Option<ResourceVersionMatch>,
 }
 
 impl Default for ListParams {
