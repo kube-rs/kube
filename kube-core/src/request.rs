@@ -1,7 +1,7 @@
 //! Request builder type for arbitrary api types
 use thiserror::Error;
 
-use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
+use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceVersionMatch};
 
 pub(crate) const JSON_MIME: &str = "application/json";
 /// Extended Accept Header
@@ -57,6 +57,21 @@ impl Request {
     pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
+
+        if lp.resource_version_match.is_some() && lp.resource_version.is_none() {
+            return Err(Error::Validation(
+                "ListParams::resource_version cannot be empty if the resource_version_match is set.".into(),
+            ));
+        }
+        if let (Some(version), Some(ResourceVersionMatch::Exact)) =
+            (&lp.resource_version, &lp.resource_version_match)
+        {
+            if version == "0" {
+                return Err(Error::Validation(
+                    "ListParams::resource_version cannot be equal to \"0\" if the resource_version_match is Exact.".into(),
+                ));
+            }
+        }
 
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", fields);
@@ -313,6 +328,21 @@ impl Request {
     pub fn list_metadata(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
+
+        if lp.resource_version_match.is_some() && lp.resource_version.is_none() {
+            return Err(Error::Validation(
+                "ListParams::resource_version cannot be empty if the resource_version_match is set.".into(),
+            ));
+        }
+        if let (Some(version), Some(ResourceVersionMatch::Exact)) =
+            (&lp.resource_version, &lp.resource_version_match)
+        {
+            if version == "0" {
+                return Err(Error::Validation(
+                    "ListParams::resource_version cannot be equal to \"0\" if the resource_version_match is Exact.".into(),
+                ));
+            }
+        }
 
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", fields);
@@ -814,5 +844,25 @@ mod test {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let err = Request::new(url).watch(&lp, "0").unwrap_err();
         assert!(format!("{err}").contains("resource_version_match cannot be used with a watch"));
+    }
+
+    #[test]
+    fn list_invalid_resource_version_combination() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let gp = ListParams::default().resource_version_match(ResourceVersionMatch::NotOlderThan);
+        let err = Request::new(url).list(&gp).unwrap_err();
+        assert!(format!("{err}")
+            .contains("resource_version cannot be empty if the resource_version_match is set"));
+    }
+
+    #[test]
+    fn list_invalid_resource_version_zero_and_exact_match() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let gp = ListParams::default()
+            .resource_version("0")
+            .resource_version_match(ResourceVersionMatch::Exact);
+        let err = Request::new(url).list(&gp).unwrap_err();
+        assert!(format!("{err}")
+            .contains("resource_version cannot be equal to \"0\" if the resource_version_match is Exact"));
     }
 }

@@ -8,7 +8,7 @@ use serde::Serialize;
 /// "NotOlderThan" matches data at least as new as the provided resourceVersion. "Exact" matches data at the exact resourceVersion provided.
 ///
 /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ResourceVersionMatch {
     /// Matches data at least as new as the provided resourceVersion.
     NotOlderThan,
