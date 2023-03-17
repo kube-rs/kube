@@ -3,8 +3,8 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{
-        Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, ListParams, Patch, PatchParams,
-        PostParams, WatchEvent,
+        Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams,
+        WatchEvent, WatchParams,
     },
     runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt,
@@ -127,24 +127,27 @@ async fn main() -> Result<()> {
     // Nullables defaults to `None` and only sent if it's not configured to skip.
     let bar = Foo::new("bar", FooSpec { ..FooSpec::default() });
     let bar = foos.create(&PostParams::default(), &bar).await?;
-    assert_eq!(bar.spec, FooSpec {
-        // Nonnullable without default is required.
-        non_nullable: String::default(),
-        // Defaulting didn't happen because an empty string was sent.
-        non_nullable_with_default: String::default(),
-        // `nullable_skipped` field does not exist in the object (see below).
-        nullable_skipped: None,
-        // `nullable` field exists in the object (see below).
-        nullable: None,
-        // Defaulting happened because serialization was skipped.
-        nullable_skipped_with_default: default_nullable(),
-        // Defaulting did not happen because `null` was sent.
-        // Deserialization does not apply the default either.
-        nullable_with_default: None,
-        // Empty listables to be patched in later
-        default_listable: Default::default(),
-        set_listable: Default::default(),
-    });
+    assert_eq!(
+        bar.spec,
+        FooSpec {
+            // Nonnullable without default is required.
+            non_nullable: String::default(),
+            // Defaulting didn't happen because an empty string was sent.
+            non_nullable_with_default: String::default(),
+            // `nullable_skipped` field does not exist in the object (see below).
+            nullable_skipped: None,
+            // `nullable` field exists in the object (see below).
+            nullable: None,
+            // Defaulting happened because serialization was skipped.
+            nullable_skipped_with_default: default_nullable(),
+            // Defaulting did not happen because `null` was sent.
+            // Deserialization does not apply the default either.
+            nullable_with_default: None,
+            // Empty listables to be patched in later
+            default_listable: Default::default(),
+            set_listable: Default::default(),
+        }
+    );
 
     // Set up dynamic resource to test using raw values.
     let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
@@ -241,10 +244,10 @@ async fn delete_crd(client: Client) -> Result<()> {
 
         // Wait until deleted
         let timeout_secs = 15;
-        let lp = ListParams::default()
+        let wp = WatchParams::default()
             .fields("metadata.name=foos.clux.dev")
             .timeout(timeout_secs);
-        let mut stream = api.watch(&lp, "0").await?.boxed_local();
+        let mut stream = api.watch(&wp, "0").await?.boxed_local();
         while let Some(status) = stream.try_next().await? {
             if let WatchEvent::Deleted(_) = status {
                 return Ok(());

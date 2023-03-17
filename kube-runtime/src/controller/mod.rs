@@ -9,7 +9,7 @@ use crate::{
     },
     scheduler::{scheduler, ScheduleRequest},
     utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
-    watcher::{self, watcher},
+    watcher::{self, watcher, Config},
 };
 use backoff::backoff::Backoff;
 use derivative::Derivative;
@@ -18,7 +18,7 @@ use futures::{
     future::{self, BoxFuture},
     ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube_client::api::{Api, DynamicObject, ListParams, Resource};
+use kube_client::api::{Api, DynamicObject, Resource};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
@@ -480,11 +480,11 @@ where
     /// and receive reconcile events for.
     /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
     #[must_use]
-    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self
+    pub fn new(owned_api: Api<K>, wc: Config) -> Self
     where
         K::DynamicType: Default,
     {
-        Self::new_with(owned_api, lp, Default::default())
+        Self::new_with(owned_api, wc, Default::default())
     }
 
     /// Create a Controller on a type `K`
@@ -501,12 +501,12 @@ where
     /// [`Api`]: kube_client::Api
     /// [`dynamic`]: kube_client::core::dynamic
     /// [`ListParams::default`]: kube_client::api::ListParams::default
-    pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
+    pub fn new_with(owned_api: Api<K>, wc: Config, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
-            reflector(writer, watcher(owned_api, lp)).applied_objects(),
+            reflector(writer, watcher(owned_api, wc)).applied_objects(),
             dyntype.clone(),
         )
         .boxed();
@@ -558,9 +558,9 @@ where
     pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
         self,
         api: Api<Child>,
-        lp: ListParams,
+        wc: Config,
     ) -> Self {
-        self.owns_with(api, (), lp)
+        self.owns_with(api, (), wc)
     }
 
     /// Specify `Child` objects which `K` owns and should be watched
@@ -571,12 +571,12 @@ where
         mut self,
         api: Api<Child>,
         dyntype: Child::DynamicType,
-        lp: ListParams,
+        wc: Config,
     ) -> Self
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners(watcher(api, lp).touched_objects(), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners(watcher(api, wc).touched_objects(), self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -653,13 +653,13 @@ where
     >(
         self,
         api: Api<Other>,
-        lp: ListParams,
+        wc: Config,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
         I::IntoIter: Send,
     {
-        self.watches_with(api, (), lp, mapper)
+        self.watches_with(api, (), wc, mapper)
     }
 
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
@@ -673,14 +673,14 @@ where
         mut self,
         api: Api<Other>,
         dyntype: Other::DynamicType,
-        lp: ListParams,
+        wc: Config,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
         I::IntoIter: Send,
         Other::DynamicType: Clone,
     {
-        let other_watcher = trigger_with(watcher(api, lp).touched_objects(), move |obj| {
+        let other_watcher = trigger_with(watcher(api, wc).touched_objects(), move |obj| {
             let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
             mapper(obj)
                 .into_iter()

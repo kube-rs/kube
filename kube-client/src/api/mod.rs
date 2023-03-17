@@ -1,13 +1,16 @@
 //! API helpers for structured interaction with the Kubernetes API
 
-
 mod core_methods;
-#[cfg(feature = "ws")] mod remote_command;
+#[cfg(feature = "ws")]
+mod remote_command;
 use std::fmt::Debug;
 
-#[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
-#[cfg(feature = "ws")] mod portforward;
-#[cfg(feature = "ws")] pub use portforward::Portforwarder;
+#[cfg(feature = "ws")]
+pub use remote_command::{AttachedProcess, TerminalSize};
+#[cfg(feature = "ws")]
+mod portforward;
+#[cfg(feature = "ws")]
+pub use portforward::Portforwarder;
 
 mod subresource;
 #[cfg(feature = "ws")]
@@ -36,7 +39,7 @@ pub use kube_core::{
 use kube_core::{DynamicResourceScope, NamespaceResourceScope};
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
-    ValidationDirective,
+    ResourceVersionMatch, ValidationDirective, WatchParams,
 };
 
 use crate::Client;
@@ -118,7 +121,6 @@ impl<K: Resource> Api<K> {
         &self.request.url_path
     }
 }
-
 
 /// Api constructors for Resource implementors with Default DynamicTypes
 ///

@@ -1,7 +1,7 @@
 //! Request builder type for arbitrary api types
 use thiserror::Error;
 
-use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceVersionMatch};
+use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchParams};
 
 pub(crate) const JSON_MIME: &str = "application/json";
 /// Extended Accept Header
@@ -57,21 +57,7 @@ impl Request {
     pub fn list(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
-
-        if lp.resource_version_match.is_some() && lp.resource_version.is_none() {
-            return Err(Error::Validation(
-                "ListParams::resource_version cannot be empty if the resource_version_match is set.".into(),
-            ));
-        }
-        if let (Some(version), Some(ResourceVersionMatch::Exact)) =
-            (&lp.resource_version, &lp.resource_version_match)
-        {
-            if version == "0" {
-                return Err(Error::Validation(
-                    "ListParams::resource_version cannot be equal to \"0\" if the resource_version_match is Exact.".into(),
-                ));
-            }
-        }
+        lp.validate()?;
 
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", fields);
@@ -98,43 +84,23 @@ impl Request {
     }
 
     /// Watch a resource at a given version
-    pub fn watch(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>, Error> {
+    pub fn watch(&self, wp: &WatchParams, ver: &str) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
-        lp.validate()?;
-        if lp.limit.is_some() {
-            return Err(Error::Validation(
-                "ListParams::limit cannot be used with a watch.".into(),
-            ));
-        }
-        if lp.continue_token.is_some() {
-            return Err(Error::Validation(
-                "ListParams::continue_token cannot be used with a watch.".into(),
-            ));
-        }
-        if lp.resource_version.is_some() {
-            return Err(Error::Validation(
-                "ListParams::resource_version cannot be used with a watch.".into(),
-            ));
-        }
-        if lp.resource_version_match.is_some() {
-            return Err(Error::Validation(
-                "ListParams::resource_version_match cannot be used with a watch.".into(),
-            ));
-        }
+        wp.validate()?;
 
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
 
         // https://github.com/kubernetes/kubernetes/issues/6513
-        qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(290).to_string());
-        if let Some(fields) = &lp.field_selector {
+        qp.append_pair("timeoutSeconds", &wp.timeout.unwrap_or(290).to_string());
+        if let Some(fields) = &wp.field_selector {
             qp.append_pair("fieldSelector", fields);
         }
-        if let Some(labels) = &lp.label_selector {
+        if let Some(labels) = &wp.label_selector {
             qp.append_pair("labelSelector", labels);
         }
-        if lp.bookmarks {
+        if wp.bookmarks {
             qp.append_pair("allowWatchBookmarks", "true");
         }
 
@@ -328,21 +294,7 @@ impl Request {
     pub fn list_metadata(&self, lp: &ListParams) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
-
-        if lp.resource_version_match.is_some() && lp.resource_version.is_none() {
-            return Err(Error::Validation(
-                "ListParams::resource_version cannot be empty if the resource_version_match is set.".into(),
-            ));
-        }
-        if let (Some(version), Some(ResourceVersionMatch::Exact)) =
-            (&lp.resource_version, &lp.resource_version_match)
-        {
-            if version == "0" {
-                return Err(Error::Validation(
-                    "ListParams::resource_version cannot be equal to \"0\" if the resource_version_match is Exact.".into(),
-                ));
-            }
-        }
+        lp.validate()?;
 
         if let Some(fields) = &lp.field_selector {
             qp.append_pair("fieldSelector", fields);
@@ -372,44 +324,21 @@ impl Request {
     }
 
     /// Watch metadata of a resource at a given version
-    pub fn watch_metadata(&self, lp: &ListParams, ver: &str) -> Result<http::Request<Vec<u8>>, Error> {
+    pub fn watch_metadata(&self, wp: &WatchParams, ver: &str) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
-        lp.validate()?;
-        if lp.limit.is_some() {
-            return Err(Error::Validation(
-                "ListParams::limit cannot be used with a watch.".into(),
-            ));
-        }
-        if lp.continue_token.is_some() {
-            return Err(Error::Validation(
-                "ListParams::continue_token cannot be used with a watch.".into(),
-            ));
-        }
-        if lp.resource_version.is_some() {
-            return Err(Error::Validation(
-                "ListParams::resource_version cannot be used with a watch.".into(),
-            ));
-        }
-        if lp.resource_version_match.is_some() {
-            return Err(Error::Validation(
-                "ListParams::resource_version_match cannot be used with a watch.".into(),
-            ));
-        }
+        wp.validate()?;
 
         qp.append_pair("watch", "true");
         qp.append_pair("resourceVersion", ver);
 
-        qp.append_pair("timeoutSeconds", &lp.timeout.unwrap_or(290).to_string());
+        qp.append_pair("timeoutSeconds", &wp.timeout.unwrap_or(290).to_string());
 
-        if let Some(fields) = &lp.field_selector {
+        if let Some(fields) = &wp.field_selector {
             qp.append_pair("fieldSelector", fields);
         }
-        if let Some(labels) = &lp.label_selector {
+        if let Some(labels) = &wp.label_selector {
             qp.append_pair("labelSelector", labels);
-        }
-        if lp.bookmarks {
-            qp.append_pair("allowWatchBookmarks", "true");
         }
 
         let urlstr = qp.finish();
@@ -449,7 +378,7 @@ impl Request {
 #[cfg(test)]
 mod test {
     use crate::{
-        params::{PostParams, ResourceVersionMatch},
+        params::{PostParams, ResourceVersionMatch, WatchParams},
         request::Request,
         resource::Resource,
     };
@@ -606,8 +535,8 @@ mod test {
     #[test]
     fn watch_path() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default();
-        let req = Request::new(url).watch(&gp, "0").unwrap();
+        let wp = WatchParams::default();
+        let req = Request::new(url).watch(&wp, "0").unwrap();
         assert_eq!(
             req.uri(),
             "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290&allowWatchBookmarks=true"
@@ -616,11 +545,11 @@ mod test {
     #[test]
     fn watch_metadata_path() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default();
-        let req = Request::new(url).watch_metadata(&gp, "0").unwrap();
+        let wp = WatchParams::default();
+        let req = Request::new(url).watch_metadata(&wp, "0").unwrap();
         assert_eq!(
             req.uri(),
-            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290&allowWatchBookmarks=true"
+            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290"
             );
         assert_eq!(
             req.headers().get(http::header::CONTENT_TYPE).unwrap(),
@@ -810,14 +739,6 @@ mod test {
     //}
 
     #[test]
-    fn watches_cannot_have_limits() {
-        let lp = ListParams::default().limit(5);
-        let url = corev1::Pod::url_path(&(), Some("ns"));
-        let err = Request::new(url).watch(&lp, "0").unwrap_err();
-        assert!(format!("{err}").contains("limit cannot be used with a watch"));
-    }
-
-    #[test]
     fn list_pods_from_cache() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let gp = ListParams::default()
@@ -828,22 +749,6 @@ mod test {
             req.uri(),
             "/api/v1/namespaces/ns/pods?&resourceVersion=0&resourceVersionMatch=NotOlderThan"
         );
-    }
-
-    #[test]
-    fn watches_cannot_have_resource_version() {
-        let lp = ListParams::default().resource_version("0");
-        let url = corev1::Pod::url_path(&(), Some("ns"));
-        let err = Request::new(url).watch(&lp, "0").unwrap_err();
-        assert!(format!("{err}").contains("resource_version cannot be used with a watch"));
-    }
-
-    #[test]
-    fn watches_cannot_have_resource_version_match() {
-        let lp = ListParams::default().resource_version_match(ResourceVersionMatch::Exact);
-        let url = corev1::Pod::url_path(&(), Some("ns"));
-        let err = Request::new(url).watch(&lp, "0").unwrap_err();
-        assert!(format!("{err}").contains("resource_version_match cannot be used with a watch"));
     }
 
     #[test]
