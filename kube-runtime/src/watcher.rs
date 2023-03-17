@@ -217,9 +217,10 @@ where
         State::Empty => match api.list(list_params).await {
             Ok(list) => {
                 if let Some(resource_version) = list.metadata.resource_version {
-                    (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                        resource_version,
-                    })
+                    (
+                        Some(Ok(Event::Restarted(list.items))),
+                        State::InitListed { resource_version },
+                    )
                 } else {
                     (Some(Err(Error::NoResourceVersion)), State::Empty)
                 }
@@ -233,11 +234,22 @@ where
                 (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
             }
         },
-        State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
-            Ok(stream) => (None, State::Watching {
-                resource_version,
-                stream,
-            }),
+        State::InitListed { resource_version } => match {
+            // Watch requests do not support setting resource_version and resource_version_match.
+            // This is a hack until we split List and Watch params to make watcher able to benefit from setting resource versions for list requests.
+            let mut watch_params = list_params.clone();
+            watch_params.resource_version = None;
+            watch_params.resource_version_match = None;
+
+            api.watch(&watch_params, &resource_version).await
+        } {
+            Ok(stream) => (
+                None,
+                State::Watching {
+                    resource_version,
+                    stream,
+                },
+            ),
             Err(err) => {
                 if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
                     warn!("watch initlist error with 403: {err:?}");
@@ -256,22 +268,31 @@ where
         } => match stream.next().await {
             Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Applied(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Ok(Event::Applied(obj))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
                 let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Deleted(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Ok(Event::Deleted(obj))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
-            Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
-                resource_version: bm.metadata.resource_version,
-                stream,
-            }),
+            Some(Ok(WatchEvent::Bookmark(bm))) => (
+                None,
+                State::Watching {
+                    resource_version: bm.metadata.resource_version,
+                    stream,
+                },
+            ),
             Some(Ok(WatchEvent::Error(err))) => {
                 // HTTP GONE, means we have desynced and need to start over and re-list :(
                 let new_state = if err.code == 410 {
@@ -295,10 +316,13 @@ where
                 } else {
                     debug!("watcher error: {err:?}");
                 }
-                (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Err(err).map_err(Error::WatchFailed)),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
             None => (None, State::InitListed { resource_version }),
         },
@@ -459,10 +483,13 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, ListParams {
-        field_selector: Some(format!("metadata.name={name}")),
-        ..Default::default()
-    })
+    watcher(
+        api,
+        ListParams {
+            field_selector: Some(format!("metadata.name={name}")),
+            ..Default::default()
+        },
+    )
     .map(|event| match event? {
         Event::Deleted(_) => Ok(None),
         // We're filtering by object name, so getting more than one object means that either:
