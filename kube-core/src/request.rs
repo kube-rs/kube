@@ -550,7 +550,7 @@ mod test {
         assert_eq!(
             req.uri(),
             "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290"
-            );
+        );
         assert_eq!(
             req.headers().get(http::header::CONTENT_TYPE).unwrap(),
             super::JSON_MIME

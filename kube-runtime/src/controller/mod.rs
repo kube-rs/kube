@@ -395,7 +395,10 @@ where
 /// use kube::{
 ///   Client, CustomResource,
 ///   api::{Api, ListParams},
-///   runtime::controller::{Controller, Action}
+///   runtime::{
+///     controller::{Controller, Action},
+///     watcher,
+///   },
 /// };
 /// use serde::{Deserialize, Serialize};
 /// use tokio::time::Duration;
@@ -434,8 +437,8 @@ where
 ///     let context = Arc::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
-///     Controller::new(cmgs, ListParams::default())
-///         .owns(cms, ListParams::default())
+///     Controller::new(cmgs, watcher::Config::default())
+///         .owns(cms, watcher::Config::default())
 ///         .run(reconcile, error_policy, context)
 ///         .for_each(|res| async move {
 ///             match res {
@@ -476,9 +479,9 @@ where
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
-    /// The [`ListParams`] controls to the possible subset of objects of `K` that you want to manage
+    /// The [`Config`] controls to the possible subset of objects of `K` that you want to manage
     /// and receive reconcile events for.
-    /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
+    /// For the full set of objects `K` in the given `Api` scope, you can use [`Config::default`].
     #[must_use]
     pub fn new(owned_api: Api<K>, wc: Config) -> Self
     where
@@ -491,16 +494,16 @@ where
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
-    /// The [`ListParams`] lets you define a possible subset of objects of `K` that you want the [`Api`]
+    /// The [`Config`] lets you define a possible subset of objects of `K` that you want the [`Api`]
     /// to watch - in the Api's  configured scope - and receive reconcile events for.
-    /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
+    /// For the full set of objects `K` in the given `Api` scope, you can use [`Config::default`].
     ///
     /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::new`] for static types.
     ///
-    /// [`ListParams`]: kube_client::api::ListParams
+    /// [`Config`]: kube_runtime::watcher::Config
     /// [`Api`]: kube_client::Api
     /// [`dynamic`]: kube_client::core::dynamic
-    /// [`ListParams::default`]: kube_client::api::ListParams::default
+    /// [`Config::default`]: kube_runtime::watcher::Config::default
     pub fn new_with(owned_api: Api<K>, wc: Config, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
@@ -599,7 +602,7 @@ where
     /// Tracking cross cluster references using the [Operator-SDK] annotations.
     ///
     /// ```
-    /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef};
+    /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef, watcher};
     /// # use kube::api::{Api, ListParams};
     /// # use kube::ResourceExt;
     /// # use k8s_openapi::api::core::v1::{ConfigMap, Namespace};
@@ -616,10 +619,10 @@ where
     /// # async fn doc(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// # let memcached = Api::<ConfigMap>::all(client.clone());
     /// # let context = Arc::new(Context);
-    /// Controller::new(memcached, ListParams::default())
+    /// Controller::new(memcached, watcher::Config::default())
     ///     .watches(
     ///         Api::<WatchedResource>::all(client.clone()),
-    ///         ListParams::default(),
+    ///         watcher::Config::default(),
     ///         |ar| {
     ///             let prt = ar
     ///                 .annotations()
@@ -707,8 +710,11 @@ where
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{
     ///     Client,
-    ///     api::{ListParams, Api, ResourceExt},
-    ///     runtime::{controller::{Controller, Action}},
+    ///     api::{Api, ResourceExt},
+    ///     runtime::{
+    ///         controller::{Controller, Action},
+    ///         watcher,
+    ///     },
     /// };
     /// use std::{convert::Infallible, io::BufRead, sync::Arc};
     /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
@@ -721,7 +727,7 @@ where
     /// });
     /// Controller::new(
     ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
-    ///     ListParams::default(),
+    ///     watcher::Config::default(),
     /// )
     /// .reconcile_all_on(reload_rx.map(|_| ()))
     /// .run(
@@ -771,12 +777,15 @@ where
     /// # async {
     /// use futures::future::FutureExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
-    /// use kube::{api::ListParams, Api, Client, ResourceExt};
-    /// use kube_runtime::controller::{Controller, Action};
+    /// use kube::{Api, Client, ResourceExt};
+    /// use kube_runtime::{
+    ///     controller::{Controller, Action},
+    ///     watcher,  
+    /// };
     /// use std::{convert::Infallible, sync::Arc};
     /// Controller::new(
     ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
-    ///     ListParams::default(),
+    ///     watcher::Config::default(),
     /// )
     /// .graceful_shutdown_on(tokio::signal::ctrl_c().map(|_| ()))
     /// .run(

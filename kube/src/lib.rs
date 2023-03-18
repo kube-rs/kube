@@ -52,7 +52,7 @@
 //! use futures::{StreamExt, TryStreamExt};
 //! use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 //! use kube::{
-//!     api::{Api, DeleteParams, ListParams, PatchParams, Patch, ResourceExt},
+//!     api::{Api, DeleteParams, PatchParams, Patch, ResourceExt},
 //!     core::CustomResourceExt,
 //!     Client, CustomResource,
 //!     runtime::{watcher, WatchStreamExt, wait::{conditions, await_condition}},
@@ -87,8 +87,8 @@
 //!
 //!     // Watch for changes to foos in the configured namespace
 //!     let foos: Api<Foo> = Api::default_namespaced(client.clone());
-//!     let lp = ListParams::default();
-//!     let mut apply_stream = watcher(foos, lp).applied_objects().boxed();
+//!     let wc = watcher::Config::default();
+//!     let mut apply_stream = watcher(foos, wc).applied_objects().boxed();
 //!     while let Some(f) = apply_stream.try_next().await? {
 //!         println!("saw apply to {}", f.name_any());
 //!     }

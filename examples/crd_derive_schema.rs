@@ -127,27 +127,24 @@ async fn main() -> Result<()> {
     // Nullables defaults to `None` and only sent if it's not configured to skip.
     let bar = Foo::new("bar", FooSpec { ..FooSpec::default() });
     let bar = foos.create(&PostParams::default(), &bar).await?;
-    assert_eq!(
-        bar.spec,
-        FooSpec {
-            // Nonnullable without default is required.
-            non_nullable: String::default(),
-            // Defaulting didn't happen because an empty string was sent.
-            non_nullable_with_default: String::default(),
-            // `nullable_skipped` field does not exist in the object (see below).
-            nullable_skipped: None,
-            // `nullable` field exists in the object (see below).
-            nullable: None,
-            // Defaulting happened because serialization was skipped.
-            nullable_skipped_with_default: default_nullable(),
-            // Defaulting did not happen because `null` was sent.
-            // Deserialization does not apply the default either.
-            nullable_with_default: None,
-            // Empty listables to be patched in later
-            default_listable: Default::default(),
-            set_listable: Default::default(),
-        }
-    );
+    assert_eq!(bar.spec, FooSpec {
+        // Nonnullable without default is required.
+        non_nullable: String::default(),
+        // Defaulting didn't happen because an empty string was sent.
+        non_nullable_with_default: String::default(),
+        // `nullable_skipped` field does not exist in the object (see below).
+        nullable_skipped: None,
+        // `nullable` field exists in the object (see below).
+        nullable: None,
+        // Defaulting happened because serialization was skipped.
+        nullable_skipped_with_default: default_nullable(),
+        // Defaulting did not happen because `null` was sent.
+        // Deserialization does not apply the default either.
+        nullable_with_default: None,
+        // Empty listables to be patched in later
+        default_listable: Default::default(),
+        set_listable: Default::default(),
+    });
 
     // Set up dynamic resource to test using raw values.
     let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
