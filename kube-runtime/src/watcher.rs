@@ -173,18 +173,6 @@ pub struct Config {
     /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
     pub timeout: Option<u32>,
 
-    /// Limit the number of results.
-    ///
-    /// If there are more results, the server will respond with a continue token which can be used to fetch another page
-    /// of results. See the [Kubernetes API docs](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks)
-    /// for pagination details.
-    pub limit: Option<u32>,
-
-    /// Fetch a second page of results.
-    ///
-    /// After listing results with a limit, a continue token can be used to fetch another page of results.
-    pub continue_token: Option<String>,
-
     /// Sets a constraint on what resource versions a request may be served from.
     /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
     /// details.
@@ -209,31 +197,6 @@ pub struct Config {
     pub bookmarks: bool,
 }
 
-impl From<&Config> for ListParams {
-    fn from(val: &Config) -> ListParams {
-        ListParams {
-            label_selector: val.label_selector.clone(),
-            field_selector: val.field_selector.clone(),
-            timeout: val.timeout,
-            limit: val.limit,
-            continue_token: val.continue_token.clone(),
-            resource_version: val.resource_version.clone(),
-            resource_version_match: val.resource_version_match.clone(),
-        }
-    }
-}
-
-impl From<&Config> for WatchParams {
-    fn from(val: &Config) -> WatchParams {
-        WatchParams {
-            label_selector: val.label_selector.clone(),
-            field_selector: val.field_selector.clone(),
-            timeout: val.timeout,
-            bookmarks: val.bookmarks,
-        }
-    }
-}
-
 impl Default for Config {
     /// Default `WatchParams` without any constricting selectors
     fn default() -> Self {
@@ -244,8 +207,6 @@ impl Default for Config {
             label_selector: None,
             field_selector: None,
             timeout: None,
-            limit: None,
-            continue_token: None,
             resource_version: None,
             resource_version_match: None,
         }
@@ -293,20 +254,6 @@ impl Config {
         self
     }
 
-    /// Sets a result limit.
-    #[must_use]
-    pub fn limit(mut self, limit: u32) -> Self {
-        self.limit = Some(limit);
-        self
-    }
-
-    /// Sets a continue token.
-    #[must_use]
-    pub fn continue_token(mut self, token: &str) -> Self {
-        self.continue_token = Some(token.to_string());
-        self
-    }
-
     /// Sets a resource version.
     #[must_use]
     pub fn resource_version(mut self, version: &str) -> Self {
@@ -329,6 +276,31 @@ impl Config {
     pub fn disable_bookmarks(mut self) -> Self {
         self.bookmarks = false;
         self
+    }
+
+    /// Converts generic watcher::Config structure to the instance of ListParams used for list requests.
+    fn to_list_params(&self) -> ListParams {
+        ListParams {
+            label_selector: self.label_selector.clone(),
+            field_selector: self.field_selector.clone(),
+            timeout: self.timeout,
+            resource_version: self.resource_version.clone(),
+            resource_version_match: self.resource_version_match.clone(),
+            // It is not permissible for users to configure the continue token and limit for the watcher, as these parameters are associated with paging.
+            // The watcher must handle paging internally.
+            limit: None,
+            continue_token: None,
+        }
+    }
+
+    /// Converts generic watcher::Config structure to the instance of WatchParams used for watch requests.
+    fn to_watch_params(&self) -> WatchParams {
+        WatchParams {
+            label_selector: self.label_selector.clone(),
+            field_selector: self.field_selector.clone(),
+            timeout: self.timeout,
+            bookmarks: self.bookmarks,
+        }
     }
 }
 
@@ -392,7 +364,7 @@ where
     A::Value: Resource + 'static,
 {
     match state {
-        State::Empty => match api.list(&wc.into()).await {
+        State::Empty => match api.list(&wc.to_list_params()).await {
             Ok(list) => {
                 if let Some(resource_version) = list.metadata.resource_version {
                     (Some(Ok(Event::Restarted(list.items))), State::InitListed {
@@ -411,23 +383,25 @@ where
                 (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
             }
         },
-        State::InitListed { resource_version } => match api.watch(&wc.into(), &resource_version).await {
-            Ok(stream) => (None, State::Watching {
-                resource_version,
-                stream,
-            }),
-            Err(err) => {
-                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                    warn!("watch initlist error with 403: {err:?}");
-                } else {
-                    debug!("watch initlist error: {err:?}");
+        State::InitListed { resource_version } => {
+            match api.watch(&wc.to_watch_params(), &resource_version).await {
+                Ok(stream) => (None, State::Watching {
+                    resource_version,
+                    stream,
+                }),
+                Err(err) => {
+                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                        warn!("watch initlist error with 403: {err:?}");
+                    } else {
+                        debug!("watch initlist error: {err:?}");
+                    }
+                    (
+                        Some(Err(err).map_err(Error::WatchStartFailed)),
+                        State::InitListed { resource_version },
+                    )
                 }
-                (
-                    Some(Err(err).map_err(Error::WatchStartFailed)),
-                    State::InitListed { resource_version },
-                )
             }
-        },
+        }
         State::Watching {
             resource_version,
             mut stream,
@@ -637,11 +611,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, Config {
-        field_selector: Some(format!("metadata.name={name}")),
-        ..Config::default()
-    })
-    .map(|event| match event? {
+    watcher(api, Config::default().fields(&format!("metadata.name={name}"))).map(|event| match event? {
         Event::Deleted(_) => Ok(None),
         // We're filtering by object name, so getting more than one object means that either:
         // 1. The apiserver is accepting multiple objects with the same name, or
