@@ -770,4 +770,27 @@ mod test {
         assert!(format!("{err}")
             .contains("resource_version cannot be equal to \"0\" if the resource_version_match is Exact"));
     }
+
+
+    #[test]
+    fn watch_params() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let wp = WatchParams::default()
+            .disable_bookmarks()
+            .fields("metadata.name=pod=1")
+            .labels("app=web");
+        let req = Request::new(url).watch(&wp, "").unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=&timeoutSeconds=290&fieldSelector=metadata.name%3Dpod%3D1&labelSelector=app%3Dweb"
+        );
+    }
+
+    #[test]
+    fn watch_timeout_error() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let wp = WatchParams::default().timeout(100000);
+        let err = Request::new(url).watch(&wp, "").unwrap_err();
+        assert!(format!("{err}").contains("timeout must be < 295s"));
+    }
 }

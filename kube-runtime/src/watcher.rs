@@ -278,7 +278,7 @@ impl Config {
         self
     }
 
-    /// Converts generic watcher::Config structure to the instance of ListParams used for list requests.
+    /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
         ListParams {
             label_selector: self.label_selector.clone(),
@@ -293,7 +293,7 @@ impl Config {
         }
     }
 
-    /// Converts generic watcher::Config structure to the instance of WatchParams used for watch requests.
+    /// Converts generic `watcher::Config` structure to the instance of `WatchParams` used for watch requests.
     fn to_watch_params(&self) -> WatchParams {
         WatchParams {
             label_selector: self.label_selector.clone(),
