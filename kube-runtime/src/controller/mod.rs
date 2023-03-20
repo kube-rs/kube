@@ -1011,6 +1011,53 @@ where
         self
     }
 
+    /// Trigger the reconciliation process for a managed object `ObjectRef<K>` whenever `trigger` emits a value
+    ///
+    /// For example, this can be used to watch resources once and use the stream to trigger reconciliation and also keep a cache of those objects.
+    /// That way it's possible to use this up to date cache instead of querying Kubernetes to access those resources
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// # async {
+    /// use futures::{StreamExt, TryStreamExt};
+    /// use k8s_openapi::api::core::v1::{ConfigMap, Pod};
+    /// use kube::api::ListParams;
+    /// use kube::runtime::controller::Action;
+    /// use kube::runtime::reflector::ObjectRef;
+    /// use kube::runtime::{reflector, watcher, Controller, WatchStreamExt};
+    /// use kube::ResourceExt;
+    /// use kube::{Api, Client};
+    /// use std::convert::Infallible;
+    /// use std::future;
+    /// use std::sync::Arc;
+    ///
+    /// // let client = Client::try_default().await.unwrap();
+    ///
+    /// // Store can be used in the reconciler instead of querying Kube
+    /// let (pod_store, writer) = reflector::store();
+    /// let pod_stream = reflector(
+    ///     writer,
+    ///     watcher(Api::<Pod>::all(client.clone()), ListParams::default()),
+    /// )
+    /// .applied_objects()
+    /// // Map to the relevant `ObjectRef<K>` to reconcile
+    /// .map_ok(|pod| ObjectRef::new(&format!("{}-cm", pod.name_any())));
+    ///
+    /// Controller::new(Api::<ConfigMap>::all(client), ListParams::default())
+    ///     .reconcile_on(pod_stream)
+    ///     .run(
+    ///         |_obj, _pod_store| async move {
+    ///             // `pod_store` can be used there instead of querying Kubernetes
+    ///             Ok(Action::await_change())
+    ///         },
+    ///         |_object: Arc<ConfigMap>, err: &Infallible, _| Err(err).unwrap(),
+    ///         Arc::new(pod_store),
+    ///     )
+    ///     .for_each(|_| future::ready(()))
+    ///     .await;
+    /// # };
+    /// ```
     #[must_use]
     pub fn reconcile_on(
         mut self,
