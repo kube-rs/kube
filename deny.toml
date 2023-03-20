@@ -92,6 +92,10 @@ version = "0.42"
 name = "hermit-abi"
 
 [[bans.skip]]
+# Needs a complicated upgrade
+name = "syn"
+
+[[bans.skip]]
 # waiting for pem to bump base64
 # https://github.com/jcreekmore/pem-rs/blob/master/Cargo.toml#L16
 name = "base64"
