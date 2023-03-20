@@ -10,12 +10,80 @@ use kube_client::Resource;
 use std::hash::Hash;
 pub use store::{store, Store};
 
-/// Caches objects from `watcher::Event`s to a local `Store`
+/// Cache objects from a [`watcher()`] stream into a local [`Store`]
 ///
-/// Keep in mind that the `Store` is just a cache, and may be out of date.
+/// Observes the raw [`Stream`] of [`watcher::Event`] objects, and modifies the cache.
+/// It passes the raw [`watcher()`] stream through unmodified.
 ///
-/// Note: It is a bad idea to feed a single `reflector` from multiple `watcher`s, since
-/// the whole `Store` will be cleared whenever any of them emits a `Restarted` event.
+/// ## Usage
+/// Create a [`Store`] through e.g. [`store::store()`]. The `writer` part is not-clonable,
+/// and must be moved into the reflector. The `reader` part is the [`Store`] interface
+/// that you can send to other parts of your program as state.
+///
+/// The cache contains the last-seen state of objects,
+/// which may lag slightly behind the actual state.
+///
+/// ## Example
+///
+/// Infinite watch of [`Node`](k8s_openapi::api::core::v1::Node) resources with a certain label.
+///
+/// The `reader` part being passed around to a webserver is omitted.
+/// For examples see [version-rs](https://github.com/kube-rs/version-rs) for integration with [axum](https://github.com/tokio-rs/axum),
+/// or [controller-rs](https://github.com/kube-rs/controller-rs) for the similar controller integration with [actix-web](https://actix.rs/).
+///
+/// ```no_run
+/// use k8s_openapi::api::core::v1::Node;
+/// use kube::runtime::{reflector, watcher, WatchStreamExt},
+/// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+/// # let client: kube::Client = todo!();
+///
+/// let nodes: Api<Node> = Api::all(client);
+/// let node_filter = ListParams::default().labels("kubernetes.io/arch=amd64");
+/// let (reader, writer) = reflector::store();
+///
+/// // Create the infinite reflector stream
+/// let rf = reflector(writer, watcher(nodes, node_filter));
+///
+/// // !!! pass reader to your webserver/manager as state !!!
+///
+/// // Poll the stream (needed to keep the store up-to-date)
+/// let infinite_watch = rf.applied_objects().for_each(|o| { future::ready(()) });
+/// infinite_watch.await;
+/// # Ok(())
+/// # }
+/// ```
+///
+///
+/// ## Memory Usage
+///
+/// A reflector often constitutes one of the biggest components of a controller's memory use.
+/// Given ~two thousand pods in a cluster, a reflector around that quickly consumes 1GB of memory.
+///
+/// While, sometimes acceptible, there are techniques you can leverage to reduce the memory usage
+/// depending on your use case.
+///
+/// 1. Reflect a [`PartialObjectMeta<K>`](kube_client::core::PartialObjectMeta) stream rather than a stream of `K`
+///
+/// You can send in a [`metadata_watcher()`](crate::watcher::metadata_watcher()) for a type rather than a [`watcher()`],
+/// and this will can drop your memory usage by more than a factor of two,
+/// depending on the size of `K`. 60% reduction seen for `Pod`. Usage is otherwise identical.
+///
+/// 2. Use `modify` the raw [`watcher::Event`] object stream to clear unneeded properties
+///
+/// For instance, managed fields typically constitutes around half the size of `ObjectMeta` and can often be dropped:
+///
+/// ```no_run
+/// let stream = watcher(api, ListParams::default()).map_ok(|ev| {
+///     ev.modify(|pod| {
+///         pod.managed_fields_mut().clear();
+///         pod.annotations_mut().clear();
+///         pod.status = None;
+///     })
+/// });
+/// ```
+/// The `stream` can then be passed to `reflector` causing smaller objects to be written to its store.
+/// Note that you **cannot drop everything**; you minimally need the spec properties your app relies on.
+/// Additionally, only `labels`, `annotations` and `managed_fields` are safe to drop from `ObjectMeta`.
 pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Resource + Clone,

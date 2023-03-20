@@ -1,6 +1,6 @@
 //! Publishes events for objects for kubernetes >= 1.19
 use k8s_openapi::{
-    api::{core::v1::ObjectReference, events::v1::Event as CoreEvent},
+    api::{core::v1::ObjectReference, events::v1::Event as K8sEvent},
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
     chrono::Utc,
 };
@@ -163,7 +163,7 @@ impl From<&str> for Reporter {
 /// of `kubectl describe` for that object.
 #[derive(Clone)]
 pub struct Recorder {
-    events: Api<CoreEvent>,
+    events: Api<K8sEvent>,
     reporter: Reporter,
     reference: ObjectReference,
 }
@@ -202,7 +202,7 @@ impl Recorder {
         // for more detail on the fields
         // and what's expected: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#event-v125
         self.events
-            .create(&PostParams::default(), &CoreEvent {
+            .create(&PostParams::default(), &K8sEvent {
                 action: Some(ev.action),
                 reason: Some(ev.reason),
                 deprecated_count: None,
@@ -241,7 +241,7 @@ mod test {
     #![allow(unused_imports)]
 
     use k8s_openapi::api::{
-        core::v1::{Event as CoreEvent, Service},
+        core::v1::{Event as K8sEvent, Service},
         rbac::v1::ClusterRole,
     };
     use kube_client::{Api, Client, Resource};
@@ -265,7 +265,7 @@ mod test {
                 secondary: None,
             })
             .await?;
-        let events: Api<CoreEvent> = Api::namespaced(client, "default");
+        let events: Api<K8sEvent> = Api::namespaced(client, "default");
 
         let event_list = events.list(&Default::default()).await?;
         let found_event = event_list
@@ -294,7 +294,7 @@ mod test {
                 secondary: None,
             })
             .await?;
-        let events: Api<CoreEvent> = Api::namespaced(client, "kube-system");
+        let events: Api<K8sEvent> = Api::namespaced(client, "kube-system");
 
         let event_list = events.list(&Default::default()).await?;
         let found_event = event_list
