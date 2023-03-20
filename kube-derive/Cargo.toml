@@ -18,7 +18,7 @@ categories = ["api-bindings", "encoding"]
 [dependencies]
 proc-macro2 = "1.0.29"
 quote = "1.0.10"
-syn = { version = "1.0.80", features = ["extra-traits"] }
+syn = { version = "2.0.2", features = ["extra-traits"] }
 serde_json = "1.0.68"
 darling = "0.14.0"
 
