@@ -33,7 +33,9 @@ pub use store::{store, Store};
 ///
 /// ```no_run
 /// use k8s_openapi::api::core::v1::Node;
-/// use kube::runtime::{reflector, watcher, WatchStreamExt},
+/// use kube::runtime::{reflector, watcher, WatchStreamExt};
+/// use futures::{StreamExt, future::ready};
+/// # use kube::api::{Api, ListParams};
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();
 ///
@@ -47,7 +49,7 @@ pub use store::{store, Store};
 /// // !!! pass reader to your webserver/manager as state !!!
 ///
 /// // Poll the stream (needed to keep the store up-to-date)
-/// let infinite_watch = rf.applied_objects().for_each(|o| { future::ready(()) });
+/// let infinite_watch = rf.applied_objects().for_each(|o| { ready(()) });
 /// infinite_watch.await;
 /// # Ok(())
 /// # }
@@ -73,6 +75,9 @@ pub use store::{store, Store};
 /// For instance, managed fields typically constitutes around half the size of `ObjectMeta` and can often be dropped:
 ///
 /// ```no_run
+/// # use futures::TryStreamExt;
+/// # use kube::{ResourceExt, api::{Api, ListParams}, runtime::watcher};
+/// # let api: Api<k8s_openapi::api::core::v1::Node> = todo!();
 /// let stream = watcher(api, ListParams::default()).map_ok(|ev| {
 ///     ev.modify(|pod| {
 ///         pod.managed_fields_mut().clear();
