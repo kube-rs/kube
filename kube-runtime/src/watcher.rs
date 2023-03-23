@@ -8,7 +8,7 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
-    api::{ListParams, Resource, ResourceExt, ResourceVersionMatch, WatchEvent, WatchParams},
+    api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
     core::{metadata::PartialObjectMeta, ObjectList},
     error::ErrorResponse,
     Api, Error as ClientErr,
@@ -173,17 +173,10 @@ pub struct Config {
     /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
     pub timeout: Option<u32>,
 
-    /// Sets a constraint on what resource versions a request may be served from.
-    /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
-    /// details.
-    pub resource_version: Option<String>,
-
     /// Determines how resourceVersion is applied to list calls.
-    /// It is highly recommended that resourceVersionMatch be set for list calls where
-    /// resourceVersion is set
     /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
     /// details.
-    pub resource_version_match: Option<ResourceVersionMatch>,
+    pub version_match: VersionMatch,
 
     /// Enables watch events with type "BOOKMARK".
     ///
@@ -207,8 +200,7 @@ impl Default for Config {
             label_selector: None,
             field_selector: None,
             timeout: None,
-            resource_version: None,
-            resource_version_match: None,
+            version_match: VersionMatch::default(),
         }
     }
 }
@@ -254,17 +246,10 @@ impl Config {
         self
     }
 
-    /// Sets a resource version.
+    /// Sets resource version and resource version match.
     #[must_use]
-    pub fn resource_version(mut self, version: &str) -> Self {
-        self.resource_version = Some(version.to_string());
-        self
-    }
-
-    /// Sets a resource version match.
-    #[must_use]
-    pub fn resource_version_match(mut self, version_match: ResourceVersionMatch) -> Self {
-        self.resource_version_match = Some(version_match);
+    pub fn version_match(mut self, version_match: VersionMatch) -> Self {
+        self.version_match = version_match;
         self
     }
 
@@ -284,8 +269,7 @@ impl Config {
             label_selector: self.label_selector.clone(),
             field_selector: self.field_selector.clone(),
             timeout: self.timeout,
-            resource_version: self.resource_version.clone(),
-            resource_version_match: self.resource_version_match.clone(),
+            version_match: self.version_match.clone(),
             // It is not permissible for users to configure the continue token and limit for the watcher, as these parameters are associated with paging.
             // The watcher must handle paging internally.
             limit: None,

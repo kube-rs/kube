@@ -5,22 +5,27 @@ use crate::request::Error;
 use serde::Serialize;
 
 /// Specifies how the resourceVersion parameter is applied. resourceVersionMatch may only be set if resourceVersion is also set.
-/// "NotOlderThan" matches data at least as new as the provided resourceVersion. "Exact" matches data at the exact resourceVersion provided.
-///
 /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.
-#[derive(Clone, Debug, PartialEq)]
-pub enum ResourceVersionMatch {
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum VersionMatch {
+    /// Matches data with the latest version available in the kube-apiserver database (etcd) (quorum read required).
+    #[default]
+    MostRecent,
+    /// Matches data with the latest version available in the kube-apiserver cache.
+    Any,
     /// Matches data at least as new as the provided resourceVersion.
-    NotOlderThan,
+    NotOlderThan(String),
     /// Matches data at the exact resourceVersion provided.
-    Exact,
+    Exact(String),
 }
 
-impl fmt::Display for ResourceVersionMatch {
+impl fmt::Display for VersionMatch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ResourceVersionMatch::NotOlderThan => write!(f, "NotOlderThan"),
-            ResourceVersionMatch::Exact => write!(f, "Exact"),
+            VersionMatch::MostRecent => write!(f, "MostRecent"),
+            VersionMatch::Any => write!(f, "Any"),
+            VersionMatch::NotOlderThan(s) => write!(f, "NotOlderThan[{}]", s),
+            VersionMatch::Exact(s) => write!(f, "Exact[{}]", s),
         }
     }
 }
@@ -55,17 +60,10 @@ pub struct ListParams {
     /// After listing results with a limit, a continue token can be used to fetch another page of results.
     pub continue_token: Option<String>,
 
-    /// Sets a constraint on what resource versions a request may be served from.
-    /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
-    /// details.
-    pub resource_version: Option<String>,
-
     /// Determines how resourceVersion is applied to list calls.
-    /// It is highly recommended that resourceVersionMatch be set for list calls where
-    /// resourceVersion is set
     /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
     /// details.
-    pub resource_version_match: Option<ResourceVersionMatch>,
+    pub version_match: VersionMatch,
 }
 
 impl Default for ListParams {
@@ -77,27 +75,22 @@ impl Default for ListParams {
             timeout: None,
             limit: None,
             continue_token: None,
-            resource_version: None,
-            resource_version_match: None,
+            version_match: VersionMatch::default(),
         }
     }
 }
 
 impl ListParams {
     pub(crate) fn validate(&self) -> Result<(), Error> {
-        if self.resource_version_match.is_some() && self.resource_version.is_none() {
-            return Err(Error::Validation(
-                "ListParams::resource_version cannot be empty if the resource_version_match is set.".into(),
-            ));
-        }
-        if let (Some(version), Some(ResourceVersionMatch::Exact)) =
-            (&self.resource_version, &self.resource_version_match)
-        {
-            if version == "0" {
-                return Err(Error::Validation(
-                    "ListParams::resource_version cannot be equal to \"0\" if the resource_version_match is Exact.".into(),
-                ));
+        match &self.version_match {
+            VersionMatch::Exact(resource_version) | VersionMatch::NotOlderThan(resource_version) => {
+                if resource_version == "0" {
+                    return Err(Error::Validation(
+                        "ListParams::version_match cannot be equal to \"0\" for Exact and NotOlderThan variants.".into(),
+                    ));
+                }
             }
+            _ => (),
         }
         Ok(())
     }
@@ -158,17 +151,10 @@ impl ListParams {
         self
     }
 
-    /// Sets a resource version.
+    /// Sets resource version and resource version match.
     #[must_use]
-    pub fn resource_version(mut self, version: &str) -> Self {
-        self.resource_version = Some(version.to_string());
-        self
-    }
-
-    /// Sets a resource version match.
-    #[must_use]
-    pub fn resource_version_match(mut self, version_match: ResourceVersionMatch) -> Self {
-        self.resource_version_match = Some(version_match);
+    pub fn version_match(mut self, version_match: VersionMatch) -> Self {
+        self.version_match = version_match;
         self
     }
 }
