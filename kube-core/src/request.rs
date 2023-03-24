@@ -764,8 +764,19 @@ mod test {
         let gp = ListParams::default().version_match(VersionMatch::Any);
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
-            req.uri(),
-            "/api/v1/namespaces/ns/pods?&resourceVersion=0&resourceVersionMatch=NotOlderThan"
+            req.uri().query().unwrap(),
+            "&resourceVersion=0&resourceVersionMatch=NotOlderThan"
+        );
+    }
+
+    #[test]
+    fn list_most_recent_pods() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let gp = ListParams::default().version_match(VersionMatch::MostRecent);
+        let req = Request::new(url).list(&gp).unwrap();
+        assert_eq!(
+            req.uri().query().unwrap(),
+            "" // No options are required
         );
     }
 
@@ -778,14 +789,26 @@ mod test {
             .contains("version_match cannot be equal to \"0\" for Exact and NotOlderThan variants"));
     }
 
+
+    #[test]
+    fn list_not_older() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let gp = ListParams::default().version_match(VersionMatch::NotOlderThan("20".to_string()));
+        let req = Request::new(url).list(&gp).unwrap();
+        assert_eq!(
+            req.uri().query().unwrap(),
+            "&resourceVersion=20&resourceVersionMatch=NotOlderThan"
+        );
+    }
+
     #[test]
     fn list_exact_match() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let gp = ListParams::default().version_match(VersionMatch::Exact("500".to_string()));
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
-            req.uri(),
-            "/api/v1/namespaces/ns/pods?&resourceVersion=500&resourceVersionMatch=Exact"
+            req.uri().query().unwrap(),
+            "&resourceVersion=500&resourceVersionMatch=Exact"
         );
     }
 
@@ -798,8 +821,8 @@ mod test {
             .labels("app=web");
         let req = Request::new(url).watch(&wp, "").unwrap();
         assert_eq!(
-            req.uri(),
-            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=&timeoutSeconds=290&fieldSelector=metadata.name%3Dpod%3D1&labelSelector=app%3Dweb"
+            req.uri().query().unwrap(),
+            "&watch=true&resourceVersion=&timeoutSeconds=290&fieldSelector=metadata.name%3Dpod%3D1&labelSelector=app%3Dweb"
         );
     }
 

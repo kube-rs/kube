@@ -31,7 +31,7 @@ impl fmt::Display for VersionMatch {
 }
 
 /// Common query parameters used in list/delete calls on collections
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///
@@ -64,20 +64,6 @@ pub struct ListParams {
     /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
     /// details.
     pub version_match: VersionMatch,
-}
-
-impl Default for ListParams {
-    /// Default `ListParams` without any constricting selectors
-    fn default() -> Self {
-        Self {
-            label_selector: None,
-            field_selector: None,
-            timeout: None,
-            limit: None,
-            continue_token: None,
-            version_match: VersionMatch::default(),
-        }
-    }
 }
 
 impl ListParams {
