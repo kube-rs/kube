@@ -500,10 +500,10 @@ where
     ///
     /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::new`] for static types.
     ///
-    /// [`Config`]: kube_runtime::watcher::Config
+    /// [`Config`]: crate::watcher::Config
     /// [`Api`]: kube_client::Api
     /// [`dynamic`]: kube_client::core::dynamic
-    /// [`Config::default`]: kube_runtime::watcher::Config::default
+    /// [`Config::default`]: crate::watcher::Config::default
     pub fn new_with(owned_api: Api<K>, wc: Config, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
@@ -552,9 +552,9 @@ where
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `Child`.
     /// All owned `Child` objects **must** contain an [`OwnerReference`] pointing back to a `K`.
     ///
-    /// The [`ListParams`] refer to the possible subset of `Child` objects that you want the [`Api`]
-    ///  to watch - in the Api's configured scope - and receive reconcile events for.
-    /// To watch the full set of `Child` objects in the given `Api` scope, you can use [`ListParams::default`].
+    /// The [`watcher::Config`] controls the subset of `Child` objects that you want the [`Api`]
+    /// to watch - in the Api's configured scope - and receive reconcile events for.
+    /// To watch the full set of `Child` objects in the given `Api` scope, you can use [`watcher::Config::default`].
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
     #[must_use]
@@ -593,9 +593,9 @@ where
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `Watched`.
     ///
-    /// The [`ListParams`] refer to the possible subset of `Watched` objects that you want the [`Api`]
+    /// The [`watcher::Config`] controls the subset of `Watched` objects that you want the [`Api`]
     /// to watch - in the Api's configured scope - and run through the custom mapper.
-    /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`ListParams::default`].
+    /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`watcher::Config::default`].
     ///
     /// # Example
     ///

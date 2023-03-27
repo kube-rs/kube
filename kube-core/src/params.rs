@@ -4,8 +4,10 @@ use std::fmt;
 use crate::request::Error;
 use serde::Serialize;
 
-/// Specifies how the resourceVersion parameter is applied. resourceVersionMatch may only be set if resourceVersion is also set.
-/// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.
+/// Controls how the resourceVersion parameter is applied
+///
+/// This embeds the resource version when using the `NotOlderThan` or `Exact` variants.
+/// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list> for details.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum VersionMatch {
     /// Matches data with the latest version available in the kube-apiserver database (etcd) (quorum read required).
@@ -61,7 +63,7 @@ pub struct ListParams {
     pub continue_token: Option<String>,
 
     /// Determines how resourceVersion is applied to list calls.
-    /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for
     /// details.
     pub version_match: VersionMatch,
 }
