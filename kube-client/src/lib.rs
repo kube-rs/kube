@@ -449,7 +449,7 @@ mod test {
         assert_eq!(log_line, "kube 1\n");
 
         // wait for container to finish
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         let all_logs = pods.logs("busybox-kube3", &Default::default()).await?;
         assert_eq!(all_logs, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
