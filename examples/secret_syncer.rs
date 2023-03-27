@@ -6,11 +6,12 @@
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 use kube::{
-    api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
+    api::{Api, DeleteParams, ObjectMeta, Patch, PatchParams, Resource},
     error::ErrorResponse,
     runtime::{
         controller::{Action, Controller},
         finalizer::{finalizer, Event},
+        watcher,
     },
 };
 use std::{sync::Arc, time::Duration};
@@ -78,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
     let client = kube::Client::try_default().await?;
     Controller::new(
         Api::<ConfigMap>::all(client.clone()),
-        ListParams::default().labels("configmap-secret-syncer.nullable.se/sync=true"),
+        watcher::Config::default().labels("configmap-secret-syncer.nullable.se/sync=true"),
     )
     .run(
         |cm, _| {

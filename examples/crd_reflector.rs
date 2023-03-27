@@ -3,7 +3,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 use tracing::*;
 
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, ResourceExt},
+    api::{Api, Patch, PatchParams, ResourceExt},
     runtime::{reflector, watcher, WatchStreamExt},
     Client, CustomResource, CustomResourceExt,
 };
@@ -36,8 +36,8 @@ async fn main() -> anyhow::Result<()> {
     let (reader, writer) = reflector::store::<Foo>();
 
     let foos: Api<Foo> = Api::default_namespaced(client);
-    let lp = ListParams::default().timeout(20); // low timeout in this example
-    let rf = reflector(writer, watcher(foos, lp));
+    let wc = watcher::Config::default().timeout(20); // low timeout in this example
+    let rf = reflector(writer, watcher(foos, wc));
 
     tokio::spawn(async move {
         loop {

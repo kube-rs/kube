@@ -423,20 +423,20 @@ where
     /// then you can stream the remaining buffered `WatchEvent` objects.
     ///
     /// Note that a `watch` call can terminate for many reasons (even before the specified
-    /// [`ListParams::timeout`] is triggered), and will have to be re-issued
+    /// [`WatchParams::timeout`] is triggered), and will have to be re-issued
     /// with the last seen resource version when or if it closes.
     ///
     /// Consider using a managed [`watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
-    /// use kube::api::{Api, ListParams, ResourceExt, WatchEvent};
+    /// use kube::api::{Api, WatchParams, ResourceExt, WatchEvent};
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
     ///
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
     /// let jobs: Api<Job> = Api::namespaced(client, "apps");
-    /// let lp = ListParams::default()
+    /// let lp = WatchParams::default()
     ///     .fields("metadata.name=my_job")
     ///     .timeout(20); // upper bound of how long we watch for
     /// let mut stream = jobs.watch(&lp, "0").await?.boxed();
@@ -452,14 +452,14 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    /// [`ListParams::timeout`]: super::ListParams::timeout
+    /// [`WatchParams::timeout`]: super::WatchParams::timeout
     /// [`watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.watcher.html
     pub async fn watch(
         &self,
-        lp: &ListParams,
+        wp: &WatchParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
-        let mut req = self.request.watch(lp, version).map_err(Error::BuildRequest)?;
+        let mut req = self.request.watch(wp, version).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch");
         self.client.request_events::<K>(req).await
     }
@@ -470,14 +470,14 @@ where
     /// then you can stream the remaining buffered `WatchEvent` objects.
     ///
     /// Note that a `watch_metadata` call can terminate for many reasons (even
-    /// before the specified [`ListParams::timeout`] is triggered), and will
+    /// before the specified [`WatchParams::timeout`] is triggered), and will
     /// have to be re-issued with the last seen resource version when or if it
     /// closes.
     ///
     /// Consider using a managed [`metadata_watcher`] to deal with automatic re-watches and error cases.
     ///
     /// ```no_run
-    /// use kube::api::{Api, ListParams, ResourceExt, WatchEvent};
+    /// use kube::api::{Api, WatchParams, ResourceExt, WatchEvent};
     /// use k8s_openapi::api::batch::v1::Job;
     /// use futures::{StreamExt, TryStreamExt};
     ///
@@ -485,7 +485,7 @@ where
     /// # let client: kube::Client = todo!();
     /// let jobs: Api<Job> = Api::namespaced(client, "apps");
     ///
-    /// let lp = ListParams::default()
+    /// let lp = WatchParams::default()
     ///     .fields("metadata.name=my_job")
     ///     .timeout(20); // upper bound of how long we watch for
     /// let mut stream = jobs.watch(&lp, "0").await?.boxed();
@@ -501,16 +501,16 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    /// [`ListParams::timeout`]: super::ListParams::timeout
+    /// [`WatchParams::timeout`]: super::WatchParams::timeout
     /// [`metadata_watcher`]: https://docs.rs/kube_runtime/*/kube_runtime/watcher/fn.metadata_watcher.html
     pub async fn watch_metadata(
         &self,
-        lp: &ListParams,
+        wp: &WatchParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<PartialObjectMeta<K>>>>> {
         let mut req = self
             .request
-            .watch_metadata(lp, version)
+            .watch_metadata(wp, version)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch_metadata");
         self.client.request_events::<PartialObjectMeta<K>>(req).await

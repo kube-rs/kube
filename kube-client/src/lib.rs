@@ -139,7 +139,7 @@ mod test {
     use futures::{StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::Pod;
     use kube_core::{
-        params::{DeleteParams, Patch},
+        params::{DeleteParams, Patch, WatchParams},
         response::StatusSummary,
     };
     use serde_json::json;
@@ -227,10 +227,10 @@ mod test {
 
         // Manual watch-api for it to become ready
         // NB: don't do this; using conditions (see pod_api example) is easier and less error prone
-        let lp = ListParams::default()
+        let wp = WatchParams::default()
             .fields(&format!("metadata.name={}", "busybox-kube1"))
             .timeout(15);
-        let mut stream = pods.watch(&lp, "0").await?.boxed();
+        let mut stream = pods.watch(&wp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
             // can debug format watch event
             let _ = format!("we: {ev:?}");
@@ -307,10 +307,10 @@ mod test {
 
         // Manual watch-api for it to become ready
         // NB: don't do this; using conditions (see pod_api example) is easier and less error prone
-        let lp = ListParams::default()
+        let wp = WatchParams::default()
             .fields(&format!("metadata.name={}", "busybox-kube2"))
             .timeout(15);
-        let mut stream = pods.watch(&lp, "0").await?.boxed();
+        let mut stream = pods.watch(&wp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
             match ev {
                 WatchEvent::Modified(o) => {
@@ -421,10 +421,10 @@ mod test {
 
         // Manual watch-api for it to become ready
         // NB: don't do this; using conditions (see pod_api example) is easier and less error prone
-        let lp = ListParams::default()
+        let wp = WatchParams::default()
             .fields(&format!("metadata.name={}", "busybox-kube3"))
             .timeout(15);
-        let mut stream = pods.watch(&lp, "0").await?.boxed();
+        let mut stream = pods.watch(&wp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
             match ev {
                 WatchEvent::Modified(o) => {
