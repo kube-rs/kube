@@ -33,14 +33,14 @@ pub use store::{store, Store};
 ///
 /// ```no_run
 /// use k8s_openapi::api::core::v1::Node;
-/// use kube::runtime::{reflector, watcher, WatchStreamExt};
+/// use kube::runtime::{reflector, watcher, WatchStreamExt, watcher::Config};
 /// use futures::{StreamExt, future::ready};
-/// # use kube::api::{Api, ListParams};
+/// # use kube::api::Api;
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();
 ///
 /// let nodes: Api<Node> = Api::all(client);
-/// let node_filter = ListParams::default().labels("kubernetes.io/arch=amd64");
+/// let node_filter = Config::default().labels("kubernetes.io/arch=amd64");
 /// let (reader, writer) = reflector::store();
 ///
 /// // Create the infinite reflector stream
@@ -76,9 +76,9 @@ pub use store::{store, Store};
 ///
 /// ```no_run
 /// # use futures::TryStreamExt;
-/// # use kube::{ResourceExt, api::{Api, ListParams}, runtime::watcher};
+/// # use kube::{ResourceExt, Api, runtime::watcher};
 /// # let api: Api<k8s_openapi::api::core::v1::Node> = todo!();
-/// let stream = watcher(api, ListParams::default()).map_ok(|ev| {
+/// let stream = watcher(api, Default::default()).map_ok(|ev| {
 ///     ev.modify(|pod| {
 ///         pod.managed_fields_mut().clear();
 ///         pod.annotations_mut().clear();
