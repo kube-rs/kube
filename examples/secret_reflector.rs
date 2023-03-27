@@ -1,7 +1,7 @@
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
+    api::{Api, ResourceExt},
     runtime::{reflector, reflector::Store, watcher, WatchStreamExt},
     Client,
 };
@@ -53,10 +53,10 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let secrets: Api<Secret> = Api::default_namespaced(client);
-    let lp = ListParams::default().timeout(10); // short watch timeout in this example
+    let wc = watcher::Config::default().timeout(10); // short watch timeout in this example
 
     let (reader, writer) = reflector::store::<Secret>();
-    let rf = reflector(writer, watcher(secrets, lp));
+    let rf = reflector(writer, watcher(secrets, wc));
 
     spawn_periodic_reader(reader); // read from a reader in the background
 

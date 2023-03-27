@@ -1,6 +1,6 @@
 use futures::{Stream, StreamExt, TryStreamExt};
 use kube::{
-    api::{Api, DynamicObject, GroupVersionKind, ListParams, Resource, ResourceExt},
+    api::{Api, DynamicObject, GroupVersionKind, Resource, ResourceExt},
     runtime::{metadata_watcher, watcher, watcher::Event, WatchStreamExt},
 };
 use serde::de::DeserializeOwned;
@@ -28,13 +28,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Use the full resource info to create an Api with the ApiResource as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &ar);
-    let lp = ListParams::default();
+    let wc = watcher::Config::default();
 
     // Start a metadata or a full resource watch
     if watch_metadata {
-        handle_events(metadata_watcher(api, lp)).await
+        handle_events(metadata_watcher(api, wc)).await
     } else {
-        handle_events(watcher(api, lp)).await
+        handle_events(watcher(api, wc)).await
     }
 }
 

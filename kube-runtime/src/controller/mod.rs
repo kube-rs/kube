@@ -9,7 +9,7 @@ use crate::{
     },
     scheduler::{scheduler, ScheduleRequest},
     utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
-    watcher::{self, watcher},
+    watcher::{self, watcher, Config},
 };
 use backoff::backoff::Backoff;
 use derivative::Derivative;
@@ -18,7 +18,7 @@ use futures::{
     future::{self, BoxFuture},
     ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube_client::api::{Api, DynamicObject, ListParams, Resource};
+use kube_client::api::{Api, DynamicObject, Resource};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
@@ -395,7 +395,10 @@ where
 /// use kube::{
 ///   Client, CustomResource,
 ///   api::{Api, ListParams},
-///   runtime::controller::{Controller, Action}
+///   runtime::{
+///     controller::{Controller, Action},
+///     watcher,
+///   },
 /// };
 /// use serde::{Deserialize, Serialize};
 /// use tokio::time::Duration;
@@ -434,8 +437,8 @@ where
 ///     let context = Arc::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
-///     Controller::new(cmgs, ListParams::default())
-///         .owns(cms, ListParams::default())
+///     Controller::new(cmgs, watcher::Config::default())
+///         .owns(cms, watcher::Config::default())
 ///         .run(reconcile, error_policy, context)
 ///         .for_each(|res| async move {
 ///             match res {
@@ -476,37 +479,37 @@ where
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
-    /// The [`ListParams`] controls to the possible subset of objects of `K` that you want to manage
+    /// The [`Config`] controls to the possible subset of objects of `K` that you want to manage
     /// and receive reconcile events for.
-    /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
+    /// For the full set of objects `K` in the given `Api` scope, you can use [`Config::default`].
     #[must_use]
-    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self
+    pub fn new(owned_api: Api<K>, wc: Config) -> Self
     where
         K::DynamicType: Default,
     {
-        Self::new_with(owned_api, lp, Default::default())
+        Self::new_with(owned_api, wc, Default::default())
     }
 
     /// Create a Controller on a type `K`
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
-    /// The [`ListParams`] lets you define a possible subset of objects of `K` that you want the [`Api`]
+    /// The [`Config`] lets you define a possible subset of objects of `K` that you want the [`Api`]
     /// to watch - in the Api's  configured scope - and receive reconcile events for.
-    /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
+    /// For the full set of objects `K` in the given `Api` scope, you can use [`Config::default`].
     ///
     /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::new`] for static types.
     ///
-    /// [`ListParams`]: kube_client::api::ListParams
+    /// [`Config`]: kube_runtime::watcher::Config
     /// [`Api`]: kube_client::Api
     /// [`dynamic`]: kube_client::core::dynamic
-    /// [`ListParams::default`]: kube_client::api::ListParams::default
-    pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
+    /// [`Config::default`]: kube_runtime::watcher::Config::default
+    pub fn new_with(owned_api: Api<K>, wc: Config, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
-            reflector(writer, watcher(owned_api, lp)).applied_objects(),
+            reflector(writer, watcher(owned_api, wc)).applied_objects(),
             dyntype.clone(),
         )
         .boxed();
@@ -558,9 +561,9 @@ where
     pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
         self,
         api: Api<Child>,
-        lp: ListParams,
+        wc: Config,
     ) -> Self {
-        self.owns_with(api, (), lp)
+        self.owns_with(api, (), wc)
     }
 
     /// Specify `Child` objects which `K` owns and should be watched
@@ -571,12 +574,12 @@ where
         mut self,
         api: Api<Child>,
         dyntype: Child::DynamicType,
-        lp: ListParams,
+        wc: Config,
     ) -> Self
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners(watcher(api, lp).touched_objects(), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners(watcher(api, wc).touched_objects(), self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -599,7 +602,7 @@ where
     /// Tracking cross cluster references using the [Operator-SDK] annotations.
     ///
     /// ```
-    /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef};
+    /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef, watcher};
     /// # use kube::api::{Api, ListParams};
     /// # use kube::ResourceExt;
     /// # use k8s_openapi::api::core::v1::{ConfigMap, Namespace};
@@ -616,10 +619,10 @@ where
     /// # async fn doc(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// # let memcached = Api::<ConfigMap>::all(client.clone());
     /// # let context = Arc::new(Context);
-    /// Controller::new(memcached, ListParams::default())
+    /// Controller::new(memcached, watcher::Config::default())
     ///     .watches(
     ///         Api::<WatchedResource>::all(client.clone()),
-    ///         ListParams::default(),
+    ///         watcher::Config::default(),
     ///         |ar| {
     ///             let prt = ar
     ///                 .annotations()
@@ -653,13 +656,13 @@ where
     >(
         self,
         api: Api<Other>,
-        lp: ListParams,
+        wc: Config,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
         I::IntoIter: Send,
     {
-        self.watches_with(api, (), lp, mapper)
+        self.watches_with(api, (), wc, mapper)
     }
 
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
@@ -673,14 +676,14 @@ where
         mut self,
         api: Api<Other>,
         dyntype: Other::DynamicType,
-        lp: ListParams,
+        wc: Config,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
         I::IntoIter: Send,
         Other::DynamicType: Clone,
     {
-        let other_watcher = trigger_with(watcher(api, lp).touched_objects(), move |obj| {
+        let other_watcher = trigger_with(watcher(api, wc).touched_objects(), move |obj| {
             let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
             mapper(obj)
                 .into_iter()
@@ -707,8 +710,11 @@ where
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{
     ///     Client,
-    ///     api::{ListParams, Api, ResourceExt},
-    ///     runtime::{controller::{Controller, Action}},
+    ///     api::{Api, ResourceExt},
+    ///     runtime::{
+    ///         controller::{Controller, Action},
+    ///         watcher,
+    ///     },
     /// };
     /// use std::{convert::Infallible, io::BufRead, sync::Arc};
     /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
@@ -721,7 +727,7 @@ where
     /// });
     /// Controller::new(
     ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
-    ///     ListParams::default(),
+    ///     watcher::Config::default(),
     /// )
     /// .reconcile_all_on(reload_rx.map(|_| ()))
     /// .run(
@@ -771,12 +777,15 @@ where
     /// # async {
     /// use futures::future::FutureExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
-    /// use kube::{api::ListParams, Api, Client, ResourceExt};
-    /// use kube_runtime::controller::{Controller, Action};
+    /// use kube::{Api, Client, ResourceExt};
+    /// use kube_runtime::{
+    ///     controller::{Controller, Action},
+    ///     watcher,  
+    /// };
     /// use std::{convert::Infallible, sync::Arc};
     /// Controller::new(
     ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
-    ///     ListParams::default(),
+    ///     watcher::Config::default(),
     /// )
     /// .graceful_shutdown_on(tokio::signal::ctrl_c().map(|_| ()))
     /// .run(

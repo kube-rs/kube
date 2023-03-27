@@ -3,8 +3,8 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{
-        Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, ListParams, Patch, PatchParams,
-        PostParams, WatchEvent,
+        Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams,
+        WatchEvent, WatchParams,
     },
     runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt,
@@ -241,10 +241,10 @@ async fn delete_crd(client: Client) -> Result<()> {
 
         // Wait until deleted
         let timeout_secs = 15;
-        let lp = ListParams::default()
+        let wp = WatchParams::default()
             .fields("metadata.name=foos.clux.dev")
             .timeout(timeout_secs);
-        let mut stream = api.watch(&lp, "0").await?.boxed_local();
+        let mut stream = api.watch(&wp, "0").await?.boxed_local();
         while let Some(status) = stream.try_next().await? {
             if let WatchEvent::Deleted(_) = status {
                 return Ok(());

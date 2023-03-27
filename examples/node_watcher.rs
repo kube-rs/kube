@@ -15,8 +15,8 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 
-    let lp = ListParams::default().labels("beta.kubernetes.io/arch=amd64");
-    let obs = watcher(nodes, lp)
+    let wc = watcher::Config::default().labels("beta.kubernetes.io/arch=amd64");
+    let obs = watcher(nodes, wc)
         .backoff(ExponentialBackoff::default())
         .applied_objects();
 
