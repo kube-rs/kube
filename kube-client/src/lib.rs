@@ -454,11 +454,12 @@ mod test {
         let all_logs = pods.logs("busybox-kube3", &Default::default()).await?;
         assert_eq!(all_logs, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
 
-        // remaining logs should have been buffered internally
-        assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 2\n");
-        assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 3\n");
-        assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 4\n");
-        assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 5\n");
+        // individual logs may or may not buffer
+        let mut output = String::new();
+        while let Some(line) = logs_stream.try_next().await? {
+            output.push_str(&String::from_utf8_lossy(&line));
+        }
+        assert_eq!(output, "kube 2\nkube 3\nkube 4\nkube 5\n"); // NB: first line taken
 
         // evict the pod
         let ep = EvictParams::default();
