@@ -139,6 +139,9 @@ mod custom_resource;
 /// ## `#[kube(shortname = "sn")]`
 /// Add a single shortname to the generated crd.
 ///
+/// ## `#[kube(category = "apps")]`
+/// Add a single category to `crd.spec.names.categories`.
+///
 /// ## Example with all properties
 ///
 /// ```rust

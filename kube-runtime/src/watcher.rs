@@ -174,7 +174,7 @@ pub struct Config {
     pub timeout: Option<u32>,
 
     /// Determines how resourceVersion is applied to list calls.
-    /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for
     /// details.
     pub version_match: VersionMatch,
 

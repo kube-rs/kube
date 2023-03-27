@@ -1,6 +1,6 @@
 //! Publishes events for objects for kubernetes >= 1.19
 use k8s_openapi::{
-    api::{core::v1::ObjectReference, events::v1::Event as CoreEvent},
+    api::{core::v1::ObjectReference, events::v1::Event as K8sEvent},
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
     chrono::Utc,
 };
@@ -21,6 +21,7 @@ pub struct Event {
     /// The short reason explaining why the `action` was taken.
     ///
     /// This must be at most 128 characters, and is often PascalCased. Shows up in `kubectl describe` as `Reason`.
+    /// Usually denoted
     pub reason: String,
 
     /// A optional description of the status of the `action`.
@@ -31,6 +32,8 @@ pub struct Event {
     /// The action that was taken (either successfully or unsuccessfully) against main object
     ///
     /// This must be at most 128 characters. It does not currently show up in `kubectl describe`.
+    /// A common convention is a short identifier of the action that caused the outcome described in `reason`.
+    /// Usually denoted in `PascalCase`.
     pub action: String,
 
     /// Optional secondary object related to the main object
@@ -126,10 +129,7 @@ impl From<&str> for Reporter {
 /// specified when building the recorder using [`Recorder::new`].
 ///
 /// ```
-/// use kube::{
-///   core::Resource,
-///   runtime::events::{Reporter, Recorder, Event, EventType}
-/// };
+/// use kube::runtime::events::{Reporter, Recorder, Event, EventType};
 /// use k8s_openapi::api::core::v1::ObjectReference;
 ///
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
@@ -161,9 +161,19 @@ impl From<&str> for Reporter {
 ///
 /// Events attached to an object will be shown in the `Events` section of the output of
 /// of `kubectl describe` for that object.
+///
+/// ## RBAC
+///
+/// Note that usage of the event recorder minimally requires the following RBAC rules:
+///
+/// ```yaml
+/// - apiGroups: ["events.k8s.io"]
+///   resources: ["events"]
+///   verbs: ["create"]
+/// ```
 #[derive(Clone)]
 pub struct Recorder {
-    events: Api<CoreEvent>,
+    events: Api<K8sEvent>,
     reporter: Reporter,
     reference: ObjectReference,
 }
@@ -202,7 +212,7 @@ impl Recorder {
         // for more detail on the fields
         // and what's expected: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#event-v125
         self.events
-            .create(&PostParams::default(), &CoreEvent {
+            .create(&PostParams::default(), &K8sEvent {
                 action: Some(ev.action),
                 reason: Some(ev.reason),
                 deprecated_count: None,
@@ -241,7 +251,7 @@ mod test {
     #![allow(unused_imports)]
 
     use k8s_openapi::api::{
-        core::v1::{Event as CoreEvent, Service},
+        core::v1::{Event as K8sEvent, Service},
         rbac::v1::ClusterRole,
     };
     use kube_client::{Api, Client, Resource};
@@ -265,7 +275,7 @@ mod test {
                 secondary: None,
             })
             .await?;
-        let events: Api<CoreEvent> = Api::namespaced(client, "default");
+        let events: Api<K8sEvent> = Api::namespaced(client, "default");
 
         let event_list = events.list(&Default::default()).await?;
         let found_event = event_list
@@ -294,7 +304,7 @@ mod test {
                 secondary: None,
             })
             .await?;
-        let events: Api<CoreEvent> = Api::namespaced(client, "kube-system");
+        let events: Api<K8sEvent> = Api::namespaced(client, "kube-system");
 
         let event_list = events.list(&Default::default()).await?;
         let found_event = event_list
