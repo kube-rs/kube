@@ -445,8 +445,6 @@ mod test {
             ..LogParams::default()
         };
         let mut logs_stream = pods.log_stream("busybox-kube3", &lp).await?.boxed();
-        let log_line = logs_stream.try_next().await?.unwrap();
-        assert_eq!(log_line, "kube 1\n");
 
         // wait for container to finish
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -459,7 +457,7 @@ mod test {
         while let Some(line) = logs_stream.try_next().await? {
             output.push_str(&String::from_utf8_lossy(&line));
         }
-        assert_eq!(output, "kube 2\nkube 3\nkube 4\nkube 5\n"); // NB: first line taken
+        assert_eq!(output, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
 
         // evict the pod
         let ep = EvictParams::default();
