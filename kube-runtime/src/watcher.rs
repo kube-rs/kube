@@ -157,11 +157,11 @@ struct FullObject<'a, K> {
 /// Allowable list semantics
 #[derive(Clone, Default, Debug, PartialEq)]
 pub enum Semantic {
-    /// List calls perform a full quorum read
+    /// List calls perform a full quorum read for most recent results
     ///
-    /// Prefer this only if you have strong consistency requirements as it is less
-    /// scalable for the cluster.
-    Strong,
+    /// Prefer this if you have strong consistency requirements. Note that this
+    /// is more taxing for the apiserver and can be less scalable for the cluster.
+    MostRecent,
 
     /// List calls returns cached results from apiserver
     ///
@@ -169,7 +169,7 @@ pub enum Semantic {
     /// in much older results than has previously observed for `Restarted` events,
     /// particularly in HA configurations, due to partitions or stale caches.
     #[default]
-    Cache,
+    Cached,
 }
 
 /// Accumulates all options that can be used on the watcher invocation.
@@ -276,8 +276,8 @@ impl Config {
     /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
         let version_match = match self.semantic {
-            Semantic::Cache => VersionMatch::NotOlderThan,
-            Semantic::Strong => VersionMatch::Unset,
+            Semantic::Cached => VersionMatch::NotOlderThan,
+            Semantic::MostRecent => VersionMatch::Unset,
         };
         ListParams {
             label_selector: self.label_selector.clone(),
