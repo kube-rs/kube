@@ -72,20 +72,13 @@ impl Request {
             qp.append_pair("continue", continue_token);
         }
 
-        match &lp.version_match {
-            VersionMatch::MostRecent => (),
-            VersionMatch::Any => {
-                qp.append_pair("resourceVersion", "0");
-                qp.append_pair("resourceVersionMatch", "NotOlderThan");
-            }
-            VersionMatch::NotOlderThan(resource_version) => {
-                qp.append_pair("resourceVersion", resource_version.as_str());
-                qp.append_pair("resourceVersionMatch", "NotOlderThan");
-            }
-            VersionMatch::Exact(resource_version) => {
-                qp.append_pair("resourceVersion", resource_version.as_str());
-                qp.append_pair("resourceVersionMatch", "Exact");
-            }
+        if let Some(rv) = &lp.resource_version {
+            qp.append_pair("resourceVersion", rv.as_str());
+        }
+        if std::matches!(&lp.version_match, VersionMatch::NotOlderThan) {
+            qp.append_pair("resourceVersionMatch", "NotOlderThan");
+        } else if std::matches!(&lp.version_match, VersionMatch::Exact) {
+            qp.append_pair("resourceVersionMatch", "Exact");
         }
 
         let urlstr = qp.finish();
@@ -319,20 +312,13 @@ impl Request {
             qp.append_pair("continue", continue_token);
         }
 
-        match &lp.version_match {
-            VersionMatch::MostRecent => (),
-            VersionMatch::Any => {
-                qp.append_pair("resourceVersion", "0");
-                qp.append_pair("resourceVersionMatch", "NotOlderThan");
-            }
-            VersionMatch::NotOlderThan(resource_version) => {
-                qp.append_pair("resourceVersion", resource_version.as_str());
-                qp.append_pair("resourceVersionMatch", "NotOlderThan");
-            }
-            VersionMatch::Exact(resource_version) => {
-                qp.append_pair("resourceVersion", resource_version.as_str());
-                qp.append_pair("resourceVersionMatch", "Exact");
-            }
+        if let Some(rv) = &lp.resource_version {
+            qp.append_pair("resourceVersion", rv.as_str());
+        }
+        if std::matches!(&lp.version_match, VersionMatch::NotOlderThan) {
+            qp.append_pair("resourceVersionMatch", "NotOlderThan");
+        } else if std::matches!(&lp.version_match, VersionMatch::Exact) {
+            qp.append_pair("resourceVersionMatch", "Exact");
         }
 
         let urlstr = qp.finish();
@@ -761,7 +747,7 @@ mod test {
     #[test]
     fn list_pods_from_cache() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::Any);
+        let gp = ListParams::default().match_any();
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
@@ -772,7 +758,7 @@ mod test {
     #[test]
     fn list_most_recent_pods() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::MostRecent);
+        let gp = ListParams::default().version_match(VersionMatch::Unset);
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
@@ -783,17 +769,18 @@ mod test {
     #[test]
     fn list_invalid_resource_version_combination() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::NotOlderThan("0".to_string()));
+        let gp = ListParams::default().at("0").version_match(VersionMatch::Exact);
         let err = Request::new(url).list(&gp).unwrap_err();
-        assert!(format!("{err}")
-            .contains("version_match cannot be equal to \"0\" for Exact and NotOlderThan variants"));
+        assert!(format!("{err}").contains("A zero resource_version is required when using an Exact match"));
     }
 
 
     #[test]
     fn list_not_older() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::NotOlderThan("20".to_string()));
+        let gp = ListParams::default()
+            .at("20")
+            .version_match(VersionMatch::NotOlderThan);
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
@@ -804,7 +791,7 @@ mod test {
     #[test]
     fn list_exact_match() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::Exact("500".to_string()));
+        let gp = ListParams::default().at("500").version_match(VersionMatch::Exact);
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),

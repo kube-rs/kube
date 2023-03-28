@@ -1,35 +1,48 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
-use std::fmt;
-
 use crate::request::Error;
 use serde::Serialize;
 
-/// Controls how the resourceVersion parameter is applied
+/// Controls how the resource version parameter is applied for list calls
 ///
-/// This embeds the resource version when using the `NotOlderThan` or `Exact` variants.
+/// This enum is by default `Unset` and results in a slow (but consistent) quorum read from etcd.
 /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list> for details.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum VersionMatch {
-    /// Matches data with the latest version available in the kube-apiserver database (etcd) (quorum read required).
+    /// Return data at the most recent resource version.
+    ///
+    /// The returned data must be consistent and is served straight from etcd via a quorum read.
+    ///
+    /// This is the default option.
+    ///
+    /// Note that unless you have strong consistency requirements, using `NotOlderThan`
+    /// and a known resource version is preferable since it can achieve better performance and scalability
+    /// of your cluster than leaving resource version  and resource version Match unset, which requires quorum read to be served.
     #[default]
-    MostRecent,
-    /// Matches data with the latest version available in the kube-apiserver cache.
-    Any,
-    /// Matches data at least as new as the provided resourceVersion.
-    NotOlderThan(String),
-    /// Matches data at the exact resourceVersion provided.
-    Exact(String),
-}
+    Unset,
 
-impl fmt::Display for VersionMatch {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            VersionMatch::MostRecent => write!(f, "MostRecent"),
-            VersionMatch::Any => write!(f, "Any"),
-            VersionMatch::NotOlderThan(s) => write!(f, "NotOlderThan[{}]", s),
-            VersionMatch::Exact(s) => write!(f, "Exact[{}]", s),
-        }
-    }
+    /// Returns data at least as new as the provided resource version.
+    ///
+    /// The newest available data is preferred, but any data not older than the provided resource version may be served.
+    /// This guarantees that the collection's resource version is not older than the requested resource version,
+    /// but does not make any guarantee about the resource version of any of the items in that collection.
+    ///
+    /// ### Any Version
+    /// A degenerate, but common sub-case of `NotOlderThan` is when used together with `resource_version` "0".
+    ///
+    /// It is possible for a "0" resource version request to return data at a much older resource version
+    /// than the client has previously observed, particularly in HA configurations, due to partitions or stale caches.
+    /// Clients that cannot tolerate this should not use this semantic.
+    NotOlderThan,
+
+    /// Return data at the exact resource version provided.
+    ///
+    /// If the provided resource version  is unavailable, the server responds with HTTP 410 "Gone".
+    /// For list requests to servers that honor the resource version Match parameter, this guarantees that the collection's
+    /// resource version  is the same as the resource version  you requested in the query string.
+    /// That guarantee does not apply to the resource version  of any items within that collection.
+    ///
+    /// Note that `Exact` cannot be used with resource version "0". For the most up-to-date list; use `Unset`.
+    Exact,
 }
 
 /// Common query parameters used in list/delete calls on collections
@@ -62,23 +75,27 @@ pub struct ListParams {
     /// After listing results with a limit, a continue token can be used to fetch another page of results.
     pub continue_token: Option<String>,
 
-    /// Determines how resourceVersion is applied to list calls.
-    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for
-    /// details.
+    /// Determines how resourceVersion is matched  applied to list calls.
     pub version_match: VersionMatch,
+
+    /// An explicit resourceVersion using the given `VersionMatch` strategy
+    ///
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for details.
+    pub resource_version: Option<String>,
 }
 
 impl ListParams {
     pub(crate) fn validate(&self) -> Result<(), Error> {
-        match &self.version_match {
-            VersionMatch::Exact(resource_version) | VersionMatch::NotOlderThan(resource_version) => {
-                if resource_version == "0" {
-                    return Err(Error::Validation(
-                        "ListParams::version_match cannot be equal to \"0\" for Exact and NotOlderThan variants.".into(),
-                    ));
-                }
+        if let Some(rv) = &self.resource_version {
+            if self.version_match == VersionMatch::Exact && rv == "0" {
+                return Err(Error::Validation(
+                    "A zero resource_version is required when using an Exact match".into(),
+                ));
             }
-            _ => (),
+        } else if self.version_match != VersionMatch::Unset {
+            return Err(Error::Validation(
+                "A resource_version is required when using an explicit match".into(),
+            ));
         }
         Ok(())
     }
@@ -90,6 +107,7 @@ impl ListParams {
 /// ```
 /// use kube::api::ListParams;
 /// let lp = ListParams::default()
+///     .match_any()
 ///     .timeout(60)
 ///     .labels("kubernetes.io/lifecycle=spot");
 /// ```
@@ -139,10 +157,35 @@ impl ListParams {
         self
     }
 
-    /// Sets resource version and resource version match.
+    /// Sets the resource version
+    #[must_use]
+    pub fn at(mut self, resource_version: &str) -> Self {
+        self.resource_version = Some(resource_version.into());
+        self
+    }
+
+    /// Sets an arbitary resource version match strategy
+    ///
+    /// A non-default strategy such as `VersionMatch::Exact` or `VersionMatch::NotGreaterThan`
+    /// requires an explicit `resource_version` set to pass request validation.
     #[must_use]
     pub fn version_match(mut self, version_match: VersionMatch) -> Self {
         self.version_match = version_match;
+        self
+    }
+
+    /// Use the semantic "any" resource version strategy
+    ///
+    /// This is a less taxing variant of the default list, returning data at any resource version.
+    /// It will prefer the newest avialable resource version, but strong consistency is not required;
+    /// data at any resource version may be served.
+    /// It is possible for the request to return data at a much older resource version than the client
+    /// has previously observed, particularly in high availability configurations, due to partitions or stale caches.
+    /// Clients that cannot tolerate this should not use this semantic.
+    #[must_use]
+    pub fn match_any(mut self) -> Self {
+        self.resource_version = Some("0".into());
+        self.version_match = VersionMatch::NotOlderThan;
         self
     }
 }

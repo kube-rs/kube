@@ -154,6 +154,24 @@ struct FullObject<'a, K> {
     api: &'a Api<K>,
 }
 
+/// Allowable list semantics
+#[derive(Clone, Default, Debug, PartialEq)]
+pub enum Semantic {
+    /// List calls perform a full quorum read
+    ///
+    /// Prefer this only if you have strong consistency requirements as it is less
+    /// scalable for the cluster.
+    Strong,
+
+    /// List calls returns cached results from apiserver
+    ///
+    /// This is faster and much less taxing on the apiserver, but can result
+    /// in much older results than has previously observed for `Restarted` events,
+    /// particularly in HA configurations, due to partitions or stale caches.
+    #[default]
+    Cache,
+}
+
 /// Accumulates all options that can be used on the watcher invocation.
 pub struct Config {
     /// A selector to restrict the list of returned objects by their labels.
@@ -173,34 +191,26 @@ pub struct Config {
     /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
     pub timeout: Option<u32>,
 
-    /// Determines how resourceVersion is applied to list calls.
-    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for
-    /// details.
-    pub version_match: VersionMatch,
+    /// Semantics for list calls.
+    ///
+    /// Configures re-list for performance vs. consistency.
+    pub semantic: Semantic,
 
     /// Enables watch events with type "BOOKMARK".
     ///
-    /// Servers that do not implement bookmarks ignore this flag and
-    /// bookmarks are sent at the server's discretion. Clients should not
-    /// assume bookmarks are returned at any specific interval, nor may they
-    /// assume the server will send any BOOKMARK event during a session.
-    /// If this is not a watch, this field is ignored.
-    /// If the feature gate WatchBookmarks is not enabled in apiserver,
-    /// this field is ignored.
+    /// Requests watch bookmarks from the apiserver when enabled for improved watch precision and reduced list calls.
+    /// This is default enabled and should generally not be turned off.
     pub bookmarks: bool,
 }
 
 impl Default for Config {
-    /// Default `WatchParams` without any constricting selectors
     fn default() -> Self {
         Self {
-            // bookmarks stable since 1.17, and backwards compatible
             bookmarks: true,
-
             label_selector: None,
             field_selector: None,
             timeout: None,
-            version_match: VersionMatch::default(),
+            semantic: Semantic::default(),
         }
     }
 }
@@ -246,10 +256,10 @@ impl Config {
         self
     }
 
-    /// Sets resource version and resource version match.
+    /// Sets watcher semantic to configure re-list performance and consistency
     #[must_use]
-    pub fn version_match(mut self, version_match: VersionMatch) -> Self {
-        self.version_match = version_match;
+    pub fn semantic(mut self, semantic: Semantic) -> Self {
+        self.semantic = semantic;
         self
     }
 
@@ -265,11 +275,17 @@ impl Config {
 
     /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
+        let version_match = match self.semantic {
+            Semantic::Cache => VersionMatch::NotOlderThan,
+            Semantic::Strong => VersionMatch::Unset,
+        };
         ListParams {
             label_selector: self.label_selector.clone(),
             field_selector: self.field_selector.clone(),
             timeout: self.timeout,
-            version_match: self.version_match.clone(),
+            version_match,
+            /// we always do a full re-list when getting desynced
+            resource_version: Some("0".into()),
             // It is not permissible for users to configure the continue token and limit for the watcher, as these parameters are associated with paging.
             // The watcher must handle paging internally.
             limit: None,
@@ -444,7 +460,7 @@ where
 /// Trampoline helper for `step_trampolined`
 async fn step<A>(
     api: &A,
-    watcher_config: &Config,
+    config: &Config,
     mut state: State<A::Value>,
 ) -> (Result<Event<A::Value>>, State<A::Value>)
 where
@@ -452,7 +468,7 @@ where
     A::Value: Resource + 'static,
 {
     loop {
-        match step_trampolined(api, watcher_config, state).await {
+        match step_trampolined(api, config, state).await {
             (Some(result), new_state) => return (result, new_state),
             (None, new_state) => state = new_state,
         }
