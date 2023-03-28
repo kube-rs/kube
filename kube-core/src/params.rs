@@ -169,7 +169,7 @@ impl ListParams {
     /// A non-default strategy such as `VersionMatch::Exact` or `VersionMatch::NotGreaterThan`
     /// requires an explicit `resource_version` set to pass request validation.
     #[must_use]
-    pub fn version_match(mut self, version_match: VersionMatch) -> Self {
+    pub fn matching(mut self, version_match: VersionMatch) -> Self {
         self.version_match = version_match;
         self
     }
@@ -184,7 +184,7 @@ impl ListParams {
     /// Clients that cannot tolerate this should not use this semantic.
     #[must_use]
     pub fn match_any(self) -> Self {
-        self.version_match(VersionMatch::NotOlderThan).at("0")
+        self.matching(VersionMatch::NotOlderThan).at("0")
     }
 }
 

@@ -521,9 +521,7 @@ mod test {
     #[test]
     fn list_metadata_path() {
         let url = appsv1::Deployment::url_path(&(), Some("ns"));
-        let lp = ListParams::default()
-            .version_match(VersionMatch::NotOlderThan)
-            .at("5");
+        let lp = ListParams::default().matching(VersionMatch::NotOlderThan).at("5");
         let req = Request::new(url).list_metadata(&lp).unwrap();
         assert_eq!(
             req.uri(),
@@ -740,7 +738,7 @@ mod test {
     #[test]
     fn list_most_recent_pods() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::Unset);
+        let gp = ListParams::default().matching(VersionMatch::Unset);
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
@@ -751,7 +749,7 @@ mod test {
     #[test]
     fn list_invalid_resource_version_combination() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().at("0").version_match(VersionMatch::Exact);
+        let gp = ListParams::default().at("0").matching(VersionMatch::Exact);
         let err = Request::new(url).list(&gp).unwrap_err();
         assert!(format!("{err}").contains("A zero resource_version is required when using an Exact match"));
     }
@@ -762,7 +760,7 @@ mod test {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let gp = ListParams::default()
             .at("20")
-            .version_match(VersionMatch::NotOlderThan);
+            .matching(VersionMatch::NotOlderThan);
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
@@ -773,7 +771,7 @@ mod test {
     #[test]
     fn list_exact_match() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().at("500").version_match(VersionMatch::Exact);
+        let gp = ListParams::default().at("500").matching(VersionMatch::Exact);
         let req = Request::new(url).list(&gp).unwrap();
         let query = req.uri().query().unwrap();
         assert_eq!(query, "&resourceVersion=500&resourceVersionMatch=Exact");
