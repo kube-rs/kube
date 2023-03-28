@@ -183,10 +183,8 @@ impl ListParams {
     /// has previously observed, particularly in high availability configurations, due to partitions or stale caches.
     /// Clients that cannot tolerate this should not use this semantic.
     #[must_use]
-    pub fn match_any(mut self) -> Self {
-        self.resource_version = Some("0".into());
-        self.version_match = VersionMatch::NotOlderThan;
-        self
+    pub fn match_any(self) -> Self {
+        self.version_match(VersionMatch::NotOlderThan).at("0")
     }
 }
 

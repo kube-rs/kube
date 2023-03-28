@@ -154,9 +154,9 @@ struct FullObject<'a, K> {
     api: &'a Api<K>,
 }
 
-/// Allowable list semantics
+/// Configurable list semantics for `watcher` relists
 #[derive(Clone, Default, Debug, PartialEq)]
-pub enum Semantic {
+pub enum ListSemantic {
     /// List calls perform a full quorum read for most recent results
     ///
     /// Prefer this if you have strong consistency requirements. Note that this
@@ -194,7 +194,7 @@ pub struct Config {
     /// Semantics for list calls.
     ///
     /// Configures re-list for performance vs. consistency.
-    pub semantic: Semantic,
+    pub list_semantic: ListSemantic,
 
     /// Enables watch events with type "BOOKMARK".
     ///
@@ -210,7 +210,7 @@ impl Default for Config {
             label_selector: None,
             field_selector: None,
             timeout: None,
-            semantic: Semantic::default(),
+            list_semantic: ListSemantic::default(),
         }
     }
 }
@@ -256,11 +256,17 @@ impl Config {
         self
     }
 
-    /// Sets watcher semantic to configure re-list performance and consistency
+    /// Sets list semantic to configure re-list performance and consistency
     #[must_use]
-    pub fn semantic(mut self, semantic: Semantic) -> Self {
-        self.semantic = semantic;
+    pub fn list_semantic(mut self, semantic: ListSemantic) -> Self {
+        self.list_semantic = semantic;
         self
+    }
+
+    /// Sets list semantic to the strongly consistent `MostRecent`
+    #[must_use]
+    pub fn most_recent(self) -> Self {
+        self.list_semantic(ListSemantic::MostRecent)
     }
 
     /// Disables watch bookmarks to simplify watch handling
@@ -275,9 +281,9 @@ impl Config {
 
     /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
-        let version_match = match self.semantic {
-            Semantic::Cached => VersionMatch::NotOlderThan,
-            Semantic::MostRecent => VersionMatch::Unset,
+        let version_match = match self.list_semantic {
+            ListSemantic::Cached => VersionMatch::NotOlderThan,
+            ListSemantic::MostRecent => VersionMatch::Unset,
         };
         ListParams {
             label_selector: self.label_selector.clone(),
