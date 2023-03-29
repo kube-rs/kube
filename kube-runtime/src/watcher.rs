@@ -282,8 +282,8 @@ impl Config {
     /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
         let version_match = match self.list_semantic {
-            ListSemantic::Cached => VersionMatch::NotOlderThan,
-            ListSemantic::MostRecent => VersionMatch::Unset,
+            ListSemantic::Cached => Some(VersionMatch::NotOlderThan),
+            ListSemantic::MostRecent => None,
         };
         ListParams {
             label_selector: self.label_selector.clone(),
