@@ -43,7 +43,11 @@ pub trait WatchStreamExt: Stream {
     }
 
 
-    /// Filter out a flattened stream on [`predicates`](crate::runtime::predicates)
+    /// Filter out a flattened stream on [`predicates`](crate::predicates).
+    ///
+    /// This will filter out repeat calls where the predicate returns the same result.
+    /// Common use case for this is to avoid repeat events for status updates
+    /// by filtering on []`predicates::generation`].
     ///
     /// ## Usage
     /// ```no_run
