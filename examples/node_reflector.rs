@@ -18,7 +18,9 @@ async fn main() -> anyhow::Result<()> {
         .timeout(10); // short watch timeout in this example
 
     let (reader, writer) = reflector::store();
-    let rf = reflector(writer, watcher(nodes, wc));
+    let rf = reflector(writer, watcher(nodes, wc))
+        .applied_objects()
+        .predicate_filter(predicates::labels); // NB: requires an unstable feature
 
     // Periodically read our state in the background
     tokio::spawn(async move {
@@ -29,10 +31,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Drain and log applied events from the reflector
-    let rf = reflector(writer, watcher(nodes, lp))
-        .applied_objects()
-        .predicate_filter(predicates::labels);
+    // Log applied events with changes from the reflector
     pin_mut!(rf);
     while let Some(node) = rf.try_next().await? {
         info!("saw node {} with hitherto unseen labels", node.name_any());
