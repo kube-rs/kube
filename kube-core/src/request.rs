@@ -75,10 +75,14 @@ impl Request {
         if let Some(rv) = &lp.resource_version {
             qp.append_pair("resourceVersion", rv.as_str());
         }
-        if std::matches!(&lp.version_match, VersionMatch::NotOlderThan) {
-            qp.append_pair("resourceVersionMatch", "NotOlderThan");
-        } else if std::matches!(&lp.version_match, VersionMatch::Exact) {
-            qp.append_pair("resourceVersionMatch", "Exact");
+        match &lp.version_match {
+            VersionMatch::MostRecent => {}
+            VersionMatch::NotOlderThan => {
+                qp.append_pair("resourceVersionMatch", "NotOlderThan");
+            }
+            VersionMatch::Exact => {
+                qp.append_pair("resourceVersionMatch", "Exact");
+            }
         }
 
         let urlstr = qp.finish();
@@ -315,10 +319,14 @@ impl Request {
         if let Some(rv) = &lp.resource_version {
             qp.append_pair("resourceVersion", rv.as_str());
         }
-        if std::matches!(&lp.version_match, VersionMatch::NotOlderThan) {
-            qp.append_pair("resourceVersionMatch", "NotOlderThan");
-        } else if std::matches!(&lp.version_match, VersionMatch::Exact) {
-            qp.append_pair("resourceVersionMatch", "Exact");
+        match &lp.version_match {
+            VersionMatch::MostRecent => {}
+            VersionMatch::NotOlderThan => {
+                qp.append_pair("resourceVersionMatch", "NotOlderThan");
+            }
+            VersionMatch::Exact => {
+                qp.append_pair("resourceVersionMatch", "Exact");
+            }
         }
 
         let urlstr = qp.finish();
