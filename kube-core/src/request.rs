@@ -76,11 +76,11 @@ impl Request {
             qp.append_pair("resourceVersion", rv.as_str());
         }
         match &lp.version_match {
-            VersionMatch::Unset => {}
-            VersionMatch::NotOlderThan => {
+            None => {}
+            Some(VersionMatch::NotOlderThan) => {
                 qp.append_pair("resourceVersionMatch", "NotOlderThan");
             }
-            VersionMatch::Exact => {
+            Some(VersionMatch::Exact) => {
                 qp.append_pair("resourceVersionMatch", "Exact");
             }
         }
@@ -320,11 +320,11 @@ impl Request {
             qp.append_pair("resourceVersion", rv.as_str());
         }
         match &lp.version_match {
-            VersionMatch::Unset => {}
-            VersionMatch::NotOlderThan => {
+            None => {}
+            Some(VersionMatch::NotOlderThan) => {
                 qp.append_pair("resourceVersionMatch", "NotOlderThan");
             }
-            VersionMatch::Exact => {
+            Some(VersionMatch::Exact) => {
                 qp.append_pair("resourceVersionMatch", "Exact");
             }
         }
@@ -746,7 +746,7 @@ mod test {
     #[test]
     fn list_most_recent_pods() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().matching(VersionMatch::Unset);
+        let gp = ListParams::default();
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),

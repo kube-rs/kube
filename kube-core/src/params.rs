@@ -4,22 +4,12 @@ use serde::Serialize;
 
 /// Controls how the resource version parameter is applied for list calls
 ///
-/// This enum is by default `Unset` and results in a slow (but consistent) quorum read from etcd.
+/// Not specifying a `VersionMatch` strategy will give you different semantics
+/// depending on what `resource_version`, `limit`, `continue_token` you include with the list request.
+///
 /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list> for details.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VersionMatch {
-    /// Return data at the most recent resource version.
-    ///
-    /// The returned data must be consistent and is served straight from etcd via a quorum read.
-    ///
-    /// This is the default option.
-    ///
-    /// Note that if you have weak consistency requirements, using `NotOlderThan`
-    /// may be preferable since it can achieve better performance and scalability
-    /// of your cluster than leaving resource version  and resource version Match unset, which requires quorum read to be served.
-    #[default]
-    Unset,
-
     /// Returns data at least as new as the provided resource version.
     ///
     /// The newest available data is preferred, but any data not older than the provided resource version may be served.
@@ -76,7 +66,7 @@ pub struct ListParams {
     pub continue_token: Option<String>,
 
     /// Determines how resourceVersion is matched  applied to list calls.
-    pub version_match: VersionMatch,
+    pub version_match: Option<VersionMatch>,
 
     /// An explicit resourceVersion using the given `VersionMatch` strategy
     ///
@@ -87,12 +77,12 @@ pub struct ListParams {
 impl ListParams {
     pub(crate) fn validate(&self) -> Result<(), Error> {
         if let Some(rv) = &self.resource_version {
-            if self.version_match == VersionMatch::Exact && rv == "0" {
+            if self.version_match == Some(VersionMatch::Exact) && rv == "0" {
                 return Err(Error::Validation(
                     "A non-zero resource_version is required when using an Exact match".into(),
                 ));
             }
-        } else if self.version_match != VersionMatch::Unset {
+        } else if self.version_match.is_some() {
             return Err(Error::Validation(
                 "A resource_version is required when using an explicit match".into(),
             ));
@@ -170,7 +160,7 @@ impl ListParams {
     /// requires an explicit `resource_version` set to pass request validation.
     #[must_use]
     pub fn matching(mut self, version_match: VersionMatch) -> Self {
-        self.version_match = version_match;
+        self.version_match = Some(version_match);
         self
     }
 
