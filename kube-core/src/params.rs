@@ -65,7 +65,7 @@ pub struct ListParams {
     /// After listing results with a limit, a continue token can be used to fetch another page of results.
     pub continue_token: Option<String>,
 
-    /// Determines how resourceVersion is matched  applied to list calls.
+    /// Determines how resourceVersion is matched applied to list calls.
     pub version_match: Option<VersionMatch>,
 
     /// An explicit resourceVersion using the given `VersionMatch` strategy
