@@ -99,3 +99,7 @@ name = "syn"
 # waiting for pem to bump base64
 # https://github.com/jcreekmore/pem-rs/blob/master/Cargo.toml#L16
 name = "base64"
+
+[[bans.skip]]
+# deep in dependency tree, only dual use via dev dependency
+name = "redox_syscall"
