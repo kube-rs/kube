@@ -76,7 +76,7 @@ impl Request {
             qp.append_pair("resourceVersion", rv.as_str());
         }
         match &lp.version_match {
-            VersionMatch::MostRecent => {}
+            VersionMatch::Unset => {}
             VersionMatch::NotOlderThan => {
                 qp.append_pair("resourceVersionMatch", "NotOlderThan");
             }
@@ -320,7 +320,7 @@ impl Request {
             qp.append_pair("resourceVersion", rv.as_str());
         }
         match &lp.version_match {
-            VersionMatch::MostRecent => {}
+            VersionMatch::Unset => {}
             VersionMatch::NotOlderThan => {
                 qp.append_pair("resourceVersionMatch", "NotOlderThan");
             }
@@ -759,7 +759,7 @@ mod test {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let gp = ListParams::default().at("0").matching(VersionMatch::Exact);
         let err = Request::new(url).list(&gp).unwrap_err();
-        assert!(format!("{err}").contains("A zero resource_version is required when using an Exact match"));
+        assert!(format!("{err}").contains("non-zero resource_version is required when using an Exact match"));
     }
 
 
