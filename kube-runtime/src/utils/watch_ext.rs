@@ -1,11 +1,15 @@
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
-    utils::{event_flatten::EventFlatten, predicate::PredicateFilter, stream_backoff::StreamBackoff},
+    utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
     watcher,
 };
-use backoff::backoff::Backoff;
+#[cfg(feature = "unstable-runtime-predicates")]
+use crate::utils::predicate::PredicateFilter;
+#[cfg(feature = "unstable-runtime-predicates")]
 use kube_client::Resource;
+
+use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
@@ -41,6 +45,28 @@ pub trait WatchStreamExt: Stream {
 
 
     /// Filter out a flattened stream on [`predicates`](crate::runtime::predicates)
+    ///
+    /// ## Usage
+    /// ```no_run
+    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// use kube::{Api, Client, ResourceExt};
+    /// use kube_runtime::{watcher, WatchStreamExt, predicates};
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::default_namespaced(client);
+    /// let changed_pods = watcher(pods, watcher::Config::default())
+    ///     .applied_objects()
+    ///     .predicate_filter(predicates::generation);
+    /// pin_mut!(changed_pods);
+    ///
+    /// while let Some(pod) = changed_pods.try_next().await? {
+    ///    println!("saw Pod '{} with hitherto unseen generation", pod.name_any());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "unstable-runtime-predicates")]
     fn predicate_filter<K>(self, predicate: impl Fn(&K) -> Option<u64> + 'static) -> PredicateFilter<Self, K>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,

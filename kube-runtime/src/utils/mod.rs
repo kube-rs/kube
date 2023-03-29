@@ -2,6 +2,7 @@
 
 mod backoff_reset_timer;
 mod event_flatten;
+#[cfg(feature = "unstable-runtime-predicates")]
 mod predicate;
 mod stream_backoff;
 #[cfg(feature = "unstable-runtime-subscribe")] pub mod stream_subscribe;
@@ -9,6 +10,7 @@ mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use event_flatten::EventFlatten;
+#[cfg(feature = "unstable-runtime-predicates")]
 pub use predicate::{predicates, PredicateFilter};
 pub use stream_backoff::StreamBackoff;
 #[cfg(feature = "unstable-runtime-subscribe")]
