@@ -1020,19 +1020,20 @@ where
     ///
     /// ```no_run
     /// # async {
-    /// use futures::{StreamExt, TryStreamExt};
-    /// use k8s_openapi::api::core::v1::{ConfigMap, Pod};
+    /// # use futures::{StreamExt, TryStreamExt};
+    /// # use k8s_openapi::api::core::v1::{ConfigMap, Pod};
     /// # use kube::api::{Api, ListParams};
     /// # use kube::runtime::controller::Action;
-    /// # use kube::runtime::reflector::ObjectRef;
+    /// # use kube::runtime::reflector::{ObjectRef, Store};
     /// # use kube::runtime::{reflector, watcher, Controller, WatchStreamExt};
-    /// # use kube::{Client, ResourceExt};
-    /// use std::convert::Infallible;
-    /// use std::future;
-    /// use std::sync::Arc;
-    ///
+    /// # use kube::{Client, Error, ResourceExt};
+    /// # use std::future;
+    /// # use std::sync::Arc;
+    /// #
     /// # let client: Client = todo!();
-    ///
+    /// # async fn reconcile(_: Arc<ConfigMap>, _: Arc<Store<Pod>>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<ConfigMap>, _: &kube::Error, _: Arc<Store<Pod>>) -> Action { Action::await_change() }
+    /// #
     /// // Store can be used in the reconciler instead of querying Kube
     /// let (pod_store, writer) = reflector::store();
     /// let pod_stream = reflector(
@@ -1041,7 +1042,7 @@ where
     /// )
     /// .applied_objects()
     /// // Map to the relevant `ObjectRef<K>` to reconcile
-    /// .map_ok(|pod| ObjectRef::new(&format!("{}-cm", pod.name_any())));
+    /// .map_ok(|pod| ObjectRef::new(&format!("{}-cm", pod.name_any())).within(&pod.namespace().unwrap()));
     ///
     /// Controller::new(Api::<ConfigMap>::all(client), ListParams::default())
     ///     .reconcile_on(pod_stream)
