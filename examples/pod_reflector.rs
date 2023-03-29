@@ -1,7 +1,7 @@
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, ListParams},
+    api::Api,
     runtime::{reflector, watcher, WatchStreamExt},
     Client, ResourceExt,
 };
@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let stream = watcher(api, ListParams::default()).map_ok(|ev| {
+    let stream = watcher(api, watcher::Config::default()).map_ok(|ev| {
         ev.modify(|pod| {
             // memory optimization for our store - we don't care about fields/annotations/status
             pod.managed_fields_mut().clear();

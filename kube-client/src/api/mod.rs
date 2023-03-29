@@ -1,6 +1,5 @@
 //! API helpers for structured interaction with the Kubernetes API
 
-
 mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 use std::fmt::Debug;
@@ -27,7 +26,7 @@ pub(crate) use kube_core::params;
 pub use kube_core::{
     dynamic::{ApiResource, DynamicObject},
     gvk::{GroupVersionKind, GroupVersionResource},
-    metadata::{ListMeta, ObjectMeta, TypeMeta},
+    metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta},
     object::{NotUsed, Object, ObjectList},
     request::Request,
     watch::WatchEvent,
@@ -36,7 +35,7 @@ pub use kube_core::{
 use kube_core::{DynamicResourceScope, NamespaceResourceScope};
 pub use params::{
     DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
-    ValidationDirective,
+    ValidationDirective, VersionMatch, WatchParams,
 };
 
 use crate::Client;
@@ -104,7 +103,7 @@ impl<K: Resource> Api<K> {
     where
         K: Resource<Scope = DynamicResourceScope>,
     {
-        let ns = client.default_ns().to_string();
+        let ns = client.default_namespace().to_string();
         Self::namespaced_with(client, &ns, dyntype)
     }
 
@@ -118,7 +117,6 @@ impl<K: Resource> Api<K> {
         &self.request.url_path
     }
 }
-
 
 /// Api constructors for Resource implementors with Default DynamicTypes
 ///
@@ -208,7 +206,7 @@ where
     where
         K: Resource<Scope = NamespaceResourceScope>,
     {
-        let ns = client.default_ns().to_string();
+        let ns = client.default_namespace().to_string();
         Self::namespaced(client, &ns)
     }
 }

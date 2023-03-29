@@ -42,12 +42,22 @@ mod custom_resource;
 /// and optionally status. The **generated** type `Foo` can be used with the [`kube`] crate
 /// as an `Api<Foo>` object (`FooSpec` can not be used with [`Api`][`kube::Api`]).
 ///
-/// ```rust,ignore
-///  let client = Client::try_default().await?;
-///  let foos: Api<Foo> = Api::namespaced(client.clone(), "default");
-///
+/// ```no_run
+///  # use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+///  # use kube_derive::CustomResource;
+///  # use kube::{api::{Api, Patch, PatchParams}, Client, CustomResourceExt};
+///  # use serde::{Deserialize, Serialize};
+///  # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+///  # #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, schemars::JsonSchema)]
+///  # #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+///  # struct FooSpec {}
+///  # let client: Client = todo!();
+///  let foos: Api<Foo> = Api::default_namespaced(client.clone());
 ///  let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-///  crds.patch("foos.clux.dev", &ssapply, serde_yaml::to_vec(&Foo::crd())?).await
+///  let crd_yaml = serde_yaml::to_vec(&Foo::crd())?;
+///  crds.patch("foos.clux.dev", &PatchParams::apply("myapp"), &Patch::Apply(crd_yaml)).await;
+/// # Ok(())
+/// # }
 ///  ```
 ///
 /// This example posts the generated `::crd` to the `CustomResourceDefinition` API.
@@ -129,6 +139,9 @@ mod custom_resource;
 /// ## `#[kube(shortname = "sn")]`
 /// Add a single shortname to the generated crd.
 ///
+/// ## `#[kube(category = "apps")]`
+/// Add a single category to `crd.spec.names.categories`.
+///
 /// ## Example with all properties
 ///
 /// ```rust
@@ -177,8 +190,8 @@ mod custom_resource;
 ///
 /// # Generated code
 ///
-/// The example above will roughly generate:
-/// ```ignore
+/// The example above will **roughly** generate:
+/// ```compile_fail
 /// #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 /// #[serde(rename_all = "camelCase")]
 /// pub struct FooCrd {
@@ -188,11 +201,11 @@ mod custom_resource;
 ///     spec: FooSpec,
 ///     status: Option<FooStatus>,
 /// }
-/// impl kube::Resource for FooCrd {...}
+/// impl kube::Resource for FooCrd { .. }
 ///
 /// impl FooCrd {
-///     pub fn new(name: &str, spec: FooSpec) -> Self { ... }
-///     pub fn crd() -> k8s_openapi::...::CustomResourceDefinition { ... }
+///     pub fn new(name: &str, spec: FooSpec) -> Self { .. }
+///     pub fn crd() -> CustomResourceDefinition { .. }
 /// }
 /// ```
 ///

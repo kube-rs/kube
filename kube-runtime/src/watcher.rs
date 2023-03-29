@@ -3,17 +3,21 @@
 //! See [`watcher`] for the primary entry point.
 
 use crate::utils::ResetTimerBackoff;
+use async_trait::async_trait;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
-    api::{ListParams, Resource, ResourceExt, WatchEvent},
-    Api,
+    api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
+    core::{metadata::PartialObjectMeta, ObjectList},
+    error::ErrorResponse,
+    Api, Error as ClientErr,
 };
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
 use std::{clone::Clone, fmt::Debug, time::Duration};
 use thiserror::Error;
+use tracing::{debug, error, warn};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -22,9 +26,11 @@ pub enum Error {
     #[error("failed to start watching object: {0}")]
     WatchStartFailed(#[source] kube_client::Error),
     #[error("error returned by apiserver during watch: {0}")]
-    WatchError(#[source] kube_client::error::ErrorResponse),
+    WatchError(#[source] ErrorResponse),
     #[error("watch stream failed: {0}")]
     WatchFailed(#[source] kube_client::Error),
+    #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
+    NoResourceVersion,
     #[error("too many objects matched search criteria")]
     TooManyObjects,
 }
@@ -110,7 +116,7 @@ impl<K> Event<K> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 /// The internal finite state machine driving the [`watcher`]
-enum State<K: Resource + Clone> {
+enum State<K> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
     Empty,
     /// The initial LIST was successful, so we should move on to starting the actual watch.
@@ -128,32 +134,258 @@ enum State<K: Resource + Clone> {
     },
 }
 
+/// Used to control whether the watcher receives the full object, or only the
+/// metadata
+#[async_trait]
+trait ApiMode {
+    type Value: Clone;
+
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>>;
+    async fn watch(
+        &self,
+        wp: &WatchParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>>;
+}
+
+/// A wrapper around the `Api` of a `Resource` type that when used by the
+/// watcher will return the entire (full) object
+struct FullObject<'a, K> {
+    api: &'a Api<K>,
+}
+
+/// Accumulates all options that can be used on the watcher invocation.
+pub struct Config {
+    /// A selector to restrict the list of returned objects by their labels.
+    ///
+    /// Defaults to everything if `None`.
+    pub label_selector: Option<String>,
+
+    /// A selector to restrict the list of returned objects by their fields.
+    ///
+    /// Defaults to everything if `None`.
+    pub field_selector: Option<String>,
+
+    /// Timeout for the list/watch call.
+    ///
+    /// This limits the duration of the call, regardless of any activity or inactivity.
+    /// If unset for a watch call, we will use 290s.
+    /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
+    pub timeout: Option<u32>,
+
+    /// Determines how resourceVersion is applied to list calls.
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for
+    /// details.
+    pub version_match: VersionMatch,
+
+    /// Enables watch events with type "BOOKMARK".
+    ///
+    /// Servers that do not implement bookmarks ignore this flag and
+    /// bookmarks are sent at the server's discretion. Clients should not
+    /// assume bookmarks are returned at any specific interval, nor may they
+    /// assume the server will send any BOOKMARK event during a session.
+    /// If this is not a watch, this field is ignored.
+    /// If the feature gate WatchBookmarks is not enabled in apiserver,
+    /// this field is ignored.
+    pub bookmarks: bool,
+}
+
+impl Default for Config {
+    /// Default `WatchParams` without any constricting selectors
+    fn default() -> Self {
+        Self {
+            // bookmarks stable since 1.17, and backwards compatible
+            bookmarks: true,
+
+            label_selector: None,
+            field_selector: None,
+            timeout: None,
+            version_match: VersionMatch::default(),
+        }
+    }
+}
+
+/// Builder interface to Config
+///
+/// Usage:
+/// ```
+/// use kube::runtime::watcher::Config;
+/// let wc = Config::default()
+///     .timeout(60)
+///     .labels("kubernetes.io/lifecycle=spot");
+/// ```
+impl Config {
+    /// Configure the timeout for list/watch calls
+    ///
+    /// This limits the duration of the call, regardless of any activity or inactivity.
+    /// Defaults to 290s
+    #[must_use]
+    pub fn timeout(mut self, timeout_secs: u32) -> Self {
+        self.timeout = Some(timeout_secs);
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their fields.
+    ///
+    /// Defaults to everything.
+    /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
+    /// The server only supports a limited number of field queries per type.
+    #[must_use]
+    pub fn fields(mut self, field_selector: &str) -> Self {
+        self.field_selector = Some(field_selector.to_string());
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their labels.
+    ///
+    /// Defaults to everything.
+    /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
+    #[must_use]
+    pub fn labels(mut self, label_selector: &str) -> Self {
+        self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// Sets resource version and resource version match.
+    #[must_use]
+    pub fn version_match(mut self, version_match: VersionMatch) -> Self {
+        self.version_match = version_match;
+        self
+    }
+
+    /// Disables watch bookmarks to simplify watch handling
+    ///
+    /// This is not recommended to use with production watchers as it can cause desyncs.
+    /// See [#219](https://github.com/kube-rs/kube/issues/219) for details.
+    #[must_use]
+    pub fn disable_bookmarks(mut self) -> Self {
+        self.bookmarks = false;
+        self
+    }
+
+    /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
+    fn to_list_params(&self) -> ListParams {
+        ListParams {
+            label_selector: self.label_selector.clone(),
+            field_selector: self.field_selector.clone(),
+            timeout: self.timeout,
+            version_match: self.version_match.clone(),
+            // It is not permissible for users to configure the continue token and limit for the watcher, as these parameters are associated with paging.
+            // The watcher must handle paging internally.
+            limit: None,
+            continue_token: None,
+        }
+    }
+
+    /// Converts generic `watcher::Config` structure to the instance of `WatchParams` used for watch requests.
+    fn to_watch_params(&self) -> WatchParams {
+        WatchParams {
+            label_selector: self.label_selector.clone(),
+            field_selector: self.field_selector.clone(),
+            timeout: self.timeout,
+            bookmarks: self.bookmarks,
+        }
+    }
+}
+
+#[async_trait]
+impl<K> ApiMode for FullObject<'_, K>
+where
+    K: Clone + Debug + DeserializeOwned + Send + 'static,
+{
+    type Value = K;
+
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
+        self.api.list(lp).await
+    }
+
+    async fn watch(
+        &self,
+        wp: &WatchParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
+        self.api.watch(wp, version).await.map(StreamExt::boxed)
+    }
+}
+
+/// A wrapper around the `Api` of a `Resource` type that when used by the
+/// watcher will return only the metadata associated with an object
+struct MetaOnly<'a, K> {
+    api: &'a Api<K>,
+}
+
+#[async_trait]
+impl<K> ApiMode for MetaOnly<'_, K>
+where
+    K: Clone + Debug + DeserializeOwned + Send + 'static,
+{
+    type Value = PartialObjectMeta<K>;
+
+    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
+        self.api.list_metadata(lp).await
+    }
+
+    async fn watch(
+        &self,
+        wp: &WatchParams,
+        version: &str,
+    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
+        self.api.watch_metadata(wp, version).await.map(StreamExt::boxed)
+    }
+}
+
 /// Progresses the watcher a single step, returning (event, state)
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
-async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    api: &Api<K>,
-    list_params: &ListParams,
-    state: State<K>,
-) -> (Option<Result<Event<K>>>, State<K>) {
+async fn step_trampolined<A>(
+    api: &A,
+    wc: &Config,
+    state: State<A::Value>,
+) -> (Option<Result<Event<A::Value>>>, State<A::Value>)
+where
+    A: ApiMode,
+    A::Value: Resource + 'static,
+{
     match state {
-        State::Empty => match api.list(list_params).await {
-            Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                resource_version: list.metadata.resource_version.unwrap(),
-            }),
-            Err(err) => (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty),
+        State::Empty => match api.list(&wc.to_list_params()).await {
+            Ok(list) => {
+                if let Some(resource_version) = list.metadata.resource_version {
+                    (Some(Ok(Event::Restarted(list.items))), State::InitListed {
+                        resource_version,
+                    })
+                } else {
+                    (Some(Err(Error::NoResourceVersion)), State::Empty)
+                }
+            }
+            Err(err) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watch list error with 403: {err:?}");
+                } else {
+                    debug!("watch list error: {err:?}");
+                }
+                (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
+            }
         },
-        State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
-            Ok(stream) => (None, State::Watching {
-                resource_version,
-                stream: stream.boxed(),
-            }),
-            Err(err) => (
-                Some(Err(err).map_err(Error::WatchStartFailed)),
-                State::InitListed { resource_version },
-            ),
-        },
+        State::InitListed { resource_version } => {
+            match api.watch(&wc.to_watch_params(), &resource_version).await {
+                Ok(stream) => (None, State::Watching {
+                    resource_version,
+                    stream,
+                }),
+                Err(err) => {
+                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                        warn!("watch initlist error with 403: {err:?}");
+                    } else {
+                        debug!("watch initlist error: {err:?}");
+                    }
+                    (
+                        Some(Err(err).map_err(Error::WatchStartFailed)),
+                        State::InitListed { resource_version },
+                    )
+                }
+            }
+        }
         State::Watching {
             resource_version,
             mut stream,
@@ -186,25 +418,41 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
                         stream,
                     }
                 };
+                if err.code == 403 {
+                    warn!("watcher watchevent error 403: {err:?}");
+                } else {
+                    debug!("error watchevent error: {err:?}");
+                }
                 (Some(Err(err).map_err(Error::WatchError)), new_state)
             }
-            Some(Err(err)) => (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
-                resource_version,
-                stream,
-            }),
+            Some(Err(err)) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watcher error 403: {err:?}");
+                } else {
+                    debug!("watcher error: {err:?}");
+                }
+                (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
+                    resource_version,
+                    stream,
+                })
+            }
             None => (None, State::InitListed { resource_version }),
         },
     }
 }
 
 /// Trampoline helper for `step_trampolined`
-async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-    api: &Api<K>,
-    list_params: &ListParams,
-    mut state: State<K>,
-) -> (Result<Event<K>>, State<K>) {
+async fn step<A>(
+    api: &A,
+    watcher_config: &Config,
+    mut state: State<A::Value>,
+) -> (Result<Event<A::Value>>, State<A::Value>)
+where
+    A: ApiMode,
+    A::Value: Resource + 'static,
+{
     loop {
-        match step_trampolined(api, list_params, state).await {
+        match step_trampolined(api, watcher_config, state).await {
             (Some(result), new_state) => return (result, new_state),
             (None, new_state) => state = new_state,
         }
@@ -226,7 +474,7 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// ```no_run
 /// use kube::{
-///   api::{Api, ListParams, ResourceExt}, Client,
+///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
@@ -236,9 +484,9 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     watcher(pods, ListParams::default()).applied_objects()
+///     watcher(pods, watcher::Config::default()).applied_objects()
 ///         .try_for_each(|p| async move {
-///          println!("Applied: {}", p.name());
+///          println!("Applied: {}", p.name_any());
 ///             Ok(())
 ///         })
 ///         .await?;
@@ -262,13 +510,77 @@ async fn step<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
 pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
-    list_params: ListParams,
+    watcher_config: Config,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
     futures::stream::unfold(
-        (api, list_params, State::Empty),
-        |(api, list_params, state)| async {
-            let (event, state) = step(&api, &list_params, state).await;
-            Some((event, (api, list_params, state)))
+        (api, watcher_config, State::Empty),
+        |(api, watcher_config, state)| async {
+            let (event, state) = step(&FullObject { api: &api }, &watcher_config, state).await;
+            Some((event, (api, watcher_config, state)))
+        },
+    )
+}
+
+/// Watches a Kubernetes Resource for changes continuously and receives only the
+/// metadata
+///
+/// Compared to [`Api::watch_metadata`], this automatically tries to recover the stream upon errors.
+///
+/// Errors from the underlying watch are propagated, after which the stream will go into recovery mode on the next poll.
+/// You can apply your own backoff by not polling the stream for a duration after errors.
+/// Keep in mind that some [`TryStream`](futures::TryStream) combinators (such as
+/// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
+/// will terminate eagerly as soon as they receive an [`Err`].
+///
+/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
+/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+///
+/// ```no_run
+/// use kube::{
+///   api::{Api, ResourceExt}, Client,
+///   runtime::{watcher, metadata_watcher, WatchStreamExt}
+/// };
+/// use k8s_openapi::api::core::v1::Pod;
+/// use futures::{StreamExt, TryStreamExt};
+/// #[tokio::main]
+/// async fn main() -> Result<(), watcher::Error> {
+///     let client = Client::try_default().await.unwrap();
+///     let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+///     metadata_watcher(pods, watcher::Config::default()).applied_objects()
+///         .try_for_each(|p| async move {
+///          println!("Applied: {}", p.name_any());
+///             Ok(())
+///         })
+///         .await?;
+///    Ok(())
+/// }
+/// ```
+/// [`WatchStreamExt`]: super::WatchStreamExt
+/// [`reflector`]: super::reflector::reflector
+/// [`Api::watch`]: kube_client::Api::watch
+///
+/// # Recovery
+///
+/// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
+/// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
+/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+///
+/// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
+/// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
+/// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
+/// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
+/// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
+#[allow(clippy::module_name_repetitions)]
+pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
+    api: Api<K>,
+    watcher_config: Config,
+) -> impl Stream<Item = Result<Event<PartialObjectMeta<K>>>> + Send {
+    futures::stream::unfold(
+        (api, watcher_config, State::Empty),
+        |(api, watcher_config, state)| async {
+            let (event, state) = step(&MetaOnly { api: &api }, &watcher_config, state).await;
+            Some((event, (api, watcher_config, state)))
         },
     )
 }
@@ -283,11 +595,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, ListParams {
-        field_selector: Some(format!("metadata.name={name}")),
-        ..Default::default()
-    })
-    .map(|event| match event? {
+    watcher(api, Config::default().fields(&format!("metadata.name={name}"))).map(|event| match event? {
         Event::Deleted(_) => Ok(None),
         // We're filtering by object name, so getting more than one object means that either:
         // 1. The apiserver is accepting multiple objects with the same name, or

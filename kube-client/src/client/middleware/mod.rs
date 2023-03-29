@@ -55,7 +55,7 @@ mod tests {
             let (request, send) = handle.next_request().await.expect("service not called");
             assert_eq!(
                 request.headers().get(AUTHORIZATION).unwrap(),
-                HeaderValue::try_from(format!("Bearer {}", TOKEN)).unwrap()
+                HeaderValue::try_from(format!("Bearer {TOKEN}")).unwrap()
             );
             send.send_response(Response::builder().body(Body::empty()).unwrap());
         });

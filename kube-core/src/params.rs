@@ -1,9 +1,39 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
+use std::fmt;
+
 use crate::request::Error;
 use serde::Serialize;
 
-/// Common query parameters used in watch/list/delete calls on collections
-#[derive(Clone, Debug)]
+/// Controls how the resourceVersion parameter is applied
+///
+/// This embeds the resource version when using the `NotOlderThan` or `Exact` variants.
+/// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list> for details.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum VersionMatch {
+    /// Matches data with the latest version available in the kube-apiserver database (etcd) (quorum read required).
+    #[default]
+    MostRecent,
+    /// Matches data with the latest version available in the kube-apiserver cache.
+    Any,
+    /// Matches data at least as new as the provided resourceVersion.
+    NotOlderThan(String),
+    /// Matches data at the exact resourceVersion provided.
+    Exact(String),
+}
+
+impl fmt::Display for VersionMatch {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            VersionMatch::MostRecent => write!(f, "MostRecent"),
+            VersionMatch::Any => write!(f, "Any"),
+            VersionMatch::NotOlderThan(s) => write!(f, "NotOlderThan[{}]", s),
+            VersionMatch::Exact(s) => write!(f, "Exact[{}]", s),
+        }
+    }
+}
+
+/// Common query parameters used in list/delete calls on collections
+#[derive(Clone, Debug, Default)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///
@@ -18,20 +48,7 @@ pub struct ListParams {
     /// Timeout for the list/watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// If unset for a watch call, we will use 290s.
-    /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
     pub timeout: Option<u32>,
-
-    /// Enables watch events with type "BOOKMARK".
-    ///
-    /// Servers that do not implement bookmarks ignore this flag and
-    /// bookmarks are sent at the server's discretion. Clients should not
-    /// assume bookmarks are returned at any specific interval, nor may they
-    /// assume the server will send any BOOKMARK event during a session.
-    /// If this is not a watch, this field is ignored.
-    /// If the feature gate WatchBookmarks is not enabled in apiserver,
-    /// this field is ignored.
-    pub bookmarks: bool,
 
     /// Limit the number of results.
     ///
@@ -44,31 +61,24 @@ pub struct ListParams {
     ///
     /// After listing results with a limit, a continue token can be used to fetch another page of results.
     pub continue_token: Option<String>,
-}
 
-impl Default for ListParams {
-    /// Default `ListParams` without any constricting selectors
-    fn default() -> Self {
-        Self {
-            // bookmarks stable since 1.17, and backwards compatible
-            bookmarks: true,
-
-            label_selector: None,
-            field_selector: None,
-            timeout: None,
-            limit: None,
-            continue_token: None,
-        }
-    }
+    /// Determines how resourceVersion is applied to list calls.
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for
+    /// details.
+    pub version_match: VersionMatch,
 }
 
 impl ListParams {
     pub(crate) fn validate(&self) -> Result<(), Error> {
-        if let Some(to) = &self.timeout {
-            // https://github.com/kubernetes/kubernetes/issues/6513
-            if *to >= 295 {
-                return Err(Error::Validation("ListParams::timeout must be < 295s".into()));
+        match &self.version_match {
+            VersionMatch::Exact(resource_version) | VersionMatch::NotOlderThan(resource_version) => {
+                if resource_version == "0" {
+                    return Err(Error::Validation(
+                        "ListParams::version_match cannot be equal to \"0\" for Exact and NotOlderThan variants.".into(),
+                    ));
+                }
             }
+            _ => (),
         }
         Ok(())
     }
@@ -115,16 +125,6 @@ impl ListParams {
         self
     }
 
-    /// Disables watch bookmarks to simplify watch handling
-    ///
-    /// This is not recommended to use with production watchers as it can cause desyncs.
-    /// See [#219](https://github.com/kube-rs/kube/issues/219) for details.
-    #[must_use]
-    pub fn disable_bookmarks(mut self) -> Self {
-        self.bookmarks = false;
-        self
-    }
-
     /// Sets a result limit.
     #[must_use]
     pub fn limit(mut self, limit: u32) -> Self {
@@ -136,6 +136,13 @@ impl ListParams {
     #[must_use]
     pub fn continue_token(mut self, token: &str) -> Self {
         self.continue_token = Some(token.to_string());
+        self
+    }
+
+    /// Sets resource version and resource version match.
+    #[must_use]
+    pub fn version_match(mut self, version_match: VersionMatch) -> Self {
+        self.version_match = version_match;
         self
     }
 }
@@ -170,6 +177,116 @@ impl ValidationDirective {
             Self::Warn => "Warn",
             Self::Ignore => "Ignore",
         }
+    }
+}
+
+/// Common query parameters used in watch calls on collections
+#[derive(Clone, Debug)]
+pub struct WatchParams {
+    /// A selector to restrict returned objects by their labels.
+    ///
+    /// Defaults to everything if `None`.
+    pub label_selector: Option<String>,
+
+    /// A selector to restrict returned objects by their fields.
+    ///
+    /// Defaults to everything if `None`.
+    pub field_selector: Option<String>,
+
+    /// Timeout for the watch call.
+    ///
+    /// This limits the duration of the call, regardless of any activity or inactivity.
+    /// If unset for a watch call, we will use 290s.
+    /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
+    pub timeout: Option<u32>,
+
+    /// Enables watch events with type "BOOKMARK".
+    ///
+    /// Servers that do not implement bookmarks ignore this flag and
+    /// bookmarks are sent at the server's discretion. Clients should not
+    /// assume bookmarks are returned at any specific interval, nor may they
+    /// assume the server will send any BOOKMARK event during a session.
+    /// If this is not a watch, this field is ignored.
+    /// If the feature gate WatchBookmarks is not enabled in apiserver,
+    /// this field is ignored.
+    pub bookmarks: bool,
+}
+
+impl WatchParams {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        if let Some(to) = &self.timeout {
+            // https://github.com/kubernetes/kubernetes/issues/6513
+            if *to >= 295 {
+                return Err(Error::Validation("WatchParams::timeout must be < 295s".into()));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Default for WatchParams {
+    /// Default `WatchParams` without any constricting selectors
+    fn default() -> Self {
+        Self {
+            // bookmarks stable since 1.17, and backwards compatible
+            bookmarks: true,
+
+            label_selector: None,
+            field_selector: None,
+            timeout: None,
+        }
+    }
+}
+
+/// Builder interface to WatchParams
+///
+/// Usage:
+/// ```
+/// use kube::api::WatchParams;
+/// let lp = WatchParams::default()
+///     .timeout(60)
+///     .labels("kubernetes.io/lifecycle=spot");
+/// ```
+impl WatchParams {
+    /// Configure the timeout for watch calls
+    ///
+    /// This limits the duration of the call, regardless of any activity or inactivity.
+    /// Defaults to 290s
+    #[must_use]
+    pub fn timeout(mut self, timeout_secs: u32) -> Self {
+        self.timeout = Some(timeout_secs);
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their fields.
+    ///
+    /// Defaults to everything.
+    /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
+    /// The server only supports a limited number of field queries per type.
+    #[must_use]
+    pub fn fields(mut self, field_selector: &str) -> Self {
+        self.field_selector = Some(field_selector.to_string());
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their labels.
+    ///
+    /// Defaults to everything.
+    /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
+    #[must_use]
+    pub fn labels(mut self, label_selector: &str) -> Self {
+        self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// Disables watch bookmarks to simplify watch handling
+    ///
+    /// This is not recommended to use with production watchers as it can cause desyncs.
+    /// See [#219](https://github.com/kube-rs/kube/issues/219) for details.
+    #[must_use]
+    pub fn disable_bookmarks(mut self) -> Self {
+        self.bookmarks = false;
+        self
     }
 }
 
@@ -534,15 +651,15 @@ mod test {
     #[test]
     fn delete_param_constructors() {
         let dp_background = DeleteParams::background();
-        let ser = serde_json::to_value(&dp_background).unwrap();
+        let ser = serde_json::to_value(dp_background).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Background"}));
 
         let dp_foreground = DeleteParams::foreground();
-        let ser = serde_json::to_value(&dp_foreground).unwrap();
+        let ser = serde_json::to_value(dp_foreground).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Foreground"}));
 
         let dp_orphan = DeleteParams::orphan();
-        let ser = serde_json::to_value(&dp_orphan).unwrap();
+        let ser = serde_json::to_value(dp_orphan).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Orphan"}));
     }
 

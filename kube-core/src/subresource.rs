@@ -392,8 +392,7 @@ impl Request {
             for port in ports.iter() {
                 if seen.contains(port) {
                     return Err(Error::Validation(format!(
-                        "ports must be unique, found multiple {}",
-                        port
+                        "ports must be unique, found multiple {port}"
                     )));
                 }
                 seen.insert(port);

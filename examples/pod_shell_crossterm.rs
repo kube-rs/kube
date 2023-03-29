@@ -18,7 +18,7 @@ async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), a
     // create a stream to catch SIGWINCH signal
     let mut sig = signal::unix::signal(signal::unix::SignalKind::window_change())?;
     loop {
-        if sig.recv().await == None {
+        if (sig.recv().await).is_none() {
             return Ok(());
         }
 
@@ -36,7 +36,6 @@ async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), a
     ctrl_c.recv().await;
     Ok(())
 }
-
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -126,6 +125,6 @@ async fn main() -> anyhow::Result<()> {
             assert_eq!(pdel.name_any(), "example");
         });
 
-    println!("");
+    println!();
     Ok(())
 }

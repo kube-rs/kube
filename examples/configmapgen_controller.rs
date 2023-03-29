@@ -5,8 +5,11 @@ use anyhow::Result;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-    api::{Api, ListParams, ObjectMeta, Patch, PatchParams, Resource},
-    runtime::controller::{Action, Controller},
+    api::{Api, ObjectMeta, Patch, PatchParams, Resource},
+    runtime::{
+        controller::{Action, Controller},
+        watcher,
+    },
     Client, CustomResource,
 };
 use schemars::JsonSchema;
@@ -99,8 +102,8 @@ async fn main() -> Result<()> {
         }
     });
 
-    Controller::new(cmgs, ListParams::default())
-        .owns(cms, ListParams::default())
+    Controller::new(cmgs, watcher::Config::default())
+        .owns(cms, watcher::Config::default())
         .reconcile_all_on(reload_rx.map(|_| ()))
         .shutdown_on_signal()
         .run(reconcile, error_policy, Arc::new(Data { client }))

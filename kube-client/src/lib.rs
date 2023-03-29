@@ -47,7 +47,7 @@
 //!
 //!     // List pods in the configured namespace
 //!     for p in pods.list(&ListParams::default()).await? {
-//!         println!("found pod {}", p.name());
+//!         println!("found pod {}", p.name_any());
 //!     }
 //!
 //!     Ok(())
@@ -125,7 +125,6 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from kube_core
 pub use kube_core as core;
 
-
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube-client --lib features=rustls-tls,ws -- --ignored`
 #[cfg(all(feature = "client", feature = "config"))]
@@ -140,7 +139,7 @@ mod test {
     use futures::{StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::Pod;
     use kube_core::{
-        params::{DeleteParams, Patch},
+        params::{DeleteParams, Patch, WatchParams},
         response::StatusSummary,
     };
     use serde_json::json;
@@ -149,7 +148,7 @@ mod test {
     // hard disabled test atm due to k3d rustls issues: https://github.com/kube-rs/kube/issues?q=is%3Aopen+is%3Aissue+label%3Arustls
     #[cfg(feature = "when_rustls_works_with_k3d")]
     #[tokio::test]
-    #[ignore] // needs cluster (lists pods)
+    #[ignore = "needs cluster (lists pods)"]
     #[cfg(all(feature = "rustls-tls"))]
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
@@ -164,7 +163,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (lists pods)
+    #[ignore = "needs cluster (lists pods)"]
     #[cfg(all(feature = "openssl-tls"))]
     async fn custom_client_openssl_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
@@ -179,7 +178,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (lists api resources)
+    #[ignore = "needs cluster (lists api resources)"]
     #[cfg(all(feature = "discovery"))]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{core::DynamicObject, discovery};
@@ -193,7 +192,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create and edit a pod)
+    #[ignore = "needs cluster (will create and edit a pod)"]
     async fn pod_can_use_core_apis() -> Result<(), Box<dyn std::error::Error>> {
         use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchEvent};
 
@@ -228,13 +227,13 @@ mod test {
 
         // Manual watch-api for it to become ready
         // NB: don't do this; using conditions (see pod_api example) is easier and less error prone
-        let lp = ListParams::default()
+        let wp = WatchParams::default()
             .fields(&format!("metadata.name={}", "busybox-kube1"))
             .timeout(15);
-        let mut stream = pods.watch(&lp, "0").await?.boxed();
+        let mut stream = pods.watch(&wp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
             // can debug format watch event
-            let _ = format!("we: {:?}", ev);
+            let _ = format!("we: {ev:?}");
             match ev {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
@@ -243,7 +242,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }
@@ -273,7 +272,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create and attach to a pod)
+    #[ignore = "needs cluster (will create and attach to a pod)"]
     #[cfg(all(feature = "ws"))]
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
@@ -308,10 +307,10 @@ mod test {
 
         // Manual watch-api for it to become ready
         // NB: don't do this; using conditions (see pod_api example) is easier and less error prone
-        let lp = ListParams::default()
+        let wp = WatchParams::default()
             .fields(&format!("metadata.name={}", "busybox-kube2"))
             .timeout(15);
-        let mut stream = pods.watch(&lp, "0").await?.boxed();
+        let mut stream = pods.watch(&wp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
             match ev {
                 WatchEvent::Modified(o) => {
@@ -321,7 +320,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }
@@ -361,7 +360,7 @@ mod test {
             let next_stdout = stdout_stream.next();
             stdin_writer.write_all(b"echo test string 1\n").await?;
             let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
-            println!("{}", stdout);
+            println!("{stdout}");
             assert_eq!(stdout, "test string 1\n");
 
             // AttachedProcess resolves with status object.
@@ -369,7 +368,7 @@ mod test {
             stdin_writer.write_all(b"exit 1\n").await?;
             let status = attached.take_status().unwrap();
             if let Some(status) = status.await {
-                println!("{:?}", status);
+                println!("{status:?}");
                 assert_eq!(status.status, Some("Failure".to_owned()));
                 assert_eq!(status.reason, Some("NonZeroExitCode".to_owned()));
             }
@@ -385,7 +384,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create and tail logs from a pod)
+    #[ignore = "needs cluster (will create and tail logs from a pod)"]
     async fn can_get_pod_logs_and_evict() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
@@ -422,10 +421,10 @@ mod test {
 
         // Manual watch-api for it to become ready
         // NB: don't do this; using conditions (see pod_api example) is easier and less error prone
-        let lp = ListParams::default()
+        let wp = WatchParams::default()
             .fields(&format!("metadata.name={}", "busybox-kube3"))
             .timeout(15);
-        let mut stream = pods.watch(&lp, "0").await?.boxed();
+        let mut stream = pods.watch(&wp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
             match ev {
                 WatchEvent::Modified(o) => {
@@ -435,7 +434,7 @@ mod test {
                         break;
                     }
                 }
-                WatchEvent::Error(e) => panic!("watch error: {}", e),
+                WatchEvent::Error(e) => panic!("watch error: {e}"),
                 _ => {}
             }
         }
@@ -446,20 +445,19 @@ mod test {
             ..LogParams::default()
         };
         let mut logs_stream = pods.log_stream("busybox-kube3", &lp).await?.boxed();
-        let log_line = logs_stream.try_next().await?.unwrap();
-        assert_eq!(log_line, "kube 1\n");
 
         // wait for container to finish
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         let all_logs = pods.logs("busybox-kube3", &Default::default()).await?;
         assert_eq!(all_logs, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
 
-        // remaining logs should have been buffered internally
-        assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 2\n");
-        assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 3\n");
-        assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 4\n");
-        assert_eq!(logs_stream.try_next().await?.unwrap(), "kube 5\n");
+        // individual logs may or may not buffer
+        let mut output = String::new();
+        while let Some(line) = logs_stream.try_next().await? {
+            output.push_str(&String::from_utf8_lossy(&line));
+        }
+        assert_eq!(output, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
 
         // evict the pod
         let ep = EvictParams::default();
@@ -471,7 +469,91 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create a CertificateSigningRequest)
+    #[ignore = "requires a cluster"]
+    async fn can_operate_on_pod_metadata() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
+            core::subresource::LogParams,
+        };
+        use kube_core::{ObjectList, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt};
+
+        let client = Client::try_default().await?;
+        let pods: Api<Pod> = Api::default_namespaced(client);
+
+        // create busybox pod that's alive for at most 30s
+        let p: Pod = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "busybox-kube-meta",
+                "labels": { "app": "kube-rs-test" },
+            },
+            "spec": {
+                "terminationGracePeriodSeconds": 1,
+                "restartPolicy": "Never",
+                "containers": [{
+                  "name": "busybox",
+                  "image": "busybox:1.34.1",
+                  "command": ["sh", "-c", "sleep 30s"],
+                }],
+            }
+        }))?;
+
+        match pods.create(&Default::default(), &p).await {
+            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
+            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(e) => return Err(e.into()),                         // any other case if a failure
+        }
+
+        // Test we can get a pod as a PartialObjectMeta and convert to
+        // ObjectMeta
+        let pod_metadata = pods.get_metadata("busybox-kube-meta").await?;
+        assert_eq!("busybox-kube-meta", pod_metadata.name_any());
+        assert_eq!(
+            Some((&"app".to_string(), &"kube-rs-test".to_string())),
+            pod_metadata.labels().get_key_value("app")
+        );
+
+        // Test we can get a list of PartialObjectMeta for pods
+        let p_list = pods.list_metadata(&ListParams::default()).await?;
+
+        // Find only pod we are concerned with in this test and fail eagerly if
+        // name doesn't exist
+        let pod_metadata = p_list
+            .items
+            .into_iter()
+            .find(|p| p.name_any() == "busybox-kube-meta")
+            .unwrap();
+        assert_eq!(
+            pod_metadata.labels().get("app"),
+            Some(&"kube-rs-test".to_string())
+        );
+
+        // Attempt to patch pod metadata
+        let patch = ObjectMeta {
+            annotations: Some([("test".to_string(), "123".to_string())].into()),
+            ..Default::default()
+        }
+        .into_request_partial::<Pod>();
+
+        let patchparams = PatchParams::default();
+        let p_patched = pods
+            .patch_metadata("busybox-kube-meta", &patchparams, &Patch::Merge(&patch))
+            .await?;
+        assert_eq!(p_patched.annotations().get("test"), Some(&"123".to_string()));
+        assert_eq!(p_patched.types.as_ref().unwrap().kind, "PartialObjectMetadata");
+        assert_eq!(p_patched.types.as_ref().unwrap().api_version, "meta.k8s.io/v1");
+
+        // Clean-up
+        let dp = DeleteParams::default();
+        pods.delete("busybox-kube-meta", &dp).await?.map_left(|pdel| {
+            assert_eq!(pdel.name_any(), "busybox-kube-meta");
+        });
+
+        Ok(())
+    }
+    #[tokio::test]
+    #[ignore = "needs cluster (will create a CertificateSigningRequest)"]
     async fn csr_can_be_approved() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::PostParams;
         use k8s_openapi::api::certificates::v1::{

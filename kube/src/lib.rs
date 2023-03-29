@@ -30,7 +30,7 @@
 //!     // Read pods in the configured namespace into the typed interface from k8s-openapi
 //!     let pods: Api<Pod> = Api::default_namespaced(client);
 //!     for p in pods.list(&ListParams::default()).await? {
-//!         println!("found pod {}", p.name());
+//!         println!("found pod {}", p.name_any());
 //!     }
 //!     Ok(())
 //! }
@@ -52,7 +52,7 @@
 //! use futures::{StreamExt, TryStreamExt};
 //! use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 //! use kube::{
-//!     api::{Api, DeleteParams, ListParams, PatchParams, Patch, ResourceExt},
+//!     api::{Api, DeleteParams, PatchParams, Patch, ResourceExt},
 //!     core::CustomResourceExt,
 //!     Client, CustomResource,
 //!     runtime::{watcher, WatchStreamExt, wait::{conditions, await_condition}},
@@ -87,10 +87,10 @@
 //!
 //!     // Watch for changes to foos in the configured namespace
 //!     let foos: Api<Foo> = Api::default_namespaced(client.clone());
-//!     let lp = ListParams::default();
-//!     let mut apply_stream = watcher(foos, lp).applied_objects().boxed();
+//!     let wc = watcher::Config::default();
+//!     let mut apply_stream = watcher(foos, wc).applied_objects().boxed();
 //!     while let Some(f) = apply_stream.try_next().await? {
-//!         println!("saw apply to {}", f.name());
+//!         println!("saw apply to {}", f.name_any());
 //!     }
 //!     Ok(())
 //! }
@@ -168,14 +168,14 @@ cfg_error! {
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-/// Re-exports from [`kube-runtime`](kube_runtime)
+/// Re-exports from `kube-runtime`
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 #[doc(inline)]
 pub use kube_runtime as runtime;
 
 pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
-/// Re-exports from [`kube_core`](kube_core)
+/// Re-exports from `kube_core`
 #[doc(inline)]
 pub use kube_core as core;
 
@@ -210,7 +210,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs kubeconfig
+    #[ignore = "needs kubeconfig"]
     async fn custom_resource_generates_correct_core_structs() {
         use crate::core::{ApiResource, DynamicObject, GroupVersionKind};
         let client = Client::try_default().await.unwrap();
@@ -229,7 +229,7 @@ mod test {
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
     #[tokio::test]
-    #[ignore] // needs cluster (creates + patches foo crd)
+    #[ignore = "needs cluster (creates + patches foo crd)"]
     #[cfg(all(feature = "derive", feature = "runtime"))]
     async fn derived_resource_queriable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
         use crate::runtime::wait::{await_condition, conditions};
@@ -305,7 +305,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (lists pods)
+    #[ignore = "needs cluster (lists pods)"]
     async fn custom_serialized_objects_are_queryable_and_iterable() -> Result<(), Box<dyn std::error::Error>>
     {
         use crate::core::{
@@ -356,7 +356,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (fetches api resources, and lists all)
+    #[ignore = "needs cluster (fetches api resources, and lists all)"]
     #[cfg(all(feature = "derive"))]
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
@@ -432,7 +432,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (will create await a pod)
+    #[ignore = "needs cluster (will create await a pod)"]
     #[cfg(all(feature = "runtime"))]
     async fn pod_can_await_conditions() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
@@ -514,7 +514,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (lists cms)
+    #[ignore = "needs cluster (lists cms)"]
     async fn api_get_opt_handles_404() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);

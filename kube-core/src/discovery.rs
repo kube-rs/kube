@@ -125,7 +125,7 @@ fn to_plural(word: &str) -> String {
         || word.ends_with("ch")
         || word.ends_with("sh")
     {
-        return format!("{}es", word);
+        return format!("{word}es");
     }
 
     // Words ending in y that are preceded by a consonant will be pluralized by
@@ -142,7 +142,7 @@ fn to_plural(word: &str) -> String {
     }
 
     // All other words will have "s" added to the end (eg. days).
-    format!("{}s", word)
+    format!("{word}s")
 }
 
 #[test]

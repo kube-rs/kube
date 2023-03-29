@@ -24,7 +24,7 @@ jobs:
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       # Install OpenSSL Libraries for Windows
       - name: install openssl
@@ -42,29 +42,28 @@ jobs:
       - name: Build workspace
         run: cargo build
 
-      # Workspace tests
-      - name: Run workspace unit tests
-        run: cargo test --lib --all -j6
+      # Workspace unit tests with various feature sets
+      - name: Run workspace unit tests (no default features)
+        run: cargo test --workspace --lib --no-default-features -j6
+        if: matrix.os == 'ubuntu-latest'
+      - name: Run workspace unit tests (default features)
+        run: cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
+        if: matrix.os == 'ubuntu-latest'
+      - name: Run workspace unit tests (all features)
+        run: cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e -j6
+      # Workspace documentation (all features only)
       - name: Run workspace doc tests
-        run: cargo test --doc --all -j6
+        run: cargo test --workspace --doc --all-features --exclude kube-examples --exclude e2e -j6
+      - name: Run ad-hoc doc test verification
+        run: |
+          if rg "\`\`\`ignored"; then
+            echo "ignored doctests are not allowed, use compile_fail or no_run"
+            exit 1
+          fi
+        if: matrix.os == 'ubuntu-latest'
+      # Examples
       - name: Test examples
         run: cargo test -p kube-examples --examples -j6
-      - name: Compile check remaining examples
-        # No OS specific code in examples, run this on fastest executor
-        if: matrix.os == 'ubuntu-latest'
-        run: cargo build -j4 -p kube-examples
-
-      # Feature tests
-      - name: Test kube with features rustls-tls,ws,oauth
-        run: cargo test -p kube --lib --no-default-features --features=rustls-tls,ws,oauth
-        if: matrix.os == 'ubuntu-latest'
-      - name: Test kube with features openssl-tls,ws,oauth
-        run: cargo test -p kube --lib --no-default-features --features=openssl-tls,ws,oauth
-        if: matrix.os == 'ubuntu-latest'
-      # Feature tests in examples
-      - name: Test crd_derive_no_schema example
-        run: cargo test -p kube-examples --example crd_derive_no_schema --no-default-features --features=openssl-tls,latest
-        if: matrix.os == 'ubuntu-latest'
 
   msrv:
     # Run `cargo check` on our minimum supported Rust version
@@ -76,18 +75,18 @@ jobs:
       run: |
         MSRV=$(grep MSRV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+")
         echo $MSRV
-        echo ::set-output name=msrv::${MSRV}
+        echo "msrv=${MSRV}" >> $GITHUB_OUTPUT
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ steps.msrv.outputs.msrv }}
         profile: minimal
         override: true
-    - uses: Swatinem/rust-cache@v1
+    - uses: Swatinem/rust-cache@v2
     - name: Check
       uses: actions-rs/cargo@v1
       with:
         command: check
-        args: --all
+        args: --workspace
 
     - name: Check rust-version keys matches MSRV consistently
       run: |
@@ -119,7 +118,7 @@ jobs:
       fail-fast: false
       matrix:
         # Run these tests against older clusters as well
-        k8s: [v1.20, latest]
+        k8s: [v1.21, latest]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -131,7 +130,7 @@ jobs:
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
@@ -148,18 +147,12 @@ jobs:
         run: cargo build
 
       # Run the equivalent of `just integration`
-      - name: Run all default features integration library tests
-        run: cargo test --lib --all -- --ignored
-      - name: Run all facade integration library tests with extra features
-        run: cargo test -p kube --lib --features=derive,runtime -- --ignored --nocapture
+      - name: Run all integration library tests
+        run: cargo test --lib --workspace --exclude e2e --all-features -j6 -- --ignored
       - name: Run crd example tests
         run: cargo run -p kube-examples --example crd_api
-      - name: Run all client integration library tests with rustls and ws
-        run: cargo test -p kube-client --lib --features=rustls-tls,ws -- --ignored
       - name: Run derive example tests
         run: cargo run -p kube-examples --example crd_derive
-      - name: Run crd example tests
-        run: cargo run -p kube-examples --example crd_api
 
   mk8sv:
     # comile check e2e tests against mk8sv
@@ -172,8 +165,8 @@ jobs:
         run: |
           MK8SV=$(grep MK8SV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+" | head -n 1)
           echo $MK8SV
-          echo ::set-output name=mk8sv::${MK8SV}
-          echo ::set-output name=mk8svdash::v${MK8SV/\./_}
+          echo "mk8sv=${MK8SV}" >> $GITHUB_OUTPUT
+          echo "mk8svdash=v${MK8SV/\./_}" >> $GITHUB_OUTPUT
 
       - name: Check ci jobs run against advertised MK8SV
         run: |
@@ -195,11 +188,11 @@ jobs:
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.20
+          version: v1.21
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.

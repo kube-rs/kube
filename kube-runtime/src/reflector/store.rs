@@ -127,8 +127,33 @@ where
         let s = self.store.read();
         s.values().cloned().collect()
     }
-}
 
+    /// Retrieve a `clone()` of the entry found by the given predicate
+    #[must_use]
+    pub fn find<P>(&self, predicate: P) -> Option<Arc<K>>
+    where
+        P: Fn(&K) -> bool,
+    {
+        self.store
+            .read()
+            .iter()
+            .map(|(_, k)| k)
+            .find(|k| predicate(k.as_ref()))
+            .cloned()
+    }
+
+    /// Return the number of elements in the store
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.store.read().len()
+    }
+
+    /// Return whether the store is empty
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.store.read().is_empty()
+    }
+}
 
 /// Create a (Reader, Writer) for a `Store<K>` for a typed resource `K`
 ///
@@ -144,7 +169,6 @@ where
     let r = w.as_reader();
     (r, w)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -218,5 +242,33 @@ mod tests {
         store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(), Some(&cm));
+    }
+
+    #[test]
+    fn find_element_in_store() {
+        let cm = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("obj".to_string()),
+                namespace: None,
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let mut target_cm = cm.clone();
+
+        let (reader, mut writer) = store::<ConfigMap>();
+        assert!(reader.is_empty());
+        writer.apply_watcher_event(&watcher::Event::Applied(cm));
+
+        assert_eq!(reader.len(), 1);
+        assert!(reader.find(|k| k.metadata.generation == Some(1234)).is_none());
+
+        target_cm.metadata.name = Some("obj1".to_string());
+        target_cm.metadata.generation = Some(1234);
+        writer.apply_watcher_event(&watcher::Event::Applied(target_cm.clone()));
+        assert!(!reader.is_empty());
+        assert_eq!(reader.len(), 2);
+        let found = reader.find(|k| k.metadata.generation == Some(1234));
+        assert_eq!(found.as_deref(), Some(&target_cm));
     }
 }

@@ -1,7 +1,7 @@
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
+    api::{Api, ResourceExt},
     runtime::{watcher, WatchStreamExt},
     Client,
 };
@@ -13,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
     let api = Api::<Pod>::default_namespaced(client);
 
-    watcher(api, ListParams::default())
+    watcher(api, watcher::Config::default())
         .applied_objects()
         .try_for_each(|p| async move {
             info!("saw {}", p.name_any());

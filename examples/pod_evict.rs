@@ -4,7 +4,7 @@ use serde_json::json;
 use tracing::*;
 
 use kube::{
-    api::{Api, EvictParams, ListParams, PostParams, ResourceExt, WatchEvent},
+    api::{Api, EvictParams, PostParams, ResourceExt, WatchEvent, WatchParams},
     Client,
 };
 
@@ -35,10 +35,10 @@ async fn main() -> anyhow::Result<()> {
     pods.create(&pp, &empty_pod).await?;
 
     // Wait until the pod is running, although it's not necessary
-    let lp = ListParams::default()
+    let wp = WatchParams::default()
         .fields("metadata.name=empty-pod")
         .timeout(10);
-    let mut stream = pods.watch(&lp, "0").await?.boxed();
+    let mut stream = pods.watch(&wp, "0").await?.boxed();
     while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(o) => {

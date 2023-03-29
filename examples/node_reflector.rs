@@ -1,7 +1,7 @@
 use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::Node;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
+    api::{Api, ResourceExt},
     runtime::{predicates, reflector, watcher, WatchStreamExt},
     Client,
 };
@@ -13,11 +13,12 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let nodes: Api<Node> = Api::all(client.clone());
-    let lp = ListParams::default()
+    let wc = watcher::Config::default()
         .labels("kubernetes.io/arch=amd64") // filter instances by label
         .timeout(10); // short watch timeout in this example
 
-    let (reader, writer) = reflector::store::<Node>();
+    let (reader, writer) = reflector::store();
+    let rf = reflector(writer, watcher(nodes, wc));
 
     // Periodically read our state in the background
     tokio::spawn(async move {

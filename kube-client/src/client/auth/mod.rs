@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+
 use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
 use http::{
@@ -17,10 +18,11 @@ use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
 use tower::{filter::AsyncPredicate, BoxError};
 
-use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig};
+use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig, ExecInteractiveMode};
 
 #[cfg(feature = "oauth")] mod oauth;
 #[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
+#[cfg(target_os = "windows")] use std::os::windows::process::CommandExt;
 
 #[derive(Error, Debug)]
 /// Client auth errors
@@ -64,6 +66,10 @@ pub enum Error {
     #[error("failed to parse auth exec output: {0}")]
     AuthExecParse(#[source] serde_json::Error),
 
+    /// Fail to serialize input
+    #[error("failed to serialize input: {0}")]
+    AuthExecSerialize(#[source] serde_json::Error),
+
     /// Failed to exec auth
     #[error("failed exec auth: {0}")]
     AuthExec(String),
@@ -75,6 +81,10 @@ pub enum Error {
     /// Failed to parse token-key
     #[error("failed to parse token-key")]
     ParseTokenKey(#[source] serde_json::Error),
+
+    /// command was missing from exec config
+    #[error("command must be specified to use exec authentication plugin")]
+    MissingCommand,
 
     /// OAuth error
     #[cfg(feature = "oauth")]
@@ -90,6 +100,7 @@ pub(crate) enum Auth {
     Basic(String, SecretString),
     Bearer(SecretString),
     RefreshableToken(RefreshableToken),
+    Certificate(String, SecretString),
 }
 
 // Token file reference. Reloads at least once per minute.
@@ -184,7 +195,7 @@ impl RefreshableToken {
                 if Utc::now() + Duration::seconds(60) >= locked_data.1 {
                     // TODO Improve refreshing exec to avoid `Auth::try_from`
                     match Auth::try_from(&locked_data.2)? {
-                        Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) => {
+                        Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) | Auth::Certificate(_, _) => {
                             return Err(Error::UnrefreshableTokenResponse);
                         }
 
@@ -230,7 +241,7 @@ impl RefreshableToken {
 }
 
 fn bearer_header(token: &str) -> Result<HeaderValue, Error> {
-    let mut value = HeaderValue::try_from(format!("Bearer {}", token)).map_err(Error::InvalidBearerToken)?;
+    let mut value = HeaderValue::try_from(format!("Bearer {token}")).map_err(Error::InvalidBearerToken)?;
     value.set_sensitive(true);
     Ok(value)
 }
@@ -291,6 +302,11 @@ impl TryFrom<&AuthInfo> for Auth {
         if let Some(exec) = &auth_info.exec {
             let creds = auth_exec(exec)?;
             let status = creds.status.ok_or(Error::ExecPluginFailed)?;
+            if let (Some(client_certificate_data), Some(client_key_data)) =
+                (status.client_certificate_data, status.client_key_data)
+            {
+                return Ok(Self::Certificate(client_certificate_data, client_key_data.into()));
+            }
             let expiration = status
                 .expiration_timestamp
                 .map(|ts| ts.parse())
@@ -363,16 +379,23 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     // Command-based token source
     if let Some(cmd) = provider.config.get("cmd-path") {
         let params = provider.config.get("cmd-args").cloned().unwrap_or_default();
-
+        // NB: This property does currently not exist upstream in client-go
+        // See https://github.com/kube-rs/kube/issues/1060
+        let drop_env = provider.config.get("cmd-drop-env").cloned().unwrap_or_default();
         // TODO splitting args by space is not safe
-        let output = Command::new(cmd)
+        let mut command = Command::new(cmd);
+        // Do not pass the following env vars to the command
+        for env in drop_env.trim().split(' ') {
+            command.env_remove(env);
+        }
+        let output = command
             .args(params.trim().split(' '))
             .output()
-            .map_err(|e| Error::AuthExec(format!("Executing {:} failed: {:?}", cmd, e)))?;
+            .map_err(|e| Error::AuthExec(format!("Executing {cmd:} failed: {e:?}")))?;
 
         if !output.status.success() {
             return Err(Error::AuthExecRun {
-                cmd: format!("{} {}", cmd, params),
+                cmd: format!("{cmd} {params}"),
                 status: output.status,
                 out: output,
             });
@@ -393,7 +416,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
             }
         } else {
             let token = std::str::from_utf8(&output.stdout)
-                .map_err(|e| Error::AuthExec(format!("Result is not a string {:?} ", e)))?
+                .map_err(|e| Error::AuthExec(format!("Result is not a string {e:?} ")))?
                 .to_owned();
             return Ok(ProviderToken::GcpCommand(token, None));
         }
@@ -417,21 +440,20 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 
 fn extract_value(json: &serde_json::Value, path: &str) -> Result<String, Error> {
     let pure_path = path.trim_matches(|c| c == '"' || c == '{' || c == '}');
-    match jsonpath_select(json, &format!("${}", pure_path)) {
+    match jsonpath_select(json, &format!("${pure_path}")) {
         Ok(v) if !v.is_empty() => {
             if let serde_json::Value::String(res) = v[0] {
                 Ok(res.clone())
             } else {
                 Err(Error::AuthExec(format!(
-                    "Target value at {:} is not a string",
-                    pure_path
+                    "Target value at {pure_path:} is not a string"
                 )))
             }
         }
 
-        Err(e) => Err(Error::AuthExec(format!("Could not extract JSON value: {:}", e))),
+        Err(e) => Err(Error::AuthExec(format!("Could not extract JSON value: {e:}"))),
 
-        _ => Err(Error::AuthExec(format!("Target value {:} not found", pure_path))),
+        _ => Err(Error::AuthExec(format!("Target value {pure_path:} not found"))),
     }
 }
 
@@ -443,13 +465,17 @@ pub struct ExecCredential {
     #[serde(rename = "apiVersion")]
     pub api_version: Option<String>,
     pub spec: Option<ExecCredentialSpec>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ExecCredentialStatus>,
 }
 
 /// ExecCredenitalSpec holds request and runtime specific information provided
 /// by transport.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ExecCredentialSpec {}
+pub struct ExecCredentialSpec {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interactive: Option<bool>,
+}
 
 /// ExecCredentialStatus holds credentials for the transport to use.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -464,7 +490,11 @@ pub struct ExecCredentialStatus {
 }
 
 fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
-    let mut cmd = Command::new(&auth.command);
+    let mut cmd = match &auth.command {
+        Some(cmd) => Command::new(cmd),
+        None => return Err(Error::MissingCommand),
+    };
+
     if let Some(args) = &auth.args {
         cmd.args(args);
     }
@@ -478,16 +508,41 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
         cmd.envs(envs);
     }
 
+    let interactive = auth.interactive_mode != Some(ExecInteractiveMode::Never);
+    if interactive {
+        cmd.stdin(std::process::Stdio::inherit());
+    } else {
+        cmd.stdin(std::process::Stdio::piped());
+    }
+
+    // Provide exec info to child process
+    let exec_info = serde_json::to_string(&ExecCredential {
+        api_version: auth.api_version.clone(),
+        kind: None,
+        spec: Some(ExecCredentialSpec {
+            interactive: Some(interactive),
+        }),
+        status: None,
+    })
+    .map_err(Error::AuthExecSerialize)?;
+    cmd.env("KUBERNETES_EXEC_INFO", exec_info);
+
     if let Some(envs) = &auth.drop_env {
         for env in envs {
             cmd.env_remove(env);
         }
     }
 
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
     let out = cmd.output().map_err(Error::AuthExecStart)?;
     if !out.status.success() {
         return Err(Error::AuthExecRun {
-            cmd: format!("{:?}", cmd),
+            cmd: format!("{cmd:?}"),
             status: out.status,
             out,
         });
@@ -531,12 +586,11 @@ mod test {
                 expiry-key: '{{.credential.token_expiry}}'
                 token-key: '{{.credential.access_token}}'
               name: gcp
-        "#,
-            expiry = expiry
+        "#
         );
 
         let config: Kubeconfig = serde_yaml::from_str(&test_file).unwrap();
-        let auth_info = &config.auth_infos[0].auth_info;
+        let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
         match Auth::try_from(auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();

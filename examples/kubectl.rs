@@ -123,12 +123,12 @@ impl App {
         Ok(())
     }
 
-    async fn watch(&self, api: Api<DynamicObject>, mut lp: ListParams) -> Result<()> {
+    async fn watch(&self, api: Api<DynamicObject>, mut wc: watcher::Config) -> Result<()> {
         if let Some(n) = &self.name {
-            lp = lp.fields(&format!("metadata.name={}", n));
+            wc = wc.fields(&format!("metadata.name={n}"));
         }
         // present a dumb table for it for now. kubectl does not do this anymore.
-        let mut stream = watcher(api, lp).applied_objects().boxed();
+        let mut stream = watcher(api, wc).applied_objects().boxed();
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
             let age = format_creation_since(inst.creation_timestamp());
@@ -196,11 +196,17 @@ async fn main() -> Result<()> {
     if let Some(resource) = &app.resource {
         // Common discovery, parameters, and api configuration for a single resource
         let (ar, caps) = resolve_api_resource(&discovery, resource)
-            .with_context(|| format!("resource {:?} not found in cluster", resource))?;
+            .with_context(|| format!("resource {resource:?} not found in cluster"))?;
         let mut lp = ListParams::default();
         if let Some(label) = &app.selector {
             lp = lp.labels(label);
         }
+
+        let mut wc = watcher::Config::default();
+        if let Some(label) = &app.selector {
+            wc = wc.labels(label);
+        }
+
         let api = dynamic_api(ar, caps, client, &app.namespace, app.all);
 
         tracing::info!(?app.verb, ?resource, name = ?app.name.clone().unwrap_or_default(), "requested objects");
@@ -208,7 +214,7 @@ async fn main() -> Result<()> {
             Verb::Edit => app.edit(api).await?,
             Verb::Get => app.get(api, lp).await?,
             Verb::Delete => app.delete(api, lp).await?,
-            Verb::Watch => app.watch(api, lp).await?,
+            Verb::Watch => app.watch(api, wc).await?,
             Verb::Apply => bail!("verb {:?} cannot act on an explicit resource", app.verb),
         }
     } else if app.verb == Verb::Apply {
@@ -238,9 +244,9 @@ fn format_creation_since(time: Option<Time>) -> String {
 }
 fn format_duration(dur: Duration) -> String {
     match (dur.num_days(), dur.num_hours(), dur.num_minutes()) {
-        (days, _, _) if days > 0 => format!("{}d", days),
-        (_, hours, _) if hours > 0 => format!("{}h", hours),
-        (_, _, mins) => format!("{}m", mins),
+        (days, _, _) if days > 0 => format!("{days}d"),
+        (_, hours, _) if hours > 0 => format!("{hours}h"),
+        (_, _, mins) => format!("{mins}m"),
     }
 }
 

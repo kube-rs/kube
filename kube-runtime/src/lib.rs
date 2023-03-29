@@ -16,11 +16,12 @@
 #![allow(clippy::type_repetition_in_bounds)]
 // Triggered by Tokio macros
 #![allow(clippy::semicolon_if_nothing_returned)]
+// Triggered by nightly clippy on idiomatic code
+#![allow(clippy::let_underscore_untyped)]
 
 pub mod controller;
-k8s_openapi::k8s_if_ge_1_19! {
-    pub mod events;
-}
+pub mod events;
+
 pub mod finalizer;
 pub mod reflector;
 pub mod scheduler;
@@ -33,7 +34,7 @@ pub use finalizer::finalizer;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
-pub use watcher::watcher;
+pub use watcher::{metadata_watcher, watcher};
 
 pub use utils::predicates;
 pub use wait::conditions;

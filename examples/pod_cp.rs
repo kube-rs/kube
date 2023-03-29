@@ -3,7 +3,7 @@ use k8s_openapi::api::core::v1::Pod;
 use tracing::*;
 
 use kube::{
-    api::{Api, AttachParams, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent},
+    api::{Api, AttachParams, DeleteParams, PostParams, ResourceExt, WatchEvent, WatchParams},
     Client,
 };
 use tokio::io::AsyncWriteExt;
@@ -34,8 +34,8 @@ async fn main() -> anyhow::Result<()> {
     pods.create(&PostParams::default(), &p).await?;
 
     // Wait until the pod is running, otherwise we get 500 error.
-    let lp = ListParams::default().fields("metadata.name=example").timeout(10);
-    let mut stream = pods.watch(&lp, "0").await?.boxed();
+    let wp = WatchParams::default().fields("metadata.name=example").timeout(10);
+    let mut stream = pods.watch(&wp, "0").await?.boxed();
     while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(o) => {
@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
     {
         let ap = AttachParams::default().stderr(false);
         let mut cat = pods
-            .exec("example", vec!["cat", &format!("/{}", file_name)], &ap)
+            .exec("example", vec!["cat", &format!("/{file_name}")], &ap)
             .await?;
         let mut cat_out = tokio_util::io::ReaderStream::new(cat.stdout().unwrap());
         let next_stdout = cat_out.next().await.unwrap()?;

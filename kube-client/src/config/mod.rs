@@ -69,6 +69,10 @@ pub enum KubeconfigError {
     #[error("the structure of the parsed kubeconfig is invalid: {0}")]
     InvalidStructure(#[source] serde_yaml::Error),
 
+    /// Cluster url is missing on selected cluster
+    #[error("cluster url is missing on selected cluster")]
+    MissingClusterUrl,
+
     /// Failed to parse cluster url
     #[error("failed to parse cluster url: {0}")]
     ParseClusterUrl(#[source] http::uri::InvalidUri),
@@ -140,14 +144,6 @@ pub struct Config {
     ///
     /// A value of `None` means no timeout
     pub write_timeout: Option<std::time::Duration>,
-    /// Timeout for calls to the Kubernetes API.
-    ///
-    /// A value of `None` means no timeout
-    #[deprecated(
-        since = "0.75.0",
-        note = "replaced by more granular members `connect_timeout`, `read_timeout` and `write_timeout`. This member will be removed in 0.78.0."
-    )]
-    pub timeout: Option<std::time::Duration>,
     /// Whether to accept invalid certificates
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
@@ -155,6 +151,10 @@ pub struct Config {
     // TODO Actually support proxy or create an example with custom client
     /// Optional proxy URL.
     pub proxy_url: Option<http::Uri>,
+    /// If set, apiserver certificate will be validated to contain this string
+    ///
+    /// If not set, the `cluster_url` is used instead
+    pub tls_server_name: Option<String>,
 }
 
 impl Config {
@@ -164,7 +164,6 @@ impl Config {
     /// Most likely you want to use [`Config::infer`] to infer the config from
     /// the environment.
     pub fn new(cluster_url: http::Uri) -> Self {
-        #[allow(deprecated)]
         Self {
             cluster_url,
             default_namespace: String::from("default"),
@@ -172,10 +171,10 @@ impl Config {
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
             write_timeout: None,
-            timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
             proxy_url: None,
+            tls_server_name: None,
         }
     }
 
@@ -209,20 +208,20 @@ impl Config {
 
     /// Load an in-cluster Kubernetes client configuration using
     /// [`Config::incluster_env`].
-    #[cfg(not(feature = "rustls-tls"))]
-    pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_env()
-    }
-
-    /// Load an in-cluster Kubernetes client configuration using
-    /// [`Config::incluster_dns`].
     ///
-    /// The `rustls-tls` feature is currently incompatible with
-    /// [`Config::incluster_env`]. See
-    /// <https://github.com/kube-rs/kube/issues/1003>.
-    #[cfg(feature = "rustls-tls")]
+    /// # Rustls-specific behavior
+    /// Rustls does not support validating IP addresses (see
+    /// <https://github.com/kube-rs/kube/issues/1003>).
+    /// To work around this, when rustls is configured, this function automatically appends
+    /// `tls-server-name = "kubernetes.default.svc"` to the resulting configuration.
+    /// Overriding or unsetting `Config::tls_server_name` will avoid this behaviour.
     pub fn incluster() -> Result<Self, InClusterError> {
-        Self::incluster_dns()
+        let mut cfg = Self::incluster_env()?;
+        if cfg!(all(not(feature = "openssl-tls"), feature = "rustls-tls")) {
+            // openssl takes precedence when both features present, so only do it when only rustls is there
+            cfg.tls_server_name = Some("kubernetes.default.svc".to_string());
+        }
+        Ok(cfg)
     }
 
     /// Load an in-cluster config using the `KUBERNETES_SERVICE_HOST` and
@@ -232,9 +231,7 @@ impl Config {
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     ///
     /// This method matches the behavior of the official Kubernetes client
-    /// libraries, but it is not compatible with the `rustls-tls` feature . When
-    /// this feature is enabled, [`Config::incluster_dns`] should be used
-    /// instead. See <https://github.com/kube-rs/kube/issues/1003>.
+    /// libraries and is the default for both TLS stacks.
     pub fn incluster_env() -> Result<Self, InClusterError> {
         let uri = incluster_config::try_kube_from_env()?;
         Self::incluster_with_uri(uri)
@@ -247,7 +244,9 @@ impl Config {
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     ///
     /// This behavior does not match that of the official Kubernetes clients,
-    /// but this approach is compatible with the `rustls-tls` feature.
+    /// but this approach is compatible with the `rustls-tls` feature
+    /// without setting `tls_server_name`.
+    /// See <https://github.com/kube-rs/kube/issues/1003>.
     pub fn incluster_dns() -> Result<Self, InClusterError> {
         Self::incluster_with_uri(incluster_config::kube_dns())
     }
@@ -256,7 +255,6 @@ impl Config {
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
 
-        #[allow(deprecated)]
         Ok(Self {
             cluster_url,
             default_namespace,
@@ -264,13 +262,13 @@ impl Config {
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
             write_timeout: None,
-            timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo {
                 token_file: Some(incluster_config::token_file()),
                 ..Default::default()
             },
             proxy_url: None,
+            tls_server_name: None,
         })
     }
 
@@ -299,6 +297,8 @@ impl Config {
         let cluster_url = loader
             .cluster
             .server
+            .clone()
+            .ok_or(KubeconfigError::MissingClusterUrl)?
             .parse::<http::Uri>()
             .map_err(KubeconfigError::ParseClusterUrl)?;
 
@@ -315,7 +315,6 @@ impl Config {
             root_cert = Some(ca_bundle);
         }
 
-        #[allow(deprecated)]
         Ok(Self {
             cluster_url,
             default_namespace,
@@ -323,10 +322,10 @@ impl Config {
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
             write_timeout: None,
-            timeout: Some(DEFAULT_TIMEOUT),
             accept_invalid_certs,
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
+            tls_server_name: loader.cluster.tls_server_name,
         })
     }
 
@@ -388,15 +387,13 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
 }
 
 // https://github.com/kube-rs/kube/issues/146#issuecomment-590924397
-/// Default Timeout
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(295);
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
 
 // Expose raw config structs
 pub use file_config::{
-    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, Kubeconfig, NamedAuthInfo, NamedCluster,
-    NamedContext, NamedExtension, Preferences,
+    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, ExecInteractiveMode, Kubeconfig,
+    NamedAuthInfo, NamedCluster, NamedContext, NamedExtension, Preferences,
 };
 
 #[cfg(test)]

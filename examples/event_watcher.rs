@@ -1,7 +1,7 @@
 use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::Event;
 use kube::{
-    api::{Api, ListParams},
+    api::Api,
     runtime::{watcher, WatchStreamExt},
     Client,
 };
@@ -13,9 +13,9 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let events: Api<Event> = Api::all(client);
-    let lp = ListParams::default();
+    let wc = watcher::Config::default();
 
-    let ew = watcher(events, lp).applied_objects();
+    let ew = watcher(events, wc).applied_objects();
 
     pin_mut!(ew);
     while let Some(event) = ew.try_next().await? {

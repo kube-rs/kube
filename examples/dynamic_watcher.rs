@@ -1,40 +1,54 @@
-use futures::{StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use kube::{
-    api::{Api, DynamicObject, GroupVersionKind, ListParams, ResourceExt},
-    discovery::{self, Scope},
-    runtime::{watcher, WatchStreamExt},
-    Client,
+    api::{Api, DynamicObject, GroupVersionKind, Resource, ResourceExt},
+    runtime::{metadata_watcher, watcher, watcher::Event, WatchStreamExt},
 };
+use serde::de::DeserializeOwned;
 use tracing::*;
 
-use std::env;
+use std::{env, fmt::Debug};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
+
+    // If set will receive only the metadata for watched resources
+    let watch_metadata = env::var("WATCH_METADATA").map(|s| s == "1").unwrap_or(false);
 
     // Take dynamic resource identifiers:
-    let group = env::var("GROUP").unwrap_or_else(|_| "clux.dev".into());
+    let group = env::var("GROUP").unwrap_or_else(|_| "".into());
     let version = env::var("VERSION").unwrap_or_else(|_| "v1".into());
-    let kind = env::var("KIND").unwrap_or_else(|_| "Foo".into());
+    let kind = env::var("KIND").unwrap_or_else(|_| "Pod".into());
 
     // Turn them into a GVK
     let gvk = GroupVersionKind::gvk(&group, &version, &kind);
     // Use API discovery to identify more information about the type (like its plural)
-    let (ar, caps) = discovery::pinned_kind(&client, &gvk).await?;
+    let (ar, _caps) = kube::discovery::pinned_kind(&client, &gvk).await?;
 
     // Use the full resource info to create an Api with the ApiResource as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &ar);
+    let wc = watcher::Config::default();
 
-    // Fully compatible with kube-runtime
-    let mut items = watcher(api, ListParams::default()).applied_objects().boxed();
+    // Start a metadata or a full resource watch
+    if watch_metadata {
+        handle_events(metadata_watcher(api, wc)).await
+    } else {
+        handle_events(watcher(api, wc)).await
+    }
+}
+
+async fn handle_events<K: Resource + Clone + Debug + Send + DeserializeOwned + 'static>(
+    stream: impl Stream<Item = watcher::Result<Event<K>>> + Send + 'static,
+) -> anyhow::Result<()> {
+    let mut items = stream.applied_objects().boxed();
     while let Some(p) = items.try_next().await? {
-        if caps.scope == Scope::Cluster {
-            info!("saw {}", p.name_any());
+        if let Some(ns) = p.namespace() {
+            info!("saw {} in {ns}", p.name_any());
         } else {
-            info!("saw {} in {}", p.name_any(), p.namespace().unwrap());
+            info!("saw {}", p.name_any());
         }
+        trace!("full obj: {p:?}");
     }
     Ok(())
 }

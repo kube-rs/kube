@@ -51,7 +51,7 @@ fn main() {
     });
     println!("Spec: {:?}", foo.spec);
     let crd = serde_json::to_string_pretty(&FooCrd::crd()).unwrap();
-    println!("Foo CRD: \n{}", crd);
+    println!("Foo CRD: \n{crd}");
 
     println!("Spec (via HasSpec): {:?}", foo.spec());
     println!("Status (via HasStatus): {:?}", foo.status());

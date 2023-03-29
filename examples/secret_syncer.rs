@@ -6,11 +6,12 @@
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 use kube::{
-    api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, Resource},
+    api::{Api, DeleteParams, ObjectMeta, Patch, PatchParams, Resource},
     error::ErrorResponse,
     runtime::{
         controller::{Action, Controller},
         finalizer::{finalizer, Event},
+        watcher,
     },
 };
 use std::{sync::Arc, time::Duration};
@@ -32,7 +33,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 fn secret_name_for_configmap(cm: &ConfigMap) -> Result<String> {
     let name = cm.metadata.name.as_deref().ok_or(Error::NoName)?;
-    Ok(format!("cmsyncer-{}", name))
+    Ok(format!("cmsyncer-{name}"))
 }
 
 async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
@@ -78,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
     let client = kube::Client::try_default().await?;
     Controller::new(
         Api::<ConfigMap>::all(client.clone()),
-        ListParams::default().labels("configmap-secret-syncer.nullable.se/sync=true"),
+        watcher::Config::default().labels("configmap-secret-syncer.nullable.se/sync=true"),
     )
     .run(
         |cm, _| {
