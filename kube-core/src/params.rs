@@ -14,8 +14,8 @@ pub enum VersionMatch {
     ///
     /// This is the default option.
     ///
-    /// Note that unless you have strong consistency requirements, using `NotOlderThan`
-    /// and a known resource version is preferable since it can achieve better performance and scalability
+    /// Note that if you have weak consistency requirements, using `NotOlderThan`
+    /// may be preferable since it can achieve better performance and scalability
     /// of your cluster than leaving resource version  and resource version Match unset, which requires quorum read to be served.
     #[default]
     Unset,
@@ -89,7 +89,7 @@ impl ListParams {
         if let Some(rv) = &self.resource_version {
             if self.version_match == VersionMatch::Exact && rv == "0" {
                 return Err(Error::Validation(
-                    "A zero resource_version is required when using an Exact match".into(),
+                    "A non-zero resource_version is required when using an Exact match".into(),
                 ));
             }
         } else if self.version_match != VersionMatch::Unset {
