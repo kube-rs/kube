@@ -36,6 +36,5 @@ pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
 pub use watcher::{metadata_watcher, watcher};
 
-#[cfg(feature = "unstable-runtime-predicates")]
-pub use utils::predicates;
+#[cfg(feature = "unstable-runtime-predicates")] pub use utils::predicates;
 pub use wait::conditions;

@@ -2,8 +2,7 @@
 
 mod backoff_reset_timer;
 mod event_flatten;
-#[cfg(feature = "unstable-runtime-predicates")]
-mod predicate;
+#[cfg(feature = "unstable-runtime-predicates")] mod predicate;
 mod stream_backoff;
 #[cfg(feature = "unstable-runtime-subscribe")] pub mod stream_subscribe;
 mod watch_ext;

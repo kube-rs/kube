@@ -1,13 +1,12 @@
+#[cfg(feature = "unstable-runtime-predicates")]
+use crate::utils::predicate::PredicateFilter;
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
     utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
     watcher,
 };
-#[cfg(feature = "unstable-runtime-predicates")]
-use crate::utils::predicate::PredicateFilter;
-#[cfg(feature = "unstable-runtime-predicates")]
-use kube_client::Resource;
+#[cfg(feature = "unstable-runtime-predicates")] use kube_client::Resource;
 
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
