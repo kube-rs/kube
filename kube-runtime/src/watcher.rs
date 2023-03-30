@@ -265,7 +265,7 @@ impl Config {
 
     /// Sets list semantic to `Any` to reduce cluster load
     #[must_use]
-    pub fn cached(self) -> Self {
+    pub fn any_semantic(self) -> Self {
         self.list_semantic(ListSemantic::Any)
     }
 
