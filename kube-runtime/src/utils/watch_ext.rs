@@ -144,3 +144,36 @@ pub trait WatchStreamExt: Stream {
 }
 
 impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
+
+// Compile tests
+#[cfg(feature = "unstable-runtime-predicates")]
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::predicates;
+    use futures::StreamExt;
+    use k8s_openapi::api::core::v1::Pod;
+    use kube_client::{Api, Resource};
+
+    fn compile_type<T>() -> T {
+        unimplemented!("not called - compile test only")
+    }
+
+    pub fn assert_stream<T, K>(x: T) -> T
+    where
+        T: Stream<Item = watcher::Result<K>> + Send,
+        K: Resource + Clone + Send + 'static,
+    {
+        x
+    }
+
+    // not #[test] because this is only a compile check verification
+    #[allow(dead_code, unused_must_use)]
+    fn test_watcher_stream_type_drift() {
+        let pred_watch = watcher(compile_type::<Api<Pod>>(), Default::default())
+            .touched_objects()
+            .predicate_filter(predicates::generation)
+            .boxed();
+        assert_stream(pred_watch);
+    }
+}
