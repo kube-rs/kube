@@ -13,14 +13,19 @@ use std::{collections::HashMap, hash::Hash};
 /// Stream returned by the [`predicate_filter`](super::WatchStreamExt::predicate_filter) method.
 #[must_use = "streams do nothing unless polled"]
 #[allow(clippy::type_complexity)]
-pub struct PredicateFilter<St, K: Resource> {
+pub struct PredicateFilter<St, K: Resource, Func> {
     #[pin]
     stream: St,
-    predicate: Box<dyn (Fn(&K) -> Option<u64>) + Send>,
+    predicate: Box<dyn Func>,
     cache: HashMap<ObjectRef<K>, u64>,
 }
-impl<St: TryStream<Ok = K>, K: Resource> PredicateFilter<St, K> {
-    pub(super) fn new(stream: St, predicate: impl Fn(&K) -> Option<u64> + 'static + Send) -> Self {
+impl<St, K, F> PredicateFilter<St, K, F> {
+    pub(super) fn new(stream: St, predicate: F) -> Self
+    where
+        St: TryStream<Ok = K>,
+        K: Resource,
+        F: Fn(&K) -> Option<u64> + 'static + Send,
+    {
         Self {
             stream,
             predicate: Box::new(predicate),
@@ -28,11 +33,12 @@ impl<St: TryStream<Ok = K>, K: Resource> PredicateFilter<St, K> {
         }
     }
 }
-impl<St, K> Stream for PredicateFilter<St, K>
+impl<St, K, F> Stream for PredicateFilter<St, K, F>
 where
     St: Stream<Item = Result<K, Error>>,
     K: Resource,
     K::DynamicType: Default + Eq + Hash,
+    F: Fn(&K) -> Option<u64> + 'static + Send,
 {
     type Item = Result<K, Error>;
 
