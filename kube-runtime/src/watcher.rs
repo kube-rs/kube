@@ -161,6 +161,11 @@ pub enum ListSemantic {
     ///
     /// Prefer this if you have strong consistency requirements. Note that this
     /// is more taxing for the apiserver and can be less scalable for the cluster.
+    ///
+    /// If you are observing large resource sets (such as congested `Controller` cases),
+    /// you typically have a delay between the list call completing, and all the events
+    /// getting processed. In such cases, it is probably worth picking `Any` over `MostRecent`,
+    /// as your events are not guaranteed to be up-to-date by the time you get to them anyway.
     #[default]
     MostRecent,
 
@@ -169,6 +174,9 @@ pub enum ListSemantic {
     /// This is faster and much less taxing on the apiserver, but can result
     /// in much older results than has previously observed for `Restarted` events,
     /// particularly in HA configurations, due to partitions or stale caches.
+    ///
+    /// This option makes the most sense for controller usage where events have
+    /// some delay between being seen by the runtime, and it being sent to the reconciler.
     Any,
 }
 
@@ -263,7 +271,7 @@ impl Config {
         self
     }
 
-    /// Sets list semantic to `Any` to reduce cluster load
+    /// Sets list semantic to `Any` to improve list performance
     #[must_use]
     pub fn any_semantic(self) -> Self {
         self.list_semantic(ListSemantic::Any)
