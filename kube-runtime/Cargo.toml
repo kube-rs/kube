@@ -15,9 +15,10 @@ rust-version = "1.63.0"
 edition = "2021"
 
 [features]
-unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-predicates"]
+unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-predicates", "unstable-runtime-owns-stream"]
 unstable-runtime-subscribe = []
 unstable-runtime-predicates = []
+unstable-runtime-owns-stream = []
 
 [package.metadata.docs.rs]
 features = ["k8s-openapi/v1_26", "unstable-runtime"]
