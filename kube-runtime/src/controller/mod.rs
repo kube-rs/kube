@@ -57,7 +57,7 @@ pub struct Action {
 }
 
 impl Action {
-    /// Action to to the reconciliation at this time even if no external watch triggers hit
+    /// Action to the reconciliation at this time even if no external watch triggers hit
     ///
     /// This is the best-practice action that ensures eventual consistency of your controller
     /// even in the case of missed changes (which can happen).
