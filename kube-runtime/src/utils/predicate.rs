@@ -16,11 +16,11 @@ use std::{collections::HashMap, hash::Hash};
 pub struct PredicateFilter<St, K: Resource> {
     #[pin]
     stream: St,
-    predicate: Box<dyn (Fn(&K) -> Option<u64>)>,
+    predicate: Box<dyn (Fn(&K) -> Option<u64>) + Send>,
     cache: HashMap<ObjectRef<K>, u64>,
 }
 impl<St: TryStream<Ok = K>, K: Resource> PredicateFilter<St, K> {
-    pub(super) fn new(stream: St, predicate: impl Fn(&K) -> Option<u64> + 'static) -> Self {
+    pub(super) fn new(stream: St, predicate: impl Fn(&K) -> Option<u64> + 'static + Send) -> Self {
         Self {
             stream,
             predicate: Box::new(predicate),
