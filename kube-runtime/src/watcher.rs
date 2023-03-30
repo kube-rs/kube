@@ -161,6 +161,7 @@ pub enum ListSemantic {
     ///
     /// Prefer this if you have strong consistency requirements. Note that this
     /// is more taxing for the apiserver and can be less scalable for the cluster.
+    #[default]
     MostRecent,
 
     /// List calls returns cached results from apiserver
@@ -168,8 +169,7 @@ pub enum ListSemantic {
     /// This is faster and much less taxing on the apiserver, but can result
     /// in much older results than has previously observed for `Restarted` events,
     /// particularly in HA configurations, due to partitions or stale caches.
-    #[default]
-    Cached,
+    Any,
 }
 
 /// Accumulates all options that can be used on the watcher invocation.
@@ -263,10 +263,10 @@ impl Config {
         self
     }
 
-    /// Sets list semantic to the strongly consistent `MostRecent`
+    /// Sets list semantic to `Any` to reduce cluster load
     #[must_use]
-    pub fn most_recent(self) -> Self {
-        self.list_semantic(ListSemantic::MostRecent)
+    pub fn cached(self) -> Self {
+        self.list_semantic(ListSemantic::Any)
     }
 
     /// Disables watch bookmarks to simplify watch handling
@@ -282,7 +282,7 @@ impl Config {
     /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
         let version_match = match self.list_semantic {
-            ListSemantic::Cached => Some(VersionMatch::NotOlderThan),
+            ListSemantic::Any => Some(VersionMatch::NotOlderThan),
             ListSemantic::MostRecent => None,
         };
         ListParams {
