@@ -3,7 +3,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use futures::{ready, Stream, TryStream};
+use futures::{ready, Stream};
 use kube_client::Resource;
 use pin_project::pin_project;
 use std::{collections::HashMap, hash::Hash};
@@ -12,23 +12,22 @@ use std::{collections::HashMap, hash::Hash};
 #[pin_project]
 /// Stream returned by the [`predicate_filter`](super::WatchStreamExt::predicate_filter) method.
 #[must_use = "streams do nothing unless polled"]
-#[allow(clippy::type_complexity)]
 pub struct PredicateFilter<St, K: Resource, Func> {
     #[pin]
     stream: St,
-    predicate: Box<dyn Func>,
+    predicate: Func,
     cache: HashMap<ObjectRef<K>, u64>,
 }
-impl<St, K, F> PredicateFilter<St, K, F> {
-    pub(super) fn new(stream: St, predicate: F) -> Self
-    where
-        St: TryStream<Ok = K>,
-        K: Resource,
-        F: Fn(&K) -> Option<u64> + 'static + Send,
-    {
+impl<St, K, F> PredicateFilter<St, K, F>
+where
+    St: Stream<Item = Result<K, Error>>,
+    K: Resource,
+    F: Fn(&K) -> Option<u64> + 'static,
+{
+    pub(super) fn new(stream: St, predicate: F) -> Self {
         Self {
             stream,
-            predicate: Box::new(predicate),
+            predicate,
             cache: HashMap::new(),
         }
     }
@@ -38,7 +37,7 @@ where
     St: Stream<Item = Result<K, Error>>,
     K: Resource,
     K::DynamicType: Default + Eq + Hash,
-    F: Fn(&K) -> Option<u64> + 'static + Send,
+    F: Fn(&K) -> Option<u64> + 'static,
 {
     type Item = Result<K, Error>;
 

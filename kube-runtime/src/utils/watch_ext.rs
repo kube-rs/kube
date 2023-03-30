@@ -70,13 +70,13 @@ pub trait WatchStreamExt: Stream {
     /// # }
     /// ```
     #[cfg(feature = "unstable-runtime-predicates")]
-    fn predicate_filter<K, F>(self, predicateFn: F) -> PredicateFilter<Self, K>
+    fn predicate_filter<K, F>(self, predicate: F) -> PredicateFilter<Self, K, F>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
         K: Resource + 'static,
-        F: Fn(&K) -> Option<u64> + 'static + Send,
+        F: Fn(&K) -> Option<u64> + 'static,
     {
-        PredicateFilter::new(self, predicateFn)
+        PredicateFilter::new(self, predicate)
     }
 
     /// Create a [`StreamSubscribe`] from a [`watcher()`] stream.
