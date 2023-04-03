@@ -208,15 +208,10 @@ jobs:
         run: cargo run -p e2e --bin boot --features=openssl,latest
       - name: boot openssl, minimum supported k8s
         run: cargo run -p e2e --bin boot --features=openssl,mk8sv
-      # no rustls local yet: https://github.com/kube-rs/kube-rs/issues/153
-      # we could edit kubeconfig and /etc/hosts to have the following lines:
-      # /etc/hosts: 127.0.0.1       k3d.local
-      # kubeconfig:     server: https://k3d.local:36729 (e.g. swap out 0.0.0.0 under cluster)
-      # Together, that makes it work locally. Maybe that can be done with some k3d-args to host-aliases.
-      #- name: boot rustls, latest k8s
-      #  run: cargo run -p e2e --bin boot --features=rustls,latest
-      #- name: boot rustls, minimum supported k8s
-      #  run: cargo run -p e2e --bin boot --features=rustls,mk8sv
+      - name: boot rustls, latest k8s
+        run: cargo run -p e2e --bin boot --features=rustls,latest
+      - name: boot rustls, minimum supported k8s
+        run: cargo run -p e2e --bin boot --features=rustls,mk8sv
 
   in-cluster:
     # in-cluster e2e via docker on linux
