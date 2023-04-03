@@ -377,8 +377,8 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
     Ok(pem::parse_many(data)?
         .into_iter()
         .filter_map(|p| {
-            if p.tag() == "CERTIFICATE" {
-                Some(p.into_contents())
+            if p.tag == "CERTIFICATE" {
+                Some(p.contents)
             } else {
                 None
             }
