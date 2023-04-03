@@ -72,18 +72,15 @@ impl Request {
             qp.append_pair("continue", continue_token);
         }
 
+        if let Some(rv) = &lp.resource_version {
+            qp.append_pair("resourceVersion", rv.as_str());
+        }
         match &lp.version_match {
-            VersionMatch::MostRecent => (),
-            VersionMatch::Any => {
-                qp.append_pair("resourceVersion", "0");
+            None => {}
+            Some(VersionMatch::NotOlderThan) => {
                 qp.append_pair("resourceVersionMatch", "NotOlderThan");
             }
-            VersionMatch::NotOlderThan(resource_version) => {
-                qp.append_pair("resourceVersion", resource_version.as_str());
-                qp.append_pair("resourceVersionMatch", "NotOlderThan");
-            }
-            VersionMatch::Exact(resource_version) => {
-                qp.append_pair("resourceVersion", resource_version.as_str());
+            Some(VersionMatch::Exact) => {
                 qp.append_pair("resourceVersionMatch", "Exact");
             }
         }
@@ -319,18 +316,15 @@ impl Request {
             qp.append_pair("continue", continue_token);
         }
 
+        if let Some(rv) = &lp.resource_version {
+            qp.append_pair("resourceVersion", rv.as_str());
+        }
         match &lp.version_match {
-            VersionMatch::MostRecent => (),
-            VersionMatch::Any => {
-                qp.append_pair("resourceVersion", "0");
+            None => {}
+            Some(VersionMatch::NotOlderThan) => {
                 qp.append_pair("resourceVersionMatch", "NotOlderThan");
             }
-            VersionMatch::NotOlderThan(resource_version) => {
-                qp.append_pair("resourceVersion", resource_version.as_str());
-                qp.append_pair("resourceVersionMatch", "NotOlderThan");
-            }
-            VersionMatch::Exact(resource_version) => {
-                qp.append_pair("resourceVersion", resource_version.as_str());
+            Some(VersionMatch::Exact) => {
                 qp.append_pair("resourceVersionMatch", "Exact");
             }
         }
@@ -402,6 +396,7 @@ mod test {
         request::Request,
         resource::Resource,
     };
+    use http::header;
     use k8s::{
         admissionregistration::v1 as adregv1, apps::v1 as appsv1, authorization::v1 as authv1,
         autoscaling::v1 as autoscalingv1, batch::v1 as batchv1, core::v1 as corev1,
@@ -418,10 +413,7 @@ mod test {
         let url = corev1::Secret::url_path(&(), Some("ns"));
         let req = Request::new(url).create(&PostParams::default(), vec![]).unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces/ns/secrets?");
-        assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            super::JSON_MIME
-        );
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
     }
 
     #[test]
@@ -521,34 +513,31 @@ mod test {
         let req = Request::new(url).get_metadata("mydeploy").unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments/mydeploy");
         assert_eq!(req.method(), "GET");
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
         assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            super::JSON_MIME
-        );
-        assert_eq!(
-            req.headers().get(http::header::ACCEPT).unwrap(),
+            req.headers().get(header::ACCEPT).unwrap(),
             super::JSON_METADATA_MIME
         );
     }
     #[test]
     fn list_path() {
         let url = appsv1::Deployment::url_path(&(), Some("ns"));
-        let gp = ListParams::default();
-        let req = Request::new(url).list(&gp).unwrap();
+        let lp = ListParams::default();
+        let req = Request::new(url).list(&lp).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
     }
     #[test]
     fn list_metadata_path() {
         let url = appsv1::Deployment::url_path(&(), Some("ns"));
-        let gp = ListParams::default();
-        let req = Request::new(url).list_metadata(&gp).unwrap();
-        assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments");
+        let lp = ListParams::default().matching(VersionMatch::NotOlderThan).at("5");
+        let req = Request::new(url).list_metadata(&lp).unwrap();
         assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            super::JSON_MIME
+            req.uri(),
+            "/apis/apps/v1/namespaces/ns/deployments?&resourceVersion=5&resourceVersionMatch=NotOlderThan"
         );
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
         assert_eq!(
-            req.headers().get(http::header::ACCEPT).unwrap(),
+            req.headers().get(header::ACCEPT).unwrap(),
             super::JSON_METADATA_LIST_MIME
         );
     }
@@ -571,12 +560,9 @@ mod test {
             req.uri(),
             "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290"
         );
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
         assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            super::JSON_MIME
-        );
-        assert_eq!(
-            req.headers().get(http::header::ACCEPT).unwrap(),
+            req.headers().get(header::ACCEPT).unwrap(),
             super::JSON_METADATA_MIME
         );
     }
@@ -589,10 +575,7 @@ mod test {
         };
         let req = Request::new(url).replace("myds", &pp, vec![]).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/daemonsets/myds?&dryRun=All");
-        assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            super::JSON_MIME
-        );
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
     }
 
     #[test]
@@ -602,10 +585,7 @@ mod test {
         let req = Request::new(url).delete("myrs", &dp).unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/replicasets/myrs");
         assert_eq!(req.method(), "DELETE");
-        assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            super::JSON_MIME
-        );
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
     }
 
     #[test]
@@ -619,10 +599,7 @@ mod test {
             "/apis/apps/v1/namespaces/ns/replicasets?&labelSelector=app%3Dmyapp"
         );
         assert_eq!(req.method(), "DELETE");
-        assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            super::JSON_MIME
-        );
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
     }
 
     #[test]
@@ -657,11 +634,11 @@ mod test {
             .unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/mypod?");
         assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            req.headers().get(header::CONTENT_TYPE).unwrap(),
             Patch::Merge(()).content_type()
         );
         assert_eq!(
-            req.headers().get(http::header::ACCEPT).unwrap(),
+            req.headers().get(header::ACCEPT).unwrap(),
             super::JSON_METADATA_MIME
         );
         assert_eq!(req.method(), "PATCH");
@@ -675,10 +652,7 @@ mod test {
             .unwrap();
         assert_eq!(req.uri(), "/api/v1/nodes/mynode/status?");
         assert_eq!(req.method(), "PUT");
-        assert_eq!(
-            req.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            super::JSON_MIME
-        );
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
     }
 
     #[test]
@@ -761,7 +735,7 @@ mod test {
     #[test]
     fn list_pods_from_cache() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::Any);
+        let gp = ListParams::default().match_any();
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
@@ -772,7 +746,7 @@ mod test {
     #[test]
     fn list_most_recent_pods() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::MostRecent);
+        let gp = ListParams::default();
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
@@ -783,17 +757,18 @@ mod test {
     #[test]
     fn list_invalid_resource_version_combination() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::NotOlderThan("0".to_string()));
+        let gp = ListParams::default().at("0").matching(VersionMatch::Exact);
         let err = Request::new(url).list(&gp).unwrap_err();
-        assert!(format!("{err}")
-            .contains("version_match cannot be equal to \"0\" for Exact and NotOlderThan variants"));
+        assert!(format!("{err}").contains("non-zero resource_version is required when using an Exact match"));
     }
 
 
     #[test]
     fn list_not_older() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::NotOlderThan("20".to_string()));
+        let gp = ListParams::default()
+            .at("20")
+            .matching(VersionMatch::NotOlderThan);
         let req = Request::new(url).list(&gp).unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
@@ -804,12 +779,10 @@ mod test {
     #[test]
     fn list_exact_match() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().version_match(VersionMatch::Exact("500".to_string()));
+        let gp = ListParams::default().at("500").matching(VersionMatch::Exact);
         let req = Request::new(url).list(&gp).unwrap();
-        assert_eq!(
-            req.uri().query().unwrap(),
-            "&resourceVersion=500&resourceVersionMatch=Exact"
-        );
+        let query = req.uri().query().unwrap();
+        assert_eq!(query, "&resourceVersion=500&resourceVersionMatch=Exact");
     }
 
     #[test]
