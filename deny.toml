@@ -69,6 +69,14 @@ license-files = [
     { path = "LICENSE", hash = 0x001c7e6c },
 ]
 
+# rustls' webpki fork uses same license https://github.com/rustls/webpki
+[[licenses.clarify]]
+name = "rustls-webpki"
+expression = "LicenseRef-webpki"
+license-files = [
+    { path = "LICENSE", hash = 0x001c7e6c },
+]
+
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
