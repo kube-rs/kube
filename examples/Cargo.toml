@@ -18,7 +18,7 @@ default = ["openssl-tls", "kubederive", "ws", "latest", "runtime"]
 kubederive = ["kube/derive"]
 openssl-tls = ["kube/client", "kube/openssl-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
-runtime = ["kube/runtime"]
+runtime = ["kube/runtime", "kube/unstable-runtime"]
 ws = ["kube/ws"]
 latest = ["k8s-openapi/v1_26"]
 

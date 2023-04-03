@@ -1,9 +1,13 @@
+#[cfg(feature = "unstable-runtime-predicates")]
+use crate::utils::predicate::PredicateFilter;
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
     utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
     watcher,
 };
+#[cfg(feature = "unstable-runtime-predicates")] use kube_client::Resource;
+
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
@@ -36,6 +40,43 @@ pub trait WatchStreamExt: Stream {
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
         EventFlatten::new(self, true)
+    }
+
+
+    /// Filter out a flattened stream on [`predicates`](crate::predicates).
+    ///
+    /// This will filter out repeat calls where the predicate returns the same result.
+    /// Common use case for this is to avoid repeat events for status updates
+    /// by filtering on []`predicates::generation`].
+    ///
+    /// ## Usage
+    /// ```no_run
+    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// use kube::{Api, Client, ResourceExt};
+    /// use kube_runtime::{watcher, WatchStreamExt, predicates};
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::default_namespaced(client);
+    /// let changed_pods = watcher(pods, watcher::Config::default())
+    ///     .applied_objects()
+    ///     .predicate_filter(predicates::generation);
+    /// pin_mut!(changed_pods);
+    ///
+    /// while let Some(pod) = changed_pods.try_next().await? {
+    ///    println!("saw Pod '{} with hitherto unseen generation", pod.name_any());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "unstable-runtime-predicates")]
+    fn predicate_filter<K, F>(self, predicate: F) -> PredicateFilter<Self, K, F>
+    where
+        Self: Stream<Item = Result<K, watcher::Error>> + Sized,
+        K: Resource + 'static,
+        F: Fn(&K) -> Option<u64> + 'static,
+    {
+        PredicateFilter::new(self, predicate)
     }
 
     /// Create a [`StreamSubscribe`] from a [`watcher()`] stream.
@@ -103,3 +144,36 @@ pub trait WatchStreamExt: Stream {
 }
 
 impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
+
+// Compile tests
+#[cfg(feature = "unstable-runtime-predicates")]
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::predicates;
+    use futures::StreamExt;
+    use k8s_openapi::api::core::v1::Pod;
+    use kube_client::{Api, Resource};
+
+    fn compile_type<T>() -> T {
+        unimplemented!("not called - compile test only")
+    }
+
+    pub fn assert_stream<T, K>(x: T) -> T
+    where
+        T: Stream<Item = watcher::Result<K>> + Send,
+        K: Resource + Clone + Send + 'static,
+    {
+        x
+    }
+
+    // not #[test] because this is only a compile check verification
+    #[allow(dead_code, unused_must_use)]
+    fn test_watcher_stream_type_drift() {
+        let pred_watch = watcher(compile_type::<Api<Pod>>(), Default::default())
+            .touched_objects()
+            .predicate_filter(predicates::generation)
+            .boxed();
+        assert_stream(pred_watch);
+    }
+}
