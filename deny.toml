@@ -69,6 +69,14 @@ license-files = [
     { path = "LICENSE", hash = 0x001c7e6c },
 ]
 
+# rustls' webpki fork uses same license https://github.com/rustls/webpki
+[[licenses.clarify]]
+name = "rustls-webpki"
+expression = "LicenseRef-webpki"
+license-files = [
+    { path = "LICENSE", hash = 0x001c7e6c },
+]
+
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
@@ -103,3 +111,8 @@ name = "base64"
 [[bans.skip]]
 # deep in dependency tree, only dual use via dev dependency
 name = "redox_syscall"
+
+[[bans.skip-tree]]
+name = "windows-sys"
+[[bans.skip-tree]]
+name = "windows"
