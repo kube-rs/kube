@@ -111,3 +111,8 @@ name = "base64"
 [[bans.skip]]
 # deep in dependency tree, only dual use via dev dependency
 name = "redox_syscall"
+
+[[bans.skip-tree]]
+name = "windows-sys"
+[[bans.skip-tree]]
+name = "windows"
