@@ -77,8 +77,8 @@ where
 
 /// Predicate functions for [`WatchStreamExt::predicate_filter`](crate::WatchStreamExt::predicate_filter)
 ///
-/// These functions return a hash of commonly compared values to hel decide
-/// whether to pass a watch event along or not.
+/// These functions just return a hash of commonly compared values,
+/// to help decide whether to pass a watch event along or not.
 ///
 /// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
 pub mod predicates {
