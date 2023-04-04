@@ -504,7 +504,7 @@ where
 ///
 /// ```no_run
 /// use kube::{
-///   api::{Api, ListParams, ResourceExt}, Client,
+///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
@@ -514,7 +514,7 @@ where
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     watcher(pods, ListParams::default()).applied_objects()
+///     watcher(pods, watcher::Config::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
@@ -567,7 +567,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// ```no_run
 /// use kube::{
-///   api::{Api, ListParams, ResourceExt}, Client,
+///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, metadata_watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
@@ -577,7 +577,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     metadata_watcher(pods, ListParams::default()).applied_objects()
+///     metadata_watcher(pods, watcher::Config::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
