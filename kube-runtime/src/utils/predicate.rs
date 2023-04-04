@@ -75,14 +75,18 @@ where
     }
 }
 
+/// Predicate functions for [`WatchStreamExt::predicate_filter`](crate::WatchStreamExt::predicate_filter)
+///
+/// These functions return a hash of commonly compared values to hel decide
+/// whether to pass a watch event along or not.
+///
+/// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
 pub mod predicates {
     use kube_client::{Resource, ResourceExt};
     use std::{
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
     };
-
-    // See: https://github.com/kubernetes-sigs/controller-runtime/blob/v0.12.0/pkg/predicate/predicate.go
 
     fn hash<T: Hash>(t: &T) -> u64 {
         let mut hasher = DefaultHasher::new();

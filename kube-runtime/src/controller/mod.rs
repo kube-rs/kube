@@ -380,32 +380,32 @@ where
     }
 }
 
-/// Controller
+/// Controller for a Resource `K`
 ///
-/// A controller is made up of:
-/// - 1 `reflector` (for the core object)
-/// - N `watcher` objects for each object child object
-/// - user defined `reconcile` + `error_policy` callbacks
-/// - a generated input stream considering all sources
+/// A controller is an infinite stream of objects to be reconciled.
 ///
-/// And all reconcile requests  through an internal scheduler
+/// Once `run` and continuously awaited, it continuously calls out to user provided
+/// `reconcile` and `error_policy` callbacks whenever relevant changes are detected
+/// or if errors are seen from `reconcile`.
 ///
-/// Pieces:
+/// Reconciles are generally requested for all changes on your root objects.
+/// Changes to managed child resources will also trigger the reconciler for the
+/// managing object by travirsing owner references (for `Controller::owns`),
+/// or traverse a custom mapping (for `Controller::watches`).
+///
+/// This mapping mechanism ultimately hides the reason for the reconciliation request,
+/// and forces you to write an idempotent reconciler.
+///
+/// General setup:
 /// ```no_run
-/// use kube::{
-///   Client, CustomResource,
-///   api::{Api, ListParams},
-///   runtime::{
-///     controller::{Controller, Action},
-///     watcher,
-///   },
-/// };
-/// use serde::{Deserialize, Serialize};
-/// use tokio::time::Duration;
+/// use kube::{Api, Client, CustomResource};
+/// use kube::runtime::{controller::{Controller, Action}, watcher, reflector};
+/// # use serde::{Deserialize, Serialize};
+/// # use tokio::time::Duration;
 /// use futures::StreamExt;
 /// use k8s_openapi::api::core::v1::ConfigMap;
 /// use schemars::JsonSchema;
-/// use std::sync::Arc;
+/// # use std::sync::Arc;
 /// use thiserror::Error;
 ///
 /// #[derive(Debug, Error)]
@@ -475,7 +475,7 @@ where
     K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
     K::DynamicType: Eq + Hash + Clone,
 {
-    /// Create a Controller on a type `K`
+    /// Create a Controller for a resource `K`
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
@@ -483,14 +483,14 @@ where
     /// and receive reconcile events for.
     /// For the full set of objects `K` in the given `Api` scope, you can use [`Config::default`].
     #[must_use]
-    pub fn new(owned_api: Api<K>, wc: Config) -> Self
+    pub fn new(main_api: Api<K>, wc: Config) -> Self
     where
         K::DynamicType: Default,
     {
-        Self::new_with(owned_api, wc, Default::default())
+        Self::new_with(main_api, wc, Default::default())
     }
 
-    /// Create a Controller on a type `K`
+    /// Create a Controller for a resource `K`
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
@@ -504,15 +504,98 @@ where
     /// [`Api`]: kube_client::Api
     /// [`dynamic`]: kube_client::core::dynamic
     /// [`Config::default`]: crate::watcher::Config::default
-    pub fn new_with(owned_api: Api<K>, wc: Config, dyntype: K::DynamicType) -> Self {
+    pub fn new_with(main_api: Api<K>, wc: Config, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
-            reflector(writer, watcher(owned_api, wc)).applied_objects(),
+            reflector(writer, watcher(main_api, wc)).applied_objects(),
             dyntype.clone(),
         )
         .boxed();
+        trigger_selector.push(self_watcher);
+        Self {
+            trigger_selector,
+            trigger_backoff: Box::new(watcher::default_backoff()),
+            graceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            forceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            dyntype,
+            reader,
+        }
+    }
+
+    /// Create a Controller for a resource `K` from a stream of `K` objects
+    ///
+    /// Same as [`Controller::new`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # use kube::runtime::controller::{Action, Controller};
+    /// # use kube::runtime::{predicates, watcher, reflector, WatchStreamExt};
+    /// # use kube::{Api, Client, Error, ResourceExt};
+    /// # use std::sync::Arc;
+    /// # async fn reconcile(_: Arc<Deployment>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<Deployment>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
+    /// # async fn doc(client: kube::Client) {
+    /// let api: Api<Deployment> = Api::default_namespaced(client);
+    /// let (reader, writer) = reflector::store();
+    /// let deploys = reflector(writer, watcher(api, watcher::Config::default()))
+    ///     .applied_objects()
+    ///     .predicate_filter(predicates::generation);
+    ///
+    /// Controller::for_stream(deploys, reader)
+    ///     .run(reconcile, error_policy, Arc::new(()))
+    ///     .for_each(|_| std::future::ready(()))
+    ///     .await;
+    /// # }
+    /// ```
+    ///
+    /// Prefer [`Controller::new`] if you do not need to share the stream, or do not need pre-filtering.
+    #[cfg(feature = "unstable-runtime-stream-share")]
+    pub fn for_stream(
+        trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
+        reader: Store<K>,
+    ) -> Self
+    where
+        K::DynamicType: Default,
+    {
+        Self::for_stream_with(trigger, reader, Default::default())
+    }
+
+    /// Create a Controller for a resource `K` from a stream of `K` objects
+    ///
+    /// Same as [`Controller::new`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Prefer [`Controller::new`] if you do not need to share the stream, or do not need pre-filtering.
+    ///
+    /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::for_stream`] for static types.
+    ///
+    /// [`dynamic`]: kube_client::core::dynamic
+    #[cfg(feature = "unstable-runtime-stream-share")]
+    pub fn for_stream_with(
+        trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
+        reader: Store<K>,
+        dyntype: K::DynamicType,
+    ) -> Self {
+        let mut trigger_selector = stream::SelectAll::new();
+        let self_watcher = trigger_self(trigger, dyntype.clone()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
@@ -579,6 +662,7 @@ where
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
+        // TODO: call owns_stream_with when it's stable
         let child_watcher = trigger_owners(watcher(api, wc).touched_objects(), self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
@@ -586,8 +670,13 @@ where
 
     /// Trigger the reconciliation process for a stream of `Child` objects of the owner `K`
     ///
-    /// Same as [`Controller::owns`], but instad of a resource a stream of resources is used.
-    /// This allows for customized and pre-filtered watch streams to be used as a trigger.
+    /// Same as [`Controller::owns`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Watcher streams passed in here should be filtered first through `touched_objects`.
     ///
     /// # Example:
     ///
@@ -614,7 +703,7 @@ where
     ///     .await;
     /// # }
     /// ```
-    #[cfg(feature = "unstable-runtime-owns-stream")]
+    #[cfg(feature = "unstable-runtime-stream-share")]
     #[must_use]
     pub fn owns_stream<Child: Resource<DynamicType = ()> + Send + 'static>(
         self,
@@ -625,8 +714,14 @@ where
 
     /// Trigger the reconciliation process for a stream of `Child` objects of the owner `K`
     ///
+    /// Same as [`Controller::owns`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
     /// Same as [`Controller::owns_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
-    #[cfg(feature = "unstable-runtime-owns-stream")]
+    #[cfg(feature = "unstable-runtime-stream-share")]
     #[must_use]
     pub fn owns_stream_with<Child: Resource + Send + 'static>(
         mut self,
@@ -660,8 +755,7 @@ where
     ///
     /// ```
     /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef, watcher};
-    /// # use kube::api::{Api, ListParams};
-    /// # use kube::ResourceExt;
+    /// # use kube::{Api, ResourceExt};
     /// # use k8s_openapi::api::core::v1::{ConfigMap, Namespace};
     /// # use futures::StreamExt;
     /// # use std::sync::Arc;

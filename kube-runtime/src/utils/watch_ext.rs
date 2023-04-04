@@ -47,7 +47,9 @@ pub trait WatchStreamExt: Stream {
     ///
     /// This will filter out repeat calls where the predicate returns the same result.
     /// Common use case for this is to avoid repeat events for status updates
-    /// by filtering on []`predicates::generation`].
+    /// by filtering on [`predicates::generation`](crate::predicates::generation).
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// ## Usage
     /// ```no_run
@@ -84,11 +86,13 @@ pub trait WatchStreamExt: Stream {
     /// The [`StreamSubscribe::subscribe()`] method which allows additional consumers
     /// of events from a stream without consuming the stream itself.
     ///
-    /// If a subscriber begins to lag behind the stream, it will receive an [`Error::Lagged`]
+    /// If a subscriber begins to lag behind the stream, it will receive an [`Error::Lagged`](crate::utils::stream_subscribe::Error::Lagged)
     /// error. The subscriber can then decide to abort its task or tolerate the lost events.
     ///
     /// If the [`Stream`] is dropped or ends, any [`StreamSubscribe::subscribe()`] streams
     /// will also end.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// ## Warning
     ///
