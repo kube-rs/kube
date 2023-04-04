@@ -504,17 +504,17 @@ where
 ///
 /// ```no_run
 /// use kube::{
-///   api::{Api, ResourceExt}, Client,
+///   api::{Api, ListParams, ResourceExt}, Client,
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
-/// use futures::{StreamExt, TryStreamExt};
+/// use futures::TryStreamExt;
 /// #[tokio::main]
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     watcher(pods, watcher::Config::default()).applied_objects()
+///     watcher(pods, ListParams::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
@@ -567,17 +567,17 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// ```no_run
 /// use kube::{
-///   api::{Api, ResourceExt}, Client,
+///   api::{Api, ListParams, ResourceExt}, Client,
 ///   runtime::{watcher, metadata_watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
-/// use futures::{StreamExt, TryStreamExt};
+/// use futures::TryStreamExt;
 /// #[tokio::main]
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
 ///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     metadata_watcher(pods, watcher::Config::default()).applied_objects()
+///     metadata_watcher(pods, ListParams::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
