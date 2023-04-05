@@ -118,6 +118,37 @@ where
     })
 }
 
+/// Enqueues any mapper returned `K` types for reconciliation
+fn trigger_others<S, K, I>(
+    stream: S,
+    mapper: impl Fn(S::Ok) -> I + Sync + Send + 'static,
+    dyntype: <S::Ok as Resource>::DynamicType,
+) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
+where
+    // Input stream has items as some Resource (via Controller::watches)
+    S: TryStream,
+    S::Ok: Resource,
+    <S::Ok as Resource>::DynamicType: Clone,
+    // Output stream is requests for the root type K
+    K: Resource,
+    K::DynamicType: Clone,
+    // but the mapper can produce many of them
+    I: 'static + IntoIterator<Item = ObjectRef<K>>,
+    I::IntoIter: Send,
+{
+    trigger_with(stream, move |obj| {
+        let watch_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
+        mapper(obj)
+            .into_iter()
+            .map(move |mapped_obj_ref| ReconcileRequest {
+                obj_ref: mapped_obj_ref,
+                reason: ReconcileReason::RelatedObjectUpdated {
+                    obj_ref: Box::new(watch_ref.clone()),
+                },
+            })
+    })
+}
+
 /// Enqueues any owners of type `KOwner` for reconciliation
 pub fn trigger_owners<KOwner, S>(
     stream: S,
@@ -833,17 +864,7 @@ where
         I::IntoIter: Send,
         Other::DynamicType: Debug + Clone + Eq + Hash,
     {
-        let other_watcher = trigger_with(watcher(api, wc).touched_objects(), move |obj| {
-            let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
-            mapper(obj)
-                .into_iter()
-                .map(move |mapped_obj_ref| ReconcileRequest {
-                    obj_ref: mapped_obj_ref,
-                    reason: ReconcileReason::RelatedObjectUpdated {
-                        obj_ref: Box::new(watched_obj_ref.clone()),
-                    },
-                })
-        });
+        let other_watcher = trigger_others(watcher(api, wc).touched_objects(), mapper, dyntype);
         self.trigger_selector.push(other_watcher.boxed());
         self
     }
@@ -925,17 +946,7 @@ where
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
-        let other_watcher = trigger_with(trigger, move |obj| {
-            let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
-            mapper(obj)
-                .into_iter()
-                .map(move |mapped_obj_ref| ReconcileRequest {
-                    obj_ref: mapped_obj_ref,
-                    reason: ReconcileReason::RelatedObjectUpdated {
-                        obj_ref: Box::new(watched_obj_ref.clone()),
-                    },
-                })
-        });
+        let other_watcher = trigger_others(trigger, mapper, dyntype);
         self.trigger_selector.push(other_watcher.boxed());
         self
     }
