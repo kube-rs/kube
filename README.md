@@ -101,7 +101,7 @@ A low level streaming interface (similar to informers) that presents `Applied`, 
 
 ```rust
 let api = Api::<Pod>::default_namespaced(client);
-let stream = watcher(api, ListParams::default()).applied_objects();
+let stream = watcher(api, Config::default()).applied_objects();
 ```
 
 This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
@@ -112,7 +112,7 @@ while let Some(event) = stream.try_next().await? {
 }
 ```
 
-NB: the plain items in a `watcher` stream are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities from `WatchStreamExt`, such as `applied_objects`.
+NB: the plain items in a `watcher` stream are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities from [`WatchStreamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html), such as `applied_objects`.
 
 ## Reflectors
 
@@ -120,7 +120,7 @@ A `reflector` is a `watcher` with `Store` on `K`. It acts on all the `Event<K>` 
 
 ```rust
 let nodes: Api<Node> = Api::all(client);
-let lp = ListParams::default().labels("kubernetes.io/arch=amd64");
+let lp = Config::default().labels("kubernetes.io/arch=amd64");
 let (reader, writer) = reflector::store();
 let rf = reflector(writer, watcher(nodes, lp));
 ```
@@ -132,8 +132,8 @@ At this point you can listen to the `reflector` as if it was a `watcher`, but yo
 A `Controller` is a `reflector` along with an arbitrary number of watchers that schedule events internally to send events through a reconciler:
 
 ```rust
-Controller::new(root_kind_api, ListParams::default())
-    .owns(child_kind_api, ListParams::default())
+Controller::new(root_kind_api, Config::default())
+    .owns(child_kind_api, Config::default())
     .run(reconcile, error_policy, context)
     .for_each(|res| async move {
         match res {
@@ -148,7 +148,7 @@ Here `reconcile` and `error_policy` refer to functions you define. The first wil
 
 ## Rustls
 
-Kube has basic support ([with caveats](https://github.com/kube-rs/kube/issues?q=is%3Aopen+is%3Aissue+label%3Arustls)) for [rustls](https://github.com/ctz/rustls) as a replacement for the `openssl` dependency. To use this, turn off default features, and enable `rustls-tls`:
+By default `openssl` is used for TLS, but [rustls](https://github.com/ctz/rustls) is supported. To switch, turn off `default-features`, and enable the `rustls-tls` feature:
 
 ```toml
 [dependencies]
@@ -156,7 +156,7 @@ kube = { version = "0.80.0", default-features = false, features = ["client", "ru
 k8s-openapi = { version = "0.17.0", features = ["v1_26"] }
 ```
 
-This will pull in `rustls` and `hyper-rustls`.
+This will pull in `rustls` and `hyper-rustls`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `openssl`.
 
 ## musl-libc
 
