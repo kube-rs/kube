@@ -564,7 +564,7 @@ where
     /// ```
     ///
     /// Prefer [`Controller::new`] if you do not need to share the stream, or do not need pre-filtering.
-    #[cfg(feature = "unstable-runtime-stream-share")]
+    #[cfg(feature = "unstable-runtime-stream-control")]
     pub fn for_stream(
         trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
         reader: Store<K>,
@@ -588,9 +588,9 @@ where
     /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::for_stream`] for static types.
     ///
     /// [`dynamic`]: kube_client::core::dynamic
-    #[cfg(feature = "unstable-runtime-stream-share")]
+    #[cfg(feature = "unstable-runtime-stream-control")]
     pub fn for_stream_with(
-        trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
+        trigger: impl Stream<Item = Result<Arc<K>, watcher::Error>> + Send + 'static,
         reader: Store<K>,
         dyntype: K::DynamicType,
     ) -> Self {
@@ -703,7 +703,7 @@ where
     ///     .await;
     /// # }
     /// ```
-    #[cfg(feature = "unstable-runtime-stream-share")]
+    #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
     pub fn owns_stream<Child: Resource<DynamicType = ()> + Send + 'static>(
         self,
@@ -721,7 +721,7 @@ where
     /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// Same as [`Controller::owns_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
-    #[cfg(feature = "unstable-runtime-stream-share")]
+    #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
     pub fn owns_stream_with<Child: Resource + Send + 'static>(
         mut self,
@@ -886,7 +886,7 @@ where
     ///     .await;
     /// # }
     /// ```
-    #[cfg(feature = "unstable-runtime-stream-share")]
+    #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
     pub fn watches_stream<Other, I>(
         self,
@@ -911,7 +911,7 @@ where
     /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// Same as [`Controller::watches_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
-    #[cfg(feature = "unstable-runtime-stream-share")]
+    #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
     pub fn watches_stream_with<Other, I>(
         mut self,
