@@ -801,16 +801,15 @@ where
     ///
     /// [Operator-SDK]: https://sdk.operatorframework.io/docs/building-operators/ansible/reference/retroactively-owned-resources/
     #[must_use]
-    pub fn watches<
-        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
-        I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    >(
+    pub fn watches<Other, I>(
         self,
         api: Api<Other>,
         wc: Config,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
+        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
         self.watches_with(api, (), wc, mapper)
@@ -820,10 +819,7 @@ where
     ///
     /// Same as [`Controller::watches`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[must_use]
-    pub fn watches_with<
-        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
-        I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    >(
+    pub fn watches_with<Other, I>(
         mut self,
         api: Api<Other>,
         dyntype: Other::DynamicType,
@@ -831,10 +827,103 @@ where
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
         Other::DynamicType: Clone,
     {
         let other_watcher = trigger_with(watcher(api, wc).touched_objects(), move |obj| {
+            let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
+            mapper(obj)
+                .into_iter()
+                .map(move |mapped_obj_ref| ReconcileRequest {
+                    obj_ref: mapped_obj_ref,
+                    reason: ReconcileReason::RelatedObjectUpdated {
+                        obj_ref: Box::new(watched_obj_ref.clone()),
+                    },
+                })
+        });
+        self.trigger_selector.push(other_watcher.boxed());
+        self
+    }
+
+    /// Trigger the reconciliation process for a stream of `Other` objects of the owner `K`
+    ///
+    /// Same as [`Controller::watches`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Watcher streams passed in here should be filtered first through `touched_objects`.
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use k8s_openapi::api::core::v1::ConfigMap;
+    /// # use k8s_openapi::api::apps::v1::DaemonSet;
+    /// # use kube::runtime::controller::Action;
+    /// # use kube::runtime::{predicates, reflector::ObjectRef, watcher, Controller, WatchStreamExt};
+    /// # use kube::{Api, Client, Error, ResourceExt};
+    /// # use std::sync::Arc;
+    /// # type CustomResource = ConfigMap;
+    /// # async fn reconcile(_: Arc<CustomResource>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<CustomResource>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
+    /// fn mapper(_: DaemonSet) -> Option<ObjectRef<CustomResource>> { todo!() }
+    /// # async fn doc(client: kube::Client) {
+    /// let api: Api<DaemonSet> = Api::all(client.clone());
+    /// let cr: Api<CustomResource> = Api::all(client.clone());
+    /// let daemons = watcher(api, watcher::Config::default())
+    ///     .touched_objects()
+    ///     .predicate_filter(predicates::generation);
+    ///
+    /// Controller::new(cr, watcher::Config::default())
+    ///     .watches_stream(daemons, mapper)
+    ///     .run(reconcile, error_policy, Arc::new(()))
+    ///     .for_each(|_| std::future::ready(()))
+    ///     .await;
+    /// # }
+    /// ```
+    #[cfg(feature = "unstable-runtime-stream-share")]
+    #[must_use]
+    pub fn watches_stream<Other, I>(
+        self,
+        trigger: impl Stream<Item = Result<Other, watcher::Error>> + Send + 'static,
+        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
+    ) -> Self
+    where
+        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
+        I::IntoIter: Send,
+    {
+        self.watches_stream_with(trigger, mapper, ())
+    }
+
+    /// Trigger the reconciliation process for a stream of `Child` objects of the owner `K`
+    ///
+    /// Same as [`Controller::owns`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Same as [`Controller::watches_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
+    #[cfg(feature = "unstable-runtime-stream-share")]
+    #[must_use]
+    pub fn watches_stream_with<Other, I>(
+        mut self,
+        trigger: impl Stream<Item = Result<Other, watcher::Error>> + Send + 'static,
+        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
+        dyntype: Other::DynamicType,
+    ) -> Self
+    where
+        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Debug + Eq + Hash + Clone,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
+        I::IntoIter: Send,
+    {
+        let other_watcher = trigger_with(trigger, move |obj| {
             let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
             mapper(obj)
                 .into_iter()
