@@ -590,7 +590,7 @@ where
     /// [`dynamic`]: kube_client::core::dynamic
     #[cfg(feature = "unstable-runtime-stream-control")]
     pub fn for_stream_with(
-        trigger: impl Stream<Item = Result<Arc<K>, watcher::Error>> + Send + 'static,
+        trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
         reader: Store<K>,
         dyntype: K::DynamicType,
     ) -> Self {
