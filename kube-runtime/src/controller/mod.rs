@@ -808,11 +808,12 @@ where
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
-        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Default + Debug + Clone + Eq + Hash,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
-        self.watches_with(api, (), wc, mapper)
+        self.watches_with(api, Default::default(), wc, mapper)
     }
 
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
@@ -830,7 +831,7 @@ where
         Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
-        Other::DynamicType: Clone,
+        Other::DynamicType: Debug + Clone + Eq + Hash,
     {
         let other_watcher = trigger_with(watcher(api, wc).touched_objects(), move |obj| {
             let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
@@ -847,7 +848,7 @@ where
         self
     }
 
-    /// Trigger the reconciliation process for a stream of `Other` objects of the owner `K`
+    /// Trigger the reconciliation process for a stream of `Other` objects related to a `K`
     ///
     /// Same as [`Controller::watches`], but instead of an `Api`, a stream of resources is used.
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
@@ -893,14 +894,15 @@ where
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
-        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Default + Debug + Clone,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
-        self.watches_stream_with(trigger, mapper, ())
+        self.watches_stream_with(trigger, mapper, Default::default())
     }
 
-    /// Trigger the reconciliation process for a stream of `Child` objects of the owner `K`
+    /// Trigger the reconciliation process for a stream of `Other` objects related to a `K`
     ///
     /// Same as [`Controller::owns`], but instead of an `Api`, a stream of resources is used.
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
@@ -918,8 +920,8 @@ where
         dyntype: Other::DynamicType,
     ) -> Self
     where
-        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
-        Other::DynamicType: Debug + Eq + Hash + Clone,
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Debug + Clone,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
