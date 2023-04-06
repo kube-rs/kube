@@ -162,22 +162,16 @@ where
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
-    trigger_with(stream, move |obj| {
+    let mapper = move |obj: S::Ok| {
         let meta = obj.meta().clone();
         let ns = meta.namespace;
         let owner_type = owner_type.clone();
-        let child_ref = ObjectRef::from_obj_with(&obj, child_type.clone()).erase();
         meta.owner_references
             .into_iter()
             .flatten()
             .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
-            .map(move |owner_ref| ReconcileRequest {
-                obj_ref: owner_ref,
-                reason: ReconcileReason::RelatedObjectUpdated {
-                    obj_ref: Box::new(child_ref.clone()),
-                },
-            })
-    })
+    };
+    trigger_others(stream, mapper, child_type)
 }
 
 /// A request to reconcile an object, annotated with why that request was made.
