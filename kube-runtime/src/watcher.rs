@@ -508,7 +508,7 @@ where
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
-/// use futures::{StreamExt, TryStreamExt};
+/// use futures::TryStreamExt;
 /// #[tokio::main]
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
@@ -571,7 +571,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///   runtime::{watcher, metadata_watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
-/// use futures::{StreamExt, TryStreamExt};
+/// use futures::TryStreamExt;
 /// #[tokio::main]
 /// async fn main() -> Result<(), watcher::Error> {
 ///     let client = Client::try_default().await.unwrap();
