@@ -5,7 +5,43 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.80.0...main
+ * see https://github.com/kube-rs/kube/compare/0.81.0...main
+
+[0.81.0](https://github.com/kube-rs/kube/releases/tag/0.81.0) / 2023-04-07
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.81.0 -->
+## Highlights
+### List/Watch Changes
+One big change is the splitting of `ListParams` into `ListParams` and `WatchParams` in #1162 and #1171. If you were using `api.list` directly, this should not affect you, but `api.watch` calls will need a replace of `ListParams` to `WatchParams`. Apart from the resulting field splitting, the two structs still have a mostly compatible api.
+
+If you were passing `ListParams` to `watcher`, you can change this for a new `watcher::Config` with a mostly compatible interface:
+
+```diff
+-    let stream = watcher(api, ListParams::default());
++    let stream = watcher(api, watcher::Config::default());
+```
+
+The reason for this change has been to add support for specific [version match strategies](https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list) and has new builders on both `ListParams` and `watcher::Config` to control the strategy. Using the new `VersionMatch::NotOlderThan` can reduce strain on the apiserver for individual `api.list` calls. Watchers will benefit the most from this, and **should consider** using the semantic `Any` strategy (= `NotOlderThan` with version "0") on all relists by setting `watcher::Config::any_semantic()`.
+
+### rustls
+This release closes [all our rustls issues](https://github.com/kube-rs/kube/labels/rustls) as a consequence of the long standing IP address incompatibility (#153) having been resolved upstream. All `rustls` specific overrides (such as using the deprecated `incluster_dns` strategy for configuration #1184) have been removed as a result.
+
+### Controller streams
+Multiple new `runtime` features have been added to be able to more precisely control the input streams used by `Controller` a starting step towards stream sharing (#1080) and as a way to reduce excess input events. Because these interfaces are likely to remain in flux for some time, these are only available under [unstable feature flags](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21).
+
+## What's Changed
+### Added
+* Add `predicates` to allow filtering `watcher` streams by @clux in https://github.com/kube-rs/kube/pull/911
+* Add `Controller::owns_stream` by @Dav1dde in https://github.com/kube-rs/kube/pull/1173
+* Add `Controller::for_stream` + `Controller::watches_stream` by @clux in https://github.com/kube-rs/kube/pull/1187
+### Changed
+* Split `ListParams` and `WatchParams` by @nabokihms in https://github.com/kube-rs/kube/pull/1162
+* Make `VersionMatch` follow upstream + configure list semantics in `watcher::Config` by @clux in https://github.com/kube-rs/kube/pull/1171
+* kube-derive: Disable `option_nullable` for CRD generation by @Dav1dde in https://github.com/kube-rs/kube/pull/1079
+### Fixed
+* Run `rustls` CI against IP cluster address by @clux in https://github.com/kube-rs/kube/pull/1183
+* Fix:  tower buffer's worker closed unexpectedly by @divinerapier in https://github.com/kube-rs/kube/pull/1185
+* Avoid special `Config::incluster` behavior for `rustls` by @clux in https://github.com/kube-rs/kube/pull/1184
 
 [0.80.0](https://github.com/kube-rs/kube/releases/tag/0.80.0) / 2023-03-02
 ===================
