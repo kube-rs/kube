@@ -1,7 +1,7 @@
 //! Request builder type for arbitrary api types
 use thiserror::Error;
 
-use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams, VersionMatch, WatchParams};
+use super::params::{DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchParams};
 
 pub(crate) const JSON_MIME: &str = "application/json";
 /// Extended Accept Header
@@ -58,33 +58,7 @@ impl Request {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
         lp.validate()?;
-
-        if let Some(fields) = &lp.field_selector {
-            qp.append_pair("fieldSelector", fields);
-        }
-        if let Some(labels) = &lp.label_selector {
-            qp.append_pair("labelSelector", labels);
-        }
-        if let Some(limit) = &lp.limit {
-            qp.append_pair("limit", &limit.to_string());
-        }
-        if let Some(continue_token) = &lp.continue_token {
-            qp.append_pair("continue", continue_token);
-        }
-
-        if let Some(rv) = &lp.resource_version {
-            qp.append_pair("resourceVersion", rv.as_str());
-        }
-        match &lp.version_match {
-            None => {}
-            Some(VersionMatch::NotOlderThan) => {
-                qp.append_pair("resourceVersionMatch", "NotOlderThan");
-            }
-            Some(VersionMatch::Exact) => {
-                qp.append_pair("resourceVersionMatch", "Exact");
-            }
-        }
-
+        lp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::BuildRequest)
@@ -95,22 +69,8 @@ impl Request {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
         wp.validate()?;
-
-        qp.append_pair("watch", "true");
+        wp.populate_qp(&mut qp);
         qp.append_pair("resourceVersion", ver);
-
-        // https://github.com/kubernetes/kubernetes/issues/6513
-        qp.append_pair("timeoutSeconds", &wp.timeout.unwrap_or(290).to_string());
-        if let Some(fields) = &wp.field_selector {
-            qp.append_pair("fieldSelector", fields);
-        }
-        if let Some(labels) = &wp.label_selector {
-            qp.append_pair("labelSelector", labels);
-        }
-        if wp.bookmarks {
-            qp.append_pair("allowWatchBookmarks", "true");
-        }
-
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::BuildRequest)
@@ -302,33 +262,7 @@ impl Request {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
         lp.validate()?;
-
-        if let Some(fields) = &lp.field_selector {
-            qp.append_pair("fieldSelector", fields);
-        }
-        if let Some(labels) = &lp.label_selector {
-            qp.append_pair("labelSelector", labels);
-        }
-        if let Some(limit) = &lp.limit {
-            qp.append_pair("limit", &limit.to_string());
-        }
-        if let Some(continue_token) = &lp.continue_token {
-            qp.append_pair("continue", continue_token);
-        }
-
-        if let Some(rv) = &lp.resource_version {
-            qp.append_pair("resourceVersion", rv.as_str());
-        }
-        match &lp.version_match {
-            None => {}
-            Some(VersionMatch::NotOlderThan) => {
-                qp.append_pair("resourceVersionMatch", "NotOlderThan");
-            }
-            Some(VersionMatch::Exact) => {
-                qp.append_pair("resourceVersionMatch", "Exact");
-            }
-        }
-
+        lp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr)
             .header(http::header::ACCEPT, JSON_METADATA_LIST_MIME)
@@ -342,18 +276,8 @@ impl Request {
         let target = format!("{}?", self.url_path);
         let mut qp = form_urlencoded::Serializer::new(target);
         wp.validate()?;
-
-        qp.append_pair("watch", "true");
+        wp.populate_qp(&mut qp);
         qp.append_pair("resourceVersion", ver);
-
-        qp.append_pair("timeoutSeconds", &wp.timeout.unwrap_or(290).to_string());
-
-        if let Some(fields) = &wp.field_selector {
-            qp.append_pair("fieldSelector", fields);
-        }
-        if let Some(labels) = &wp.label_selector {
-            qp.append_pair("labelSelector", labels);
-        }
 
         let urlstr = qp.finish();
         http::Request::get(urlstr)
@@ -548,7 +472,7 @@ mod test {
         let req = Request::new(url).watch(&wp, "0").unwrap();
         assert_eq!(
             req.uri(),
-            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290&allowWatchBookmarks=true"
+            "/api/v1/namespaces/ns/pods?&watch=true&timeoutSeconds=290&allowWatchBookmarks=true&resourceVersion=0"
         );
     }
     #[test]
@@ -558,7 +482,7 @@ mod test {
         let req = Request::new(url).watch_metadata(&wp, "0").unwrap();
         assert_eq!(
             req.uri(),
-            "/api/v1/namespaces/ns/pods?&watch=true&resourceVersion=0&timeoutSeconds=290"
+            "/api/v1/namespaces/ns/pods?&watch=true&timeoutSeconds=290&allowWatchBookmarks=true&resourceVersion=0"
         );
         assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
         assert_eq!(
@@ -792,10 +716,10 @@ mod test {
             .disable_bookmarks()
             .fields("metadata.name=pod=1")
             .labels("app=web");
-        let req = Request::new(url).watch(&wp, "").unwrap();
+        let req = Request::new(url).watch(&wp, "0").unwrap();
         assert_eq!(
             req.uri().query().unwrap(),
-            "&watch=true&resourceVersion=&timeoutSeconds=290&fieldSelector=metadata.name%3Dpod%3D1&labelSelector=app%3Dweb"
+            "&watch=true&timeoutSeconds=290&fieldSelector=metadata.name%3Dpod%3D1&labelSelector=app%3Dweb&resourceVersion=0"
         );
     }
 
