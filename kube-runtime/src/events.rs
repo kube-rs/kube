@@ -219,7 +219,7 @@ impl Recorder {
                 deprecated_first_timestamp: None,
                 deprecated_last_timestamp: None,
                 deprecated_source: None,
-                event_time: MicroTime(Utc::now()),
+                event_time: Some(MicroTime(Utc::now())),
                 regarding: Some(self.reference.clone()),
                 note: ev.note.map(Into::into),
                 metadata: ObjectMeta {
