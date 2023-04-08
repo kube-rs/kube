@@ -54,8 +54,7 @@ mod custom_resource;
 ///  # let client: Client = todo!();
 ///  let foos: Api<Foo> = Api::default_namespaced(client.clone());
 ///  let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-///  let crd_yaml = serde_yaml::to_vec(&Foo::crd())?;
-///  crds.patch("foos.clux.dev", &PatchParams::apply("myapp"), &Patch::Apply(crd_yaml)).await;
+///  crds.patch("foos.clux.dev", &PatchParams::apply("myapp"), &Patch::Apply(Foo::crd())).await;
 /// # Ok(())
 /// # }
 ///  ```

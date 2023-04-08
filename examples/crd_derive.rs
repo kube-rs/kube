@@ -218,12 +218,12 @@ async fn verify_url_gen() {
 fn verify_default() {
     let fdef = FooCrd::default();
     let ser = serde_yaml::to_string(&fdef).unwrap();
-    let exp = r#"---
+    let exp = r#"
 apiVersion: clux.dev/v1
 kind: Foo
 metadata: {}
 spec:
-  name: ""
+  name: ''
 "#;
-    assert_eq!(exp, ser);
+    assert_eq!(exp.trim(), ser.trim());
 }
