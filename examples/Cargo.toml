@@ -34,7 +34,7 @@ kube-derive = { path = "../kube-derive", version = "^0.81.0", default-features =
 k8s-openapi = { version = "0.17.0", default-features = false }
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
-serde_yaml = "0.8.21"
+serde_yaml = "0.9.19"
 tokio = { version = "1.14.0", features = ["full"] }
 either = "1.6.1"
 schemars = "0.8.6"
