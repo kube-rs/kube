@@ -7,9 +7,26 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.82.0...main
 
-0.82.0 / 2023-04-08
+[0.82.0](https://github.com/kube-rs/kube/releases/tag/0.82.0) / 2023-04-08
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.82.0 -->
 
+## Dependency Updates
+
+This release brings in the new [`k8s-openapi` release](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.18.0).
+Be sure to upgrade `k8s-openapi` and `kube` **simultaneously** to avoid multiple version errors:
+
+```sh
+cargo upgrade -p k8s-openapi -p kube -i
+```
+
+## What's Changed
+### Changed
+* Bump `serde_yaml` to 0.9 by @clux in https://github.com/kube-rs/kube/pull/1188
+* Bump `k8s-openapi` to 0.18.0 by @clux in https://github.com/kube-rs/kube/pull/1190
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/0.81.0...0.82.0
 [0.81.0](https://github.com/kube-rs/kube/releases/tag/0.81.0) / 2023-04-07
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.81.0 -->
