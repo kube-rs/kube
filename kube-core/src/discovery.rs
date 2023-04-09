@@ -61,10 +61,11 @@ impl ApiResource {
 impl Into<APIResource> for ApiResource {
     fn into(self) -> APIResource {
         APIResource {
-            group: Option::from(self.group),
+            group: Some(self.group),
             kind: self.kind,
             version: Option::from(self.api_version),
             namespaced: true,
+            name: self.plural,
             verbs: vec!["list".to_string(), "get".to_string()],
             ..Default::default()
         }
@@ -217,4 +218,30 @@ fn test_to_plural_native() {
     for (kind, plural) in native_kinds {
         assert_eq!(to_plural(&kind.to_ascii_lowercase()), plural);
     }
+}
+
+#[test]
+fn api_resource_into_k8s_open_api_api_resource() {
+    let api_resource = ApiResource {
+        group: "apps".to_string(),
+        version: "v1".to_string(),
+        api_version: "apps/v1".to_string(),
+        kind: "Deployment".to_string(),
+        plural: "deployments".to_string(),
+    };
+    assert_eq!(
+        k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource {
+            categories: None,
+            group: Some("apps".to_string()),
+            kind: "Deployment".to_string(),
+            name: "deployments".to_string(),
+            namespaced: true,
+            short_names: None,
+            singular_name: "".to_string(),
+            storage_version_hash: None,
+            verbs: vec!["list".to_string(), "get".to_string()],
+            version: Some("apps/v1".to_string())
+        },
+        api_resource.into()
+    );
 }
