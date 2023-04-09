@@ -1,5 +1,6 @@
 //! Type information structs for API discovery
 use crate::{gvk::GroupVersionKind, resource::Resource};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::APIResource;
 use serde::{Deserialize, Serialize};
 
 /// Information about a Kubernetes API resource
@@ -54,6 +55,19 @@ impl ApiResource {
     /// to explicitly set the plural, or run api discovery on it via `kube::discovery`.
     pub fn from_gvk(gvk: &GroupVersionKind) -> Self {
         ApiResource::from_gvk_with_plural(gvk, &to_plural(&gvk.kind.to_ascii_lowercase()))
+    }
+}
+
+impl Into<APIResource> for ApiResource {
+    fn into(self) -> APIResource {
+        APIResource {
+            group: Option::from(self.group),
+            kind: self.kind,
+            version: Option::from(self.api_version),
+            namespaced: true,
+            verbs: vec!["list".to_string(), "get".to_string()],
+            ..Default::default()
+        }
     }
 }
 
