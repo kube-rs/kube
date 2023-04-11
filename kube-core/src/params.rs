@@ -89,6 +89,7 @@ impl ListParams {
         }
         Ok(())
     }
+
     // Partially populate query parameters (needs resourceVersion out of band)
     pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
         if let Some(fields) = &self.field_selector {
