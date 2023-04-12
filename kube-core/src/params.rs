@@ -89,6 +89,35 @@ impl ListParams {
         }
         Ok(())
     }
+
+    // Partially populate query parameters (needs resourceVersion out of band)
+    pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
+        if let Some(fields) = &self.field_selector {
+            qp.append_pair("fieldSelector", fields);
+        }
+        if let Some(labels) = &self.label_selector {
+            qp.append_pair("labelSelector", labels);
+        }
+        if let Some(limit) = &self.limit {
+            qp.append_pair("limit", &limit.to_string());
+        }
+        if let Some(continue_token) = &self.continue_token {
+            qp.append_pair("continue", continue_token);
+        }
+
+        if let Some(rv) = &self.resource_version {
+            qp.append_pair("resourceVersion", rv.as_str());
+        }
+        match &self.version_match {
+            None => {}
+            Some(VersionMatch::NotOlderThan) => {
+                qp.append_pair("resourceVersionMatch", "NotOlderThan");
+            }
+            Some(VersionMatch::Exact) => {
+                qp.append_pair("resourceVersionMatch", "Exact");
+            }
+        }
+    }
 }
 
 /// Builder interface to ListParams
@@ -252,6 +281,24 @@ impl WatchParams {
             }
         }
         Ok(())
+    }
+
+    // Partially populate query parameters (needs resourceVersion out of band)
+    pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
+        qp.append_pair("watch", "true");
+
+        // https://github.com/kubernetes/kubernetes/issues/6513
+        qp.append_pair("timeoutSeconds", &self.timeout.unwrap_or(290).to_string());
+
+        if let Some(fields) = &self.field_selector {
+            qp.append_pair("fieldSelector", fields);
+        }
+        if let Some(labels) = &self.label_selector {
+            qp.append_pair("labelSelector", labels);
+        }
+        if self.bookmarks {
+            qp.append_pair("allowWatchBookmarks", "true");
+        }
     }
 }
 
