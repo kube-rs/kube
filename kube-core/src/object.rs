@@ -4,7 +4,7 @@ use crate::{
     metadata::{ListMeta, ObjectMeta, TypeMeta},
     resource::{DynamicResourceScope, Resource},
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::borrow::Cow;
 
 /// A generic Kubernetes object list
@@ -28,8 +28,20 @@ where
     pub metadata: ListMeta,
 
     /// The items we are actually interested in. In practice; `T := Resource<T,U>`.
-    #[serde(bound(deserialize = "Vec<T>: Deserialize<'de>"))]
+    #[serde(
+        deserialize_with = "deserialize_null_as_default",
+        bound(deserialize = "Vec<T>: Deserialize<'de>")
+    )]
     pub items: Vec<T>,
+}
+
+fn deserialize_null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
 }
 
 impl<T: Clone> ObjectList<T> {
