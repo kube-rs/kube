@@ -192,14 +192,13 @@ mod custom_resource;
 ///
 /// # Options and nullable
 ///
-/// Serde serializes `null` for options which are `None`, this leads to two issues:
+/// Serde serializes `Option::None` to an explicit `null` by default. This is problematic against Kubernetes:
 ///
-/// - Optional values are not marked as `nullable` in the generated CRD to follow the Kubernetes
-/// [defaulting and nullable](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable)
-/// behaviour.
-/// - `null` values are incompatible with [server side apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/).
+/// 1. [schema defaults applied when nulls are encountered](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable), potentially reverting a previous `Some`, even when the patch did not intend this to happen.
+/// 2. `null` is not an accepted value in a patch unless the field is `nullable` in the schema
+/// 3. `nullable` fields do not integrate with [`kubectl explain`](https://github.com/kube-rs/kube/issues/1078)
 ///
-/// Therefore all `Option`'s should be marked with `#[serde(skip_serializing_if = "Option::is_none")]`:
+/// The recommended way is therefore to mark `Option` members with `#[serde(skip_serializing_if = "Option::is_none")]`.
 ///
 /// ```rust
 /// # use serde::{Serialize, Deserialize};
@@ -215,7 +214,7 @@ mod custom_resource;
 /// }
 /// ```
 ///
-/// It is possible to mark a field explicitly as `nullable` using a newtype.
+/// It is also possible to mark a field explicitly as `nullable` using a newtype.
 /// The integration test `crd_schema_test` in `kube-derive` can be used as a reference for such a
 /// newtype.
 ///
