@@ -374,7 +374,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 .with(|s| {
                     s.inline_subschemas = true;
                     s.meta_schema = None;
-                    s.option_nullable = false;
                 })
                 .with_visitor(#kube_core::schema::StructuralSchemaRewriter)
                 .into_generator();
