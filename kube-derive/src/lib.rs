@@ -28,11 +28,14 @@ mod custom_resource;
 /// #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 /// struct FooSpec {
 ///     info: String,
+///     #[serde(skip_serializing_if = "Option::is_none")]
+///     project: Option<String>,
 /// }
 ///
 /// println!("kind = {}", Foo::kind(&())); // impl kube::Resource
 /// let f = Foo::new("foo-1", FooSpec {
 ///     info: "informative info".into(),
+///     project: None,
 /// });
 /// println!("foo: {:?}", f); // debug print on generated type
 /// println!("crd: {}", serde_yaml::to_string(&Foo::crd()).unwrap()); // crd yaml
@@ -186,6 +189,35 @@ mod custom_resource;
 /// - Unit variants may not be mixed with struct or tuple variants (`enum Foo { Bar, Baz {}, Qux() }` is invalid, for example)
 ///
 /// If these restrictions are not followed then `YourCrd::crd()` may panic, or the Kubernetes API may reject the CRD definition.
+///
+/// # Options and nullable
+///
+/// Serde serializes `null` for options which are `None`, this leads to two issues:
+///
+/// - Optional values are not marked as `nullable` in the generated CRD to follow the Kubernetes
+/// [defaulting and nullable](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable)
+/// behaviour.
+/// - `null` values are incompatible with [server side apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/).
+///
+/// Therefore all `Option`'s should be marked with `#[serde(skip_serializing_if = "Option::is_none")]`:
+///
+/// ```rust
+/// # use serde::{Serialize, Deserialize};
+/// # use kube::core::{Resource, CustomResourceExt};
+/// # use kube_derive::CustomResource;
+/// # use schemars::JsonSchema;
+/// #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
+/// #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+/// struct FooSpec {
+///     info: String,
+///     #[serde(skip_serializing_if = "Option::is_none")]
+///     project: Option<String>,
+/// }
+/// ```
+///
+/// It is possible to mark a field explicitly as `nullable` using a newtype.
+/// The integration test `crd_schema_test` in `kube-derive` can be used as a reference for such a
+/// newtype.
 ///
 /// # Generated code
 ///
