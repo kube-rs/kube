@@ -3,7 +3,7 @@
 use assert_json_diff::assert_json_eq;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use kube_derive::CustomResource;
-use schemars::{gen::SchemaGenerator, schema::Schema, JsonSchema};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -27,18 +27,15 @@ struct FooSpec {
     non_nullable_with_default: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    option_skipped: Option<String>,
-    option: Option<String>,
+    nullable_skipped: Option<String>,
+    nullable: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default = "default_option")]
-    option_skipped_with_default: Option<String>,
+    #[serde(default = "default_nullable")]
+    nullable_skipped_with_default: Option<String>,
 
-    #[serde(default = "default_option")]
-    option_with_default: Option<String>,
-
-    // Marks the field nullable in the schema
-    nullable: Option<Nullable<String>>,
+    #[serde(default = "default_nullable")]
+    nullable_with_default: Option<String>,
 
     // Using feature `chrono`
     timestamp: DateTime<Utc>,
@@ -54,26 +51,8 @@ fn default_value() -> String {
     "default_value".into()
 }
 
-fn default_option() -> Option<String> {
-    Some("default_option".into())
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Nullable<T>(T);
-
-impl<T: JsonSchema> JsonSchema for Nullable<T> {
-    fn schema_name() -> String {
-        format!("Nullable_K8s_{}", T::schema_name())
-    }
-
-    fn json_schema(gen: &mut SchemaGenerator) -> Schema {
-        let schema = gen.subschema_for::<T>();
-        let mut schema_obj = schema.into_object();
-        schema_obj
-            .extensions
-            .insert("nullable".to_owned(), serde_json::Value::Bool(true));
-        Schema::Object(schema_obj)
-    }
+fn default_nullable() -> Option<String> {
+    Some("default_nullable".into())
 }
 
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
@@ -149,11 +128,10 @@ fn test_serialized_matches_expected() {
         serde_json::to_value(Foo::new("bar", FooSpec {
             non_nullable: "asdf".to_string(),
             non_nullable_with_default: "asdf".to_string(),
-            option_skipped: None,
-            option: None,
-            option_skipped_with_default: None,
-            option_with_default: None,
+            nullable_skipped: None,
             nullable: None,
+            nullable_skipped_with_default: None,
+            nullable_with_default: None,
             timestamp: DateTime::from_utc(NaiveDateTime::from_timestamp_opt(0, 0).unwrap(), Utc),
             complex_enum: ComplexEnum::VariantOne { int: 23 },
             untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
@@ -171,9 +149,8 @@ fn test_serialized_matches_expected() {
             "spec": {
                 "nonNullable": "asdf",
                 "nonNullableWithDefault": "asdf",
-                "option": null,
-                "optionWithDefault": null,
                 "nullable": null,
+                "nullableWithDefault": null,
                 "timestamp": "1970-01-01T00:00:00Z",
                 "complexEnum": {
                     "variantOne": {
@@ -229,23 +206,24 @@ fn test_crd_schema_matches_expected() {
                                                 "default": "default_value",
                                                 "type": "string"
                                             },
-                                            "optionSkipped": {
-                                                "type": "string"
-                                            },
-                                            "option": {
-                                                "type": "string"
-                                            },
-                                            "optionSkippedWithDefault": {
-                                                "default": "default_option",
-                                                "type": "string"
-                                            },
-                                            "optionWithDefault": {
-                                                "default": "default_option",
+
+                                            "nullableSkipped": {
+                                                "nullable": true,
                                                 "type": "string"
                                             },
                                             "nullable": {
-                                                "type": "string",
-                                                "nullable": true
+                                                "nullable": true,
+                                                "type": "string"
+                                            },
+                                            "nullableSkippedWithDefault": {
+                                                "default": "default_nullable",
+                                                "nullable": true,
+                                                "type": "string"
+                                            },
+                                            "nullableWithDefault": {
+                                                "default": "default_nullable",
+                                                "nullable": true,
+                                                "type": "string"
                                             },
                                             "timestamp": {
                                                 "type": "string",
