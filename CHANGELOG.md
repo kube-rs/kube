@@ -7,8 +7,20 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.82.1...main
 
-0.82.1 / 2023-04-14
+[0.82.1](https://github.com/kube-rs/kube/releases/tag/0.82.1) / 2023-04-14
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.82.1 -->
+## Bugfix Release
+
+[`nullable`](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable) is re-instated on `Option` types from [`CustomResource`](https://docs.rs/kube/latest/kube/derive.CustomResource.html) generated schemas, due to unintended errors removing it caused on `Api::patch` calls on `None` members that were not setting [`#[serde(skip_serializing_if = "Option::is_none")]`](https://serde.rs/attr-skip-serializing.html). This only affected 0.81 and 0.82 from last week, and does not require user action regardless of where you are upgrading from.
+
+This release also fixes a [`metadata_watcher`](https://docs.rs/kube/latest/kube/runtime/fn.metadata_watcher.html) triggering deserialization error from doing `Api::list_metadata` on an empty set.
+
+## What's Changed
+### Fixed
+* Fix `WatchParams` bookmarks for `watch_metadata` by @clux in https://github.com/kube-rs/kube/pull/1193
+* Fix `ObjectList` not deserializing `items: null` by @suryapandian in https://github.com/kube-rs/kube/pull/1199
+* Revert "kube-derive: Disable `option_nullable` for CRD generation" by @Dav1dde in https://github.com/kube-rs/kube/pull/1201
 
 [0.82.0](https://github.com/kube-rs/kube/releases/tag/0.82.0) / 2023-04-08
 ===================
