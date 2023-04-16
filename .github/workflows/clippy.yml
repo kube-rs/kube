@@ -1,6 +1,10 @@
 name: clippy
 on:
   pull_request:
+    paths:
+      - '**.rs'
+      - '**.toml'
+
 jobs:
   clippy_nightly:
     runs-on: ubuntu-latest

@@ -1,9 +1,6 @@
 name: test
 on:
   pull_request:
-    paths:
-      - '**.rs'
-      - '**.toml'
 
 env:
   RUST_BACKTRACE: 1
