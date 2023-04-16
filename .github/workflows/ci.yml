@@ -1,6 +1,11 @@
 name: test
 on:
   pull_request:
+    paths:
+      - '**.rs'
+      - '**.toml'
+    paths-ignore:
+      - '**.md'
 
 env:
   RUST_BACKTRACE: 1
