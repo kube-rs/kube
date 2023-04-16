@@ -4,6 +4,7 @@ on:
     paths:
       - '**.rs'
       - '**.toml'
+      - '**.yml'
 
 jobs:
   cargo-deny:

@@ -8,6 +8,7 @@ on:
     paths:
       - '**.rs'
       - '**.toml'
+      - '**.yml'
 
 jobs:
   tarpaulin-codecov:
