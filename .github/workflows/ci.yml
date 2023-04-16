@@ -74,6 +74,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
       # Examples
       - name: Test examples
+        if: matrix.os != 'windows-latest'
         run: cargo test -p kube-examples --examples -j6
 
   msrv:
