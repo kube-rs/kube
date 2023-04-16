@@ -39,7 +39,7 @@ jobs:
       #     echo "OPENSSL_INCLUDE_DIR=C:/Program Files/OpenSSL-Win64/include" >> $env:GITHUB_ENV
       # Only test Rustls on Windows instead due to #1191
       - name: "Hack out openssl when on Windows"
-        if: matrix.os = 'windows-latest'
+        if: matrix.os == 'windows-latest'
         run: sed -i 's/default \= \["client", "openssl-tls"\]/default = \["client", "rustls-tls"\]/' kube/Cargo.toml
 
       # Real CI work starts here
