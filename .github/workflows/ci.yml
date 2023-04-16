@@ -37,12 +37,10 @@ jobs:
       #     echo "OPENSSL_LIB_DIR=C:/Program Files/OpenSSL-Win64/lib" >> $env:GITHUB_ENV
       #     echo "OPENSSL_DIR=C:/Program Files/OpenSSL-Win64/" >> $env:GITHUB_ENV
       #     echo "OPENSSL_INCLUDE_DIR=C:/Program Files/OpenSSL-Win64/include" >> $env:GITHUB_ENV
-      # Only test Rustls on Windows
-      - name: "hack out openssl"
+      # Only test Rustls on Windows instead due to #1191
+      - name: "Hack out openssl when on Windows"
         if: matrix.os = 'windows-latest'
-        run: |
-          sed -i 's/default \= \["client", "openssl-tls"\]/default = \["client", "rustls-tls"\]/' kube/Cargo.toml
-
+        run: sed -i 's/default \= \["client", "openssl-tls"\]/default = \["client", "rustls-tls"\]/' kube/Cargo.toml
 
       # Real CI work starts here
       - name: Build workspace
@@ -54,13 +52,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' # only linux tests all feature combinations
       - name: Run workspace unit tests (default features)
         run: cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
-        if: matrix.os != 'macos-latest' # windows + ubuntu (best windows can do atm)
+        if: matrix.os == 'ubuntu-latest' && matrix.os == 'windows-latest' # windows + ubuntu (best windows can do atm)
       - name: Run workspace unit tests (all features)
         run: cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e -j6
       # Workspace documentation (all features only)
       - name: Run workspace doc tests
         run: cargo test --workspace --doc --all-features --exclude kube-examples --exclude e2e -j6
-        if: matrix.os != 'windows-latest' # windows cant do openssl-tls atm
+        if: matrix.os != 'windows-latest' # windows cant do openssl-tls atm, but test mac here
       - name: Run ad-hoc doc test verification
         run: |
           if rg "\`\`\`ignored"; then
