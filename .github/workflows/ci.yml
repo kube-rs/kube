@@ -4,8 +4,6 @@ on:
     paths:
       - '**.rs'
       - '**.toml'
-    paths-ignore:
-      - '**.md'
 
 env:
   RUST_BACKTRACE: 1
