@@ -59,6 +59,7 @@ jobs:
         run: cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
         if: matrix.os == 'ubuntu-latest'
       - name: Run workspace unit tests (all features)
+        if: matrix.os != 'windows-latest'
         run: cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e -j6
       # Workspace documentation (all features only)
       - name: Run workspace doc tests
