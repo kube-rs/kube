@@ -2,6 +2,11 @@ comment:
   require_changes: no
   layout: "diff,files"
 
+status:
+  project:
+    project: off
+    patch: off
+
 #flags:
 #  kube:
 #    paths: ["kube"]
