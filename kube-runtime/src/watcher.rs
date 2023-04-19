@@ -289,17 +289,16 @@ impl Config {
 
     /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
-        let version_match = match self.list_semantic {
-            ListSemantic::Any => Some(VersionMatch::NotOlderThan),
-            ListSemantic::MostRecent => None,
+        let (resource_version, version_match) = match self.list_semantic {
+            ListSemantic::Any => (Some("0".into()), Some(VersionMatch::NotOlderThan)),
+            ListSemantic::MostRecent => (None, None),
         };
         ListParams {
             label_selector: self.label_selector.clone(),
             field_selector: self.field_selector.clone(),
             timeout: self.timeout,
             version_match,
-            /// we always do a full re-list when getting desynced
-            resource_version: Some("0".into()),
+            resource_version,
             // It is not permissible for users to configure the continue token and limit for the watcher, as these parameters are associated with paging.
             // The watcher must handle paging internally.
             limit: None,
