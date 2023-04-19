@@ -181,6 +181,7 @@ pub enum ListSemantic {
 }
 
 /// Accumulates all options that can be used on the watcher invocation.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     /// A selector to restrict the list of returned objects by their labels.
     ///
