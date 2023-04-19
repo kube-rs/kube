@@ -5,8 +5,21 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.82.1...main
+ * see https://github.com/kube-rs/kube/compare/0.82.2...main
 
+[0.82.2](https://github.com/kube-rs/kube/releases/tag/0.82.2) / 2023-04-19
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.82.2 -->
+## Watcher Fixes
+Two fixes to allow `watcher::Config` to function as intended.
+
+## What's Changed
+### Fixed
+* `runtime::watcher`: only set rv if semantic is any by @goenning in https://github.com/kube-rs/kube/pull/1204
+* `watcher::Config`: Derive `Clone` + `Debug` + `PartialEq` by @clux in https://github.com/kube-rs/kube/pull/1206
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/0.82.1...0.82.2
 [0.82.1](https://github.com/kube-rs/kube/releases/tag/0.82.1) / 2023-04-14
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.82.1 -->
