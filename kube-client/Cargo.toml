@@ -25,7 +25,7 @@ gzip = ["client", "tower-http/decompression-gzip"]
 client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
-config = ["__non_core", "pem", "dirs"]
+config = ["__non_core", "pem", "home"]
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
@@ -38,7 +38,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 base64 = { version = "0.20.0", optional = true }
 chrono = { version = "0.4.23", optional = true, default-features = false }
-dirs = { package = "dirs-next", optional = true, version = "2.0.0" }
+home = { version = "0.5.4", optional = true }
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
 serde_yaml = { version = "0.9.19", optional = true }
