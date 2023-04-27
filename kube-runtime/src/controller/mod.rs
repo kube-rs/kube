@@ -1016,16 +1016,17 @@ where
     /// For example, this can be used to watch resources once and use the stream to trigger reconciliation and also keep a cache of those objects.
     /// That way it's possible to use this up to date cache instead of querying Kubernetes to access those resources
     ///
-    /// Example:
+    /// # Example:
     ///
     /// ```no_run
     /// # async {
     /// # use futures::{StreamExt, TryStreamExt};
     /// # use k8s_openapi::api::core::v1::{ConfigMap, Pod};
-    /// # use kube::api::{Api, ListParams};
+    /// # use kube::api::Api;
     /// # use kube::runtime::controller::Action;
     /// # use kube::runtime::reflector::{ObjectRef, Store};
     /// # use kube::runtime::{reflector, watcher, Controller, WatchStreamExt};
+    /// # use kube::runtime::watcher::Config;
     /// # use kube::{Client, Error, ResourceExt};
     /// # use std::future;
     /// # use std::sync::Arc;
@@ -1038,13 +1039,13 @@ where
     /// let (pod_store, writer) = reflector::store();
     /// let pod_stream = reflector(
     ///     writer,
-    ///     watcher(Api::<Pod>::all(client.clone()), ListParams::default()),
+    ///     watcher(Api::<Pod>::all(client.clone()), Config::default()),
     /// )
     /// .applied_objects()
     /// // Map to the relevant `ObjectRef<K>` to reconcile
     /// .map_ok(|pod| ObjectRef::new(&format!("{}-cm", pod.name_any())).within(&pod.namespace().unwrap()));
     ///
-    /// Controller::new(Api::<ConfigMap>::all(client), ListParams::default())
+    /// Controller::new(Api::<ConfigMap>::all(client), Config::default())
     ///     .reconcile_on(pod_stream)
     ///     // The store can be re-used between controllers and even inspected from the reconciler through [Context]
     ///     .run(reconcile, error_policy, Arc::new(pod_store))
@@ -1052,6 +1053,7 @@ where
     ///     .await;
     /// # };
     /// ```
+    #[cfg(feature = "unstable-runtime-reconcile-on")]
     #[must_use]
     pub fn reconcile_on(
         mut self,
