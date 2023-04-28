@@ -8,7 +8,10 @@ use crate::{
         ObjectRef,
     },
     scheduler::{scheduler, ScheduleRequest},
-    utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
+    utils::{
+        trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff,
+        WatchStreamExt,
+    },
     watcher::{self, watcher},
 };
 use backoff::backoff::Backoff;
@@ -16,7 +19,8 @@ use derivative::Derivative;
 use futures::{
     channel,
     future::{self, BoxFuture},
-    ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
+    ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream,
+    TryStreamExt,
 };
 use kube_client::api::{Api, DynamicObject, ListParams, Resource};
 use pin_project::pin_project;
@@ -80,7 +84,9 @@ impl Action {
     /// frequent changes to the underlying object, or some other hook to retain eventual consistency.
     #[must_use]
     pub fn await_change() -> Self {
-        Self { requeue_after: None }
+        Self {
+            requeue_after: None,
+        }
     }
 }
 
@@ -139,7 +145,9 @@ where
         meta.owner_references
             .into_iter()
             .flatten()
-            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
+            .filter_map(move |owner| {
+                ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone())
+            })
             .map(move |owner_ref| ReconcileRequest {
                 obj_ref: owner_ref,
                 reason: ReconcileReason::RelatedObjectUpdated {
@@ -181,11 +189,15 @@ impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
 pub enum ReconcileReason {
     Unknown,
     ObjectUpdated,
-    RelatedObjectUpdated { obj_ref: Box<ObjectRef<DynamicObject>> },
+    RelatedObjectUpdated {
+        obj_ref: Box<ObjectRef<DynamicObject>>,
+    },
     ReconcilerRequestedRetry,
     ErrorPolicyRequestedRetry,
     BulkReconcile,
-    Custom { reason: String },
+    Custom {
+        reason: String,
+    },
 }
 
 impl Display for ReconcileReason {
@@ -198,7 +210,9 @@ impl Display for ReconcileReason {
             }
             ReconcileReason::BulkReconcile => f.write_str("bulk reconcile requested"),
             ReconcileReason::ReconcilerRequestedRetry => f.write_str("reconciler requested retry"),
-            ReconcileReason::ErrorPolicyRequestedRetry => f.write_str("error policy requested retry"),
+            ReconcileReason::ErrorPolicyRequestedRetry => {
+                f.write_str("error policy requested retry")
+            }
             ReconcileReason::Custom { reason } => f.write_str(reason),
         }
     }
@@ -291,7 +305,9 @@ where
                             .instrument(reconciler_span)
                             .left_future()
                     }
-                    None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
+                    None => {
+                        future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future()
+                    }
                 }
             })
             .on_complete(async { tracing::debug!("applier runner terminated") })
@@ -333,7 +349,12 @@ where
         let reconciler_finished_at = Instant::now();
 
         let (action, reschedule_reason) = result.as_ref().map_or_else(
-            |err| (error_policy(err), ReconcileReason::ErrorPolicyRequestedRetry),
+            |err| {
+                (
+                    error_policy(err),
+                    ReconcileReason::ErrorPolicyRequestedRetry,
+                )
+            },
             |action| (action.clone(), ReconcileReason::ReconcilerRequestedRetry),
         );
 
@@ -453,7 +474,8 @@ where
     K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
-    trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
+    trigger_selector:
+        stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
     trigger_backoff: Box<dyn Backoff + Send>,
     /// [`run`](crate::Controller::run) starts a graceful shutdown when any of these [`Future`]s complete,
     /// refusing to start any new reconciliations but letting any existing ones finish.
@@ -506,7 +528,21 @@ where
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
-            reflector(writer, watcher(owned_api, lp)).applied_objects(),
+            reflector(
+                writer,
+                watcher(owned_api, lp).map_ok(|mut ev| {
+                    let strip_mf = |o: &mut K| {
+                        o.meta_mut().managed_fields = None;
+                    };
+                    match &mut ev {
+                        watcher::Event::Applied(o) => strip_mf(o),
+                        watcher::Event::Deleted(o) => strip_mf(o),
+                        watcher::Event::Restarted(os) => os.iter_mut().for_each(strip_mf),
+                    }
+                    ev
+                }),
+            )
+            .applied_objects(),
             dyntype.clone(),
         )
         .boxed();
@@ -555,7 +591,9 @@ where
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
     #[must_use]
-    pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
+    pub fn owns<
+        Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
+    >(
         self,
         api: Api<Child>,
         lp: ListParams,
@@ -576,7 +614,11 @@ where
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners(watcher(api, lp).touched_objects(), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners(
+            watcher(api, lp).touched_objects(),
+            self.dyntype.clone(),
+            dyntype,
+        );
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -739,7 +781,10 @@ where
     ///
     /// If a [`Stream`] is terminated (by emitting [`None`]) then the [`Controller`] keeps running, but the [`Stream`] stops being polled.
     #[must_use]
-    pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
+    pub fn reconcile_all_on(
+        mut self,
+        trigger: impl Stream<Item = ()> + Send + Sync + 'static,
+    ) -> Self {
         let store = self.store();
         let dyntype = self.dyntype.clone();
         self.trigger_selector.push(
@@ -793,7 +838,10 @@ where
     /// This can be called multiple times, in which case they are additive; the [`Controller`] starts to terminate
     /// as soon as *any* [`Future`] resolves.
     #[must_use]
-    pub fn graceful_shutdown_on(mut self, trigger: impl Future<Output = ()> + Send + Sync + 'static) -> Self {
+    pub fn graceful_shutdown_on(
+        mut self,
+        trigger: impl Future<Output = ()> + Send + Sync + 'static,
+    ) -> Self {
         self.graceful_shutdown_selector.push(trigger.boxed());
         self
     }
@@ -840,7 +888,9 @@ where
                 tracing::info!("press ctrl+c to shut down gracefully");
                 shutdown_signal().await;
                 if let Ok(()) = graceful_tx.send(()) {
-                    tracing::info!("graceful shutdown requested, press ctrl+c again to force shutdown");
+                    tracing::info!(
+                        "graceful shutdown requested, press ctrl+c again to force shutdown"
+                    );
                 } else {
                     tracing::info!(
                         "graceful shutdown already requested, press ctrl+c again to force shutdown"

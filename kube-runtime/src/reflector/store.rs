@@ -129,7 +129,6 @@ where
     }
 }
 
-
 /// Create a (Reader, Writer) for a `Store<K>` for a typed resource `K`
 ///
 /// The `Writer` should be passed to a [`reflector`](crate::reflector()),
@@ -144,7 +143,6 @@ where
     let r = w.as_reader();
     (r, w)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -217,6 +215,9 @@ mod tests {
         let mut store_w = Writer::default();
         store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         let store = store_w.as_reader();
-        assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(), Some(&cm));
+        assert_eq!(
+            store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(),
+            Some(&cm)
+        );
     }
 }

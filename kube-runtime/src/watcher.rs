@@ -112,7 +112,10 @@ impl<K> Event<K> {
 /// The internal finite state machine driving the [`watcher`]
 enum State<K: Resource + Clone> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
-    Empty,
+    Empty {
+        continue_token: Option<String>,
+        objects: Vec<K>,
+    },
     /// The initial LIST was successful, so we should move on to starting the actual watch.
     InitListed { resource_version: String },
     /// The watch is in progress, from this point we just return events from the server.
@@ -128,6 +131,15 @@ enum State<K: Resource + Clone> {
     },
 }
 
+impl<K: Resource + Clone> Default for State<K> {
+    fn default() -> Self {
+        Self::Empty {
+            continue_token: None,
+            objects: vec![],
+        }
+    }
+}
+
 /// Progresses the watcher a single step, returning (event, state)
 ///
 /// This function should be trampolined: if event == `None`
@@ -138,48 +150,89 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
     state: State<K>,
 ) -> (Option<Result<Event<K>>>, State<K>) {
     match state {
-        State::Empty => match api.list(list_params).await {
-            Ok(list) => (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                resource_version: list.metadata.resource_version.unwrap(),
-            }),
-            Err(err) => (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty),
-        },
-        State::InitListed { resource_version } => match api.watch(list_params, &resource_version).await {
-            Ok(stream) => (None, State::Watching {
-                resource_version,
-                stream: stream.boxed(),
-            }),
-            Err(err) => (
-                Some(Err(err).map_err(Error::WatchStartFailed)),
-                State::InitListed { resource_version },
-            ),
-        },
+        State::Empty {
+            continue_token,
+            mut objects,
+        } => {
+            let mut lp = list_params.clone();
+            lp.continue_token = continue_token;
+            lp.limit = Some(100);
+            match api.list(&lp).await {
+                Ok(list) => {
+                    objects.extend(list.items);
+                    if let Some(continue_token) = list.metadata.continue_ {
+                        (
+                            None,
+                            State::Empty {
+                                continue_token: Some(continue_token),
+                                objects,
+                            },
+                        )
+                    } else {
+                        (
+                            Some(Ok(Event::Restarted(objects))),
+                            State::InitListed {
+                                resource_version: list.metadata.resource_version.unwrap(),
+                            },
+                        )
+                    }
+                }
+                Err(err) => (
+                    Some(Err(err).map_err(Error::InitialListFailed)),
+                    State::default(),
+                ),
+            }
+        }
+        State::InitListed { resource_version } => {
+            match api.watch(list_params, &resource_version).await {
+                Ok(stream) => (
+                    None,
+                    State::Watching {
+                        resource_version,
+                        stream: stream.boxed(),
+                    },
+                ),
+                Err(err) => (
+                    Some(Err(err).map_err(Error::WatchStartFailed)),
+                    State::InitListed { resource_version },
+                ),
+            }
+        }
         State::Watching {
             resource_version,
             mut stream,
         } => match stream.next().await {
             Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Applied(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Ok(Event::Applied(obj))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
                 let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Deleted(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Ok(Event::Deleted(obj))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
-            Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
-                resource_version: bm.metadata.resource_version,
-                stream,
-            }),
+            Some(Ok(WatchEvent::Bookmark(bm))) => (
+                None,
+                State::Watching {
+                    resource_version: bm.metadata.resource_version,
+                    stream,
+                },
+            ),
             Some(Ok(WatchEvent::Error(err))) => {
                 // HTTP GONE, means we have desynced and need to start over and re-list :(
                 let new_state = if err.code == 410 {
-                    State::Empty
+                    State::default()
                 } else {
                     State::Watching {
                         resource_version,
@@ -188,10 +241,13 @@ async fn step_trampolined<K: Resource + Clone + DeserializeOwned + Debug + Send 
                 };
                 (Some(Err(err).map_err(Error::WatchError)), new_state)
             }
-            Some(Err(err)) => (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
-                resource_version,
-                stream,
-            }),
+            Some(Err(err)) => (
+                Some(Err(err).map_err(Error::WatchFailed)),
+                State::Watching {
+                    resource_version,
+                    stream,
+                },
+            ),
             None => (None, State::InitListed { resource_version }),
         },
     }
@@ -265,7 +321,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     list_params: ListParams,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
     futures::stream::unfold(
-        (api, list_params, State::Empty),
+        (api, list_params, State::default()),
         |(api, list_params, state)| async {
             let (event, state) = step(&api, &list_params, state).await;
             Some((event, (api, list_params, state)))
@@ -283,10 +339,13 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, ListParams {
-        field_selector: Some(format!("metadata.name={name}")),
-        ..Default::default()
-    })
+    watcher(
+        api,
+        ListParams {
+            field_selector: Some(format!("metadata.name={name}")),
+            ..Default::default()
+        },
+    )
     .map(|event| match event? {
         Event::Deleted(_) => Ok(None),
         // We're filtering by object name, so getting more than one object means that either:
