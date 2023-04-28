@@ -147,7 +147,7 @@ mod custom_resource;
 /// use serde::{Serialize, Deserialize};
 /// use kube_derive::CustomResource;
 /// use schemars::JsonSchema;
-/// use validator::Validate;
+/// use garde::Validate;
 ///
 /// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, Validate, JsonSchema)]
 /// #[kube(
@@ -167,7 +167,9 @@ mod custom_resource;
 /// #[serde(rename_all = "camelCase")]
 /// struct FooSpec {
 ///     #[validate(length(min = 3))]
+///     #[garde(length(min = 3))]
 ///     data: String,
+///     #[garde(skip)]
 ///     replicas_count: i32
 /// }
 ///
@@ -213,7 +215,9 @@ mod custom_resource;
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
 /// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube/blob/main/examples/crd_derive.rs))
 /// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/kube-rs/kube/issues/129#issuecomment-750852916)
-/// - [`#[validate(...)]` field attributes with validator](https://github.com/Keats/validator) for kubebuilder style validation rules (see [`crd_api` example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs)))
+/// - [`#[validate(...)]` field attributes based on the validator crate](https://github.com/Keats/validator) for kubebuilder style validation rules (see [`crd_api` example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs))
+/// - [`#[garde(...)]` field attributes for client-side validation](https://github.com/jprochazk/garde) (see [`crd_api`
+/// example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs))
 ///
 /// You might need to override parts of the schemas (for fields in question) when you are:
 /// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
@@ -230,14 +234,18 @@ mod custom_resource;
 /// - **generating rust code from schemas** can be done via [kopium](https://github.com/kube-rs/kopium) and is supported on stable crds (> 1.16 kubernetes)
 ///
 /// ## Validation Caveats
-/// The supported **`#[validate]` attrs also exist as `#[schemars]` attrs** so you can use those directly if you do not require the validation to run client-side (in your code).
-/// Otherwise, you should `#[derive(Validate)]` on your struct to have both server-side (kubernetes) and client-side validation.
+/// A number of `#[validate]` attrs are supported by `schemars` and can be used directly on your struct if you do not require validation to run client-side (in your code).
+/// Otherwise, to have both server-side (kubernetes) and client-side validation, you should `#[derive(Validate)]` on your struct and include additional `#[garde]` attrs that mirror the `#[validate]` ones.
+/// Two different sets of attrs are needed because `schemar`'s validation attrs are based on a now unmaintained [`validator`](https://github.com/Keats/validator/issues/201) crate.
 ///
-/// When using `validator` directly, you must add it to your dependencies (with the `derive` feature).
+/// When using `garde` directly, you must add it to your dependencies (with the `derive` feature).
 ///
 /// Make sure your validation rules are static and handled by `schemars`:
 /// - validations from `#[validate(custom = "some_fn")]` will not show up in the schema.
 /// - similarly; [nested / must_match / credit_card were unhandled by schemars at time of writing](https://github.com/GREsau/schemars/pull/78)
+/// - encoding validations specified through garde (i.e. #[garde(ascii)]), are currently not supported by schemars
+/// - to validate required attributes client-side, garde requires a custom validation function (`#[garde(custom(my_required_check))]`)
+/// - when using garde, fields that should not be validated need to be explictly skipped through the `#[garde(skip)]` attr
 ///
 /// For sanity, you should review the generated schema before sending it to kubernetes.
 ///

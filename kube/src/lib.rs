@@ -48,7 +48,7 @@
 //! use schemars::JsonSchema;
 //! use serde::{Deserialize, Serialize};
 //! use serde_json::json;
-//! use validator::Validate;
+//! use garde::Validate;
 //! use futures::{StreamExt, TryStreamExt};
 //! use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 //! use kube::{
@@ -62,9 +62,12 @@
 //! #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, Validate, JsonSchema)]
 //! #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 //! pub struct FooSpec {
+//!     #[garde(skip)]
 //!     info: String,
 //!     #[validate(length(min = 3))]
+//!     #[garde(length(min = 3))]
 //!     name: String,
+//!     #[garde(skip)]
 //!     replicas: i32,
 //! }
 //!
