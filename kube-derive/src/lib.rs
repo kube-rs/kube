@@ -234,9 +234,11 @@ mod custom_resource;
 /// - **generating rust code from schemas** can be done via [kopium](https://github.com/kube-rs/kopium) and is supported on stable crds (> 1.16 kubernetes)
 ///
 /// ## Validation Caveats
-/// A number of `#[validate]` attrs are supported by `schemars` and can be used directly on your struct if you do not require validation to run client-side (in your code).
-/// Otherwise, to have both server-side (kubernetes) and client-side validation, you should `#[derive(Validate)]` on your struct and include additional `#[garde]` attrs that mirror the `#[validate]` ones.
-/// Two different sets of attrs are needed because `schemar`'s validation attrs are based on a now unmaintained [`validator`](https://github.com/Keats/validator/issues/201) crate.
+/// There are two main ways of doing validation; **server-side** (embedding validation attributes into the schema for the apiserver to respect), and **client-side** (provides validate() methods in your code).
+///
+/// Client side validation of structs can be achieved by hooking up `#[garde]` attributes in your struct and is a replacement of the now unmaintained [`validator`](https://github.com/Keats/validator/issues/201) crate.
+/// Server-side validation require mutation of your generated schema, and can in the basic cases be achieved through the use of `schemars`'s [validation attributes](https://graham.cool/schemars/deriving/attributes/#supported-validator-attributes).
+/// For complete control, [parts of the schema can be overridden](https://github.com/kube-rs/kube/blob/e01187e13ba364ccecec452e023316a62fb13e04/examples/crd_derive.rs#L37-L38) to support more advanced [Kubernetes specific validation rules](https://kubernetes.io/blog/2022/09/23/crd-validation-rules-beta/).
 ///
 /// When using `garde` directly, you must add it to your dependencies (with the `derive` feature).
 ///
