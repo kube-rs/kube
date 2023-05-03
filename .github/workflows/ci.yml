@@ -41,7 +41,7 @@ jobs:
       - name: "Interim Hacky Windows Test for #1191"
         if: matrix.os == 'windows-latest'
         run: |
-          sed -i 's/default \= \["client", "openssl-tls"\]/default = \["client", "rustls-tls"\]/' kube/Cargo.toml
+          sed -i '0,/openssl/s//rustls/' kube/Cargo.toml
           cat kube/Cargo.toml
           cargo build
           cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
