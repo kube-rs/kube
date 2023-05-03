@@ -207,6 +207,41 @@ impl ListParams {
     }
 }
 
+/// Common query parameters used in get calls
+#[derive(Clone, Debug, Default)]
+pub struct GetParams {
+    /// An explicit resourceVersion with implicit version matching strategies
+    ///
+    /// Default (unset) gives the most recent version. "0" gives a less
+    /// consistent, but more performant "Any" version. Specifing a version is
+    /// like providing a `VersionMatch::NotOlderThan`.
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for details.
+    pub resource_version: Option<String>,
+}
+
+/// Helper interface to GetParams
+///
+/// Usage:
+/// ```
+/// use kube::api::GetParams;
+/// let gp = GetParams::at("6664");
+/// ```
+impl GetParams {
+    /// Sets the resource version, implicitly applying a 'NotOlderThan' match
+    #[must_use]
+    pub fn at(resource_version: &str) -> Self {
+        Self {
+            resource_version: Some(resource_version.into()),
+        }
+    }
+
+    /// Sets the resource version to "0"
+    #[must_use]
+    pub fn any() -> Self {
+        Self::at("0")
+    }
+}
+
 /// The validation directive to use for `fieldValidation` when using server-side apply.
 #[derive(Clone, Debug)]
 pub enum ValidationDirective {
