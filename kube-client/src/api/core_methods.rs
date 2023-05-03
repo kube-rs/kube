@@ -61,7 +61,7 @@ where
 
     /// [Get](`Api::get`) a named resource with an explicit resourceVersion
     ///
-    /// This function allows the caller to pass in a [`GetParams`](`kube::api::GetParams`) type containing
+    /// This function allows the caller to pass in a [`GetParams`](`super::GetParams`) type containing
     /// a `resourceVersion` to a [Get](`Api::get`) call.
     /// For example
     ///
@@ -89,8 +89,8 @@ where
 
     ///  [Get](`Api::get_metadata`) the metadata of an object using an explicit `resourceVersion`
     ///
-    /// This function allows the caller to pass in a [`GetParams`](`kube::api::GetParams`) type containing
-    /// a resourceVersion to a [Get](`Api::get_metadata`) call.
+    /// This function allows the caller to pass in a [`GetParams`](`super::GetParams`) type containing
+    /// a `resourceVersion` to a [Get](`Api::get_metadata`) call.
     /// For example
     ///
     ///
