@@ -147,9 +147,8 @@ mod custom_resource;
 /// use serde::{Serialize, Deserialize};
 /// use kube_derive::CustomResource;
 /// use schemars::JsonSchema;
-/// use validator::Validate;
 ///
-/// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, Validate, JsonSchema)]
+/// #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 /// #[kube(
 ///     group = "clux.dev",
 ///     version = "v1",
@@ -166,7 +165,7 @@ mod custom_resource;
 /// )]
 /// #[serde(rename_all = "camelCase")]
 /// struct FooSpec {
-///     #[validate(length(min = 3))]
+///     #[schemars(length(min = 3))]
 ///     data: String,
 ///     replicas_count: i32
 /// }
@@ -213,7 +212,8 @@ mod custom_resource;
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
 /// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube/blob/main/examples/crd_derive.rs))
 /// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/kube-rs/kube/issues/129#issuecomment-750852916)
-/// - [`#[validate(...)]` field attributes with validator](https://github.com/Keats/validator) for kubebuilder style validation rules (see [`crd_api` example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs)))
+/// - [`#[garde(...)]` field attributes for client-side validation](https://github.com/jprochazk/garde) (see [`crd_api`
+/// example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs))
 ///
 /// You might need to override parts of the schemas (for fields in question) when you are:
 /// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
@@ -229,15 +229,22 @@ mod custom_resource;
 /// - **adding validation** via [validator crate](https://github.com/Keats/validator) is supported from `schemars` >= [`0.8.5`](https://github.com/GREsau/schemars/blob/master/CHANGELOG.md#085---2021-09-20)
 /// - **generating rust code from schemas** can be done via [kopium](https://github.com/kube-rs/kopium) and is supported on stable crds (> 1.16 kubernetes)
 ///
-/// ## Validation Caveats
-/// The supported **`#[validate]` attrs also exist as `#[schemars]` attrs** so you can use those directly if you do not require the validation to run client-side (in your code).
-/// Otherwise, you should `#[derive(Validate)]` on your struct to have both server-side (kubernetes) and client-side validation.
+/// ## Schema Validation
+/// There are two main ways of doing validation; **server-side** (embedding validation attributes into the schema for the apiserver to respect), and **client-side** (provides `validate()` methods in your code).
 ///
-/// When using `validator` directly, you must add it to your dependencies (with the `derive` feature).
+/// Client side validation of structs can be achieved by hooking up `#[garde]` attributes in your struct and is a replacement of the now unmaintained [`validator`](https://github.com/Keats/validator/issues/201) crate.
+/// Server-side validation require mutation of your generated schema, and can in the basic cases be achieved through the use of `schemars`'s [validation attributes](https://graham.cool/schemars/deriving/attributes/#supported-validator-attributes).
+/// For complete control, [parts of the schema can be overridden](https://github.com/kube-rs/kube/blob/e01187e13ba364ccecec452e023316a62fb13e04/examples/crd_derive.rs#L37-L38) to support more advanced [Kubernetes specific validation rules](https://kubernetes.io/blog/2022/09/23/crd-validation-rules-beta/).
 ///
+/// When using `garde` directly, you must add it to your dependencies (with the `derive` feature).
+///
+/// ### Validation Caveats
 /// Make sure your validation rules are static and handled by `schemars`:
-/// - validations from `#[validate(custom = "some_fn")]` will not show up in the schema.
+/// - validations from `#[garde(custom(my_func))]` will not show up in the schema.
 /// - similarly; [nested / must_match / credit_card were unhandled by schemars at time of writing](https://github.com/GREsau/schemars/pull/78)
+/// - encoding validations specified through garde (i.e. #[garde(ascii)]), are currently not supported by schemars
+/// - to validate required attributes client-side, garde requires a custom validation function (`#[garde(custom(my_required_check))]`)
+/// - when using garde, fields that should not be validated need to be explictly skipped through the `#[garde(skip)]` attr
 ///
 /// For sanity, you should review the generated schema before sending it to kubernetes.
 ///
