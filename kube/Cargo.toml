@@ -16,7 +16,7 @@ rust-version = "1.63.0"
 edition = "2021"
 
 [features]
-default = ["client", "rustls-tls"]
+default = ["client", "openssl-tls"]
 rustls-tls = ["kube-client/rustls-tls"]
 openssl-tls = ["kube-client/openssl-tls"]
 ws = ["kube-client/ws", "kube-core/ws"]
