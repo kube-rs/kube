@@ -80,12 +80,15 @@ impl Request {
 
     /// Get a single instance
     pub fn get(&self, name: &str, gp: &GetParams) -> Result<http::Request<Vec<u8>>, Error> {
-        let target = format!("{}/{}", self.url_path, name);
-        let mut qp = form_urlencoded::Serializer::new(target);
-        if let Some(rv) = &gp.resource_version {
-            qp.append_pair("resourceVersion", rv);
-        }
-        let urlstr = qp.finish();
+        let urlstr = if let Some(rv) = &gp.resource_version {
+            let target = format!("{}/{}?", self.url_path, name);
+            form_urlencoded::Serializer::new(target)
+                .append_pair("resourceVersion", rv)
+                .finish()
+        } else {
+            let target = format!("{}/{}", self.url_path, name);
+            form_urlencoded::Serializer::new(target).finish()
+        };
         let req = http::Request::get(urlstr);
         req.body(vec![]).map_err(Error::BuildRequest)
     }
@@ -253,12 +256,15 @@ impl Request {
 impl Request {
     /// Get a single metadata instance for a named resource
     pub fn get_metadata(&self, name: &str, gp: &GetParams) -> Result<http::Request<Vec<u8>>, Error> {
-        let target = format!("{}/{}", self.url_path, name);
-        let mut qp = form_urlencoded::Serializer::new(target);
-        let urlstr = qp.finish();
-        if let Some(rv) = &gp.resource_version {
-            qp.append_pair("resourceVersion", rv);
-        }
+        let urlstr = if let Some(rv) = &gp.resource_version {
+            let target = format!("{}/{}?", self.url_path, name);
+            form_urlencoded::Serializer::new(target)
+                .append_pair("resourceVersion", rv)
+                .finish()
+        } else {
+            let target = format!("{}/{}", self.url_path, name);
+            form_urlencoded::Serializer::new(target).finish()
+        };
         let req = http::Request::get(urlstr)
             .header(http::header::ACCEPT, JSON_METADATA_MIME)
             .header(http::header::CONTENT_TYPE, JSON_MIME);
@@ -445,6 +451,7 @@ mod test {
         let req = Request::new(url)
             .get_metadata("mydeploy", &GetParams::default())
             .unwrap();
+        println!("{}", req.uri());
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments/mydeploy");
         assert_eq!(req.method(), "GET");
         assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
@@ -453,6 +460,36 @@ mod test {
             super::JSON_METADATA_MIME
         );
     }
+
+    #[test]
+    fn get_path_with_rv() {
+        let url = appsv1::Deployment::url_path(&(), Some("ns"));
+        let req = Request::new(url).get("mydeploy", &GetParams::any()).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/apps/v1/namespaces/ns/deployments/mydeploy?&resourceVersion=0"
+        );
+    }
+
+    #[test]
+    fn get_meta_path_with_rv() {
+        let url = appsv1::Deployment::url_path(&(), Some("ns"));
+        let req = Request::new(url)
+            .get_metadata("mydeploy", &GetParams::at("665"))
+            .unwrap();
+        assert_eq!(
+            req.uri(),
+            "/apis/apps/v1/namespaces/ns/deployments/mydeploy?&resourceVersion=665"
+        );
+
+        assert_eq!(req.method(), "GET");
+        assert_eq!(req.headers().get(header::CONTENT_TYPE).unwrap(), super::JSON_MIME);
+        assert_eq!(
+            req.headers().get(header::ACCEPT).unwrap(),
+            super::JSON_METADATA_MIME
+        );
+    }
+
     #[test]
     fn list_path() {
         let url = appsv1::Deployment::url_path(&(), Some("ns"));

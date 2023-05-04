@@ -101,7 +101,7 @@ where
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
     /// let pods: Api<Pod> = Api::namespaced(client, "apps");
-    /// let p: PartialObjectMeta<Pod> = pods.get_metadata("blog", &GetParams::any()).await?;
+    /// let p: PartialObjectMeta<Pod> = pods.get_metadata_with("blog", &GetParams::any()).await?;
     /// # Ok(())
     /// # }
     /// ```
