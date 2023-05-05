@@ -42,7 +42,6 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          #sed -i '0,/openssl/s//rustls/' kube/Cargo.toml
           sed -i 's/default \= \["client", "openssl-tls"\]/default = \["client", "rustls-tls"\]/' kube/Cargo.toml
           cat kube/Cargo.toml
           cargo build
