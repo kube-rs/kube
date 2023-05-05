@@ -5,6 +5,10 @@ on:
     # Limit to `main` because this action creates a PR
     branches:
       - main
+    paths:
+      - '**.rs'
+      - '**.yml'
+
 jobs:
   rustfmt_nightly:
     runs-on: ubuntu-latest

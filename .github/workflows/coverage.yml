@@ -5,6 +5,10 @@ on:
     branches:
       - main
   pull_request:
+    paths:
+      - '**.rs'
+      - '**.toml'
+      - '**.yml'
 
 jobs:
   tarpaulin-codecov:
