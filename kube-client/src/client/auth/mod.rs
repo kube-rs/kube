@@ -560,7 +560,8 @@ mod test {
     #[tokio::test]
     async fn exec_auth_command() -> Result<(), Error> {
         let expiry = (Utc::now() + Duration::seconds(60 * 60)).to_rfc3339();
-        let test_file = format!(r#"
+        let test_file = format!(
+            r#"
         apiVersion: v1
         clusters:
         - cluster:
@@ -585,7 +586,8 @@ mod test {
                 expiry-key: '{{.credential.token_expiry}}'
                 token-key: '{{.credential.access_token}}'
               name: gcp
-        "#);
+        "#
+        );
 
         let config: Kubeconfig = serde_yaml::from_str(&test_file).unwrap();
         let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
