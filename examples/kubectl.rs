@@ -163,7 +163,7 @@ impl App {
             std::fs::read_to_string(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
         for doc in multidoc_deserialize(&yaml)? {
             let obj: DynamicObject = serde_yaml::from_value(doc)?;
-            let namespace = obj.metadata.namespace.clone().or_else(|| self.namespace.clone());
+            let namespace = obj.metadata.namespace.as_deref().or(self.namespace.as_deref());
             let gvk = if let Some(tm) = &obj.types {
                 GroupVersionKind::try_from(tm)?
             } else {
@@ -171,7 +171,7 @@ impl App {
             };
             let name = obj.name_any();
             if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
-                let api = dynamic_api(ar, caps, client.clone(), &namespace, false);
+                let api = dynamic_api(ar, caps, client.clone(), namespace, false);
                 trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
                 let data: serde_json::Value = serde_json::to_value(&obj)?;
                 let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
@@ -208,7 +208,7 @@ async fn main() -> Result<()> {
             wc = wc.labels(label);
         }
 
-        let api = dynamic_api(ar, caps, client, &app.namespace, app.all);
+        let api = dynamic_api(ar, caps, client, app.namespace.as_deref(), app.all);
 
         tracing::info!(?app.verb, ?resource, name = ?app.name.clone().unwrap_or_default(), "requested objects");
         match app.verb {
@@ -228,7 +228,7 @@ fn dynamic_api(
     ar: ApiResource,
     caps: ApiCapabilities,
     client: Client,
-    ns: &Option<String>,
+    ns: Option<&str>,
     all: bool,
 ) -> Api<DynamicObject> {
     if caps.scope == Scope::Cluster || all {
