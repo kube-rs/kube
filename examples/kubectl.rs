@@ -163,7 +163,7 @@ impl App {
             std::fs::read_to_string(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
         for doc in multidoc_deserialize(&yaml)? {
             let obj: DynamicObject = serde_yaml::from_value(doc)?;
-            let namespace = obj.metadata.namespace.clone().or_else(|| self.namespace.clone();
+            let namespace = obj.metadata.namespace.clone().or_else(|| self.namespace.clone());
             let gvk = if let Some(tm) = &obj.types {
                 GroupVersionKind::try_from(tm)?
             } else {
