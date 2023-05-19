@@ -163,6 +163,13 @@ impl App {
             std::fs::read_to_string(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
         for doc in multidoc_deserialize(&yaml)? {
             let obj: DynamicObject = serde_yaml::from_value(doc)?;
+            let namespace = {
+                if let Some(ns) = obj.metadata.namespace.clone() {
+                    Some(ns)
+                } else {
+                    self.namespace.clone()
+                }
+            };
             let gvk = if let Some(tm) = &obj.types {
                 GroupVersionKind::try_from(tm)?
             } else {
@@ -170,7 +177,7 @@ impl App {
             };
             let name = obj.name_any();
             if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
-                let api = dynamic_api(ar, caps, client.clone(), &self.namespace, false);
+                let api = dynamic_api(ar, caps, client.clone(), &namespace, false);
                 trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
                 let data: serde_json::Value = serde_json::to_value(&obj)?;
                 let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
