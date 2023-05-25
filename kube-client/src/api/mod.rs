@@ -34,7 +34,7 @@ pub use kube_core::{
 };
 use kube_core::{DynamicResourceScope, NamespaceResourceScope};
 pub use params::{
-    DeleteParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
+    DeleteParams, GetParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
     ValidationDirective, VersionMatch, WatchParams,
 };
 

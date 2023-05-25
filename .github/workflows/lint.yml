@@ -1,6 +1,10 @@
 name: lint
 on:
   pull_request:
+    paths:
+      - '**.rs'
+      - '**.toml'
+      - '**.yml'
 
 jobs:
   cargo-deny:

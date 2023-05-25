@@ -32,9 +32,7 @@ where
     /// This function assumes that the object is expected to always exist, and returns [`Error`] if it does not.
     /// Consider using [`Api::get_opt`] if you need to handle missing objects.
     pub async fn get(&self, name: &str) -> Result<K> {
-        let mut req = self.request.get(name).map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("get");
-        self.client.request::<K>(req).await
+        self.get_with(name, &GetParams::default()).await
     }
 
     ///  Get only the metadata for a named resource as [`PartialObjectMeta`]
@@ -58,7 +56,64 @@ where
     /// This function assumes that the object is expected to always exist, and returns [`Error`] if it does not.
     /// Consider using [`Api::get_metadata_opt`] if you need to handle missing objects.
     pub async fn get_metadata(&self, name: &str) -> Result<PartialObjectMeta<K>> {
-        let mut req = self.request.get_metadata(name).map_err(Error::BuildRequest)?;
+        self.get_metadata_with(name, &GetParams::default()).await
+    }
+
+    /// [Get](`Api::get`) a named resource with an explicit resourceVersion
+    ///
+    /// This function allows the caller to pass in a [`GetParams`](`super::GetParams`) type containing
+    /// a `resourceVersion` to a [Get](`Api::get`) call.
+    /// For example
+    ///
+    /// ```no_run
+    /// # use kube::{Api, api::GetParams};
+    /// use k8s_openapi::api::core::v1::Pod;
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let p: Pod = pods.get_with("blog", &GetParams::any()).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function assumes that the object is expected to always exist, and returns [`Error`] if it does not.
+    /// Consider using [`Api::get_opt`] if you need to handle missing objects.
+    pub async fn get_with(&self, name: &str, gp: &GetParams) -> Result<K> {
+        let mut req = self.request.get(name, gp).map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("get");
+        self.client.request::<K>(req).await
+    }
+
+    ///  [Get](`Api::get_metadata`) the metadata of an object using an explicit `resourceVersion`
+    ///
+    /// This function allows the caller to pass in a [`GetParams`](`super::GetParams`) type containing
+    /// a `resourceVersion` to a [Get](`Api::get_metadata`) call.
+    /// For example
+    ///
+    ///
+    /// ```no_run
+    /// use kube::{Api, api::GetParams, core::PartialObjectMeta};
+    /// use k8s_openapi::api::core::v1::Pod;
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let p: PartialObjectMeta<Pod> = pods.get_metadata_with("blog", &GetParams::any()).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// Note that the type may be converted to `ObjectMeta` through the usual
+    /// conversion traits.
+    ///
+    /// # Errors
+    ///
+    /// This function assumes that the object is expected to always exist, and returns [`Error`] if it does not.
+    /// Consider using [`Api::get_metadata_opt`] if you need to handle missing objects.
+    pub async fn get_metadata_with(&self, name: &str, gp: &GetParams) -> Result<PartialObjectMeta<K>> {
+        let mut req = self.request.get_metadata(name, gp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get_metadata");
         self.client.request::<PartialObjectMeta<K>>(req).await
     }

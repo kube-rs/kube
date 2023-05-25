@@ -1,5 +1,6 @@
 use darling::{FromDeriveInput, FromMeta};
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Ident, Literal, Span, TokenStream};
+use quote::ToTokens;
 use syn::{parse_quote, Data, DeriveInput, Path, Visibility};
 
 /// Values we can parse from #[kube(attrs)]
@@ -239,12 +240,14 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     }
 
     let docstr = format!(" Auto-generated derived type for {ident} via `CustomResource`");
+    let quoted_serde = Literal::string(&serde.to_token_stream().to_string());
     let root_obj = quote! {
         #[doc = #docstr]
         #[automatically_derived]
         #[allow(missing_docs)]
         #[derive(#(#derive_paths),*)]
         #[serde(rename_all = "camelCase")]
+        #[serde(crate = #quoted_serde)]
         #visibility struct #rootident {
             #schemars_skip
             #visibility metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
