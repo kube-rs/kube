@@ -56,17 +56,17 @@ pub trait WatchStreamExt: Stream {
     /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
     /// use kube::{Api, Client, ResourceExt};
     /// use kube_runtime::{watcher, WatchStreamExt, predicates};
-    /// use k8s_openapi::api::core::v1::Pod;
+    /// use k8s_openapi::api::apps::v1::Deployment;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
-    /// let pods: Api<Pod> = Api::default_namespaced(client);
-    /// let changed_pods = watcher(pods, watcher::Config::default())
+    /// let deploys: Api<Deployment> = Api::default_namespaced(client);
+    /// let changed_deploys = watcher(deploys, watcher::Config::default())
     ///     .applied_objects()
     ///     .predicate_filter(predicates::generation);
-    /// pin_mut!(changed_pods);
+    /// pin_mut!(changed_deploys);
     ///
-    /// while let Some(pod) = changed_pods.try_next().await? {
-    ///    println!("saw Pod '{} with hitherto unseen generation", pod.name_any());
+    /// while let Some(d) = changed_deploys.try_next().await? {
+    ///    println!("saw Deployment '{} with hitherto unseen generation", d.name_any());
     /// }
     /// # Ok(())
     /// # }
