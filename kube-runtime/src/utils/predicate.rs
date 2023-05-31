@@ -101,7 +101,7 @@ pub mod predicates {
 
     /// Hash the resource version of a Resource K
     pub fn resource_version<K: Resource>(obj: &K) -> Option<u64> {
-        obj.meta().resource_version.as_ref().map(|rv| hash(rv))
+        obj.meta().resource_version.as_ref().map(hash)
     }
 
     /// Hash the labels of a Resource K
