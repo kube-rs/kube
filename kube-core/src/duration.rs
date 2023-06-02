@@ -180,7 +180,7 @@ impl<'de> Deserialize<'de> for Duration {
             type Value = Duration;
 
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.write_str("a string in Go `time.time::Duration.String()` format")
+                f.write_str("a string in Go `time.Duration.String()` format")
             }
 
 
@@ -228,7 +228,7 @@ impl PartialEq<Duration> for time::Duration {
             return false;
         }
 
-        self == other.duration
+        self == &other.duration
     }
 }
 
