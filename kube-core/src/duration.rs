@@ -1,5 +1,5 @@
 //! Kubernetes [`Duration`]s.
-use std::{str::FromStr, time, fmt};
+use std::{str::FromStr, time, fmt, cmp::Ordering};
 use serde::{Serialize, Serializer, Deserialize, Deserializer, de};
 
 /// A Kubernetes duration.
@@ -233,42 +233,42 @@ impl PartialEq<Duration> for time::Duration {
 }
 
 impl PartialEq<Duration> for &'_ time::Duration {
-    fn eq(&self, other: Duration) -> bool {
+    fn eq(&self, other: &Duration) -> bool {
         // Since `std::time::Duration` is unsigned, a negative `Duration` is
         // never equal to a `std::time::Duration`.
         if other.is_negative {
             return false;
         }
 
-        self == other.duration
+        *self == &other.duration
     }
 }
 
 impl PartialOrd for Duration {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for Duration {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         match (self.is_negative, other.is_negative) {
-            (true, false) => Some(std::cmp::Ordering::Less),
-            (false, true) => Some(std::cmp::Ordering::Greater),
+            (true, false) => Ordering::Less,
+            (false, true) => Ordering::Greater,
             // if both durations are negative, the "higher" Duration value is
             // actually the lower one
-            (true, true) => self.duration.partial_cmp(other).reverse(),
-            (false, false) => self.duration.partial_cmp(other),
+            (true, true) => self.duration.cmp(&other.duration).reverse(),
+            (false, false) => self.duration.cmp(&other.duration),
         }
     }
 }
 
 impl PartialOrd<time::Duration> for Duration {
-    fn partial_cmp(&self, other: &time::Duration) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &time::Duration) -> Option<Ordering> {
         // Since `std::time::Duration` is unsigned, a negative `Duration` is
         // always less than the `std::time::Duration`.
         if self.is_negative {
-            return Some(std::cmp::Ordering::Less);
+            return Some(Ordering::Less);
         }
 
         self.duration.partial_cmp(other)
