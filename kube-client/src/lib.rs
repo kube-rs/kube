@@ -149,7 +149,7 @@ mod test {
     #[cfg(feature = "when_rustls_works_with_k3d")]
     #[tokio::test]
     #[ignore = "needs cluster (lists pods)"]
-    #[cfg(all(feature = "rustls-tls"))]
+    #[cfg(feature = "rustls-tls")]
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
         let https = config.rustls_https_connector()?;
@@ -164,7 +164,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (lists pods)"]
-    #[cfg(all(feature = "openssl-tls"))]
+    #[cfg(feature = "openssl-tls")]
     async fn custom_client_openssl_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
         let https = config.openssl_https_connector()?;
@@ -179,7 +179,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (lists api resources)"]
-    #[cfg(all(feature = "discovery"))]
+    #[cfg(feature = "discovery")]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{core::DynamicObject, discovery};
         let client = Client::try_default().await?;
@@ -273,7 +273,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (will create and attach to a pod)"]
-    #[cfg(all(feature = "ws"))]
+    #[cfg(feature = "ws")]
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
 
