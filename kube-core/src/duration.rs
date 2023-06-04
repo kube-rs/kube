@@ -114,13 +114,13 @@ impl FromStr for Duration {
         // implements the same format as
         // https://cs.opensource.google/go/go/+/refs/tags/go1.20.4:src/time/format.go;l=1589
         const MINUTE: time::Duration = time::Duration::from_secs(60);
-        
+
         // Go durations are signed. Rust durations aren't.
         let is_negative = s.starts_with('-');
         s = s.trim_start_matches('+').trim_start_matches('-');
 
         let mut total = time::Duration::from_secs(0);
-        while s.is_empty() && s != "0" {
+        while !s.is_empty() && s != "0" {
             let unit_start = s.find(|c: char| c.is_alphabetic()).ok_or(ParseError::NoUnit)?;
 
             let (val, rest) = s.split_at(unit_start);
