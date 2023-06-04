@@ -113,23 +113,8 @@ impl FromStr for Duration {
     fn from_str(mut s: &str) -> Result<Self, Self::Err> {
         // implements the same format as
         // https://cs.opensource.google/go/go/+/refs/tags/go1.20.4:src/time/format.go;l=1589
-
-        fn duration_from_units(val: f64, unit: &str) -> Result<time::Duration, ParseError> {
-            const MINUTE: time::Duration = time::Duration::from_secs(60);
-            // https://cs.opensource.google/go/go/+/refs/tags/go1.20.4:src/time/format.go;l=1573
-            let base = match unit {
-                "ns" => time::Duration::from_nanos(1),
-                // U+00B5 is the "micro sign" while U+03BC is "Greek letter mu"
-                "us" | "\u{00b5}s" | "\u{03bc}s" => time::Duration::from_micros(1),
-                "ms" => time::Duration::from_millis(1),
-                "s" => time::Duration::from_secs(1),
-                "m" => MINUTE,
-                "h" => MINUTE * 60,
-                _ => return Err(ParseError::InvalidUnit),
-            };
-            Ok(base.mul_f64(val))
-        }
-
+        const MINUTE: time::Duration = time::Duration::from_secs(60);
+        
         // Go durations are signed. Rust durations aren't.
         let is_negative = s.starts_with('-');
         s = s.trim_start_matches('+').trim_start_matches('-');
@@ -148,7 +133,20 @@ impl FromStr for Duration {
                 s = "";
                 rest
             };
-            total += duration_from_units(val, unit)?;
+
+            // https://cs.opensource.google/go/go/+/refs/tags/go1.20.4:src/time/format.go;l=1573
+            let base = match unit {
+                "ns" => time::Duration::from_nanos(1),
+                // U+00B5 is the "micro sign" while U+03BC is "Greek letter mu"
+                "us" | "\u{00b5}s" | "\u{03bc}s" => time::Duration::from_micros(1),
+                "ms" => time::Duration::from_millis(1),
+                "s" => time::Duration::from_secs(1),
+                "m" => MINUTE,
+                "h" => MINUTE * 60,
+                _ => return Err(ParseError::InvalidUnit),
+            };
+
+            total += base.mul_f64(val);
         }
 
         Ok(Duration { duration: total, is_negative })
