@@ -60,7 +60,7 @@ impl Api<ServiceAccount> {
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube-client --lib -- --ignored`
 #[cfg(test)]
-#[cfg(all(feature = "client"))]
+#[cfg(feature = "client")]
 mod test {
     use crate::{
         api::{Api, DeleteParams, ListParams, PostParams},

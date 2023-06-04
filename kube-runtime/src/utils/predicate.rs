@@ -99,6 +99,11 @@ pub mod predicates {
         obj.meta().generation.map(|g| hash(&g))
     }
 
+    /// Hash the resource version of a Resource K
+    pub fn resource_version<K: Resource>(obj: &K) -> Option<u64> {
+        obj.meta().resource_version.as_ref().map(hash)
+    }
+
     /// Hash the labels of a Resource K
     pub fn labels<K: Resource>(obj: &K) -> Option<u64> {
         Some(hash(obj.labels()))

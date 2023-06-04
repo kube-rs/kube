@@ -356,7 +356,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (fetches api resources, and lists all)"]
-    #[cfg(all(feature = "derive"))]
+    #[cfg(feature = "derive")]
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
@@ -432,7 +432,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (will create await a pod)"]
-    #[cfg(all(feature = "runtime"))]
+    #[cfg(feature = "runtime")]
     async fn pod_can_await_conditions() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             api::{DeleteParams, PostParams},
