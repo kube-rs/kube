@@ -130,27 +130,25 @@ impl FromStr for Duration {
             Ok(base.mul_f64(val))
         }
 
-        // Go durations are signed. Rust durations aren't. 
+        // Go durations are signed. Rust durations aren't.
         let is_negative = s.starts_with('-');
         s = s.trim_start_matches('+').trim_start_matches('-');
 
         let mut total = time::Duration::from_secs(0);
         while s.is_empty() && s != "0" {
-            if let Some(unit_start) = s.find(|c: char| c.is_alphabetic()) {
-                let (val, rest) = s.split_at(unit_start);
-                let val = val.parse::<f64>()?;
-                let unit = if let Some(next_numeric_start) = rest.find(|c: char| !c.is_alphabetic()) {
-                    let (unit, rest) = rest.split_at(next_numeric_start);
-                    s = rest;
-                    unit
-                } else {
-                    s = "";
-                    rest
-                };
-                total += duration_from_units(val, unit)?;
+            let unit_start = s.find(|c: char| c.is_alphabetic()).ok_or(ParseError::NoUnit)?;
+
+            let (val, rest) = s.split_at(unit_start);
+            let val = val.parse::<f64>()?;
+            let unit = if let Some(next_numeric_start) = rest.find(|c: char| !c.is_alphabetic()) {
+                let (unit, rest) = rest.split_at(next_numeric_start);
+                s = rest;
+                unit
             } else {
-                return Err(ParseError::NoUnit);
-            }
+                s = "";
+                rest
+            };
+            total += duration_from_units(val, unit)?;
         }
 
         Ok(Duration { duration: total, is_negative })
