@@ -7,8 +7,20 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.83.0...main
 
-0.83.0 / 2023-06-05
+[0.83.0](https://github.com/kube-rs/kube/releases/tag/0.83.0) / 2023-06-05
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.83.0 -->
+
+## What's Changed
+### Added
+* Add `Controller::reconcile_on` by @co42 in https://github.com/kube-rs/kube/pull/1163
+* Add `predicates::resource_version` by @clux in https://github.com/kube-rs/kube/pull/1221
+* add `Duration` to `kube-core` by @hawkw in https://github.com/kube-rs/kube/pull/1224
+### Changed
+* Introduce `GetParams` support by @mateiidavid in https://github.com/kube-rs/kube/pull/1214
+### Fixed
+* Swap `validator` for `garde` by @mateiidavid in https://github.com/kube-rs/kube/pull/1212
+* fix: `#[kube(crates(serde = "some_crate::serde"))]` was not working by @chubei in https://github.com/kube-rs/kube/pull/1215
 
 [0.82.2](https://github.com/kube-rs/kube/releases/tag/0.82.2) / 2023-04-19
 ===================
