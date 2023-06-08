@@ -534,21 +534,7 @@ where
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
-            reflector(
-                writer,
-                watcher(main_api, wc).map_ok(|mut ev| {
-                    let strip_mf = |o: &mut K| {
-                        o.meta_mut().managed_fields = None;
-                    };
-                    match &mut ev {
-                        watcher::Event::Applied(o) => strip_mf(o),
-                        watcher::Event::Deleted(o) => strip_mf(o),
-                        watcher::Event::Restarted(os) => os.iter_mut().for_each(strip_mf),
-                    }
-                    ev
-                }),
-            )
-            .applied_objects(),
+            reflector(writer, watcher(main_api, wc)).applied_objects(),
             dyntype.clone(),
         )
         .boxed();
