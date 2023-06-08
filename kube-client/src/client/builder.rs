@@ -85,20 +85,14 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
             #[cfg(feature = "openssl-tls")]
             let connector = config.openssl_https_connector_with_connector(connector)?;
             #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
-            let connector = hyper_rustls::HttpsConnector::from((
-                connector,
-                std::sync::Arc::new(config.rustls_client_config()?),
-            ));
+            let connector = config.rustls_https_connector_with_connector(connector)?;
 
             let mut connector = TimeoutConnector::new(connector);
 
-            // Set the timeout for the client and fallback to default deprecated timeout until it's removed
-            #[allow(deprecated)]
-            {
-                connector.set_connect_timeout(config.connect_timeout.or(config.timeout));
-                connector.set_read_timeout(config.read_timeout.or(config.timeout));
-                connector.set_write_timeout(config.write_timeout);
-            }
+            // Set the timeouts for the client
+            connector.set_connect_timeout(config.connect_timeout);
+            connector.set_read_timeout(config.read_timeout);
+            connector.set_write_timeout(config.write_timeout);
 
             hyper::Client::builder().build(connector)
         };

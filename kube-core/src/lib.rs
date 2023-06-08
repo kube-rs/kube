@@ -18,6 +18,9 @@ pub mod conversion;
 
 pub mod discovery;
 
+pub mod duration;
+pub use duration::Duration;
+
 pub mod dynamic;
 pub use dynamic::{ApiResource, DynamicObject};
 
@@ -28,7 +31,7 @@ pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 
 pub mod metadata;
-pub use metadata::{ListMeta, ObjectMeta, TypeMeta};
+pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta};
 
 pub mod object;
 pub use object::{NotUsed, Object, ObjectList};

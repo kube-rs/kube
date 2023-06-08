@@ -1,6 +1,11 @@
 comment:
   require_changes: no
   layout: "diff,files"
+coverage:
+  status:
+    project:
+      project: off
+      patch: off
 
 #flags:
 #  kube:

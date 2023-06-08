@@ -4,7 +4,7 @@ use k8s_openapi::api::{
     core::v1::{ConfigMap, Secret},
 };
 use kube::{
-    api::{Api, ListParams, ResourceExt},
+    api::{Api, ResourceExt},
     runtime::{watcher, WatchStreamExt},
     Client,
 };
@@ -18,9 +18,9 @@ async fn main() -> anyhow::Result<()> {
     let deploys: Api<Deployment> = Api::default_namespaced(client.clone());
     let cms: Api<ConfigMap> = Api::default_namespaced(client.clone());
     let secret: Api<Secret> = Api::default_namespaced(client.clone());
-    let dep_watcher = watcher(deploys, ListParams::default());
-    let cm_watcher = watcher(cms, ListParams::default());
-    let sec_watcher = watcher(secret, ListParams::default());
+    let dep_watcher = watcher(deploys, watcher::Config::default());
+    let cm_watcher = watcher(cms, watcher::Config::default());
+    let sec_watcher = watcher(secret, watcher::Config::default());
 
     // select on applied events from all watchers
     let mut combo_stream = stream::select_all(vec![

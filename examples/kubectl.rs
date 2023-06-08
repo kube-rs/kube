@@ -123,12 +123,12 @@ impl App {
         Ok(())
     }
 
-    async fn watch(&self, api: Api<DynamicObject>, mut lp: ListParams) -> Result<()> {
+    async fn watch(&self, api: Api<DynamicObject>, mut wc: watcher::Config) -> Result<()> {
         if let Some(n) = &self.name {
-            lp = lp.fields(&format!("metadata.name={}", n));
+            wc = wc.fields(&format!("metadata.name={n}"));
         }
         // present a dumb table for it for now. kubectl does not do this anymore.
-        let mut stream = watcher(api, lp).applied_objects().boxed();
+        let mut stream = watcher(api, wc).applied_objects().boxed();
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
             let age = format_creation_since(inst.creation_timestamp());
@@ -163,6 +163,7 @@ impl App {
             std::fs::read_to_string(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
         for doc in multidoc_deserialize(&yaml)? {
             let obj: DynamicObject = serde_yaml::from_value(doc)?;
+            let namespace = obj.metadata.namespace.as_deref().or(self.namespace.as_deref());
             let gvk = if let Some(tm) = &obj.types {
                 GroupVersionKind::try_from(tm)?
             } else {
@@ -170,7 +171,7 @@ impl App {
             };
             let name = obj.name_any();
             if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
-                let api = dynamic_api(ar, caps, client.clone(), &self.namespace, false);
+                let api = dynamic_api(ar, caps, client.clone(), namespace, false);
                 trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
                 let data: serde_json::Value = serde_json::to_value(&obj)?;
                 let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
@@ -196,19 +197,25 @@ async fn main() -> Result<()> {
     if let Some(resource) = &app.resource {
         // Common discovery, parameters, and api configuration for a single resource
         let (ar, caps) = resolve_api_resource(&discovery, resource)
-            .with_context(|| format!("resource {:?} not found in cluster", resource))?;
+            .with_context(|| format!("resource {resource:?} not found in cluster"))?;
         let mut lp = ListParams::default();
         if let Some(label) = &app.selector {
             lp = lp.labels(label);
         }
-        let api = dynamic_api(ar, caps, client, &app.namespace, app.all);
+
+        let mut wc = watcher::Config::default();
+        if let Some(label) = &app.selector {
+            wc = wc.labels(label);
+        }
+
+        let api = dynamic_api(ar, caps, client, app.namespace.as_deref(), app.all);
 
         tracing::info!(?app.verb, ?resource, name = ?app.name.clone().unwrap_or_default(), "requested objects");
         match app.verb {
             Verb::Edit => app.edit(api).await?,
             Verb::Get => app.get(api, lp).await?,
             Verb::Delete => app.delete(api, lp).await?,
-            Verb::Watch => app.watch(api, lp).await?,
+            Verb::Watch => app.watch(api, wc).await?,
             Verb::Apply => bail!("verb {:?} cannot act on an explicit resource", app.verb),
         }
     } else if app.verb == Verb::Apply {
@@ -221,7 +228,7 @@ fn dynamic_api(
     ar: ApiResource,
     caps: ApiCapabilities,
     client: Client,
-    ns: &Option<String>,
+    ns: Option<&str>,
     all: bool,
 ) -> Api<DynamicObject> {
     if caps.scope == Scope::Cluster || all {
@@ -238,9 +245,9 @@ fn format_creation_since(time: Option<Time>) -> String {
 }
 fn format_duration(dur: Duration) -> String {
     match (dur.num_days(), dur.num_hours(), dur.num_minutes()) {
-        (days, _, _) if days > 0 => format!("{}d", days),
-        (_, hours, _) if hours > 0 => format!("{}h", hours),
-        (_, _, mins) => format!("{}m", mins),
+        (days, _, _) if days > 0 => format!("{days}d"),
+        (_, hours, _) if hours > 0 => format!("{hours}h"),
+        (_, _, mins) => format!("{mins}m"),
     }
 }
 

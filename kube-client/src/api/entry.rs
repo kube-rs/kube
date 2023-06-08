@@ -326,7 +326,7 @@ mod tests {
     };
 
     #[tokio::test]
-    #[ignore] // needs cluster (gets and writes cms)
+    #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_create_missing_object() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);
@@ -407,7 +407,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (gets and writes cms)
+    #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_update_existing_object() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);
@@ -429,11 +429,11 @@ mod tests {
 
         let mut entry = match api.entry(object_name).await? {
             Entry::Occupied(entry) => entry,
-            entry => panic!("entry for existing object must be occupied: {:?}", entry),
+            entry => panic!("entry for existing object must be occupied: {entry:?}"),
         };
         let mut entry2 = match api.entry(object_name).await? {
             Entry::Occupied(entry) => entry,
-            entry => panic!("entry for existing object must be occupied: {:?}", entry),
+            entry => panic!("entry for existing object must be occupied: {entry:?}"),
         };
 
         // Entry is up-to-date, modify cleanly
@@ -478,7 +478,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // needs cluster (gets and writes cms)
+    #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_create_dry_run() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
         let api = Api::<ConfigMap>::default_namespaced(client);

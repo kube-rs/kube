@@ -4,7 +4,7 @@ use tracing::*;
 
 use kube::{
     api::{
-        Api, AttachParams, AttachedProcess, DeleteParams, ListParams, PostParams, ResourceExt, WatchEvent,
+        Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, WatchEvent, WatchParams,
     },
     Client,
 };
@@ -34,8 +34,8 @@ async fn main() -> anyhow::Result<()> {
     pods.create(&PostParams::default(), &p).await?;
 
     // Wait until the pod is running, otherwise we get 500 error.
-    let lp = ListParams::default().fields("metadata.name=example").timeout(10);
-    let mut stream = pods.watch(&lp, "0").await?.boxed();
+    let wp = WatchParams::default().fields("metadata.name=example").timeout(10);
+    let mut stream = pods.watch(&wp, "0").await?.boxed();
     while let Some(status) = stream.try_next().await? {
         match status {
             WatchEvent::Added(o) => {
@@ -62,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
         let output = get_output(attached).await;
-        println!("{}", output);
+        println!("{output}");
         assert_eq!(output.lines().count(), 3);
     }
 
@@ -71,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
             .exec("example", vec!["uptime"], &AttachParams::default().stderr(false))
             .await?;
         let output = get_output(attached).await;
-        println!("{}", output);
+        println!("{output}");
         assert_eq!(output.lines().count(), 1);
     }
 
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
         let next_stdout = stdout_stream.next();
         stdin_writer.write_all(b"echo test string 1\n").await?;
         let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
-        println!("{}", stdout);
+        println!("{stdout}");
         assert_eq!(stdout, "test string 1\n");
 
         // AttachedProcess provides access to a future that resolves with a status object.
@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
         // Send `exit 1` to get a failure status.
         stdin_writer.write_all(b"exit 1\n").await?;
         if let Some(status) = status.await {
-            println!("{:?}", status);
+            println!("{status:?}");
             assert_eq!(status.status, Some("Failure".to_owned()));
             assert_eq!(status.reason, Some("NonZeroExitCode".to_owned()));
         }

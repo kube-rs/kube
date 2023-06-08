@@ -2,8 +2,41 @@
 use crate::request::Error;
 use serde::Serialize;
 
-/// Common query parameters used in watch/list/delete calls on collections
-#[derive(Clone, Debug)]
+/// Controls how the resource version parameter is applied for list calls
+///
+/// Not specifying a `VersionMatch` strategy will give you different semantics
+/// depending on what `resource_version`, `limit`, `continue_token` you include with the list request.
+///
+/// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list> for details.
+#[derive(Clone, Debug, PartialEq)]
+pub enum VersionMatch {
+    /// Returns data at least as new as the provided resource version.
+    ///
+    /// The newest available data is preferred, but any data not older than the provided resource version may be served.
+    /// This guarantees that the collection's resource version is not older than the requested resource version,
+    /// but does not make any guarantee about the resource version of any of the items in that collection.
+    ///
+    /// ### Any Version
+    /// A degenerate, but common sub-case of `NotOlderThan` is when used together with `resource_version` "0".
+    ///
+    /// It is possible for a "0" resource version request to return data at a much older resource version
+    /// than the client has previously observed, particularly in HA configurations, due to partitions or stale caches.
+    /// Clients that cannot tolerate this should not use this semantic.
+    NotOlderThan,
+
+    /// Return data at the exact resource version provided.
+    ///
+    /// If the provided resource version  is unavailable, the server responds with HTTP 410 "Gone".
+    /// For list requests to servers that honor the resource version Match parameter, this guarantees that the collection's
+    /// resource version  is the same as the resource version  you requested in the query string.
+    /// That guarantee does not apply to the resource version  of any items within that collection.
+    ///
+    /// Note that `Exact` cannot be used with resource version "0". For the most up-to-date list; use `Unset`.
+    Exact,
+}
+
+/// Common query parameters used in list/delete calls on collections
+#[derive(Clone, Debug, Default)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///
@@ -16,6 +49,246 @@ pub struct ListParams {
     pub field_selector: Option<String>,
 
     /// Timeout for the list/watch call.
+    ///
+    /// This limits the duration of the call, regardless of any activity or inactivity.
+    pub timeout: Option<u32>,
+
+    /// Limit the number of results.
+    ///
+    /// If there are more results, the server will respond with a continue token which can be used to fetch another page
+    /// of results. See the [Kubernetes API docs](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks)
+    /// for pagination details.
+    pub limit: Option<u32>,
+
+    /// Fetch a second page of results.
+    ///
+    /// After listing results with a limit, a continue token can be used to fetch another page of results.
+    pub continue_token: Option<String>,
+
+    /// Determines how resourceVersion is matched applied to list calls.
+    pub version_match: Option<VersionMatch>,
+
+    /// An explicit resourceVersion using the given `VersionMatch` strategy
+    ///
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for details.
+    pub resource_version: Option<String>,
+}
+
+impl ListParams {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        if let Some(rv) = &self.resource_version {
+            if self.version_match == Some(VersionMatch::Exact) && rv == "0" {
+                return Err(Error::Validation(
+                    "A non-zero resource_version is required when using an Exact match".into(),
+                ));
+            }
+        } else if self.version_match.is_some() {
+            return Err(Error::Validation(
+                "A resource_version is required when using an explicit match".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    // Partially populate query parameters (needs resourceVersion out of band)
+    pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
+        if let Some(fields) = &self.field_selector {
+            qp.append_pair("fieldSelector", fields);
+        }
+        if let Some(labels) = &self.label_selector {
+            qp.append_pair("labelSelector", labels);
+        }
+        if let Some(limit) = &self.limit {
+            qp.append_pair("limit", &limit.to_string());
+        }
+        if let Some(continue_token) = &self.continue_token {
+            qp.append_pair("continue", continue_token);
+        }
+
+        if let Some(rv) = &self.resource_version {
+            qp.append_pair("resourceVersion", rv.as_str());
+        }
+        match &self.version_match {
+            None => {}
+            Some(VersionMatch::NotOlderThan) => {
+                qp.append_pair("resourceVersionMatch", "NotOlderThan");
+            }
+            Some(VersionMatch::Exact) => {
+                qp.append_pair("resourceVersionMatch", "Exact");
+            }
+        }
+    }
+}
+
+/// Builder interface to ListParams
+///
+/// Usage:
+/// ```
+/// use kube::api::ListParams;
+/// let lp = ListParams::default()
+///     .match_any()
+///     .timeout(60)
+///     .labels("kubernetes.io/lifecycle=spot");
+/// ```
+impl ListParams {
+    /// Configure the timeout for list/watch calls
+    ///
+    /// This limits the duration of the call, regardless of any activity or inactivity.
+    /// Defaults to 290s
+    #[must_use]
+    pub fn timeout(mut self, timeout_secs: u32) -> Self {
+        self.timeout = Some(timeout_secs);
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their fields.
+    ///
+    /// Defaults to everything.
+    /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
+    /// The server only supports a limited number of field queries per type.
+    #[must_use]
+    pub fn fields(mut self, field_selector: &str) -> Self {
+        self.field_selector = Some(field_selector.to_string());
+        self
+    }
+
+    /// Configure the selector to restrict the list of returned objects by their labels.
+    ///
+    /// Defaults to everything.
+    /// Supports `=`, `==`, `!=`, and can be comma separated: `key1=value1,key2=value2`.
+    #[must_use]
+    pub fn labels(mut self, label_selector: &str) -> Self {
+        self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// Sets a result limit.
+    #[must_use]
+    pub fn limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    /// Sets a continue token.
+    #[must_use]
+    pub fn continue_token(mut self, token: &str) -> Self {
+        self.continue_token = Some(token.to_string());
+        self
+    }
+
+    /// Sets the resource version
+    #[must_use]
+    pub fn at(mut self, resource_version: &str) -> Self {
+        self.resource_version = Some(resource_version.into());
+        self
+    }
+
+    /// Sets an arbitary resource version match strategy
+    ///
+    /// A non-default strategy such as `VersionMatch::Exact` or `VersionMatch::NotGreaterThan`
+    /// requires an explicit `resource_version` set to pass request validation.
+    #[must_use]
+    pub fn matching(mut self, version_match: VersionMatch) -> Self {
+        self.version_match = Some(version_match);
+        self
+    }
+
+    /// Use the semantic "any" resource version strategy
+    ///
+    /// This is a less taxing variant of the default list, returning data at any resource version.
+    /// It will prefer the newest avialable resource version, but strong consistency is not required;
+    /// data at any resource version may be served.
+    /// It is possible for the request to return data at a much older resource version than the client
+    /// has previously observed, particularly in high availability configurations, due to partitions or stale caches.
+    /// Clients that cannot tolerate this should not use this semantic.
+    #[must_use]
+    pub fn match_any(self) -> Self {
+        self.matching(VersionMatch::NotOlderThan).at("0")
+    }
+}
+
+/// Common query parameters used in get calls
+#[derive(Clone, Debug, Default)]
+pub struct GetParams {
+    /// An explicit resourceVersion with implicit version matching strategies
+    ///
+    /// Default (unset) gives the most recent version. "0" gives a less
+    /// consistent, but more performant "Any" version. Specifing a version is
+    /// like providing a `VersionMatch::NotOlderThan`.
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for details.
+    pub resource_version: Option<String>,
+}
+
+/// Helper interface to GetParams
+///
+/// Usage:
+/// ```
+/// use kube::api::GetParams;
+/// let gp = GetParams::at("6664");
+/// ```
+impl GetParams {
+    /// Sets the resource version, implicitly applying a 'NotOlderThan' match
+    #[must_use]
+    pub fn at(resource_version: &str) -> Self {
+        Self {
+            resource_version: Some(resource_version.into()),
+        }
+    }
+
+    /// Sets the resource version to "0"
+    #[must_use]
+    pub fn any() -> Self {
+        Self::at("0")
+    }
+}
+
+/// The validation directive to use for `fieldValidation` when using server-side apply.
+#[derive(Clone, Debug)]
+pub enum ValidationDirective {
+    /// Strict mode will fail any invalid manifests.
+    ///
+    /// This will fail the request with a BadRequest error if any unknown fields would be dropped from the
+    /// object, or if any duplicate fields are present. The error returned from the server will contain
+    /// all unknown and duplicate fields encountered.
+    Strict,
+    /// Warn mode will return a warning for invalid manifests.
+    ///
+    /// This will send a warning via the standard warning response header for each unknown field that
+    /// is dropped from the object, and for each duplicate field that is encountered. The request will
+    /// still succeed if there are no other errors, and will only persist the last of any duplicate fields.
+    Warn,
+    /// Ignore mode will silently ignore any problems.
+    ///
+    /// This will ignore any unknown fields that are silently dropped from the object, and will ignore
+    /// all but the last duplicate field that the decoder encounters.
+    Ignore,
+}
+
+impl ValidationDirective {
+    /// Returns the string format of the directive
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Strict => "Strict",
+            Self::Warn => "Warn",
+            Self::Ignore => "Ignore",
+        }
+    }
+}
+
+/// Common query parameters used in watch calls on collections
+#[derive(Clone, Debug)]
+pub struct WatchParams {
+    /// A selector to restrict returned objects by their labels.
+    ///
+    /// Defaults to everything if `None`.
+    pub label_selector: Option<String>,
+
+    /// A selector to restrict returned objects by their fields.
+    ///
+    /// Defaults to everything if `None`.
+    pub field_selector: Option<String>,
+
+    /// Timeout for the watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// If unset for a watch call, we will use 290s.
@@ -32,22 +305,40 @@ pub struct ListParams {
     /// If the feature gate WatchBookmarks is not enabled in apiserver,
     /// this field is ignored.
     pub bookmarks: bool,
-
-    /// Limit the number of results.
-    ///
-    /// If there are more results, the server will respond with a continue token which can be used to fetch another page
-    /// of results. See the [Kubernetes API docs](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks)
-    /// for pagination details.
-    pub limit: Option<u32>,
-
-    /// Fetch a second page of results.
-    ///
-    /// After listing results with a limit, a continue token can be used to fetch another page of results.
-    pub continue_token: Option<String>,
 }
 
-impl Default for ListParams {
-    /// Default `ListParams` without any constricting selectors
+impl WatchParams {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        if let Some(to) = &self.timeout {
+            // https://github.com/kubernetes/kubernetes/issues/6513
+            if *to >= 295 {
+                return Err(Error::Validation("WatchParams::timeout must be < 295s".into()));
+            }
+        }
+        Ok(())
+    }
+
+    // Partially populate query parameters (needs resourceVersion out of band)
+    pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
+        qp.append_pair("watch", "true");
+
+        // https://github.com/kubernetes/kubernetes/issues/6513
+        qp.append_pair("timeoutSeconds", &self.timeout.unwrap_or(290).to_string());
+
+        if let Some(fields) = &self.field_selector {
+            qp.append_pair("fieldSelector", fields);
+        }
+        if let Some(labels) = &self.label_selector {
+            qp.append_pair("labelSelector", labels);
+        }
+        if self.bookmarks {
+            qp.append_pair("allowWatchBookmarks", "true");
+        }
+    }
+}
+
+impl Default for WatchParams {
+    /// Default `WatchParams` without any constricting selectors
     fn default() -> Self {
         Self {
             // bookmarks stable since 1.17, and backwards compatible
@@ -56,35 +347,21 @@ impl Default for ListParams {
             label_selector: None,
             field_selector: None,
             timeout: None,
-            limit: None,
-            continue_token: None,
         }
     }
 }
 
-impl ListParams {
-    pub(crate) fn validate(&self) -> Result<(), Error> {
-        if let Some(to) = &self.timeout {
-            // https://github.com/kubernetes/kubernetes/issues/6513
-            if *to >= 295 {
-                return Err(Error::Validation("ListParams::timeout must be < 295s".into()));
-            }
-        }
-        Ok(())
-    }
-}
-
-/// Builder interface to ListParams
+/// Builder interface to WatchParams
 ///
 /// Usage:
 /// ```
-/// use kube::api::ListParams;
-/// let lp = ListParams::default()
+/// use kube::api::WatchParams;
+/// let lp = WatchParams::default()
 ///     .timeout(60)
 ///     .labels("kubernetes.io/lifecycle=spot");
 /// ```
-impl ListParams {
-    /// Configure the timeout for list/watch calls
+impl WatchParams {
+    /// Configure the timeout for watch calls
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// Defaults to 290s
@@ -123,53 +400,6 @@ impl ListParams {
     pub fn disable_bookmarks(mut self) -> Self {
         self.bookmarks = false;
         self
-    }
-
-    /// Sets a result limit.
-    #[must_use]
-    pub fn limit(mut self, limit: u32) -> Self {
-        self.limit = Some(limit);
-        self
-    }
-
-    /// Sets a continue token.
-    #[must_use]
-    pub fn continue_token(mut self, token: &str) -> Self {
-        self.continue_token = Some(token.to_string());
-        self
-    }
-}
-
-/// The validation directive to use for `fieldValidation` when using server-side apply.
-#[derive(Clone, Debug)]
-pub enum ValidationDirective {
-    /// Strict mode will fail any invalid manifests.
-    ///
-    /// This will fail the request with a BadRequest error if any unknown fields would be dropped from the
-    /// object, or if any duplicate fields are present. The error returned from the server will contain
-    /// all unknown and duplicate fields encountered.
-    Strict,
-    /// Warn mode will return a warning for invalid manifests.
-    ///
-    /// This will send a warning via the standard warning response header for each unknown field that
-    /// is dropped from the object, and for each duplicate field that is encountered. The request will
-    /// still succeed if there are no other errors, and will only persist the last of any duplicate fields.
-    Warn,
-    /// Ignore mode will silently ignore any problems.
-    ///
-    /// This will ignore any unknown fields that are silently dropped from the object, and will ignore
-    /// all but the last duplicate field that the decoder encounters.
-    Ignore,
-}
-
-impl ValidationDirective {
-    /// Returns the string format of the directive
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Strict => "Strict",
-            Self::Warn => "Warn",
-            Self::Ignore => "Ignore",
-        }
     }
 }
 
@@ -534,15 +764,15 @@ mod test {
     #[test]
     fn delete_param_constructors() {
         let dp_background = DeleteParams::background();
-        let ser = serde_json::to_value(&dp_background).unwrap();
+        let ser = serde_json::to_value(dp_background).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Background"}));
 
         let dp_foreground = DeleteParams::foreground();
-        let ser = serde_json::to_value(&dp_foreground).unwrap();
+        let ser = serde_json::to_value(dp_foreground).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Foreground"}));
 
         let dp_orphan = DeleteParams::orphan();
-        let ser = serde_json::to_value(&dp_orphan).unwrap();
+        let ser = serde_json::to_value(dp_orphan).unwrap();
         assert_eq!(ser, serde_json::json!({"propagationPolicy": "Orphan"}));
     }
 

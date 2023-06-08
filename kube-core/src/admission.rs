@@ -76,11 +76,11 @@ impl<T: Resource> TryInto<AdmissionRequest<T>> for AdmissionReview<T> {
 ///
 /// In an admission controller scenario, this is extracted from an [`AdmissionReview`] via [`TryInto`]
 ///
-/// ```ignore
-/// use kube::api::{admission::{AdmissionRequest, AdmissionReview}, DynamicObject};
+/// ```no_run
+/// use kube::core::{admission::{AdmissionRequest, AdmissionReview}, DynamicObject};
 ///
 /// // The incoming AdmissionReview received by the controller.
-/// let body: AdmissionReview<DynamicObject>;
+/// let body: AdmissionReview<DynamicObject> = todo!();
 /// let req: AdmissionRequest<_> = body.try_into().unwrap();
 /// ```
 ///
@@ -204,14 +204,14 @@ pub enum Operation {
 
 /// An outgoing [`AdmissionReview`] response. Constructed from the corresponding
 /// [`AdmissionRequest`].
-/// ```ignore
-/// use kube::api::{
-///         admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
-///         DynamicObject,
+/// ```no_run
+/// use kube::core::{
+///     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
+///     DynamicObject,
 /// };
 ///
 /// // The incoming AdmissionReview received by the controller.
-/// let body: AdmissionReview<DynamicObject>;
+/// let body: AdmissionReview<DynamicObject> = todo!();
 /// let req: AdmissionRequest<_> = body.try_into().unwrap();
 ///
 /// // A normal response with no side effects.

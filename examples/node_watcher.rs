@@ -15,8 +15,8 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 
-    let lp = ListParams::default().labels("beta.kubernetes.io/arch=amd64");
-    let obs = watcher(nodes, lp)
+    let wc = watcher::Config::default().labels("beta.kubernetes.io/arch=amd64");
+    let obs = watcher(nodes, wc)
         .backoff(ExponentialBackoff::default())
         .applied_objects();
 
@@ -48,7 +48,7 @@ async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result
         warn!("Unschedulable Node: {}, ({:?})", name, failed);
         // Find events related to this node
         let opts =
-            ListParams::default().fields(&format!("involvedObject.kind=Node,involvedObject.name={}", name));
+            ListParams::default().fields(&format!("involvedObject.kind=Node,involvedObject.name={name}"));
         let evlist = events.list(&opts).await?;
         for e in evlist {
             warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);

@@ -4,8 +4,7 @@ pub mod rustls_tls {
     use rustls::{
         self,
         client::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
-        internal::msgs::handshake::DigitallySignedStruct,
-        Certificate, ClientConfig, PrivateKey,
+        Certificate, ClientConfig, DigitallySignedStruct, PrivateKey,
     };
     use thiserror::Error;
 

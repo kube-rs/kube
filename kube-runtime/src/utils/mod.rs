@@ -2,12 +2,18 @@
 
 mod backoff_reset_timer;
 mod event_flatten;
+#[cfg(feature = "unstable-runtime-predicates")] mod predicate;
 mod stream_backoff;
+#[cfg(feature = "unstable-runtime-subscribe")] pub mod stream_subscribe;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use event_flatten::EventFlatten;
+#[cfg(feature = "unstable-runtime-predicates")]
+pub use predicate::{predicates, PredicateFilter};
 pub use stream_backoff::StreamBackoff;
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub use stream_subscribe::StreamSubscribe;
 pub use watch_ext::WatchStreamExt;
 
 use futures::{
@@ -24,7 +30,6 @@ use std::{
 };
 use stream::IntoStream;
 use tokio::{runtime::Handle, task::JoinHandle};
-
 
 /// Allows splitting a `Stream` into several streams that each emit a disjoint subset of the input stream's items,
 /// like a streaming variant of pattern matching.
@@ -78,8 +83,7 @@ where
                             "`try_extract_item_case` returned `None` despite `should_consume_item` returning `true`",
                         ))),
                         res => panic!(
-                    "Peekable::poll_next() returned {:?} when Peekable::peek() returned Ready(Some(_))",
-                    res
+                    "Peekable::poll_next() returned {res:?} when Peekable::peek() returned Ready(Some(_))"
                 ),
                     }
                 } else {

@@ -3,7 +3,7 @@ set -euo pipefail
 
 main() {
   cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. # aka $WORKSPACE_ROOT
-  local -r CURRENT_VER="$(rg "kube =" README.md | head -n 1 | awk -F"\"" '{print $2}')"
+  local -r CURRENT_VER="$(rg 'kube = \{ version = "(\S*)"' -or '$1' README.md | head -n1)"
   git tag -a "${CURRENT_VER}" -m "${CURRENT_VER}"
   git push
   git push --tags

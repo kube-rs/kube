@@ -8,21 +8,17 @@ use crate::{
         ObjectRef,
     },
     scheduler::{scheduler, ScheduleRequest},
-    utils::{
-        trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff,
-        WatchStreamExt,
-    },
-    watcher::{self, watcher},
+    utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
+    watcher::{self, watcher, Config},
 };
 use backoff::backoff::Backoff;
 use derivative::Derivative;
 use futures::{
     channel,
     future::{self, BoxFuture},
-    ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream,
-    TryStreamExt,
+    ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube_client::api::{Api, DynamicObject, ListParams, Resource};
+use kube_client::api::{Api, DynamicObject, Resource};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
@@ -61,7 +57,7 @@ pub struct Action {
 }
 
 impl Action {
-    /// Action to to the reconciliation at this time even if no external watch triggers hit
+    /// Action to the reconciliation at this time even if no external watch triggers hit
     ///
     /// This is the best-practice action that ensures eventual consistency of your controller
     /// even in the case of missed changes (which can happen).
@@ -84,9 +80,7 @@ impl Action {
     /// frequent changes to the underlying object, or some other hook to retain eventual consistency.
     #[must_use]
     pub fn await_change() -> Self {
-        Self {
-            requeue_after: None,
-        }
+        Self { requeue_after: None }
     }
 }
 
@@ -124,6 +118,37 @@ where
     })
 }
 
+/// Enqueues any mapper returned `K` types for reconciliation
+fn trigger_others<S, K, I>(
+    stream: S,
+    mapper: impl Fn(S::Ok) -> I + Sync + Send + 'static,
+    dyntype: <S::Ok as Resource>::DynamicType,
+) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
+where
+    // Input stream has items as some Resource (via Controller::watches)
+    S: TryStream,
+    S::Ok: Resource,
+    <S::Ok as Resource>::DynamicType: Clone,
+    // Output stream is requests for the root type K
+    K: Resource,
+    K::DynamicType: Clone,
+    // but the mapper can produce many of them
+    I: 'static + IntoIterator<Item = ObjectRef<K>>,
+    I::IntoIter: Send,
+{
+    trigger_with(stream, move |obj| {
+        let watch_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
+        mapper(obj)
+            .into_iter()
+            .map(move |mapped_obj_ref| ReconcileRequest {
+                obj_ref: mapped_obj_ref,
+                reason: ReconcileReason::RelatedObjectUpdated {
+                    obj_ref: Box::new(watch_ref.clone()),
+                },
+            })
+    })
+}
+
 /// Enqueues any owners of type `KOwner` for reconciliation
 pub fn trigger_owners<KOwner, S>(
     stream: S,
@@ -137,24 +162,16 @@ where
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
-    trigger_with(stream, move |obj| {
+    let mapper = move |obj: S::Ok| {
         let meta = obj.meta().clone();
         let ns = meta.namespace;
         let owner_type = owner_type.clone();
-        let child_ref = ObjectRef::from_obj_with(&obj, child_type.clone()).erase();
         meta.owner_references
             .into_iter()
             .flatten()
-            .filter_map(move |owner| {
-                ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone())
-            })
-            .map(move |owner_ref| ReconcileRequest {
-                obj_ref: owner_ref,
-                reason: ReconcileReason::RelatedObjectUpdated {
-                    obj_ref: Box::new(child_ref.clone()),
-                },
-            })
-    })
+            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
+    };
+    trigger_others(stream, mapper, child_type)
 }
 
 /// A request to reconcile an object, annotated with why that request was made.
@@ -189,15 +206,11 @@ impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
 pub enum ReconcileReason {
     Unknown,
     ObjectUpdated,
-    RelatedObjectUpdated {
-        obj_ref: Box<ObjectRef<DynamicObject>>,
-    },
+    RelatedObjectUpdated { obj_ref: Box<ObjectRef<DynamicObject>> },
     ReconcilerRequestedRetry,
     ErrorPolicyRequestedRetry,
     BulkReconcile,
-    Custom {
-        reason: String,
-    },
+    Custom { reason: String },
 }
 
 impl Display for ReconcileReason {
@@ -210,9 +223,7 @@ impl Display for ReconcileReason {
             }
             ReconcileReason::BulkReconcile => f.write_str("bulk reconcile requested"),
             ReconcileReason::ReconcilerRequestedRetry => f.write_str("reconciler requested retry"),
-            ReconcileReason::ErrorPolicyRequestedRetry => {
-                f.write_str("error policy requested retry")
-            }
+            ReconcileReason::ErrorPolicyRequestedRetry => f.write_str("error policy requested retry"),
             ReconcileReason::Custom { reason } => f.write_str(reason),
         }
     }
@@ -305,9 +316,7 @@ where
                             .instrument(reconciler_span)
                             .left_future()
                     }
-                    None => {
-                        future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future()
-                    }
+                    None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
                 }
             })
             .on_complete(async { tracing::debug!("applier runner terminated") })
@@ -349,12 +358,7 @@ where
         let reconciler_finished_at = Instant::now();
 
         let (action, reschedule_reason) = result.as_ref().map_or_else(
-            |err| {
-                (
-                    error_policy(err),
-                    ReconcileReason::ErrorPolicyRequestedRetry,
-                )
-            },
+            |err| (error_policy(err), ReconcileReason::ErrorPolicyRequestedRetry),
             |action| (action.clone(), ReconcileReason::ReconcilerRequestedRetry),
         );
 
@@ -401,29 +405,32 @@ where
     }
 }
 
-/// Controller
+/// Controller for a Resource `K`
 ///
-/// A controller is made up of:
-/// - 1 `reflector` (for the core object)
-/// - N `watcher` objects for each object child object
-/// - user defined `reconcile` + `error_policy` callbacks
-/// - a generated input stream considering all sources
+/// A controller is an infinite stream of objects to be reconciled.
 ///
-/// And all reconcile requests  through an internal scheduler
+/// Once `run` and continuously awaited, it continuously calls out to user provided
+/// `reconcile` and `error_policy` callbacks whenever relevant changes are detected
+/// or if errors are seen from `reconcile`.
 ///
-/// Pieces:
+/// Reconciles are generally requested for all changes on your root objects.
+/// Changes to managed child resources will also trigger the reconciler for the
+/// managing object by travirsing owner references (for `Controller::owns`),
+/// or traverse a custom mapping (for `Controller::watches`).
+///
+/// This mapping mechanism ultimately hides the reason for the reconciliation request,
+/// and forces you to write an idempotent reconciler.
+///
+/// General setup:
 /// ```no_run
-/// use kube::{
-///   Client, CustomResource,
-///   api::{Api, ListParams},
-///   runtime::controller::{Controller, Action}
-/// };
-/// use serde::{Deserialize, Serialize};
-/// use tokio::time::Duration;
+/// use kube::{Api, Client, CustomResource};
+/// use kube::runtime::{controller::{Controller, Action}, watcher, reflector};
+/// # use serde::{Deserialize, Serialize};
+/// # use tokio::time::Duration;
 /// use futures::StreamExt;
 /// use k8s_openapi::api::core::v1::ConfigMap;
 /// use schemars::JsonSchema;
-/// use std::sync::Arc;
+/// # use std::sync::Arc;
 /// use thiserror::Error;
 ///
 /// #[derive(Debug, Error)]
@@ -455,8 +462,8 @@ where
 ///     let context = Arc::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
-///     Controller::new(cmgs, ListParams::default())
-///         .owns(cms, ListParams::default())
+///     Controller::new(cmgs, watcher::Config::default())
+///         .owns(cms, watcher::Config::default())
 ///         .run(reconcile, error_policy, context)
 ///         .for_each(|res| async move {
 ///             match res {
@@ -474,8 +481,7 @@ where
     K::DynamicType: Eq + Hash,
 {
     // NB: Need to Unpin for stream::select_all
-    trigger_selector:
-        stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
+    trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
     trigger_backoff: Box<dyn Backoff + Send>,
     /// [`run`](crate::Controller::run) starts a graceful shutdown when any of these [`Future`]s complete,
     /// refusing to start any new reconciliations but letting any existing ones finish.
@@ -494,43 +500,43 @@ where
     K: Clone + Resource + DeserializeOwned + Debug + Send + Sync + 'static,
     K::DynamicType: Eq + Hash + Clone,
 {
-    /// Create a Controller on a type `K`
+    /// Create a Controller for a resource `K`
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
-    /// The [`ListParams`] controls to the possible subset of objects of `K` that you want to manage
+    /// The [`Config`] controls to the possible subset of objects of `K` that you want to manage
     /// and receive reconcile events for.
-    /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
+    /// For the full set of objects `K` in the given `Api` scope, you can use [`Config::default`].
     #[must_use]
-    pub fn new(owned_api: Api<K>, lp: ListParams) -> Self
+    pub fn new(main_api: Api<K>, wc: Config) -> Self
     where
         K::DynamicType: Default,
     {
-        Self::new_with(owned_api, lp, Default::default())
+        Self::new_with(main_api, wc, Default::default())
     }
 
-    /// Create a Controller on a type `K`
+    /// Create a Controller for a resource `K`
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `K`.
     ///
-    /// The [`ListParams`] lets you define a possible subset of objects of `K` that you want the [`Api`]
+    /// The [`Config`] lets you define a possible subset of objects of `K` that you want the [`Api`]
     /// to watch - in the Api's  configured scope - and receive reconcile events for.
-    /// For the full set of objects `K` in the given `Api` scope, you can use [`ListParams::default`].
+    /// For the full set of objects `K` in the given `Api` scope, you can use [`Config::default`].
     ///
     /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::new`] for static types.
     ///
-    /// [`ListParams`]: kube_client::api::ListParams
+    /// [`Config`]: crate::watcher::Config
     /// [`Api`]: kube_client::Api
     /// [`dynamic`]: kube_client::core::dynamic
-    /// [`ListParams::default`]: kube_client::api::ListParams::default
-    pub fn new_with(owned_api: Api<K>, lp: ListParams, dyntype: K::DynamicType) -> Self {
+    /// [`Config::default`]: crate::watcher::Config::default
+    pub fn new_with(main_api: Api<K>, wc: Config, dyntype: K::DynamicType) -> Self {
         let writer = Writer::<K>::new(dyntype.clone());
         let reader = writer.as_reader();
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(
             reflector(
                 writer,
-                watcher(owned_api, lp).map_ok(|mut ev| {
+                watcher(main_api, wc).map_ok(|mut ev| {
                     let strip_mf = |o: &mut K| {
                         o.meta_mut().managed_fields = None;
                     };
@@ -546,6 +552,89 @@ where
             dyntype.clone(),
         )
         .boxed();
+        trigger_selector.push(self_watcher);
+        Self {
+            trigger_selector,
+            trigger_backoff: Box::new(watcher::default_backoff()),
+            graceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            forceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            dyntype,
+            reader,
+        }
+    }
+
+    /// Create a Controller for a resource `K` from a stream of `K` objects
+    ///
+    /// Same as [`Controller::new`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # use kube::runtime::controller::{Action, Controller};
+    /// # use kube::runtime::{predicates, watcher, reflector, WatchStreamExt};
+    /// # use kube::{Api, Client, Error, ResourceExt};
+    /// # use std::sync::Arc;
+    /// # async fn reconcile(_: Arc<Deployment>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<Deployment>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
+    /// # async fn doc(client: kube::Client) {
+    /// let api: Api<Deployment> = Api::default_namespaced(client);
+    /// let (reader, writer) = reflector::store();
+    /// let deploys = reflector(writer, watcher(api, watcher::Config::default()))
+    ///     .applied_objects()
+    ///     .predicate_filter(predicates::generation);
+    ///
+    /// Controller::for_stream(deploys, reader)
+    ///     .run(reconcile, error_policy, Arc::new(()))
+    ///     .for_each(|_| std::future::ready(()))
+    ///     .await;
+    /// # }
+    /// ```
+    ///
+    /// Prefer [`Controller::new`] if you do not need to share the stream, or do not need pre-filtering.
+    #[cfg(feature = "unstable-runtime-stream-control")]
+    pub fn for_stream(
+        trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
+        reader: Store<K>,
+    ) -> Self
+    where
+        K::DynamicType: Default,
+    {
+        Self::for_stream_with(trigger, reader, Default::default())
+    }
+
+    /// Create a Controller for a resource `K` from a stream of `K` objects
+    ///
+    /// Same as [`Controller::new`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Prefer [`Controller::new`] if you do not need to share the stream, or do not need pre-filtering.
+    ///
+    /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::for_stream`] for static types.
+    ///
+    /// [`dynamic`]: kube_client::core::dynamic
+    #[cfg(feature = "unstable-runtime-stream-control")]
+    pub fn for_stream_with(
+        trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
+        reader: Store<K>,
+        dyntype: K::DynamicType,
+    ) -> Self {
+        let mut trigger_selector = stream::SelectAll::new();
+        let self_watcher = trigger_self(trigger, dyntype.clone()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
@@ -585,20 +674,18 @@ where
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `Child`.
     /// All owned `Child` objects **must** contain an [`OwnerReference`] pointing back to a `K`.
     ///
-    /// The [`ListParams`] refer to the possible subset of `Child` objects that you want the [`Api`]
-    ///  to watch - in the Api's configured scope - and receive reconcile events for.
-    /// To watch the full set of `Child` objects in the given `Api` scope, you can use [`ListParams::default`].
+    /// The [`watcher::Config`] controls the subset of `Child` objects that you want the [`Api`]
+    /// to watch - in the Api's configured scope - and receive reconcile events for.
+    /// To watch the full set of `Child` objects in the given `Api` scope, you can use [`watcher::Config::default`].
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
     #[must_use]
-    pub fn owns<
-        Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
-    >(
+    pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
         self,
         api: Api<Child>,
-        lp: ListParams,
+        wc: Config,
     ) -> Self {
-        self.owns_with(api, (), lp)
+        self.owns_with(api, (), wc)
     }
 
     /// Specify `Child` objects which `K` owns and should be watched
@@ -609,16 +696,81 @@ where
         mut self,
         api: Api<Child>,
         dyntype: Child::DynamicType,
-        lp: ListParams,
+        wc: Config,
     ) -> Self
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners(
-            watcher(api, lp).touched_objects(),
-            self.dyntype.clone(),
-            dyntype,
-        );
+        // TODO: call owns_stream_with when it's stable
+        let child_watcher = trigger_owners(watcher(api, wc).touched_objects(), self.dyntype.clone(), dyntype);
+        self.trigger_selector.push(child_watcher.boxed());
+        self
+    }
+
+    /// Trigger the reconciliation process for a stream of `Child` objects of the owner `K`
+    ///
+    /// Same as [`Controller::owns`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Watcher streams passed in here should be filtered first through `touched_objects`.
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use k8s_openapi::api::core::v1::ConfigMap;
+    /// # use k8s_openapi::api::apps::v1::StatefulSet;
+    /// # use kube::runtime::controller::Action;
+    /// # use kube::runtime::{predicates, watcher, Controller, WatchStreamExt};
+    /// # use kube::{Api, Client, Error, ResourceExt};
+    /// # use std::sync::Arc;
+    /// # type CustomResource = ConfigMap;
+    /// # async fn reconcile(_: Arc<CustomResource>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<CustomResource>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
+    /// # async fn doc(client: kube::Client) {
+    /// let sts_stream = watcher(Api::<StatefulSet>::all(client.clone()), watcher::Config::default())
+    ///     .touched_objects()
+    ///     .predicate_filter(predicates::generation);
+    ///
+    /// Controller::new(Api::<CustomResource>::all(client), watcher::Config::default())
+    ///     .owns_stream(sts_stream)
+    ///     .run(reconcile, error_policy, Arc::new(()))
+    ///     .for_each(|_| std::future::ready(()))
+    ///     .await;
+    /// # }
+    /// ```
+    #[cfg(feature = "unstable-runtime-stream-control")]
+    #[must_use]
+    pub fn owns_stream<Child: Resource<DynamicType = ()> + Send + 'static>(
+        self,
+        trigger: impl Stream<Item = Result<Child, watcher::Error>> + Send + 'static,
+    ) -> Self {
+        self.owns_stream_with(trigger, ())
+    }
+
+    /// Trigger the reconciliation process for a stream of `Child` objects of the owner `K`
+    ///
+    /// Same as [`Controller::owns`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Same as [`Controller::owns_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
+    #[cfg(feature = "unstable-runtime-stream-control")]
+    #[must_use]
+    pub fn owns_stream_with<Child: Resource + Send + 'static>(
+        mut self,
+        trigger: impl Stream<Item = Result<Child, watcher::Error>> + Send + 'static,
+        dyntype: Child::DynamicType,
+    ) -> Self
+    where
+        Child::DynamicType: Debug + Eq + Hash + Clone,
+    {
+        let child_watcher = trigger_owners(trigger, self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -632,18 +784,17 @@ where
     ///
     /// Takes an [`Api`] object that determines how the `Controller` listens for changes to the `Watched`.
     ///
-    /// The [`ListParams`] refer to the possible subset of `Watched` objects that you want the [`Api`]
+    /// The [`watcher::Config`] controls the subset of `Watched` objects that you want the [`Api`]
     /// to watch - in the Api's configured scope - and run through the custom mapper.
-    /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`ListParams::default`].
+    /// To watch the full set of `Watched` objects in given the `Api` scope, you can use [`watcher::Config::default`].
     ///
     /// # Example
     ///
     /// Tracking cross cluster references using the [Operator-SDK] annotations.
     ///
     /// ```
-    /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef};
-    /// # use kube::api::{Api, ListParams};
-    /// # use kube::ResourceExt;
+    /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef, watcher};
+    /// # use kube::{Api, ResourceExt};
     /// # use k8s_openapi::api::core::v1::{ConfigMap, Namespace};
     /// # use futures::StreamExt;
     /// # use std::sync::Arc;
@@ -658,10 +809,10 @@ where
     /// # async fn doc(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
     /// # let memcached = Api::<ConfigMap>::all(client.clone());
     /// # let context = Arc::new(Context);
-    /// Controller::new(memcached, ListParams::default())
+    /// Controller::new(memcached, watcher::Config::default())
     ///     .watches(
     ///         Api::<WatchedResource>::all(client.clone()),
-    ///         ListParams::default(),
+    ///         watcher::Config::default(),
     ///         |ar| {
     ///             let prt = ar
     ///                 .annotations()
@@ -689,50 +840,121 @@ where
     ///
     /// [Operator-SDK]: https://sdk.operatorframework.io/docs/building-operators/ansible/reference/retroactively-owned-resources/
     #[must_use]
-    pub fn watches<
-        Other: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static,
-        I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    >(
+    pub fn watches<Other, I>(
         self,
         api: Api<Other>,
-        lp: ListParams,
+        wc: Config,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Default + Debug + Clone + Eq + Hash,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
-        self.watches_with(api, (), lp, mapper)
+        self.watches_with(api, Default::default(), wc, mapper)
     }
 
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
     ///
     /// Same as [`Controller::watches`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[must_use]
-    pub fn watches_with<
-        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
-        I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    >(
+    pub fn watches_with<Other, I>(
         mut self,
         api: Api<Other>,
         dyntype: Other::DynamicType,
-        lp: ListParams,
+        wc: Config,
         mapper: impl Fn(Other) -> I + Sync + Send + 'static,
     ) -> Self
     where
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
-        Other::DynamicType: Clone,
+        Other::DynamicType: Debug + Clone + Eq + Hash,
     {
-        let other_watcher = trigger_with(watcher(api, lp).touched_objects(), move |obj| {
-            let watched_obj_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
-            mapper(obj)
-                .into_iter()
-                .map(move |mapped_obj_ref| ReconcileRequest {
-                    obj_ref: mapped_obj_ref,
-                    reason: ReconcileReason::RelatedObjectUpdated {
-                        obj_ref: Box::new(watched_obj_ref.clone()),
-                    },
-                })
-        });
+        let other_watcher = trigger_others(watcher(api, wc).touched_objects(), mapper, dyntype);
+        self.trigger_selector.push(other_watcher.boxed());
+        self
+    }
+
+    /// Trigger the reconciliation process for a stream of `Other` objects related to a `K`
+    ///
+    /// Same as [`Controller::watches`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Watcher streams passed in here should be filtered first through `touched_objects`.
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use k8s_openapi::api::core::v1::ConfigMap;
+    /// # use k8s_openapi::api::apps::v1::DaemonSet;
+    /// # use kube::runtime::controller::Action;
+    /// # use kube::runtime::{predicates, reflector::ObjectRef, watcher, Controller, WatchStreamExt};
+    /// # use kube::{Api, Client, Error, ResourceExt};
+    /// # use std::sync::Arc;
+    /// # type CustomResource = ConfigMap;
+    /// # async fn reconcile(_: Arc<CustomResource>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<CustomResource>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
+    /// fn mapper(_: DaemonSet) -> Option<ObjectRef<CustomResource>> { todo!() }
+    /// # async fn doc(client: kube::Client) {
+    /// let api: Api<DaemonSet> = Api::all(client.clone());
+    /// let cr: Api<CustomResource> = Api::all(client.clone());
+    /// let daemons = watcher(api, watcher::Config::default())
+    ///     .touched_objects()
+    ///     .predicate_filter(predicates::generation);
+    ///
+    /// Controller::new(cr, watcher::Config::default())
+    ///     .watches_stream(daemons, mapper)
+    ///     .run(reconcile, error_policy, Arc::new(()))
+    ///     .for_each(|_| std::future::ready(()))
+    ///     .await;
+    /// # }
+    /// ```
+    #[cfg(feature = "unstable-runtime-stream-control")]
+    #[must_use]
+    pub fn watches_stream<Other, I>(
+        self,
+        trigger: impl Stream<Item = Result<Other, watcher::Error>> + Send + 'static,
+        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
+    ) -> Self
+    where
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Default + Debug + Clone,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
+        I::IntoIter: Send,
+    {
+        self.watches_stream_with(trigger, mapper, Default::default())
+    }
+
+    /// Trigger the reconciliation process for a stream of `Other` objects related to a `K`
+    ///
+    /// Same as [`Controller::owns`], but instead of an `Api`, a stream of resources is used.
+    /// This allows for customized and pre-filtered watch streams to be used as a trigger,
+    /// as well as sharing input streams between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Same as [`Controller::watches_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
+    #[cfg(feature = "unstable-runtime-stream-control")]
+    #[must_use]
+    pub fn watches_stream_with<Other, I>(
+        mut self,
+        trigger: impl Stream<Item = Result<Other, watcher::Error>> + Send + 'static,
+        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
+        dyntype: Other::DynamicType,
+    ) -> Self
+    where
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Debug + Clone,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
+        I::IntoIter: Send,
+    {
+        let other_watcher = trigger_others(trigger, mapper, dyntype);
         self.trigger_selector.push(other_watcher.boxed());
         self
     }
@@ -749,8 +971,11 @@ where
     /// use k8s_openapi::api::core::v1::ConfigMap;
     /// use kube::{
     ///     Client,
-    ///     api::{ListParams, Api, ResourceExt},
-    ///     runtime::{controller::{Controller, Action}},
+    ///     api::{Api, ResourceExt},
+    ///     runtime::{
+    ///         controller::{Controller, Action},
+    ///         watcher,
+    ///     },
     /// };
     /// use std::{convert::Infallible, io::BufRead, sync::Arc};
     /// let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
@@ -763,12 +988,12 @@ where
     /// });
     /// Controller::new(
     ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
-    ///     ListParams::default(),
+    ///     watcher::Config::default(),
     /// )
     /// .reconcile_all_on(reload_rx.map(|_| ()))
     /// .run(
     ///     |o, _| async move {
-    ///         println!("Reconciling {}", o.name());
+    ///         println!("Reconciling {}", o.name_any());
     ///         Ok(Action::await_change())
     ///     },
     ///     |_object: Arc<ConfigMap>, err: &Infallible, _| Err(err).unwrap(),
@@ -781,10 +1006,7 @@ where
     ///
     /// If a [`Stream`] is terminated (by emitting [`None`]) then the [`Controller`] keeps running, but the [`Stream`] stops being polled.
     #[must_use]
-    pub fn reconcile_all_on(
-        mut self,
-        trigger: impl Stream<Item = ()> + Send + Sync + 'static,
-    ) -> Self {
+    pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
         let store = self.store();
         let dyntype = self.dyntype.clone();
         self.trigger_selector.push(
@@ -797,6 +1019,65 @@ where
                             reason: ReconcileReason::BulkReconcile,
                         })
                     }))
+                })
+                .boxed(),
+        );
+        self
+    }
+
+    /// Trigger the reconciliation process for a managed object `ObjectRef<K>` whenever `trigger` emits a value
+    ///
+    /// For example, this can be used to watch resources once and use the stream to trigger reconciliation and also keep a cache of those objects.
+    /// That way it's possible to use this up to date cache instead of querying Kubernetes to access those resources
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # async {
+    /// # use futures::{StreamExt, TryStreamExt};
+    /// # use k8s_openapi::api::core::v1::{ConfigMap, Pod};
+    /// # use kube::api::Api;
+    /// # use kube::runtime::controller::Action;
+    /// # use kube::runtime::reflector::{ObjectRef, Store};
+    /// # use kube::runtime::{reflector, watcher, Controller, WatchStreamExt};
+    /// # use kube::runtime::watcher::Config;
+    /// # use kube::{Client, Error, ResourceExt};
+    /// # use std::future;
+    /// # use std::sync::Arc;
+    /// #
+    /// # let client: Client = todo!();
+    /// # async fn reconcile(_: Arc<ConfigMap>, _: Arc<Store<Pod>>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<ConfigMap>, _: &kube::Error, _: Arc<Store<Pod>>) -> Action { Action::await_change() }
+    /// #
+    /// // Store can be used in the reconciler instead of querying Kube
+    /// let (pod_store, writer) = reflector::store();
+    /// let pod_stream = reflector(
+    ///     writer,
+    ///     watcher(Api::<Pod>::all(client.clone()), Config::default()),
+    /// )
+    /// .applied_objects()
+    /// // Map to the relevant `ObjectRef<K>` to reconcile
+    /// .map_ok(|pod| ObjectRef::new(&format!("{}-cm", pod.name_any())).within(&pod.namespace().unwrap()));
+    ///
+    /// Controller::new(Api::<ConfigMap>::all(client), Config::default())
+    ///     .reconcile_on(pod_stream)
+    ///     // The store can be re-used between controllers and even inspected from the reconciler through [Context]
+    ///     .run(reconcile, error_policy, Arc::new(pod_store))
+    ///     .for_each(|_| future::ready(()))
+    ///     .await;
+    /// # };
+    /// ```
+    #[cfg(feature = "unstable-runtime-reconcile-on")]
+    #[must_use]
+    pub fn reconcile_on(
+        mut self,
+        trigger: impl Stream<Item = Result<ObjectRef<K>, watcher::Error>> + Send + 'static,
+    ) -> Self {
+        self.trigger_selector.push(
+            trigger
+                .map_ok(move |obj| ReconcileRequest {
+                    obj_ref: obj,
+                    reason: ReconcileReason::Unknown,
                 })
                 .boxed(),
         );
@@ -816,17 +1097,20 @@ where
     /// # async {
     /// use futures::future::FutureExt;
     /// use k8s_openapi::api::core::v1::ConfigMap;
-    /// use kube::{api::ListParams, Api, Client, ResourceExt};
-    /// use kube_runtime::controller::{Controller, Action};
+    /// use kube::{Api, Client, ResourceExt};
+    /// use kube_runtime::{
+    ///     controller::{Controller, Action},
+    ///     watcher,  
+    /// };
     /// use std::{convert::Infallible, sync::Arc};
     /// Controller::new(
     ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
-    ///     ListParams::default(),
+    ///     watcher::Config::default(),
     /// )
     /// .graceful_shutdown_on(tokio::signal::ctrl_c().map(|_| ()))
     /// .run(
     ///     |o, _| async move {
-    ///         println!("Reconciling {}", o.name());
+    ///         println!("Reconciling {}", o.name_any());
     ///         Ok(Action::await_change())
     ///     },
     ///     |_, err: &Infallible, _| Err(err).unwrap(),
@@ -838,10 +1122,7 @@ where
     /// This can be called multiple times, in which case they are additive; the [`Controller`] starts to terminate
     /// as soon as *any* [`Future`] resolves.
     #[must_use]
-    pub fn graceful_shutdown_on(
-        mut self,
-        trigger: impl Future<Output = ()> + Send + Sync + 'static,
-    ) -> Self {
+    pub fn graceful_shutdown_on(mut self, trigger: impl Future<Output = ()> + Send + Sync + 'static) -> Self {
         self.graceful_shutdown_selector.push(trigger.boxed());
         self
     }
@@ -888,9 +1169,7 @@ where
                 tracing::info!("press ctrl+c to shut down gracefully");
                 shutdown_signal().await;
                 if let Ok(()) = graceful_tx.send(()) {
-                    tracing::info!(
-                        "graceful shutdown requested, press ctrl+c again to force shutdown"
-                    );
+                    tracing::info!("graceful shutdown requested, press ctrl+c again to force shutdown");
                 } else {
                     tracing::info!(
                         "graceful shutdown already requested, press ctrl+c again to force shutdown"
@@ -945,14 +1224,26 @@ mod tests {
     use crate::{
         applier,
         reflector::{self, ObjectRef},
-        watcher, Controller,
+        watcher::{self, metadata_watcher, watcher, Event},
+        Controller,
     };
-    use futures::{pin_mut, StreamExt, TryStreamExt};
+    use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::ConfigMap;
-    use kube_client::{core::ObjectMeta, Api};
+    use kube_client::{core::ObjectMeta, Api, Resource};
+    use serde::de::DeserializeOwned;
     use tokio::time::timeout;
 
     fn assert_send<T: Send>(x: T) -> T {
+        x
+    }
+
+    // Used to typecheck that a type T is a generic type that implements Stream
+    // and returns a WatchEvent generic over a resource `K`
+    fn assert_stream<T, K>(x: T) -> T
+    where
+        T: Stream<Item = watcher::Result<Event<K>>> + Send,
+        K: Resource + Clone + DeserializeOwned + std::fmt::Debug + Send + 'static,
+    {
         x
     }
 
@@ -974,13 +1265,27 @@ mod tests {
         );
     }
 
+    // not #[test] because we don't want to actually run it, we just want to
+    // assert that it typechecks
+    //
+    // will check return types for `watcher` and `watch_metadata` do not drift
+    // given an arbitrary K that implements `Resource` (e.g ConfigMap)
+    #[allow(dead_code, unused_must_use)]
+    fn test_watcher_stream_type_drift() {
+        assert_stream(watcher(mock_type::<Api<ConfigMap>>(), Default::default()));
+        assert_stream(metadata_watcher(
+            mock_type::<Api<ConfigMap>>(),
+            Default::default(),
+        ));
+    }
+
     #[tokio::test]
     async fn applier_must_not_deadlock_if_reschedule_buffer_fills() {
         // This tests that `applier` handles reschedule queue backpressure correctly, by trying to flood it with no-op reconciles
         // This is intended to avoid regressing on https://github.com/kube-rs/kube/issues/926
 
         // Assume that we can keep APPLIER_REQUEUE_BUF_SIZE flooded if we have 100x the number of objects "in rotation"
-        // On my (@teozkr)'s 3900X I can reliably trigger this with 10x, but let's have some safety margin to avoid false negatives
+        // On my (@nightkr)'s 3900X I can reliably trigger this with 10x, but let's have some safety margin to avoid false negatives
         let items = APPLIER_REQUEUE_BUF_SIZE * 50;
         // Assume that everything's OK if we can reconcile every object 3 times on average
         let reconciles = items * 3;

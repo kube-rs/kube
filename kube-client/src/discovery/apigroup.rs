@@ -48,7 +48,7 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
 ///     for service in api.list(&Default::default()).await? {
-///         println!("Found APIService: {}", service.name());
+///         println!("Found APIService: {}", service.name_any());
 ///     }
 ///     Ok(())
 /// }
@@ -140,10 +140,7 @@ impl ApiGroup {
                 return Ok((ar, caps));
             }
         }
-        Err(Error::Discovery(DiscoveryError::MissingKind(format!(
-            "{:?}",
-            gvk
-        ))))
+        Err(Error::Discovery(DiscoveryError::MissingKind(format!("{gvk:?}"))))
     }
 
     // shortcut method to give cheapest return for a pinned group
@@ -230,7 +227,7 @@ impl ApiGroup {
     ///         }
     ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///         for inst in api.list(&Default::default()).await? {
-    ///             println!("Found {}: {}", ar.kind, inst.name());
+    ///             println!("Found {}: {}", ar.kind, inst.name_any());
     ///         }
     ///     }
     ///     Ok(())
@@ -257,7 +254,7 @@ impl ApiGroup {
     ///         }
     ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///         for inst in api.list(&Default::default()).await? {
-    ///             println!("Found {}: {}", ar.kind, inst.name());
+    ///             println!("Found {}: {}", ar.kind, inst.name_any());
     ///         }
     ///     }
     ///     Ok(())
@@ -294,7 +291,7 @@ impl ApiGroup {
     ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
     ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
     ///     for service in api.list(&Default::default()).await? {
-    ///         println!("Found APIService: {}", service.name());
+    ///         println!("Found APIService: {}", service.name_any());
     ///     }
     ///     Ok(())
     /// }

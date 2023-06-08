@@ -1,10 +1,14 @@
-# When pushed to main, run `cargo +nightly fmt --all` and open a PR.
+# When pushed to main, run `cargo +nightly fmt` against all files and open a PR.
 name: rustfmt
 on:
   push:
     # Limit to `main` because this action creates a PR
     branches:
       - main
+    paths:
+      - '**.rs'
+      - '**.yml'
+
 jobs:
   rustfmt_nightly:
     runs-on: ubuntu-latest
@@ -22,7 +26,7 @@ jobs:
       - run: rustfmt +nightly --edition 2018 $(find . -type f -iname *.rs)
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v4
+        uses: peter-evans/create-pull-request@v5
         with:
           commit-message: rustfmt
           signoff: true
