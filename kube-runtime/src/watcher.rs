@@ -217,6 +217,14 @@ pub struct Config {
     /// Configures re-list for performance vs. consistency.
     pub list_semantic: ListSemantic,
 
+    /// Maximum number of objects retrieved per list operation resyncs.
+    ///
+    /// This can reduce the memory consumption during resyncs, at the cost of requiring more
+    /// API roundtrips to complete.
+    ///
+    /// Defaults to unlimited (everything is retrieved in one request) if `None`.
+    pub page_size_limit: Option<u32>,
+
     /// Enables watch events with type "BOOKMARK".
     ///
     /// Requests watch bookmarks from the apiserver when enabled for improved watch precision and reduced list calls.
@@ -232,6 +240,7 @@ impl Default for Config {
             field_selector: None,
             timeout: None,
             list_semantic: ListSemantic::default(),
+            page_size_limit: None,
         }
     }
 }
@@ -300,6 +309,16 @@ impl Config {
         self
     }
 
+    /// Limits the number of objects retrieved in each list operation during resync.
+    ///
+    /// This can reduce the memory consumption during resyncs, at the cost of requiring more
+    /// API roundtrips to complete.
+    #[must_use]
+    pub fn page_size_limit(mut self, page_size_limit: u32) -> Self {
+        self.page_size_limit = Some(page_size_limit);
+        self
+    }
+
     /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
         let (resource_version, version_match) = match self.list_semantic {
@@ -312,9 +331,8 @@ impl Config {
             timeout: self.timeout,
             version_match,
             resource_version,
-            // It is not permissible for users to configure the continue token and limit for the watcher, as these parameters are associated with paging.
-            // The watcher must handle paging internally.
-            limit: None,
+            // The watcher handles pagination internally.
+            limit: self.page_size_limit,
             continue_token: None,
         }
     }
@@ -396,7 +414,6 @@ where
         } => {
             let mut lp = wc.to_list_params();
             lp.continue_token = continue_token;
-            lp.limit = Some(100);
             match api.list(&lp).await {
                 Ok(list) => {
                     objects.extend(list.items);
