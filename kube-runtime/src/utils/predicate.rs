@@ -82,6 +82,49 @@ where
 ///
 /// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
 pub mod predicates {
+
+    pub trait Predicate<K> {
+        fn hash_property(&self, obj: &K) -> Option<u64>;
+
+        /// Returns a `Predicate` that falls back to an alternate property if the first does not exist
+        ///
+        /// # Usage
+        ///
+        /// ```
+        /// # use k8s_openapi::api::core::v1::Pod;
+        /// use kube::runtime::{predicates, Predicate};
+        /// # fn blah<K>(a: impl Predicate<K>) {}
+        /// let pred = predicates::generation.fallback(predicates::resource_version);
+        /// blah::<Pod>(pred);
+        /// ```
+        fn fallback<F: Predicate<K>>(self, f: F) -> Fallback<Self, F>
+        where
+            Self: Sized
+        {
+            Fallback(self, f)
+        }
+    }
+
+    impl<K, F: Fn(&K) -> Option<u64>> Predicate<K> for F {
+        fn hash_property(&self, obj: &K) -> Option<u64> {
+            (self)(obj)
+        }
+    }
+
+    /// See [`Predicate::fallback`]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub struct Fallback<A, B>(pub(super) A, pub(super) B);
+    impl<A, B, K> Predicate<K> for Fallback<A, B>
+    where
+        A: Predicate<K>,
+        B: Predicate<K>,
+    {
+        fn hash_property(&self, obj: &K) -> Option<u64> {
+            self.0.hash_property(obj).or_else(|| self.1.hash_property(obj))
+        }
+    }
+
+
     use kube_client::{Resource, ResourceExt};
     use std::{
         collections::hash_map::DefaultHasher,
