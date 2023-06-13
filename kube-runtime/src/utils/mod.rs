@@ -10,7 +10,7 @@ mod watch_ext;
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use event_flatten::EventFlatten;
 #[cfg(feature = "unstable-runtime-predicates")]
-pub use predicate::{predicates, PredicateFilter};
+pub use predicate::{predicates, Predicate, PredicateFilter};
 pub use stream_backoff::StreamBackoff;
 #[cfg(feature = "unstable-runtime-subscribe")]
 pub use stream_subscribe::StreamSubscribe;
