@@ -22,6 +22,8 @@ use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig, ExecInteractiveMod
 
 #[cfg(feature = "oauth")] mod oauth;
 #[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
+#[cfg(feature = "refresh-oidc")] mod oidc;
+#[cfg(feature = "refresh-oidc")] pub use oidc::Error as OidcError;
 #[cfg(target_os = "windows")] use std::os::windows::process::CommandExt;
 
 #[derive(Error, Debug)]
@@ -91,6 +93,12 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
     #[error("failed OAuth: {0}")]
     OAuth(#[source] OAuthError),
+
+    /// OIDC error
+    #[cfg(feature = "refresh-oidc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "refresh-oidc")))]
+    #[error("failed OIDC: {0}")]
+    Oidc(#[source] OidcError),
 }
 
 #[derive(Debug, Clone)]
@@ -164,6 +172,8 @@ pub enum RefreshableToken {
     File(Arc<RwLock<TokenFile>>),
     #[cfg(feature = "oauth")]
     GcpOauth(Arc<Mutex<oauth::Gcp>>),
+    #[cfg(feature = "refresh-oidc")]
+    Oidc(Arc<Mutex<oidc::Oidc>>),
 }
 
 // For use with `AsyncFilterLayer` to add `Authorization` header with a refreshed token.
@@ -212,6 +222,8 @@ impl RefreshableToken {
                         Auth::RefreshableToken(RefreshableToken::File(_)) => unreachable!(),
                         #[cfg(feature = "oauth")]
                         Auth::RefreshableToken(RefreshableToken::GcpOauth(_)) => unreachable!(),
+                        #[cfg(feature = "refresh-oidc")]
+                        Auth::RefreshableToken(RefreshableToken::Oidc(_)) => unreachable!(),
                     }
                 }
 
@@ -236,6 +248,12 @@ impl RefreshableToken {
                 let token = (*gcp_oauth).token().await.map_err(Error::OAuth)?;
                 bearer_header(&token.access_token)
             }
+
+            #[cfg(feature = "refresh-oidc")]
+            RefreshableToken::Oidc(oidc) => {
+                let token = oidc.lock().await.id_token().await.map_err(Error::Oidc)?;
+                bearer_header(&token)
+            }
         }
     }
 }
@@ -255,6 +273,14 @@ impl TryFrom<&AuthInfo> for Auth {
     fn try_from(auth_info: &AuthInfo) -> Result<Self, Self::Error> {
         if let Some(provider) = &auth_info.auth_provider {
             match token_from_provider(provider)? {
+                #[cfg(feature = "refresh-oidc")]
+                ProviderToken::Oidc(oidc) => {
+                    return Ok(Self::RefreshableToken(RefreshableToken::Oidc(Arc::new(
+                        Mutex::new(oidc),
+                    ))));
+                }
+
+                #[cfg(not(feature = "refresh-oidc"))]
                 ProviderToken::Oidc(token) => {
                     return Ok(Self::Bearer(SecretString::from(token)));
                 }
@@ -327,6 +353,9 @@ impl TryFrom<&AuthInfo> for Auth {
 
 // We need to differentiate providers because the keys/formats to store token expiration differs.
 enum ProviderToken {
+    #[cfg(feature = "refresh-oidc")]
+    Oidc(oidc::Oidc),
+    #[cfg(not(feature = "refresh-oidc"))]
     Oidc(String),
     // "access-token", "expiry" (RFC3339)
     GcpCommand(String, Option<DateTime<Utc>>),
@@ -350,6 +379,14 @@ fn token_from_provider(provider: &AuthProviderConfig) -> Result<ProviderToken, E
     }
 }
 
+#[cfg(feature = "refresh-oidc")]
+fn token_from_oidc_provider(provider: &AuthProviderConfig) -> Result<ProviderToken, Error> {
+    oidc::Oidc::from_config(&provider.config)
+        .map_err(Error::Oidc)
+        .map(ProviderToken::Oidc)
+}
+
+#[cfg(not(feature = "refresh-oidc"))]
 fn token_from_oidc_provider(provider: &AuthProviderConfig) -> Result<ProviderToken, Error> {
     match provider.config.get("id-token") {
         Some(id_token) => Ok(ProviderToken::Oidc(id_token.clone())),

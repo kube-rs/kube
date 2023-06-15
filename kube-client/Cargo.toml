@@ -26,6 +26,7 @@ client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "dirs"]
+refresh-oidc = ["client", "form_urlencoded"]
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
@@ -68,6 +69,7 @@ rand = { version = "0.8.3", optional = true }
 secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
 tracing = { version = "0.1.36", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
+form_urlencoded = { version = "1.2.0", optional = true }
 
 [dependencies.k8s-openapi]
 version = "0.18.0"
