@@ -6,7 +6,16 @@ use core::{
 use futures::{ready, Stream};
 use kube_client::Resource;
 use pin_project::pin_project;
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+};
+
+fn hash<T: Hash>(t: &T) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    t.hash(&mut hasher);
+    hasher.finish()
+}
 
 /// A predicate is a hasher of Kubernetes objects stream filtering
 pub trait Predicate<K> {
@@ -30,6 +39,24 @@ pub trait Predicate<K> {
     {
         Fallback(self, f)
     }
+
+    /// Returns a `Predicate` that combines the available hashes that exist
+    ///
+    /// # Usage
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// use kube::runtime::{predicates, Predicate};
+    /// # fn blah<K>(a: impl Predicate<K>) {}
+    /// let pred = predicates::labels.combine(predicates::annotations);
+    /// blah::<Pod>(pred);
+    /// ```
+    fn combine<F: Predicate<K>>(self, f: F) -> Combine<Self, F>
+    where
+        Self: Sized,
+    {
+        Combine(self, f)
+    }
 }
 
 impl<K, F: Fn(&K) -> Option<u64>> Predicate<K> for F {
@@ -48,6 +75,23 @@ where
 {
     fn hash_property(&self, obj: &K) -> Option<u64> {
         self.0.hash_property(obj).or_else(|| self.1.hash_property(obj))
+    }
+}
+/// See [`Predicate::combine`]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Combine<A, B>(pub(super) A, pub(super) B);
+impl<A, B, K> Predicate<K> for Combine<A, B>
+where
+    A: Predicate<K>,
+    B: Predicate<K>,
+{
+    fn hash_property(&self, obj: &K) -> Option<u64> {
+        match (self.0.hash_property(obj), self.1.hash_property(obj)) {
+            (Some(v1), Some(v2)) => Some(v1.overflowing_add(v2).0),
+            (Some(v1), None) => Some(v1),
+            (None, Some(v2)) => Some(v2),
+            (None, None) => None,
+        }
     }
 }
 
@@ -125,17 +169,8 @@ where
 ///
 /// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
 pub mod predicates {
+    use super::hash;
     use kube_client::{Resource, ResourceExt};
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::{Hash, Hasher},
-    };
-
-    fn hash<T: Hash>(t: &T) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        t.hash(&mut hasher);
-        hasher.finish()
-    }
 
     /// Hash the generation of a Resource K
     pub fn generation<K: Resource>(obj: &K) -> Option<u64> {
