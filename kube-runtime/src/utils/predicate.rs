@@ -40,7 +40,7 @@ pub trait Predicate<K> {
         Fallback(self, f)
     }
 
-    /// Returns a `Predicate` that combines the available hashes that exist
+    /// Returns a `Predicate` that combines all available hashes
     ///
     /// # Usage
     ///
@@ -87,10 +87,10 @@ where
 {
     fn hash_property(&self, obj: &K) -> Option<u64> {
         match (self.0.hash_property(obj), self.1.hash_property(obj)) {
-            (Some(v1), Some(v2)) => Some(v1.overflowing_add(v2).0),
-            (Some(v1), None) => Some(v1),
-            (None, Some(v2)) => Some(v2),
+            // pass on both missing properties so people can chain .fallback
             (None, None) => None,
+            // but any other combination of properties are hashed together
+            (a, b) => Some(hash(&(a, b))),
         }
     }
 }
