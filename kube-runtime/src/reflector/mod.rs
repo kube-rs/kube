@@ -67,7 +67,7 @@ pub use store::{store, Store};
 /// 1. Reflect a [`PartialObjectMeta<K>`](kube_client::core::PartialObjectMeta) stream rather than a stream of `K`
 ///
 /// You can send in a [`metadata_watcher()`](crate::watcher::metadata_watcher()) for a type rather than a [`watcher()`],
-/// and this will can drop your memory usage by more than a factor of two,
+/// and this can drop your memory usage by more than a factor of two,
 /// depending on the size of `K`. 60% reduction seen for `Pod`. Usage is otherwise identical.
 ///
 /// 2. Use `modify` the raw [`watcher::Event`] object stream to clear unneeded properties
