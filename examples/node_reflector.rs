@@ -2,7 +2,7 @@ use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{Api, ResourceExt},
-    runtime::{predicates, reflector, watcher, WatchStreamExt},
+    runtime::{predicates, reflector, watcher, Predicate, WatchStreamExt},
     Client,
 };
 use tracing::*;
