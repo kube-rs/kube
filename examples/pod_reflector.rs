@@ -2,7 +2,7 @@ use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::Api,
-    runtime::{reflector, watcher, WatchStreamExt},
+    runtime::{predicates, reflector, watcher, WatchStreamExt},
     Client, ResourceExt,
 };
 use tracing::*;
@@ -37,7 +37,9 @@ async fn main() -> anyhow::Result<()> {
         })
     });
 
-    let rf = reflector(writer, stream).applied_objects();
+    let rf = reflector(writer, stream)
+        .applied_objects()
+        .predicate_filter(predicates::resource_version); // NB: requires an unstable feature
     futures::pin_mut!(rf);
 
     while let Some(pod) = rf.try_next().await? {

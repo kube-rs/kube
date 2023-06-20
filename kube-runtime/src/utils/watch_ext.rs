@@ -1,5 +1,5 @@
 #[cfg(feature = "unstable-runtime-predicates")]
-use crate::utils::predicate::PredicateFilter;
+use crate::utils::predicate::{Predicate, PredicateFilter};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
@@ -42,7 +42,6 @@ pub trait WatchStreamExt: Stream {
         EventFlatten::new(self, true)
     }
 
-
     /// Filter out a flattened stream on [`predicates`](crate::predicates).
     ///
     /// This will filter out repeat calls where the predicate returns the same result.
@@ -72,11 +71,11 @@ pub trait WatchStreamExt: Stream {
     /// # }
     /// ```
     #[cfg(feature = "unstable-runtime-predicates")]
-    fn predicate_filter<K, F>(self, predicate: F) -> PredicateFilter<Self, K, F>
+    fn predicate_filter<K, P>(self, predicate: P) -> PredicateFilter<Self, K, P>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
         K: Resource + 'static,
-        F: Fn(&K) -> Option<u64> + 'static,
+        P: Predicate<K> + 'static,
     {
         PredicateFilter::new(self, predicate)
     }

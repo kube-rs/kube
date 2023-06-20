@@ -733,7 +733,6 @@ mod test {
         assert!(format!("{err}").contains("non-zero resource_version is required when using an Exact match"));
     }
 
-
     #[test]
     fn list_not_older() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
