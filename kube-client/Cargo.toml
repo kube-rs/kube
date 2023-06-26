@@ -21,12 +21,12 @@ rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls"]
 openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws", "tokio/macros"]
 oauth = ["client", "tame-oauth"]
+oidc = ["client", "form_urlencoded"]
 gzip = ["client", "tower-http/decompression-gzip"]
 client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "dirs"]
-refresh-oidc = ["client", "form_urlencoded"]
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
