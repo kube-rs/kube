@@ -141,7 +141,7 @@ impl ListParams {
 }
 
 /// The validation directive to use for `fieldValidation` when using server-side apply.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ValidationDirective {
     /// Strict mode will fail any invalid manifests.
     ///
@@ -174,7 +174,7 @@ impl ValidationDirective {
 }
 
 /// Common query parameters for put/post calls
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub struct PostParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
@@ -303,7 +303,7 @@ impl<T: Serialize> Patch<T> {
 }
 
 /// Common query parameters for patch calls
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub struct PatchParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
@@ -401,7 +401,7 @@ impl PatchParams {
 }
 
 /// Common query parameters for delete calls
-#[derive(Default, Clone, Serialize, Debug)]
+#[derive(Default, Clone, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteParams {
     /// When present, indicates that modifications should not be persisted.
@@ -569,7 +569,7 @@ mod test {
 }
 
 /// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
-#[derive(Default, Clone, Serialize, Debug)]
+#[derive(Default, Clone, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preconditions {
     /// Specifies the target ResourceVersion
@@ -581,7 +581,7 @@ pub struct Preconditions {
 }
 
 /// Propagation policy when deleting single objects
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub enum PropagationPolicy {
     /// Orphan dependents
     Orphan,
