@@ -1,3 +1,5 @@
+//! TODO
+
 mod command;
 
 pub use command::*;
@@ -10,15 +12,18 @@ use crate::Client;
 use crate::Error;
 use either::Either;
 
+/// TODO
 pub struct Dispatcher {
     client: Client,
 }
 
 impl Dispatcher {
+    /// TODO
     pub fn new(client: Client) -> Dispatcher {
         Dispatcher { client }
     }
 
+    /// TODO
     pub async fn dispatch_command(
         &self,
         command: KubeCommand,
@@ -35,6 +40,7 @@ impl Dispatcher {
 }
 
 impl Api<DynamicObject> {
+    /// TODO
     pub async fn dispatch_command(
         &self,
         command: KubeCommandVerb,

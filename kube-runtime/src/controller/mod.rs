@@ -18,7 +18,10 @@ use futures::{
     future::{self, BoxFuture},
     ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube_client::api::{Api, DynamicObject, ListParams, Resource};
+use kube_client::{
+    api::{Api, DynamicObject, ListParams, Resource},
+    command::{Dispatcher, KubeCommand},
+};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
@@ -884,6 +887,65 @@ where
                 .take_until(future::select_all(self.graceful_shutdown_selector)),
         )
         .take_until(futures::future::select_all(self.forceful_shutdown_selector))
+    }
+
+    /// TODO - function name?
+    ///
+    /// Consume all the parameters of the Controller and start the applier stream
+    ///
+    ///
+    pub fn run_via_dispatch<E, Ctx>(
+        self,
+        reconciler: fn(Arc<K>, Arc<Ctx>) -> Result<(Action, Option<KubeCommand>), E>,
+        error_policy: fn(Arc<K>, &DansNewError<E>, Arc<Ctx>) -> Action,
+        dispatcher: Dispatcher,
+        context: Arc<Ctx>,
+    ) -> impl Stream<Item = Result<(ObjectRef<K>, Action), Error<DansNewError<E>, watcher::Error>>>
+    where
+        K::DynamicType: Debug + Unpin,
+        E: std::error::Error + Send + 'static,
+        Ctx: Send + Sync + 'static,
+    {
+        let dispatcher = Arc::new(dispatcher);
+        let context = Arc::new((context, dispatcher));
+
+        self.run(
+            move |res, things| async move {
+                let ctx = things.0.clone();
+                let dispatcher = things.1.clone();
+
+                let (action, command) = reconciler(res, ctx).map_err(DansNewError::Reconcile)?;
+
+                if let Some(command) = command {
+                    dispatcher
+                        .dispatch_command(command)
+                        .await
+                        .map_err(DansNewError::Dispatch)?;
+                }
+
+                Ok(action)
+            },
+            move |res, err, things| error_policy(res, err, things.0.clone()),
+            context,
+        )
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum DansNewError<E>
+where
+    E: std::error::Error + Send + 'static,
+{
+    Dispatch(kube_client::Error),
+    Reconcile(E),
+}
+
+impl<E> Display for DansNewError<E>
+where
+    E: std::error::Error + Send + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unimplemented!()
     }
 }
 

@@ -3,6 +3,9 @@
 mod object_ref;
 pub mod store;
 
+// TODO - this belongs behind a test util feature flag of some sort
+mod test_utils;
+
 pub use self::object_ref::{Extra as ObjectRefExtra, ObjectRef};
 use crate::watcher;
 use futures::{Stream, TryStreamExt};

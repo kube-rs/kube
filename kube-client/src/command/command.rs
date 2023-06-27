@@ -5,13 +5,17 @@ use serde::Serialize;
 use std::fmt::{Display, Formatter};
 use std::option::Option::None;
 
+/// TODO
 #[derive(Clone, Debug, PartialEq)]
 pub struct KubeCommand {
+    /// TODO
     pub namespace: Option<String>,
+    /// TODO
     pub verb: KubeCommandVerb,
 }
 
 impl KubeCommand {
+    /// TODO
     pub fn cluster(command: KubeCommandVerb) -> KubeCommand {
         Self {
             namespace: None,
@@ -19,6 +23,7 @@ impl KubeCommand {
         }
     }
 
+    /// TODO
     pub fn namespaced(namespace: &str, command: KubeCommandVerb) -> KubeCommand {
         Self {
             namespace: Some(namespace.to_string()),
@@ -26,27 +31,33 @@ impl KubeCommand {
         }
     }
 
+    /// TODO
     pub fn api_resource(&self) -> ApiResource {
         self.verb.api_resource()
     }
 
+    /// TODO
     pub fn kind(&self) -> String {
         self.verb.kind()
     }
 
+    /// TODO
     pub fn name(&self) -> String {
         self.verb.name()
     }
 
+    /// TODO
     pub fn namespace(&self) -> Option<String> {
         self.namespace.clone()
     }
 
+    /// TODO
     pub fn verb_name(&self) -> String {
         self.verb.verb_name()
     }
 }
 
+/// TODO
 #[derive(Clone, Debug, PartialEq)]
 pub enum KubeCommandVerb {
     Create {
