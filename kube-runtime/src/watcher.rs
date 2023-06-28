@@ -646,13 +646,18 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 /// for more details.
 #[must_use]
 pub fn default_backoff() -> impl Backoff + Send + Sync {
-    let expo = backoff::ExponentialBackoff {
+    let bo = default_exponential_backoff();
+    ResetTimerBackoff::new(bo, Duration::from_secs(120))
+}
+
+// ideally should be a const var but Default for ExponentialBackoff is not const
+pub(crate) fn default_exponential_backoff() -> backoff::ExponentialBackoff {
+    backoff::ExponentialBackoff {
         initial_interval: Duration::from_millis(800),
         max_interval: Duration::from_secs(30),
         randomization_factor: 1.0,
         multiplier: 2.0,
         max_elapsed_time: None,
         ..ExponentialBackoff::default()
-    };
-    ResetTimerBackoff::new(expo, Duration::from_secs(120))
+    }
 }
