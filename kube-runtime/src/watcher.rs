@@ -646,9 +646,8 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     since = "0.84.0",
     note = "replaced by `watcher::DefaultBackoff`. This fn will be removed in 0.88.0."
 )]
-pub fn default_backoff() -> impl Backoff + Send + Sync {
-    let bo = default_exponential_backoff();
-    ResetTimerBackoff::new(bo, DEFAULT_RESET_DURATION)
+pub fn default_backoff() -> DefaultBackoff {
+    DefaultBackoff::default()
 }
 
 /// Default watcher backoff inspired by Kubernetes' client-go.
@@ -662,36 +661,30 @@ pub fn default_backoff() -> impl Backoff + Send + Sync {
 /// when calling `WatchStreamExt::default_backoff`. If you need to create
 /// this manually then [`DefaultBackoff::default`] can be used.
 pub struct DefaultBackoff(Strategy);
-
-struct Strategy(ResetTimerBackoff<ExponentialBackoff>); // encapsulate strategy
-
-fn default_exponential_backoff() -> backoff::ExponentialBackoff {
-    backoff::ExponentialBackoff {
-        initial_interval: Duration::from_millis(800),
-        max_interval: Duration::from_secs(30),
-        randomization_factor: 1.0,
-        multiplier: 2.0,
-        max_elapsed_time: None,
-        ..ExponentialBackoff::default()
-    }
-}
-const DEFAULT_RESET_DURATION: Duration = Duration::from_secs(120);
+type Strategy = ResetTimerBackoff<ExponentialBackoff>;
 
 impl Default for DefaultBackoff {
     fn default() -> Self {
-        Self(Strategy(ResetTimerBackoff::new(
-            default_exponential_backoff(),
-            DEFAULT_RESET_DURATION,
-        )))
+        Self(ResetTimerBackoff::new(
+            backoff::ExponentialBackoff {
+                initial_interval: Duration::from_millis(800),
+                max_interval: Duration::from_secs(30),
+                randomization_factor: 1.0,
+                multiplier: 2.0,
+                max_elapsed_time: None,
+                ..ExponentialBackoff::default()
+            },
+            Duration::from_secs(120),
+        ))
     }
 }
 
 impl Backoff for DefaultBackoff {
     fn next_backoff(&mut self) -> Option<Duration> {
-        self.0 .0.next_backoff()
+        self.0.next_backoff()
     }
 
     fn reset(&mut self) {
-        self.0 .0.reset()
+        self.0.reset()
     }
 }
