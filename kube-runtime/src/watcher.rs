@@ -645,13 +645,25 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 /// See [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
 /// for more details.
 #[must_use]
+#[deprecated(
+    since = "0.84.0",
+    note = "replaced by `watcher::DefaultBackoff`. This fn will be removed in 0.88.0."
+)]
 pub fn default_backoff() -> impl Backoff + Send + Sync {
     let bo = default_exponential_backoff();
     ResetTimerBackoff::new(bo, DEFAULT_RESET_DURATION)
 }
 
-// ideally should be a const var but Default for ExponentialBackoff is not const
-pub(crate) fn default_exponential_backoff() -> backoff::ExponentialBackoff {
+/// Default watcher backoff inspired by Kubernetes' client-go.
+///
+/// Note that the exact parameters used herein should not be considered stable.
+/// The parameters currently optimize for being kind to struggling apiservers.
+/// See [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
+/// for more details.
+pub struct DefaultBackoff(ResetTimerBackoff<ExponentialBackoff>);
+
+
+fn default_exponential_backoff() -> backoff::ExponentialBackoff {
     backoff::ExponentialBackoff {
         initial_interval: Duration::from_millis(800),
         max_interval: Duration::from_secs(30),
@@ -661,4 +673,23 @@ pub(crate) fn default_exponential_backoff() -> backoff::ExponentialBackoff {
         ..ExponentialBackoff::default()
     }
 }
-pub(crate) const DEFAULT_RESET_DURATION: Duration = Duration::from_secs(120);
+const DEFAULT_RESET_DURATION: Duration = Duration::from_secs(120);
+
+impl Default for DefaultBackoff {
+    fn default() -> Self {
+        Self(ResetTimerBackoff::new(
+            default_exponential_backoff(),
+            DEFAULT_RESET_DURATION,
+        ))
+    }
+}
+
+impl Backoff for DefaultBackoff {
+    fn next_backoff(&mut self) -> Option<Duration> {
+        self.0.next_backoff()
+    }
+
+    fn reset(&mut self) {
+        self.0.reset()
+    }
+}
