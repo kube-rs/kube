@@ -8,10 +8,12 @@ use crate::{
 };
 #[cfg(feature = "unstable-runtime-predicates")] use kube_client::Resource;
 
-use crate::{utils::ResetTimerBackoff, watcher::default_exponential_backoff};
+use crate::{
+    utils::ResetTimerBackoff,
+    watcher::{default_exponential_backoff, DEFAULT_RESET_DURATION},
+};
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use futures::{Stream, TryStream};
-use std::time::Duration;
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
@@ -23,7 +25,7 @@ pub trait WatchStreamExt: Stream {
         Self: TryStream + Sized,
     {
         let bo = default_exponential_backoff();
-        StreamBackoff::new(self, ResetTimerBackoff::new(bo, Duration::from_secs(120)))
+        StreamBackoff::new(self, ResetTimerBackoff::new(bo, DEFAULT_RESET_DURATION))
     }
 
     /// Apply a specific [`Backoff`] policy to a [`Stream`] using [`StreamBackoff`]

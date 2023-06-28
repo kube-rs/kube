@@ -647,7 +647,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 #[must_use]
 pub fn default_backoff() -> impl Backoff + Send + Sync {
     let bo = default_exponential_backoff();
-    ResetTimerBackoff::new(bo, Duration::from_secs(120))
+    ResetTimerBackoff::new(bo, DEFAULT_RESET_DURATION)
 }
 
 // ideally should be a const var but Default for ExponentialBackoff is not const
@@ -661,3 +661,4 @@ pub(crate) fn default_exponential_backoff() -> backoff::ExponentialBackoff {
         ..ExponentialBackoff::default()
     }
 }
+pub(crate) const DEFAULT_RESET_DURATION: Duration = Duration::from_secs(120);
