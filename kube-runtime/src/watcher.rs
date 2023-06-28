@@ -640,10 +640,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 
 /// Default watch [`Backoff`] inspired by Kubernetes' client-go.
 ///
-/// Note that the exact parameters used herein should not be considered stable.
-/// The parameters currently optimize for being kind to struggling apiservers.
-/// See [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
-/// for more details.
+/// This fn has been moved into [`DefaultBackoff`].
 #[must_use]
 #[deprecated(
     since = "0.84.0",
@@ -656,12 +653,17 @@ pub fn default_backoff() -> impl Backoff + Send + Sync {
 
 /// Default watcher backoff inspired by Kubernetes' client-go.
 ///
-/// Note that the exact parameters used herein should not be considered stable.
 /// The parameters currently optimize for being kind to struggling apiservers.
-/// See [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
-/// for more details.
-pub struct DefaultBackoff(ResetTimerBackoff<ExponentialBackoff>);
+/// The exact parameters are taken from
+/// [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
+/// and should not be considered stable.
+///
+/// This struct implements [`Backoff`] and is the default strategy used
+/// when calling `WatchStreamExt::default_backoff`. If you need to create
+/// this manually then [`DefaultBackoff::default`] can be used.
+pub struct DefaultBackoff(Strategy);
 
+struct Strategy(ResetTimerBackoff<ExponentialBackoff>); // encapsulate strategy
 
 fn default_exponential_backoff() -> backoff::ExponentialBackoff {
     backoff::ExponentialBackoff {
@@ -677,19 +679,19 @@ const DEFAULT_RESET_DURATION: Duration = Duration::from_secs(120);
 
 impl Default for DefaultBackoff {
     fn default() -> Self {
-        Self(ResetTimerBackoff::new(
+        Self(Strategy(ResetTimerBackoff::new(
             default_exponential_backoff(),
             DEFAULT_RESET_DURATION,
-        ))
+        )))
     }
 }
 
 impl Backoff for DefaultBackoff {
     fn next_backoff(&mut self) -> Option<Duration> {
-        self.0.next_backoff()
+        self.0 .0.next_backoff()
     }
 
     fn reset(&mut self) {
-        self.0.reset()
+        self.0 .0.reset()
     }
 }
