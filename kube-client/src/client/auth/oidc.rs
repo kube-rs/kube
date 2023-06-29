@@ -1,5 +1,12 @@
 use std::collections::HashMap;
 
+use base64::{
+    alphabet,
+    engine::{
+        fast_portable::{FastPortable, FastPortableConfig},
+        DecodePaddingMode,
+    },
+};
 use chrono::{Duration, TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
@@ -111,6 +118,13 @@ pub enum Error {
     ),
 }
 
+const BASE64_ENGINE: FastPortable = FastPortable::from(
+    &alphabet::URL_SAFE,
+    FastPortableConfig::new()
+        .with_decode_allow_trailing_bits(true)
+        .with_decode_padding_mode(DecodePaddingMode::Indifferent),
+);
+
 #[derive(Debug)]
 pub struct Oidc {
     id_token: SecretString,
@@ -132,10 +146,10 @@ impl Oidc {
             .skip(1)
             .next()
             .ok_or(IdTokenError::InvalidFormat)?;
-        let payload = base64::decode(part)?;
+        let payload = base64::decode_engine(part, &BASE64_ENGINE)?;
         let expiry = serde_json::from_slice::<Claims>(&payload)?.expiry;
         let timestamp = Utc
-            .timestamp_millis_opt(expiry)
+            .timestamp_opt(expiry, 0)
             .earliest()
             .ok_or(IdTokenError::InvalidExpirationTimestamp)?;
 
@@ -395,5 +409,56 @@ impl Refresher {
         }
 
         token_response.id_token.ok_or(RefreshError::NoIdTokenReceived)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn token_valid() {
+        let mut oidc = Oidc {
+            id_token: String::new().into(),
+            refresher: Err(RefreshInitError::MissingField(Refresher::CONFIG_REFRESH_TOKEN)),
+        };
+
+        // Proper JWT expiring at 2123-06-28T15:18:12.629Z
+        let token_valid = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9\
+.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2ODc5NjU0NTIsImV4cCI6NDg0MzYzOTA5MiwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwic3ViIjoianJvY2tldEBleGFtcGxlLmNvbSIsIkVtYWlsIjoiYmVlQGV4YW1wbGUuY29tIn0\
+.GKTkPMywcNQv0n01iBfv_A6VuCCCcAe72RhP0OrZsQM";
+        // Proper JWT expired at 2023-06-28T15:19:53.421Z
+        let token_expired = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9\
+.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2ODc5NjU0NTIsImV4cCI6MTY4Nzk2NTU5MywiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwic3ViIjoianJvY2tldEBleGFtcGxlLmNvbSIsIkVtYWlsIjoiYmVlQGV4YW1wbGUuY29tIn0\
+.zTDnfI_zXIa6yPKY_ZE8r6GoLK7Syj-URcTU5_ryv1M";
+
+        oidc.id_token = token_valid.to_string().into();
+        assert!(oidc.token_valid().unwrap());
+
+        oidc.id_token = token_expired.to_string().into();
+        assert!(!oidc.token_valid().unwrap());
+
+        let malformed_token = token_expired.split_once('.').unwrap().0.to_string();
+        oidc.id_token = malformed_token.into();
+        oidc.token_valid().unwrap_err();
+
+        let invalid_base64_token = token_valid
+            .split_once('.')
+            .map(|(prefix, suffix)| format!("{}.?{}", prefix, suffix))
+            .unwrap();
+        oidc.id_token = invalid_base64_token.into();
+        oidc.token_valid().unwrap_err();
+
+        let invalid_claims = [("sub", "jrocket@example.com"), ("aud", "www.example.com")]
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+        let invalid_claims_token = format!(
+            "{}.{}.{}",
+            token_valid.split_once('.').unwrap().0,
+            base64::encode(serde_json::to_string(&invalid_claims).unwrap()),
+            token_valid.rsplit_once('.').unwrap().1,
+        );
+        oidc.id_token = invalid_claims_token.into();
+        oidc.token_valid().unwrap_err();
     }
 }
