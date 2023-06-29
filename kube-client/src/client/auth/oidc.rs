@@ -210,7 +210,7 @@ struct Metadata {
 /// Authorization styles used by different providers.
 /// Some providers require the authorization info in the header, some in the request body.
 /// Some providers reject requests when authorization info is passed in both.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AuthStyle {
     Header,
     Params,
@@ -433,21 +433,22 @@ mod tests {
 .zTDnfI_zXIa6yPKY_ZE8r6GoLK7Syj-URcTU5_ryv1M";
 
         oidc.id_token = token_valid.to_string().into();
-        assert!(oidc.token_valid().unwrap());
+        assert!(oidc.token_valid().expect("proper token failed validation"));
 
         oidc.id_token = token_expired.to_string().into();
-        assert!(!oidc.token_valid().unwrap());
+        assert!(!oidc.token_valid().expect("proper token failed validation"));
 
         let malformed_token = token_expired.split_once('.').unwrap().0.to_string();
         oidc.id_token = malformed_token.into();
-        oidc.token_valid().unwrap_err();
+        oidc.token_valid().expect_err("malformed token passed validation");
 
         let invalid_base64_token = token_valid
             .split_once('.')
             .map(|(prefix, suffix)| format!("{}.?{}", prefix, suffix))
             .unwrap();
         oidc.id_token = invalid_base64_token.into();
-        oidc.token_valid().unwrap_err();
+        oidc.token_valid()
+            .expect_err("token with invalid base64 encoding passed validation");
 
         let invalid_claims = [("sub", "jrocket@example.com"), ("aud", "www.example.com")]
             .into_iter()
@@ -459,6 +460,53 @@ mod tests {
             token_valid.rsplit_once('.').unwrap().1,
         );
         oidc.id_token = invalid_claims_token.into();
-        oidc.token_valid().unwrap_err();
+        oidc.token_valid()
+            .expect_err("token without expiration timestamp passed validation");
+    }
+
+    #[cfg(any(feature = "openssl-tls", feature = "rustls-tls"))]
+    #[test]
+    fn from_minimal_config() {
+        let minimal_config = [(Oidc::CONFIG_ID_TOKEN.into(), "some_id_token".into())]
+            .into_iter()
+            .collect();
+
+        let oidc = Oidc::from_config(&minimal_config)
+            .expect("failed to create oidc from minimal config (only id-token)");
+        assert_eq!(oidc.id_token.expose_secret(), "some_id_token");
+        assert!(oidc.refresher.is_err());
+    }
+
+    #[cfg(any(feature = "openssl-tls", feature = "rustls-tls"))]
+    #[test]
+    fn from_full_config() {
+        let full_config = [
+            (Oidc::CONFIG_ID_TOKEN.into(), "some_id_token".into()),
+            (Refresher::CONFIG_ISSUER_URL.into(), "some_issuer".into()),
+            (
+                Refresher::CONFIG_REFRESH_TOKEN.into(),
+                "some_refresh_token".into(),
+            ),
+            (Refresher::CONFIG_CLIENT_ID.into(), "some_client_id".into()),
+            (
+                Refresher::CONFIG_CLIENT_SECRET.into(),
+                "some_client_secret".into(),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        let oidc = Oidc::from_config(&full_config).expect("failed to create oidc from full config");
+        assert_eq!(oidc.id_token.expose_secret(), "some_id_token");
+        let refresher = oidc
+            .refresher
+            .as_ref()
+            .expect("failed to create oidc refresher from full config");
+        assert_eq!(refresher.issuer, "some_issuer");
+        assert_eq!(refresher.token_endpoint, None);
+        assert_eq!(refresher.refresh_token.expose_secret(), "some_refresh_token");
+        assert_eq!(refresher.client_id.expose_secret(), "some_client_id");
+        assert_eq!(refresher.client_secret.expose_secret(), "some_client_secret");
+        assert_eq!(refresher.auth_style, None);
     }
 }
