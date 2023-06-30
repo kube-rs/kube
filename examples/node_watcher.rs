@@ -1,4 +1,3 @@
-use backoff::ExponentialBackoff;
 use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
@@ -16,9 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let nodes: Api<Node> = Api::all(client.clone());
 
     let wc = watcher::Config::default().labels("beta.kubernetes.io/arch=amd64");
-    let obs = watcher(nodes, wc)
-        .backoff(ExponentialBackoff::default())
-        .applied_objects();
+    let obs = watcher(nodes, wc).default_backoff().applied_objects();
 
     pin_mut!(obs);
     while let Some(n) = obs.try_next().await? {

@@ -9,7 +9,7 @@ use crate::{
     },
     scheduler::{scheduler, ScheduleRequest},
     utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
-    watcher::{self, watcher, Config},
+    watcher::{self, watcher, Config, DefaultBackoff},
 };
 use backoff::backoff::Backoff;
 use derivative::Derivative;
@@ -541,7 +541,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
-            trigger_backoff: Box::new(watcher::default_backoff()),
+            trigger_backoff: Box::<DefaultBackoff>::default(),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -624,7 +624,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
-            trigger_backoff: Box::new(watcher::default_backoff()),
+            trigger_backoff: Box::<DefaultBackoff>::default(),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -710,14 +710,14 @@ where
     /// # use k8s_openapi::api::core::v1::ConfigMap;
     /// # use k8s_openapi::api::apps::v1::StatefulSet;
     /// # use kube::runtime::controller::Action;
-    /// # use kube::runtime::{predicates, watcher, Controller, WatchStreamExt};
+    /// # use kube::runtime::{predicates, metadata_watcher, watcher, Controller, WatchStreamExt};
     /// # use kube::{Api, Client, Error, ResourceExt};
     /// # use std::sync::Arc;
     /// # type CustomResource = ConfigMap;
     /// # async fn reconcile(_: Arc<CustomResource>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
     /// # fn error_policy(_: Arc<CustomResource>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
     /// # async fn doc(client: kube::Client) {
-    /// let sts_stream = watcher(Api::<StatefulSet>::all(client.clone()), watcher::Config::default())
+    /// let sts_stream = metadata_watcher(Api::<StatefulSet>::all(client.clone()), watcher::Config::default())
     ///     .touched_objects()
     ///     .predicate_filter(predicates::generation);
     ///

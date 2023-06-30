@@ -15,6 +15,7 @@ async fn main() -> anyhow::Result<()> {
 
     watcher(api, watcher::Config::default())
         .applied_objects()
+        .default_backoff()
         .try_for_each(|p| async move {
             info!("saw {}", p.name_any());
             if let Some(unready_reason) = pod_unready(&p) {

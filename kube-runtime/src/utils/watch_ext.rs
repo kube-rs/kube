@@ -8,12 +8,23 @@ use crate::{
 };
 #[cfg(feature = "unstable-runtime-predicates")] use kube_client::Resource;
 
+use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
-    /// Apply a [`Backoff`] policy to a [`Stream`] using [`StreamBackoff`]
+    /// Apply the [`DefaultBackoff`] watcher [`Backoff`] policy
+    ///
+    /// This is recommended for controllers that want to play nicely with the apiserver.
+    fn default_backoff(self) -> StreamBackoff<Self, DefaultBackoff>
+    where
+        Self: TryStream + Sized,
+    {
+        StreamBackoff::new(self, DefaultBackoff::default())
+    }
+
+    /// Apply a specific [`Backoff`] policy to a [`Stream`] using [`StreamBackoff`]
     fn backoff<B>(self, b: B) -> StreamBackoff<Self, B>
     where
         B: Backoff,
