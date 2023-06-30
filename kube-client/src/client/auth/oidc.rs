@@ -11,111 +11,130 @@ use chrono::{Duration, TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
     header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE},
-    Method, StatusCode, Version,
+    Method, Version,
 };
-use hyper::{
-    body,
-    client::HttpConnector,
-    http::{uri::InvalidUri, Uri},
-    Client, Request,
-};
+use hyper::{body, client::HttpConnector, http::Uri, Client, Request};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
 use serde_json::Number;
-use thiserror::Error;
 
-/// Possible errors when extracting expiration time from an ID token.
-#[derive(Error, Debug)]
-pub enum IdTokenError {
-    #[error("not a valid JWT token")]
-    InvalidFormat,
-    #[error("failed to decode base64: {0}")]
-    InvalidBase64(
-        #[source]
-        #[from]
-        base64::DecodeError,
-    ),
-    #[error("failed to unmarshal JSON: {0}")]
-    InvalidJson(
-        #[source]
-        #[from]
-        serde_json::Error,
-    ),
-    #[error("invalid expiration timestamp")]
-    InvalidExpirationTimestamp,
-}
+/// Possible errors when handling OIDC authentication.
+pub mod errors {
+    use super::Oidc;
+    use http::{uri::InvalidUri, StatusCode};
+    use thiserror::Error;
 
-/// Possible error when initializing the [`Refresher`].
-#[derive(Error, Debug, Clone)]
-pub enum RefreshInitError {
-    #[error("missing field {0}")]
-    MissingField(&'static str),
-    #[cfg(feature = "openssl-tls")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
-    #[error("failed to create OpenSSL HTTPS connector: {0}")]
-    CreateOpensslHttpsConnector(
-        #[source]
-        #[from]
-        openssl::error::ErrorStack,
-    ),
-}
+    /// Possible errors when extracting expiration time from an ID token.
+    #[derive(Error, Debug)]
+    pub enum IdTokenError {
+        /// Failed to extract payload from the ID token.
+        #[error("not a valid JWT token")]
+        InvalidFormat,
+        /// ID token payload is not properly encoded in base64.
+        #[error("failed to decode base64: {0}")]
+        InvalidBase64(
+            #[source]
+            #[from]
+            base64::DecodeError,
+        ),
+        /// ID token payload is not valid JSON object containing expiration timestamp.
+        #[error("failed to unmarshal JSON: {0}")]
+        InvalidJson(
+            #[source]
+            #[from]
+            serde_json::Error,
+        ),
+        /// Expiration timestamp extracted from the ID token payload is not valid.
+        #[error("invalid expiration timestamp")]
+        InvalidExpirationTimestamp,
+    }
 
-/// Possible errors when using the refresh token.
-#[derive(Error, Debug)]
-pub enum RefreshError {
-    #[error("invalid URI: {0}")]
-    InvalidURI(
-        #[source]
-        #[from]
-        InvalidUri,
-    ),
-    #[error("hyper error: {0}")]
-    HyperError(
-        #[source]
-        #[from]
-        hyper::Error,
-    ),
-    #[error("invalid metadata received from the provider: {0}")]
-    InvalidMetadata(#[source] serde_json::Error),
-    #[error("request failed with status code: {0}")]
-    RequestFailed(StatusCode),
-    #[error("http error: {0}")]
-    HttpError(
-        #[source]
-        #[from]
-        http::Error,
-    ),
-    #[error("failed to authorize with the provider using any of known authorization styles")]
-    AuthorizationFailure,
-    #[error("invalid token response received from the provider: {0}")]
-    InvalidTokenResponse(#[source] serde_json::Error),
-    #[error("no ID token received from the provider")]
-    NoIdTokenReceived,
-}
+    /// Possible error when initializing the ID token refreshing.
+    #[derive(Error, Debug, Clone)]
+    pub enum RefreshInitError {
+        /// Missing field in the configuration.
+        #[error("missing field {0}")]
+        MissingField(&'static str),
+        /// Failed to create an HTTPS client.
+        #[cfg(feature = "openssl-tls")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
+        #[error("failed to create OpenSSL HTTPS connector: {0}")]
+        CreateOpensslHttpsConnector(
+            #[source]
+            #[from]
+            openssl::error::ErrorStack,
+        ),
+    }
 
-/// Possible errors when dealing with OIDC.
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("missing field {}", Oidc::CONFIG_ID_TOKEN)]
-    IdTokenMissing,
-    #[error("invalid ID token: {0}")]
-    IdToken(
-        #[source]
-        #[from]
-        IdTokenError,
-    ),
-    #[error("ID token expired and refreshing is not possible: {0}")]
-    RefreshInit(
-        #[source]
-        #[from]
-        RefreshInitError,
-    ),
-    #[error("ID token expired and refreshing failed: {0}")]
-    Refresh(
-        #[source]
-        #[from]
-        RefreshError,
-    ),
+    /// Possible errors when using the refresh token.
+    #[derive(Error, Debug)]
+    pub enum RefreshError {
+        /// Failed to parse the provided issuer URL.
+        #[error("invalid URI: {0}")]
+        InvalidURI(
+            #[source]
+            #[from]
+            InvalidUri,
+        ),
+        /// [`hyper::Error`] occurred during refreshing.
+        #[error("hyper error: {0}")]
+        HyperError(
+            #[source]
+            #[from]
+            hyper::Error,
+        ),
+        /// Failed to parse the metadata received from the provider.
+        #[error("invalid metadata received from the provider: {0}")]
+        InvalidMetadata(#[source] serde_json::Error),
+        /// Received an invalid status code from the provider.
+        #[error("request failed with status code: {0}")]
+        RequestFailed(StatusCode),
+        /// [`http::Error`] occurred during refreshing.
+        #[error("http error: {0}")]
+        HttpError(
+            #[source]
+            #[from]
+            http::Error,
+        ),
+        /// Failed to authorize with the provider.
+        #[error("failed to authorize with the provider using any of known authorization styles")]
+        AuthorizationFailure,
+        /// Failed to parse the token response from the provider.
+        #[error("invalid token response received from the provider: {0}")]
+        InvalidTokenResponse(#[source] serde_json::Error),
+        /// Token response from the provider did not contain an ID token.
+        #[error("no ID token received from the provider")]
+        NoIdTokenReceived,
+    }
+
+    /// Possible errors when dealing with OIDC.
+    #[derive(Error, Debug)]
+    pub enum Error {
+        /// Config did not contain the ID token.
+        #[error("missing field {}", Oidc::CONFIG_ID_TOKEN)]
+        IdTokenMissing,
+        /// Failed to retrieve expiration timestamp from the ID token.
+        #[error("invalid ID token: {0}")]
+        IdToken(
+            #[source]
+            #[from]
+            IdTokenError,
+        ),
+        /// Failed to initialize ID token refreshing.
+        #[error("ID token expired and refreshing is not possible: {0}")]
+        RefreshInit(
+            #[source]
+            #[from]
+            RefreshInitError,
+        ),
+        /// Failed to refresh the ID token.
+        #[error("ID token expired and refreshing failed: {0}")]
+        Refresh(
+            #[source]
+            #[from]
+            RefreshError,
+        ),
+    }
 }
 
 const BASE64_ENGINE: FastPortable = FastPortable::from(
@@ -128,7 +147,7 @@ const BASE64_ENGINE: FastPortable = FastPortable::from(
 #[derive(Debug)]
 pub struct Oidc {
     id_token: SecretString,
-    refresher: Result<Refresher, RefreshInitError>,
+    refresher: Result<Refresher, errors::RefreshInitError>,
 }
 
 impl Oidc {
@@ -138,20 +157,20 @@ impl Oidc {
     const EXPIRY_DELTA_SECONDS: i64 = 10;
 
     /// Check whether the stored ID token can still be used.
-    fn token_valid(&self) -> Result<bool, IdTokenError> {
+    fn token_valid(&self) -> Result<bool, errors::IdTokenError> {
         let part = self
             .id_token
             .expose_secret()
             .split('.')
             .skip(1)
             .next()
-            .ok_or(IdTokenError::InvalidFormat)?;
+            .ok_or(errors::IdTokenError::InvalidFormat)?;
         let payload = base64::decode_engine(part, &BASE64_ENGINE)?;
         let expiry = serde_json::from_slice::<Claims>(&payload)?.expiry;
         let timestamp = Utc
             .timestamp_opt(expiry, 0)
             .earliest()
-            .ok_or(IdTokenError::InvalidExpirationTimestamp)?;
+            .ok_or(errors::IdTokenError::InvalidExpirationTimestamp)?;
 
         let valid = Utc::now() + Duration::seconds(Self::EXPIRY_DELTA_SECONDS) < timestamp;
 
@@ -159,7 +178,7 @@ impl Oidc {
     }
 
     /// Retrieve the ID token. If the stored ID token is or will soon be expired, try refreshing it first.
-    pub async fn id_token(&mut self) -> Result<String, Error> {
+    pub async fn id_token(&mut self) -> Result<String, errors::Error> {
         if self.token_valid()? {
             return Ok(self.id_token.expose_secret().clone());
         }
@@ -172,10 +191,10 @@ impl Oidc {
     }
 
     /// Create an instance of this struct from the auth provider config.
-    pub fn from_config(config: &HashMap<String, String>) -> Result<Self, Error> {
+    pub fn from_config(config: &HashMap<String, String>) -> Result<Self, errors::Error> {
         let id_token = config
             .get(Self::CONFIG_ID_TOKEN)
-            .ok_or(Error::IdTokenMissing)?
+            .ok_or(errors::Error::IdTokenMissing)?
             .clone()
             .into();
         let refresher = Refresher::from_config(config);
@@ -269,12 +288,12 @@ impl Refresher {
     const CONFIG_REFRESH_TOKEN: &str = "refresh-token";
 
     /// Create a new instance of this struct from the provider config.
-    fn from_config(config: &HashMap<String, String>) -> Result<Self, RefreshInitError> {
+    fn from_config(config: &HashMap<String, String>) -> Result<Self, errors::RefreshInitError> {
         let get_field = |name: &'static str| {
             config
                 .get(name)
                 .cloned()
-                .ok_or(RefreshInitError::MissingField(name))
+                .ok_or(errors::RefreshInitError::MissingField(name))
         };
 
         let issuer = get_field(Self::CONFIG_ISSUER_URL)?;
@@ -307,7 +326,7 @@ impl Refresher {
 
     /// If the token endpoint is not yet cached in this struct, extract it from the provider metadata and store in the cache.
     /// Provider metadata is retrieved from a well-known path.
-    async fn token_endpoint(&mut self) -> Result<String, RefreshError> {
+    async fn token_endpoint(&mut self) -> Result<String, errors::RefreshError> {
         if let Some(endpoint) = self.token_endpoint.clone() {
             return Ok(endpoint);
         }
@@ -317,19 +336,23 @@ impl Refresher {
 
         if response.status().is_success() {
             let body = body::to_bytes(response.into_body()).await?;
-            let metadata =
-                serde_json::from_slice::<Metadata>(body.as_ref()).map_err(RefreshError::InvalidMetadata)?;
+            let metadata = serde_json::from_slice::<Metadata>(body.as_ref())
+                .map_err(errors::RefreshError::InvalidMetadata)?;
 
             self.token_endpoint.replace(metadata.token_endpoint.clone());
 
             Ok(metadata.token_endpoint)
         } else {
-            Err(RefreshError::RequestFailed(response.status()))
+            Err(errors::RefreshError::RequestFailed(response.status()))
         }
     }
 
     /// Prepare a token request to the provider.
-    fn token_request(&self, endpoint: &str, auth_style: AuthStyle) -> Result<Request<String>, RefreshError> {
+    fn token_request(
+        &self,
+        endpoint: &str,
+        auth_style: AuthStyle,
+    ) -> Result<Request<String>, errors::RefreshError> {
         let mut builder = Request::builder()
             .uri(endpoint)
             .method(Method::POST)
@@ -371,7 +394,7 @@ impl Refresher {
     }
 
     /// Fetch a new ID token from the provider.
-    async fn id_token(&mut self) -> Result<String, RefreshError> {
+    async fn id_token(&mut self) -> Result<String, errors::RefreshError> {
         let token_endpoint = self.token_endpoint().await?;
 
         let response = match self.auth_style.clone() {
@@ -392,23 +415,25 @@ impl Refresher {
                     }
                 }
 
-                ok_response.ok_or(RefreshError::AuthorizationFailure)?
+                ok_response.ok_or(errors::RefreshError::AuthorizationFailure)?
             }
         };
 
         if !response.status().is_success() {
-            return Err(RefreshError::RequestFailed(response.status()));
+            return Err(errors::RefreshError::RequestFailed(response.status()));
         }
 
         let body = body::to_bytes(response.into_body()).await?;
         let token_response = serde_json::from_slice::<TokenResponse>(body.as_ref())
-            .map_err(RefreshError::InvalidTokenResponse)?;
+            .map_err(errors::RefreshError::InvalidTokenResponse)?;
 
         if let Some(token) = token_response.refresh_token {
             self.refresh_token = token.into();
         }
 
-        token_response.id_token.ok_or(RefreshError::NoIdTokenReceived)
+        token_response
+            .id_token
+            .ok_or(errors::RefreshError::NoIdTokenReceived)
     }
 }
 
@@ -420,7 +445,9 @@ mod tests {
     fn token_valid() {
         let mut oidc = Oidc {
             id_token: String::new().into(),
-            refresher: Err(RefreshInitError::MissingField(Refresher::CONFIG_REFRESH_TOKEN)),
+            refresher: Err(errors::RefreshInitError::MissingField(
+                Refresher::CONFIG_REFRESH_TOKEN,
+            )),
         };
 
         // Proper JWT expiring at 2123-06-28T15:18:12.629Z

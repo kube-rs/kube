@@ -32,7 +32,7 @@ config = ["__non_core", "pem", "dirs"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_26"]
+features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/v1_26"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 

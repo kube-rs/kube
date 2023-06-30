@@ -23,7 +23,7 @@ use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig, ExecInteractiveMod
 #[cfg(feature = "oauth")] mod oauth;
 #[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
 #[cfg(feature = "oidc")] mod oidc;
-#[cfg(feature = "oidc")] pub use oidc::Error as OidcError;
+#[cfg(feature = "oidc")] pub use oidc::errors as oidc_errors;
 #[cfg(target_os = "windows")] use std::os::windows::process::CommandExt;
 
 #[derive(Error, Debug)]
@@ -98,7 +98,7 @@ pub enum Error {
     #[cfg(feature = "oidc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
     #[error("failed OIDC: {0}")]
-    Oidc(#[source] OidcError),
+    Oidc(#[source] oidc_errors::Error),
 }
 
 #[derive(Debug, Clone)]
