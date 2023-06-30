@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "client", "runtime", "cncf"]
 categories = ["network-programming", "caching", "api-bindings", "configuration", "encoding"]
-rust-version = "1.63.0"
+rust-version = "1.64.0"
 edition = "2021"
 
 [features]
