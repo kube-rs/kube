@@ -47,6 +47,10 @@ pub use tls::openssl_tls::Error as OpensslTlsError;
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
 pub use auth::OAuthError;
 
+#[cfg(feature = "oidc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
+pub use auth::oidc_errors;
+
 #[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
 
 pub use builder::{ClientBuilder, DynBody};

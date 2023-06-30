@@ -14,11 +14,12 @@ license = "Apache-2.0"
 release = false
 
 [features]
-default = ["openssl-tls", "kubederive", "ws", "latest", "runtime"]
+default = ["openssl-tls", "kubederive", "ws", "latest", "runtime", "refresh"]
 kubederive = ["kube/derive"]
 openssl-tls = ["kube/client", "kube/openssl-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
 runtime = ["kube/runtime", "kube/unstable-runtime"]
+refresh = ["kube/oauth", "kube/oidc"]
 ws = ["kube/ws"]
 latest = ["k8s-openapi/v1_26"]
 
