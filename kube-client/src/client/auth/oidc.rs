@@ -162,8 +162,7 @@ impl Oidc {
             .id_token
             .expose_secret()
             .split('.')
-            .skip(1)
-            .next()
+            .nth(1)
             .ok_or(errors::IdTokenError::InvalidFormat)?;
         let payload = base64::decode_engine(part, &BASE64_ENGINE)?;
         let expiry = serde_json::from_slice::<Claims>(&payload)?.expiry;
@@ -397,7 +396,7 @@ impl Refresher {
     async fn id_token(&mut self) -> Result<String, errors::RefreshError> {
         let token_endpoint = self.token_endpoint().await?;
 
-        let response = match self.auth_style.clone() {
+        let response = match self.auth_style {
             Some(style) => {
                 let request = self.token_request(&token_endpoint, style)?;
                 self.https_client.request(request).await?

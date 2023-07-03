@@ -46,6 +46,7 @@ pub enum Error {
 /// # Ok(())
 /// # }
 /// ```
+#[allow(clippy::missing_panics_doc)] // watch never actually terminates, expect cannot fail
 pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<Option<K>, Error>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
