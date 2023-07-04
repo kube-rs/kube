@@ -269,9 +269,14 @@ where
             // 1. inputs from users queue stream
             queue
                 .map_err(Error::QueueError)
-                .map_ok(|request| ScheduleRequest {
-                    message: request.into(),
-                    run_at: Instant::now() + Duration::from_millis(1),
+                .map_ok(|request| {
+                    let r = Into::<ReconcileRequest<K>>::into(request);
+                    let reason = r.reason.to_string();
+                    ScheduleRequest {
+                        message: r,
+                        run_at: Instant::now() + Duration::from_millis(1),
+                        reason: reason,
+                    }
                 })
                 .on_complete(async move {
                     // On error: scheduler has already been shut down and there is nothing for us to do
@@ -367,9 +372,10 @@ where
             reschedule_request: action.requeue_after.map(|requeue_after| ScheduleRequest {
                 message: ReconcileRequest {
                     obj_ref,
-                    reason: reschedule_reason,
+                    reason: reschedule_reason.clone(),
                 },
                 run_at: reconciler_finished_at + requeue_after,
+                reason: reschedule_reason.to_string(),
             }),
             result: Some(result),
         }

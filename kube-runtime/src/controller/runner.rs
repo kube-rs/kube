@@ -123,6 +123,7 @@ mod tests {
             .send(ScheduleRequest {
                 message: (),
                 run_at: Instant::now(),
+                reason: String::from(""),
             })
             .await
             .unwrap();
@@ -131,6 +132,7 @@ mod tests {
             .send(ScheduleRequest {
                 message: (),
                 run_at: Instant::now(),
+                reason: String::from(""),
             })
             .await
             .unwrap();
@@ -163,6 +165,7 @@ mod tests {
             .send(ScheduleRequest {
                 message: 8,
                 run_at: Instant::now(),
+                reason: String::from(""),
             })
             .await
             .unwrap();

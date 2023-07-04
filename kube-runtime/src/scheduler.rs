@@ -1,5 +1,6 @@
 //! Delays and deduplicates [`Stream`] items
 
+use crate::controller::ReconcileRequest;
 use futures::{stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use std::{
@@ -16,11 +17,18 @@ use tokio_util::time::delay_queue::{self, DelayQueue};
 pub struct ScheduleRequest<T> {
     pub message: T,
     pub run_at: Instant,
+    // The reason behind the scheduling of this request. This field mainly
+    // exists to let us shadow the value of `controller::ReconcileRequest.reason`
+    // since the controller uses the scheduler to emit `controller::ReconcileRequest`s
+    // as a `message` and we can't update its `reason` field since message is bound to
+    // a generic parameter.
+    pub reason: String,
 }
 
 /// Internal metadata for a scheduled message.
 struct ScheduledEntry {
     run_at: Instant,
+    reason: String,
     queue_key: delay_queue::Key,
 }
 
@@ -60,12 +68,24 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             // Message is already pending, so we can't even expedite it
             return;
         }
-        match self.scheduled.entry(request.message) {
+        match self.scheduled.entry(request.message.clone()) {
             Entry::Occupied(mut old_entry) if old_entry.get().run_at >= request.run_at => {
                 // Old entry will run after the new request, so replace it..
                 let entry = old_entry.get_mut();
+
+                // Compare the new request's reason with the reason we have for the existing
+                // message. If its different then we need to replace the entire message with the new
+                // request's message since we can't update the existing message's reason and we'd
+                // like the emitted message to have the correct reason about emission.
+                if entry.reason != request.reason {
+                    // Something like `queue.update(key, value)` would have been ideal, but alas.
+                    self.queue.try_remove(&entry.queue_key);
+                    entry.queue_key = self.queue.insert_at(request.message, request.run_at);
+                    entry.reason = request.reason;
+                } else {
+                    self.queue.reset_at(&entry.queue_key, request.run_at);
+                }
                 // TODO: this should add a little delay here to actually debounce
-                self.queue.reset_at(&entry.queue_key, request.run_at);
                 entry.run_at = request.run_at;
             }
             Entry::Occupied(_old_entry) => {
@@ -77,6 +97,7 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
                 entry.insert(ScheduledEntry {
                     run_at: request.run_at,
                     queue_key: self.queue.insert_at(message, request.run_at),
+                    reason: request.reason,
                 });
             }
         }
@@ -204,7 +225,12 @@ mod tests {
     use crate::utils::KubeRuntimeStreamExt;
 
     use super::{scheduler, ScheduleRequest};
+    use crate::{
+        controller::{ReconcileReason, ReconcileRequest},
+        reflector::ObjectRef,
+    };
     use futures::{channel::mpsc, future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
+    use k8s_openapi::api::core::v1::ConfigMap;
     use std::task::Poll;
     use tokio::time::{advance, pause, sleep, Duration, Instant};
 
@@ -223,6 +249,7 @@ mod tests {
             stream::iter(vec![ScheduleRequest {
                 message: 1_u8,
                 run_at: Instant::now(),
+                reason: String::from(""),
             }])
             .on_complete(sleep(Duration::from_secs(4))),
         ));
@@ -245,6 +272,7 @@ mod tests {
         tx.send(ScheduleRequest {
             message: 1,
             run_at: Instant::now(),
+            reason: String::from(""),
         })
         .await
         .unwrap();
@@ -252,6 +280,7 @@ mod tests {
         tx.send(ScheduleRequest {
             message: 1,
             run_at: Instant::now(),
+            reason: String::from(""),
         })
         .await
         .unwrap();
@@ -275,10 +304,12 @@ mod tests {
                 ScheduleRequest {
                     message: 1,
                     run_at: Instant::now(),
+                    reason: String::from(""),
                 },
                 ScheduleRequest {
                     message: 2,
                     run_at: Instant::now(),
+                    reason: String::from(""),
                 },
             ])
             .on_complete(sleep(Duration::from_secs(2))),
@@ -297,10 +328,12 @@ mod tests {
                 ScheduleRequest {
                     message: 1_u8,
                     run_at: Instant::now() + Duration::from_secs(1),
+                    reason: String::from(""),
                 },
                 ScheduleRequest {
                     message: 2,
                     run_at: Instant::now() + Duration::from_secs(3),
+                    reason: String::from(""),
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
@@ -324,10 +357,12 @@ mod tests {
                 ScheduleRequest {
                     message: (),
                     run_at: Instant::now() + Duration::from_secs(1),
+                    reason: String::from(""),
                 },
                 ScheduleRequest {
                     message: (),
                     run_at: Instant::now() + Duration::from_secs(3),
+                    reason: String::from(""),
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
@@ -348,10 +383,12 @@ mod tests {
                 ScheduleRequest {
                     message: (),
                     run_at: Instant::now() + Duration::from_secs(3),
+                    reason: String::from(""),
                 },
                 ScheduleRequest {
                     message: (),
                     run_at: Instant::now() + Duration::from_secs(1),
+                    reason: String::from(""),
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
@@ -373,6 +410,7 @@ mod tests {
             .send(ScheduleRequest {
                 message: (),
                 run_at: Instant::now() + Duration::from_secs(1),
+                reason: String::from(""),
             })
             .await
             .unwrap();
@@ -384,6 +422,7 @@ mod tests {
             .send(ScheduleRequest {
                 message: (),
                 run_at: Instant::now() + Duration::from_secs(1),
+                reason: String::from(""),
             })
             .await
             .unwrap();
@@ -391,5 +430,40 @@ mod tests {
         advance(Duration::from_secs(2)).await;
         scheduler.next().now_or_never().unwrap().unwrap();
         assert!(poll!(scheduler.next()).is_pending());
+    }
+
+    #[tokio::test]
+    async fn scheduler_dedupe_should_consider_earliest_item_reason() {
+        pause();
+        let early = ReconcileReason::ObjectUpdated;
+        let later = ReconcileReason::ReconcilerRequestedRetry;
+        let scheduler = scheduler(
+            stream::iter(vec![
+                ScheduleRequest {
+                    message: ReconcileRequest {
+                        obj_ref: ObjectRef::<ConfigMap>::new("a").erase(),
+                        reason: later.clone(),
+                    },
+                    run_at: Instant::now() + Duration::from_secs(3),
+                    reason: later.to_string(),
+                },
+                ScheduleRequest {
+                    message: ReconcileRequest {
+                        obj_ref: ObjectRef::<ConfigMap>::new("a").erase(),
+                        reason: early.clone(),
+                    },
+                    run_at: Instant::now() + Duration::from_secs(1),
+                    reason: early.to_string(),
+                },
+            ])
+            .on_complete(sleep(Duration::from_secs(5))),
+        );
+        pin_mut!(scheduler);
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(2)).await;
+        let a = scheduler.next().now_or_never().unwrap().unwrap();
+        assert_eq!(a.reason.to_string(), early.to_string());
+        // Stream has terminated
+        assert!(scheduler.next().await.is_none());
     }
 }
