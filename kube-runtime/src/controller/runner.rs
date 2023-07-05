@@ -1,6 +1,6 @@
 use super::future_hash_map::FutureHashMap;
 use crate::scheduler::{ScheduleRequest, Scheduler};
-use futures::{Future, Stream, StreamExt};
+use futures::{future, Future, FutureExt, Stream, StreamExt};
 use pin_project::pin_project;
 use std::{
     hash::Hash,
@@ -15,11 +15,14 @@ use std::{
 /// already being processed then it will be held pending until the current item
 /// is finished.
 #[pin_project]
-pub struct Runner<T, R, F, MkF> {
+pub struct Runner<T, R, F, MkF, Ready = future::Ready<()>> {
     #[pin]
     scheduler: Scheduler<T, R>,
     run_msg: MkF,
     slots: FutureHashMap<T, F>,
+    #[pin]
+    ready_to_execute_after: future::Fuse<Ready>,
+    is_ready_to_execute: bool,
 }
 
 impl<T, R, F, MkF> Runner<T, R, F, MkF>
@@ -32,16 +35,35 @@ where
             scheduler,
             run_msg,
             slots: FutureHashMap::default(),
+            ready_to_execute_after: future::ready(()).fuse(),
+            is_ready_to_execute: false,
+        }
+    }
+
+    /// Wait for `ready_to_execute_after` to complete before starting to run any scheduled tasks.
+    ///
+    /// `scheduler` will still be polled in the meantime.
+    pub fn delay_tasks_until<Ready>(self, ready_to_execute_after: Ready) -> Runner<T, R, F, MkF, Ready>
+    where
+        Ready: Future<Output = ()>,
+    {
+        Runner {
+            scheduler: self.scheduler,
+            run_msg: self.run_msg,
+            slots: self.slots,
+            ready_to_execute_after: ready_to_execute_after.fuse(),
+            is_ready_to_execute: false,
         }
     }
 }
 
-impl<T, R, F, MkF> Stream for Runner<T, R, F, MkF>
+impl<T, R, F, MkF, Ready> Stream for Runner<T, R, F, MkF, Ready>
 where
     T: Eq + Hash + Clone + Unpin,
     R: Stream<Item = ScheduleRequest<T>>,
     F: Future + Unpin,
     MkF: FnMut(&T) -> F,
+    Ready: Future<Output = ()>,
 {
     type Item = F::Output;
 
@@ -54,13 +76,16 @@ where
             Poll::Ready(None) => false,
             Poll::Pending => true,
         };
+        if this.ready_to_execute_after.poll(cx).is_ready() {
+            *this.is_ready_to_execute = true
+        }
         loop {
             // Try to take take a new message that isn't already being processed
             // leave the already-processing ones in the queue, so that we can take them once
             // we're free again.
             let next_msg_poll = scheduler
                 .as_mut()
-                .hold_unless(|msg| !slots.contains_key(msg))
+                .hold_unless(|msg| *this.is_ready_to_execute && !slots.contains_key(msg))
                 .poll_next_unpin(cx);
             match next_msg_poll {
                 Poll::Ready(Some(msg)) => {
