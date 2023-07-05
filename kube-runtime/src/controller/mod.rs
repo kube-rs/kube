@@ -9,7 +9,7 @@ use crate::{
     },
     scheduler::{scheduler, ScheduleRequest},
     utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
-    watcher::{self, watcher, Config, DefaultBackoff},
+    watcher::{self, metadata_watcher, watcher, Config, DefaultBackoff},
 };
 use backoff::backoff::Backoff;
 use derivative::Derivative;
@@ -688,7 +688,11 @@ where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
         // TODO: call owns_stream_with when it's stable
-        let child_watcher = trigger_owners(watcher(api, wc).touched_objects(), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners(
+            metadata_watcher(api, wc).touched_objects(),
+            self.dyntype.clone(),
+            dyntype,
+        );
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
