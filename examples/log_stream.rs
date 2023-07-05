@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use futures::{StreamExt, TryStreamExt};
+use futures::{AsyncBufReadExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, LogParams},
@@ -26,10 +26,10 @@ async fn main() -> Result<()> {
             ..LogParams::default()
         })
         .await?
-        .boxed();
+        .lines();
 
     while let Some(line) = logs.try_next().await? {
-        info!("{:?}", String::from_utf8_lossy(&line));
+        info!("{}", line);
     }
     Ok(())
 }
