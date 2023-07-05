@@ -54,6 +54,7 @@ serde_json = "1.0.68"
 tokio = { version = "1.14.0", features = ["full", "test-util"] }
 rand = "0.8.0"
 schemars = "0.8.6"
+tracing-subscriber = "0.3.17"
 
 [dev-dependencies.k8s-openapi]
 version = "0.18.0"
