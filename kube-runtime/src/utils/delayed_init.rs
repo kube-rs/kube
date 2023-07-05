@@ -71,7 +71,7 @@ impl<T: Clone + Send + Sync> DelayedInit<T> {
 
 // Using a manually implemented future because we don't want to hold the lock across poll calls
 // since that would mean that an unpolled writer would stall all other tasks from being able to poll it
-pub struct Get<'a, T>(&'a DelayedInit<T>);
+struct Get<'a, T>(&'a DelayedInit<T>);
 impl<'a, T> Future for Get<'a, T>
 where
     T: Clone,
