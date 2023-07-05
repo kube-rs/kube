@@ -8,7 +8,10 @@ use crate::{
         ObjectRef,
     },
     scheduler::{scheduler, ScheduleRequest},
-    utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
+    utils::{
+        delayed_init, trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff,
+        WatchStreamExt,
+    },
     watcher::{self, metadata_watcher, watcher, Config, DefaultBackoff},
 };
 use backoff::backoff::Backoff;
@@ -36,6 +39,8 @@ use tracing::{info_span, Instrument};
 mod future_hash_map;
 mod runner;
 
+pub type RunnerError = runner::Error<delayed_init::InitDropped>;
+
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
@@ -44,6 +49,8 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
+    #[error("runner error")]
+    RunnerError(#[source] RunnerError),
 }
 
 /// Results of the reconciliation attempt
@@ -322,9 +329,11 @@ where
             })
             .delay_tasks_until(async move {
                 tracing::debug!("applier runner held until store is ready");
-                delay_store.wait_until_ready().await;
+                let res = delay_store.wait_until_ready().await;
                 tracing::debug!("store is ready, starting runner");
+                res
             })
+            .map(|runner_res| runner_res.unwrap_or_else(|err| Err(Error::RunnerError(err))))
             .on_complete(async { tracing::debug!("applier runner terminated") })
         },
     )

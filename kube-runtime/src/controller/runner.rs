@@ -3,10 +3,18 @@ use crate::scheduler::{ScheduleRequest, Scheduler};
 use futures::{future, Future, FutureExt, Stream, StreamExt};
 use pin_project::pin_project;
 use std::{
+    convert::Infallible,
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
 };
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum Error<ReadyErr> {
+    #[error("readiness gate failed to become ready")]
+    Readiness(#[source] ReadyErr),
+}
 
 /// Pulls items from a [`Scheduler`], and runs an action for each item in parallel,
 /// while making sure to not process [equal](`Eq`) items multiple times at once.
@@ -15,7 +23,7 @@ use std::{
 /// already being processed then it will be held pending until the current item
 /// is finished.
 #[pin_project]
-pub struct Runner<T, R, F, MkF, Ready = future::Ready<()>> {
+pub struct Runner<T, R, F, MkF, Ready = future::Ready<Result<(), Infallible>>> {
     #[pin]
     scheduler: Scheduler<T, R>,
     run_msg: MkF,
@@ -23,6 +31,7 @@ pub struct Runner<T, R, F, MkF, Ready = future::Ready<()>> {
     #[pin]
     ready_to_execute_after: future::Fuse<Ready>,
     is_ready_to_execute: bool,
+    stopped: bool,
 }
 
 impl<T, R, F, MkF> Runner<T, R, F, MkF>
@@ -35,17 +44,21 @@ where
             scheduler,
             run_msg,
             slots: FutureHashMap::default(),
-            ready_to_execute_after: future::ready(()).fuse(),
+            ready_to_execute_after: future::ready(Ok(())).fuse(),
             is_ready_to_execute: false,
+            stopped: false,
         }
     }
 
     /// Wait for `ready_to_execute_after` to complete before starting to run any scheduled tasks.
     ///
     /// `scheduler` will still be polled in the meantime.
-    pub fn delay_tasks_until<Ready>(self, ready_to_execute_after: Ready) -> Runner<T, R, F, MkF, Ready>
+    pub fn delay_tasks_until<Ready, ReadyErr>(
+        self,
+        ready_to_execute_after: Ready,
+    ) -> Runner<T, R, F, MkF, Ready>
     where
-        Ready: Future<Output = ()>,
+        Ready: Future<Output = Result<(), ReadyErr>>,
     {
         Runner {
             scheduler: self.scheduler,
@@ -53,31 +66,40 @@ where
             slots: self.slots,
             ready_to_execute_after: ready_to_execute_after.fuse(),
             is_ready_to_execute: false,
+            stopped: false,
         }
     }
 }
 
-impl<T, R, F, MkF, Ready> Stream for Runner<T, R, F, MkF, Ready>
+impl<T, R, F, MkF, Ready, ReadyErr> Stream for Runner<T, R, F, MkF, Ready>
 where
     T: Eq + Hash + Clone + Unpin,
     R: Stream<Item = ScheduleRequest<T>>,
     F: Future + Unpin,
     MkF: FnMut(&T) -> F,
-    Ready: Future<Output = ()>,
+    Ready: Future<Output = Result<(), ReadyErr>>,
 {
-    type Item = F::Output;
+    type Item = Result<F::Output, Error<ReadyErr>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
+        if *this.stopped {
+            return Poll::Ready(None);
+        }
         let slots = this.slots;
         let scheduler = &mut this.scheduler;
         let has_active_slots = match slots.poll_next_unpin(cx) {
-            Poll::Ready(Some(result)) => return Poll::Ready(Some(result)),
+            Poll::Ready(Some(result)) => return Poll::Ready(Some(Ok(result))),
             Poll::Ready(None) => false,
             Poll::Pending => true,
         };
-        if this.ready_to_execute_after.poll(cx).is_ready() {
-            *this.is_ready_to_execute = true
+        match this.ready_to_execute_after.poll(cx) {
+            Poll::Ready(Ok(())) => *this.is_ready_to_execute = true,
+            Poll::Ready(Err(err)) => {
+                *this.stopped = true;
+                return Poll::Ready(Some(Err(Error::Readiness(err))));
+            }
+            Poll::Pending => {}
         }
         loop {
             // Try to take take a new message that isn't already being processed
