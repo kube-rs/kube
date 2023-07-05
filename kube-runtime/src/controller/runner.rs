@@ -135,13 +135,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::Runner;
-    use crate::scheduler::{scheduler, ScheduleRequest};
+    use super::{Error, Runner};
+    use crate::{
+        scheduler::{scheduler, ScheduleRequest},
+        utils::delayed_init::{self, DelayedInit},
+    };
     use futures::{
         channel::{mpsc, oneshot},
-        future, poll, SinkExt, StreamExt,
+        future, poll, stream, SinkExt, StreamExt, TryStreamExt,
     };
-    use std::{cell::RefCell, time::Duration};
+    use std::{cell::RefCell, collections::HashSet, sync::Mutex, time::Duration};
     use tokio::{
         runtime::Handle,
         task::yield_now,
@@ -217,8 +220,108 @@ mod tests {
         // a timeout here *should* mean that the background task isn't getting awoken properly
         // when the new message is ready.
         assert_eq!(
-            timeout(Duration::from_secs(1), result_rx).await.unwrap().unwrap(),
+            timeout(Duration::from_secs(1), result_rx)
+                .await
+                .unwrap()
+                .unwrap()
+                .transpose()
+                .unwrap(),
             Some(8)
         );
+    }
+
+    #[tokio::test]
+    async fn runner_should_wait_for_readiness() {
+        let is_ready = Mutex::new(false);
+        let (delayed_init, ready) = DelayedInit::<()>::new();
+        let mut runner = Box::pin(
+            Runner::new(
+                scheduler(
+                    stream::iter([ScheduleRequest {
+                        message: 1u8,
+                        run_at: Instant::now(),
+                    }])
+                    .chain(stream::pending()),
+                ),
+                |msg| {
+                    assert!(*is_ready.lock().unwrap());
+                    future::ready(*msg)
+                },
+            )
+            .delay_tasks_until(ready.get()),
+        );
+        assert!(poll!(runner.next()).is_pending());
+        *is_ready.lock().unwrap() = true;
+        delayed_init.init(());
+        assert_eq!(runner.next().await.transpose().unwrap(), Some(1));
+    }
+
+    #[tokio::test]
+    async fn runner_should_dedupe_while_waiting_for_readiness() {
+        let is_ready = Mutex::new(false);
+        let (delayed_init, ready) = DelayedInit::<()>::new();
+        let mut runner = Box::pin(
+            Runner::new(
+                scheduler(
+                    stream::iter([
+                        ScheduleRequest {
+                            message: 1u8,
+                            run_at: Instant::now(),
+                        },
+                        ScheduleRequest {
+                            message: 2u8,
+                            run_at: Instant::now(),
+                        },
+                        ScheduleRequest {
+                            message: 1u8,
+                            run_at: Instant::now(),
+                        },
+                    ])
+                    .chain(stream::pending()),
+                ),
+                |msg| {
+                    assert!(*is_ready.lock().unwrap());
+                    future::ready(*msg)
+                },
+            )
+            .delay_tasks_until(ready.get()),
+        );
+        assert!(poll!(runner.next()).is_pending());
+        *is_ready.lock().unwrap() = true;
+        delayed_init.init(());
+        assert_eq!(
+            runner.as_mut().take(2).try_collect::<HashSet<_>>().await.unwrap(),
+            HashSet::from([1, 2])
+        );
+        assert!(poll!(runner.next()).is_pending());
+    }
+
+    #[tokio::test]
+    async fn runner_should_report_readiness_errors() {
+        let (delayed_init, ready) = DelayedInit::<()>::new();
+        let mut runner = Box::pin(
+            Runner::new(
+                scheduler(
+                    stream::iter([ScheduleRequest {
+                        message: (),
+                        run_at: Instant::now(),
+                    }])
+                    .chain(stream::pending()),
+                ),
+                |()| {
+                    panic!("run_msg should never be invoked if readiness gate fails");
+                    // It's "useless", but it helps to direct rustc to the correct types
+                    #[allow(unreachable_code)]
+                    future::ready(())
+                },
+            )
+            .delay_tasks_until(ready.get()),
+        );
+        assert!(poll!(runner.next()).is_pending());
+        drop(delayed_init);
+        assert!(matches!(
+            runner.try_collect::<Vec<_>>().await.unwrap_err(),
+            Error::Readiness(delayed_init::InitDropped)
+        ));
     }
 }
