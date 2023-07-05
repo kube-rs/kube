@@ -262,6 +262,7 @@ where
     let (scheduler_tx, scheduler_rx) =
         channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(APPLIER_REQUEUE_BUF_SIZE);
     let error_policy = Arc::new(error_policy);
+    let delay_store = store.clone();
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
@@ -318,6 +319,11 @@ where
                     }
                     None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
                 }
+            })
+            .delay_tasks_until(async move {
+                tracing::debug!("applier runner held until store is ready");
+                delay_store.wait_until_ready().await;
+                tracing::debug!("store is ready, starting runner");
             })
             .on_complete(async { tracing::debug!("applier runner terminated") })
         },
