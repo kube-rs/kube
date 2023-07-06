@@ -1,9 +1,7 @@
-#[cfg(test)] use std::sync::RwLockWriteGuard;
-use std::{fmt::Debug, task::Poll};
+use std::{fmt::Debug, sync::Mutex, task::Poll};
 
 use derivative::Derivative;
 use futures::{channel, Future, FutureExt};
-use std::sync::RwLock;
 use thiserror::Error;
 use tracing::trace;
 
@@ -31,12 +29,7 @@ impl<T> Debug for Initializer<T> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct DelayedInit<T> {
-    state: RwLock<ReceiverState<T>>,
-    // A test-only hook to let us create artificial race conditions
-    #[cfg(test)]
-    #[allow(clippy::type_complexity)]
-    #[derivative(Debug = "ignore")]
-    test_hook_start_of_slow_path: Box<dyn Fn(&mut RwLockWriteGuard<ReceiverState<T>>) + Send + Sync>,
+    state: Mutex<ReceiverState<T>>,
 }
 #[derive(Debug)]
 enum ReceiverState<T> {
@@ -49,9 +42,7 @@ impl<T> DelayedInit<T> {
     pub fn new() -> (Initializer<T>, Self) {
         let (tx, rx) = channel::oneshot::channel();
         (Initializer(tx), DelayedInit {
-            state: RwLock::new(ReceiverState::Waiting(rx)),
-            #[cfg(test)]
-            test_hook_start_of_slow_path: Box::new(|_| ()),
+            state: Mutex::new(ReceiverState::Waiting(rx)),
         })
     }
 }
@@ -83,34 +74,23 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let read_lock = self.0.state.read().unwrap();
-        if let ReceiverState::Ready(v) = &*read_lock {
-            trace!("using fast path, value is already ready");
-            Poll::Ready(v.clone())
-        } else {
-            trace!("using slow path, need to wait for the channel");
-            // IMPORTANT: Make sure that the optimistic read lock has been released already
-            drop(read_lock);
-            let mut state = self.0.state.write().unwrap();
-            trace!("got write lock");
-            #[cfg(test)]
-            (self.0.test_hook_start_of_slow_path)(&mut state);
-            match &mut *state {
-                ReceiverState::Waiting(rx) => {
-                    trace!("channel still active, polling");
-                    if let Poll::Ready(value) = rx.poll_unpin(cx).map_err(|_| InitDropped) {
-                        trace!("got value on slow path, memoizing");
-                        *state = ReceiverState::Ready(value.clone());
-                        Poll::Ready(value)
-                    } else {
-                        trace!("channel is still pending");
-                        Poll::Pending
-                    }
+        let mut state = self.0.state.lock().unwrap();
+        trace!("got lock lock");
+        match &mut *state {
+            ReceiverState::Waiting(rx) => {
+                trace!("channel still active, polling");
+                if let Poll::Ready(value) = rx.poll_unpin(cx).map_err(|_| InitDropped) {
+                    trace!("got value on slow path, memoizing");
+                    *state = ReceiverState::Ready(value.clone());
+                    Poll::Ready(value)
+                } else {
+                    trace!("channel is still pending");
+                    Poll::Pending
                 }
-                ReceiverState::Ready(v) => {
-                    trace!("slow path but value was already initialized, another writer already initialized");
-                    Poll::Ready(v.clone())
-                }
+            }
+            ReceiverState::Ready(v) => {
+                trace!("slow path but value was already initialized, another writer already initialized");
+                Poll::Ready(v.clone())
             }
         }
     }
@@ -199,23 +179,5 @@ mod tests {
         assert_eq!(poll!(get3), Poll::Ready(Ok(1)));
         assert_eq!(poll!(get2), Poll::Ready(Ok(1)));
         assert_eq!(poll!(get1), Poll::Ready(Ok(1)));
-    }
-
-    #[tokio::test]
-    async fn must_work_despite_writer_race() {
-        let _tracing = setup_tracing();
-        let (_tx, mut rx) = DelayedInit::<u8>::new();
-        let slow_path_calls = Arc::new(Mutex::new(0));
-        let slow_path_calls2 = slow_path_calls.clone();
-        // This emulates two racing get() calls, where a fake get() memoizes a value while the true get()
-        // is waiting to upgrade its read lock to a write lock.
-        rx.test_hook_start_of_slow_path = Box::new(move |state| {
-            *slow_path_calls2.lock().unwrap() += 1;
-            **state = ReceiverState::Ready(Ok(1));
-        });
-        assert_eq!(rx.get().await, Ok(1));
-        assert_eq!(rx.get().await, Ok(1));
-        assert_eq!(rx.get().await, Ok(1));
-        assert_eq!(*slow_path_calls.lock().unwrap(), 1);
     }
 }
