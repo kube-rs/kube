@@ -42,7 +42,7 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     ObjectNotFound(ObjectRef<DynamicObject>),
     #[error("reconciler for object {1} failed")]
     ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
-    #[error("event queue error")]
+    #[error("event queue error: {0}")]
     QueueError(#[source] QueueErr),
 }
 
