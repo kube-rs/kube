@@ -3,15 +3,12 @@
 use self::runner::Runner;
 use crate::{
     reflector::{
-        reflector,
+        self, reflector,
         store::{Store, Writer},
         ObjectRef,
     },
     scheduler::{scheduler, ScheduleRequest},
-    utils::{
-        delayed_init, trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff,
-        WatchStreamExt,
-    },
+    utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
     watcher::{self, metadata_watcher, watcher, Config, DefaultBackoff},
 };
 use backoff::backoff::Backoff;
@@ -39,7 +36,7 @@ use tracing::{info_span, Instrument};
 mod future_hash_map;
 mod runner;
 
-pub type RunnerError = runner::Error<delayed_init::InitDropped>;
+pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
 
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {

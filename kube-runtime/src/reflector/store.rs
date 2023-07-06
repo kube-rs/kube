@@ -8,6 +8,7 @@ use derivative::Derivative;
 use kube_client::Resource;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
+use thiserror::Error;
 
 type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
@@ -114,6 +115,10 @@ where
     ready_rx: Arc<DelayedInit<()>>,
 }
 
+#[derive(Debug, Error)]
+#[error("writer was dropped before store became ready")]
+pub struct WriterDropped(delayed_init::InitDropped);
+
 impl<K: 'static + Clone + Resource> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
@@ -124,8 +129,8 @@ where
     ///
     /// # Errors
     /// Returns an error if the [`Writer`] was dropped before any value was written.
-    pub async fn wait_until_ready(&self) -> Result<(), delayed_init::InitDropped> {
-        self.ready_rx.get().await
+    pub async fn wait_until_ready(&self) -> Result<(), WriterDropped> {
+        self.ready_rx.get().await.map_err(WriterDropped)
     }
 
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
