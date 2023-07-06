@@ -3,7 +3,7 @@
 use self::runner::Runner;
 use crate::{
     reflector::{
-        reflector,
+        self, reflector,
         store::{Store, Writer},
         ObjectRef,
     },
@@ -36,6 +36,8 @@ use tracing::{info_span, Instrument};
 mod future_hash_map;
 mod runner;
 
+pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
+
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
@@ -44,6 +46,8 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
+    #[error("runner error")]
+    RunnerError(#[source] RunnerError),
 }
 
 /// Results of the reconciliation attempt
@@ -262,6 +266,7 @@ where
     let (scheduler_tx, scheduler_rx) =
         channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(APPLIER_REQUEUE_BUF_SIZE);
     let error_policy = Arc::new(error_policy);
+    let delay_store = store.clone();
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
@@ -319,6 +324,13 @@ where
                     None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
                 }
             })
+            .delay_tasks_until(async move {
+                tracing::debug!("applier runner held until store is ready");
+                let res = delay_store.wait_until_ready().await;
+                tracing::debug!("store is ready, starting runner");
+                res
+            })
+            .map(|runner_res| runner_res.unwrap_or_else(|err| Err(Error::RunnerError(err))))
             .on_complete(async { tracing::debug!("applier runner terminated") })
         },
     )

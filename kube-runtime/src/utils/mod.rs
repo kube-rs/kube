@@ -1,6 +1,7 @@
 //! Helpers for manipulating built-in streams
 
 mod backoff_reset_timer;
+pub(crate) mod delayed_init;
 mod event_flatten;
 #[cfg(feature = "unstable-runtime-predicates")] mod predicate;
 mod stream_backoff;
