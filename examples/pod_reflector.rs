@@ -28,13 +28,11 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let stream = watcher(api, watcher::Config::default()).map_ok(|ev| {
-        ev.modify(|pod| {
-            // memory optimization for our store - we don't care about fields/annotations/status
-            pod.managed_fields_mut().clear();
-            pod.annotations_mut().clear();
-            pod.status = None;
-        })
+    let stream = watcher(api, watcher::Config::default()).modify(|pod| {
+        // memory optimization for our store - we don't care about managed fields/annotations/status
+        pod.managed_fields_mut().clear();
+        pod.annotations_mut().clear();
+        pod.status = None;
     });
 
     let rf = reflector(writer, stream)
