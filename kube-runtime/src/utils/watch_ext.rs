@@ -3,7 +3,7 @@ use crate::utils::predicate::{Predicate, PredicateFilter};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
-    utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
+    utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
     watcher,
 };
 #[cfg(feature = "unstable-runtime-predicates")] use kube_client::Resource;
@@ -51,6 +51,41 @@ pub trait WatchStreamExt: Stream {
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
         EventFlatten::new(self, true)
+    }
+
+    /// Modify elements of a [`watcher()`] stream.
+    ///
+    /// Calls [`watcher::Event::modify()`] on every element.
+    /// Stream shorthand for `stream.map_ok(|event| { event.modify(f) })`.
+    ///
+    /// ```no_run
+    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use kube::{Api, Client, ResourceExt};
+    /// # use kube_runtime::{watcher, WatchStreamExt};
+    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let deploys: Api<Deployment> = Api::all(client);
+    /// let truncated_deploy_stream = watcher(deploys, watcher::Config::default())
+    ///     .modify(|deploy| {
+    ///         deploy.managed_fields_mut().clear();
+    ///         deploy.status = None;
+    ///     })
+    ///     .applied_objects();
+    /// pin_mut!(truncated_deploy_stream);
+    ///
+    /// while let Some(d) = truncated_deploy_stream.try_next().await? {
+    ///    println!("Truncated Deployment: '{:?}'", serde_json::to_string(&d)?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn modify<F, K>(self, f: F) -> EventModify<Self, F>
+    where
+        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        F: FnMut(&mut K),
+    {
+        EventModify::new(self, f)
     }
 
     /// Filter out a flattened stream on [`predicates`](crate::predicates).
