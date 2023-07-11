@@ -223,7 +223,7 @@ pub struct Config {
     /// API roundtrips to complete.
     ///
     /// Defaults to 500. Note that `None` represents unbounded.
-    pub page_size_limit: Option<u32>,
+    pub page_size: Option<u32>,
 
     /// Enables watch events with type "BOOKMARK".
     ///
@@ -242,7 +242,7 @@ impl Default for Config {
             list_semantic: ListSemantic::default(),
             // same default page size limit as client-go
             // https://github.com/kubernetes/client-go/blob/aed71fa5cf054e1c196d67b2e21f66fd967b8ab1/tools/pager/pager.go#L31
-            page_size_limit: Some(500),
+            page_size: Some(500),
         }
     }
 }
@@ -316,8 +316,8 @@ impl Config {
     /// This can reduce the memory consumption during resyncs, at the cost of requiring more
     /// API roundtrips to complete.
     #[must_use]
-    pub fn page_size_limit(mut self, page_size_limit: u32) -> Self {
-        self.page_size_limit = Some(page_size_limit);
+    pub fn page_size(mut self, page_size: u32) -> Self {
+        self.page_size = Some(page_size);
         self
     }
 
@@ -334,7 +334,7 @@ impl Config {
             version_match,
             resource_version,
             // The watcher handles pagination internally.
-            limit: self.page_size_limit,
+            limit: self.page_size,
             continue_token: None,
         }
     }
