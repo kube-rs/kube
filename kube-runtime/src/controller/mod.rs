@@ -237,12 +237,12 @@ const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
 
 /// Apply a reconciler to an input stream, with a given retry policy
 ///
-/// Takes a `store` parameter for the core objects, which should usually be updated by a [`reflector`].
+/// Takes a `store` parameter for the core objects, which should usually be updated by a [`reflector()`].
 ///
 /// The `queue` indicates which objects should be reconciled. For the core objects this will usually be
-/// the [`reflector`] (piped through [`trigger_self`]). If your core objects own any subobjects then you
-/// can also make them trigger reconciliations by [merging](`futures::stream::select`) the [`reflector`]
-/// with a [`watcher`](watcher()) or [`reflector`](reflector()) for the subobject.
+/// the [`reflector()`] (piped through [`trigger_self`]). If your core objects own any subobjects then you
+/// can also make them trigger reconciliations by [merging](`futures::stream::select`) the [`reflector()`]
+/// with a [`watcher()`] or [`reflector()`] for the subobject.
 ///
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
