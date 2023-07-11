@@ -398,6 +398,7 @@ where
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
+#[allow(clippy::too_many_lines)] // for now
 async fn step_trampolined<A>(
     api: &A,
     wc: &Config,
