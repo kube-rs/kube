@@ -2,7 +2,7 @@ use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::Api,
-    runtime::{reflector, watcher, WatchStreamExt},
+    runtime::{predicates, reflector, watcher, WatchStreamExt},
     Client, ResourceExt,
 };
 use tracing::*;
@@ -28,16 +28,16 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let stream = watcher(api, watcher::Config::default()).map_ok(|ev| {
-        ev.modify(|pod| {
-            // memory optimization for our store - we don't care about fields/annotations/status
-            pod.managed_fields_mut().clear();
-            pod.annotations_mut().clear();
-            pod.status = None;
-        })
+    let stream = watcher(api, watcher::Config::default()).modify(|pod| {
+        // memory optimization for our store - we don't care about managed fields/annotations/status
+        pod.managed_fields_mut().clear();
+        pod.annotations_mut().clear();
+        pod.status = None;
     });
 
-    let rf = reflector(writer, stream).applied_objects();
+    let rf = reflector(writer, stream)
+        .applied_objects()
+        .predicate_filter(predicates::resource_version); // NB: requires an unstable feature
     futures::pin_mut!(rf);
 
     while let Some(pod) = rf.try_next().await? {

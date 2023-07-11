@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "client",]
 categories = ["web-programming::http-client", "configuration", "network-programming", "api-bindings"]
-rust-version = "1.63.0"
+rust-version = "1.64.0"
 edition = "2021"
 
 [features]
@@ -21,6 +21,7 @@ rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls"]
 openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws", "tokio/macros"]
 oauth = ["client", "tame-oauth"]
+oidc = ["client", "form_urlencoded"]
 gzip = ["client", "tower-http/decompression-gzip"]
 client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
@@ -31,7 +32,7 @@ config = ["__non_core", "pem", "dirs"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_26"]
+features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/v1_26"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -68,6 +69,7 @@ rand = { version = "0.8.3", optional = true }
 secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
 tracing = { version = "0.1.36", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
+form_urlencoded = { version = "1.2.0", optional = true }
 
 [dependencies.k8s-openapi]
 version = "0.18.0"

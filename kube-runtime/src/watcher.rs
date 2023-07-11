@@ -683,19 +683,51 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 
 /// Default watch [`Backoff`] inspired by Kubernetes' client-go.
 ///
-/// Note that the exact parameters used herein should not be considered stable.
-/// The parameters currently optimize for being kind to struggling apiservers.
-/// See [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
-/// for more details.
+/// This fn has been moved into [`DefaultBackoff`].
 #[must_use]
-pub fn default_backoff() -> impl Backoff + Send + Sync {
-    let expo = backoff::ExponentialBackoff {
-        initial_interval: Duration::from_millis(800),
-        max_interval: Duration::from_secs(30),
-        randomization_factor: 1.0,
-        multiplier: 2.0,
-        max_elapsed_time: None,
-        ..ExponentialBackoff::default()
-    };
-    ResetTimerBackoff::new(expo, Duration::from_secs(120))
+#[deprecated(
+    since = "0.84.0",
+    note = "replaced by `watcher::DefaultBackoff`. This fn will be removed in 0.88.0."
+)]
+pub fn default_backoff() -> DefaultBackoff {
+    DefaultBackoff::default()
+}
+
+/// Default watcher backoff inspired by Kubernetes' client-go.
+///
+/// The parameters currently optimize for being kind to struggling apiservers.
+/// The exact parameters are taken from
+/// [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
+/// and should not be considered stable.
+///
+/// This struct implements [`Backoff`] and is the default strategy used
+/// when calling `WatchStreamExt::default_backoff`. If you need to create
+/// this manually then [`DefaultBackoff::default`] can be used.
+pub struct DefaultBackoff(Strategy);
+type Strategy = ResetTimerBackoff<ExponentialBackoff>;
+
+impl Default for DefaultBackoff {
+    fn default() -> Self {
+        Self(ResetTimerBackoff::new(
+            backoff::ExponentialBackoff {
+                initial_interval: Duration::from_millis(800),
+                max_interval: Duration::from_secs(30),
+                randomization_factor: 1.0,
+                multiplier: 2.0,
+                max_elapsed_time: None,
+                ..ExponentialBackoff::default()
+            },
+            Duration::from_secs(120),
+        ))
+    }
+}
+
+impl Backoff for DefaultBackoff {
+    fn next_backoff(&mut self) -> Option<Duration> {
+        self.0.next_backoff()
+    }
+
+    fn reset(&mut self) {
+        self.0.reset()
+    }
 }

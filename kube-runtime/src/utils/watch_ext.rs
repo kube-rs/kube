@@ -1,19 +1,30 @@
 #[cfg(feature = "unstable-runtime-predicates")]
-use crate::utils::predicate::PredicateFilter;
+use crate::utils::predicate::{Predicate, PredicateFilter};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
-    utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
+    utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
     watcher,
 };
 #[cfg(feature = "unstable-runtime-predicates")] use kube_client::Resource;
 
+use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
-    /// Apply a [`Backoff`] policy to a [`Stream`] using [`StreamBackoff`]
+    /// Apply the [`DefaultBackoff`] watcher [`Backoff`] policy
+    ///
+    /// This is recommended for controllers that want to play nicely with the apiserver.
+    fn default_backoff(self) -> StreamBackoff<Self, DefaultBackoff>
+    where
+        Self: TryStream + Sized,
+    {
+        StreamBackoff::new(self, DefaultBackoff::default())
+    }
+
+    /// Apply a specific [`Backoff`] policy to a [`Stream`] using [`StreamBackoff`]
     fn backoff<B>(self, b: B) -> StreamBackoff<Self, B>
     where
         B: Backoff,
@@ -42,6 +53,40 @@ pub trait WatchStreamExt: Stream {
         EventFlatten::new(self, true)
     }
 
+    /// Modify elements of a [`watcher()`] stream.
+    ///
+    /// Calls [`watcher::Event::modify()`] on every element.
+    /// Stream shorthand for `stream.map_ok(|event| { event.modify(f) })`.
+    ///
+    /// ```no_run
+    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use kube::{Api, Client, ResourceExt};
+    /// # use kube_runtime::{watcher, WatchStreamExt};
+    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let deploys: Api<Deployment> = Api::all(client);
+    /// let truncated_deploy_stream = watcher(deploys, watcher::Config::default())
+    ///     .modify(|deploy| {
+    ///         deploy.managed_fields_mut().clear();
+    ///         deploy.status = None;
+    ///     })
+    ///     .applied_objects();
+    /// pin_mut!(truncated_deploy_stream);
+    ///
+    /// while let Some(d) = truncated_deploy_stream.try_next().await? {
+    ///    println!("Truncated Deployment: '{:?}'", serde_json::to_string(&d)?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn modify<F, K>(self, f: F) -> EventModify<Self, F>
+    where
+        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        F: FnMut(&mut K),
+    {
+        EventModify::new(self, f)
+    }
 
     /// Filter out a flattened stream on [`predicates`](crate::predicates).
     ///
@@ -72,11 +117,11 @@ pub trait WatchStreamExt: Stream {
     /// # }
     /// ```
     #[cfg(feature = "unstable-runtime-predicates")]
-    fn predicate_filter<K, F>(self, predicate: F) -> PredicateFilter<Self, K, F>
+    fn predicate_filter<K, P>(self, predicate: P) -> PredicateFilter<Self, K, P>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
         K: Resource + 'static,
-        F: Fn(&K) -> Option<u64> + 'static,
+        P: Predicate<K> + 'static,
     {
         PredicateFilter::new(self, predicate)
     }

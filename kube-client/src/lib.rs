@@ -136,7 +136,7 @@ mod test {
         client::ConfigExt,
         Api, Client, Config, ResourceExt,
     };
-    use futures::{StreamExt, TryStreamExt};
+    use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::Pod;
     use kube_core::{
         params::{DeleteParams, Patch, WatchParams},
@@ -444,7 +444,7 @@ mod test {
             follow: true,
             ..LogParams::default()
         };
-        let mut logs_stream = pods.log_stream("busybox-kube3", &lp).await?.boxed();
+        let mut logs_stream = pods.log_stream("busybox-kube3", &lp).await?.lines();
 
         // wait for container to finish
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -453,11 +453,11 @@ mod test {
         assert_eq!(all_logs, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
 
         // individual logs may or may not buffer
-        let mut output = String::new();
+        let mut output = vec![];
         while let Some(line) = logs_stream.try_next().await? {
-            output.push_str(&String::from_utf8_lossy(&line));
+            output.push(line);
         }
-        assert_eq!(output, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
+        assert_eq!(output, vec!["kube 1", "kube 2", "kube 3", "kube 4", "kube 5"]);
 
         // evict the pod
         let ep = EvictParams::default();

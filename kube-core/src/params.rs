@@ -36,7 +36,7 @@ pub enum VersionMatch {
 }
 
 /// Common query parameters used in list/delete calls on collections
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///
@@ -208,7 +208,7 @@ impl ListParams {
 }
 
 /// Common query parameters used in get calls
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct GetParams {
     /// An explicit resourceVersion with implicit version matching strategies
     ///
@@ -276,7 +276,7 @@ impl ValidationDirective {
 }
 
 /// Common query parameters used in watch calls on collections
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WatchParams {
     /// A selector to restrict returned objects by their labels.
     ///
@@ -404,7 +404,7 @@ impl WatchParams {
 }
 
 /// Common query parameters for put/post calls
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub struct PostParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
@@ -631,7 +631,7 @@ impl PatchParams {
 }
 
 /// Common query parameters for delete calls
-#[derive(Default, Clone, Serialize, Debug)]
+#[derive(Default, Clone, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteParams {
     /// When present, indicates that modifications should not be persisted.
@@ -799,7 +799,7 @@ mod test {
 }
 
 /// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
-#[derive(Default, Clone, Serialize, Debug)]
+#[derive(Default, Clone, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preconditions {
     /// Specifies the target ResourceVersion
@@ -811,7 +811,7 @@ pub struct Preconditions {
 }
 
 /// Propagation policy when deleting single objects
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub enum PropagationPolicy {
     /// Orphan dependents
     Orphan,

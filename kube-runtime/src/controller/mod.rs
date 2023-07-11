@@ -3,13 +3,13 @@
 use self::runner::Runner;
 use crate::{
     reflector::{
-        reflector,
+        self, reflector,
         store::{Store, Writer},
         ObjectRef,
     },
     scheduler::{scheduler, ScheduleRequest},
     utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
-    watcher::{self, watcher, Config},
+    watcher::{self, metadata_watcher, watcher, Config, DefaultBackoff},
 };
 use backoff::backoff::Backoff;
 use derivative::Derivative;
@@ -36,6 +36,8 @@ use tracing::{info_span, Instrument};
 mod future_hash_map;
 mod runner;
 
+pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
+
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
@@ -44,6 +46,8 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
+    #[error("runner error")]
+    RunnerError(#[source] RunnerError),
 }
 
 /// Results of the reconciliation attempt
@@ -262,6 +266,7 @@ where
     let (scheduler_tx, scheduler_rx) =
         channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(APPLIER_REQUEUE_BUF_SIZE);
     let error_policy = Arc::new(error_policy);
+    let delay_store = store.clone();
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
@@ -319,6 +324,13 @@ where
                     None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
                 }
             })
+            .delay_tasks_until(async move {
+                tracing::debug!("applier runner held until store is ready");
+                let res = delay_store.wait_until_ready().await;
+                tracing::debug!("store is ready, starting runner");
+                res
+            })
+            .map(|runner_res| runner_res.unwrap_or_else(|err| Err(Error::RunnerError(err))))
             .on_complete(async { tracing::debug!("applier runner terminated") })
         },
     )
@@ -541,7 +553,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
-            trigger_backoff: Box::new(watcher::default_backoff()),
+            trigger_backoff: Box::<DefaultBackoff>::default(),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -624,7 +636,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
-            trigger_backoff: Box::new(watcher::default_backoff()),
+            trigger_backoff: Box::<DefaultBackoff>::default(),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -688,7 +700,11 @@ where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
         // TODO: call owns_stream_with when it's stable
-        let child_watcher = trigger_owners(watcher(api, wc).touched_objects(), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners(
+            metadata_watcher(api, wc).touched_objects(),
+            self.dyntype.clone(),
+            dyntype,
+        );
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -710,14 +726,14 @@ where
     /// # use k8s_openapi::api::core::v1::ConfigMap;
     /// # use k8s_openapi::api::apps::v1::StatefulSet;
     /// # use kube::runtime::controller::Action;
-    /// # use kube::runtime::{predicates, watcher, Controller, WatchStreamExt};
+    /// # use kube::runtime::{predicates, metadata_watcher, watcher, Controller, WatchStreamExt};
     /// # use kube::{Api, Client, Error, ResourceExt};
     /// # use std::sync::Arc;
     /// # type CustomResource = ConfigMap;
     /// # async fn reconcile(_: Arc<CustomResource>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
     /// # fn error_policy(_: Arc<CustomResource>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
     /// # async fn doc(client: kube::Client) {
-    /// let sts_stream = watcher(Api::<StatefulSet>::all(client.clone()), watcher::Config::default())
+    /// let sts_stream = metadata_watcher(Api::<StatefulSet>::all(client.clone()), watcher::Config::default())
     ///     .touched_objects()
     ///     .predicate_filter(predicates::generation);
     ///

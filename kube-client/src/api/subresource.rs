@@ -1,5 +1,4 @@
-use bytes::Bytes;
-use futures::Stream;
+use futures::AsyncBufRead;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 
@@ -248,11 +247,35 @@ where
         self.client.request_text(req).await
     }
 
-    /// Fetch logs as a stream of bytes
-    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl Stream<Item = Result<Bytes>>> {
+    /// Stream the logs via [`AsyncBufRead`].
+    ///
+    /// Log stream can be processsed using [`AsyncReadExt`](futures::AsyncReadExt)
+    /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # use kube::{api::{Api, LogParams}, Client};
+    /// # let client: Client = todo!();
+    /// use futures::{AsyncBufReadExt, TryStreamExt};
+    ///
+    /// let pods: Api<Pod> = Api::default_namespaced(client);
+    /// let mut logs = pods
+    ///     .log_stream("my-pod", &LogParams::default()).await?
+    ///     .lines();
+    ///
+    /// while let Some(line) = logs.try_next().await? {
+    ///     println!("{}", line);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl AsyncBufRead> {
         let mut req = self.request.logs(name, lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("log_stream");
-        self.client.request_text_stream(req).await
+        self.client.request_stream(req).await
     }
 }
 
