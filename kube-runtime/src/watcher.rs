@@ -222,7 +222,7 @@ pub struct Config {
     /// This can reduce the memory consumption during resyncs, at the cost of requiring more
     /// API roundtrips to complete.
     ///
-    /// Defaults to unlimited (everything is retrieved in one request) if `None`.
+    /// Defaults to 500. Note that `None` represents unbounded.
     pub page_size_limit: Option<u32>,
 
     /// Enables watch events with type "BOOKMARK".
@@ -240,7 +240,9 @@ impl Default for Config {
             field_selector: None,
             timeout: None,
             list_semantic: ListSemantic::default(),
-            page_size_limit: None,
+            // same default page size limit as client-go
+            // https://github.com/kubernetes/client-go/blob/aed71fa5cf054e1c196d67b2e21f66fd967b8ab1/tools/pager/pager.go#L31
+            page_size_limit: Some(500),
         }
     }
 }
