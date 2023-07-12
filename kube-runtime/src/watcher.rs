@@ -447,7 +447,7 @@ where
             match api.watch(&wc.to_watch_params(), &resource_version).await {
                 Ok(stream) => (None, State::Watching {
                     resource_version,
-                    stream: stream.boxed(),
+                    stream,
                 }),
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
