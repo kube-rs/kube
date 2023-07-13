@@ -420,7 +420,8 @@ where
             match api.list(&lp).await {
                 Ok(list) => {
                     objects.extend(list.items);
-                    if let Some(continue_token) = list.metadata.continue_ {
+                    let continue_token = list.metadata.continue_.unwrap_or_default();
+                    if ! continue_token.is_empty() {
                         (None, State::Empty {
                             continue_token: Some(continue_token),
                             objects,
