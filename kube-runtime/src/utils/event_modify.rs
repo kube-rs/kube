@@ -2,7 +2,6 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::task::ready;
 
 use futures::{Stream, TryStream};
 use pin_project::pin_project;
@@ -50,7 +49,7 @@ pub(crate) mod test {
     use std::{task::Poll, vec};
 
     use super::{Error, Event, EventModify};
-    use futures::{pin_mut, poll, stream, Stream, StreamExt};
+    use futures::{pin_mut, poll, stream, StreamExt};
 
     #[tokio::test]
     async fn eventmodify_modifies_innner_value_of_event() {

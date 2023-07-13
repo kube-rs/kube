@@ -178,6 +178,11 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 #[doc(inline)]
 pub use kube_core as core;
 
+// Mock tests for the runtime
+#[cfg(test)]
+#[cfg(all(feature = "derive", feature = "runtime"))]
+mod mock_tests;
+
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
 #[cfg(test)]

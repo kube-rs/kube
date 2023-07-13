@@ -125,7 +125,8 @@ where
 {
     /// Wait for the store to be populated by Kubernetes.
     ///
-    /// Note that this will _not_ await the source calling the associated [`Writer`] (such as the [`reflector`]).
+    /// Note that polling this will _not_ await the source of the stream that populates the [`Writer`].
+    /// The [`reflector`](crate::reflector()) stream must be awaited separately.
     ///
     /// # Errors
     /// Returns an error if the [`Writer`] was dropped before any value was written.

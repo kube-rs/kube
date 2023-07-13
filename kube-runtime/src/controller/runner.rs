@@ -142,18 +142,13 @@ mod tests {
     };
     use futures::{
         channel::{mpsc, oneshot},
-        future, poll, stream, FutureExt, SinkExt, StreamExt, TryStreamExt,
+        future, poll, stream, SinkExt, StreamExt, TryStreamExt,
     };
-    use std::{
-        cell::RefCell,
-        collections::{HashMap, HashSet},
-        sync::Mutex,
-        time::Duration,
-    };
+    use std::{cell::RefCell, collections::HashMap, sync::Mutex, time::Duration};
     use tokio::{
         runtime::Handle,
         task::yield_now,
-        time::{error::Elapsed, pause, sleep, timeout, Instant},
+        time::{pause, sleep, timeout, Instant},
     };
 
     #[tokio::test]

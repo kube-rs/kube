@@ -102,18 +102,12 @@ pub struct InitDropped;
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        sync::{Arc, Mutex},
-        task::Poll,
-    };
+    use std::task::Poll;
 
+    use super::DelayedInit;
     use futures::{pin_mut, poll};
     use tracing::Level;
     use tracing_subscriber::util::SubscriberInitExt;
-
-    use crate::utils::delayed_init::ReceiverState;
-
-    use super::DelayedInit;
 
     fn setup_tracing() -> tracing::dispatcher::DefaultGuard {
         tracing_subscriber::fmt()
