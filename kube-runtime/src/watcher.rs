@@ -425,9 +425,7 @@ where
                             continue_token: Some(continue_token),
                             objects,
                         })
-                    } else if let Some(resource_version) =
-                        list.metadata.resource_version.filter(|rv| !rv.is_empty())
-                    {
+                    } else if let Some(resource_version) = list.metadata.resource_version {
                         (Some(Ok(Event::Restarted(objects))), State::InitListed {
                             resource_version,
                         })
