@@ -6,7 +6,9 @@ use crate::{
     utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
     watcher,
 };
-#[cfg(feature = "unstable-runtime-predicates")] use kube_client::Resource;
+use kube_client::Resource;
+
+use crate::{reflector::store::Writer, utils::Reflect};
 
 use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
@@ -189,6 +191,19 @@ pub trait WatchStreamExt: Stream {
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,
     {
         StreamSubscribe::new(self)
+    }
+
+    /// Reflect a [`watcher()`] stream into a [`Store`] through a [`Writer`]
+    ///
+    /// Returns the stream unmodified, but passes every [`watcher::Event`] through a [`Writer`].
+    /// This populates a [`Store`] as the stream is polled.
+    fn reflect<K>(self, writer: Writer<K>) -> Reflect<Self, K>
+    where
+        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        K: Resource + Clone + 'static,
+        K::DynamicType: Eq + std::hash::Hash + Clone,
+    {
+        Reflect::new(self, writer)
     }
 }
 
