@@ -112,6 +112,7 @@ impl ApiServerVerifier {
             assert!(req_uri.contains("&continue=first"));
             let respdata = json!({
                 "metadata": {
+                    "continue": "",
                     "resourceVersion": "2"
                 },
                 "items": [Hack::test(2)]
