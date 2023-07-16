@@ -12,8 +12,8 @@ use crate::{
 };
 use kube_client::Resource;
 
+/// Stream returned by the [`reflect`](super::WatchStreamExt::reflect) method
 #[pin_project]
-/// Stream returned by the [`reflect`](super::WatchStreamExt::reflect) method.
 pub struct Reflect<St, K>
 where
     K: Resource + Clone + 'static,
@@ -45,7 +45,6 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
-        //stream.inspect_ok(move |event| writer.apply_watcher_event(event))
         me.stream.as_mut().poll_next(cx).map_ok(move |event| {
             me.writer.apply_watcher_event(&event);
             event
