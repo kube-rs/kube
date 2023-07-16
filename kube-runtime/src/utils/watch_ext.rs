@@ -199,7 +199,7 @@ pub trait WatchStreamExt: Stream {
     /// This populates a [`Store`] as the stream is polled.
     fn reflect<K>(self, writer: Writer<K>) -> Reflect<Self, K>
     where
-        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
         K: Resource + Clone + 'static,
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
