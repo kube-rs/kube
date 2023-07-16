@@ -197,6 +197,48 @@ pub trait WatchStreamExt: Stream {
     ///
     /// Returns the stream unmodified, but passes every [`watcher::Event`] through a [`Writer`].
     /// This populates a [`Store`] as the stream is polled.
+    ///
+    /// ## Usage
+    /// ```no_run
+    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use std::time::Duration;
+    /// # use tracing::{info, warn};
+    /// use kube::{Api, Client, ResourceExt};
+    /// use kube_runtime::{watcher, WatchStreamExt, reflector};
+    /// use k8s_openapi::api::apps::v1::Deployment;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    ///
+    /// let deploys: Api<Deployment> = Api::default_namespaced(client);
+    /// let (reader, writer) = reflector::store::<Deployment>();
+    ///
+    /// tokio::spawn(async move {
+    ///     // start polling the store once the reader is ready
+    ///     reader.wait_until_ready().await.unwrap();
+    ///     loop {
+    ///         let names = reader.state().iter().map(|d| d.name_any()).collect::<Vec<_>>();
+    ///         info!("Current {} deploys: {:?}", names.len(), names);
+    ///         tokio::time::sleep(Duration::from_secs(10)).await;
+    ///     }
+    /// });
+    ///
+    /// // configure the watcher stream and populate the store while polling
+    /// watcher(deploys, watcher::Config::default())
+    ///     .reflect(writer)
+    ///     .applied_objects()
+    ///     .for_each(|res| async move {
+    ///         match res {
+    ///             Ok(o) => info!("saw {}", o.name_any()),
+    ///             Err(e) => warn!("watcher error: {}", e),
+    ///         }
+    ///     })
+    ///     .await;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`Store`]: crate::reflector::Store
     fn reflect<K>(self, writer: Writer<K>) -> Reflect<Self, K>
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,

@@ -436,7 +436,7 @@ where
 /// General setup:
 /// ```no_run
 /// use kube::{Api, Client, CustomResource};
-/// use kube::runtime::{controller::{Controller, Action}, watcher, reflector};
+/// use kube::runtime::{controller::{Controller, Action}, watcher};
 /// # use serde::{Deserialize, Serialize};
 /// # use tokio::time::Duration;
 /// use futures::StreamExt;
@@ -589,7 +589,9 @@ where
     /// # async fn doc(client: kube::Client) {
     /// let api: Api<Deployment> = Api::default_namespaced(client);
     /// let (reader, writer) = reflector::store();
-    /// let deploys = reflector(writer, watcher(api, watcher::Config::default()))
+    /// let deploys = watcher(api, watcher::Config::default())
+    ///     .default_backoff()
+    ///     .reflect(writer)
     ///     .applied_objects()
     ///     .predicate_filter(predicates::generation);
     ///
@@ -1053,13 +1055,12 @@ where
     /// #
     /// // Store can be used in the reconciler instead of querying Kube
     /// let (pod_store, writer) = reflector::store();
-    /// let pod_stream = reflector(
-    ///     writer,
-    ///     watcher(Api::<Pod>::all(client.clone()), Config::default()),
-    /// )
-    /// .applied_objects()
-    /// // Map to the relevant `ObjectRef<K>` to reconcile
-    /// .map_ok(|pod| ObjectRef::new(&format!("{}-cm", pod.name_any())).within(&pod.namespace().unwrap()));
+    /// let pod_stream = watcher(Api::<Pod>::all(client.clone()), Config::default())
+    ///     .default_backoff()
+    ///     .reflect(writer)
+    ///     .applied_objects()
+    ///     // Map to the relevant `ObjectRef<K>` to reconcile
+    ///     .map_ok(|pod| ObjectRef::new(&format!("{}-cm", pod.name_any())).within(&pod.namespace().unwrap()));
     ///
     /// Controller::new(Api::<ConfigMap>::all(client), Config::default())
     ///     .reconcile_on(pod_stream)
