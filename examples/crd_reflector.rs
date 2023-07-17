@@ -36,10 +36,15 @@ async fn main() -> anyhow::Result<()> {
     let (reader, writer) = reflector::store::<Foo>();
 
     let foos: Api<Foo> = Api::default_namespaced(client);
-    let wc = watcher::Config::default().timeout(20); // low timeout in this example
-    let rf = reflector(writer, watcher(foos, wc));
+    let wc = watcher::Config::default().any_semantic();
+    let mut stream = watcher(foos, wc)
+        .default_backoff()
+        .reflect(writer)
+        .applied_objects()
+        .boxed();
 
     tokio::spawn(async move {
+        reader.wait_until_ready().await.unwrap();
         loop {
             // Periodically read our state
             // while this runs you can kubectl apply -f crd-baz.yaml or crd-qux.yaml and see it works
@@ -48,8 +53,7 @@ async fn main() -> anyhow::Result<()> {
             info!("Current crds: {:?}", crds);
         }
     });
-    let mut rfa = rf.applied_objects().boxed();
-    while let Some(event) = rfa.try_next().await? {
+    while let Some(event) = stream.try_next().await? {
         info!("saw {}", event.name_any());
     }
     Ok(())
