@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.82.2"
+version = "0.84.0"
 description = "Kubernetes client and async controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "client", "runtime", "cncf"]
 categories = ["network-programming", "caching", "api-bindings", "configuration", "encoding"]
-rust-version = "1.63.0"
+rust-version = "1.64.0"
 edition = "2021"
 
 [features]
@@ -21,6 +21,7 @@ rustls-tls = ["kube-client/rustls-tls"]
 openssl-tls = ["kube-client/openssl-tls"]
 ws = ["kube-client/ws", "kube-core/ws"]
 oauth = ["kube-client/oauth"]
+oidc = ["kube-client/oidc"]
 gzip = ["kube-client/gzip"]
 client = ["kube-client/client", "config"]
 jsonpatch = ["kube-core/jsonpatch"]
@@ -36,10 +37,10 @@ features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jso
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-kube-derive = { path = "../kube-derive", version = "=0.82.2", optional = true }
-kube-core = { path = "../kube-core", version = "=0.82.2" }
-kube-client = { path = "../kube-client", version = "=0.82.2", default-features = false, optional = true }
-kube-runtime = { path = "../kube-runtime", version = "=0.82.2", optional = true}
+kube-derive = { path = "../kube-derive", version = "=0.84.0", optional = true }
+kube-core = { path = "../kube-core", version = "=0.84.0" }
+kube-client = { path = "../kube-client", version = "=0.84.0", default-features = false, optional = true }
+kube-runtime = { path = "../kube-runtime", version = "=0.84.0", optional = true}
 
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
@@ -51,9 +52,12 @@ default-features = false
 tokio = { version = "1.14.0", features = ["full"] }
 futures = "0.3.17"
 serde_json = "1.0.68"
-validator = { version = "0.16.0", features = ["derive"] }
 serde = { version = "1.0.130", features = ["derive"] }
 schemars = "0.8.6"
+hyper = "0.14.27"
+http = "0.2.9"
+tower-test = "0.4.0"
+anyhow = "1.0.71"
 
 [dev-dependencies.k8s-openapi]
 version = "0.18.0"

@@ -18,6 +18,9 @@ pub mod conversion;
 
 pub mod discovery;
 
+pub mod duration;
+pub use duration::Duration;
+
 pub mod dynamic;
 pub use dynamic::{ApiResource, DynamicObject};
 

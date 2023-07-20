@@ -36,7 +36,7 @@ pub enum VersionMatch {
 }
 
 /// Common query parameters used in list/delete calls on collections
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///
@@ -207,6 +207,41 @@ impl ListParams {
     }
 }
 
+/// Common query parameters used in get calls
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GetParams {
+    /// An explicit resourceVersion with implicit version matching strategies
+    ///
+    /// Default (unset) gives the most recent version. "0" gives a less
+    /// consistent, but more performant "Any" version. Specifing a version is
+    /// like providing a `VersionMatch::NotOlderThan`.
+    /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for details.
+    pub resource_version: Option<String>,
+}
+
+/// Helper interface to GetParams
+///
+/// Usage:
+/// ```
+/// use kube::api::GetParams;
+/// let gp = GetParams::at("6664");
+/// ```
+impl GetParams {
+    /// Sets the resource version, implicitly applying a 'NotOlderThan' match
+    #[must_use]
+    pub fn at(resource_version: &str) -> Self {
+        Self {
+            resource_version: Some(resource_version.into()),
+        }
+    }
+
+    /// Sets the resource version to "0"
+    #[must_use]
+    pub fn any() -> Self {
+        Self::at("0")
+    }
+}
+
 /// The validation directive to use for `fieldValidation` when using server-side apply.
 #[derive(Clone, Debug)]
 pub enum ValidationDirective {
@@ -241,7 +276,7 @@ impl ValidationDirective {
 }
 
 /// Common query parameters used in watch calls on collections
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WatchParams {
     /// A selector to restrict returned objects by their labels.
     ///
@@ -369,7 +404,7 @@ impl WatchParams {
 }
 
 /// Common query parameters for put/post calls
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub struct PostParams {
     /// Whether to run this as a dry run
     pub dry_run: bool,
@@ -596,7 +631,7 @@ impl PatchParams {
 }
 
 /// Common query parameters for delete calls
-#[derive(Default, Clone, Serialize, Debug)]
+#[derive(Default, Clone, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteParams {
     /// When present, indicates that modifications should not be persisted.
@@ -764,7 +799,7 @@ mod test {
 }
 
 /// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
-#[derive(Default, Clone, Serialize, Debug)]
+#[derive(Default, Clone, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preconditions {
     /// Specifies the target ResourceVersion
@@ -776,7 +811,7 @@ pub struct Preconditions {
 }
 
 /// Propagation policy when deleting single objects
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub enum PropagationPolicy {
     /// Orphan dependents
     Orphan,

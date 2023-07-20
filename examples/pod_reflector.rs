@@ -2,7 +2,7 @@ use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::Api,
-    runtime::{reflector, watcher, WatchStreamExt},
+    runtime::{predicates, reflector, watcher, WatchStreamExt},
     Client, ResourceExt,
 };
 use tracing::*;
@@ -18,6 +18,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         // Show state every 5 seconds of watching
         loop {
+            reader.wait_until_ready().await.unwrap();
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             info!("Current pod count: {}", reader.state().len());
             // full information with debug logs
@@ -28,19 +29,20 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let stream = watcher(api, watcher::Config::default()).map_ok(|ev| {
-        ev.modify(|pod| {
-            // memory optimization for our store - we don't care about fields/annotations/status
+    let stream = watcher(api, watcher::Config::default().any_semantic())
+        .default_backoff()
+        .modify(|pod| {
+            // memory optimization for our store - we don't care about managed fields/annotations/status
             pod.managed_fields_mut().clear();
             pod.annotations_mut().clear();
             pod.status = None;
         })
-    });
+        .reflect(writer)
+        .applied_objects()
+        .predicate_filter(predicates::resource_version); // NB: requires an unstable feature
+    futures::pin_mut!(stream);
 
-    let rf = reflector(writer, stream).applied_objects();
-    futures::pin_mut!(rf);
-
-    while let Some(pod) = rf.try_next().await? {
+    while let Some(pod) = stream.try_next().await? {
         info!("saw {}", pod.name_any());
     }
     Ok(())

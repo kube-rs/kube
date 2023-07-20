@@ -1,16 +1,21 @@
 //! Helpers for manipulating built-in streams
 
 mod backoff_reset_timer;
+pub(crate) mod delayed_init;
 mod event_flatten;
+mod event_modify;
 #[cfg(feature = "unstable-runtime-predicates")] mod predicate;
+mod reflect;
 mod stream_backoff;
 #[cfg(feature = "unstable-runtime-subscribe")] pub mod stream_subscribe;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
 pub use event_flatten::EventFlatten;
+pub use event_modify::EventModify;
 #[cfg(feature = "unstable-runtime-predicates")]
-pub use predicate::{predicates, PredicateFilter};
+pub use predicate::{predicates, Predicate, PredicateFilter};
+pub use reflect::Reflect;
 pub use stream_backoff::StreamBackoff;
 #[cfg(feature = "unstable-runtime-subscribe")]
 pub use stream_subscribe::StreamSubscribe;
@@ -112,6 +117,8 @@ where
     S::Ok: Debug,
     S::Error: Debug,
 {
+    // `arc_with_non_send_sync` false positive: https://github.com/rust-lang/rust-clippy/issues/11076
+    #[allow(clippy::arc_with_non_send_sync)]
     let stream = Arc::new(Mutex::new(stream.into_stream().peekable()));
     (
         SplitCase {

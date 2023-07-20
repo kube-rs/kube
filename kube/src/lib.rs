@@ -48,7 +48,6 @@
 //! use schemars::JsonSchema;
 //! use serde::{Deserialize, Serialize};
 //! use serde_json::json;
-//! use validator::Validate;
 //! use futures::{StreamExt, TryStreamExt};
 //! use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 //! use kube::{
@@ -59,11 +58,11 @@
 //! };
 //!
 //! // Our custom resource
-//! #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, Validate, JsonSchema)]
+//! #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 //! #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 //! pub struct FooSpec {
 //!     info: String,
-//!     #[validate(length(min = 3))]
+//!     #[schemars(length(min = 3))]
 //!     name: String,
 //!     replicas: i32,
 //! }
@@ -178,6 +177,11 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from `kube_core`
 #[doc(inline)]
 pub use kube_core as core;
+
+// Mock tests for the runtime
+#[cfg(test)]
+#[cfg(all(feature = "derive", feature = "runtime"))]
+mod mock_tests;
 
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
@@ -357,7 +361,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (fetches api resources, and lists all)"]
-    #[cfg(all(feature = "derive"))]
+    #[cfg(feature = "derive")]
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
@@ -433,7 +437,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (will create await a pod)"]
-    #[cfg(all(feature = "runtime"))]
+    #[cfg(feature = "runtime")]
     async fn pod_can_await_conditions() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             api::{DeleteParams, PostParams},

@@ -109,6 +109,19 @@ name = "syn"
 name = "base64"
 
 [[bans.skip]]
+# used by h2->hyper->hyper-openssl (we have latest)
+# newer used by serde_json
+name = "indexmap"
+[[bans.skip]]
+# via indexmap - have to also skip this
+name = "hashbrown"
+
+[[bans.skip]]
+# latest via openssl->hyper-openssl (we have latest)
+# newer via tower-http (we have latest)
+name = "bitflags"
+
+[[bans.skip]]
 # deep in dependency tree, only dual use via dev dependency
 name = "redox_syscall"
 

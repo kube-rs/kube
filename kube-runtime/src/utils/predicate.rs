@@ -6,25 +6,112 @@ use core::{
 use futures::{ready, Stream};
 use kube_client::Resource;
 use pin_project::pin_project;
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+};
+
+fn hash<T: Hash>(t: &T) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    t.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// A predicate is a hasher of Kubernetes objects stream filtering
+pub trait Predicate<K> {
+    /// A predicate only needs to implement optional hashing when keys exist
+    fn hash_property(&self, obj: &K) -> Option<u64>;
+
+    /// Returns a `Predicate` that falls back to an alternate property if the first does not exist
+    ///
+    /// # Usage
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// use kube::runtime::{predicates, Predicate};
+    /// # fn blah<K>(a: impl Predicate<K>) {}
+    /// let pred = predicates::generation.fallback(predicates::resource_version);
+    /// blah::<Pod>(pred);
+    /// ```
+    fn fallback<F: Predicate<K>>(self, f: F) -> Fallback<Self, F>
+    where
+        Self: Sized,
+    {
+        Fallback(self, f)
+    }
+
+    /// Returns a `Predicate` that combines all available hashes
+    ///
+    /// # Usage
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// use kube::runtime::{predicates, Predicate};
+    /// # fn blah<K>(a: impl Predicate<K>) {}
+    /// let pred = predicates::labels.combine(predicates::annotations);
+    /// blah::<Pod>(pred);
+    /// ```
+    fn combine<F: Predicate<K>>(self, f: F) -> Combine<Self, F>
+    where
+        Self: Sized,
+    {
+        Combine(self, f)
+    }
+}
+
+impl<K, F: Fn(&K) -> Option<u64>> Predicate<K> for F {
+    fn hash_property(&self, obj: &K) -> Option<u64> {
+        (self)(obj)
+    }
+}
+
+/// See [`Predicate::fallback`]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Fallback<A, B>(pub(super) A, pub(super) B);
+impl<A, B, K> Predicate<K> for Fallback<A, B>
+where
+    A: Predicate<K>,
+    B: Predicate<K>,
+{
+    fn hash_property(&self, obj: &K) -> Option<u64> {
+        self.0.hash_property(obj).or_else(|| self.1.hash_property(obj))
+    }
+}
+/// See [`Predicate::combine`]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Combine<A, B>(pub(super) A, pub(super) B);
+impl<A, B, K> Predicate<K> for Combine<A, B>
+where
+    A: Predicate<K>,
+    B: Predicate<K>,
+{
+    fn hash_property(&self, obj: &K) -> Option<u64> {
+        match (self.0.hash_property(obj), self.1.hash_property(obj)) {
+            // pass on both missing properties so people can chain .fallback
+            (None, None) => None,
+            // but any other combination of properties are hashed together
+            (a, b) => Some(hash(&(a, b))),
+        }
+    }
+}
 
 #[allow(clippy::pedantic)]
 #[pin_project]
 /// Stream returned by the [`predicate_filter`](super::WatchStreamExt::predicate_filter) method.
 #[must_use = "streams do nothing unless polled"]
-pub struct PredicateFilter<St, K: Resource, Func> {
+pub struct PredicateFilter<St, K: Resource, P: Predicate<K>> {
     #[pin]
     stream: St,
-    predicate: Func,
+    predicate: P,
     cache: HashMap<ObjectRef<K>, u64>,
 }
-impl<St, K, F> PredicateFilter<St, K, F>
+impl<St, K, P> PredicateFilter<St, K, P>
 where
     St: Stream<Item = Result<K, Error>>,
     K: Resource,
-    F: Fn(&K) -> Option<u64> + 'static,
+    P: Predicate<K>,
 {
-    pub(super) fn new(stream: St, predicate: F) -> Self {
+    pub(super) fn new(stream: St, predicate: P) -> Self {
         Self {
             stream,
             predicate,
@@ -32,12 +119,12 @@ where
         }
     }
 }
-impl<St, K, F> Stream for PredicateFilter<St, K, F>
+impl<St, K, P> Stream for PredicateFilter<St, K, P>
 where
     St: Stream<Item = Result<K, Error>>,
     K: Resource,
     K::DynamicType: Default + Eq + Hash,
-    F: Fn(&K) -> Option<u64> + 'static,
+    P: Predicate<K>,
 {
     type Item = Result<K, Error>;
 
@@ -46,7 +133,7 @@ where
         Poll::Ready(loop {
             break match ready!(me.stream.as_mut().poll_next(cx)) {
                 Some(Ok(obj)) => {
-                    if let Some(val) = (me.predicate)(&obj) {
+                    if let Some(val) = me.predicate.hash_property(&obj) {
                         let key = ObjectRef::from_obj(&obj);
                         let changed = if let Some(old) = me.cache.get(&key) {
                             *old != val
@@ -82,21 +169,17 @@ where
 ///
 /// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
 pub mod predicates {
+    use super::hash;
     use kube_client::{Resource, ResourceExt};
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::{Hash, Hasher},
-    };
-
-    fn hash<T: Hash>(t: &T) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        t.hash(&mut hasher);
-        hasher.finish()
-    }
 
     /// Hash the generation of a Resource K
     pub fn generation<K: Resource>(obj: &K) -> Option<u64> {
         obj.meta().generation.map(|g| hash(&g))
+    }
+
+    /// Hash the resource version of a Resource K
+    pub fn resource_version<K: Resource>(obj: &K) -> Option<u64> {
+        obj.meta().resource_version.as_ref().map(hash)
     }
 
     /// Hash the labels of a Resource K

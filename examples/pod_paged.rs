@@ -5,6 +5,10 @@ use kube::{
 };
 use tracing::*;
 
+// This example shows how to do pagination with the raw `Api` only.
+// In many realistic setups that need a continual, paginated, safe list-watch;
+// the `watcher` is an easier abstraction that has configurable pagination built in.
+
 const PAGE_SIZE: u32 = 5;
 
 #[tokio::main]

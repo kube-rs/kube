@@ -118,7 +118,10 @@ impl<K> Event<K> {
 /// The internal finite state machine driving the [`watcher`]
 enum State<K> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
-    Empty,
+    Empty {
+        continue_token: Option<String>,
+        objects: Vec<K>,
+    },
     /// The initial LIST was successful, so we should move on to starting the actual watch.
     InitListed { resource_version: String },
     /// The watch is in progress, from this point we just return events from the server.
@@ -132,6 +135,15 @@ enum State<K> {
         #[derivative(Debug = "ignore")]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
+}
+
+impl<K: Resource + Clone> Default for State<K> {
+    fn default() -> Self {
+        Self::Empty {
+            continue_token: None,
+            objects: vec![],
+        }
+    }
 }
 
 /// Used to control whether the watcher receives the full object, or only the
@@ -205,6 +217,14 @@ pub struct Config {
     /// Configures re-list for performance vs. consistency.
     pub list_semantic: ListSemantic,
 
+    /// Maximum number of objects retrieved per list operation resyncs.
+    ///
+    /// This can reduce the memory consumption during resyncs, at the cost of requiring more
+    /// API roundtrips to complete.
+    ///
+    /// Defaults to 500. Note that `None` represents unbounded.
+    pub page_size: Option<u32>,
+
     /// Enables watch events with type "BOOKMARK".
     ///
     /// Requests watch bookmarks from the apiserver when enabled for improved watch precision and reduced list calls.
@@ -220,6 +240,9 @@ impl Default for Config {
             field_selector: None,
             timeout: None,
             list_semantic: ListSemantic::default(),
+            // same default page size limit as client-go
+            // https://github.com/kubernetes/client-go/blob/aed71fa5cf054e1c196d67b2e21f66fd967b8ab1/tools/pager/pager.go#L31
+            page_size: Some(500),
         }
     }
 }
@@ -288,6 +311,16 @@ impl Config {
         self
     }
 
+    /// Limits the number of objects retrieved in each list operation during resync.
+    ///
+    /// This can reduce the memory consumption during resyncs, at the cost of requiring more
+    /// API roundtrips to complete.
+    #[must_use]
+    pub fn page_size(mut self, page_size: u32) -> Self {
+        self.page_size = Some(page_size);
+        self
+    }
+
     /// Converts generic `watcher::Config` structure to the instance of `ListParams` used for list requests.
     fn to_list_params(&self) -> ListParams {
         let (resource_version, version_match) = match self.list_semantic {
@@ -300,9 +333,8 @@ impl Config {
             timeout: self.timeout,
             version_match,
             resource_version,
-            // It is not permissible for users to configure the continue token and limit for the watcher, as these parameters are associated with paging.
-            // The watcher must handle paging internally.
-            limit: None,
+            // The watcher handles pagination internally.
+            limit: self.page_size,
             continue_token: None,
         }
     }
@@ -368,6 +400,7 @@ where
 ///
 /// This function should be trampolined: if event == `None`
 /// then the function should be called again until it returns a Some.
+#[allow(clippy::too_many_lines)] // for now
 async fn step_trampolined<A>(
     api: &A,
     wc: &Config,
@@ -378,25 +411,40 @@ where
     A::Value: Resource + 'static,
 {
     match state {
-        State::Empty => match api.list(&wc.to_list_params()).await {
-            Ok(list) => {
-                if let Some(resource_version) = list.metadata.resource_version {
-                    (Some(Ok(Event::Restarted(list.items))), State::InitListed {
-                        resource_version,
-                    })
-                } else {
-                    (Some(Err(Error::NoResourceVersion)), State::Empty)
+        State::Empty {
+            continue_token,
+            mut objects,
+        } => {
+            let mut lp = wc.to_list_params();
+            lp.continue_token = continue_token;
+            match api.list(&lp).await {
+                Ok(list) => {
+                    objects.extend(list.items);
+                    if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
+                        (None, State::Empty {
+                            continue_token: Some(continue_token),
+                            objects,
+                        })
+                    } else if let Some(resource_version) =
+                        list.metadata.resource_version.filter(|s| !s.is_empty())
+                    {
+                        (Some(Ok(Event::Restarted(objects))), State::InitListed {
+                            resource_version,
+                        })
+                    } else {
+                        (Some(Err(Error::NoResourceVersion)), State::default())
+                    }
+                }
+                Err(err) => {
+                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                        warn!("watch list error with 403: {err:?}");
+                    } else {
+                        debug!("watch list error: {err:?}");
+                    }
+                    (Some(Err(err).map_err(Error::InitialListFailed)), State::default())
                 }
             }
-            Err(err) => {
-                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                    warn!("watch list error with 403: {err:?}");
-                } else {
-                    debug!("watch list error: {err:?}");
-                }
-                (Some(Err(err).map_err(Error::InitialListFailed)), State::Empty)
-            }
-        },
+        }
         State::InitListed { resource_version } => {
             match api.watch(&wc.to_watch_params(), &resource_version).await {
                 Ok(stream) => (None, State::Watching {
@@ -421,18 +469,26 @@ where
             mut stream,
         } => match stream.next().await {
             Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
-                let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Applied(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                let resource_version = obj.resource_version().unwrap_or_default();
+                if resource_version.is_empty() {
+                    (Some(Err(Error::NoResourceVersion)), State::default())
+                } else {
+                    (Some(Ok(Event::Applied(obj))), State::Watching {
+                        resource_version,
+                        stream,
+                    })
+                }
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
-                let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Deleted(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                let resource_version = obj.resource_version().unwrap_or_default();
+                if resource_version.is_empty() {
+                    (Some(Err(Error::NoResourceVersion)), State::default())
+                } else {
+                    (Some(Ok(Event::Deleted(obj))), State::Watching {
+                        resource_version,
+                        stream,
+                    })
+                }
             }
             Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
                 resource_version: bm.metadata.resource_version,
@@ -441,7 +497,7 @@ where
             Some(Ok(WatchEvent::Error(err))) => {
                 // HTTP GONE, means we have desynced and need to start over and re-list :(
                 let new_state = if err.code == 410 {
-                    State::Empty
+                    State::default()
                 } else {
                     State::Watching {
                         resource_version,
@@ -543,7 +599,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     watcher_config: Config,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
     futures::stream::unfold(
-        (api, watcher_config, State::Empty),
+        (api, watcher_config, State::default()),
         |(api, watcher_config, state)| async {
             let (event, state) = step(&FullObject { api: &api }, &watcher_config, state).await;
             Some((event, (api, watcher_config, state)))
@@ -607,7 +663,7 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
     watcher_config: Config,
 ) -> impl Stream<Item = Result<Event<PartialObjectMeta<K>>>> + Send {
     futures::stream::unfold(
-        (api, watcher_config, State::Empty),
+        (api, watcher_config, State::default()),
         |(api, watcher_config, state)| async {
             let (event, state) = step(&MetaOnly { api: &api }, &watcher_config, state).await;
             Some((event, (api, watcher_config, state)))
@@ -640,19 +696,51 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 
 /// Default watch [`Backoff`] inspired by Kubernetes' client-go.
 ///
-/// Note that the exact parameters used herein should not be considered stable.
-/// The parameters currently optimize for being kind to struggling apiservers.
-/// See [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
-/// for more details.
+/// This fn has been moved into [`DefaultBackoff`].
 #[must_use]
-pub fn default_backoff() -> impl Backoff + Send + Sync {
-    let expo = backoff::ExponentialBackoff {
-        initial_interval: Duration::from_millis(800),
-        max_interval: Duration::from_secs(30),
-        randomization_factor: 1.0,
-        multiplier: 2.0,
-        max_elapsed_time: None,
-        ..ExponentialBackoff::default()
-    };
-    ResetTimerBackoff::new(expo, Duration::from_secs(120))
+#[deprecated(
+    since = "0.84.0",
+    note = "replaced by `watcher::DefaultBackoff`. This fn will be removed in 0.88.0."
+)]
+pub fn default_backoff() -> DefaultBackoff {
+    DefaultBackoff::default()
+}
+
+/// Default watcher backoff inspired by Kubernetes' client-go.
+///
+/// The parameters currently optimize for being kind to struggling apiservers.
+/// The exact parameters are taken from
+/// [client-go's reflector source](https://github.com/kubernetes/client-go/blob/980663e185ab6fc79163b1c2565034f6d58368db/tools/cache/reflector.go#L177-L181)
+/// and should not be considered stable.
+///
+/// This struct implements [`Backoff`] and is the default strategy used
+/// when calling `WatchStreamExt::default_backoff`. If you need to create
+/// this manually then [`DefaultBackoff::default`] can be used.
+pub struct DefaultBackoff(Strategy);
+type Strategy = ResetTimerBackoff<ExponentialBackoff>;
+
+impl Default for DefaultBackoff {
+    fn default() -> Self {
+        Self(ResetTimerBackoff::new(
+            backoff::ExponentialBackoff {
+                initial_interval: Duration::from_millis(800),
+                max_interval: Duration::from_secs(30),
+                randomization_factor: 1.0,
+                multiplier: 2.0,
+                max_elapsed_time: None,
+                ..ExponentialBackoff::default()
+            },
+            Duration::from_secs(120),
+        ))
+    }
+}
+
+impl Backoff for DefaultBackoff {
+    fn next_backoff(&mut self) -> Option<Duration> {
+        self.0.next_backoff()
+    }
+
+    fn reset(&mut self) {
+        self.0.reset()
+    }
 }

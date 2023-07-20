@@ -1,10 +1,14 @@
 use super::ObjectRef;
-use crate::watcher;
+use crate::{
+    utils::delayed_init::{self, DelayedInit},
+    watcher,
+};
 use ahash::AHashMap;
 use derivative::Derivative;
 use kube_client::Resource;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
+use thiserror::Error;
 
 type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
@@ -12,14 +16,15 @@ type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 ///
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
-#[derive(Debug, Derivative)]
-#[derivative(Default(bound = "K::DynamicType: Default"))]
+#[derive(Debug)]
 pub struct Writer<K: 'static + Resource>
 where
     K::DynamicType: Eq + Hash,
 {
     store: Cache<K>,
     dyntype: K::DynamicType,
+    ready_tx: Option<delayed_init::Initializer<()>>,
+    ready_rx: Arc<DelayedInit<()>>,
 }
 
 impl<K: 'static + Resource + Clone> Writer<K>
@@ -31,9 +36,12 @@ where
     /// If the dynamic type is default-able (for example when writer is used with
     /// `k8s_openapi` types) you can use `Default` instead.
     pub fn new(dyntype: K::DynamicType) -> Self {
+        let (ready_tx, ready_rx) = DelayedInit::new();
         Writer {
             store: Default::default(),
             dyntype,
+            ready_tx: Some(ready_tx),
+            ready_rx: Arc::new(ready_rx),
         }
     }
 
@@ -45,6 +53,7 @@ where
     pub fn as_reader(&self) -> Store<K> {
         Store {
             store: self.store.clone(),
+            ready_rx: self.ready_rx.clone(),
         }
     }
 
@@ -73,6 +82,20 @@ where
                 *self.store.write() = new_objs;
             }
         }
+
+        // Mark as ready after the first event, "releasing" any calls to Store::wait_until_ready()
+        if let Some(ready_tx) = self.ready_tx.take() {
+            ready_tx.init(())
+        }
+    }
+}
+impl<K> Default for Writer<K>
+where
+    K: Resource + Clone + 'static,
+    K::DynamicType: Default + Eq + Hash + Clone,
+{
+    fn default() -> Self {
+        Self::new(K::DynamicType::default())
     }
 }
 
@@ -89,12 +112,28 @@ where
     K::DynamicType: Hash + Eq,
 {
     store: Cache<K>,
+    ready_rx: Arc<DelayedInit<()>>,
 }
+
+#[derive(Debug, Error)]
+#[error("writer was dropped before store became ready")]
+pub struct WriterDropped(delayed_init::InitDropped);
 
 impl<K: 'static + Clone + Resource> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
+    /// Wait for the store to be populated by Kubernetes.
+    ///
+    /// Note that polling this will _not_ await the source of the stream that populates the [`Writer`].
+    /// The [`reflector`](crate::reflector()) stream must be awaited separately.
+    ///
+    /// # Errors
+    /// Returns an error if the [`Writer`] was dropped before any value was written.
+    pub async fn wait_until_ready(&self) -> Result<(), WriterDropped> {
+        self.ready_rx.get().await.map_err(WriterDropped)
+    }
+
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
     ///
     /// `key.namespace` is ignored for cluster-scoped resources.
@@ -236,6 +275,7 @@ mod tests {
             },
             ..ConfigMap::default()
         };
+        #[allow(clippy::redundant_clone)] // false positive
         let mut nsed_cm = cm.clone();
         nsed_cm.metadata.namespace = Some("ns".to_string());
         let mut store_w = Writer::default();

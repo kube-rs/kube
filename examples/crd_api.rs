@@ -1,12 +1,12 @@
 use anyhow::{bail, Result};
 use either::Either::{Left, Right};
+use garde::Validate;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::*;
-use validator::Validate;
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
@@ -22,9 +22,12 @@ use kube::{
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
 #[kube(printcolumn = r#"{"name":"Team", "jsonPath": ".spec.metadata.team", "type": "string"}"#)]
 pub struct FooSpec {
-    #[validate(length(min = 3))]
+    #[schemars(length(min = 3))]
+    #[garde(length(min = 3))]
     name: String,
+    #[garde(skip)]
     info: String,
+    #[garde(skip)]
     replicas: i32,
 }
 
@@ -201,7 +204,7 @@ async fn main() -> Result<()> {
         replicas: 1,
     });
     // using derived Validate rules locally:
-    assert!(fx.spec.validate().is_err());
+    assert!(fx.spec.validate(&()).is_err());
     // check rejection from apiserver (validation rules embedded in JsonSchema)
     match foos.create(&pp, &fx).await {
         Err(kube::Error::Api(ae)) => {

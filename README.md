@@ -1,7 +1,7 @@
 # kube-rs
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
-[![Rust 1.63](https://img.shields.io/badge/MSRV-1.63-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.63.0)
+[![Rust 1.64](https://img.shields.io/badge/MSRV-1.64-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.64.0)
 [![Tested against Kubernetes v1_21 and above](https://img.shields.io/badge/MK8SV-v1_21-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
@@ -16,7 +16,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.82.2", features = ["runtime", "derive"] }
+kube = { version = "0.84.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.18.0", features = ["v1_26"] }
 ```
 
@@ -152,7 +152,7 @@ By default `openssl` is used for TLS, but [rustls](https://github.com/ctz/rustls
 
 ```toml
 [dependencies]
-kube = { version = "0.82.2", default-features = false, features = ["client", "rustls-tls"] }
+kube = { version = "0.84.0", default-features = false, features = ["client", "rustls-tls"] }
 k8s-openapi = { version = "0.18.0", features = ["v1_26"] }
 ```
 

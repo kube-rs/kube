@@ -5,7 +5,50 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.82.2...main
+ * see https://github.com/kube-rs/kube/compare/0.84.0...main
+
+[0.84.0](https://github.com/kube-rs/kube/releases/tag/0.84.0) / 2023-07-14
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.84.0 -->
+
+## Highlights
+### Stream Improvements
+On the `runtime` side, the `Controller` now delays reconciles until the main `Store` is ready (via a [new `Store` helper](https://docs.rs/kube/0.84.0/kube/runtime/reflector/struct.Store.html#method.wait_until_ready) from #1243). The stream selection for owned resources is more efficient (#1240), and the underlying `watcher` streams now all paginate (#1249). There are also many new  [`WatchStreamExt`](https://docs.rs/kube/0.84.0/kube/runtime/trait.WatchStreamExt.html) helpers ( #1246 + #1228 + #1232) as a continued work towards the more customisable streams-api (#1080).
+
+On the client-side; streaming logs are now easier to deal with as an `AsyncBufRead` #1235.
+
+### OIDC Refresh
+Optional OIDC refreshable token support was introduced in #1229 under `kube/oidc` for out-of-cluster `Client` configuration. Previously, refresh support was limited to non-OIDC tokens from the `GcpOuth` provider (`kube/oauth`) or through arbitrary `exec` calls / `TokenFile` loading.
+
+## What's Changed
+### Added
+* Add `Predicate` trait to allow combination + fallbacks by @clux in https://github.com/kube-rs/kube/pull/1228
+* Added refreshing OIDC ID token as an optional feature by @Razz4780 in https://github.com/kube-rs/kube/pull/1229
+* Add `WatchStreamExt::default_backoff` shorthand by @clux in https://github.com/kube-rs/kube/pull/1232
+* Derive `PartialEq` on `core` params structs by @danrspencer in https://github.com/kube-rs/kube/pull/1237
+* Track store readiness by @nightkr in https://github.com/kube-rs/kube/pull/1243
+* Add `WatchStreamExt::modify()` to modify events by @aryan9600 in https://github.com/kube-rs/kube/pull/1246
+* Add default pagination to `watcher` by @clux in https://github.com/kube-rs/kube/pull/1249
+### Changed
+* Bump MSRV from 1.63 to 1.64 by @clux in https://github.com/kube-rs/kube/pull/1233
+* Change `Api::log_stream` to return `AsyncBufRead` by @aryan9600 in https://github.com/kube-rs/kube/pull/1235
+### Fixed
+* Make `Controller::owns` use `metadata_watcher` internally by @clux in https://github.com/kube-rs/kube/pull/1240
+
+[0.83.0](https://github.com/kube-rs/kube/releases/tag/0.83.0) / 2023-06-05
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.83.0 -->
+
+## What's Changed
+### Added
+* Add `Controller::reconcile_on` by @co42 in https://github.com/kube-rs/kube/pull/1163
+* Add `predicates::resource_version` by @clux in https://github.com/kube-rs/kube/pull/1221
+* add `Duration` to `kube-core` by @hawkw in https://github.com/kube-rs/kube/pull/1224
+### Changed
+* Introduce `GetParams` support by @mateiidavid in https://github.com/kube-rs/kube/pull/1214
+### Fixed
+* Swap `validator` for `garde` by @mateiidavid in https://github.com/kube-rs/kube/pull/1212
+* fix: `#[kube(crates(serde = "some_crate::serde"))]` was not working by @chubei in https://github.com/kube-rs/kube/pull/1215
 
 [0.82.2](https://github.com/kube-rs/kube/releases/tag/0.82.2) / 2023-04-19
 ===================

@@ -7,9 +7,8 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
-use bytes::Bytes;
 use either::{Either, Left, Right};
-use futures::{self, Stream, StreamExt, TryStream, TryStreamExt};
+use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
 use hyper::Body;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
@@ -46,6 +45,10 @@ pub use tls::openssl_tls::Error as OpensslTlsError;
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
 pub use auth::OAuthError;
+
+#[cfg(feature = "oidc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
+pub use auth::oidc_errors;
 
 #[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
 
@@ -234,15 +237,18 @@ impl Client {
         Ok(text)
     }
 
-    /// Perform a raw HTTP request against the API and get back the response
-    /// as a stream of bytes
-    pub async fn request_text_stream(
-        &self,
-        request: Request<Vec<u8>>,
-    ) -> Result<impl Stream<Item = Result<Bytes>>> {
+    /// Perform a raw HTTP request against the API and stream the response body.
+    ///
+    /// The response can be processed using [`AsyncReadExt`](futures::AsyncReadExt)
+    /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
+    pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead> {
         let res = self.send(request.map(Body::from)).await?;
-        // trace!("Status = {:?} for {}", res.status(), res.url());
-        Ok(res.into_body().map_err(Error::HyperError))
+        // Map the error, since we want to convert this into an `AsyncBufReader` using
+        // `into_async_read` which specifies `std::io::Error` as the stream's error type.
+        let body = res
+            .into_body()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+        Ok(body.into_async_read())
     }
 
     /// Perform a raw HTTP request against the API and get back either an object

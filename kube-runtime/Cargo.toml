@@ -1,6 +1,6 @@
 [package]
 name = "kube-runtime"
-version = "0.82.2"
+version = "0.84.0"
 description = "Kubernetes futures controller runtime"
 authors = [
   "Natalie Klestrup Röijezon <nat@nullable.se>",
@@ -11,14 +11,15 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
 categories = ["web-programming::http-client", "caching", "network-programming"]
-rust-version = "1.63.0"
+rust-version = "1.64.0"
 edition = "2021"
 
 [features]
-unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-predicates", "unstable-runtime-stream-control"]
+unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-predicates", "unstable-runtime-stream-control", "unstable-runtime-reconcile-on"]
 unstable-runtime-subscribe = []
 unstable-runtime-predicates = []
 unstable-runtime-stream-control = []
+unstable-runtime-reconcile-on = []
 
 [package.metadata.docs.rs]
 features = ["k8s-openapi/v1_26", "unstable-runtime"]
@@ -27,7 +28,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 futures = "0.3.17"
-kube-client = { path = "../kube-client", version = "=0.82.2", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "=0.84.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative = "2.1.1"
 serde = "1.0.130"
 smallvec = "1.7.0"
@@ -53,6 +54,7 @@ serde_json = "1.0.68"
 tokio = { version = "1.14.0", features = ["full", "test-util"] }
 rand = "0.8.0"
 schemars = "0.8.6"
+tracing-subscriber = "0.3.17"
 
 [dev-dependencies.k8s-openapi]
 version = "0.18.0"

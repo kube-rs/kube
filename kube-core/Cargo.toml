@@ -1,13 +1,13 @@
 [package]
 name = "kube-core"
 description = "Kube shared types, traits and client-less behavior"
-version = "0.82.2"
+version = "0.84.0"
 authors = [
   "clux <sszynrae@gmail.com>",
   "kazk <kazk.dev@gmail.com>",
 ]
 edition = "2021"
-rust-version = "1.63.0"
+rust-version = "1.64.0"
 license = "Apache-2.0"
 keywords = ["kubernetes", "apimachinery"]
 categories = ["api-bindings", "encoding", "parser-implementations"]

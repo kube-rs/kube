@@ -1,19 +1,32 @@
 #[cfg(feature = "unstable-runtime-predicates")]
-use crate::utils::predicate::PredicateFilter;
+use crate::utils::predicate::{Predicate, PredicateFilter};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
-    utils::{event_flatten::EventFlatten, stream_backoff::StreamBackoff},
+    utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
     watcher,
 };
-#[cfg(feature = "unstable-runtime-predicates")] use kube_client::Resource;
+use kube_client::Resource;
 
+use crate::{reflector::store::Writer, utils::Reflect};
+
+use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
-    /// Apply a [`Backoff`] policy to a [`Stream`] using [`StreamBackoff`]
+    /// Apply the [`DefaultBackoff`] watcher [`Backoff`] policy
+    ///
+    /// This is recommended for controllers that want to play nicely with the apiserver.
+    fn default_backoff(self) -> StreamBackoff<Self, DefaultBackoff>
+    where
+        Self: TryStream + Sized,
+    {
+        StreamBackoff::new(self, DefaultBackoff::default())
+    }
+
+    /// Apply a specific [`Backoff`] policy to a [`Stream`] using [`StreamBackoff`]
     fn backoff<B>(self, b: B) -> StreamBackoff<Self, B>
     where
         B: Backoff,
@@ -42,6 +55,40 @@ pub trait WatchStreamExt: Stream {
         EventFlatten::new(self, true)
     }
 
+    /// Modify elements of a [`watcher()`] stream.
+    ///
+    /// Calls [`watcher::Event::modify()`] on every element.
+    /// Stream shorthand for `stream.map_ok(|event| { event.modify(f) })`.
+    ///
+    /// ```no_run
+    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use kube::{Api, Client, ResourceExt};
+    /// # use kube_runtime::{watcher, WatchStreamExt};
+    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let deploys: Api<Deployment> = Api::all(client);
+    /// let truncated_deploy_stream = watcher(deploys, watcher::Config::default())
+    ///     .modify(|deploy| {
+    ///         deploy.managed_fields_mut().clear();
+    ///         deploy.status = None;
+    ///     })
+    ///     .applied_objects();
+    /// pin_mut!(truncated_deploy_stream);
+    ///
+    /// while let Some(d) = truncated_deploy_stream.try_next().await? {
+    ///    println!("Truncated Deployment: '{:?}'", serde_json::to_string(&d)?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn modify<F, K>(self, f: F) -> EventModify<Self, F>
+    where
+        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        F: FnMut(&mut K),
+    {
+        EventModify::new(self, f)
+    }
 
     /// Filter out a flattened stream on [`predicates`](crate::predicates).
     ///
@@ -56,27 +103,27 @@ pub trait WatchStreamExt: Stream {
     /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
     /// use kube::{Api, Client, ResourceExt};
     /// use kube_runtime::{watcher, WatchStreamExt, predicates};
-    /// use k8s_openapi::api::core::v1::Pod;
+    /// use k8s_openapi::api::apps::v1::Deployment;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
-    /// let pods: Api<Pod> = Api::default_namespaced(client);
-    /// let changed_pods = watcher(pods, watcher::Config::default())
+    /// let deploys: Api<Deployment> = Api::default_namespaced(client);
+    /// let changed_deploys = watcher(deploys, watcher::Config::default())
     ///     .applied_objects()
     ///     .predicate_filter(predicates::generation);
-    /// pin_mut!(changed_pods);
+    /// pin_mut!(changed_deploys);
     ///
-    /// while let Some(pod) = changed_pods.try_next().await? {
-    ///    println!("saw Pod '{} with hitherto unseen generation", pod.name_any());
+    /// while let Some(d) = changed_deploys.try_next().await? {
+    ///    println!("saw Deployment '{} with hitherto unseen generation", d.name_any());
     /// }
     /// # Ok(())
     /// # }
     /// ```
     #[cfg(feature = "unstable-runtime-predicates")]
-    fn predicate_filter<K, F>(self, predicate: F) -> PredicateFilter<Self, K, F>
+    fn predicate_filter<K, P>(self, predicate: P) -> PredicateFilter<Self, K, P>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
         K: Resource + 'static,
-        F: Fn(&K) -> Option<u64> + 'static,
+        P: Predicate<K> + 'static,
     {
         PredicateFilter::new(self, predicate)
     }
@@ -144,6 +191,61 @@ pub trait WatchStreamExt: Stream {
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,
     {
         StreamSubscribe::new(self)
+    }
+
+    /// Reflect a [`watcher()`] stream into a [`Store`] through a [`Writer`]
+    ///
+    /// Returns the stream unmodified, but passes every [`watcher::Event`] through a [`Writer`].
+    /// This populates a [`Store`] as the stream is polled.
+    ///
+    /// ## Usage
+    /// ```no_run
+    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use std::time::Duration;
+    /// # use tracing::{info, warn};
+    /// use kube::{Api, Client, ResourceExt};
+    /// use kube_runtime::{watcher, WatchStreamExt, reflector};
+    /// use k8s_openapi::api::apps::v1::Deployment;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    ///
+    /// let deploys: Api<Deployment> = Api::default_namespaced(client);
+    /// let (reader, writer) = reflector::store::<Deployment>();
+    ///
+    /// tokio::spawn(async move {
+    ///     // start polling the store once the reader is ready
+    ///     reader.wait_until_ready().await.unwrap();
+    ///     loop {
+    ///         let names = reader.state().iter().map(|d| d.name_any()).collect::<Vec<_>>();
+    ///         info!("Current {} deploys: {:?}", names.len(), names);
+    ///         tokio::time::sleep(Duration::from_secs(10)).await;
+    ///     }
+    /// });
+    ///
+    /// // configure the watcher stream and populate the store while polling
+    /// watcher(deploys, watcher::Config::default())
+    ///     .reflect(writer)
+    ///     .applied_objects()
+    ///     .for_each(|res| async move {
+    ///         match res {
+    ///             Ok(o) => info!("saw {}", o.name_any()),
+    ///             Err(e) => warn!("watcher error: {}", e),
+    ///         }
+    ///     })
+    ///     .await;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`Store`]: crate::reflector::Store
+    fn reflect<K>(self, writer: Writer<K>) -> Reflect<Self, K>
+    where
+        Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
+        K: Resource + Clone + 'static,
+        K::DynamicType: Eq + std::hash::Hash + Clone,
+    {
+        Reflect::new(self, writer)
     }
 }
 

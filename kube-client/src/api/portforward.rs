@@ -319,7 +319,7 @@ where
             Message::ToPod(ch, bytes) => {
                 let mut bin = Vec::with_capacity(bytes.len() + 1);
                 bin.push(ch);
-                bin.extend(bytes.into_iter());
+                bin.extend(bytes);
                 ws_sink
                     .send(ws::Message::binary(bin))
                     .await

@@ -136,7 +136,7 @@ mod test {
         client::ConfigExt,
         Api, Client, Config, ResourceExt,
     };
-    use futures::{StreamExt, TryStreamExt};
+    use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::Pod;
     use kube_core::{
         params::{DeleteParams, Patch, WatchParams},
@@ -149,7 +149,7 @@ mod test {
     #[cfg(feature = "when_rustls_works_with_k3d")]
     #[tokio::test]
     #[ignore = "needs cluster (lists pods)"]
-    #[cfg(all(feature = "rustls-tls"))]
+    #[cfg(feature = "rustls-tls")]
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
         let https = config.rustls_https_connector()?;
@@ -164,7 +164,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (lists pods)"]
-    #[cfg(all(feature = "openssl-tls"))]
+    #[cfg(feature = "openssl-tls")]
     async fn custom_client_openssl_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
         let https = config.openssl_https_connector()?;
@@ -179,7 +179,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (lists api resources)"]
-    #[cfg(all(feature = "discovery"))]
+    #[cfg(feature = "discovery")]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{core::DynamicObject, discovery};
         let client = Client::try_default().await?;
@@ -273,7 +273,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (will create and attach to a pod)"]
-    #[cfg(all(feature = "ws"))]
+    #[cfg(feature = "ws")]
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
 
@@ -444,7 +444,7 @@ mod test {
             follow: true,
             ..LogParams::default()
         };
-        let mut logs_stream = pods.log_stream("busybox-kube3", &lp).await?.boxed();
+        let mut logs_stream = pods.log_stream("busybox-kube3", &lp).await?.lines();
 
         // wait for container to finish
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -453,11 +453,11 @@ mod test {
         assert_eq!(all_logs, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
 
         // individual logs may or may not buffer
-        let mut output = String::new();
+        let mut output = vec![];
         while let Some(line) = logs_stream.try_next().await? {
-            output.push_str(&String::from_utf8_lossy(&line));
+            output.push(line);
         }
-        assert_eq!(output, "kube 1\nkube 2\nkube 3\nkube 4\nkube 5\n");
+        assert_eq!(output, vec!["kube 1", "kube 2", "kube 3", "kube 4", "kube 5"]);
 
         // evict the pod
         let ep = EvictParams::default();
