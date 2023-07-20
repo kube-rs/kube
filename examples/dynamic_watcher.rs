@@ -1,6 +1,6 @@
 use futures::{Stream, StreamExt, TryStreamExt};
 use kube::{
-    api::{Api, DynamicObject, GroupVersionKind, Resource, ResourceExt},
+    api::{Api, ApiResource, DynamicObject, GroupVersionKind, Resource, ResourceExt},
     runtime::{metadata_watcher, watcher, watcher::Event, WatchStreamExt},
 };
 use serde::de::DeserializeOwned;
@@ -32,21 +32,24 @@ async fn main() -> anyhow::Result<()> {
 
     // Start a metadata or a full resource watch
     if watch_metadata {
-        handle_events(metadata_watcher(api, wc)).await
+        handle_events(metadata_watcher(api, wc), &ar).await
     } else {
-        handle_events(watcher(api, wc)).await
+        handle_events(watcher(api, wc), &ar).await
     }
 }
 
-async fn handle_events<K: Resource + Clone + Debug + Send + DeserializeOwned + 'static>(
+async fn handle_events<
+    K: Resource<DynamicType = ApiResource> + Clone + Debug + Send + DeserializeOwned + 'static,
+>(
     stream: impl Stream<Item = watcher::Result<Event<K>>> + Send + 'static,
+    ar: &ApiResource,
 ) -> anyhow::Result<()> {
     let mut items = stream.applied_objects().boxed();
     while let Some(p) = items.try_next().await? {
         if let Some(ns) = p.namespace() {
-            info!("saw {} in {ns}", p.name_any());
+            info!("saw {} {} in {ns}", K::kind(ar), p.name_any());
         } else {
-            info!("saw {}", p.name_any());
+            info!("saw {} {}", K::kind(ar), p.name_any());
         }
         trace!("full obj: {p:?}");
     }
