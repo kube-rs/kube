@@ -425,7 +425,9 @@ where
                             continue_token: Some(continue_token),
                             objects,
                         })
-                    } else if let Some(resource_version) = list.metadata.resource_version {
+                    } else if let Some(resource_version) =
+                        list.metadata.resource_version.filter(|s| !s.is_empty())
+                    {
                         (Some(Ok(Event::Restarted(objects))), State::InitListed {
                             resource_version,
                         })
@@ -467,18 +469,26 @@ where
             mut stream,
         } => match stream.next().await {
             Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
-                let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Applied(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                let resource_version = obj.resource_version().unwrap_or_default();
+                if resource_version.is_empty() {
+                    (Some(Err(Error::NoResourceVersion)), State::default())
+                } else {
+                    (Some(Ok(Event::Applied(obj))), State::Watching {
+                        resource_version,
+                        stream,
+                    })
+                }
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
-                let resource_version = obj.resource_version().unwrap();
-                (Some(Ok(Event::Deleted(obj))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                let resource_version = obj.resource_version().unwrap_or_default();
+                if resource_version.is_empty() {
+                    (Some(Err(Error::NoResourceVersion)), State::default())
+                } else {
+                    (Some(Ok(Event::Deleted(obj))), State::Watching {
+                        resource_version,
+                        stream,
+                    })
+                }
             }
             Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
                 resource_version: bm.metadata.resource_version,
