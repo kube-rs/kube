@@ -224,6 +224,11 @@ mod tests {
         }
     }
 
+    /// Message type that is always considered equal to itself
+    #[derive(Derivative, Eq, Clone, Debug)]
+    #[derivative(PartialEq, Hash)]
+    struct SingletonMessage(#[derivative(PartialEq = "ignore", Hash = "ignore")] u8);
+
     #[tokio::test]
     async fn scheduler_should_hold_and_release_items() {
         pause();
@@ -403,11 +408,6 @@ mod tests {
 
     #[tokio::test]
     async fn scheduler_should_overwrite_message_with_soonest_version() {
-        // Message type that is always considered equal to itself
-        #[derive(Derivative, Eq, Clone, Debug)]
-        #[derivative(PartialEq, Hash)]
-        struct SingletonMessage(#[derivative(PartialEq = "ignore", Hash = "ignore")] u8);
-
         pause();
 
         let now = Instant::now();
@@ -429,11 +429,6 @@ mod tests {
 
     #[tokio::test]
     async fn scheduler_should_not_overwrite_message_with_later_version() {
-        // Message type that is always considered equal to itself
-        #[derive(Derivative, Eq, Clone, Debug)]
-        #[derivative(PartialEq, Hash)]
-        struct SingletonMessage(#[derivative(PartialEq = "ignore", Hash = "ignore")] u8);
-
         pause();
 
         let now = Instant::now();
