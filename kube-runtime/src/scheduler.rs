@@ -1,9 +1,10 @@
 //! Delays and deduplicates [`Stream`] items
 
 use futures::{stream::Fuse, Stream, StreamExt};
+use hashbrown::{hash_map::Entry, HashMap};
 use pin_project::pin_project;
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::HashSet,
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
@@ -30,8 +31,13 @@ pub struct Scheduler<T, R> {
     ///
     /// To ensure that the metadata is kept up-to-date, use `schedule_message` and
     /// `poll_pop_queue_message` rather than manipulating this directly.
+    ///
+    /// NOTE: `scheduled` should be considered to hold the "canonical" representation of the message.
+    /// Always pull the message out of `scheduled` once it has been retrieved from `queue`.
     queue: DelayQueue<T>,
     /// Metadata for all currently scheduled messages. Used to detect duplicate messages.
+    ///
+    /// `scheduled` is considered to hold the "canonical" representation of the message.
     scheduled: HashMap<T, ScheduledEntry>,
     /// Messages that are scheduled to have happened, but have been held using `hold_unless`.
     pending: HashSet<T>,
@@ -67,6 +73,7 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
                 // TODO: this should add a little delay here to actually debounce
                 self.queue.reset_at(&entry.queue_key, request.run_at);
                 entry.run_at = request.run_at;
+                old_entry.replace_key();
             }
             Entry::Occupied(_old_entry) => {
                 // Old entry will run before the new request, so ignore the new request..
@@ -96,7 +103,7 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             match self.queue.poll_expired(cx) {
                 Poll::Ready(Some(msg)) => {
                     let msg = msg.into_inner();
-                    self.scheduled.remove(&msg).expect(
+                    let (msg, _) = self.scheduled.remove_entry(&msg).expect(
                         "Expired message was popped from the Scheduler queue, but was not in the metadata map",
                     );
                     if can_take_message(&msg) {
@@ -204,6 +211,7 @@ mod tests {
     use crate::utils::KubeRuntimeStreamExt;
 
     use super::{scheduler, ScheduleRequest};
+    use derivative::Derivative;
     use futures::{channel::mpsc, future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
     use std::task::Poll;
     use tokio::time::{advance, pause, sleep, Duration, Instant};
@@ -215,6 +223,11 @@ mod tests {
             panic!("Tried to unwrap a pending poll!")
         }
     }
+
+    /// Message type that is always considered equal to itself
+    #[derive(Derivative, Eq, Clone, Debug)]
+    #[derivative(PartialEq, Hash)]
+    struct SingletonMessage(#[derivative(PartialEq = "ignore", Hash = "ignore")] u8);
 
     #[tokio::test]
     async fn scheduler_should_hold_and_release_items() {
@@ -391,5 +404,47 @@ mod tests {
         advance(Duration::from_secs(2)).await;
         scheduler.next().now_or_never().unwrap().unwrap();
         assert!(poll!(scheduler.next()).is_pending());
+    }
+
+    #[tokio::test]
+    async fn scheduler_should_overwrite_message_with_soonest_version() {
+        pause();
+
+        let now = Instant::now();
+        let scheduler = scheduler(
+            stream::iter([
+                ScheduleRequest {
+                    message: SingletonMessage(1),
+                    run_at: now + Duration::from_secs(2),
+                },
+                ScheduleRequest {
+                    message: SingletonMessage(2),
+                    run_at: now + Duration::from_secs(1),
+                },
+            ])
+            .on_complete(sleep(Duration::from_secs(5))),
+        );
+        assert_eq!(scheduler.map(|msg| msg.0).collect::<Vec<_>>().await, vec![2]);
+    }
+
+    #[tokio::test]
+    async fn scheduler_should_not_overwrite_message_with_later_version() {
+        pause();
+
+        let now = Instant::now();
+        let scheduler = scheduler(
+            stream::iter([
+                ScheduleRequest {
+                    message: SingletonMessage(1),
+                    run_at: now + Duration::from_secs(1),
+                },
+                ScheduleRequest {
+                    message: SingletonMessage(2),
+                    run_at: now + Duration::from_secs(2),
+                },
+            ])
+            .on_complete(sleep(Duration::from_secs(5))),
+        );
+        assert_eq!(scheduler.map(|msg| msg.0).collect::<Vec<_>>().await, vec![1]);
     }
 }
