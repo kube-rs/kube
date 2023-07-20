@@ -108,17 +108,17 @@ impl Gcp {
                     "At least one of rustls-tls or openssl-tls feature must be enabled to use oauth feature"
                 );
                 // Current TLS feature precedence when more than one are set:
-                // 1. openssl-tls
-                // 2. rustls-tls
-                #[cfg(feature = "openssl-tls")]
-                let https =
-                    hyper_openssl::HttpsConnector::new().map_err(Error::CreateOpensslHttpsConnector)?;
-                #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+                // 1. rustls-tls
+                // 2. openssl-tls
+                #[cfg(feature = "rustls-tls")]
                 let https = hyper_rustls::HttpsConnectorBuilder::new()
                     .with_native_roots()
                     .https_only()
                     .enable_http1()
                     .build();
+                #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+                let https =
+                    hyper_openssl::HttpsConnector::new().map_err(Error::CreateOpensslHttpsConnector)?;
 
                 let client = hyper::Client::builder().build::<_, hyper::Body>(https);
 

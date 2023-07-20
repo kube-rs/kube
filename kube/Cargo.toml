@@ -16,18 +16,24 @@ rust-version = "1.64.0"
 edition = "2021"
 
 [features]
-default = ["client", "openssl-tls"]
+default = ["client", "rustls-tls"]
+
+# default features
+client = ["kube-client/client", "config"]
+config = ["kube-client/config"]
 rustls-tls = ["kube-client/rustls-tls"]
+
+# alternative features
 openssl-tls = ["kube-client/openssl-tls"]
+
+# auxiliary features
 ws = ["kube-client/ws", "kube-core/ws"]
 oauth = ["kube-client/oauth"]
 oidc = ["kube-client/oidc"]
 gzip = ["kube-client/gzip"]
-client = ["kube-client/client", "config"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 derive = ["kube-derive", "kube-core/schema"]
-config = ["kube-client/config"]
 runtime = ["kube-runtime"]
 unstable-runtime = ["kube-runtime/unstable-runtime"]
 

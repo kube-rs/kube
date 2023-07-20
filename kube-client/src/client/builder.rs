@@ -78,14 +78,14 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
             connector.enforce_http(false);
 
             // Current TLS feature precedence when more than one are set:
-            // 1. openssl-tls
-            // 2. rustls-tls
+            // 1. rustls-tls
+            // 2. openssl-tls
             // Create a custom client to use something else.
             // If TLS features are not enabled, http connector will be used.
-            #[cfg(feature = "openssl-tls")]
-            let connector = config.openssl_https_connector_with_connector(connector)?;
-            #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+            #[cfg(feature = "rustls-tls")]
             let connector = config.rustls_https_connector_with_connector(connector)?;
+            #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+            let connector = config.openssl_https_connector_with_connector(connector)?;
 
             let mut connector = TimeoutConnector::new(connector);
 
