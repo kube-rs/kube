@@ -87,16 +87,6 @@ allow-git = []
 multiple-versions = "deny"
 
 [[bans.skip]]
-# Waiting on https://github.com/Keats/validator/pull/233
-name = "idna"
-version = "0.2"
-
-# tokio 1.25 pulls in mio which pulls in older an windows-sys than parking-lot
-[[bans.skip]]
-name = "windows-sys"
-version = "0.42"
-
-[[bans.skip]]
 name = "hermit-abi"
 
 [[bans.skip]]
