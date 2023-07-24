@@ -58,15 +58,14 @@ where
     }
 
     /// Applies a single watcher event to the store
-    pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
+    pub fn apply_watcher_event(&mut self, event: &watcher::Event<Arc<K>>) {
         match event {
             watcher::Event::Applied(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
-                let obj = Arc::new(obj.clone());
-                self.store.write().insert(key, obj);
+                let key = ObjectRef::from_obj_with(obj.as_ref(), self.dyntype.clone());
+                self.store.write().insert(key, obj.clone());
             }
             watcher::Event::Deleted(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = ObjectRef::from_obj_with(obj.as_ref(), self.dyntype.clone());
                 self.store.write().remove(&key);
             }
             watcher::Event::Restarted(new_objs) => {
@@ -74,8 +73,8 @@ where
                     .iter()
                     .map(|obj| {
                         (
-                            ObjectRef::from_obj_with(obj, self.dyntype.clone()),
-                            Arc::new(obj.clone()),
+                            ObjectRef::from_obj_with(obj.as_ref(), self.dyntype.clone()),
+                            obj.clone(),
                         )
                     })
                     .collect::<AHashMap<_, _>>();

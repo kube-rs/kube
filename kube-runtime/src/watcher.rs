@@ -15,7 +15,7 @@ use kube_client::{
 };
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
-use std::{clone::Clone, fmt::Debug, time::Duration};
+use std::{clone::Clone, fmt::Debug, sync::Arc, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
@@ -405,7 +405,7 @@ async fn step_trampolined<A>(
     api: &A,
     wc: &Config,
     state: State<A::Value>,
-) -> (Option<Result<Event<A::Value>>>, State<A::Value>)
+) -> (Option<Result<Event<Arc<A::Value>>>>, State<A::Value>)
 where
     A: ApiMode,
     A::Value: Resource + 'static,
@@ -428,9 +428,10 @@ where
                     } else if let Some(resource_version) =
                         list.metadata.resource_version.filter(|s| !s.is_empty())
                     {
-                        (Some(Ok(Event::Restarted(objects))), State::InitListed {
-                            resource_version,
-                        })
+                        (
+                            Some(Ok(Event::Restarted(objects.into_iter().map(Arc::new).collect()))),
+                            State::InitListed { resource_version },
+                        )
                     } else {
                         (Some(Err(Error::NoResourceVersion)), State::default())
                     }
@@ -473,7 +474,7 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (Some(Ok(Event::Applied(obj))), State::Watching {
+                    (Some(Ok(Event::Applied(Arc::new(obj)))), State::Watching {
                         resource_version,
                         stream,
                     })
@@ -484,7 +485,7 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (Some(Ok(Event::Deleted(obj))), State::Watching {
+                    (Some(Ok(Event::Deleted(Arc::new(obj)))), State::Watching {
                         resource_version,
                         stream,
                     })
@@ -532,7 +533,7 @@ async fn step<A>(
     api: &A,
     config: &Config,
     mut state: State<A::Value>,
-) -> (Result<Event<A::Value>>, State<A::Value>)
+) -> (Result<Event<Arc<A::Value>>>, State<A::Value>)
 where
     A: ApiMode,
     A::Value: Resource + 'static,
@@ -597,7 +598,7 @@ where
 pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     watcher_config: Config,
-) -> impl Stream<Item = Result<Event<K>>> + Send {
+) -> impl Stream<Item = Result<Event<Arc<K>>>> + Send {
     futures::stream::unfold(
         (api, watcher_config, State::default()),
         |(api, watcher_config, state)| async {
@@ -661,7 +662,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     watcher_config: Config,
-) -> impl Stream<Item = Result<Event<PartialObjectMeta<K>>>> + Send {
+) -> impl Stream<Item = Result<Event<Arc<PartialObjectMeta<K>>>>> + Send {
     futures::stream::unfold(
         (api, watcher_config, State::default()),
         |(api, watcher_config, state)| async {
@@ -680,7 +681,7 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
 pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     name: &str,
-) -> impl Stream<Item = Result<Option<K>>> + Send {
+) -> impl Stream<Item = Result<Option<Arc<K>>>> + Send {
     watcher(api, Config::default().fields(&format!("metadata.name={name}"))).map(|event| match event? {
         Event::Deleted(_) => Ok(None),
         // We're filtering by object name, so getting more than one object means that either:

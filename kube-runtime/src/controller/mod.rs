@@ -91,10 +91,10 @@ impl Action {
 /// Helper for building custom trigger filters, see the implementations of [`trigger_self`] and [`trigger_owners`] for some examples.
 pub fn trigger_with<T, K, I, S>(
     stream: S,
-    mapper: impl Fn(T) -> I,
+    mapper: impl Fn(Arc<T>) -> I,
 ) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
 where
-    S: TryStream<Ok = T>,
+    S: TryStream<Ok = Arc<T>>,
     I: IntoIterator,
     I::Item: Into<ReconcileRequest<K>>,
     K: Resource,
@@ -110,29 +110,29 @@ pub fn trigger_self<K, S>(
     dyntype: K::DynamicType,
 ) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
 where
-    S: TryStream<Ok = K>,
+    S: TryStream<Ok = Arc<K>>,
     K: Resource,
     K::DynamicType: Clone,
 {
     trigger_with(stream, move |obj| {
         Some(ReconcileRequest {
-            obj_ref: ObjectRef::from_obj_with(&obj, dyntype.clone()),
+            obj_ref: ObjectRef::from_obj_with(obj.as_ref(), dyntype.clone()),
             reason: ReconcileReason::ObjectUpdated,
         })
     })
 }
 
 /// Enqueues any mapper returned `K` types for reconciliation
-fn trigger_others<S, K, I>(
+fn trigger_others<T, S, K, I>(
     stream: S,
-    mapper: impl Fn(S::Ok) -> I + Sync + Send + 'static,
-    dyntype: <S::Ok as Resource>::DynamicType,
+    mapper: impl Fn(Arc<T>) -> I + Sync + Send + 'static,
+    dyntype: T::DynamicType,
 ) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
 where
     // Input stream has items as some Resource (via Controller::watches)
-    S: TryStream,
-    S::Ok: Resource,
-    <S::Ok as Resource>::DynamicType: Clone,
+    S: TryStream<Ok = Arc<T>>,
+    T: Resource,
+    T::DynamicType: Clone,
     // Output stream is requests for the root type K
     K: Resource,
     K::DynamicType: Clone,
@@ -141,7 +141,7 @@ where
     I::IntoIter: Send,
 {
     trigger_with(stream, move |obj| {
-        let watch_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
+        let watch_ref = ObjectRef::from_obj_with(obj.as_ref(), dyntype.clone()).erase();
         mapper(obj)
             .into_iter()
             .map(move |mapped_obj_ref| ReconcileRequest {
@@ -154,19 +154,19 @@ where
 }
 
 /// Enqueues any owners of type `KOwner` for reconciliation
-pub fn trigger_owners<KOwner, S>(
+pub fn trigger_owners<KOwner, S, T>(
     stream: S,
     owner_type: KOwner::DynamicType,
-    child_type: <S::Ok as Resource>::DynamicType,
+    child_type: T::DynamicType,
 ) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
 where
-    S: TryStream,
-    S::Ok: Resource,
-    <S::Ok as Resource>::DynamicType: Clone,
+    S: TryStream<Ok = Arc<T>>,
+    T: Resource,
+    T::DynamicType: Clone,
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
-    let mapper = move |obj: S::Ok| {
+    let mapper = move |obj: Arc<T>| {
         let meta = obj.meta().clone();
         let ns = meta.namespace;
         let owner_type = owner_type.clone();
@@ -605,7 +605,7 @@ where
     /// Prefer [`Controller::new`] if you do not need to share the stream, or do not need pre-filtering.
     #[cfg(feature = "unstable-runtime-stream-control")]
     pub fn for_stream(
-        trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
+        trigger: impl Stream<Item = Result<Arc<K>, watcher::Error>> + Send + 'static,
         reader: Store<K>,
     ) -> Self
     where
@@ -629,7 +629,7 @@ where
     /// [`dynamic`]: kube_client::core::dynamic
     #[cfg(feature = "unstable-runtime-stream-control")]
     pub fn for_stream_with(
-        trigger: impl Stream<Item = Result<K, watcher::Error>> + Send + 'static,
+        trigger: impl Stream<Item = Result<Arc<K>, watcher::Error>> + Send + 'static,
         reader: Store<K>,
         dyntype: K::DynamicType,
     ) -> Self {
@@ -680,7 +680,9 @@ where
     ///
     /// [`OwnerReference`]: k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference
     #[must_use]
-    pub fn owns<Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static>(
+    pub fn owns<
+        Child: Clone + Resource<DynamicType = ()> + DeserializeOwned + Debug + Send + 'static + Sync,
+    >(
         self,
         api: Api<Child>,
         wc: Config,
@@ -692,7 +694,7 @@ where
     ///
     /// Same as [`Controller::owns`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[must_use]
-    pub fn owns_with<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static>(
+    pub fn owns_with<Child: Clone + Resource + DeserializeOwned + Debug + Send + 'static + Sync>(
         mut self,
         api: Api<Child>,
         dyntype: Child::DynamicType,
@@ -750,7 +752,7 @@ where
     #[must_use]
     pub fn owns_stream<Child: Resource<DynamicType = ()> + Send + 'static>(
         self,
-        trigger: impl Stream<Item = Result<Child, watcher::Error>> + Send + 'static,
+        trigger: impl Stream<Item = Result<Arc<Child>, watcher::Error>> + Send + 'static,
     ) -> Self {
         self.owns_stream_with(trigger, ())
     }
@@ -768,7 +770,7 @@ where
     #[must_use]
     pub fn owns_stream_with<Child: Resource + Send + 'static>(
         mut self,
-        trigger: impl Stream<Item = Result<Child, watcher::Error>> + Send + 'static,
+        trigger: impl Stream<Item = Result<Arc<Child>, watcher::Error>> + Send + 'static,
         dyntype: Child::DynamicType,
     ) -> Self
     where
@@ -848,10 +850,10 @@ where
         self,
         api: Api<Other>,
         wc: Config,
-        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
+        mapper: impl Fn(Arc<Other>) -> I + Sync + Send + 'static,
     ) -> Self
     where
-        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static + Sync,
         Other::DynamicType: Default + Debug + Clone + Eq + Hash,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
@@ -868,10 +870,10 @@ where
         api: Api<Other>,
         dyntype: Other::DynamicType,
         wc: Config,
-        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
+        mapper: impl Fn(Arc<Other>) -> I + Sync + Send + 'static,
     ) -> Self
     where
-        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static + Sync,
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
         Other::DynamicType: Debug + Clone + Eq + Hash,
@@ -923,8 +925,8 @@ where
     #[must_use]
     pub fn watches_stream<Other, I>(
         self,
-        trigger: impl Stream<Item = Result<Other, watcher::Error>> + Send + 'static,
-        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
+        trigger: impl Stream<Item = Result<Arc<Other>, watcher::Error>> + Send + 'static,
+        mapper: impl Fn(Arc<Other>) -> I + Sync + Send + 'static,
     ) -> Self
     where
         Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
@@ -948,8 +950,8 @@ where
     #[must_use]
     pub fn watches_stream_with<Other, I>(
         mut self,
-        trigger: impl Stream<Item = Result<Other, watcher::Error>> + Send + 'static,
-        mapper: impl Fn(Other) -> I + Sync + Send + 'static,
+        trigger: impl Stream<Item = Result<Arc<Other>, watcher::Error>> + Send + 'static,
+        mapper: impl Fn(Arc<Other>) -> I + Sync + Send + 'static,
         dyntype: Other::DynamicType,
     ) -> Self
     where

@@ -5,6 +5,7 @@ use core::{
 };
 use futures::{ready, Stream, TryStream};
 use pin_project::pin_project;
+use std::sync::Arc;
 
 #[pin_project]
 /// Stream returned by the [`applied_objects`](super::WatchStreamExt::applied_objects) and [`touched_objects`](super::WatchStreamExt::touched_objects) method.
@@ -13,9 +14,9 @@ pub struct EventFlatten<St, K> {
     #[pin]
     stream: St,
     emit_deleted: bool,
-    queue: std::vec::IntoIter<K>,
+    queue: std::vec::IntoIter<Arc<K>>,
 }
-impl<St: TryStream<Ok = Event<K>>, K> EventFlatten<St, K> {
+impl<St: TryStream<Ok = Event<Arc<K>>>, K> EventFlatten<St, K> {
     pub(super) fn new(stream: St, emit_deleted: bool) -> Self {
         Self {
             stream,
@@ -26,9 +27,9 @@ impl<St: TryStream<Ok = Event<K>>, K> EventFlatten<St, K> {
 }
 impl<St, K> Stream for EventFlatten<St, K>
 where
-    St: Stream<Item = Result<Event<K>, Error>>,
+    St: Stream<Item = Result<Event<Arc<K>>, Error>>,
 {
-    type Item = Result<K, Error>;
+    type Item = Result<Arc<K>, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();

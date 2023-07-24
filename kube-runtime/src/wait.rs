@@ -2,7 +2,7 @@
 use futures::TryStreamExt;
 use kube_client::{Api, Resource};
 use serde::de::DeserializeOwned;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use thiserror::Error;
 
 use crate::watcher::{self, watch_object};
@@ -47,13 +47,17 @@ pub enum Error {
 /// # }
 /// ```
 #[allow(clippy::missing_panics_doc)] // watch never actually terminates, expect cannot fail
-pub async fn await_condition<K>(api: Api<K>, name: &str, cond: impl Condition<K>) -> Result<Option<K>, Error>
+pub async fn await_condition<K>(
+    api: Api<K>,
+    name: &str,
+    cond: impl Condition<K>,
+) -> Result<Option<Arc<K>>, Error>
 where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
     // Skip updates until the condition is satisfied.
     let stream = watch_object(api, name).try_skip_while(|obj| {
-        let matches = cond.matches_object(obj.as_ref());
+        let matches = cond.matches_object(obj.as_ref().map(Arc::as_ref));
         futures::future::ok(!matches)
     });
     futures::pin_mut!(stream);

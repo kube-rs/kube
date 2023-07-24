@@ -2,6 +2,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
+use std::sync::Arc;
 
 use futures::{Stream, TryStream};
 use pin_project::pin_project;
@@ -39,9 +40,9 @@ impl<St, K> Stream for Reflect<St, K>
 where
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone,
-    St: Stream<Item = Result<Event<K>, Error>>,
+    St: Stream<Item = Result<Event<Arc<K>>, Error>>,
 {
-    type Item = Result<Event<K>, Error>;
+    type Item = Result<Event<Arc<K>>, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();

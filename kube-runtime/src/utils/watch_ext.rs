@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 #[cfg(feature = "unstable-runtime-predicates")]
 use crate::utils::predicate::{Predicate, PredicateFilter};
 #[cfg(feature = "unstable-runtime-subscribe")]
@@ -40,7 +42,7 @@ pub trait WatchStreamExt: Stream {
     /// All Added/Modified events are passed through, and critical errors bubble up.
     fn applied_objects<K>(self) -> EventFlatten<Self, K>
     where
-        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        Self: Stream<Item = Result<watcher::Event<Arc<K>>, watcher::Error>> + Sized,
     {
         EventFlatten::new(self, false)
     }
@@ -50,7 +52,7 @@ pub trait WatchStreamExt: Stream {
     /// All Added/Modified/Deleted events are passed through, and critical errors bubble up.
     fn touched_objects<K>(self) -> EventFlatten<Self, K>
     where
-        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        Self: Stream<Item = Result<watcher::Event<Arc<K>>, watcher::Error>> + Sized,
     {
         EventFlatten::new(self, true)
     }
