@@ -8,6 +8,7 @@ use std::{
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 use tokio::time::Instant;
 use tokio_util::time::delay_queue::{self, DelayQueue};
@@ -44,15 +45,18 @@ pub struct Scheduler<T, R> {
     /// Incoming queue of scheduling requests.
     #[pin]
     requests: Fuse<R>,
+    /// Debounce time to allow for deduplication of requests.
+    debounce: Duration,
 }
 
 impl<T, R: Stream> Scheduler<T, R> {
-    fn new(requests: R) -> Self {
+    fn new(requests: R, debounce: Duration) -> Self {
         Self {
             queue: DelayQueue::new(),
             scheduled: HashMap::new(),
             pending: HashSet::new(),
             requests: requests.fuse(),
+            debounce,
         }
     }
 }
@@ -67,12 +71,15 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             return;
         }
         match self.scheduled.entry(request.message) {
+            // If new request is supposed to be earlier than the current entry's scheduled
+            // time (for eg: the new request is user triggered and the current entry is the
+            // reconciler's usual retry), then give priority to the new request.
             Entry::Occupied(mut old_entry) if old_entry.get().run_at >= request.run_at => {
                 // Old entry will run after the new request, so replace it..
                 let entry = old_entry.get_mut();
-                // TODO: this should add a little delay here to actually debounce
-                self.queue.reset_at(&entry.queue_key, request.run_at);
-                entry.run_at = request.run_at;
+                self.queue
+                    .reset_at(&entry.queue_key, request.run_at + *self.debounce);
+                entry.run_at = request.run_at + *self.debounce;
                 old_entry.replace_key();
             }
             Entry::Occupied(_old_entry) => {
@@ -82,8 +89,8 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
                 // No old entry, we're free to go!
                 let message = entry.key().clone();
                 entry.insert(ScheduledEntry {
-                    run_at: request.run_at,
-                    queue_key: self.queue.insert_at(message, request.run_at),
+                    run_at: request.run_at + *self.debounce,
+                    queue_key: self.queue.insert_at(message, request.run_at + *self.debounce),
                 });
             }
         }
@@ -202,8 +209,11 @@ where
 /// is ready for it).
 ///
 /// The [`Scheduler`] terminates as soon as `requests` does.
-pub fn scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(requests: S) -> Scheduler<T, S> {
-    Scheduler::new(requests)
+pub fn scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(
+    requests: S,
+    debounce: Option<Duration>,
+) -> Scheduler<T, S> {
+    Scheduler::new(requests, debounce.unwrap_or(Duration::ZERO))
 }
 
 #[cfg(test)]
@@ -238,6 +248,7 @@ mod tests {
                 run_at: Instant::now(),
             }])
             .on_complete(sleep(Duration::from_secs(4))),
+            None,
         ));
         assert!(!scheduler.contains_pending(&1));
         assert!(poll!(scheduler.as_mut().hold_unless(|_| false).next()).is_pending());
@@ -254,7 +265,7 @@ mod tests {
     async fn scheduler_should_not_reschedule_pending_items() {
         pause();
         let (mut tx, rx) = mpsc::unbounded::<ScheduleRequest<u8>>();
-        let mut scheduler = Box::pin(scheduler(rx));
+        let mut scheduler = Box::pin(scheduler(rx, None));
         tx.send(ScheduleRequest {
             message: 1,
             run_at: Instant::now(),
@@ -295,6 +306,7 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(2))),
+            None,
         ));
         assert_eq!(
             scheduler.as_mut().hold_unless(|x| *x != 1).next().await.unwrap(),
@@ -317,6 +329,7 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
+            None,
         );
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
@@ -344,6 +357,7 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
+            None,
         );
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
@@ -368,6 +382,7 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
+            None,
         );
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
@@ -381,7 +396,7 @@ mod tests {
     async fn scheduler_dedupe_should_allow_rescheduling_emitted_item() {
         pause();
         let (mut schedule_tx, schedule_rx) = mpsc::unbounded();
-        let mut scheduler = scheduler(schedule_rx);
+        let mut scheduler = scheduler(schedule_rx, None);
         schedule_tx
             .send(ScheduleRequest {
                 message: (),
@@ -423,6 +438,7 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
+            None,
         );
         assert_eq!(scheduler.map(|msg| msg.0).collect::<Vec<_>>().await, vec![2]);
     }
@@ -444,7 +460,59 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
+            None,
         );
         assert_eq!(scheduler.map(|msg| msg.0).collect::<Vec<_>>().await, vec![1]);
+    }
+
+    #[tokio::test]
+    async fn scheduler_should_add_debounce_to_a_request() {
+        pause();
+
+        let now = Instant::now();
+        let (mut sched_tx, sched_rx) = mpsc::unbounded::<ScheduleRequest<SingletonMessage>>();
+        let mut scheduler = scheduler(sched_rx, Some(Duration::from_secs(2)));
+
+        sched_tx
+            .send(ScheduleRequest {
+                message: SingletonMessage(1),
+                run_at: now,
+            })
+            .await
+            .unwrap();
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(3)).await;
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().0, 1);
+    }
+
+    #[tokio::test]
+    async fn scheduler_should_dedup_message_within_debounce_period() {
+        pause();
+
+        let now = Instant::now();
+        let (mut sched_tx, sched_rx) = mpsc::unbounded::<ScheduleRequest<SingletonMessage>>();
+        let mut scheduler = scheduler(sched_rx, Some(Duration::from_secs(2)));
+
+        sched_tx
+            .send(ScheduleRequest {
+                message: SingletonMessage(1),
+                run_at: now,
+            })
+            .await
+            .unwrap();
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(1)).await;
+
+        sched_tx
+            .send(ScheduleRequest {
+                message: SingletonMessage(2),
+                run_at: now,
+            })
+            .await
+            .unwrap();
+        assert!(poll!(scheduler.next()).is_pending());
+        advance(Duration::from_secs(3)).await;
+        assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().0, 2);
+        assert!(poll!(scheduler.next()).is_pending());
     }
 }

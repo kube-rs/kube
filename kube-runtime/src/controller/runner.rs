@@ -158,7 +158,9 @@ mod tests {
         let mut count = 0;
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
         let mut runner = Box::pin(
-            Runner::new(scheduler(sched_rx), |_| {
+            // The debounce period needs to zero because otherwise the scheduler has a default
+            // debounce period of 1 ms, which will lead to the second request to be discarded.
+            Runner::new(scheduler(sched_rx, Some(Duration::ZERO)), |_| {
                 count += 1;
                 // Panic if this ref is already held, to simulate some unsafe action..
                 let mutex_ref = rc.borrow_mut();
@@ -203,7 +205,7 @@ mod tests {
         // pause();
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
         let (result_tx, result_rx) = oneshot::channel();
-        let mut runner = Runner::new(scheduler(sched_rx), |msg: &u8| futures::future::ready(*msg));
+        let mut runner = Runner::new(scheduler(sched_rx, None), |msg: &u8| futures::future::ready(*msg));
         // Start a background task that starts listening /before/ we enqueue the message
         // We can't just use Stream::poll_next(), since that bypasses the waker system
         Handle::current().spawn(async move { result_tx.send(runner.next().await).unwrap() });
@@ -242,6 +244,7 @@ mod tests {
                         run_at: Instant::now(),
                     }])
                     .chain(stream::pending()),
+                    None,
                 ),
                 |msg| {
                     assert!(*is_ready.lock().unwrap());
@@ -278,6 +281,7 @@ mod tests {
                         },
                     ])
                     .chain(stream::pending()),
+                    None,
                 ),
                 |msg| {
                     assert!(*is_ready.lock().unwrap());
@@ -313,6 +317,7 @@ mod tests {
                         run_at: Instant::now(),
                     }])
                     .chain(stream::pending()),
+                    None,
                 ),
                 |()| {
                     panic!("run_msg should never be invoked if readiness gate fails");
