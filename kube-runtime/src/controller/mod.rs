@@ -427,7 +427,7 @@ where
 ///
 /// Reconciles are generally requested for all changes on your root objects.
 /// Changes to managed child resources will also trigger the reconciler for the
-/// managing object by travirsing owner references (for `Controller::owns`),
+/// managing object by traversing owner references (for `Controller::owns`),
 /// or traverse a custom mapping (for `Controller::watches`).
 ///
 /// This mapping mechanism ultimately hides the reason for the reconciliation request,
