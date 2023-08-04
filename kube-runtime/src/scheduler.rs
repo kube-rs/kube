@@ -45,7 +45,11 @@ pub struct Scheduler<T, R> {
     /// Incoming queue of scheduling requests.
     #[pin]
     requests: Fuse<R>,
-    /// Debounce time to allow for deduplication of requests.
+    /// Debounce time to allow for deduplication of requests. It is added to the request's
+    /// initial expiration time. If another request with the same message arrives before
+    /// the request expires, its added to the new request's expiration time. This allows
+    /// for a request to be emitted, if the scheduler is "uninterrupted" for the configured
+    /// debounce period. Its primary purpose to deduplicate requests that expire instantly.
     debounce: Duration,
 }
 
@@ -209,18 +213,29 @@ where
 /// is ready for it).
 ///
 /// The [`Scheduler`] terminates as soon as `requests` does.
-pub fn scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(
+pub fn scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(requests: S) -> Scheduler<T, S> {
+    Scheduler::new(requests, Duration::ZERO)
+}
+
+/// Stream transformer that delays and deduplicates [`Stream`] items.
+///
+/// The debounce period lets the scheduler deduplicate requests that ask to be
+/// emitted instantly, by making sure we wait for the configured period of time
+/// to receive an uninterrupted request before actually emitting it.
+///
+/// For more info, see [`scheduler()`].
+pub fn debounced_scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(
     requests: S,
-    debounce: Option<Duration>,
+    debounce: Duration,
 ) -> Scheduler<T, S> {
-    Scheduler::new(requests, debounce.unwrap_or(Duration::ZERO))
+    Scheduler::new(requests, debounce)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::utils::KubeRuntimeStreamExt;
 
-    use super::{scheduler, ScheduleRequest};
+    use super::{debounced_scheduler, scheduler, ScheduleRequest};
     use derivative::Derivative;
     use futures::{channel::mpsc, future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
     use std::task::Poll;
@@ -248,7 +263,6 @@ mod tests {
                 run_at: Instant::now(),
             }])
             .on_complete(sleep(Duration::from_secs(4))),
-            None,
         ));
         assert!(!scheduler.contains_pending(&1));
         assert!(poll!(scheduler.as_mut().hold_unless(|_| false).next()).is_pending());
@@ -265,7 +279,7 @@ mod tests {
     async fn scheduler_should_not_reschedule_pending_items() {
         pause();
         let (mut tx, rx) = mpsc::unbounded::<ScheduleRequest<u8>>();
-        let mut scheduler = Box::pin(scheduler(rx, None));
+        let mut scheduler = Box::pin(scheduler(rx));
         tx.send(ScheduleRequest {
             message: 1,
             run_at: Instant::now(),
@@ -306,7 +320,6 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(2))),
-            None,
         ));
         assert_eq!(
             scheduler.as_mut().hold_unless(|x| *x != 1).next().await.unwrap(),
@@ -329,7 +342,6 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
-            None,
         );
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
@@ -357,7 +369,6 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
-            None,
         );
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
@@ -382,7 +393,6 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
-            None,
         );
         pin_mut!(scheduler);
         assert!(poll!(scheduler.next()).is_pending());
@@ -396,7 +406,7 @@ mod tests {
     async fn scheduler_dedupe_should_allow_rescheduling_emitted_item() {
         pause();
         let (mut schedule_tx, schedule_rx) = mpsc::unbounded();
-        let mut scheduler = scheduler(schedule_rx, None);
+        let mut scheduler = scheduler(schedule_rx);
         schedule_tx
             .send(ScheduleRequest {
                 message: (),
@@ -438,7 +448,6 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
-            None,
         );
         assert_eq!(scheduler.map(|msg| msg.0).collect::<Vec<_>>().await, vec![2]);
     }
@@ -460,7 +469,6 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
-            None,
         );
         assert_eq!(scheduler.map(|msg| msg.0).collect::<Vec<_>>().await, vec![1]);
     }
@@ -471,7 +479,7 @@ mod tests {
 
         let now = Instant::now();
         let (mut sched_tx, sched_rx) = mpsc::unbounded::<ScheduleRequest<SingletonMessage>>();
-        let mut scheduler = scheduler(sched_rx, Some(Duration::from_secs(2)));
+        let mut scheduler = debounced_scheduler(sched_rx, Duration::from_secs(2));
 
         sched_tx
             .send(ScheduleRequest {
@@ -491,7 +499,7 @@ mod tests {
 
         let now = Instant::now();
         let (mut sched_tx, sched_rx) = mpsc::unbounded::<ScheduleRequest<SingletonMessage>>();
-        let mut scheduler = scheduler(sched_rx, Some(Duration::from_secs(2)));
+        let mut scheduler = debounced_scheduler(sched_rx, Duration::from_secs(2));
 
         sched_tx
             .send(ScheduleRequest {
