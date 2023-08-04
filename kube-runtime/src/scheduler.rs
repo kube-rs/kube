@@ -224,6 +224,7 @@ pub fn scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(req
 /// to receive an uninterrupted request before actually emitting it.
 ///
 /// For more info, see [`scheduler()`].
+#[allow(clippy::module_name_repetitions)]
 pub fn debounced_scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(
     requests: S,
     debounce: Duration,

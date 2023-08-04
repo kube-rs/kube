@@ -156,7 +156,7 @@ impl Client {
                     // Error requesting
                     .or_else(|err| err.downcast::<hyper::Error>().map(|err| Error::HyperError(*err)))
                     // Error from another middleware
-                    .unwrap_or_else(|err| Error::Service(err))
+                    .unwrap_or_else(Error::Service)
             })?;
         Ok(res)
     }
