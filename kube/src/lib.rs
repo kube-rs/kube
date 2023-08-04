@@ -383,7 +383,7 @@ mod test {
             .await?;
         let establish = await_condition(crds.clone(), "testcrs.kube.rs", conditions::is_crd_established());
         let crd = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await??;
-        assert!(conditions::is_crd_established().matches_object(crd.as_ref()));
+        assert!(conditions::is_crd_established().matches_object(crd.as_ref().map(|v| &**v)));
         tokio::time::sleep(std::time::Duration::from_secs(2)).await; // Established condition is actually not enough for api discovery :(
 
         // create partial information for it to discover

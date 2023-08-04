@@ -6,7 +6,7 @@ use kube::{
 use serde::de::DeserializeOwned;
 use tracing::*;
 
-use std::{env, fmt::Debug};
+use std::{env, fmt::Debug, sync::Arc};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -39,9 +39,9 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn handle_events<
-    K: Resource<DynamicType = ApiResource> + Clone + Debug + Send + DeserializeOwned + 'static,
+    K: Resource<DynamicType = ApiResource> + Clone + Debug + Send + Sync + DeserializeOwned + 'static,
 >(
-    stream: impl Stream<Item = watcher::Result<Event<K>>> + Send + 'static,
+    stream: impl Stream<Item = watcher::Result<Event<Arc<K>>>> + Send + 'static,
     ar: &ApiResource,
 ) -> anyhow::Result<()> {
     let mut items = stream.applied_objects().boxed();

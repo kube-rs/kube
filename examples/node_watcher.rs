@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
@@ -25,12 +27,13 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // A simple node problem detector
-async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result<()> {
+async fn check_for_node_failures(events: &Api<Event>, o: Arc<Node>) -> anyhow::Result<()> {
     let name = o.name_any();
     // Nodes often modify a lot - only print broken nodes
-    if let Some(true) = o.spec.unwrap().unschedulable {
+    if let Some(true) = o.spec.clone().unwrap().unschedulable {
         let failed = o
             .status
+            .clone()
             .unwrap()
             .conditions
             .unwrap()

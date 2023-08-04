@@ -906,7 +906,7 @@ where
     /// # type CustomResource = ConfigMap;
     /// # async fn reconcile(_: Arc<CustomResource>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
     /// # fn error_policy(_: Arc<CustomResource>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
-    /// fn mapper(_: DaemonSet) -> Option<ObjectRef<CustomResource>> { todo!() }
+    /// fn mapper(_: Arc<DaemonSet>) -> Option<ObjectRef<CustomResource>> { todo!() }
     /// # async fn doc(client: kube::Client) {
     /// let api: Api<DaemonSet> = Api::all(client.clone());
     /// let cr: Api<CustomResource> = Api::all(client.clone());
@@ -1207,7 +1207,7 @@ where
         applier(
             move |obj, ctx| {
                 CancelableJoinHandle::spawn(
-                    reconciler(obj.clone(), ctx).into_future().in_current_span(),
+                    reconciler(obj, ctx).into_future().in_current_span(),
                     &Handle::current(),
                 )
             },
@@ -1246,7 +1246,7 @@ mod tests {
     // and returns a WatchEvent generic over a resource `K`
     fn assert_stream<T, K>(x: T) -> T
     where
-        T: Stream<Item = watcher::Result<Event<K>>> + Send,
+        T: Stream<Item = watcher::Result<Event<Arc<K>>>> + Send,
         K: Resource + Clone + DeserializeOwned + std::fmt::Debug + Send + 'static,
     {
         x
@@ -1312,14 +1312,14 @@ mod tests {
         );
         pin_mut!(applier);
         for i in 0..items {
-            let obj = ConfigMap {
+            let obj = Arc::new(ConfigMap {
                 metadata: ObjectMeta {
                     name: Some(format!("cm-{i}")),
                     namespace: Some("default".to_string()),
                     ..Default::default()
                 },
                 ..Default::default()
-            };
+            });
             store_tx.apply_watcher_event(&watcher::Event::Applied(obj.clone()));
             queue_tx.unbounded_send(ObjectRef::from_obj(&obj)).unwrap();
         }

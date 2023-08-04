@@ -108,19 +108,22 @@ mod tests {
         distributions::{Bernoulli, Uniform},
         Rng,
     };
-    use std::collections::{BTreeMap, HashMap};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        sync::Arc,
+    };
 
     #[tokio::test]
     async fn reflector_applied_should_add_object() {
         let store_w = store::Writer::default();
         let store = store_w.as_reader();
-        let cm = ConfigMap {
+        let cm = Arc::new(ConfigMap {
             metadata: ObjectMeta {
                 name: Some("a".to_string()),
                 ..ObjectMeta::default()
             },
             ..ConfigMap::default()
-        };
+        });
         reflector(
             store_w,
             stream::iter(vec![Ok(watcher::Event::Applied(cm.clone()))]),
@@ -128,7 +131,7 @@ mod tests {
         .map(|_| ())
         .collect::<()>()
         .await;
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(cm.as_ref()));
     }
 
     #[tokio::test]
@@ -150,6 +153,9 @@ mod tests {
             }),
             ..cm.clone()
         };
+        let cm = Arc::new(cm);
+        let updated_cm = Arc::new(updated_cm);
+
         reflector(
             store_w,
             stream::iter(vec![
@@ -160,20 +166,23 @@ mod tests {
         .map(|_| ())
         .collect::<()>()
         .await;
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&updated_cm));
+        assert_eq!(
+            store.get(&ObjectRef::from_obj(&cm)).as_deref(),
+            Some(updated_cm.as_ref())
+        );
     }
 
     #[tokio::test]
     async fn reflector_deleted_should_remove_object() {
         let store_w = store::Writer::default();
         let store = store_w.as_reader();
-        let cm = ConfigMap {
+        let cm = Arc::new(ConfigMap {
             metadata: ObjectMeta {
                 name: Some("a".to_string()),
                 ..ObjectMeta::default()
             },
             ..ConfigMap::default()
-        };
+        });
         reflector(
             store_w,
             stream::iter(vec![
@@ -205,6 +214,10 @@ mod tests {
             },
             ..ConfigMap::default()
         };
+
+        let cm_a = Arc::new(cm_a);
+        let cm_b = Arc::new(cm_b);
+
         reflector(
             store_w,
             stream::iter(vec![
@@ -216,7 +229,10 @@ mod tests {
         .collect::<()>()
         .await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm_a)), None);
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm_b)).as_deref(), Some(&cm_b));
+        assert_eq!(
+            store.get(&ObjectRef::from_obj(&cm_b)).as_deref(),
+            Some(cm_b.as_ref())
+        );
     }
 
     #[tokio::test]
@@ -231,14 +247,14 @@ mod tests {
             stream::iter((0_u32..100_000).map(|gen| {
                 let item = rng.sample(item_dist);
                 let deleted = rng.sample(deleted_dist);
-                let obj = ConfigMap {
+                let obj = Arc::new(ConfigMap {
                     metadata: ObjectMeta {
                         name: Some(item.to_string()),
                         resource_version: Some(gen.to_string()),
                         ..ObjectMeta::default()
                     },
                     ..ConfigMap::default()
-                };
+                });
                 Ok(if deleted {
                     watcher::Event::Deleted(obj)
                 } else {

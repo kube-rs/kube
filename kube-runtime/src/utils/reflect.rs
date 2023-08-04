@@ -27,7 +27,7 @@ where
 
 impl<St, K> Reflect<St, K>
 where
-    St: TryStream<Ok = Event<K>>,
+    St: TryStream<Ok = Event<Arc<K>>>,
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
@@ -55,7 +55,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{task::Poll, vec};
+    use std::{sync::Arc, task::Poll, vec};
 
     use super::{Error, Event, Reflect};
     use crate::reflector;
@@ -70,12 +70,12 @@ pub(crate) mod test {
 
     #[tokio::test]
     async fn reflect_passes_events_through() {
-        let foo = testpod("foo");
-        let bar = testpod("bar");
+        let foo = Arc::new(testpod("foo"));
+        let bar = Arc::new(testpod("bar"));
         let st = stream::iter([
             Ok(Event::Applied(foo.clone())),
             Err(Error::TooManyObjects),
-            Ok(Event::Restarted(vec![foo, bar])),
+            Ok(Event::Restarted(vec![foo.clone(), bar.clone()])),
         ]);
         let (reader, writer) = reflector::store();
 

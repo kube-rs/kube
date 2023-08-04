@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use futures::{stream, StreamExt, TryStreamExt};
 use k8s_openapi::api::{
     apps::v1::Deployment,
@@ -31,9 +33,9 @@ async fn main() -> anyhow::Result<()> {
     // SelectAll Stream elements must have the same Item, so all packed in this:
     #[allow(clippy::large_enum_variant)]
     enum Watched {
-        Config(ConfigMap),
-        Deploy(Deployment),
-        Secret(Secret),
+        Config(Arc<ConfigMap>),
+        Deploy(Arc<Deployment>),
+        Secret(Arc<Secret>),
     }
     while let Some(o) = combo_stream.try_next().await? {
         match o {

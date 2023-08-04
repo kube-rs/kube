@@ -9,6 +9,7 @@ use pin_project::pin_project;
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
+    sync::Arc,
 };
 
 fn hash<T: Hash>(t: &T) -> u64 {
@@ -107,7 +108,7 @@ pub struct PredicateFilter<St, K: Resource, P: Predicate<K>> {
 }
 impl<St, K, P> PredicateFilter<St, K, P>
 where
-    St: Stream<Item = Result<K, Error>>,
+    St: Stream<Item = Result<Arc<K>, Error>>,
     K: Resource,
     P: Predicate<K>,
 {
@@ -121,20 +122,20 @@ where
 }
 impl<St, K, P> Stream for PredicateFilter<St, K, P>
 where
-    St: Stream<Item = Result<K, Error>>,
+    St: Stream<Item = Result<Arc<K>, Error>>,
     K: Resource,
     K::DynamicType: Default + Eq + Hash,
     P: Predicate<K>,
 {
-    type Item = Result<K, Error>;
+    type Item = Result<Arc<K>, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
         Poll::Ready(loop {
             break match ready!(me.stream.as_mut().poll_next(cx)) {
                 Some(Ok(obj)) => {
-                    if let Some(val) = me.predicate.hash_property(&obj) {
-                        let key = ObjectRef::from_obj(&obj);
+                    if let Some(val) = me.predicate.hash_property(obj.as_ref()) {
+                        let key = ObjectRef::from_obj(obj.as_ref());
                         let changed = if let Some(old) = me.cache.get(&key) {
                             *old != val
                         } else {
@@ -146,13 +147,13 @@ where
                             me.cache.insert(key, val);
                         }
                         if changed {
-                            Some(Ok(obj))
+                            Some(Ok(obj.clone()))
                         } else {
                             continue;
                         }
                     } else {
                         // if we can't evaluate predicate, always emit K
-                        Some(Ok(obj))
+                        Some(Ok(obj.clone()))
                     }
                 }
                 Some(Err(err)) => Some(Err(err)),
@@ -195,10 +196,10 @@ pub mod predicates {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::task::Poll;
+    use std::{sync::Arc, task::Poll};
 
     use super::{predicates, Error, PredicateFilter};
-    use futures::{pin_mut, poll, stream, FutureExt, StreamExt};
+    use futures::{pin_mut, poll, stream, FutureExt, StreamExt, TryStreamExt};
     use kube_client::Resource;
     use serde_json::json;
 
@@ -228,7 +229,8 @@ pub(crate) mod tests {
             Err(Error::TooManyObjects),
             Ok(mkobj(1)),
             Ok(mkobj(2)),
-        ]);
+        ])
+        .map_ok(|obj| Arc::new(obj));
         let rx = PredicateFilter::new(data, predicates::generation);
         pin_mut!(rx);
 

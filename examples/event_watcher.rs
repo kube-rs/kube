@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::Event;
 use kube::{
@@ -25,12 +27,12 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // This function lets the app handle an added/modified event from k8s
-fn handle_event(ev: Event) -> anyhow::Result<()> {
+fn handle_event(ev: Arc<Event>) -> anyhow::Result<()> {
     info!(
         "Event: \"{}\" via {} {}",
-        ev.message.unwrap().trim(),
-        ev.involved_object.kind.unwrap(),
-        ev.involved_object.name.unwrap()
+        ev.message.as_ref().unwrap().trim(),
+        ev.involved_object.kind.as_ref().unwrap(),
+        ev.involved_object.name.as_ref().unwrap()
     );
     Ok(())
 }

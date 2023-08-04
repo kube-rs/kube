@@ -81,7 +81,15 @@ impl<K> Event<K> {
         }
         .into_iter()
     }
+}
 
+// TODO (matei): To discuss in review. Alternatively, could impl<K: Clone +
+// Deref> and create an obj clone from ref and swap out Event.
+//
+// On second thought, this probably won't work since it's unlikely we'll at any
+// point _only_ have one Arc, unless no reflector is ever used. With a
+// reflector, we'll always end up with 2 ptrs to the same shared data (?)
+impl<K> Event<Arc<K>> {
     /// Map each object in an event through a mutator fn
     ///
     /// This allows for memory optimizations in watch streams.
@@ -91,8 +99,10 @@ impl<K> Event<K> {
     /// ```no_run
     /// use k8s_openapi::api::core::v1::Pod;
     /// use kube::ResourceExt;
+    /// use std::sync::Arc;
+    ///
     /// # use kube::runtime::watcher::Event;
-    /// # let event: Event<Pod> = todo!();
+    /// # let event: Event<Arc<Pod>> = todo!();
     /// event.modify(|pod| {
     ///     pod.managed_fields_mut().clear();
     ///     pod.annotations_mut().clear();
@@ -102,10 +112,16 @@ impl<K> Event<K> {
     #[must_use]
     pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
         match &mut self {
-            Event::Applied(obj) | Event::Deleted(obj) => (f)(obj),
+            Event::Applied(obj) | Event::Deleted(obj) => {
+                if let Some(obj) = Arc::get_mut(obj) {
+                    (f)(obj)
+                }
+            }
             Event::Restarted(objs) => {
                 for k in objs {
-                    (f)(k)
+                    if let Some(k) = Arc::get_mut(k) {
+                        (f)(k)
+                    }
                 }
             }
         }

@@ -210,6 +210,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::{store, Writer};
     use crate::{reflector::ObjectRef, watcher};
     use k8s_openapi::api::core::v1::ConfigMap;
@@ -217,18 +219,18 @@ mod tests {
 
     #[test]
     fn should_allow_getting_namespaced_object_by_namespaced_ref() {
-        let cm = ConfigMap {
+        let cm = Arc::new(ConfigMap {
             metadata: ObjectMeta {
                 name: Some("obj".to_string()),
                 namespace: Some("ns".to_string()),
                 ..ObjectMeta::default()
             },
             ..ConfigMap::default()
-        };
+        });
         let mut store_w = Writer::default();
         store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         let store = store_w.as_reader();
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(cm.as_ref()));
     }
 
     #[test]
@@ -244,24 +246,24 @@ mod tests {
         let mut cluster_cm = cm.clone();
         cluster_cm.metadata.namespace = None;
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm));
+        store_w.apply_watcher_event(&watcher::Event::Applied(Arc::new(cm)));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&cluster_cm)), None);
     }
 
     #[test]
     fn should_allow_getting_clusterscoped_object_by_clusterscoped_ref() {
-        let cm = ConfigMap {
+        let cm = Arc::new(ConfigMap {
             metadata: ObjectMeta {
                 name: Some("obj".to_string()),
                 namespace: None,
                 ..ObjectMeta::default()
             },
             ..ConfigMap::default()
-        };
+        });
         let (store, mut writer) = store();
         writer.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
-        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(cm.as_ref()));
     }
 
     #[test]
@@ -276,11 +278,16 @@ mod tests {
         };
         #[allow(clippy::redundant_clone)] // false positive
         let mut nsed_cm = cm.clone();
+        // Need cm to be an Arc to be wrapped by Event type
+        let cm = Arc::new(cm);
         nsed_cm.metadata.namespace = Some("ns".to_string());
         let mut store_w = Writer::default();
         store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
         let store = store_w.as_reader();
-        assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(), Some(&cm));
+        assert_eq!(
+            store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(),
+            Some(cm.as_ref())
+        );
     }
 
     #[test]
@@ -295,6 +302,7 @@ mod tests {
         };
         let mut target_cm = cm.clone();
 
+        let cm = Arc::new(cm);
         let (reader, mut writer) = store::<ConfigMap>();
         assert!(reader.is_empty());
         writer.apply_watcher_event(&watcher::Event::Applied(cm));
@@ -304,10 +312,11 @@ mod tests {
 
         target_cm.metadata.name = Some("obj1".to_string());
         target_cm.metadata.generation = Some(1234);
+        let target_cm = Arc::new(target_cm);
         writer.apply_watcher_event(&watcher::Event::Applied(target_cm.clone()));
         assert!(!reader.is_empty());
         assert_eq!(reader.len(), 2);
         let found = reader.find(|k| k.metadata.generation == Some(1234));
-        assert_eq!(found.as_deref(), Some(&target_cm));
+        assert_eq!(found.as_deref(), Some(target_cm.as_ref()));
     }
 }

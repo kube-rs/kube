@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     runtime::{
         watcher::{watcher, Config},
@@ -35,9 +37,9 @@ async fn watchers_respect_pagination_limits() {
     let api: Api<Hack> = Api::all(client);
     let cfg = Config::default().page_size(1);
     let mut stream = watcher(api, cfg).applied_objects().boxed();
-    let first: Hack = stream.try_next().await.unwrap().unwrap();
+    let first: Arc<Hack> = stream.try_next().await.unwrap().unwrap();
     assert_eq!(first.spec.num, 1);
-    let second: Hack = stream.try_next().await.unwrap().unwrap();
+    let second: Arc<Hack> = stream.try_next().await.unwrap().unwrap();
     assert_eq!(second.spec.num, 2);
     assert!(poll!(stream.next()).is_pending());
     timeout_after_1s(mocksrv).await;

@@ -79,14 +79,14 @@ pub trait WatchStreamExt: Stream {
     /// pin_mut!(truncated_deploy_stream);
     ///
     /// while let Some(d) = truncated_deploy_stream.try_next().await? {
-    ///    println!("Truncated Deployment: '{:?}'", serde_json::to_string(&d)?);
+    ///    println!("Truncated Deployment: '{:?}'", serde_json::to_string(d.as_ref())?);
     /// }
     /// # Ok(())
     /// # }
     /// ```
     fn modify<F, K>(self, f: F) -> EventModify<Self, F>
     where
-        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        Self: Stream<Item = Result<watcher::Event<Arc<K>>, watcher::Error>> + Sized,
         F: FnMut(&mut K),
     {
         EventModify::new(self, f)
@@ -123,7 +123,7 @@ pub trait WatchStreamExt: Stream {
     #[cfg(feature = "unstable-runtime-predicates")]
     fn predicate_filter<K, P>(self, predicate: P) -> PredicateFilter<Self, K, P>
     where
-        Self: Stream<Item = Result<K, watcher::Error>> + Sized,
+        Self: Stream<Item = Result<Arc<K>, watcher::Error>> + Sized,
         K: Resource + 'static,
         P: Predicate<K> + 'static,
     {
@@ -243,7 +243,7 @@ pub trait WatchStreamExt: Stream {
     /// [`Store`]: crate::reflector::Store
     fn reflect<K>(self, writer: Writer<K>) -> Reflect<Self, K>
     where
-        Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
+        Self: Stream<Item = watcher::Result<watcher::Event<Arc<K>>>> + Sized,
         K: Resource + Clone + 'static,
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
@@ -269,7 +269,7 @@ pub(crate) mod tests {
 
     pub fn assert_stream<T, K>(x: T) -> T
     where
-        T: Stream<Item = watcher::Result<K>> + Send,
+        T: Stream<Item = watcher::Result<Arc<K>>> + Send,
         K: Resource + Clone + Send + 'static,
     {
         x
