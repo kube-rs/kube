@@ -437,8 +437,10 @@ impl Config {
     /// This option delays (and keeps delaying) reconcile requests for objects while
     /// the object is updated. It can **permanently hide** updates from your reconciler
     /// if set too high on objects that are updated frequently (like nodes).
-    pub fn debounce(&mut self, debounce: Duration) {
+    #[must_use]
+    pub fn debounce(mut self, debounce: Duration) -> Self {
         self.debounce = debounce;
+        self
     }
 }
 
@@ -1331,8 +1333,6 @@ mod tests {
 
         let (queue_tx, queue_rx) = futures::channel::mpsc::unbounded::<ObjectRef<ConfigMap>>();
         let (store_rx, mut store_tx) = reflector::store();
-        let mut config = Config::default();
-        config.debounce(Duration::from_millis(1));
         let applier = applier(
             |obj, _| {
                 Box::pin(async move {
@@ -1345,7 +1345,7 @@ mod tests {
             Arc::new(()),
             store_rx,
             queue_rx.map(Result::<_, Infallible>::Ok),
-            config,
+            Config::default(),
         );
         pin_mut!(applier);
         for i in 0..items {
