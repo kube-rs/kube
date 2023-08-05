@@ -489,6 +489,7 @@ mod tests {
             })
             .await
             .unwrap();
+        advance(Duration::from_secs(1)).await;
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(3)).await;
         assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().0, 1);
@@ -498,9 +499,9 @@ mod tests {
     async fn scheduler_should_dedup_message_within_debounce_period() {
         pause();
 
-        let now = Instant::now();
+        let mut now = Instant::now();
         let (mut sched_tx, sched_rx) = mpsc::unbounded::<ScheduleRequest<SingletonMessage>>();
-        let mut scheduler = debounced_scheduler(sched_rx, Duration::from_secs(2));
+        let mut scheduler = debounced_scheduler(sched_rx, Duration::from_secs(3));
 
         sched_tx
             .send(ScheduleRequest {
@@ -512,6 +513,7 @@ mod tests {
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(1)).await;
 
+        now = Instant::now();
         sched_tx
             .send(ScheduleRequest {
                 message: SingletonMessage(2),
@@ -519,7 +521,10 @@ mod tests {
             })
             .await
             .unwrap();
+        // Check if the initial request was indeed duplicated.
+        advance(Duration::from_millis(2500)).await;
         assert!(poll!(scheduler.next()).is_pending());
+
         advance(Duration::from_secs(3)).await;
         assert_eq!(scheduler.next().now_or_never().unwrap().unwrap().0, 2);
         assert!(poll!(scheduler.next()).is_pending());

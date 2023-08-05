@@ -419,17 +419,24 @@ where
     }
 }
 
-/// Config contains all the options that can be used to configure
-/// the behavior of the contorller.
+/// Accumulates all options that can be used on a [`Controller`] invocation.
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     debounce: Duration,
 }
 
 impl Config {
-    /// Sets the debounce period for the controller that allows for deduplication
-    /// of events, preventing unnecessary reconciliations. This is particularly useful
-    /// if the object is requeued instantly for a reconciliation by multiple streams.
+    /// The debounce duration used to deduplicate reconciliation requests.
+    ///
+    /// When set to a non-zero duration, debouncing is enabled in the [`Scheduler`] resulting
+    /// in __trailing edge debouncing__ of reqonciler requests.
+    /// This option can help to reduce the amount of unnecessary reconciler calls
+    /// when using multiple controller relations, or during rapid phase transitions.
+    ///
+    /// ## Warning
+    /// This option delays (and keeps delaying) reconcile requests for objects while
+    /// the object is updated. It can **permanently hide** updates from your reconciler
+    /// if set too high on objects that are updated frequently (like nodes).
     pub fn debounce(&mut self, debounce: Duration) {
         self.debounce = debounce;
     }
@@ -1329,11 +1336,9 @@ mod tests {
         let applier = applier(
             |obj, _| {
                 Box::pin(async move {
-                    // Try to flood the rescheduling buffer buffer by just putting it back in the queue
-                    // almost immediately, but making sure its after the debounce time, so that the
-                    // scheduler actuallys runs the request.
+                    // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
                     println!("reconciling {:?}", obj.metadata.name);
-                    Ok(Action::requeue(Duration::from_millis(2)))
+                    Ok(Action::requeue(Duration::ZERO))
                 })
             },
             |_: Arc<ConfigMap>, _: &Infallible, _| todo!(),
