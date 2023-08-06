@@ -16,7 +16,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.84.0", features = ["runtime", "derive"] }
+kube = { version = "0.85.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.19.0", features = ["v1_27"] }
 ```
 
@@ -152,7 +152,7 @@ By default `openssl` is used for TLS, but [rustls](https://github.com/ctz/rustls
 
 ```toml
 [dependencies]
-kube = { version = "0.84.0", default-features = false, features = ["client", "rustls-tls"] }
+kube = { version = "0.85.0", default-features = false, features = ["client", "rustls-tls"] }
 k8s-openapi = { version = "0.19.0", features = ["v1_27"] }
 ```
 

@@ -30,8 +30,8 @@ garde = { version = "0.13.0", default-features = false, features = ["derive"] }
 anyhow = "1.0.44"
 futures = "0.3.17"
 jsonpath_lib = "0.3.0"
-kube = { path = "../kube", version = "^0.84.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.84.0", default-features = false } # only needed to opt out of schema
+kube = { path = "../kube", version = "^0.85.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.85.0", default-features = false } # only needed to opt out of schema
 k8s-openapi = { version = "0.19.0", default-features = false }
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
