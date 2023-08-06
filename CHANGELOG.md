@@ -7,8 +7,20 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.85.0...main
 
-0.85.0 / 2023-08-06
+[0.85.0](https://github.com/kube-rs/kube/releases/tag/0.85.0) / 2023-08-06
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.85.0 -->
+
+## What's Changed
+### Added
+* Add `WatchStreamExt::reflect` to allow chaining on a reflector  by @clux in https://github.com/kube-rs/kube/pull/1252
+* Implement ephemeral containers subresource by @jmintb in https://github.com/kube-rs/kube/pull/1153
+### Changed
+* Swap `dirs-next` dependency to cargo-team maintained `home` crate by @utkarshgupta137 in https://github.com/kube-rs/kube/pull/1207
+* Upgrade `k8s-openapi` to `0.19.0` for `v1_27` support by @clux in https://github.com/kube-rs/kube/pull/1271
+### Fixed
+* `watcher`: return `NoResourceVersion` error if resource version is empty by @aryan9600 in https://github.com/kube-rs/kube/pull/1259
+* Update the `scheduler` message when preponing by @nightkr in https://github.com/kube-rs/kube/pull/1260
 
 [0.84.0](https://github.com/kube-rs/kube/releases/tag/0.84.0) / 2023-07-14
 ===================
