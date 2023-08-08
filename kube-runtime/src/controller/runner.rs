@@ -158,6 +158,8 @@ mod tests {
         let mut count = 0;
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
         let mut runner = Box::pin(
+            // The debounce period needs to zero because a debounce period > 0
+            // will lead to the second request to be discarded.
             Runner::new(scheduler(sched_rx), |_| {
                 count += 1;
                 // Panic if this ref is already held, to simulate some unsafe action..

@@ -5,7 +5,22 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.84.0...main
+ * see https://github.com/kube-rs/kube/compare/0.85.0...main
+
+[0.85.0](https://github.com/kube-rs/kube/releases/tag/0.85.0) / 2023-08-06
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.85.0 -->
+
+## What's Changed
+### Added
+* Add `WatchStreamExt::reflect` to allow chaining on a reflector  by @clux in https://github.com/kube-rs/kube/pull/1252
+* Implement ephemeral containers subresource by @jmintb in https://github.com/kube-rs/kube/pull/1153
+### Changed
+* Swap `dirs-next` dependency to cargo-team maintained `home` crate by @utkarshgupta137 in https://github.com/kube-rs/kube/pull/1207
+* Upgrade `k8s-openapi` to `0.19.0` for `v1_27` support by @clux in https://github.com/kube-rs/kube/pull/1271
+### Fixed
+* `watcher`: return `NoResourceVersion` error if resource version is empty by @aryan9600 in https://github.com/kube-rs/kube/pull/1259
+* Update the `scheduler` message when preponing by @nightkr in https://github.com/kube-rs/kube/pull/1260
 
 [0.84.0](https://github.com/kube-rs/kube/releases/tag/0.84.0) / 2023-07-14
 ===================
@@ -13,12 +28,12 @@ UNRELEASED
 
 ## Highlights
 ### Stream Improvements
-On the `runtime` side, the `Controller` now delays reconciles until the main `Store` is ready (via a [new `Store` helper](https://docs.rs/kube/0.84.0/kube/runtime/reflector/struct.Store.html#method.wait_until_ready) from #1243). The stream selection for owned resources is more efficient (#1240), and the underlying `watcher` streams now all paginate (#1249). There are also many new  [`WatchStreamExt`](https://docs.rs/kube/0.84.0/kube/runtime/trait.WatchStreamExt.html) helpers ( #1246 + #1228 + #1232) as a continued work towards the more customisable streams-api (#1080).
+On the `runtime` side, the `Controller` now delays reconciles until the main `Store` is ready (via a [new `Store` helper](https://docs.rs/kube/0.84.0/kube/runtime/reflector/struct.Store.html#method.wait_until_ready) from [#1243](https://github.com/kube-rs/kube/issues/1243)). The stream selection for owned resources is more efficient (#1240), and the underlying `watcher` streams now all paginate (#1249). There are also many new  [`WatchStreamExt`](https://docs.rs/kube/0.84.0/kube/runtime/trait.WatchStreamExt.html) helpers ( [#1246](https://github.com/kube-rs/kube/issues/1246) + [#1228](https://github.com/kube-rs/kube/issues/1228) + [#1232](https://github.com/kube-rs/kube/issues/1232)) as a continued work towards the more customisable streams-api (#1080).
 
-On the client-side; streaming logs are now easier to deal with as an `AsyncBufRead` #1235.
+On the client-side; streaming logs are now easier to deal with as an `AsyncBufRead` [#1235](https://github.com/kube-rs/kube/issues/1235).
 
 ### OIDC Refresh
-Optional OIDC refreshable token support was introduced in #1229 under `kube/oidc` for out-of-cluster `Client` configuration. Previously, refresh support was limited to non-OIDC tokens from the `GcpOuth` provider (`kube/oauth`) or through arbitrary `exec` calls / `TokenFile` loading.
+Optional OIDC refreshable token support was introduced in [#1229](https://github.com/kube-rs/kube/issues/1229) under `kube/oidc` for out-of-cluster `Client` configuration. Previously, refresh support was limited to non-OIDC tokens from the `GcpOuth` provider (`kube/oauth`) or through arbitrary `exec` calls / `TokenFile` loading.
 
 ## What's Changed
 ### Added
