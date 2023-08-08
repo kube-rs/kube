@@ -72,6 +72,7 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
         use tracing::Span;
 
         let default_ns = config.default_namespace.clone();
+        let auth_layer = config.auth_layer()?;
 
         let client: hyper::Client<_, hyper::Body> = {
             let mut connector = HttpConnector::new();
@@ -86,6 +87,11 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
             let connector = config.rustls_https_connector_with_connector(connector)?;
             #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
             let connector = config.openssl_https_connector_with_connector(connector)?;
+            #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
+            if auth_layer.is_none() {
+                // no tls stack situation only works on anonymous auth
+                return Err(Error::TlsRequired);
+            }
 
             let mut connector = TimeoutConnector::new(connector);
 
@@ -106,7 +112,7 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
 
         let service = ServiceBuilder::new()
             .layer(stack)
-            .option_layer(config.auth_layer()?)
+            .option_layer(auth_layer)
             .layer(config.extra_headers_layer()?)
             .layer(
                 // Attribute names follow [Semantic Conventions].

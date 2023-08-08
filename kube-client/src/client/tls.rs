@@ -53,7 +53,7 @@ pub mod rustls_tls {
 
         let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {
             config_builder
-                .with_single_cert(chain, pkey)
+                .with_client_auth_cert(chain, pkey)
                 .map_err(Error::InvalidPrivateKey)?
         } else {
             config_builder.with_no_client_auth()
