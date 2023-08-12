@@ -32,6 +32,7 @@ pub struct Runner<T, R, F, MkF, Ready = future::Ready<Result<(), Infallible>>> {
     ready_to_execute_after: future::Fuse<Ready>,
     is_ready_to_execute: bool,
     stopped: bool,
+    max_concurrent_executions: usize,
 }
 
 impl<T, R, F, MkF> Runner<T, R, F, MkF>
@@ -39,7 +40,10 @@ where
     F: Future + Unpin,
     MkF: FnMut(&T) -> F,
 {
-    pub fn new(scheduler: Scheduler<T, R>, run_msg: MkF) -> Self {
+    /// Creates a new [`Runner`]. [`max_concurrent_executions`] can be used to
+    /// limit the number of items are run concurrently. It can be set to 0 to
+    /// allow for unbounded concurrency.
+    pub fn new(scheduler: Scheduler<T, R>, max_concurrent_executions: usize, run_msg: MkF) -> Self {
         Self {
             scheduler,
             run_msg,
@@ -47,6 +51,7 @@ where
             ready_to_execute_after: future::ready(Ok(())).fuse(),
             is_ready_to_execute: false,
             stopped: false,
+            max_concurrent_executions,
         }
     }
 
@@ -67,10 +72,12 @@ where
             ready_to_execute_after: ready_to_execute_after.fuse(),
             is_ready_to_execute: false,
             stopped: false,
+            max_concurrent_executions: self.max_concurrent_executions,
         }
     }
 }
 
+#[allow(clippy::match_wildcard_for_single_variants)]
 impl<T, R, F, MkF, Ready, ReadyErr> Stream for Runner<T, R, F, MkF, Ready>
 where
     T: Eq + Hash + Clone + Unpin,
@@ -102,12 +109,26 @@ where
             Poll::Pending => {}
         }
         loop {
+            // If we are at our limit or not ready to start executing, then there's
+            // no point in trying to get something from the scheduler, so just put
+            // all expired messages emitted from the queue into pending.
+            if (*this.max_concurrent_executions > 0 && slots.len() >= *this.max_concurrent_executions)
+                || !*this.is_ready_to_execute
+            {
+                match scheduler.as_mut().project().pop_queue_message_into_pending(cx) {
+                    Poll::Pending => break Poll::Pending,
+                    // Since the above method never returns anything other than Poll::Pending
+                    // we don't need to handle any other variant.
+                    _ => unreachable!(),
+                };
+            };
+
             // Try to take take a new message that isn't already being processed
             // leave the already-processing ones in the queue, so that we can take them once
             // we're free again.
             let next_msg_poll = scheduler
                 .as_mut()
-                .hold_unless(|msg| *this.is_ready_to_execute && !slots.contains_key(msg))
+                .hold_unless(|msg| !slots.contains_key(msg))
                 .poll_next_unpin(cx);
             match next_msg_poll {
                 Poll::Ready(Some(msg)) => {
@@ -144,7 +165,12 @@ mod tests {
         channel::{mpsc, oneshot},
         future, poll, stream, SinkExt, StreamExt, TryStreamExt,
     };
-    use std::{cell::RefCell, collections::HashMap, sync::Mutex, time::Duration};
+    use std::{
+        cell::RefCell,
+        collections::HashMap,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
     use tokio::{
         runtime::Handle,
         task::yield_now,
@@ -160,7 +186,7 @@ mod tests {
         let mut runner = Box::pin(
             // The debounce period needs to zero because a debounce period > 0
             // will lead to the second request to be discarded.
-            Runner::new(scheduler(sched_rx), |_| {
+            Runner::new(scheduler(sched_rx), 0, |_| {
                 count += 1;
                 // Panic if this ref is already held, to simulate some unsafe action..
                 let mutex_ref = rc.borrow_mut();
@@ -205,7 +231,7 @@ mod tests {
         // pause();
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
         let (result_tx, result_rx) = oneshot::channel();
-        let mut runner = Runner::new(scheduler(sched_rx), |msg: &u8| futures::future::ready(*msg));
+        let mut runner = Runner::new(scheduler(sched_rx), 0, |msg: &u8| futures::future::ready(*msg));
         // Start a background task that starts listening /before/ we enqueue the message
         // We can't just use Stream::poll_next(), since that bypasses the waker system
         Handle::current().spawn(async move { result_tx.send(runner.next().await).unwrap() });
@@ -245,6 +271,7 @@ mod tests {
                     }])
                     .chain(stream::pending()),
                 ),
+                0,
                 |msg| {
                     assert!(*is_ready.lock().unwrap());
                     future::ready(*msg)
@@ -281,6 +308,7 @@ mod tests {
                     ])
                     .chain(stream::pending()),
                 ),
+                0,
                 |msg| {
                     assert!(*is_ready.lock().unwrap());
                     future::ready(*msg)
@@ -316,6 +344,7 @@ mod tests {
                     }])
                     .chain(stream::pending()),
                 ),
+                0,
                 |()| {
                     panic!("run_msg should never be invoked if readiness gate fails");
                     // It's "useless", but it helps to direct rustc to the correct types
@@ -331,5 +360,55 @@ mod tests {
             runner.try_collect::<Vec<_>>().await.unwrap_err(),
             Error::Readiness(delayed_init::InitDropped)
         ));
+    }
+
+    #[tokio::test]
+    async fn runner_should_respect_max_concurrent_executions() {
+        pause();
+
+        let count = Arc::new(Mutex::new(0));
+        let (mut sched_tx, sched_rx) = mpsc::unbounded();
+        let mut runner = Box::pin(
+            Runner::new(scheduler(sched_rx), 2, |_| {
+                let mut num = count.lock().unwrap();
+                *num += 1;
+                Box::pin(async move {
+                    sleep(Duration::from_secs(2)).await;
+                })
+            })
+            .for_each(|_| async {}),
+        );
+
+        sched_tx
+            .send(ScheduleRequest {
+                message: 1,
+                run_at: Instant::now(),
+            })
+            .await
+            .unwrap();
+        assert!(poll!(runner.as_mut()).is_pending());
+        sched_tx
+            .send(ScheduleRequest {
+                message: 2,
+                run_at: Instant::now(),
+            })
+            .await
+            .unwrap();
+        assert!(poll!(runner.as_mut()).is_pending());
+        sched_tx
+            .send(ScheduleRequest {
+                message: 3,
+                run_at: Instant::now(),
+            })
+            .await
+            .unwrap();
+        assert!(poll!(runner.as_mut()).is_pending());
+        // Assert that we only ran two out of the three requests
+        assert_eq!(*count.lock().unwrap(), 2);
+
+        let _ = sleep(Duration::from_secs(5));
+        assert!(poll!(runner.as_mut()).is_pending());
+        // Assert that we run the third request when we have the capacity to
+        assert_eq!(*count.lock().unwrap(), 2);
     }
 }

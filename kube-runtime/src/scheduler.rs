@@ -126,6 +126,18 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             }
         }
     }
+
+    pub fn pop_queue_message_into_pending(&mut self, cx: &mut Context<'_>) -> Poll<T> {
+        loop {
+            match self.queue.poll_expired(cx) {
+                Poll::Ready(Some(msg)) => {
+                    let msg = msg.into_inner();
+                    self.pending.insert(msg);
+                }
+                Poll::Ready(None) | Poll::Pending => break Poll::Pending,
+            }
+        }
+    }
 }
 
 /// See [`Scheduler::hold_unless`]
