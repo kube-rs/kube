@@ -427,7 +427,7 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     debounce: Duration,
-    concurrency: usize,
+    concurrency: u16,
 }
 
 impl Config {
@@ -448,12 +448,16 @@ impl Config {
         self
     }
 
-    /// The number of concurrent reconciliations that are allowed to run at any
-    /// given moment. This can be adjusted to the controller's needs to increase
+    /// The number of concurrent reconciliations of that are allowed to run at an given moment.
+    ///
+    /// This can be adjusted to the controller's needs to increase
     /// performance and/or make performance predictable. By default, its 0 meaning
     /// the controller runs with unbounded concurrency.
+    ///
+    /// Note that despite concurrency, a controller never schedules concurrent reconciles
+    /// on the same object.
     #[must_use]
-    pub fn concurrency(mut self, concurrency: usize) -> Self {
+    pub fn concurrency(mut self, concurrency: u16) -> Self {
         self.concurrency = concurrency;
         self
     }

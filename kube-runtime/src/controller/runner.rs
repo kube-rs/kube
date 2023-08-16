@@ -32,7 +32,7 @@ pub struct Runner<T, R, F, MkF, Ready = future::Ready<Result<(), Infallible>>> {
     ready_to_execute_after: future::Fuse<Ready>,
     is_ready_to_execute: bool,
     stopped: bool,
-    max_concurrent_executions: usize,
+    max_concurrent_executions: u16,
 }
 
 impl<T, R, F, MkF> Runner<T, R, F, MkF>
@@ -43,7 +43,7 @@ where
     /// Creates a new [`Runner`]. [`max_concurrent_executions`] can be used to
     /// limit the number of items are run concurrently. It can be set to 0 to
     /// allow for unbounded concurrency.
-    pub fn new(scheduler: Scheduler<T, R>, max_concurrent_executions: usize, run_msg: MkF) -> Self {
+    pub fn new(scheduler: Scheduler<T, R>, max_concurrent_executions: u16, run_msg: MkF) -> Self {
         Self {
             scheduler,
             run_msg,
@@ -112,13 +112,22 @@ where
             // If we are at our limit or not ready to start executing, then there's
             // no point in trying to get something from the scheduler, so just put
             // all expired messages emitted from the queue into pending.
-            if (*this.max_concurrent_executions > 0 && slots.len() >= *this.max_concurrent_executions)
+            if (*this.max_concurrent_executions > 0
+                && slots.len() >= *this.max_concurrent_executions as usize)
                 || !*this.is_ready_to_execute
             {
-                match scheduler.as_mut().project().pop_queue_message_into_pending(cx) {
+                match scheduler.as_mut().hold().poll_next_unpin(cx) {
                     Poll::Pending => break Poll::Pending,
-                    // Since the above method never returns anything other than Poll::Pending
-                    // we don't need to handle any other variant.
+                    Poll::Ready(None) => {
+                        break if has_active_slots {
+                            // We're done listening for new messages, but still have some that
+                            // haven't finished quite yet
+                            Poll::Pending
+                        } else {
+                            Poll::Ready(None)
+                        };
+                    }
+                    // The above future never returns Poll::Ready(Some(_)).
                     _ => unreachable!(),
                 };
             };
@@ -163,18 +172,21 @@ mod tests {
     };
     use futures::{
         channel::{mpsc, oneshot},
-        future, poll, stream, SinkExt, StreamExt, TryStreamExt,
+        future::{self},
+        poll, stream, Future, SinkExt, StreamExt, TryStreamExt,
     };
     use std::{
         cell::RefCell,
         collections::HashMap,
+        pin::Pin,
         sync::{Arc, Mutex},
+        task::{Context, Poll},
         time::Duration,
     };
     use tokio::{
         runtime::Handle,
         task::yield_now,
-        time::{pause, sleep, timeout, Instant},
+        time::{advance, pause, sleep, timeout, Instant},
     };
 
     #[tokio::test]
@@ -362,6 +374,33 @@ mod tests {
         ));
     }
 
+    // A Future that is Ready after the specified duration from its initialization.
+    struct ConditionalFuture {
+        start: Instant,
+        expires_in: Duration,
+    }
+
+    impl ConditionalFuture {
+        fn new(expires_in: Duration) -> Self {
+            let start = Instant::now();
+            ConditionalFuture { start, expires_in }
+        }
+    }
+
+    impl Future for ConditionalFuture {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let now = Instant::now();
+            if now.duration_since(self.start) > self.expires_in {
+                Poll::Ready(())
+            } else {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        }
+    }
+
     #[tokio::test]
     async fn runner_should_respect_max_concurrent_executions() {
         pause();
@@ -372,9 +411,7 @@ mod tests {
             Runner::new(scheduler(sched_rx), 2, |_| {
                 let mut num = count.lock().unwrap();
                 *num += 1;
-                Box::pin(async move {
-                    sleep(Duration::from_secs(2)).await;
-                })
+                ConditionalFuture::new(Duration::from_secs(2))
             })
             .for_each(|_| async {}),
         );
@@ -406,9 +443,9 @@ mod tests {
         // Assert that we only ran two out of the three requests
         assert_eq!(*count.lock().unwrap(), 2);
 
-        let _ = sleep(Duration::from_secs(5));
+        advance(Duration::from_secs(3)).await;
         assert!(poll!(runner.as_mut()).is_pending());
         // Assert that we run the third request when we have the capacity to
-        assert_eq!(*count.lock().unwrap(), 2);
+        assert_eq!(*count.lock().unwrap(), 3);
     }
 }
