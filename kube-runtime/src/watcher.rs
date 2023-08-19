@@ -122,6 +122,13 @@ enum State<K> {
         continue_token: Option<String>,
         objects: Vec<K>,
     },
+    /// Kubernetes 1.27 Streaming Lists
+    /// The initial watch is in progress
+    IntialWatch {
+        objects: Vec<K>,
+        #[derivative(Debug = "ignore")]
+        stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
+    },
     /// The initial LIST was successful, so we should move on to starting the actual watch.
     InitListed { resource_version: String },
     /// The watch is in progress, from this point we just return events from the server.
@@ -192,6 +199,16 @@ pub enum ListSemantic {
     Any,
 }
 
+/// Configurable watcher listwatch semantics
+#[derive(Clone, Default, Debug, PartialEq)]
+pub enum InitialListStrategy {
+    #[default]
+    ListWatch,
+    /// Kubernetes 1.27 Streaming Lists
+    /// https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+    StreamingList,
+}
+
 /// Accumulates all options that can be used on the watcher invocation.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
@@ -215,7 +232,24 @@ pub struct Config {
     /// Semantics for list calls.
     ///
     /// Configures re-list for performance vs. consistency.
+    ///
+    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
     pub list_semantic: ListSemantic,
+
+    /// Kubernetes 1.27 Streaming Lists
+    /// Determines how the watcher fetches the initial list of objects.
+    /// Defaults to `ListWatch` for backwards compatibility.
+    ///
+    /// ListWatch: The watcher will fetch the initial list of objects using a list call.
+    /// StreamingList: The watcher will fetch the initial list of objects using a watch call.
+    ///
+    /// StreamingList is more efficient than ListWatch, but it requires the server to support
+    /// streaming list bookmarks. If the server does not support streaming list bookmarks,
+    /// the watcher will fall back to ListWatch.
+    ///
+    /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+    /// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
+    pub initial_list_strategy: InitialListStrategy,
 
     /// Maximum number of objects retrieved per list operation resyncs.
     ///
@@ -223,6 +257,8 @@ pub struct Config {
     /// API roundtrips to complete.
     ///
     /// Defaults to 500. Note that `None` represents unbounded.
+    ///
+    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
     pub page_size: Option<u32>,
 
     /// Enables watch events with type "BOOKMARK".
@@ -243,6 +279,7 @@ impl Default for Config {
             // same default page size limit as client-go
             // https://github.com/kubernetes/client-go/blob/aed71fa5cf054e1c196d67b2e21f66fd967b8ab1/tools/pager/pager.go#L31
             page_size: Some(500),
+            initial_list_strategy: InitialListStrategy::ListWatch,
         }
     }
 }
@@ -289,6 +326,8 @@ impl Config {
     }
 
     /// Sets list semantic to configure re-list performance and consistency
+    ///
+    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
     #[must_use]
     pub fn list_semantic(mut self, semantic: ListSemantic) -> Self {
         self.list_semantic = semantic;
@@ -296,6 +335,8 @@ impl Config {
     }
 
     /// Sets list semantic to `Any` to improve list performance
+    ///
+    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
     #[must_use]
     pub fn any_semantic(self) -> Self {
         self.list_semantic(ListSemantic::Any)
@@ -315,9 +356,19 @@ impl Config {
     ///
     /// This can reduce the memory consumption during resyncs, at the cost of requiring more
     /// API roundtrips to complete.
+    ///
+    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
     #[must_use]
     pub fn page_size(mut self, page_size: u32) -> Self {
         self.page_size = Some(page_size);
+        self
+    }
+
+    /// Kubernetes 1.27 Streaming Lists
+    /// Sets list semantic to `Stream` to make use of watch bookmarks
+    #[must_use]
+    pub fn streaming_lists(mut self) -> Self {
+        self.initial_list_strategy = InitialListStrategy::StreamingList;
         self
     }
 
@@ -346,6 +397,7 @@ impl Config {
             field_selector: self.field_selector.clone(),
             timeout: self.timeout,
             bookmarks: self.bookmarks,
+            send_initial_events: self.initial_list_strategy == InitialListStrategy::StreamingList,
         }
     }
 }
@@ -414,35 +466,103 @@ where
         State::Empty {
             continue_token,
             mut objects,
-        } => {
-            let mut lp = wc.to_list_params();
-            lp.continue_token = continue_token;
-            match api.list(&lp).await {
-                Ok(list) => {
-                    objects.extend(list.items);
-                    if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
-                        (None, State::Empty {
-                            continue_token: Some(continue_token),
-                            objects,
-                        })
-                    } else if let Some(resource_version) =
-                        list.metadata.resource_version.filter(|s| !s.is_empty())
-                    {
-                        (Some(Ok(Event::Restarted(objects))), State::InitListed {
-                            resource_version,
-                        })
-                    } else {
-                        (Some(Err(Error::NoResourceVersion)), State::default())
+        } => match wc.initial_list_strategy {
+            InitialListStrategy::ListWatch => {
+                let mut lp = wc.to_list_params();
+                lp.continue_token = continue_token;
+                match api.list(&lp).await {
+                    Ok(list) => {
+                        objects.extend(list.items);
+                        if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
+                            (None, State::Empty {
+                                continue_token: Some(continue_token),
+                                objects,
+                            })
+                        } else if let Some(resource_version) =
+                            list.metadata.resource_version.filter(|s| !s.is_empty())
+                        {
+                            (Some(Ok(Event::Restarted(objects))), State::InitListed {
+                                resource_version,
+                            })
+                        } else {
+                            (Some(Err(Error::NoResourceVersion)), State::default())
+                        }
+                    }
+                    Err(err) => {
+                        if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                            warn!("watch list error with 403: {err:?}");
+                        } else {
+                            debug!("watch list error: {err:?}");
+                        }
+                        (Some(Err(err).map_err(Error::InitialListFailed)), State::default())
                     }
                 }
+            }
+            InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
+                Ok(stream) => (None, State::IntialWatch { stream, objects }),
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                        warn!("watch list error with 403: {err:?}");
+                        warn!("watch initlist error with 403: {err:?}");
                     } else {
-                        debug!("watch list error: {err:?}");
+                        debug!("watch initlist error: {err:?}");
                     }
-                    (Some(Err(err).map_err(Error::InitialListFailed)), State::default())
+                    (Some(Err(err).map_err(Error::WatchStartFailed)), State::default())
                 }
+            },
+        },
+        State::IntialWatch {
+            mut objects,
+            mut stream,
+        } => {
+            match stream.next().await {
+                Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
+                    objects.push(obj);
+                    (None, State::IntialWatch { objects, stream })
+                }
+                Some(Ok(WatchEvent::Deleted(obj))) => {
+                    objects.retain(|o| o.name_any() != obj.name_any() && o.namespace() != obj.namespace());
+                    (None, State::IntialWatch { objects, stream })
+                }
+                Some(Ok(WatchEvent::Bookmark(bm))) => {
+                    let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
+                    if marks_initial_end {
+                        (Some(Ok(Event::Restarted(objects))), State::Watching {
+                            resource_version: bm.metadata.resource_version,
+                            stream,
+                        })
+                    } else {
+                        (None, State::Watching {
+                            resource_version: bm.metadata.resource_version,
+                            stream,
+                        })
+                    }
+                }
+                Some(Ok(WatchEvent::Error(err))) => {
+                    // HTTP GONE, means we have desynced and need to start over and re-list :(
+                    let new_state = if err.code == 410 {
+                        State::default()
+                    } else {
+                        State::IntialWatch { objects, stream }
+                    };
+                    if err.code == 403 {
+                        warn!("watcher watchevent error 403: {err:?}");
+                    } else {
+                        debug!("error watchevent error: {err:?}");
+                    }
+                    (Some(Err(err).map_err(Error::WatchError)), new_state)
+                }
+                Some(Err(err)) => {
+                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                        warn!("watcher error 403: {err:?}");
+                    } else {
+                        debug!("watcher error: {err:?}");
+                    }
+                    (Some(Err(err).map_err(Error::WatchFailed)), State::IntialWatch {
+                        objects,
+                        stream,
+                    })
+                }
+                None => (None, State::default()),
             }
         }
         State::InitListed { resource_version } => {

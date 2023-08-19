@@ -522,6 +522,18 @@ mod test {
             "/api/v1/namespaces/ns/pods?&watch=true&timeoutSeconds=290&allowWatchBookmarks=true&resourceVersion=0"
         );
     }
+
+    #[test]
+    fn watch_streaming_list() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let wp = WatchParams::default().initial_events();
+        let req = Request::new(url).watch(&wp, "0").unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods?&watch=true&timeoutSeconds=290&allowWatchBookmarks=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&resourceVersion=0"
+        );
+    }
+
     #[test]
     fn watch_metadata_path() {
         let url = corev1::Pod::url_path(&(), Some("ns"));

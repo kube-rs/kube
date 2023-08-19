@@ -59,4 +59,9 @@ pub struct Bookmark {
 pub struct BookmarkMeta {
     /// The only field we need from a Bookmark event.
     pub resource_version: String,
+
+    /// Kubernetes 1.27 Streaming Lists
+    /// The rest of the fields are optional and may be empty.
+    #[serde(default)]
+    pub annotations: std::collections::BTreeMap<String, String>,
 }
