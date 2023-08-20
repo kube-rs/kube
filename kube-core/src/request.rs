@@ -738,10 +738,7 @@ mod test {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let gp = ListParams::default().limit(50).match_any();
         let req = Request::new(url).list(&gp).unwrap();
-        assert_eq!(
-            req.uri().query().unwrap(),
-            "&limit=50"
-        );
+        assert_eq!(req.uri().query().unwrap(), "&limit=50");
     }
 
     #[test]
@@ -749,21 +746,19 @@ mod test {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let gp = ListParams::default().limit(50).continue_token("1234").match_any();
         let req = Request::new(url).list(&gp).unwrap();
-        assert_eq!(
-            req.uri().query().unwrap(),
-            "&limit=50&continue=1234"
-        );
+        assert_eq!(req.uri().query().unwrap(), "&limit=50&continue=1234");
     }
 
     #[test]
     fn list_paged_with_continue_starting_at() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let gp = ListParams::default().limit(50).continue_token("1234").at("9999").matching(VersionMatch::Exact);
+        let gp = ListParams::default()
+            .limit(50)
+            .continue_token("1234")
+            .at("9999")
+            .matching(VersionMatch::Exact);
         let req = Request::new(url).list(&gp).unwrap();
-        assert_eq!(
-            req.uri().query().unwrap(),
-            "&limit=50&continue=1234"
-        );
+        assert_eq!(req.uri().query().unwrap(), "&limit=50&continue=1234");
     }
 
     #[test]
