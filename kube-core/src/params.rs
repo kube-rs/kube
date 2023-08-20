@@ -465,6 +465,17 @@ impl WatchParams {
 
         self
     }
+
+    /// Constructor for doing Kubernetes 1.27 Streaming List watches
+    ///
+    /// Enables [`VersionMatch::NotGreaterThan`] semantics and [`WatchParams::send_initial_events`].
+    pub fn streaming_lists() -> Self {
+        Self {
+            send_initial_events: true,
+            bookmarks: true, // required
+            ..WatchParams::default()
+        }
+    }
 }
 
 /// Common query parameters for put/post calls

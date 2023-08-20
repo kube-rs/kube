@@ -237,15 +237,13 @@ pub struct Config {
     pub list_semantic: ListSemantic,
 
     /// Kubernetes 1.27 Streaming Lists
-    /// Determines how the watcher fetches the initial list of objects.
-    /// Defaults to `ListWatch` for backwards compatibility.
+    /// Control how the watcher fetches the initial list of objects.
     ///
     /// ListWatch: The watcher will fetch the initial list of objects using a list call.
     /// StreamingList: The watcher will fetch the initial list of objects using a watch call.
     ///
     /// StreamingList is more efficient than ListWatch, but it requires the server to support
-    /// streaming list bookmarks. If the server does not support streaming list bookmarks,
-    /// the watcher will fall back to ListWatch.
+    /// streaming list bookmarks (opt-in feature gate in Kubernetes 1.27).
     ///
     /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
     /// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
