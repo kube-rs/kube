@@ -309,6 +309,29 @@ pub struct WatchParams {
     /// If the feature gate WatchBookmarks is not enabled in apiserver,
     /// this field is ignored.
     pub bookmarks: bool,
+
+    /// Kubernetes 1.27 Streaming Lists
+    /// `sendInitialEvents=true` may be set together with `watch=true`.
+    /// In that case, the watch stream will begin with synthetic events to
+    /// produce the current state of objects in the collection. Once all such
+    /// events have been sent, a synthetic "Bookmark" event  will be sent.
+    /// The bookmark will report the ResourceVersion (RV) corresponding to the
+    /// set of objects, and be marked with `"k8s.io/initial-events-end": "true"` annotation.
+    /// Afterwards, the watch stream will proceed as usual, sending watch events
+    /// corresponding to changes (subsequent to the RV) to objects watched.
+    ///
+    /// When `sendInitialEvents` option is set, we require `resourceVersionMatch`
+    /// option to also be set. The semantic of the watch request is as following:
+    /// - `resourceVersionMatch` = NotOlderThan
+    ///   is interpreted as "data at least as new as the provided `resourceVersion`"
+    ///   and the bookmark event is send when the state is synced
+    ///   to a `resourceVersion` at least as fresh as the one provided by the ListOptions.
+    ///   If `resourceVersion` is unset, this is interpreted as "consistent read" and the
+    ///   bookmark event is send when the state is synced at least to the moment
+    ///   when request started being processed.
+    /// - `resourceVersionMatch` set to any other value or unset
+    ///   Invalid error is returned.
+    pub send_initial_events: bool,
 }
 
 impl WatchParams {
@@ -318,6 +341,11 @@ impl WatchParams {
             if *to >= 295 {
                 return Err(Error::Validation("WatchParams::timeout must be < 295s".into()));
             }
+        }
+        if self.send_initial_events && !self.bookmarks {
+            return Err(Error::Validation(
+                "WatchParams::bookmarks must be set when using send_initial_events".into(),
+            ));
         }
         Ok(())
     }
@@ -338,6 +366,10 @@ impl WatchParams {
         if self.bookmarks {
             qp.append_pair("allowWatchBookmarks", "true");
         }
+        if self.send_initial_events {
+            qp.append_pair("sendInitialEvents", "true");
+            qp.append_pair("resourceVersionMatch", "NotOlderThan");
+        }
     }
 }
 
@@ -351,6 +383,7 @@ impl Default for WatchParams {
             label_selector: None,
             field_selector: None,
             timeout: None,
+            send_initial_events: false,
         }
     }
 }
@@ -404,6 +437,48 @@ impl WatchParams {
     pub fn disable_bookmarks(mut self) -> Self {
         self.bookmarks = false;
         self
+    }
+
+    /// Kubernetes 1.27 Streaming Lists
+    /// `sendInitialEvents=true` may be set together with `watch=true`.
+    /// In that case, the watch stream will begin with synthetic events to
+    /// produce the current state of objects in the collection. Once all such
+    /// events have been sent, a synthetic "Bookmark" event  will be sent.
+    /// The bookmark will report the ResourceVersion (RV) corresponding to the
+    /// set of objects, and be marked with `"k8s.io/initial-events-end": "true"` annotation.
+    /// Afterwards, the watch stream will proceed as usual, sending watch events
+    /// corresponding to changes (subsequent to the RV) to objects watched.
+    ///
+    /// When `sendInitialEvents` option is set, we require `resourceVersionMatch`
+    /// option to also be set. The semantic of the watch request is as following:
+    /// - `resourceVersionMatch` = NotOlderThan
+    ///   is interpreted as "data at least as new as the provided `resourceVersion`"
+    ///   and the bookmark event is send when the state is synced
+    ///   to a `resourceVersion` at least as fresh as the one provided by the ListOptions.
+    ///   If `resourceVersion` is unset, this is interpreted as "consistent read" and the
+    ///   bookmark event is send when the state is synced at least to the moment
+    ///   when request started being processed.
+    /// - `resourceVersionMatch` set to any other value or unset
+    ///   Invalid error is returned.
+    ///
+    /// Defaults to true if `resourceVersion=""` or `resourceVersion="0"` (for backward
+    /// compatibility reasons) and to false otherwise.
+    #[must_use]
+    pub fn initial_events(mut self) -> Self {
+        self.send_initial_events = true;
+
+        self
+    }
+
+    /// Constructor for doing Kubernetes 1.27 Streaming List watches
+    ///
+    /// Enables [`VersionMatch::NotGreaterThan`] semantics and [`WatchParams::send_initial_events`].
+    pub fn streaming_lists() -> Self {
+        Self {
+            send_initial_events: true,
+            bookmarks: true, // required
+            ..WatchParams::default()
+        }
     }
 }
 
