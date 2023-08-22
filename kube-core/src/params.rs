@@ -189,7 +189,7 @@ impl ListParams {
 
     /// Sets an arbitary resource version match strategy
     ///
-    /// A non-default strategy such as `VersionMatch::Exact` or `VersionMatch::NotGreaterThan`
+    /// A non-default strategy such as `VersionMatch::Exact` or `VersionMatch::NotOlderThan`
     /// requires an explicit `resource_version` set to pass request validation.
     #[must_use]
     pub fn matching(mut self, version_match: VersionMatch) -> Self {
@@ -472,7 +472,7 @@ impl WatchParams {
 
     /// Constructor for doing Kubernetes 1.27 Streaming List watches
     ///
-    /// Enables [`VersionMatch::NotGreaterThan`] semantics and [`WatchParams::send_initial_events`].
+    /// Enables [`VersionMatch::NotOlderThan`] semantics and [`WatchParams::send_initial_events`].
     pub fn streaming_lists() -> Self {
         Self {
             send_initial_events: true,

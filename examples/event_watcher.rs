@@ -1,11 +1,11 @@
 use futures::{pin_mut, TryStreamExt};
-use k8s_openapi::api::core::v1::Event;
+use k8s_openapi::api::{core::v1::ObjectReference, events::v1::Event};
 use kube::{
     api::Api,
     runtime::{watcher, WatchStreamExt},
     Client,
 };
-use tracing::*;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -13,9 +13,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let events: Api<Event> = Api::all(client);
-    let wc = watcher::Config::default();
-
-    let ew = watcher(events, wc).applied_objects();
+    let ew = watcher(events, watcher::Config::default()).applied_objects();
 
     pin_mut!(ew);
     while let Some(event) = ew.try_next().await? {
@@ -27,10 +25,18 @@ async fn main() -> anyhow::Result<()> {
 // This function lets the app handle an added/modified event from k8s
 fn handle_event(ev: Event) -> anyhow::Result<()> {
     info!(
-        "Event: \"{}\" via {} {}",
-        ev.message.unwrap().trim(),
-        ev.involved_object.kind.unwrap(),
-        ev.involved_object.name.unwrap()
+        "{}: {} ({})",
+        ev.regarding.map(fmt_obj_ref).unwrap_or_default(),
+        ev.reason.unwrap_or_default(),
+        ev.note.unwrap_or_default(),
     );
     Ok(())
+}
+
+fn fmt_obj_ref(oref: ObjectReference) -> String {
+    format!(
+        "{}/{}",
+        oref.kind.unwrap_or_default(),
+        oref.name.unwrap_or_default()
+    )
 }
