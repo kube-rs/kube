@@ -106,7 +106,7 @@ impl ListParams {
         } else {
             // When there's a continue token, we don't want to set resourceVersion
             if let Some(rv) = &self.resource_version {
-                if rv != "0" || (rv == "0" && self.limit.is_none()) {
+                if rv != "0" || self.limit.is_none() {
                     qp.append_pair("resourceVersion", rv.as_str());
 
                     match &self.version_match {
