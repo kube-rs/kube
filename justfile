@@ -83,11 +83,12 @@ e2e-job-musl features:
   chmod +x e2e/job
 
 k3d:
-  k3d cluster create main --servers 1 --registry-create main \
+  k3d cluster create main --servers 1 --registry-create main --image rancher/k3s:v1.27.3-k3s1 \
     --no-lb --no-rollback \
     --k3s-arg "--disable=traefik,servicelb,metrics-server@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
-    --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
+    --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*' \
+    --k3s-arg '--kube-apiserver-arg=feature-gates=WatchList=true'
 
 ## RELEASE RELATED
 
