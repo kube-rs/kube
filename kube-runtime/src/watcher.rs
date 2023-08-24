@@ -200,12 +200,19 @@ pub enum ListSemantic {
 }
 
 /// Configurable watcher listwatch semantics
+
 #[derive(Clone, Default, Debug, PartialEq)]
 pub enum InitialListStrategy {
+    /// List first, then watch from given resouce version
+    ///
+    /// This is the old and default way of watching. The watcher will do a paginated list call first before watching.
+    /// When using this mode, you can configure the page_size on the watcher.
     #[default]
     ListWatch,
     /// Kubernetes 1.27 Streaming Lists
-    /// https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+    ///
+    /// See [upstream documentation on streaming lists](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists),
+    /// and the [KEP](https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details).
     StreamingList,
 }
 
@@ -233,10 +240,9 @@ pub struct Config {
     ///
     /// Configures re-list for performance vs. consistency.
     ///
-    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
+    /// NB: This option only has an effect for [`InitialListStrategy::ListWatch`].
     pub list_semantic: ListSemantic,
 
-    /// Kubernetes 1.27 Streaming Lists
     /// Control how the watcher fetches the initial list of objects.
     ///
     /// ListWatch: The watcher will fetch the initial list of objects using a list call.
@@ -245,8 +251,8 @@ pub struct Config {
     /// StreamingList is more efficient than ListWatch, but it requires the server to support
     /// streaming list bookmarks (opt-in feature gate in Kubernetes 1.27).
     ///
-    /// See https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
-    /// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
+    /// See [upstream documentation on streaming lists](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists),
+    /// and the [KEP](https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details).
     pub initial_list_strategy: InitialListStrategy,
 
     /// Maximum number of objects retrieved per list operation resyncs.
@@ -256,7 +262,7 @@ pub struct Config {
     ///
     /// Defaults to 500. Note that `None` represents unbounded.
     ///
-    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
+    /// NB: This option only has an effect for [`InitialListStrategy::ListWatch`].
     pub page_size: Option<u32>,
 
     /// Enables watch events with type "BOOKMARK".
@@ -325,7 +331,7 @@ impl Config {
 
     /// Sets list semantic to configure re-list performance and consistency
     ///
-    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
+    /// NB: This option only has an effect for [`InitialListStrategy::ListWatch`].
     #[must_use]
     pub fn list_semantic(mut self, semantic: ListSemantic) -> Self {
         self.list_semantic = semantic;
@@ -334,7 +340,7 @@ impl Config {
 
     /// Sets list semantic to `Any` to improve list performance
     ///
-    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
+    /// NB: This option only has an effect for [`InitialListStrategy::ListWatch`].
     #[must_use]
     pub fn any_semantic(self) -> Self {
         self.list_semantic(ListSemantic::Any)
@@ -355,7 +361,7 @@ impl Config {
     /// This can reduce the memory consumption during resyncs, at the cost of requiring more
     /// API roundtrips to complete.
     ///
-    /// NB: This option only has an effect for [`WatcherMode::ListWatch`].
+    /// NB: This option only has an effect for [`InitialListStrategy::ListWatch`].
     #[must_use]
     pub fn page_size(mut self, page_size: u32) -> Self {
         self.page_size = Some(page_size);

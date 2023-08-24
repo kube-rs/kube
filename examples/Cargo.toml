@@ -213,7 +213,3 @@ path = "secret_syncer.rs"
 name = "pod_shell_crossterm"
 path = "pod_shell_crossterm.rs"
 required-features = ["ws"]
-
-[[example]]
-name = "namespace_reflector"
-path = "namespace_reflector.rs"

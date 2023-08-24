@@ -428,8 +428,8 @@ pub struct Config {
 impl Config {
     /// The debounce duration used to deduplicate reconciliation requests.
     ///
-    /// When set to a non-zero duration, debouncing is enabled in the [`Scheduler`] resulting
-    /// in __trailing edge debouncing__ of reqonciler requests.
+    /// When set to a non-zero duration, debouncing is enabled in the [`scheduler`](crate::scheduler())
+    /// resulting in __trailing edge debouncing__ of reqonciler requests.
     /// This option can help to reduce the amount of unnecessary reconciler calls
     /// when using multiple controller relations, or during rapid phase transitions.
     ///
