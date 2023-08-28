@@ -375,24 +375,27 @@ mod tests {
     }
 
     // A Future that is Ready after the specified duration from its initialization.
-    struct ConditionalFuture {
+    struct DurationalFuture {
         start: Instant,
-        expires_in: Duration,
+        ready_after: Duration,
     }
 
-    impl ConditionalFuture {
+    impl DurationalFuture {
         fn new(expires_in: Duration) -> Self {
             let start = Instant::now();
-            ConditionalFuture { start, expires_in }
+            DurationalFuture {
+                start,
+                ready_after: expires_in,
+            }
         }
     }
 
-    impl Future for ConditionalFuture {
+    impl Future for DurationalFuture {
         type Output = ();
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let now = Instant::now();
-            if now.duration_since(self.start) > self.expires_in {
+            if now.duration_since(self.start) > self.ready_after {
                 Poll::Ready(())
             } else {
                 cx.waker().wake_by_ref();
@@ -411,7 +414,7 @@ mod tests {
             Runner::new(scheduler(sched_rx), 2, |_| {
                 let mut num = count.lock().unwrap();
                 *num += 1;
-                ConditionalFuture::new(Duration::from_secs(2))
+                DurationalFuture::new(Duration::from_secs(2))
             })
             .for_each(|_| async {}),
         );
