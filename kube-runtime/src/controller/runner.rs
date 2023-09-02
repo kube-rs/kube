@@ -117,16 +117,7 @@ where
                 || !*this.is_ready_to_execute
             {
                 match scheduler.as_mut().hold().poll_next_unpin(cx) {
-                    Poll::Pending => break Poll::Pending,
-                    Poll::Ready(None) => {
-                        break if has_active_slots {
-                            // We're done listening for new messages, but still have some that
-                            // haven't finished quite yet
-                            Poll::Pending
-                        } else {
-                            Poll::Ready(None)
-                        };
-                    }
+                    Poll::Pending | Poll::Ready(None) => break Poll::Pending,
                     // The above future never returns Poll::Ready(Some(_)).
                     _ => unreachable!(),
                 };
@@ -450,5 +441,29 @@ mod tests {
         assert!(poll!(runner.as_mut()).is_pending());
         // Assert that we run the third request when we have the capacity to
         assert_eq!(*count.lock().unwrap(), 3);
+        advance(Duration::from_secs(3)).await;
+        assert!(poll!(runner.as_mut()).is_pending());
+
+        let (mut sched_tx, sched_rx) = mpsc::unbounded();
+        let mut runner = Box::pin(
+            Runner::new(scheduler(sched_rx), 1, |_| {
+                DurationalFuture::new(Duration::from_secs(2))
+            })
+            .for_each(|_| async {}),
+        );
+
+        sched_tx
+            .send(ScheduleRequest {
+                message: 1,
+                run_at: Instant::now(),
+            })
+            .await
+            .unwrap();
+        assert!(poll!(runner.as_mut()).is_pending());
+
+        // Drop the sender to test that we stop the runner when the requests
+        // stream finishes.
+        drop(sched_tx);
+        assert_eq!(poll!(runner.as_mut()), Poll::Pending);
     }
 }

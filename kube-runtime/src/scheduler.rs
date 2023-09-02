@@ -128,15 +128,10 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
     }
 
     /// Attempt to retrieve a message from queue and mark it as pending.
-    pub fn pop_queue_message_into_pending(&mut self, cx: &mut Context<'_>) -> Poll<T> {
-        loop {
-            match self.queue.poll_expired(cx) {
-                Poll::Ready(Some(msg)) => {
-                    let msg = msg.into_inner();
-                    self.pending.insert(msg);
-                }
-                Poll::Ready(None) | Poll::Pending => break Poll::Pending,
-            }
+    pub fn pop_queue_message_into_pending(&mut self, cx: &mut Context<'_>) {
+        while let Poll::Ready(Some(msg)) = self.queue.poll_expired(cx) {
+            let msg = msg.into_inner();
+            self.pending.insert(msg);
         }
     }
 }
@@ -153,7 +148,6 @@ where
 {
     type Item = T;
 
-    #[allow(clippy::match_wildcard_for_single_variants)]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         let mut scheduler = this.scheduler.as_mut().project();
@@ -166,12 +160,8 @@ where
             }
         }
 
-        match scheduler.pop_queue_message_into_pending(cx) {
-            Poll::Pending => Poll::Pending,
-            // Since the above method never returns anything other than Poll::Pending
-            // we don't need to handle any other variant.
-            _ => unreachable!(),
-        }
+        scheduler.pop_queue_message_into_pending(cx);
+        Poll::Pending
     }
 }
 
