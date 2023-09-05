@@ -7,7 +7,7 @@ use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ObjectMeta, Patch, PatchParams, Resource},
     runtime::{
-        controller::{Action, Controller},
+        controller::{Action, Config, Controller},
         watcher,
     },
     Client, CustomResource,
@@ -102,8 +102,12 @@ async fn main() -> Result<()> {
         }
     });
 
+    // limit the controller to running a maximum of two concurrent reconciliations
+    let config = Config::default().concurrency(2);
+
     Controller::new(cmgs, watcher::Config::default())
         .owns(cms, watcher::Config::default())
+        .with_config(config)
         .reconcile_all_on(reload_rx.map(|_| ()))
         .shutdown_on_signal()
         .run(reconcile, error_policy, Arc::new(Data { client }))

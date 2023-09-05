@@ -126,6 +126,43 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             }
         }
     }
+
+    /// Attempt to retrieve a message from queue and mark it as pending.
+    pub fn pop_queue_message_into_pending(&mut self, cx: &mut Context<'_>) {
+        while let Poll::Ready(Some(msg)) = self.queue.poll_expired(cx) {
+            let msg = msg.into_inner();
+            self.pending.insert(msg);
+        }
+    }
+}
+
+/// See [`Scheduler::hold`]
+pub struct Hold<'a, T, R> {
+    scheduler: Pin<&'a mut Scheduler<T, R>>,
+}
+
+impl<'a, T, R> Stream for Hold<'a, T, R>
+where
+    T: Eq + Hash + Clone,
+    R: Stream<Item = ScheduleRequest<T>>,
+{
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let mut scheduler = this.scheduler.as_mut().project();
+
+        loop {
+            match scheduler.requests.as_mut().poll_next(cx) {
+                Poll::Ready(Some(request)) => scheduler.schedule_message(request),
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Pending => break,
+            }
+        }
+
+        scheduler.pop_queue_message_into_pending(cx);
+        Poll::Pending
+    }
 }
 
 /// See [`Scheduler::hold_unless`]
@@ -182,6 +219,14 @@ where
             scheduler: self,
             can_take_message,
         }
+    }
+
+    /// A restricted view of the [`Scheduler`], which will keep all items "pending".
+    /// Its equivalent to doing `self.hold_unless(|_| false)` and is useful when the
+    /// consumer is not ready to consume the expired messages that the [`Scheduler`] emits.
+    #[must_use]
+    pub fn hold(self: Pin<&mut Self>) -> Hold<T, R> {
+        Hold { scheduler: self }
     }
 
     /// Checks whether `msg` is currently a pending message (held by `hold_unless`)
