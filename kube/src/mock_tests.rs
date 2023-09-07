@@ -8,7 +8,7 @@ use crate::{
 use anyhow::Result;
 use futures::{poll, StreamExt, TryStreamExt};
 use http::{Request, Response};
-use hyper::{body::to_bytes, Body};
+use hyper::Body;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

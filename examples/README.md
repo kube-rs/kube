@@ -87,6 +87,12 @@ cargo run --example node_watcher
 cargo run --example dynamic_watcher
 ```
 
+The `node_` and `pod_` watcher also allows using [Kubernetes 1.27 Streaming lists](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists) via `WATCHLIST=1`:
+
+```sh
+WATCHLIST=1 RUST_LOG=info,kube=debug cargo run --example pod_watcher
+```
+
 ### controllers
 Main example requires you creating the custom resource first:
 

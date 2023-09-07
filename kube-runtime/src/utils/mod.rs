@@ -117,8 +117,6 @@ where
     S::Ok: Debug,
     S::Error: Debug,
 {
-    // `arc_with_non_send_sync` false positive: https://github.com/rust-lang/rust-clippy/issues/11076
-    #[allow(clippy::arc_with_non_send_sync)]
     let stream = Arc::new(Mutex::new(stream.into_stream().peekable()));
     (
         SplitCase {

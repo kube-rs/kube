@@ -293,39 +293,43 @@ where
         )),
         // all the Oks from the select gets passed through the scheduler stream, and are then executed
         move |s| {
-            Runner::new(debounced_scheduler(s, config.debounce), move |request| {
-                let request = request.clone();
-                match store.get(&request.obj_ref) {
-                    Some(obj) => {
-                        let scheduler_tx = scheduler_tx.clone();
-                        let error_policy_ctx = context.clone();
-                        let error_policy = error_policy.clone();
-                        let reconciler_span = info_span!(
-                            "reconciling object",
-                            "object.ref" = %request.obj_ref,
-                            object.reason = %request.reason
-                        );
-                        reconciler_span
-                            .in_scope(|| reconciler(Arc::clone(&obj), context.clone()))
-                            .into_future()
-                            .then(move |res| {
-                                let error_policy = error_policy;
-                                RescheduleReconciliation::new(
-                                    res,
-                                    |err| error_policy(obj, err, error_policy_ctx),
-                                    request.obj_ref.clone(),
-                                    scheduler_tx,
-                                )
-                                // Reconciler errors are OK from the applier's PoV, we need to apply the error policy
-                                // to them separately
-                                .map(|res| Ok((request.obj_ref, res)))
-                            })
-                            .instrument(reconciler_span)
-                            .left_future()
+            Runner::new(
+                debounced_scheduler(s, config.debounce),
+                config.concurrency,
+                move |request| {
+                    let request = request.clone();
+                    match store.get(&request.obj_ref) {
+                        Some(obj) => {
+                            let scheduler_tx = scheduler_tx.clone();
+                            let error_policy_ctx = context.clone();
+                            let error_policy = error_policy.clone();
+                            let reconciler_span = info_span!(
+                                "reconciling object",
+                                "object.ref" = %request.obj_ref,
+                                object.reason = %request.reason
+                            );
+                            reconciler_span
+                                .in_scope(|| reconciler(Arc::clone(&obj), context.clone()))
+                                .into_future()
+                                .then(move |res| {
+                                    let error_policy = error_policy;
+                                    RescheduleReconciliation::new(
+                                        res,
+                                        |err| error_policy(obj, err, error_policy_ctx),
+                                        request.obj_ref.clone(),
+                                        scheduler_tx,
+                                    )
+                                    // Reconciler errors are OK from the applier's PoV, we need to apply the error policy
+                                    // to them separately
+                                    .map(|res| Ok((request.obj_ref, res)))
+                                })
+                                .instrument(reconciler_span)
+                                .left_future()
+                        }
+                        None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
                     }
-                    None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
-                }
-            })
+                },
+            )
             .delay_tasks_until(async move {
                 tracing::debug!("applier runner held until store is ready");
                 let res = delay_store.wait_until_ready().await;
@@ -423,13 +427,14 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     debounce: Duration,
+    concurrency: u16,
 }
 
 impl Config {
     /// The debounce duration used to deduplicate reconciliation requests.
     ///
-    /// When set to a non-zero duration, debouncing is enabled in the [`Scheduler`] resulting
-    /// in __trailing edge debouncing__ of reqonciler requests.
+    /// When set to a non-zero duration, debouncing is enabled in the [`scheduler`](crate::scheduler())
+    /// resulting in __trailing edge debouncing__ of reqonciler requests.
     /// This option can help to reduce the amount of unnecessary reconciler calls
     /// when using multiple controller relations, or during rapid phase transitions.
     ///
@@ -440,6 +445,20 @@ impl Config {
     #[must_use]
     pub fn debounce(mut self, debounce: Duration) -> Self {
         self.debounce = debounce;
+        self
+    }
+
+    /// The number of concurrent reconciliations of that are allowed to run at an given moment.
+    ///
+    /// This can be adjusted to the controller's needs to increase
+    /// performance and/or make performance predictable. By default, its 0 meaning
+    /// the controller runs with unbounded concurrency.
+    ///
+    /// Note that despite concurrency, a controller never schedules concurrent reconciles
+    /// on the same object.
+    #[must_use]
+    pub fn concurrency(mut self, concurrency: u16) -> Self {
+        self.concurrency = concurrency;
         self
     }
 }

@@ -152,7 +152,7 @@ pub struct Oidc {
 
 impl Oidc {
     /// Config key for the ID token.
-    const CONFIG_ID_TOKEN: &str = "id-token";
+    const CONFIG_ID_TOKEN: &'static str = "id-token";
     /// How many seconds before ID token expiration we want to refresh it.
     const EXPIRY_DELTA_SECONDS: i64 = 10;
 
@@ -278,13 +278,13 @@ struct Refresher {
 
 impl Refresher {
     /// Config key for the client ID.
-    const CONFIG_CLIENT_ID: &str = "client-id";
+    const CONFIG_CLIENT_ID: &'static str = "client-id";
     /// Config key for the client secret.
-    const CONFIG_CLIENT_SECRET: &str = "client-secret";
+    const CONFIG_CLIENT_SECRET: &'static str = "client-secret";
     /// Config key for the issuer url.
-    const CONFIG_ISSUER_URL: &str = "idp-issuer-url";
+    const CONFIG_ISSUER_URL: &'static str = "idp-issuer-url";
     /// Config key for the refresh token.
-    const CONFIG_REFRESH_TOKEN: &str = "refresh-token";
+    const CONFIG_REFRESH_TOKEN: &'static str = "refresh-token";
 
     /// Create a new instance of this struct from the provider config.
     fn from_config(config: &HashMap<String, String>) -> Result<Self, errors::RefreshInitError> {
