@@ -3,10 +3,7 @@
 //! with labels and namespace selectors supported.
 use anyhow::{bail, Context, Result};
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::{
-    apimachinery::pkg::apis::meta::v1::Time,
-    chrono::{Duration, Utc},
-};
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc};
 use kube::{
     api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
     core::GroupVersionKind,
@@ -103,7 +100,7 @@ impl App {
                 let max_name = result.iter().map(|x| x.name_any().len() + 2).max().unwrap_or(63);
                 println!("{0:<width$} {1:<20}", "NAME", "AGE", width = max_name);
                 for inst in result {
-                    let age = format_creation_since(inst.creation_timestamp());
+                    let age = inst.creation_timestamp().map(format_creation).unwrap_or_default();
                     println!("{0:<width$} {1:<20}", inst.name_any(), age, width = max_name);
                 }
             }
@@ -131,7 +128,7 @@ impl App {
         let mut stream = watcher(api, wc).applied_objects().boxed();
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
-            let age = format_creation_since(inst.creation_timestamp());
+            let age = inst.creation_timestamp().map(format_creation).unwrap_or_default();
             println!("{0:<width$} {1:<20}", inst.name_any(), age, width = 63);
         }
         Ok(())
@@ -240,10 +237,8 @@ fn dynamic_api(
     }
 }
 
-fn format_creation_since(time: Option<Time>) -> String {
-    format_duration(Utc::now().signed_duration_since(time.unwrap().0))
-}
-fn format_duration(dur: Duration) -> String {
+fn format_creation(time: Time) -> String {
+    let dur = Utc::now().signed_duration_since(time.0);
     match (dur.num_days(), dur.num_hours(), dur.num_minutes()) {
         (days, _, _) if days > 0 => format!("{days}d"),
         (_, hours, _) if hours > 0 => format!("{hours}h"),
