@@ -128,9 +128,9 @@ cargo run --example crd_reflector
 
 The `crd_reflector` will just await changes. You can run `kubectl apply -f crd-baz.yaml`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
 
-## rustls
-Disable default features and enable `rustls-tls`:
+## openssl
+Disable default features and enable `openssl-tls`:
 
 ```sh
-cargo run --example pod_watcher --no-default-features --features=rustls-tls,latest,runtime
+cargo run --example pod_watcher --no-default-features --features=openssl-tls,latest,runtime
 ```

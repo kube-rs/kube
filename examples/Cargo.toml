@@ -14,7 +14,7 @@ license = "Apache-2.0"
 release = false
 
 [features]
-default = ["openssl-tls", "kubederive", "ws", "latest", "runtime", "refresh"]
+default = ["rustls-tls", "kubederive", "ws", "latest", "runtime", "refresh"]
 kubederive = ["kube/derive"]
 openssl-tls = ["kube/client", "kube/openssl-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
