@@ -88,8 +88,8 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
             #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
             let connector = config.openssl_https_connector_with_connector(connector)?;
             #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
-            if auth_layer.is_none() {
-                // no tls stack situation only works on anonymous auth
+            if auth_layer.is_none() || config.cluster_url.scheme() == Some(&http::uri::Scheme::HTTPS) {
+                // no tls stack situation only works on anonymous auth with http scheme
                 return Err(Error::TlsRequired);
             }
 
