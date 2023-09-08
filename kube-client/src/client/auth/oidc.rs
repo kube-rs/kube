@@ -251,12 +251,12 @@ compile_error!(
     "At least one of rustls-tls or openssl-tls feature must be enabled to use refresh-oidc feature"
 );
 // Current TLS feature precedence when more than one are set:
-// 1. openssl-tls
-// 2. rustls-tls
-#[cfg(feature = "openssl-tls")]
-type HttpsConnector = hyper_openssl::HttpsConnector<HttpConnector>;
-#[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+// 1. rustls-tls
+// 2. openssl-tls
+#[cfg(feature = "rustls-tls")]
 type HttpsConnector = hyper_rustls::HttpsConnector<HttpConnector>;
+#[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+type HttpsConnector = hyper_openssl::HttpsConnector<HttpConnector>;
 
 /// Struct for refreshing the ID token with the refresh token.
 #[derive(Debug)]
@@ -300,15 +300,14 @@ impl Refresher {
         let client_id = get_field(Self::CONFIG_CLIENT_ID)?.into();
         let client_secret = get_field(Self::CONFIG_CLIENT_SECRET)?.into();
 
-
-        #[cfg(feature = "openssl-tls")]
-        let https = hyper_openssl::HttpsConnector::new()?;
-        #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+        #[cfg(feature = "rustls-tls")]
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
             .https_only()
             .enable_http1()
             .build();
+        #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+        let https = hyper_openssl::HttpsConnector::new()?;
 
         let https_client = hyper::Client::builder().build(https);
 

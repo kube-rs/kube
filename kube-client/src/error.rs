@@ -71,6 +71,10 @@ pub enum Error {
     #[error("rustls tls error: {0}")]
     RustlsTls(#[source] crate::client::RustlsTlsError),
 
+    /// Missing TLS stacks when TLS is required
+    #[error("TLS required but no TLS stack selected")]
+    TlsRequired,
+
     /// Failed to upgrade to a WebSocket connection
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
