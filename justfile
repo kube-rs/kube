@@ -15,7 +15,7 @@ fmt:
   rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
 
 doc:
-  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,oidc,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_27,unstable-runtime --open
+  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,oidc,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_28,unstable-runtime --open
 
 deny:
   # might require rm Cargo.lock first to match CI
@@ -128,7 +128,3 @@ bump-k8s:
   badge="[![Tested against Kubernetes ${mk8svnew} and above](https://img.shields.io/badge/MK8SV-${mk8svnew}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
   echo "remember to bump kubernetes-version.md in kube-rs/website"
-
-# mode: makefile
-# End:
-# vim: set ft=make :

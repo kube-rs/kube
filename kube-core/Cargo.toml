@@ -15,7 +15,7 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 
 [package.metadata.docs.rs]
-features = ["ws", "admission", "jsonpatch", "k8s-openapi/v1_27"]
+features = ["ws", "admission", "jsonpatch", "k8s-openapi/v1_28"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
@@ -36,14 +36,14 @@ chrono = { version = "0.4.19", default-features = false, features = ["clock"] }
 schemars = { version = "0.8.6", optional = true }
 
 [dependencies.k8s-openapi]
-version = "0.19.0"
+version = "0.20.0"
 default-features = false
 features = []
 
 [dev-dependencies.k8s-openapi]
-version = "0.19.0"
+version = "0.20.0"
 default-features = false
-features = ["v1_27"]
+features = ["v1_28"]
 
 [dev-dependencies]
 assert-json-diff = "2.0.1"
