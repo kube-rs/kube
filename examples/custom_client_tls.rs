@@ -14,15 +14,15 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::infer().await?;
 
     // Pick TLS at runtime
-    let use_rustls = std::env::var("USE_RUSTLS").map(|s| s == "1").unwrap_or(false);
-    let client = if use_rustls {
-        let https = config.rustls_https_connector()?;
+    let use_openssl = std::env::var("USE_OPENSSL").map(|s| s == "1").unwrap_or(false);
+    let client = if use_openssl {
+        let https = config.openssl_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
             .service(hyper::Client::builder().build(https));
         Client::new(service, config.default_namespace)
     } else {
-        let https = config.openssl_https_connector()?;
+        let https = config.rustls_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
             .service(hyper::Client::builder().build(https));

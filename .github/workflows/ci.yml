@@ -37,19 +37,9 @@ jobs:
       #     echo "OPENSSL_LIB_DIR=C:/Program Files/OpenSSL-Win64/lib" >> $env:GITHUB_ENV
       #     echo "OPENSSL_DIR=C:/Program Files/OpenSSL-Win64/" >> $env:GITHUB_ENV
       #     echo "OPENSSL_INCLUDE_DIR=C:/Program Files/OpenSSL-Win64/include" >> $env:GITHUB_ENV
-      # Only test Rustls on Windows instead due to #1191
-      - name: "Interim Hacky Windows Test for #1191"
-        if: matrix.os == 'windows-latest'
-        run: |
-          sed -i '0,/openssl/s//rustls/' kube/Cargo.toml
-          cat kube/Cargo.toml
-          cargo build
-          cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
-
 
       # Real CI work starts here
       - name: Build workspace
-        if: matrix.os != 'windows-latest'
         run: cargo build
 
       # Workspace unit tests with various feature sets
@@ -58,7 +48,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' # only linux tests all feature combinations
       - name: Run workspace unit tests (default features)
         run: cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os != 'macos-latest'
       - name: Run workspace unit tests (all features)
         if: matrix.os != 'windows-latest'
         run: cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e -j6
