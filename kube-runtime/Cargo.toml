@@ -22,7 +22,7 @@ unstable-runtime-stream-control = []
 unstable-runtime-reconcile-on = []
 
 [package.metadata.docs.rs]
-features = ["k8s-openapi/v1_28", "unstable-runtime"]
+features = ["k8s-openapi/latest", "unstable-runtime"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -60,4 +60,4 @@ tracing-subscriber = "0.3.17"
 [dev-dependencies.k8s-openapi]
 version = "0.20.0"
 default-features = false
-features = ["v1_28"]
+features = ["latest"]

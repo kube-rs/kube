@@ -12,12 +12,12 @@ These crates build upon Kubernetes [apimachinery](https://github.com/kubernetes/
 
 ## Installation
 
-Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) types corresponding for your cluster version:
+Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) structs at your chosen [Kubernetes version](https://kube.rs/kubernetes-version/):
 
 ```toml
 [dependencies]
 kube = { version = "0.86.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.20.0", features = ["v1_28"] }
+k8s-openapi = { version = "0.20.0", features = ["latest"] }
 ```
 
 [Features are available](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
@@ -153,7 +153,7 @@ By default [rustls](https://github.com/ctz/rustls) is used for TLS, but `openssl
 ```toml
 [dependencies]
 kube = { version = "0.86.0", default-features = false, features = ["client", "openssl-tls"] }
-k8s-openapi = { version = "0.20.0", features = ["v1_28"] }
+k8s-openapi = { version = "0.20.0", features = ["latest"] }
 ```
 
 This will pull in `openssl` and `hyper-openssl`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `rustls`.

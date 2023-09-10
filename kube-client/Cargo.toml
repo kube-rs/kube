@@ -32,7 +32,7 @@ config = ["__non_core", "pem", "home"]
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/v1_28"]
+features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -87,4 +87,4 @@ tower-test = "0.4.0"
 [dev-dependencies.k8s-openapi]
 version = "0.20.0"
 default-features = false
-features = ["v1_28"]
+features = ["latest"]
