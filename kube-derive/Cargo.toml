@@ -29,7 +29,7 @@ proc-macro = true
 serde = { version = "1.0.130", features = ["derive"] }
 serde_yaml = "0.9.19"
 kube = { path = "../kube", version = "<1.0.0, >=0.61.0", features = ["derive", "client"] }
-k8s-openapi = { version = "0.20.0", default-features = false, features = ["v1_28"] }
+k8s-openapi = { version = "0.20.0", default-features = false, features = ["latest"] }
 schemars = { version = "0.8.6", features = ["chrono"] }
 chrono = { version = "0.4.19", default-features = false }
 trybuild = "1.0.48"

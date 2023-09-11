@@ -15,7 +15,7 @@ fmt:
   rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
 
 doc:
-  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,oidc,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_28,unstable-runtime --open
+  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,oidc,jsonpatch,client,derive,runtime,admission,k8s-openapi/latest,unstable-runtime --open
 
 deny:
   # might require rm Cargo.lock first to match CI
@@ -114,14 +114,10 @@ bump-msrv msrv:
 # Increment the Kubernetes feature version from k8s-openapi for tests; "just bump-k8s"
 bump-k8s:
   #!/usr/bin/env bash
-  current=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1)
-  next=${current::-2}$((${current:3} + 1))
-  fastmod -m -d . -e toml "$current" "$next"
-  fastmod -m "$current" "$next" -- README.md
-  fastmod -m "$current" "$next" -- justfile
+  latest=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1 | choose -f ',' 1)
   # bumping supported version also bumps our mk8sv
-  mk8svnew=${current::-2}$((${current:3} - 4))
-  mk8svold=${current::-2}$((${current:3} - 5))
+  mk8svnew=${latest::-2}$((${latest:3} - 4))
+  mk8svold=${latest::-2}$((${latest:3} - 5))
   fastmod -m -d e2e -e toml "$mk8svold" "$mk8svnew"
   fastmod -m -d .github/workflows -e yml "${mk8svold/_/\.}" "${mk8svnew/_/.}"
   # bump mk8sv badge
