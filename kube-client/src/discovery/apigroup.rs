@@ -53,6 +53,15 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 ///     Ok(())
 /// }
 /// ```
+///
+/// This type represents an abstraction over the native [`APIGroup`] to provide easier access to underlying group resources.
+///
+/// ### Common Pitfall
+/// Version preference and recommendations shown herein is a **group concept**, not a resource-wide concept.
+/// A common mistake is have different stored versions for resources within a group, and then receive confusing results from this module.
+/// Resources in a shared group should share versions - and transition together - to minimize confusion.
+/// See <https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups-and-versioning> for more info.
+///
 /// [`ApiResource`]: crate::discovery::ApiResource
 /// [`ApiCapabilities`]: crate::discovery::ApiCapabilities
 /// [`DynamicObject`]: crate::api::DynamicObject
@@ -183,6 +192,8 @@ impl ApiGroup {
     }
 
     /// Returns preferred version for working with given group.
+    ///
+    /// Please note the [ApiGroup Common Pitfall](ApiGroup#common-pitfall).
     pub fn preferred_version(&self) -> Option<&str> {
         self.preferred.as_deref()
     }
@@ -192,6 +203,8 @@ impl ApiGroup {
     /// If the server does not recommend a version, we pick the "most stable and most recent" version
     /// in accordance with [kubernetes version priority](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
     /// via the descending sort order from [`Version`](kube_core::Version).
+    ///
+    /// Please note the [ApiGroup Common Pitfall](ApiGroup#common-pitfall).
     pub fn preferred_version_or_latest(&self) -> &str {
         // NB: self.versions is non-empty by construction in ApiGroup
         self.preferred
@@ -235,6 +248,8 @@ impl ApiGroup {
     /// ```
     ///
     /// This is equivalent to taking the [`ApiGroup::versioned_resources`] at the [`ApiGroup::preferred_version_or_latest`].
+    ///
+    /// Please note the [ApiGroup Common Pitfall](ApiGroup#common-pitfall).
     pub fn recommended_resources(&self) -> Vec<(ApiResource, ApiCapabilities)> {
         let ver = self.preferred_version_or_latest();
         self.versioned_resources(ver)
