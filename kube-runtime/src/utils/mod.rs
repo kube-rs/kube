@@ -241,7 +241,7 @@ mod tests {
                 Result::<_, Infallible>::Ok(())
             })),
             |s| {
-                s.map(|_| {
+                s.map(|()| {
                     let _ = &y;
                     Ok(())
                 })

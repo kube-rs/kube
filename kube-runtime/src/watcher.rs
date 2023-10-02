@@ -498,7 +498,7 @@ where
                         } else {
                             debug!("watch list error: {err:?}");
                         }
-                        (Some(Err(err).map_err(Error::InitialListFailed)), State::default())
+                        (Some(Err(Error::InitialListFailed(err))), State::default())
                     }
                 }
             }
@@ -510,7 +510,7 @@ where
                     } else {
                         debug!("watch initlist error: {err:?}");
                     }
-                    (Some(Err(err).map_err(Error::WatchStartFailed)), State::default())
+                    (Some(Err(Error::WatchStartFailed(err))), State::default())
                 }
             },
         },
@@ -553,7 +553,7 @@ where
                     } else {
                         debug!("error watchevent error: {err:?}");
                     }
-                    (Some(Err(err).map_err(Error::WatchError)), new_state)
+                    (Some(Err(Error::WatchError(err))), new_state)
                 }
                 Some(Err(err)) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
@@ -561,7 +561,7 @@ where
                     } else {
                         debug!("watcher error: {err:?}");
                     }
-                    (Some(Err(err).map_err(Error::WatchFailed)), State::IntialWatch {
+                    (Some(Err(Error::WatchFailed(err))), State::IntialWatch {
                         objects,
                         stream,
                     })
@@ -582,7 +582,7 @@ where
                         debug!("watch initlist error: {err:?}");
                     }
                     (
-                        Some(Err(err).map_err(Error::WatchStartFailed)),
+                        Some(Err(Error::WatchStartFailed(err))),
                         State::InitListed { resource_version },
                     )
                 }
@@ -633,7 +633,7 @@ where
                 } else {
                     debug!("error watchevent error: {err:?}");
                 }
-                (Some(Err(err).map_err(Error::WatchError)), new_state)
+                (Some(Err(Error::WatchError(err))), new_state)
             }
             Some(Err(err)) => {
                 if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
@@ -641,7 +641,7 @@ where
                 } else {
                     debug!("watcher error: {err:?}");
                 }
-                (Some(Err(err).map_err(Error::WatchFailed)), State::Watching {
+                (Some(Err(Error::WatchFailed(err))), State::Watching {
                     resource_version,
                     stream,
                 })
