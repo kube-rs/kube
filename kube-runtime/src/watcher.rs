@@ -581,10 +581,9 @@ where
                     } else {
                         debug!("watch initlist error: {err:?}");
                     }
-                    (
-                        Some(Err(Error::WatchStartFailed(err))),
-                        State::InitListed { resource_version },
-                    )
+                    (Some(Err(Error::WatchStartFailed(err))), State::InitListed {
+                        resource_version,
+                    })
                 }
             }
         }
