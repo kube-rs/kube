@@ -64,7 +64,11 @@ impl<Svc> ClientBuilder<Svc> {
 impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response<Box<DynBody>>, BoxError>> {
     type Error = Error;
 
-    /// Builds a default [`ClientBuilder`] stack from a given configuration
+    /// Builds a default [`ClientBuilder`] stack from a given configuration.
+    ///
+    /// The TLS implementation used by the constructed client depends on which
+    /// crate feature flags are enabled. See [the documentation on configuring
+    /// TLS](crate::client#configuring-tls) for details.
     fn try_from(config: Config) -> Result<Self> {
         use std::time::Duration;
 

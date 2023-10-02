@@ -7,6 +7,44 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
+//!
+//! ## Configuring TLS
+//!
+//! The Kubernetes client provided by this crate can be configured to use TLS
+//! when connecting to the Kubernetes API. A variety of TLS implementations may
+//! be used as the backend for `kube-client`'s TLS support, with the choice of
+//! TLS backend controlled by crate feature flags. The following TLS backends
+//! are available:
+//!
+//! | TLS backend | Crate feature flag | Description |
+//! |:------------|--------------------|-------------|
+//! | `<none>` | `<none>` | When no TLS feature flag is enabled, communication with the Kubernetes API is plaintext. |
+//! | [Rustls] | `rustls-tls` | [Rustls] is a pure-Rust TLS implementation. |
+//! | [OpenSSL] | `openssl-tls` | [OpenSSL] is a popular TLS implementation written in C. This feature uses the [`openssl` crate]'s Rust bindings for OpenSSL. |
+//! | [BoringSSL] | `boring-tls` | [BoringSSL] is a fork of OpenSSL maintained by Google. This feature uses the [`boring` crate]'s Rust bindings for BoringSSL. |
+//!
+//! Since crate feature flags are additive, more than one TLS feature may be
+//! enabled at the same time. However, only one TLS backend may actually be
+//! selected. Therefore, conflicts are resolved by selecting one TLS backend,
+//! with the following order of priority:
+//!
+//! 1. **rustls-tls**: If the `rustls-tls` feature is enabled, [Rustls] is
+//!    always used as the TLS implementation, regardless of what other feature
+//!    flags are enabled.
+//! 2. **openssl-tls**: If the `rustls-tls` feature is not enabled, but the
+//!    `openssl-tls` feature flag is enabled, then [OpenSSL] is used instead of
+//!    Rustls.
+//! 3. **boring-tls**: If neither the `rustls-tls` nor `openssl-tls` features
+//!    are enabled, [BoringSSL] is used as the TLS backend.
+//! 4. **none**: If none of the `rustls-tls`, `openssl-tls`, and `boring-tls`
+//!    features are enabled, all communication with the Kubernetes API is
+//!    plaintext.
+//!
+//! [Rustls]: https://crates.io/crates/rustls
+//! [OpenSSL]: https://www.openssl.org/
+//! [`openssl` crate]: https://crates.io/crates/openssl
+//! [BoringSSL]: https://github.com/google/boringssl
+//! [`boring` crate]: https://crates.io/crates/boring
 use either::{Either, Left, Right};
 use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
@@ -131,6 +169,10 @@ impl Client {
     ///
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead.
+    ///
+    /// The TLS implementation used by the returned client depends on which
+    /// crate feature flags are enabled. See [the documentation on configuring
+    /// TLS](crate::client#configuring-tls) for details.
     pub async fn try_default() -> Result<Self> {
         Self::try_from(Config::infer().await.map_err(Error::InferConfig)?)
     }
