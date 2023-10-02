@@ -22,6 +22,7 @@ latest = ["k8s-openapi/latest"]
 mk8sv = ["k8s-openapi/v1_23"]
 rustls = ["kube/rustls-tls"]
 openssl = ["kube/openssl-tls"]
+boring = ["kube/boring-tls"]
 
 [dependencies]
 anyhow = "1.0.44"

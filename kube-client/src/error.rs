@@ -71,6 +71,12 @@ pub enum Error {
     #[error("rustls tls error: {0}")]
     RustlsTls(#[source] crate::client::RustlsTlsError),
 
+    /// Errors from BoringSSL TLS
+    #[cfg(feature = "boring-tls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "boring-tls")))]
+    #[error("boringssl tls error: {0}")]
+    BoringTls(#[source] crate::client::BoringTlsError),
+
     /// Missing TLS stacks when TLS is required
     #[error("TLS required but no TLS stack selected")]
     TlsRequired,
