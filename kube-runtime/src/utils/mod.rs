@@ -105,7 +105,7 @@ where
 /// Splits a `TryStream` into separate `Ok` and `Error` streams.
 ///
 /// Note: This will deadlock if one branch outlives the other
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::arc_with_non_send_sync)]
 fn trystream_split_result<S>(
     stream: S,
 ) -> (
@@ -241,7 +241,7 @@ mod tests {
                 Result::<_, Infallible>::Ok(())
             })),
             |s| {
-                s.map(|_| {
+                s.map(|()| {
                     let _ = &y;
                     Ok(())
                 })
