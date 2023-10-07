@@ -1111,7 +1111,8 @@ where
     /// # fn error_policy(_: Arc<ConfigMap>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
     /// #
     /// let ns = "external-configs".to_string();
-    /// let mut next_object = [ObjectRef::new("managed-cm1").within(&ns)].into_iter().cycle();
+    /// let externals = [ObjectRef::new("managed-cm1").within(&ns)];
+    /// let mut next_object = externals.into_iter().cycle();
     /// let interval = tokio::time::interval(Duration::from_secs(60)); // hit the object every minute
     /// let external_stream = IntervalStream::new(interval).map(|_| Ok(next_object.next().unwrap()));
     ///
