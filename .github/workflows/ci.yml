@@ -75,7 +75,7 @@ jobs:
 
   doc:
     runs-on: ubuntu-latest
-    name: nightly / doc
+    name: doc
     steps:
       - uses: actions/checkout@v4
       - name: Install nightly
