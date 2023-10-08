@@ -5,6 +5,11 @@ on:
 env:
   RUST_BACKTRACE: 1
 
+# Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   unit:
     strategy:
@@ -67,6 +72,18 @@ jobs:
       - name: Test examples
         if: matrix.os != 'windows-latest'
         run: cargo test -p kube-examples --examples -j6
+
+  doc:
+    runs-on: ubuntu-latest
+    name: nightly / doc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: cargo doc
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: --cfg docsrs
 
   msrv:
     # Run `cargo check` on our minimum supported Rust version
@@ -244,7 +261,6 @@ jobs:
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
-
       - name: Compile e2e job against ${{matrix.tls}}
         run: |
           mkdir -p ~/.cargo/{git,registry}
