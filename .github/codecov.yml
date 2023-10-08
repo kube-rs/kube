@@ -9,10 +9,10 @@ coverage:
   # https://docs.codecov.com/docs/commit-status
   status:
     project:
+      default: false
+    patch:
       default:
-        threshold: 1% # avoid false negatives
-        informational: true
-      patch:
+        threshold: 1%
         informational: true
 
 #flags:
