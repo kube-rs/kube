@@ -1,11 +1,19 @@
 comment:
-  require_changes: no
+  require_changes: false
   layout: "diff,files"
+
 coverage:
+  range: 70..100
+  round: up
+  precision: 1
+  # https://docs.codecov.com/docs/commit-status
   status:
     project:
-      project: off
-      patch: off
+      default:
+        threshold: 1% # avoid false negatives
+        informational: true
+      patch:
+        informational: true
 
 #flags:
 #  kube:
