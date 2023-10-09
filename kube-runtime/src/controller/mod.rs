@@ -1107,7 +1107,7 @@ where
     /// # let client: Client = todo!();
     /// # async fn reconcile(_: Arc<ConfigMap>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
     /// # fn error_policy(_: Arc<ConfigMap>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
-    /// # fn watch_external_objects() -> impl Stream<Item = ExternalObject> + Send + 'static { stream::iter(vec![]) }
+    /// # fn watch_external_objects() -> impl Stream<Item = ExternalObject> { stream::iter(vec![]) }
     /// # let ns = "controller-ns".to_string();
     /// struct ExternalObject {
     ///     name: String,
