@@ -1113,7 +1113,7 @@ where
     ///     name: String,
     /// }
     /// let external_stream = watch_external_objects().map(|ext| {
-    ///     Ok(ObjectRef::new(&format!("{}-cm", ext.name)).within(&ns))
+    ///     ObjectRef::new(&format!("{}-cm", ext.name)).within(&ns)
     /// });
     ///
     /// Controller::new(Api::<ConfigMap>::namespaced(client, &ns), Config::default())
@@ -1125,15 +1125,14 @@ where
     /// ```
     #[cfg(feature = "unstable-runtime-reconcile-on")]
     #[must_use]
-    pub fn reconcile_on(
-        mut self,
-        trigger: impl Stream<Item = Result<ObjectRef<K>, watcher::Error>> + Send + 'static,
-    ) -> Self {
+    pub fn reconcile_on(mut self, trigger: impl Stream<Item = ObjectRef<K>> + Send + 'static) -> Self {
         self.trigger_selector.push(
             trigger
-                .map_ok(move |obj| ReconcileRequest {
-                    obj_ref: obj,
-                    reason: ReconcileReason::Unknown,
+                .map(move |obj| {
+                    Ok(ReconcileRequest {
+                        obj_ref: obj,
+                        reason: ReconcileReason::Unknown,
+                    })
                 })
                 .boxed(),
         );
