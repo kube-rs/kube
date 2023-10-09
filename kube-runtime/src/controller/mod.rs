@@ -1087,7 +1087,7 @@ where
 
     /// Trigger the reconciliation process for a managed object `ObjectRef<K>` whenever `trigger` emits a value
     ///
-    /// This can be used to inject reconciliations for specific objects from an external  resource.
+    /// This can be used to inject reconciliations for specific objects from an external resource.
     ///
     /// # Example:
     ///
