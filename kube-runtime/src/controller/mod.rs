@@ -1093,7 +1093,7 @@ where
     ///
     /// ```no_run
     /// # async {
-    /// # use futures::{StreamExt, TryStreamExt};
+    /// # use futures::{StreamExt, Stream, stream, TryStreamExt};
     /// # use k8s_openapi::api::core::v1::{ConfigMap};
     /// # use kube::api::Api;
     /// # use kube::runtime::controller::Action;
@@ -1101,20 +1101,20 @@ where
     /// # use kube::runtime::{reflector, watcher, Controller, WatchStreamExt};
     /// # use kube::runtime::watcher::Config;
     /// # use kube::{Client, Error, ResourceExt};
-    /// # use tokio_stream::wrappers::IntervalStream;
     /// # use std::future;
-    /// # use std::time::Duration;
     /// # use std::sync::Arc;
     /// #
     /// # let client: Client = todo!();
     /// # async fn reconcile(_: Arc<ConfigMap>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
     /// # fn error_policy(_: Arc<ConfigMap>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
-    /// #
-    /// let ns = "external-configs".to_string();
-    /// let externals = [ObjectRef::new("managed-cm1").within(&ns)];
-    /// let mut next_object = externals.into_iter().cycle();
-    /// let interval = tokio::time::interval(Duration::from_secs(60)); // hit the object every minute
-    /// let external_stream = IntervalStream::new(interval).map(|_| Ok(next_object.next().unwrap()));
+    /// # fn watch_external_objects() -> impl Stream<Item = ExternalObject> + Send + 'static { stream::iter(vec![]) }
+    /// # let ns = "controller-ns".to_string();
+    /// struct ExternalObject {
+    ///     name: String,
+    /// }
+    /// let external_stream = watch_external_objects().map(|ext| {
+    ///     Ok(ObjectRef::new(&format!("{}-cm", ext.name)).within(&ns))
+    /// });
     ///
     /// Controller::new(Api::<ConfigMap>::namespaced(client, &ns), Config::default())
     ///     .reconcile_on(external_stream)
