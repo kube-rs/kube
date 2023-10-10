@@ -240,7 +240,7 @@ jobs:
       # Prevent GitHub from cancelling all in-progress jobs when a matrix job fails.
       fail-fast: false
       matrix:
-        tls: [openssl, rustls]
+        tls: [openssl, rustls, boring]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v2

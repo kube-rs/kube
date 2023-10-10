@@ -64,7 +64,11 @@ impl<Svc> ClientBuilder<Svc> {
 impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response<Box<DynBody>>, BoxError>> {
     type Error = Error;
 
-    /// Builds a default [`ClientBuilder`] stack from a given configuration
+    /// Builds a default [`ClientBuilder`] stack from a given configuration.
+    ///
+    /// The TLS implementation used by the constructed client depends on which
+    /// crate feature flags are enabled. See [the documentation on configuring
+    /// TLS](crate::client#configuring-tls) for details.
     fn try_from(config: Config) -> Result<Self> {
         use std::time::Duration;
 
@@ -81,13 +85,24 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
             // Current TLS feature precedence when more than one are set:
             // 1. rustls-tls
             // 2. openssl-tls
+            // 3. boring-tls
             // Create a custom client to use something else.
             // If TLS features are not enabled, http connector will be used.
             #[cfg(feature = "rustls-tls")]
             let connector = config.rustls_https_connector_with_connector(connector)?;
             #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
             let connector = config.openssl_https_connector_with_connector(connector)?;
-            #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
+            #[cfg(all(
+                not(feature = "rustls-tls"),
+                not(feature = "openssl-tls"),
+                feature = "boring-tls"
+            ))]
+            let connector = config.boring_https_connector_with_connector(connector)?;
+            #[cfg(all(
+                not(feature = "rustls-tls"),
+                not(feature = "openssl-tls"),
+                not(feature = "boring-tls")
+            ))]
             if auth_layer.is_none() || config.cluster_url.scheme() == Some(&http::uri::Scheme::HTTPS) {
                 // no tls stack situation only works on anonymous auth with http scheme
                 return Err(Error::TlsRequired);

@@ -239,3 +239,105 @@ pub mod openssl_tls {
         Ok(builder)
     }
 }
+
+#[cfg(feature = "boring-tls")]
+pub mod boring_tls {
+    use boring::{
+        pkey::PKey,
+        ssl::{SslConnector, SslConnectorBuilder, SslMethod},
+        x509::X509,
+    };
+    use thiserror::Error;
+
+    /// Errors from BoringSSL TLS
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// Failed to create BoringSSL HTTPS connector
+        #[error("failed to create BoringSSL HTTPS connector: {0}")]
+        CreateHttpsConnector(#[source] boring::error::ErrorStack),
+
+        /// Failed to create BoringSSL SSL connector
+        #[error("failed to create BoringSSL SSL connector: {0}")]
+        CreateSslConnector(#[source] SslConnectorError),
+    }
+
+    /// Errors from creating a `SslConnectorBuilder`
+    #[derive(Debug, Error)]
+    pub enum SslConnectorError {
+        /// Failed to build SslConnectorBuilder
+        #[error("failed to build SslConnectorBuilder: {0}")]
+        CreateBuilder(#[source] boring::error::ErrorStack),
+
+        /// Failed to deserialize PEM-encoded chain of certificates
+        #[error("failed to deserialize PEM-encoded chain of certificates: {0}")]
+        DeserializeCertificateChain(#[source] boring::error::ErrorStack),
+
+        /// Failed to deserialize PEM-encoded private key
+        #[error("failed to deserialize PEM-encoded private key: {0}")]
+        DeserializePrivateKey(#[source] boring::error::ErrorStack),
+
+        /// Failed to set private key
+        #[error("failed to set private key: {0}")]
+        SetPrivateKey(#[source] boring::error::ErrorStack),
+
+        /// Failed to get a leaf certificate, the certificate chain is empty
+        #[error("failed to get a leaf certificate, the certificate chain is empty")]
+        GetLeafCertificate,
+
+        /// Failed to set the leaf certificate
+        #[error("failed to set the leaf certificate: {0}")]
+        SetLeafCertificate(#[source] boring::error::ErrorStack),
+
+        /// Failed to append a certificate to the chain
+        #[error("failed to append a certificate to the chain: {0}")]
+        AppendCertificate(#[source] boring::error::ErrorStack),
+
+        /// Failed to deserialize DER-encoded root certificate
+        #[error("failed to deserialize DER-encoded root certificate: {0}")]
+        DeserializeRootCertificate(#[source] boring::error::ErrorStack),
+
+        /// Failed to add a root certificate
+        #[error("failed to add a root certificate: {0}")]
+        AddRootCertificate(#[source] boring::error::ErrorStack),
+    }
+
+    /// Create `boring::ssl::SslConnectorBuilder` required for `hyper_boring::HttpsConnector`.
+    pub fn ssl_connector_builder(
+        identity_pem: Option<&Vec<u8>>,
+        root_certs: Option<&Vec<Vec<u8>>>,
+    ) -> Result<SslConnectorBuilder, SslConnectorError> {
+        let mut builder =
+            SslConnector::builder(SslMethod::tls()).map_err(SslConnectorError::CreateBuilder)?;
+        if let Some(pem) = identity_pem {
+            let mut chain = X509::stack_from_pem(pem)
+                .map_err(SslConnectorError::DeserializeCertificateChain)?
+                .into_iter();
+            let leaf_cert = chain.next().ok_or(SslConnectorError::GetLeafCertificate)?;
+            builder
+                .set_certificate(&leaf_cert)
+                .map_err(SslConnectorError::SetLeafCertificate)?;
+            for cert in chain {
+                builder
+                    .add_extra_chain_cert(cert)
+                    .map_err(SslConnectorError::AppendCertificate)?;
+            }
+
+            let pkey = PKey::private_key_from_pem(pem).map_err(SslConnectorError::DeserializePrivateKey)?;
+            builder
+                .set_private_key(&pkey)
+                .map_err(SslConnectorError::SetPrivateKey)?;
+        }
+
+        if let Some(ders) = root_certs {
+            for der in ders {
+                let cert = X509::from_der(der).map_err(SslConnectorError::DeserializeRootCertificate)?;
+                builder
+                    .cert_store_mut()
+                    .add_cert(cert)
+                    .map_err(SslConnectorError::AddRootCertificate)?;
+            }
+        }
+
+        Ok(builder)
+    }
+}

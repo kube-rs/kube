@@ -4,7 +4,8 @@ use http::{header::HeaderName, HeaderValue};
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] use super::tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
+use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},
@@ -143,6 +144,63 @@ pub trait ConfigExt: private::Sealed {
     #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder>;
+
+    /// Create [`hyper_boring::HttpsConnector`] based on config.
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use kube::{client::ConfigExt, Config};
+    /// let config = Config::infer().await?;
+    /// let https = config.boring_https_connector()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "boring-tls")))]
+    #[cfg(feature = "boring-tls")]
+    fn boring_https_connector(&self) -> Result<hyper_boring::HttpsConnector<hyper::client::HttpConnector>>;
+
+    /// Create [`hyper_boring::HttpsConnector`] based on config and `connector`.
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use hyper::client::HttpConnector;
+    /// # use kube::{client::ConfigExt, Config};
+    /// let mut http = HttpConnector::new();
+    /// http.enforce_http(false);
+    /// let config = Config::infer().await?;
+    /// let https = config.boring_https_connector_with_connector(http)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "boring-tls")))]
+    #[cfg(feature = "boring-tls")]
+    fn boring_https_connector_with_connector(
+        &self,
+        connector: hyper::client::HttpConnector,
+    ) -> Result<hyper_boring::HttpsConnector<hyper::client::HttpConnector>>;
+
+    /// Create [`boring::ssl::SslConnectorBuilder`] based on config.
+    /// # Example
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use hyper::client::HttpConnector;
+    /// # use kube::{client::ConfigExt, Client, Config};
+    /// let config = Config::infer().await?;
+    /// let https = {
+    ///     let mut http = HttpConnector::new();
+    ///     http.enforce_http(false);
+    ///     let ssl = config.boring_ssl_connector_builder()?;
+    ///     hyper_boring::HttpsConnector::with_connector(http, ssl)?
+    /// };
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "boring-tls")))]
+    #[cfg(feature = "boring-tls")]
+    fn boring_ssl_connector_builder(&self) -> Result<boring::ssl::SslConnectorBuilder>;
 }
 
 mod private {
@@ -255,6 +313,38 @@ impl ConfigExt for Config {
         if self.accept_invalid_certs {
             https.set_callback(|ssl, _uri| {
                 ssl.set_verify(openssl::ssl::SslVerifyMode::NONE);
+                Ok(())
+            });
+        }
+        Ok(https)
+    }
+
+    #[cfg(feature = "boring-tls")]
+    fn boring_ssl_connector_builder(&self) -> Result<boring::ssl::SslConnectorBuilder> {
+        let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
+        // TODO: pass self.tls_server_name for boring
+        tls::boring_tls::ssl_connector_builder(identity.as_ref(), self.root_cert.as_ref())
+            .map_err(|e| Error::BoringTls(tls::boring_tls::Error::CreateSslConnector(e)))
+    }
+
+    #[cfg(feature = "boring-tls")]
+    fn boring_https_connector(&self) -> Result<hyper_boring::HttpsConnector<hyper::client::HttpConnector>> {
+        let mut connector = hyper::client::HttpConnector::new();
+        connector.enforce_http(false);
+        self.boring_https_connector_with_connector(connector)
+    }
+
+    #[cfg(feature = "boring-tls")]
+    fn boring_https_connector_with_connector(
+        &self,
+        connector: hyper::client::HttpConnector,
+    ) -> Result<hyper_boring::HttpsConnector<hyper::client::HttpConnector>> {
+        let mut https =
+            hyper_boring::HttpsConnector::with_connector(connector, self.boring_ssl_connector_builder()?)
+                .map_err(|e| Error::BoringTls(tls::boring_tls::Error::CreateHttpsConnector(e)))?;
+        if self.accept_invalid_certs {
+            https.set_callback(|ssl, _uri| {
+                ssl.set_verify(boring::ssl::SslVerifyMode::NONE);
                 Ok(())
             });
         }
