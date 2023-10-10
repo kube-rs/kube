@@ -1,12 +1,6 @@
 use std::collections::HashMap;
 
-use base64::{
-    alphabet,
-    engine::{
-        fast_portable::{FastPortable, FastPortableConfig},
-        DecodePaddingMode,
-    },
-};
+use base64::{alphabet, engine, Engine as _};
 use chrono::{Duration, TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
@@ -137,11 +131,11 @@ pub mod errors {
     }
 }
 
-const BASE64_ENGINE: FastPortable = FastPortable::from(
+const BASE64_ENGINE: engine::GeneralPurpose = engine::GeneralPurpose::new(
     &alphabet::URL_SAFE,
-    FastPortableConfig::new()
+    engine::GeneralPurposeConfig::new()
         .with_decode_allow_trailing_bits(true)
-        .with_decode_padding_mode(DecodePaddingMode::Indifferent),
+        .with_decode_padding_mode(engine::DecodePaddingMode::Indifferent),
 );
 
 #[derive(Debug)]
@@ -164,7 +158,7 @@ impl Oidc {
             .split('.')
             .nth(1)
             .ok_or(errors::IdTokenError::InvalidFormat)?;
-        let payload = base64::decode_engine(part, &BASE64_ENGINE)?;
+        let payload = BASE64_ENGINE.decode(part)?;
         let expiry = serde_json::from_slice::<Claims>(&payload)?.expiry;
         let timestamp = Utc
             .timestamp_opt(expiry, 0)
@@ -370,7 +364,7 @@ impl Refresher {
                     AUTHORIZATION,
                     format!(
                         "Basic {}",
-                        base64::encode(format!(
+                        BASE64_ENGINE.encode(format!(
                             "{}:{}",
                             self.client_id.expose_secret(),
                             self.client_secret.expose_secret()
@@ -481,7 +475,7 @@ mod tests {
         let invalid_claims_token = format!(
             "{}.{}.{}",
             token_valid.split_once('.').unwrap().0,
-            base64::encode(serde_json::to_string(&invalid_claims).unwrap()),
+            BASE64_ENGINE.encode(serde_json::to_string(&invalid_claims).unwrap()),
             token_valid.rsplit_once('.').unwrap().1,
         );
         oidc.id_token = invalid_claims_token.into();
