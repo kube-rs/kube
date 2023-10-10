@@ -86,7 +86,7 @@ mod custom_resource;
 /// ## `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
 ///
-/// ## `#[kube(struct = "StructName")]`
+/// ## `#[kube(generate = "StructName")]`
 /// Customize the name of the generated root struct (defaults to `kind`).
 ///
 /// ## `#[kube(crates(kube_core = "::kube::core"))]`
@@ -153,7 +153,7 @@ mod custom_resource;
 ///     group = "clux.dev",
 ///     version = "v1",
 ///     kind = "Foo",
-///     struct = "FooCrd",
+///     generate = "FooCrd",
 ///     namespaced,
 ///     status = "FooStatus",
 ///     derive = "PartialEq",
