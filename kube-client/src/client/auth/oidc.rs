@@ -137,6 +137,7 @@ const JWT_BASE64_ENGINE: engine::GeneralPurpose = engine::GeneralPurpose::new(
         .with_decode_allow_trailing_bits(true)
         .with_decode_padding_mode(engine::DecodePaddingMode::Indifferent),
 );
+use base64::engine::general_purpose::STANDARD as STANDARD_BASE64_ENGINE;
 
 #[derive(Debug)]
 pub struct Oidc {
@@ -158,7 +159,7 @@ impl Oidc {
             .split('.')
             .nth(1)
             .ok_or(errors::IdTokenError::InvalidFormat)?;
-        let payload = BASE64_ENGINE.decode(part)?;
+        let payload = JWT_BASE64_ENGINE.decode(part)?;
         let expiry = serde_json::from_slice::<Claims>(&payload)?.expiry;
         let timestamp = Utc
             .timestamp_opt(expiry, 0)
@@ -364,7 +365,7 @@ impl Refresher {
                     AUTHORIZATION,
                     format!(
                         "Basic {}",
-                        base64::engine::general_purpose::STANDARD.encode(format!(
+                        STANDARD_BASE64_ENGINE.encode(format!(
                             "{}:{}",
                             self.client_id.expose_secret(),
                             self.client_secret.expose_secret()
@@ -475,7 +476,7 @@ mod tests {
         let invalid_claims_token = format!(
             "{}.{}.{}",
             token_valid.split_once('.').unwrap().0,
-            BASE64_ENGINE.encode(serde_json::to_string(&invalid_claims).unwrap()),
+            STANDARD_BASE64_ENGINE.encode(serde_json::to_string(&invalid_claims).unwrap()),
             token_valid.rsplit_once('.').unwrap().1,
         );
         oidc.id_token = invalid_claims_token.into();
