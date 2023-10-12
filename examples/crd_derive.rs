@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
     version = "v1",
     kind = "Foo",
     plural = "fooz",
-    struct = "FooCrd",
+    root = "FooCrd",
     namespaced,
     status = "FooStatus",
     derive = "PartialEq",

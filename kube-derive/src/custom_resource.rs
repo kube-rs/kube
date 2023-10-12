@@ -10,7 +10,7 @@ struct KubeAttrs {
     group: String,
     version: String,
     kind: String,
-    #[darling(rename = "struct")]
+    #[darling(rename = "root")]
     kind_struct: Option<String>,
     /// lowercase plural of kind (inferred if omitted)
     plural: Option<String>,
