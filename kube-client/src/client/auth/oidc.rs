@@ -131,7 +131,7 @@ pub mod errors {
     }
 }
 
-const BASE64_ENGINE: engine::GeneralPurpose = engine::GeneralPurpose::new(
+const JWT_BASE64_ENGINE: engine::GeneralPurpose = engine::GeneralPurpose::new(
     &alphabet::URL_SAFE,
     engine::GeneralPurposeConfig::new()
         .with_decode_allow_trailing_bits(true)
