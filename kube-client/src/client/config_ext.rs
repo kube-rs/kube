@@ -61,10 +61,10 @@ pub trait ConfigExt: private::Sealed {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
-    fn rustls_https_connector_with_connector(
+    fn rustls_https_connector_with_connector<H>(
         &self,
-        connector: hyper::client::HttpConnector,
-    ) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
+        connector: H,
+    ) -> Result<hyper_rustls::HttpsConnector<H>>;
 
     /// Create [`rustls::ClientConfig`] based on config.
     /// # Example
@@ -118,10 +118,16 @@ pub trait ConfigExt: private::Sealed {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
     #[cfg(feature = "openssl-tls")]
-    fn openssl_https_connector_with_connector(
+    fn openssl_https_connector_with_connector<H>(
         &self,
-        connector: hyper::client::HttpConnector,
-    ) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>>;
+        connector: H,
+    ) -> Result<hyper_openssl::HttpsConnector<H>>
+    where
+        H: tower::Service<http::Uri> + Send,
+        H::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        H::Future: Send + 'static,
+        H::Response:
+            tokio::io::AsyncRead + tokio::io::AsyncWrite + hyper::client::connect::Connection + Unpin;
 
     /// Create [`openssl::ssl::SslConnectorBuilder`] based on config.
     /// # Example
@@ -215,10 +221,10 @@ impl ConfigExt for Config {
     }
 
     #[cfg(feature = "rustls-tls")]
-    fn rustls_https_connector_with_connector(
+    fn rustls_https_connector_with_connector<H>(
         &self,
-        connector: hyper::client::HttpConnector,
-    ) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
+        connector: H,
+    ) -> Result<hyper_rustls::HttpsConnector<H>> {
         let rustls_config = self.rustls_client_config()?;
         let mut builder = hyper_rustls::HttpsConnectorBuilder::new()
             .with_tls_config(rustls_config)
@@ -245,10 +251,17 @@ impl ConfigExt for Config {
     }
 
     #[cfg(feature = "openssl-tls")]
-    fn openssl_https_connector_with_connector(
+    fn openssl_https_connector_with_connector<H>(
         &self,
-        connector: hyper::client::HttpConnector,
-    ) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>> {
+        connector: H,
+    ) -> Result<hyper_openssl::HttpsConnector<H>>
+    where
+        H: tower::Service<http::Uri> + Send,
+        H::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        H::Future: Send + 'static,
+        H::Response:
+            tokio::io::AsyncRead + tokio::io::AsyncWrite + hyper::client::connect::Connection + Unpin,
+    {
         let mut https =
             hyper_openssl::HttpsConnector::with_connector(connector, self.openssl_ssl_connector_builder()?)
                 .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateHttpsConnector(e)))?;
