@@ -101,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn apply_crd(client: Client, crd: CustomResourceDefinition) -> anyhow::Result<()> {
-    let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
     info!("Creating crd: {}", serde_yaml::to_string(&crd)?);
     let ssapply = PatchParams::apply("crd_derive_multi").force();
     crds.patch("manyderives.kube.rs", &ssapply, &Patch::Apply(&crd))
@@ -116,7 +116,7 @@ async fn apply_crd(client: Client, crd: CustomResourceDefinition) -> anyhow::Res
 }
 
 async fn cleanup(client: Client) -> anyhow::Result<()> {
-    let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
     let obj = crds.delete("manyderives.kube.rs", &Default::default()).await?;
     if let either::Either::Left(o) = obj {
         let uid = o.uid().unwrap();

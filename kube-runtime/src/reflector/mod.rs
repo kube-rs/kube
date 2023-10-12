@@ -39,7 +39,7 @@ pub use store::{store, Store};
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();
 ///
-/// let nodes: Api<Node> = Api::all(client);
+/// let nodes: Api<Node> = Api::cluster(client);
 /// let node_filter = Config::default().labels("kubernetes.io/arch=amd64");
 /// let (reader, writer) = reflector::store();
 ///

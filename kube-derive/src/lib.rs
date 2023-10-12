@@ -53,7 +53,7 @@ mod custom_resource;
 ///  # struct FooSpec {}
 ///  # let client: Client = todo!();
 ///  let foos: Api<Foo> = Api::default_namespaced(client.clone());
-///  let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+///  let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
 ///  crds.patch("foos.clux.dev", &PatchParams::apply("myapp"), &Patch::Apply(Foo::crd())).await;
 /// # Ok(())
 /// # }

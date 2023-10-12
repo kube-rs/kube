@@ -855,10 +855,10 @@ where
     /// ```
     /// # use kube::runtime::{Controller, controller::Action, reflector::ObjectRef, watcher};
     /// # use kube::{Api, ResourceExt};
-    /// # use k8s_openapi::api::core::v1::{ConfigMap, Namespace};
+    /// # use k8s_openapi::api::core::v1::{ConfigMap, Pod};
     /// # use futures::StreamExt;
     /// # use std::sync::Arc;
-    /// # type WatchedResource = Namespace;
+    /// # type WatchedResource = Pod;
     /// # struct Context;
     /// # async fn reconcile(_: Arc<ConfigMap>, _: Arc<Context>) -> Result<Action, kube::Error> {
     /// #     Ok(Action::await_change())
@@ -963,7 +963,7 @@ where
     /// fn mapper(_: DaemonSet) -> Option<ObjectRef<CustomResource>> { todo!() }
     /// # async fn doc(client: kube::Client) {
     /// let api: Api<DaemonSet> = Api::all(client.clone());
-    /// let cr: Api<CustomResource> = Api::all(client.clone());
+    /// let cr: Api<CustomResource> = Api::default_namespaced(client.clone());
     /// let daemons = watcher(api, watcher::Config::default())
     ///     .touched_objects()
     ///     .predicate_filter(predicates::generation);

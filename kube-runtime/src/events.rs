@@ -292,7 +292,7 @@ mod test {
     async fn event_recorder_attaches_events_without_namespace() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 
-        let svcs: Api<ClusterRole> = Api::all(client.clone());
+        let svcs: Api<ClusterRole> = Api::cluster(client.clone());
         let s = svcs.get("system:basic-user").await?; // always get this default ClusterRole
         let recorder = Recorder::new(client.clone(), "kube".into(), s.object_ref(&()));
         recorder
