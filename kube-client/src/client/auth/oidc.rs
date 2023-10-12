@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use base64::{alphabet, engine, Engine as _};
 use chrono::{Duration, TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
@@ -131,11 +130,12 @@ pub mod errors {
     }
 }
 
-const JWT_BASE64_ENGINE: engine::GeneralPurpose = engine::GeneralPurpose::new(
-    &alphabet::URL_SAFE,
-    engine::GeneralPurposeConfig::new()
+use base64::Engine as _;
+const JWT_BASE64_ENGINE: base64::engine::GeneralPurpose = base64::engine::GeneralPurpose::new(
+    &base64::alphabet::URL_SAFE,
+    base64::engine::GeneralPurposeConfig::new()
         .with_decode_allow_trailing_bits(true)
-        .with_decode_padding_mode(engine::DecodePaddingMode::Indifferent),
+        .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
 );
 use base64::engine::general_purpose::STANDARD as STANDARD_BASE64_ENGINE;
 
