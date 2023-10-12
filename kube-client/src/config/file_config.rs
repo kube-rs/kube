@@ -537,7 +537,10 @@ fn load_from_base64_or_file<P: AsRef<Path>>(
 }
 
 fn load_from_base64(value: &str) -> Result<Vec<u8>, LoadDataError> {
-    base64::decode(value).map_err(LoadDataError::DecodeBase64)
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD
+        .decode(value)
+        .map_err(LoadDataError::DecodeBase64)
 }
 
 fn load_from_file<P: AsRef<Path>>(file: &P) -> Result<Vec<u8>, LoadDataError> {
@@ -767,7 +770,6 @@ users:
     client-certificate-data: aGVsbG8K
     client-key-data: aGVsbG8K
 "#;
-
 
         let kubeconfig1 = Kubeconfig::from_yaml(config1)?;
         let kubeconfig2 = Kubeconfig::from_yaml(config2)?;

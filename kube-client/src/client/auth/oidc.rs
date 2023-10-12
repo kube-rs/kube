@@ -1,12 +1,5 @@
 use std::collections::HashMap;
 
-use base64::{
-    alphabet,
-    engine::{
-        fast_portable::{FastPortable, FastPortableConfig},
-        DecodePaddingMode,
-    },
-};
 use chrono::{Duration, TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
@@ -137,12 +130,14 @@ pub mod errors {
     }
 }
 
-const BASE64_ENGINE: FastPortable = FastPortable::from(
-    &alphabet::URL_SAFE,
-    FastPortableConfig::new()
+use base64::Engine as _;
+const JWT_BASE64_ENGINE: base64::engine::GeneralPurpose = base64::engine::GeneralPurpose::new(
+    &base64::alphabet::URL_SAFE,
+    base64::engine::GeneralPurposeConfig::new()
         .with_decode_allow_trailing_bits(true)
-        .with_decode_padding_mode(DecodePaddingMode::Indifferent),
+        .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
 );
+use base64::engine::general_purpose::STANDARD as STANDARD_BASE64_ENGINE;
 
 #[derive(Debug)]
 pub struct Oidc {
@@ -164,7 +159,7 @@ impl Oidc {
             .split('.')
             .nth(1)
             .ok_or(errors::IdTokenError::InvalidFormat)?;
-        let payload = base64::decode_engine(part, &BASE64_ENGINE)?;
+        let payload = JWT_BASE64_ENGINE.decode(part)?;
         let expiry = serde_json::from_slice::<Claims>(&payload)?.expiry;
         let timestamp = Utc
             .timestamp_opt(expiry, 0)
@@ -370,7 +365,7 @@ impl Refresher {
                     AUTHORIZATION,
                     format!(
                         "Basic {}",
-                        base64::encode(format!(
+                        STANDARD_BASE64_ENGINE.encode(format!(
                             "{}:{}",
                             self.client_id.expose_secret(),
                             self.client_secret.expose_secret()
@@ -481,7 +476,7 @@ mod tests {
         let invalid_claims_token = format!(
             "{}.{}.{}",
             token_valid.split_once('.').unwrap().0,
-            base64::encode(serde_json::to_string(&invalid_claims).unwrap()),
+            JWT_BASE64_ENGINE.encode(serde_json::to_string(&invalid_claims).unwrap()),
             token_valid.rsplit_once('.').unwrap().1,
         );
         oidc.id_token = invalid_claims_token.into();
