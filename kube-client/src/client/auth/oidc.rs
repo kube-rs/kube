@@ -476,7 +476,7 @@ mod tests {
         let invalid_claims_token = format!(
             "{}.{}.{}",
             token_valid.split_once('.').unwrap().0,
-            STANDARD_BASE64_ENGINE.encode(serde_json::to_string(&invalid_claims).unwrap()),
+            JWT_BASE64_ENGINE.encode(serde_json::to_string(&invalid_claims).unwrap()),
             token_valid.rsplit_once('.').unwrap().1,
         );
         oidc.id_token = invalid_claims_token.into();
