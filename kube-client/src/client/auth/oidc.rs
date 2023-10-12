@@ -364,7 +364,7 @@ impl Refresher {
                     AUTHORIZATION,
                     format!(
                         "Basic {}",
-                        BASE64_ENGINE.encode(format!(
+                        base64::engine::general_purpose::STANDARD.encode(format!(
                             "{}:{}",
                             self.client_id.expose_secret(),
                             self.client_secret.expose_secret()
