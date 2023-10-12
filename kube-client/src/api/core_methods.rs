@@ -266,7 +266,7 @@ where
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
 
-    /// let crds: Api<CustomResourceDefinition> = Api::all(client);
+    /// let crds: Api<CustomResourceDefinition> = Api::cluster(client);
     /// crds.delete("foos.clux.dev", &DeleteParams::default()).await?
     ///     .map_left(|o| println!("Deleting CRD: {:?}", o.status))
     ///     .map_right(|s| println!("Deleted CRD: {:?}", s));

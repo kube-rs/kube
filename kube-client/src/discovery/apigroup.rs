@@ -46,7 +46,7 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
-///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+///     let api: Api<DynamicObject> = Api::dynamic(client.clone(), &ar, caps.scope);
 ///     for service in api.list(&Default::default()).await? {
 ///         println!("Found APIService: {}", service.name_any());
 ///     }
@@ -238,7 +238,7 @@ impl ApiGroup {
     ///         if !caps.supports_operation(verbs::LIST) {
     ///             continue;
     ///         }
-    ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+    ///         let api: Api<DynamicObject> = Api::dynamic(client.clone(), &ar, caps.scope);
     ///         for inst in api.list(&Default::default()).await? {
     ///             println!("Found {}: {}", ar.kind, inst.name_any());
     ///         }
@@ -267,7 +267,7 @@ impl ApiGroup {
     ///         if !caps.supports_operation(verbs::LIST) {
     ///             continue;
     ///         }
-    ///         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+    ///         let api: Api<DynamicObject> = Api::dynamic(client.clone(), &ar, caps.scope);
     ///         for inst in api.list(&Default::default()).await? {
     ///             println!("Found {}: {}", ar.kind, inst.name_any());
     ///         }

@@ -4,6 +4,7 @@ mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 use std::fmt::Debug;
 
+use k8s_openapi::ClusterResourceScope;
 #[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
 #[cfg(feature = "ws")] mod portforward;
 #[cfg(feature = "ws")] pub use portforward::Portforwarder;
@@ -29,6 +30,7 @@ pub mod entry;
 pub use kube_core::admission;
 pub(crate) use kube_core::params;
 pub use kube_core::{
+    discovery::Scope,
     dynamic::{ApiResource, DynamicObject},
     gvk::{GroupVersionKind, GroupVersionResource},
     metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta},
@@ -67,10 +69,51 @@ pub struct Api<K> {
 ///
 /// This generally means resources created via [`DynamicObject`](crate::api::DynamicObject).
 impl<K: Resource> Api<K> {
+    /// Discovered scope in the default configuration
+    ///
+    /// This returns an `Api` scoped at the appropriate setting based on a [`discovery`](crate::discovery) result.
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client, discovery::{ApiResource, ApiCapabilities}, core::DynamicObject};
+    /// # let client: Client = todo!();
+    /// # let ar: ApiResource = todo!();
+    /// # let caps: ApiCapabilities = todo!();
+    /// let api: Api<DynamicObject> = Api::dynamic(client, &ar, caps.scope);
+    /// ```
+    pub fn dynamic(client: Client, dyntype: &K::DynamicType, scope: Scope) -> Self
+    where
+        K: Resource<Scope = DynamicResourceScope>,
+    {
+        match scope {
+            Scope::Cluster => Api::cluster_with(client, dyntype),
+            Scope::Namespaced => Api::default_namespaced_with(client, dyntype),
+        }
+    }
+
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
-    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
+    pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self
+    where
+        K: Resource<Scope = DynamicResourceScope>,
+    {
+        let url = K::url_path(dyntype, None);
+        Self {
+            client,
+            request: Request::new(url),
+            namespace: None,
+            _phantom: std::iter::empty(),
+        }
+    }
+
+    /// Cluster level resources
+    ///
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    pub fn cluster_with(client: Client, dyntype: &K::DynamicType) -> Self
+    where
+        K: Resource<Scope = DynamicResourceScope>,
+    {
+        // TODO: inspect dyntype scope to verify somehow?
         let url = K::url_path(dyntype, None);
         Self {
             client,
@@ -130,27 +173,35 @@ impl<K: Resource> Api<K>
 where
     <K as Resource>::DynamicType: Default,
 {
-    /// Cluster level resources, or resources viewed across all namespaces
-    ///
-    /// Namespace scoped resource allowing querying across all namespaces:
-    ///
-    /// ```no_run
-    /// # use kube::{Api, Client};
-    /// # let client: Client = todo!();
-    /// use k8s_openapi::api::core::v1::Pod;
-    /// let api: Api<Pod> = Api::all(client);
-    /// ```
-    ///
-    /// Cluster scoped resources also use this entrypoint:
+    /// Cluster scoped resource
     ///
     /// ```no_run
     /// # use kube::{Api, Client};
     /// # let client: Client = todo!();
     /// use k8s_openapi::api::core::v1::Node;
-    /// let api: Api<Node> = Api::all(client);
+    /// let api: Api<Node> = Api::cluster(client);
     /// ```
-    pub fn all(client: Client) -> Self {
-        Self::all_with(client, &K::DynamicType::default())
+    ///
+    /// This will ONLY work on cluster level resources as set by `Scope`:
+    ///
+    /// ```compile_fail
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// let api: Api<Pod> = Api::cluster(client); // resource not cluster-level!
+    /// ```
+    pub fn cluster(client: Client) -> Self
+    where
+        K: Resource<Scope = ClusterResourceScope>,
+    {
+        let dyntype = K::DynamicType::default();
+        let url = K::url_path(&dyntype, None);
+        Self {
+            client,
+            request: Request::new(url),
+            namespace: None,
+            _phantom: std::iter::empty(),
+        }
     }
 
     /// Namespaced resource within a given namespace
@@ -214,6 +265,44 @@ where
         let ns = client.default_namespace().to_string();
         Self::namespaced(client, &ns)
     }
+
+    /// A list/watch only view into namespaced resources across all namespaces
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// let api: Api<Pod> = Api::all(client.clone());
+    /// ```
+    ///
+    /// This will ONLY work on namespaced resources as set by `Scope`:
+    ///
+    /// ```compile_fail
+    /// # use kube::{Api, Client};
+    /// # let client: Client = todo!();
+    /// use k8s_openapi::api::core::v1::Node;
+    /// let api: Api<Node> = Api::default_namespaced(client); // resource not namespaced!
+    /// ```
+    ///
+    /// See [`Api::cluster`] for cluster level resources.
+    ///
+    /// # Warning
+    ///
+    /// This variant **can only `list` and `watch` namespaced resources** and is commonly used with a [`watcher`].
+    /// If you need to create/patch/replace/get on a namespaced resource, you need a separate `Api::namespaced`.
+    pub fn all(client: Client) -> Self
+    where
+        K: Resource<Scope = NamespaceResourceScope>,
+    {
+        let dyntype = K::DynamicType::default();
+        let url = K::url_path(&dyntype, None);
+        Self {
+            client,
+            request: Request::new(url),
+            namespace: None,
+            _phantom: std::iter::empty(),
+        }
+    }
 }
 
 impl<K> From<Api<K>> for Client {
@@ -254,9 +343,10 @@ mod test {
         let (mock_service, _handle) = mock::pair::<Request<Body>, Response<Body>>();
         let client = Client::new(mock_service, "default");
 
-        let _: Api<corev1::Node> = Api::all(client.clone());
+        let _: Api<corev1::Node> = Api::cluster(client.clone());
         let _: Api<corev1::Pod> = Api::default_namespaced(client.clone());
-        let _: Api<corev1::PersistentVolume> = Api::all(client.clone());
+        let _: Api<corev1::Pod> = Api::all(client.clone());
+        let _: Api<corev1::PersistentVolume> = Api::cluster(client.clone());
         let _: Api<corev1::ConfigMap> = Api::namespaced(client, "default");
     }
 }

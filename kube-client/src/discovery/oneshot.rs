@@ -30,7 +30,7 @@ use kube_core::{
 ///     let client = Client::try_default().await?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
-///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+///     let api: Api<DynamicObject> = Api::dynamic(client.clone(), &ar, caps.scope);
 ///     for service in api.list(&Default::default()).await? {
 ///         println!("Found APIService: {}", service.name_any());
 ///     }
@@ -67,7 +67,7 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
 ///     let gv = "apiregistration.k8s.io/v1".parse()?;
 ///     let apigroup = discovery::pinned_group(&client, &gv).await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
-///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+///     let api: Api<DynamicObject> = Api::dynamic(client.clone(), &ar, caps.scope);
 ///     for service in api.list(&Default::default()).await? {
 ///         println!("Found APIService: {}", service.name_any());
 ///     }
@@ -94,7 +94,7 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 ///     let client = Client::try_default().await?;
 ///     let gvk = GroupVersionKind::gvk("apiregistration.k8s.io", "v1", "APIService");
 ///     let (ar, caps) = discovery::pinned_kind(&client, &gvk).await?;
-///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+///     let api: Api<DynamicObject> = Api::dynamic(client.clone(), &ar, caps.scope);
 ///     for service in api.list(&Default::default()).await? {
 ///         println!("Found APIService: {}", service.name_any());
 ///     }

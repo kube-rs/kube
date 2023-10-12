@@ -86,7 +86,7 @@ mod test {
             },
         }))?;
 
-        let nodes: Api<Node> = Api::all(client.clone());
+        let nodes: Api<Node> = Api::cluster(client.clone());
         nodes.create(&PostParams::default(), &fake_node).await?;
 
         let schedulables = ListParams::default().fields("spec.unschedulable==false");
@@ -114,7 +114,7 @@ mod test {
         let audiences = vec!["api".to_string()];
 
         let serviceaccounts: Api<ServiceAccount> = Api::namespaced(client.clone(), serviceaccount_namespace);
-        let tokenreviews: Api<TokenReview> = Api::all(client);
+        let tokenreviews: Api<TokenReview> = Api::cluster(client);
 
         // Create ServiceAccount
         let fake_sa = serde_json::from_value(json!({
