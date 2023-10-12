@@ -34,12 +34,12 @@ mod custom_resource;
 /// let f = Foo::new("foo-1", FooSpec {
 ///     info: "informative info".into(),
 /// });
-/// println!("foo: {:?}", f); // debug print on generated type
+/// println!("foo: {:?}", f); // debug print on root type
 /// println!("crd: {}", serde_yaml::to_string(&Foo::crd()).unwrap()); // crd yaml
 /// ```
 ///
-/// This example creates a `struct Foo` containing metadata, the spec,
-/// and optionally status. The **generated** type `Foo` can be used with the [`kube`] crate
+/// This example generates a `struct Foo` containing metadata, the spec,
+/// and optionally status. The **root** struct `Foo` can be used with the [`kube`] crate
 /// as an `Api<Foo>` object (`FooSpec` can not be used with [`Api`][`kube::Api`]).
 ///
 /// ```no_run
@@ -73,12 +73,12 @@ mod custom_resource;
 /// Your cr api version. The part after the slash in the top level `apiVersion` key.
 ///
 /// ## `#[kube(kind = "Kind")]`
-/// Name of your kind and your generated root type.
+/// Name of your kind, and implied default for your generated root type.
 ///
 /// # Optional `#[kube]` attributes
 ///
 /// ## `#[kube(singular = "nonstandard-singular")]`
-/// To specify the singular name. Defaults to lowercased `kind`.
+/// To specify the singular name. Defaults to lowercased `.kind` value.
 ///
 /// ## `#[kube(plural = "nonstandard-plural")]`
 /// To specify the plural name. Defaults to inferring from singular.
@@ -86,8 +86,8 @@ mod custom_resource;
 /// ## `#[kube(namespaced)]`
 /// To specify that this is a namespaced resource rather than cluster level.
 ///
-/// ## `#[kube(generate = "StructName")]`
-/// Customize the name of the generated root struct (defaults to `kind`).
+/// ## `#[kube(root = "StructName")]`
+/// Customize the name of the generated root struct (defaults to `.kind` value).
 ///
 /// ## `#[kube(crates(kube_core = "::kube::core"))]`
 /// Customize the crate name the generated code will reach into (defaults to `::kube::core`).
@@ -153,7 +153,7 @@ mod custom_resource;
 ///     group = "clux.dev",
 ///     version = "v1",
 ///     kind = "Foo",
-///     generate = "FooCrd",
+///     root = "FooCrd",
 ///     namespaced,
 ///     status = "FooStatus",
 ///     derive = "PartialEq",
