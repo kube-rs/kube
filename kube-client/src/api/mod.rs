@@ -90,7 +90,7 @@ impl<K: Resource> Api<K> {
         }
     }
 
-    /// Cluster level resources, or resources viewed across all namespaces
+    /// A list/watch only view into namespaced resources across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
     pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self
@@ -281,7 +281,7 @@ where
     /// # use kube::{Api, Client};
     /// # let client: Client = todo!();
     /// use k8s_openapi::api::core::v1::Node;
-    /// let api: Api<Node> = Api::default_namespaced(client); // resource not namespaced!
+    /// let api: Api<Node> = Api::all(client); // resource not namespaced!
     /// ```
     ///
     /// See [`Api::cluster`] for cluster level resources.
