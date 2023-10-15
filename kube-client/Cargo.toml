@@ -70,6 +70,7 @@ secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
 tracing = { version = "0.1.36", features = ["log"], optional = true }
 hyper-openssl = { version = "0.9.2", optional = true }
 form_urlencoded = { version = "1.2.0", optional = true }
+disjoint_impls = "0.3.0"
 
 [dependencies.k8s-openapi]
 version = "0.20.0"

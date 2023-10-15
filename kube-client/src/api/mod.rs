@@ -18,6 +18,7 @@ pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus
 k8s_openapi::k8s_if_ge_1_25! {
     pub use subresource::Ephemeral;
 }
+use disjoint_impls::disjoint_impls;
 
 mod util;
 
@@ -61,6 +62,39 @@ pub struct Api<K> {
     /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
     /// is `Send`, even if `K` may not be).
     pub(crate) _phantom: std::iter::Empty<K>,
+}
+
+use k8s_openapi::ClusterResourceScope;
+
+disjoint_impls! {
+
+    pub trait ApiInto<K, U> {
+        fn new_with(client: Client, dyntype: &U) -> Api<K>;
+    }
+
+    impl<K, X, U> ApiInto<X, U> for Api<K> where K: Resource<Scope = NamespaceResourceScope>, U: K::DynamicType {
+        pub fn new_with(client: Client, dyntype: &K::DynamicType) -> Self {
+            let ns = client.default_namespace().to_string();
+            let url = K::url_path(dyntype, Some(ns.clone()));
+            Self {
+                client,
+                request: Request::new(url),
+                namespace: Some(ns.to_string()),
+                _phantom: std::iter::empty(),
+            }
+        }
+    }
+    impl<K, X, U> ApiInto<X, U> for Api<K> where K: Resource<Scope =  ClusterResourceScope>, U: K::DynamicType {
+        pub fn new_with(client: Client, dyntype: &K::DynamicType) -> Self {
+            let url = K::url_path(dyntype, None);
+            Self {
+                client,
+                request: Request::new(url),
+                namespace: None,
+                _phantom: std::iter::empty(),
+            }
+        }
+    }
 }
 
 /// Api constructors for Resource implementors with custom DynamicTypes
