@@ -16,7 +16,13 @@ async fn main() -> anyhow::Result<()> {
     let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 
-    let wc = watcher::Config::default().labels("beta.kubernetes.io/arch=amd64");
+    let use_watchlist = std::env::var("WATCHLIST").map(|s| s == "1").unwrap_or(false);
+    let wc = if use_watchlist {
+        // requires WatchList feature gate on 1.27 or later
+        watcher::Config::default().streaming_lists()
+    } else {
+        watcher::Config::default()
+    };
     let obs = watcher(nodes, wc).default_backoff().applied_objects();
 
     pin_mut!(obs);

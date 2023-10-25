@@ -5,6 +5,11 @@ on:
 env:
   RUST_BACKTRACE: 1
 
+# Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   unit:
     strategy:
@@ -14,7 +19,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           override: true
@@ -37,19 +42,9 @@ jobs:
       #     echo "OPENSSL_LIB_DIR=C:/Program Files/OpenSSL-Win64/lib" >> $env:GITHUB_ENV
       #     echo "OPENSSL_DIR=C:/Program Files/OpenSSL-Win64/" >> $env:GITHUB_ENV
       #     echo "OPENSSL_INCLUDE_DIR=C:/Program Files/OpenSSL-Win64/include" >> $env:GITHUB_ENV
-      # Only test Rustls on Windows instead due to #1191
-      - name: "Interim Hacky Windows Test for #1191"
-        if: matrix.os == 'windows-latest'
-        run: |
-          sed -i '0,/openssl/s//rustls/' kube/Cargo.toml
-          cat kube/Cargo.toml
-          cargo build
-          cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
-
 
       # Real CI work starts here
       - name: Build workspace
-        if: matrix.os != 'windows-latest'
         run: cargo build
 
       # Workspace unit tests with various feature sets
@@ -58,7 +53,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' # only linux tests all feature combinations
       - name: Run workspace unit tests (default features)
         run: cargo test --workspace --lib --exclude kube-examples --exclude e2e -j6
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os != 'macos-latest'
       - name: Run workspace unit tests (all features)
         if: matrix.os != 'windows-latest'
         run: cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e -j6
@@ -77,6 +72,18 @@ jobs:
       - name: Test examples
         if: matrix.os != 'windows-latest'
         run: cargo test -p kube-examples --examples -j6
+
+  doc:
+    runs-on: ubuntu-latest
+    name: doc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: cargo doc
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: --cfg docsrs
 
   msrv:
     # Run `cargo check` on our minimum supported Rust version
@@ -131,9 +138,9 @@ jobs:
       fail-fast: false
       matrix:
         # Run these tests against older clusters as well
-        k8s: [v1.21, latest]
+        k8s: [v1.23, latest]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           override: true
@@ -171,7 +178,7 @@ jobs:
     # comile check e2e tests against mk8sv
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Find MK8SV
         id: mk8sv
@@ -205,7 +212,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.21
+          version: v1.23
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
@@ -235,7 +242,7 @@ jobs:
       matrix:
         tls: [openssl, rustls]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions/cache@v2
         with:
           path: |
@@ -254,7 +261,6 @@ jobs:
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
-
       - name: Compile e2e job against ${{matrix.tls}}
         run: |
           mkdir -p ~/.cargo/{git,registry}

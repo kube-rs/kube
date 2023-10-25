@@ -1,7 +1,7 @@
 [package]
 name = "kube-derive"
 description = "Custom derives for the kube kubernetes crates"
-version = "0.84.0"
+version = "0.86.0"
 authors = [
   "clux <sszynrae@gmail.com>",
   "kazk <kazk.dev@gmail.com>",
@@ -18,9 +18,9 @@ categories = ["api-bindings", "encoding"]
 [dependencies]
 proc-macro2 = "1.0.29"
 quote = "1.0.10"
-syn = { version = "1.0.80", features = ["extra-traits"] }
+syn = { version = "2.0.38", features = ["extra-traits"] }
 serde_json = "1.0.68"
-darling = "0.14.0"
+darling = "0.20.3"
 
 [lib]
 proc-macro = true
@@ -29,7 +29,7 @@ proc-macro = true
 serde = { version = "1.0.130", features = ["derive"] }
 serde_yaml = "0.9.19"
 kube = { path = "../kube", version = "<1.0.0, >=0.61.0", features = ["derive", "client"] }
-k8s-openapi = { version = "0.18.0", default-features = false, features = ["v1_26"] }
+k8s-openapi = { version = "0.20.0", default-features = false, features = ["latest"] }
 schemars = { version = "0.8.6", features = ["chrono"] }
 chrono = { version = "0.4.19", default-features = false }
 trybuild = "1.0.48"

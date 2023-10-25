@@ -20,7 +20,6 @@ For a basic overview of how to use the `Api` try:
 
 ```sh
 cargo run --example job_api
-cargo run --example log_stream
 cargo run --example pod_api
 cargo run --example dynamic_api
 cargo run --example dynamic_jsonpath
@@ -41,6 +40,15 @@ cargo run --example kubectl -- apply -f configmapgen_controller_crd.yaml
 ```
 
 Supported flags are `-lLABELSELECTOR`, `-nNAMESPACE`, `--all`, and `-oyaml`.
+
+There are also two other examples that serve as simplistic analogues of `kubectl logs` and `kubectl events`:
+
+```sh
+# tail logs
+cargo run --example log_stream -- prometheus-promstack-kube-prometheus-prometheus-0 -c prometheus -f --since=3600
+# get events for an object
+cargo run --example event_watcher -- --for=Pod/prometheus-promstack-kube-prometheus-prometheus-0
+```
 
 ## kube admission controller example
 Admission controllers are a bit of a special beast. They don't actually need `kube_client` (unless you need to verify something with the api-server) or `kube_runtime` (unless you also build a complementing reconciler) because, by themselves, they simply get changes sent to them over `https`. You will need a webserver, certificates, and either your controller deployed behind a `Service`, or as we do here: running locally with a private ip that your `k3d` cluster can reach.
@@ -87,6 +95,12 @@ cargo run --example node_watcher
 cargo run --example dynamic_watcher
 ```
 
+The `node_` and `pod_` watcher also allows using [Kubernetes 1.27 Streaming lists](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists) via `WATCHLIST=1`:
+
+```sh
+WATCHLIST=1 RUST_LOG=info,kube=debug cargo run --example pod_watcher
+```
+
 ### controllers
 Main example requires you creating the custom resource first:
 
@@ -122,9 +136,9 @@ cargo run --example crd_reflector
 
 The `crd_reflector` will just await changes. You can run `kubectl apply -f crd-baz.yaml`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
 
-## rustls
-Disable default features and enable `rustls-tls`:
+## openssl
+Disable default features and enable `openssl-tls`:
 
 ```sh
-cargo run --example pod_watcher --no-default-features --features=rustls-tls,latest,runtime
+cargo run --example pod_watcher --no-default-features --features=openssl-tls,latest,runtime
 ```

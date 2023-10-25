@@ -72,20 +72,26 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
         use tracing::Span;
 
         let default_ns = config.default_namespace.clone();
+        let auth_layer = config.auth_layer()?;
 
         let client: hyper::Client<_, hyper::Body> = {
             let mut connector = HttpConnector::new();
             connector.enforce_http(false);
 
             // Current TLS feature precedence when more than one are set:
-            // 1. openssl-tls
-            // 2. rustls-tls
+            // 1. rustls-tls
+            // 2. openssl-tls
             // Create a custom client to use something else.
             // If TLS features are not enabled, http connector will be used.
-            #[cfg(feature = "openssl-tls")]
-            let connector = config.openssl_https_connector_with_connector(connector)?;
-            #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+            #[cfg(feature = "rustls-tls")]
             let connector = config.rustls_https_connector_with_connector(connector)?;
+            #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+            let connector = config.openssl_https_connector_with_connector(connector)?;
+            #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
+            if auth_layer.is_none() || config.cluster_url.scheme() == Some(&http::uri::Scheme::HTTPS) {
+                // no tls stack situation only works on anonymous auth with http scheme
+                return Err(Error::TlsRequired);
+            }
 
             let mut connector = TimeoutConnector::new(connector);
 
@@ -106,7 +112,7 @@ impl TryFrom<Config> for ClientBuilder<BoxService<Request<hyper::Body>, Response
 
         let service = ServiceBuilder::new()
             .layer(stack)
-            .option_layer(config.auth_layer()?)
+            .option_layer(auth_layer)
             .layer(config.extra_headers_layer()?)
             .layer(
                 // Attribute names follow [Semantic Conventions].

@@ -62,8 +62,8 @@ impl<S: Stream> Stream for StreamSubscribe<S> {
 
         match item {
             Poll::Ready(Some(item)) => {
-                // `arc_with_non_send_sync` false positive: https://github.com/rust-lang/rust-clippy/issues/11076
                 #[allow(clippy::arc_with_non_send_sync)]
+                // ^ this whole module is unstable and does not have a PoC
                 let item = Arc::new(item);
                 this.sender.send(Some(item.clone())).ok();
                 Poll::Ready(Some(item))

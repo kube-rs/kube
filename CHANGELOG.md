@@ -5,7 +5,51 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.84.0...main
+ * see https://github.com/kube-rs/kube/compare/0.86.0...main
+
+[0.86.0](https://github.com/kube-rs/kube/releases/tag/0.86.0) / 2023-09-08
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.86.0 -->
+
+## Headlines
+### k8s-openapi 0.20 for Kubernetes `v1_28`
+**Please note [upstream api removals](https://github.com/Arnavion/k8s-openapi/issues/149)**.
+As usual, [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid issues.
+
+### Default TLS stack changed to `rustls`
+With last year's upstream changes from rustls (closing all our existing rustls issues - see https://github.com/kube-rs/kube/issues/1192), this is now the better choice for security, features, and ease of building. The previous default openssl stack can still be used with `default-features = false` plus the `openssl-tls` feature.
+
+### Controller Configuration
+A controller [`Config`](https://docs.rs/kube/latest/kube/runtime/struct.Config.html) has been added to allow tweaking two behaviour parameters (debouncing  in #1265 and concurrency limits in #1277) of the `Controller`. Huge thanks to @aryan9600 for his work.
+
+### Streaming Lists
+The `sendInitialEvents` [alpha feature](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists) is now [supported](https://docs.rs/kube/latest/kube/runtime/watcher/struct.Config.html#structfield.initial_list_strategy), and is quickly testable in the [pod_watcher example](https://github.com/kube-rs/kube/blob/c8e98285362e1d0739c56baf27aaab703051dcd4/examples/pod_watcher.rs#L15-L21) when using the [feature gate](https://github.com/kube-rs/kube/blob/c8e98285362e1d0739c56baf27aaab703051dcd4/justfile#L91). This will help [optimise](https://kube.rs/controllers/optimization/) the memory profile of controllers when the feature becomes generally available. Amazing work by first time contributor @casualjim.
+
+## What's Changed
+### Added
+* add `controller::Config` and debounce period to scheduler by @aryan9600 in https://github.com/kube-rs/kube/pull/1265
+* adds watch-list implementation without breaking changes by @casualjim in https://github.com/kube-rs/kube/pull/1255
+* allow configuring controller's concurrency by @aryan9600 in https://github.com/kube-rs/kube/pull/1277
+### Changed
+* Change default TLS stack to `rustls-tls` by @clux in https://github.com/kube-rs/kube/pull/1261
+* Bump k8s-openapi to 0.20.0 by @clux in https://github.com/kube-rs/kube/pull/1291
+### Fixed
+* `core`: omit invalid resource version parameters when doing paged requests by @goenning in https://github.com/kube-rs/kube/pull/1281
+
+[0.85.0](https://github.com/kube-rs/kube/releases/tag/0.85.0) / 2023-08-06
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.85.0 -->
+
+## What's Changed
+### Added
+* Add `WatchStreamExt::reflect` to allow chaining on a reflector  by @clux in https://github.com/kube-rs/kube/pull/1252
+* Implement ephemeral containers subresource by @jmintb in https://github.com/kube-rs/kube/pull/1153
+### Changed
+* Swap `dirs-next` dependency to cargo-team maintained `home` crate by @utkarshgupta137 in https://github.com/kube-rs/kube/pull/1207
+* Upgrade `k8s-openapi` to `0.19.0` for `v1_27` support by @clux in https://github.com/kube-rs/kube/pull/1271
+### Fixed
+* `watcher`: return `NoResourceVersion` error if resource version is empty by @aryan9600 in https://github.com/kube-rs/kube/pull/1259
+* Update the `scheduler` message when preponing by @nightkr in https://github.com/kube-rs/kube/pull/1260
 
 [0.84.0](https://github.com/kube-rs/kube/releases/tag/0.84.0) / 2023-07-14
 ===================
@@ -13,12 +57,12 @@ UNRELEASED
 
 ## Highlights
 ### Stream Improvements
-On the `runtime` side, the `Controller` now delays reconciles until the main `Store` is ready (via a [new `Store` helper](https://docs.rs/kube/0.84.0/kube/runtime/reflector/struct.Store.html#method.wait_until_ready) from #1243). The stream selection for owned resources is more efficient (#1240), and the underlying `watcher` streams now all paginate (#1249). There are also many new  [`WatchStreamExt`](https://docs.rs/kube/0.84.0/kube/runtime/trait.WatchStreamExt.html) helpers ( #1246 + #1228 + #1232) as a continued work towards the more customisable streams-api (#1080).
+On the `runtime` side, the `Controller` now delays reconciles until the main `Store` is ready (via a [new `Store` helper](https://docs.rs/kube/0.84.0/kube/runtime/reflector/struct.Store.html#method.wait_until_ready) from [#1243](https://github.com/kube-rs/kube/issues/1243)). The stream selection for owned resources is more efficient (#1240), and the underlying `watcher` streams now all paginate (#1249). There are also many new  [`WatchStreamExt`](https://docs.rs/kube/0.84.0/kube/runtime/trait.WatchStreamExt.html) helpers ( [#1246](https://github.com/kube-rs/kube/issues/1246) + [#1228](https://github.com/kube-rs/kube/issues/1228) + [#1232](https://github.com/kube-rs/kube/issues/1232)) as a continued work towards the more customisable streams-api (#1080).
 
-On the client-side; streaming logs are now easier to deal with as an `AsyncBufRead` #1235.
+On the client-side; streaming logs are now easier to deal with as an `AsyncBufRead` [#1235](https://github.com/kube-rs/kube/issues/1235).
 
 ### OIDC Refresh
-Optional OIDC refreshable token support was introduced in #1229 under `kube/oidc` for out-of-cluster `Client` configuration. Previously, refresh support was limited to non-OIDC tokens from the `GcpOuth` provider (`kube/oauth`) or through arbitrary `exec` calls / `TokenFile` loading.
+Optional OIDC refreshable token support was introduced in [#1229](https://github.com/kube-rs/kube/issues/1229) under `kube/oidc` for out-of-cluster `Client` configuration. Previously, refresh support was limited to non-OIDC tokens from the `GcpOuth` provider (`kube/oauth`) or through arbitrary `exec` calls / `TokenFile` loading.
 
 ## What's Changed
 ### Added

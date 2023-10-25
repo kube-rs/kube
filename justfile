@@ -15,7 +15,7 @@ fmt:
   rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
 
 doc:
-  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --lib --workspace --features=derive,ws,oauth,oidc,jsonpatch,client,derive,runtime,admission,k8s-openapi/v1_26,unstable-runtime --open
+  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
 
 deny:
   # might require rm Cargo.lock first to match CI
@@ -83,11 +83,12 @@ e2e-job-musl features:
   chmod +x e2e/job
 
 k3d:
-  k3d cluster create main --servers 1 --registry-create main \
+  k3d cluster create main --servers 1 --registry-create main --image rancher/k3s:v1.27.3-k3s1 \
     --no-lb --no-rollback \
     --k3s-arg "--disable=traefik,servicelb,metrics-server@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
-    --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*'
+    --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*' \
+    --k3s-arg '--kube-apiserver-arg=feature-gates=WatchList=true'
 
 ## RELEASE RELATED
 
@@ -113,21 +114,13 @@ bump-msrv msrv:
 # Increment the Kubernetes feature version from k8s-openapi for tests; "just bump-k8s"
 bump-k8s:
   #!/usr/bin/env bash
-  current=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1)
-  next=${current::-2}$((${current:3} + 1))
-  fastmod -m -d . -e toml "$current" "$next"
-  fastmod -m "$current" "$next" -- README.md
-  fastmod -m "$current" "$next" -- justfile
+  latest=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1 | choose -f ',' 1)
   # bumping supported version also bumps our mk8sv
-  mk8svnew=${current::-2}$((${current:3} - 4))
-  mk8svold=${current::-2}$((${current:3} - 5))
+  mk8svnew=${latest::-2}$((${latest:3} - 4))
+  mk8svold=${latest::-2}$((${latest:3} - 5))
   fastmod -m -d e2e -e toml "$mk8svold" "$mk8svnew"
   fastmod -m -d .github/workflows -e yml "${mk8svold/_/\.}" "${mk8svnew/_/.}"
   # bump mk8sv badge
   badge="[![Tested against Kubernetes ${mk8svnew} and above](https://img.shields.io/badge/MK8SV-${mk8svnew}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
   echo "remember to bump kubernetes-version.md in kube-rs/website"
-
-# mode: makefile
-# End:
-# vim: set ft=make :

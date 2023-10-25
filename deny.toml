@@ -119,3 +119,7 @@ name = "redox_syscall"
 name = "windows-sys"
 [[bans.skip-tree]]
 name = "windows"
+
+[[bans.skip]]
+# deep in dependency tree, dual use via tokio and hyper  (needs a bump there)
+name = "socket2"

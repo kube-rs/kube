@@ -40,6 +40,10 @@ where
     pub fn contains_key(&self, key: &K) -> bool {
         self.futures.contains_key(key)
     }
+
+    pub fn len(&self) -> usize {
+        self.futures.len()
+    }
 }
 
 impl<K, F> Stream for FutureHashMap<K, F>

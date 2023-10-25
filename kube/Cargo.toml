@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.84.0"
+version = "0.86.0"
 description = "Kubernetes client and async controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -16,36 +16,42 @@ rust-version = "1.64.0"
 edition = "2021"
 
 [features]
-default = ["client", "openssl-tls"]
+default = ["client", "rustls-tls"]
+
+# default features
+client = ["kube-client/client", "config"]
+config = ["kube-client/config"]
 rustls-tls = ["kube-client/rustls-tls"]
+
+# alternative features
 openssl-tls = ["kube-client/openssl-tls"]
+
+# auxiliary features
 ws = ["kube-client/ws", "kube-core/ws"]
 oauth = ["kube-client/oauth"]
 oidc = ["kube-client/oidc"]
 gzip = ["kube-client/gzip"]
-client = ["kube-client/client", "config"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 derive = ["kube-derive", "kube-core/schema"]
-config = ["kube-client/config"]
 runtime = ["kube-runtime"]
 unstable-runtime = ["kube-runtime/unstable-runtime"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/v1_26", "unstable-runtime"]
+features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/latest", "unstable-runtime"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-kube-derive = { path = "../kube-derive", version = "=0.84.0", optional = true }
-kube-core = { path = "../kube-core", version = "=0.84.0" }
-kube-client = { path = "../kube-client", version = "=0.84.0", default-features = false, optional = true }
-kube-runtime = { path = "../kube-runtime", version = "=0.84.0", optional = true}
+kube-derive = { path = "../kube-derive", version = "=0.86.0", optional = true }
+kube-core = { path = "../kube-core", version = "=0.86.0" }
+kube-client = { path = "../kube-client", version = "=0.86.0", default-features = false, optional = true }
+kube-runtime = { path = "../kube-runtime", version = "=0.86.0", optional = true}
 
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
 [dependencies.k8s-openapi]
-version = "0.18.0"
+version = "0.20.0"
 default-features = false
 
 [dev-dependencies]
@@ -60,6 +66,6 @@ tower-test = "0.4.0"
 anyhow = "1.0.71"
 
 [dev-dependencies.k8s-openapi]
-version = "0.18.0"
+version = "0.20.0"
 default-features = false
-features = ["v1_26"]
+features = ["latest"]

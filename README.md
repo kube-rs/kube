@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 [![Rust 1.64](https://img.shields.io/badge/MSRV-1.64-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.64.0)
-[![Tested against Kubernetes v1_21 and above](https://img.shields.io/badge/MK8SV-v1_21-326ce5.svg)](https://kube.rs/kubernetes-version)
+[![Tested against Kubernetes v1_23 and above](https://img.shields.io/badge/MK8SV-v1_23-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 
@@ -12,12 +12,12 @@ These crates build upon Kubernetes [apimachinery](https://github.com/kubernetes/
 
 ## Installation
 
-Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) types corresponding for your cluster version:
+Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) structs at your chosen [Kubernetes version](https://kube.rs/kubernetes-version/):
 
 ```toml
 [dependencies]
-kube = { version = "0.84.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.18.0", features = ["v1_26"] }
+kube = { version = "0.86.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.20.0", features = ["latest"] }
 ```
 
 [Features are available](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
@@ -146,17 +146,17 @@ Controller::new(root_kind_api, Config::default())
 
 Here `reconcile` and `error_policy` refer to functions you define. The first will be called when the root or child elements change, and the second when the `reconciler` returns an `Err`.
 
-## Rustls
+## TLS
 
-By default `openssl` is used for TLS, but [rustls](https://github.com/ctz/rustls) is supported. To switch, turn off `default-features`, and enable the `rustls-tls` feature:
+By default [rustls](https://github.com/ctz/rustls) is used for TLS, but `openssl` is supported. To switch, turn off `default-features`, and enable the `openssl-tls` feature:
 
 ```toml
 [dependencies]
-kube = { version = "0.84.0", default-features = false, features = ["client", "rustls-tls"] }
-k8s-openapi = { version = "0.18.0", features = ["v1_26"] }
+kube = { version = "0.86.0", default-features = false, features = ["client", "openssl-tls"] }
+k8s-openapi = { version = "0.20.0", features = ["latest"] }
 ```
 
-This will pull in `rustls` and `hyper-rustls`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `openssl`.
+This will pull in `openssl` and `hyper-openssl`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `rustls`.
 
 ## musl-libc
 

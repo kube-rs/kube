@@ -522,6 +522,18 @@ mod test {
             "/api/v1/namespaces/ns/pods?&watch=true&timeoutSeconds=290&allowWatchBookmarks=true&resourceVersion=0"
         );
     }
+
+    #[test]
+    fn watch_streaming_list() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let wp = WatchParams::default().initial_events();
+        let req = Request::new(url).watch(&wp, "0").unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods?&watch=true&timeoutSeconds=290&allowWatchBookmarks=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&resourceVersion=0"
+        );
+    }
+
     #[test]
     fn watch_metadata_path() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
@@ -734,16 +746,31 @@ mod test {
     }
 
     #[test]
-    fn list_not_older() {
+    fn list_paged_any_semantic() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let gp = ListParams::default().limit(50).match_any();
+        let req = Request::new(url).list(&gp).unwrap();
+        assert_eq!(req.uri().query().unwrap(), "&limit=50");
+    }
+
+    #[test]
+    fn list_paged_with_continue_any_semantic() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let gp = ListParams::default().limit(50).continue_token("1234").match_any();
+        let req = Request::new(url).list(&gp).unwrap();
+        assert_eq!(req.uri().query().unwrap(), "&limit=50&continue=1234");
+    }
+
+    #[test]
+    fn list_paged_with_continue_starting_at() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let gp = ListParams::default()
-            .at("20")
-            .matching(VersionMatch::NotOlderThan);
+            .limit(50)
+            .continue_token("1234")
+            .at("9999")
+            .matching(VersionMatch::Exact);
         let req = Request::new(url).list(&gp).unwrap();
-        assert_eq!(
-            req.uri().query().unwrap(),
-            "&resourceVersion=20&resourceVersionMatch=NotOlderThan"
-        );
+        assert_eq!(req.uri().query().unwrap(), "&limit=50&continue=1234");
     }
 
     #[test]

@@ -1,12 +1,5 @@
 use std::collections::HashMap;
 
-use base64::{
-    alphabet,
-    engine::{
-        fast_portable::{FastPortable, FastPortableConfig},
-        DecodePaddingMode,
-    },
-};
 use chrono::{Duration, TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
@@ -137,12 +130,14 @@ pub mod errors {
     }
 }
 
-const BASE64_ENGINE: FastPortable = FastPortable::from(
-    &alphabet::URL_SAFE,
-    FastPortableConfig::new()
+use base64::Engine as _;
+const JWT_BASE64_ENGINE: base64::engine::GeneralPurpose = base64::engine::GeneralPurpose::new(
+    &base64::alphabet::URL_SAFE,
+    base64::engine::GeneralPurposeConfig::new()
         .with_decode_allow_trailing_bits(true)
-        .with_decode_padding_mode(DecodePaddingMode::Indifferent),
+        .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
 );
+use base64::engine::general_purpose::STANDARD as STANDARD_BASE64_ENGINE;
 
 #[derive(Debug)]
 pub struct Oidc {
@@ -152,7 +147,7 @@ pub struct Oidc {
 
 impl Oidc {
     /// Config key for the ID token.
-    const CONFIG_ID_TOKEN: &str = "id-token";
+    const CONFIG_ID_TOKEN: &'static str = "id-token";
     /// How many seconds before ID token expiration we want to refresh it.
     const EXPIRY_DELTA_SECONDS: i64 = 10;
 
@@ -164,7 +159,7 @@ impl Oidc {
             .split('.')
             .nth(1)
             .ok_or(errors::IdTokenError::InvalidFormat)?;
-        let payload = base64::decode_engine(part, &BASE64_ENGINE)?;
+        let payload = JWT_BASE64_ENGINE.decode(part)?;
         let expiry = serde_json::from_slice::<Claims>(&payload)?.expiry;
         let timestamp = Utc
             .timestamp_opt(expiry, 0)
@@ -251,12 +246,12 @@ compile_error!(
     "At least one of rustls-tls or openssl-tls feature must be enabled to use refresh-oidc feature"
 );
 // Current TLS feature precedence when more than one are set:
-// 1. openssl-tls
-// 2. rustls-tls
-#[cfg(feature = "openssl-tls")]
-type HttpsConnector = hyper_openssl::HttpsConnector<HttpConnector>;
-#[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+// 1. rustls-tls
+// 2. openssl-tls
+#[cfg(feature = "rustls-tls")]
 type HttpsConnector = hyper_rustls::HttpsConnector<HttpConnector>;
+#[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+type HttpsConnector = hyper_openssl::HttpsConnector<HttpConnector>;
 
 /// Struct for refreshing the ID token with the refresh token.
 #[derive(Debug)]
@@ -278,13 +273,13 @@ struct Refresher {
 
 impl Refresher {
     /// Config key for the client ID.
-    const CONFIG_CLIENT_ID: &str = "client-id";
+    const CONFIG_CLIENT_ID: &'static str = "client-id";
     /// Config key for the client secret.
-    const CONFIG_CLIENT_SECRET: &str = "client-secret";
+    const CONFIG_CLIENT_SECRET: &'static str = "client-secret";
     /// Config key for the issuer url.
-    const CONFIG_ISSUER_URL: &str = "idp-issuer-url";
+    const CONFIG_ISSUER_URL: &'static str = "idp-issuer-url";
     /// Config key for the refresh token.
-    const CONFIG_REFRESH_TOKEN: &str = "refresh-token";
+    const CONFIG_REFRESH_TOKEN: &'static str = "refresh-token";
 
     /// Create a new instance of this struct from the provider config.
     fn from_config(config: &HashMap<String, String>) -> Result<Self, errors::RefreshInitError> {
@@ -300,15 +295,14 @@ impl Refresher {
         let client_id = get_field(Self::CONFIG_CLIENT_ID)?.into();
         let client_secret = get_field(Self::CONFIG_CLIENT_SECRET)?.into();
 
-
-        #[cfg(feature = "openssl-tls")]
-        let https = hyper_openssl::HttpsConnector::new()?;
-        #[cfg(all(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+        #[cfg(feature = "rustls-tls")]
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
             .https_only()
             .enable_http1()
             .build();
+        #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+        let https = hyper_openssl::HttpsConnector::new()?;
 
         let https_client = hyper::Client::builder().build(https);
 
@@ -371,7 +365,7 @@ impl Refresher {
                     AUTHORIZATION,
                     format!(
                         "Basic {}",
-                        base64::encode(format!(
+                        STANDARD_BASE64_ENGINE.encode(format!(
                             "{}:{}",
                             self.client_id.expose_secret(),
                             self.client_secret.expose_secret()
@@ -482,7 +476,7 @@ mod tests {
         let invalid_claims_token = format!(
             "{}.{}.{}",
             token_valid.split_once('.').unwrap().0,
-            base64::encode(serde_json::to_string(&invalid_claims).unwrap()),
+            JWT_BASE64_ENGINE.encode(serde_json::to_string(&invalid_claims).unwrap()),
             token_valid.rsplit_once('.').unwrap().1,
         );
         oidc.id_token = invalid_claims_token.into();
