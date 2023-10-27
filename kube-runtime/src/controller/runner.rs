@@ -444,6 +444,18 @@ mod tests {
         advance(Duration::from_secs(3)).await;
         assert!(poll!(runner.as_mut()).is_pending());
 
+        // Send the third message again and check it's ran
+        sched_tx
+            .send(ScheduleRequest {
+                message: 3,
+                run_at: Instant::now(),
+            })
+            .await
+            .unwrap();
+        advance(Duration::from_secs(3)).await;
+        assert!(poll!(runner.as_mut()).is_pending());
+        assert_eq!(*count.lock().unwrap(), 4);
+
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
         let mut runner = Box::pin(
             Runner::new(scheduler(sched_rx), 1, |_| {

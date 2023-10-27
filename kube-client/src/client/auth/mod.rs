@@ -554,7 +554,7 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
     // Provide exec info to child process
     let exec_info = serde_json::to_string(&ExecCredential {
         api_version: auth.api_version.clone(),
-        kind: None,
+        kind: "ExecCredential".to_string().into(),
         spec: Some(ExecCredentialSpec {
             interactive: Some(interactive),
         }),
