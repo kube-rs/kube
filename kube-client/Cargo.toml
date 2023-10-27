@@ -18,6 +18,7 @@ edition = "2021"
 [features]
 default = ["client"]
 rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls"]
+webpki-roots = ["hyper-rustls/webpki-roots"]
 openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws", "tokio/macros"]
 oauth = ["client", "tame-oauth"]

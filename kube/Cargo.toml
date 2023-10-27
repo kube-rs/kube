@@ -36,6 +36,7 @@ admission = ["kube-core/admission"]
 derive = ["kube-derive", "kube-core/schema"]
 runtime = ["kube-runtime"]
 unstable-runtime = ["kube-runtime/unstable-runtime"]
+webpki-roots = ["kube-client/webpki-roots"]
 
 [package.metadata.docs.rs]
 features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/latest", "unstable-runtime"]

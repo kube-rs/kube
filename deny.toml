@@ -50,8 +50,11 @@ exceptions = [
     # included in the application. We do not distribute those data files so
     # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
     # for more details.
-    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" }
+    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
 
+    # Using the WebPKI roots for rustls is an optional feature that is off by default,
+    # so it's up to the user whether to pull in the MPL-2.0 license.
+    { allow = ["MPL-2.0"], name = "webpki-roots" },
 ]
 
 [[licenses.clarify]]
