@@ -131,6 +131,9 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
     pub fn pop_queue_message_into_pending(&mut self, cx: &mut Context<'_>) {
         while let Poll::Ready(Some(msg)) = self.queue.poll_expired(cx) {
             let msg = msg.into_inner();
+            self.scheduled.remove_entry(&msg).expect(
+                "Expired message was popped from the Scheduler queue, but was not in the metadata map",
+            );
             self.pending.insert(msg);
         }
     }
