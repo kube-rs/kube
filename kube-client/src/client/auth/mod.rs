@@ -17,7 +17,7 @@ use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
 use tower::{filter::AsyncPredicate, BoxError};
 
-use crate::config::{AuthInfo, AuthProviderConfig, ExecConfig, ExecInteractiveMode};
+use crate::config::{AuthInfo, AuthProviderConfig, ExecAuthCluster, ExecConfig, ExecInteractiveMode};
 
 #[cfg(feature = "oauth")] mod oauth;
 #[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
@@ -98,6 +98,10 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
     #[error("failed OIDC: {0}")]
     Oidc(#[source] oidc_errors::Error),
+
+    /// cluster spec missing while `provideClusterInfo` is true
+    #[error("Cluster spec must be populated when `provideClusterInfo` is true")]
+    ExecMissingClusterInfo,
 }
 
 #[derive(Debug, Clone)]
@@ -511,6 +515,9 @@ pub struct ExecCredential {
 pub struct ExecCredentialSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     interactive: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cluster: Option<ExecAuthCluster>,
 }
 
 /// ExecCredentialStatus holds credentials for the transport to use.
@@ -551,13 +558,20 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
         cmd.stdin(std::process::Stdio::piped());
     }
 
+    let mut exec_credential_spec = ExecCredentialSpec {
+        interactive: Some(interactive),
+        cluster: None,
+    };
+
+    if auth.provide_cluster_info {
+        exec_credential_spec.cluster = Some(auth.cluster.clone().ok_or(Error::ExecMissingClusterInfo)?);
+    }
+
     // Provide exec info to child process
     let exec_info = serde_json::to_string(&ExecCredential {
         api_version: auth.api_version.clone(),
         kind: "ExecCredential".to_string().into(),
-        spec: Some(ExecCredentialSpec {
-            interactive: Some(interactive),
-        }),
+        spec: Some(exec_credential_spec),
         status: None,
     })
     .map_err(Error::AuthExecSerialize)?;

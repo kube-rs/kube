@@ -9,6 +9,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{KubeconfigError, LoadDataError};
 
+/// [`CLUSTER_EXTENSION_KEY`] is reserved in the cluster extensions list for exec plugin config.
+const CLUSTER_EXTENSION_KEY: &str = "client.authentication.k8s.io/exec";
+
 /// [`Kubeconfig`] represents information on how to connect to a remote Kubernetes cluster
 ///
 /// Stored in `~/.kube/config` by default, but can be distributed across multiple paths in passed through `KUBECONFIG`.
@@ -278,6 +281,19 @@ pub struct ExecConfig {
     #[serde(rename = "interactiveMode")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interactive_mode: Option<ExecInteractiveMode>,
+
+    /// ProvideClusterInfo determines whether or not to provide cluster information,
+    /// which could potentially contain very large CA data, to this exec plugin as a
+    /// part of the KUBERNETES_EXEC_INFO environment variable. By default, it is set
+    /// to false. Package k8s.io/client-go/tools/auth/exec provides helper methods for
+    /// reading this environment variable.
+    #[serde(default, rename = "provideClusterInfo")]
+    pub provide_cluster_info: bool,
+
+    /// Cluster information to pass to the plugin.
+    /// Should be used only when `provide_cluster_info` is True.
+    #[serde(skip)]
+    pub cluster: Option<ExecAuthCluster>,
 }
 
 /// ExecInteractiveMode define the interactity of the child process
@@ -525,6 +541,58 @@ impl AuthInfo {
     }
 }
 
+/// Cluster stores information to connect Kubernetes cluster used with auth plugins
+/// that have `provideClusterInfo`` enabled.
+/// This is a copy of [`kube::config::Cluster`] with certificate_authority passed as bytes without the path.
+/// Taken from [clientauthentication/types.go#Cluster](https://github.com/kubernetes/client-go/blob/477cb782cf024bc70b7239f0dca91e5774811950/pkg/apis/clientauthentication/types.go#L73-L129)
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub struct ExecAuthCluster {
+    /// The address of the kubernetes cluster (https://hostname:port).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
+    /// Skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub insecure_skip_tls_verify: Option<bool>,
+    /// PEM-encoded certificate authority certificates. Overrides `certificate_authority`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(with = "base64serde")]
+    pub certificate_authority_data: Option<Vec<u8>>,
+    /// URL to the proxy to be used for all requests.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy_url: Option<String>,
+    /// Name used to check server certificate.
+    ///
+    /// If `tls_server_name` is `None`, the hostname used to contact the server is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_server_name: Option<String>,
+    /// This can be anything
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<serde_json::Value>,
+}
+
+impl TryFrom<&Cluster> for ExecAuthCluster {
+    type Error = KubeconfigError;
+
+    fn try_from(cluster: &crate::config::Cluster) -> Result<Self, KubeconfigError> {
+        let certificate_authority_data = cluster.load_certificate_authority()?;
+        Ok(Self {
+            server: cluster.server.clone(),
+            insecure_skip_tls_verify: cluster.insecure_skip_tls_verify,
+            certificate_authority_data,
+            proxy_url: cluster.proxy_url.clone(),
+            tls_server_name: cluster.tls_server_name.clone(),
+            config: cluster.extensions.as_ref().and_then(|extensions| {
+                extensions
+                    .iter()
+                    .find(|extension| extension.name == CLUSTER_EXTENSION_KEY)
+                    .map(|extension| extension.extension.clone())
+            }),
+        })
+    }
+}
+
 fn load_from_base64_or_file<P: AsRef<Path>>(
     value: &Option<&str>,
     file: &Option<P>,
@@ -559,6 +627,33 @@ fn ensure_trailing_newline(mut data: Vec<u8>) -> Vec<u8> {
 /// Returns kubeconfig path from `$HOME/.kube/config`.
 fn default_kube_path() -> Option<PathBuf> {
     home::home_dir().map(|h| h.join(".kube").join("config"))
+}
+
+mod base64serde {
+    use base64::Engine;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &Option<Vec<u8>>, s: S) -> Result<S::Ok, S::Error> {
+        match v {
+            Some(v) => {
+                let encoded = base64::engine::general_purpose::STANDARD.encode(v);
+                String::serialize(&encoded, s)
+            }
+            None => <Option<String>>::serialize(&None, s),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Vec<u8>>, D::Error> {
+        let data = <Option<String>>::deserialize(d)?;
+        match data {
+            Some(data) => Ok(Some(
+                base64::engine::general_purpose::STANDARD
+                    .decode(data.as_bytes())
+                    .map_err(serde::de::Error::custom)?,
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[cfg(test)]
