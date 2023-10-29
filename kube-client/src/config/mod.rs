@@ -148,8 +148,7 @@ pub struct Config {
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
     pub auth_info: AuthInfo,
-    // TODO Actually support proxy or create an example with custom client
-    /// Optional proxy URL.
+    /// Optional proxy URL. Proxy support requires the `socks5` feature.
     pub proxy_url: Option<http::Uri>,
     /// If set, apiserver certificate will be validated to contain this string
     ///
