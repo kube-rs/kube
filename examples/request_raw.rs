@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let api: Api<Node> = Api::all(client.clone());
     let nodes = api.list(&ListParams::default()).await?;
 
-    let node_names = nodes.items.iter().map(|n| n.name_any()).collect();
+    let node_names = nodes.iter().map(|n| n.name_any()).collect();
     let mut table = Table::new(node_names);
 
     for node in nodes.items {
@@ -63,7 +63,7 @@ struct Table {
 /// Represents a row in the stat table. A metric is associated with a node and
 /// collects information on the CPU and memory usage
 #[derive(Debug, Deserialize)]
-struct NodeMetric {
+struct NodeMetrics {
     #[serde(rename = "nodeName")]
     name: String,
     cpu: Metric,
@@ -139,11 +139,7 @@ impl Table {
 
     fn find_header_len(node_names: Vec<String>) -> usize {
         let max_name_len = node_names.iter().map(|n| n.len()).max().unwrap_or_else(|| 0);
-        if max_name_len > headers::NAME.len() {
-            max_name_len
-        } else {
-            headers::NAME.len()
-        }
+        std::cmp::max(max_name_len, headers::NAME.len())
     }
 }
 
