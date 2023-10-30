@@ -3,6 +3,9 @@
 //! users to query for objects or data that is not available through the
 //! clientsets (i.e. Api<K>, whether primitive or derived from a CRD).
 //! The example builds a tool similar to `kubectl top nodes`.
+//! By default, node summary metrics data is fetched by Kubernetes from the
+//! kubelet. The kubelet itself supports statistics access through CRI, or
+//! through cAdvisor.
 use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::api::resource::Quantity};
 use kube::{api::ListParams, Api, ResourceExt};
 use serde::Deserialize;
