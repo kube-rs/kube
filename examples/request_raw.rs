@@ -17,14 +17,14 @@ async fn main() -> anyhow::Result<()> {
 
     let api: Api<Node> = Api::all(client.clone());
     let nodes = api.list(&ListParams::default()).await?;
+    let mut summaries = Vec::new();
 
-    let node_names = nodes.iter().map(|n| n.name_any()).collect();
-    let mut table = Table::new(node_names);
+    for node in nodes {
+        let name = node.name_any();
 
-    for node in nodes.items {
         // Query node stats by issuing a request to the admin endpoint.
         // See https://kubernetes.io/docs/reference/instrumentation/node-metrics/
-        let url = format!("/api/v1/nodes/{}/proxy/stats/summary", node.name_any());
+        let url = format!("/api/v1/nodes/{}/proxy/stats/summary", name);
         let req = http::Request::get(url).body(Default::default())?;
 
         // Deserialize JSON response as a JSON value. Alternatively, a type that
@@ -37,35 +37,38 @@ async fn main() -> anyhow::Result<()> {
             .expect("node summary should exist in kubelet's admin endpoint");
 
         // The base JSON representation includes a lot of metrics, including
-        // container metrics. Use a `NodeMetric` type to deserialize only the
+        // container metrics. Use a `NodeMetrics` type to deserialize only the
         // values we care about.
-        let node_metric = serde_json::from_value::<NodeMetric>(summary.to_owned())?;
+        let metrics = serde_json::from_value::<NodeMetrics>(summary.to_owned())?;
 
         // Get the current allocatable values for the node we are looking at and
         // save in a table we will use to print the results.
-        let alloc = node.status.unwrap_or_default().allocatable.unwrap_or_default();
-        table.push(node_metric, alloc);
+        let allocatable = node.status.unwrap_or_default().allocatable.unwrap_or_default();
+
+        summaries.push(NodeSummary {
+            name,
+            metrics,
+            allocatable,
+        })
     }
 
-    table.print();
-
+    print_table(summaries);
     Ok(())
 }
 
-/// A stat table made up of rows. Holds a value for the longest name to properly
-/// right pad columns.
-#[derive(Debug, Default)]
-struct Table {
-    rows: Vec<(NodeMetric, NodeAlloc)>,
-    max_name_width: usize,
+/// Contains a node's stats, its total allocatable memory and CPU and its CPU
+/// and memory usage metrics.
+#[derive(Debug)]
+struct NodeSummary {
+    name: String,
+    metrics: NodeMetrics,
+    allocatable: NodeAlloc,
 }
 
-/// Represents a row in the stat table. A metric is associated with a node and
-/// collects information on the CPU and memory usage
+/// Information on the CPU and memory usage of a node as returned by its
+/// kubelet.
 #[derive(Debug, Deserialize)]
 struct NodeMetrics {
-    #[serde(rename = "nodeName")]
-    name: String,
     cpu: Metric,
     memory: Metric,
 }
@@ -86,60 +89,56 @@ enum Metric {
     Memory { usage_bytes: usize },
 }
 
-// === impl Table ===
 
-impl Table {
-    fn new(node_names: Vec<String>) -> Self {
-        Self {
-            max_name_width: Self::find_header_len(node_names),
-            ..Default::default()
-        }
-    }
+fn print_table(summaries: Vec<NodeSummary>) {
+    use headers::*;
 
-    fn push(&mut self, row: NodeMetric, alloc: NodeAlloc) {
-        self.rows.push((row, alloc))
-    }
+    // Each column (except for name) should be as wide as the length of its
+    // header plus some additional slack to make it look prettier.
+    let w_used_mem = USED_MEM.len() + 4;
+    let w_used_cpu = USED_CPU.len() + 2;
+    let w_percent_mem = PERCENT_MEM.len() + 2;
+    let w_percent_cpu = PERCENT_CPU.len() + 4;
 
-    fn print(&self) {
-        use headers::*;
+    // Width of name column should accommodate the longest node name present in
+    // the list of summaries
+    let w_name = {
+        let max_name_width = summaries
+            .iter()
+            .map(|summary| summary.name.len())
+            .max()
+            .unwrap_or_else(|| 0)
+            .max(NAME.len());
+        max_name_width + 4
+    };
 
-        let w_used_mem = USED_MEM.len() + 4;
-        let w_used_cpu = USED_CPU.len() + 2;
-        let w_percent_mem = PERCENT_MEM.len() + 2;
-        let w_percent_cpu = PERCENT_CPU.len() + 4;
-        let w_name = self.max_name_width + 4;
-
-        println!(
+    println!(
             "{NAME:w_name$} {USED_MEM:w_used_mem$} {PERCENT_MEM:w_percent_mem$} {USED_CPU:w_used_cpu$} {PERCENT_CPU:w_percent_cpu$}"
         );
-        for (row, alloc) in &self.rows {
-            // Get Node memory allocatable and trim measurement suffix.
-            let mem_total = alloc
-                .get("memory")
-                .map(|mem| {
-                    let mem = mem.0.trim_end_matches("Ki");
-                    mem.parse::<usize>().ok().unwrap_or_else(|| 1)
-                })
-                .unwrap_or_else(|| 1);
+    for summary in summaries {
+        // Get Node memory allocatable and trim measurement suffix.
+        let mem_total = summary
+            .allocatable
+            .get("memory")
+            .map(|mem| {
+                let mem = mem.0.trim_end_matches("Ki");
+                mem.parse::<usize>().ok().unwrap_or_else(|| 1)
+            })
+            .unwrap_or_else(|| 1);
 
-            // CPU allocatable quantity on the node does not have a measurement,
-            // but is assumed to be whole cores.
-            let cpu_total = alloc
-                .get("cpu")
-                .map(|mem| mem.0.parse::<usize>().ok().unwrap_or_else(|| 1))
-                .unwrap_or_else(|| 1);
+        // CPU allocatable quantity on the node does not have a measurement,
+        // but is assumed to be whole cores.
+        let cpu_total = summary
+            .allocatable
+            .get("cpu")
+            .map(|mem| mem.0.parse::<usize>().ok().unwrap_or_else(|| 1))
+            .unwrap_or_else(|| 1);
 
-            let name = row.name.clone();
-            let (percent_mem, used_mem) = row.memory.convert_to_stat(mem_total);
-            let (percent_cpu, used_cpu) = row.cpu.convert_to_stat(cpu_total);
+        let name = summary.name;
+        let (percent_mem, used_mem) = summary.metrics.memory.convert_to_stat(mem_total);
+        let (percent_cpu, used_cpu) = summary.metrics.cpu.convert_to_stat(cpu_total);
 
-            println!("{name:w_name$} {used_mem:<w_used_mem$} {percent_mem:<w_percent_mem$} {used_cpu:<w_used_cpu$} {percent_cpu:<w_percent_cpu$}");
-        }
-    }
-
-    fn find_header_len(node_names: Vec<String>) -> usize {
-        let max_name_len = node_names.iter().map(|n| n.len()).max().unwrap_or_else(|| 0);
-        std::cmp::max(max_name_len, headers::NAME.len())
+        println!("{name:w_name$} {used_mem:<w_used_mem$} {percent_mem:<w_percent_mem$} {used_cpu:<w_used_cpu$} {percent_cpu:<w_percent_cpu$}");
     }
 }
 
