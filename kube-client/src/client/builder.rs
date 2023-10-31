@@ -94,7 +94,7 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 
 /// Helper function for implementation of [`TryFrom<Config>`] for [`ClientBuilder`].
 /// Ignores [`Config::proxy_url`], which at this point is already handled.
-fn make_generic_builder<H>(base_connector: H, config: Config) -> Result<ClientBuilder<GenericService>, Error>
+fn make_generic_builder<H>(connector: H, config: Config) -> Result<ClientBuilder<GenericService>, Error>
 where
     H: 'static + Clone + Send + Sync + Service<http::Uri>,
     H::Response: 'static + Connection + AsyncRead + AsyncWrite + Send + Unpin,
@@ -111,9 +111,9 @@ where
         // Create a custom client to use something else.
         // If TLS features are not enabled, http connector will be used.
         #[cfg(feature = "rustls-tls")]
-        let connector = config.rustls_https_connector_with_connector(base_connector)?;
+        let connector = config.rustls_https_connector_with_connector(connector)?;
         #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
-        let connector = config.openssl_https_connector_with_connector(base_connector)?;
+        let connector = config.openssl_https_connector_with_connector(connector)?;
         #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
         if auth_layer.is_none() || config.cluster_url.scheme() == Some(&http::uri::Scheme::HTTPS) {
             // no tls stack situation only works on anonymous auth with http scheme
