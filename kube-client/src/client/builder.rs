@@ -116,7 +116,7 @@ where
         let connector = config.openssl_https_connector_with_connector(connector)?;
         #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
         if config.cluster_url.scheme() == Some(&http::uri::Scheme::HTTPS) {
-            // no tls stack situation only works on anonymous auth with http scheme
+            // no tls stack situation only works with http scheme
             return Err(Error::TlsRequired);
         }
 
