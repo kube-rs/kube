@@ -7,9 +7,31 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.87.1...main
 
-0.87.1 / 2023-11-01
+[0.87.1](https://github.com/kube-rs/kube/releases/tag/0.87.1) / 2023-11-01
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.87.1 -->
+## Headlines
+- fixed a `Controller` issue with reconciliation requests disappearing when using `concurrency` #1324
+- improved `Client` with better exec auth behaviour #1320, timeout control #1314, and socks5 proxy handling #1311
+- small changes to an unstable streams feature #1304, and a a derive property that is now illegal with `syn` 2 #1307
 
+Big thanks to everyone involved 🎃
+
+## What's Changed
+### Added
+* Feature-flagged support for `socks5` proxy in `Client` by @Razz4780 in https://github.com/kube-rs/kube/pull/1311
+* Add example for raw API Server requests by @mateiidavid in https://github.com/kube-rs/kube/pull/1330
+### Changed
+* Document `Controller::reconcile_on`  and remove `Err` input requirement by @clux in https://github.com/kube-rs/kube/pull/1304
+* Bump `base64` to `0.21` by @clux in https://github.com/kube-rs/kube/pull/1308
+* Upgrade `darling` and `syn` and rename `#[kube(struct)]` by @clux in https://github.com/kube-rs/kube/pull/1307
+### Fixed
+* Fixed `KUBERNETES_EXEC_INFO` environment variable passed to auth plugins by @Razz4780 in https://github.com/kube-rs/kube/pull/1320
+* Fix `Controller`: pending messages are stuck in the `scheduled` map by @co42 in https://github.com/kube-rs/kube/pull/1324
+* Set a default write timeout by @alex-hunt-materialize in https://github.com/kube-rs/kube/pull/1314
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/0.86.0...0.87.1
 [0.86.0](https://github.com/kube-rs/kube/releases/tag/0.86.0) / 2023-09-08
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.86.0 -->
