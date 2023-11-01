@@ -5,7 +5,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.86.0...main
+ * see https://github.com/kube-rs/kube/compare/0.87.1...main
+
+0.87.1 / 2023-11-01
+===================
 
 [0.86.0](https://github.com/kube-rs/kube/releases/tag/0.86.0) / 2023-09-08
 ===================
@@ -20,7 +23,7 @@ As usual, [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to a
 With last year's upstream changes from rustls (closing all our existing rustls issues - see https://github.com/kube-rs/kube/issues/1192), this is now the better choice for security, features, and ease of building. The previous default openssl stack can still be used with `default-features = false` plus the `openssl-tls` feature.
 
 ### Controller Configuration
-A controller [`Config`](https://docs.rs/kube/latest/kube/runtime/struct.Config.html) has been added to allow tweaking two behaviour parameters (debouncing  in #1265 and concurrency limits in #1277) of the `Controller`. Huge thanks to @aryan9600 for his work.
+A controller [`Config`](https://docs.rs/kube/latest/kube/runtime/struct.Config.html) has been added to allow tweaking two behaviour parameters (debouncing  in [#1265](https://github.com/kube-rs/kube/issues/1265) and concurrency limits in [#1277](https://github.com/kube-rs/kube/issues/1277)) of the `Controller`. Huge thanks to @aryan9600 for his work.
 
 ### Streaming Lists
 The `sendInitialEvents` [alpha feature](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists) is now [supported](https://docs.rs/kube/latest/kube/runtime/watcher/struct.Config.html#structfield.initial_list_strategy), and is quickly testable in the [pod_watcher example](https://github.com/kube-rs/kube/blob/c8e98285362e1d0739c56baf27aaab703051dcd4/examples/pod_watcher.rs#L15-L21) when using the [feature gate](https://github.com/kube-rs/kube/blob/c8e98285362e1d0739c56baf27aaab703051dcd4/justfile#L91). This will help [optimise](https://kube.rs/controllers/optimization/) the memory profile of controllers when the feature becomes generally available. Amazing work by first time contributor @casualjim.
