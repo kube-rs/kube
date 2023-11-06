@@ -658,8 +658,10 @@ mod base64serde {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::file_loader::ConfigLoader;
+
     use super::*;
-    use serde_json::Value;
+    use serde_json::{json, Value};
     use std::str::FromStr;
 
     #[test]
@@ -916,5 +918,49 @@ password: kube_rs
         }";
 
         assert_eq!(authinfo_debug_output, expected_output)
+    }
+
+    #[tokio::test]
+    async fn authinfo_exec_provide_cluster_info() {
+        let config = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://localhost:8080
+    extensions:
+    - name: client.authentication.k8s.io/exec
+      extension:
+        audience: foo
+        other: bar
+  name: foo-cluster
+contexts:
+- context:
+    cluster: foo-cluster
+    user: foo-user
+    namespace: bar
+  name: foo-context
+current-context: foo-context
+kind: Config
+users:
+- name: foo-user
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1alpha1
+      args:
+      - arg-1
+      - arg-2
+      command: foo-command
+      provideClusterInfo: true
+"#;
+        let kube_config = Kubeconfig::from_yaml(config).unwrap();
+        let config_loader = ConfigLoader::load(kube_config, None, None, None).await.unwrap();
+        let auth_info = config_loader.user;
+        let exec = auth_info.exec.unwrap();
+        assert!(exec.provide_cluster_info);
+        let cluster = exec.cluster.unwrap();
+        assert_eq!(
+            cluster.config.unwrap(),
+            json!({"audience": "foo", "other": "bar"})
+        );
     }
 }
