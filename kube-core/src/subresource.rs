@@ -355,7 +355,9 @@ impl Request {
 /// Cheap sanity check to ensure type maps work as expected
 #[cfg(test)]
 mod test {
+    use super::Time;
     use crate::{request::Request, resource::Resource};
+    use chrono::{DateTime, TimeZone, Utc};
     use k8s::core::v1 as corev1;
     use k8s_openapi::api as k8s;
 
@@ -371,11 +373,28 @@ mod test {
             pretty: true,
             previous: true,
             since_seconds: Some(3600),
+            since_time: None,
             tail_lines: Some(4096),
             timestamps: true,
         };
         let req = Request::new(url).logs("mypod", &lp).unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/mypod/log?&container=nginx&follow=true&limitBytes=10485760&pretty=true&previous=true&sinceSeconds=3600&tailLines=4096&timestamps=true");
+    }
+
+    #[test]
+    fn logs_since_time() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let date: DateTime<Utc> = Utc.with_ymd_and_hms(2023, 10, 19, 13, 14, 26).unwrap();
+        let lp = LogParams {
+            since_seconds: None,
+            since_time: Some(Time(date)),
+            ..Default::default()
+        };
+        let req = Request::new(url).logs("mypod", &lp).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods/mypod/log?&sinceTime=2023-10-19T13%3A14%3A26Z" // cross-referenced with kubectl
+        );
     }
 }
 
