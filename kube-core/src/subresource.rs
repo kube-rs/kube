@@ -354,7 +354,6 @@ impl Request {
 /// Cheap sanity check to ensure type maps work as expected
 #[cfg(test)]
 mod test {
-    use super::Time;
     use crate::{request::Request, resource::Resource};
     use chrono::{DateTime, TimeZone, Utc};
     use k8s::core::v1 as corev1;
