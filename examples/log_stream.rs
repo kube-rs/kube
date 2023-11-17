@@ -1,7 +1,6 @@
 use futures::{AsyncBufReadExt, TryStreamExt};
 use k8s_openapi::{
     api::core::v1::Pod,
-    apimachinery::pkg::apis::meta::v1::Time,
     chrono::{DateTime, Utc},
 };
 use kube::{
@@ -50,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
             container: app.container,
             tail_lines: app.tail,
             since_seconds: app.since,
-            since_time: app.since_time.map(|st| Time(st)),
+            since_time: app.since_time,
             timestamps: app.timestamps,
             ..LogParams::default()
         })

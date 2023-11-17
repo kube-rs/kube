@@ -7,7 +7,6 @@ use crate::{
 };
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 
 // ----------------------------------------------------------------------------
 // Log subresource
@@ -35,7 +34,7 @@ pub struct LogParams {
     /// precedes the time a pod was started, only logs since the pod start will be returned.
     /// If this value is in the future, no logs will be returned.
     /// Only one of sinceSeconds or sinceTime may be specified.
-    pub since_time: Option<Time>,
+    pub since_time: Option<chrono::DateTime<chrono::Utc>>,
     /// If set, the number of lines from the end of the logs to show.
     /// If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime
     pub tail_lines: Option<i64>,
@@ -72,7 +71,7 @@ impl Request {
         if let Some(ss) = &lp.since_seconds {
             qp.append_pair("sinceSeconds", &ss.to_string());
         } else if let Some(st) = &lp.since_time {
-            let ser_since = st.0.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let ser_since = st.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
             qp.append_pair("sinceTime", &ser_since);
         }
 
@@ -387,7 +386,7 @@ mod test {
         let date: DateTime<Utc> = Utc.with_ymd_and_hms(2023, 10, 19, 13, 14, 26).unwrap();
         let lp = LogParams {
             since_seconds: None,
-            since_time: Some(Time(date)),
+            since_time: Some(date),
             ..Default::default()
         };
         let req = Request::new(url).logs("mypod", &lp).unwrap();
