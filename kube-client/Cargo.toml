@@ -45,7 +45,7 @@ serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
 serde_yaml = { version = "0.9.19", optional = true }
 http = "0.2.5"
-http-body = { version = "0.4.2", optional = true }
+http-body = { version = "1.0.0", optional = true }
 either = { version = "1.6.1", optional = true }
 thiserror = "1.0.29"
 futures = { version = "0.3.17", optional = true }
