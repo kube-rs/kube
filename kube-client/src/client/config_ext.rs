@@ -1,10 +1,13 @@
 use std::sync::Arc;
 
 use http::{header::HeaderName, HeaderValue};
+use hyper_tls::HttpsConnector;
+use hyper_util::client::legacy::connect::HttpConnector;
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] use super::tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
+use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},
@@ -26,7 +29,7 @@ pub trait ConfigExt: private::Sealed {
     /// Layer to add non-authn HTTP headers depending on the config.
     fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer>;
 
-    /// Create [`hyper_rustls::HttpsConnector`] based on config.
+    /// Create [`HttpsConnector`] based on config.
     ///
     /// # Example
     ///
@@ -41,16 +44,16 @@ pub trait ConfigExt: private::Sealed {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
-    fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
+    fn rustls_https_connector(&self) -> Result<HttpsConnector<HttpConnector>>;
 
-    /// Create [`hyper_rustls::HttpsConnector`] based on config and `connector`.
+    /// Create [`HttpsConnector`] based on config and `connector`.
     ///
     /// # Example
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
     /// # use kube::{client::ConfigExt, Config};
-    /// # use hyper::client::HttpConnector;
+    /// # use hyper_util::client::legacy::connect::HttpConnector;
     /// let config = Config::infer().await?;
     /// let mut connector = HttpConnector::new();
     /// connector.enforce_http(false);
@@ -71,7 +74,7 @@ pub trait ConfigExt: private::Sealed {
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use hyper::client::HttpConnector;
+    /// # use hyper_util::client::legacy::connect::HttpConnector;
     /// # use kube::{client::ConfigExt, Config};
     /// let config = Config::infer().await?;
     /// let https = {
@@ -87,7 +90,7 @@ pub trait ConfigExt: private::Sealed {
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig>;
 
-    /// Create [`hyper_openssl::HttpsConnector`] based on config.
+    /// Create [`HttpsConnector`] based on config.
     /// # Example
     ///
     /// ```rust
@@ -100,14 +103,14 @@ pub trait ConfigExt: private::Sealed {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
     #[cfg(feature = "openssl-tls")]
-    fn openssl_https_connector(&self) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>>;
+    fn openssl_https_connector(&self) -> Result<HttpsConnector<HttpConnector>>;
 
-    /// Create [`hyper_openssl::HttpsConnector`] based on config and `connector`.
+    /// Create [`HttpsConnector`] based on config and `connector`.
     /// # Example
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use hyper::client::HttpConnector;
+    /// # use hyper_util::client::legacy::connect::HttpConnector;
     /// # use kube::{client::ConfigExt, Config};
     /// let mut http = HttpConnector::new();
     /// http.enforce_http(false);
@@ -134,7 +137,7 @@ pub trait ConfigExt: private::Sealed {
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use hyper::client::HttpConnector;
+    /// # use hyper_util::client::legacy::connect::HttpConnector;
     /// # use kube::{client::ConfigExt, Client, Config};
     /// let config = Config::infer().await?;
     /// let https = {
@@ -214,8 +217,8 @@ impl ConfigExt for Config {
     }
 
     #[cfg(feature = "rustls-tls")]
-    fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
-        let mut connector = hyper::client::HttpConnector::new();
+    fn rustls_https_connector(&self) -> Result<HttpsConnector<HttpConnector>> {
+        let mut connector = HttpConnector::new();
         connector.enforce_http(false);
         self.rustls_https_connector_with_connector(connector)
     }
@@ -244,17 +247,14 @@ impl ConfigExt for Config {
     }
 
     #[cfg(feature = "openssl-tls")]
-    fn openssl_https_connector(&self) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>> {
-        let mut connector = hyper::client::HttpConnector::new();
+    fn openssl_https_connector(&self) -> Result<HttpsConnector<HttpConnector>> {
+        let mut connector = HttpConnector::new();
         connector.enforce_http(false);
         self.openssl_https_connector_with_connector(connector)
     }
 
     #[cfg(feature = "openssl-tls")]
-    fn openssl_https_connector_with_connector<H>(
-        &self,
-        connector: H,
-    ) -> Result<hyper_openssl::HttpsConnector<H>>
+    fn openssl_https_connector_with_connector<H>(&self, connector: H) -> Result<HttpsConnector<H>>
     where
         H: tower::Service<http::Uri> + Send,
         H::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
