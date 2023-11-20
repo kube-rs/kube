@@ -30,6 +30,11 @@ pub struct LogParams {
     /// If this value precedes the time a pod was started, only logs since the pod start will be returned.
     /// If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.
     pub since_seconds: Option<i64>,
+    /// An RFC3339 timestamp from which to show logs. If this value
+    /// precedes the time a pod was started, only logs since the pod start will be returned.
+    /// If this value is in the future, no logs will be returned.
+    /// Only one of sinceSeconds or sinceTime may be specified.
+    pub since_time: Option<chrono::DateTime<chrono::Utc>>,
     /// If set, the number of lines from the end of the logs to show.
     /// If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime
     pub tail_lines: Option<i64>,
@@ -65,6 +70,9 @@ impl Request {
 
         if let Some(ss) = &lp.since_seconds {
             qp.append_pair("sinceSeconds", &ss.to_string());
+        } else if let Some(st) = &lp.since_time {
+            let ser_since = st.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            qp.append_pair("sinceTime", &ser_since);
         }
 
         if let Some(tl) = &lp.tail_lines {
@@ -347,6 +355,7 @@ impl Request {
 #[cfg(test)]
 mod test {
     use crate::{request::Request, resource::Resource};
+    use chrono::{DateTime, TimeZone, Utc};
     use k8s::core::v1 as corev1;
     use k8s_openapi::api as k8s;
 
@@ -362,11 +371,28 @@ mod test {
             pretty: true,
             previous: true,
             since_seconds: Some(3600),
+            since_time: None,
             tail_lines: Some(4096),
             timestamps: true,
         };
         let req = Request::new(url).logs("mypod", &lp).unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/mypod/log?&container=nginx&follow=true&limitBytes=10485760&pretty=true&previous=true&sinceSeconds=3600&tailLines=4096&timestamps=true");
+    }
+
+    #[test]
+    fn logs_since_time() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let date: DateTime<Utc> = Utc.with_ymd_and_hms(2023, 10, 19, 13, 14, 26).unwrap();
+        let lp = LogParams {
+            since_seconds: None,
+            since_time: Some(date),
+            ..Default::default()
+        };
+        let req = Request::new(url).logs("mypod", &lp).unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods/mypod/log?&sinceTime=2023-10-19T13%3A14%3A26Z" // cross-referenced with kubectl
+        );
     }
 }
 
