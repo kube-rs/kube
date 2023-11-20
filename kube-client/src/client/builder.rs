@@ -1,10 +1,10 @@
 use bytes::Bytes;
 use http::{header::HeaderMap, Request, Response};
-use hyper::{
-    self,
-    client::{connect::Connection, HttpConnector},
-};
+use http_body::Body;
+use hyper::client::conn::http1::{Builder as HyperBuilder, Connection};
 use hyper_timeout::TimeoutConnector;
+use hyper_tls::HttpsConnector;
+use hyper_util::client::legacy::connect::HttpConnector; //uh private?
 pub use kube_core::response::Status;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -18,7 +18,7 @@ use crate::{client::ConfigExt, Client, Config, Error, Result};
 
 /// HTTP body of a dynamic backing type.
 ///
-/// The suggested implementation type is [`hyper::Body`].
+/// The suggested implementation type is [`Body`].
 pub type DynBody = dyn http_body::Body<Data = Bytes, Error = BoxError> + Send + Unpin;
 
 /// Builder for [`Client`] instances with customized [tower](`Service`) middleware.
@@ -34,7 +34,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// which provides a default stack as a starting point.
     pub fn new(service: Svc, default_namespace: impl Into<String>) -> Self
     where
-        Svc: Service<Request<hyper::Body>>,
+        Svc: Service<Request<dyn Body>>,
     {
         Self {
             service,
@@ -57,7 +57,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// Build a [`Client`] instance with the current [`Service`] stack.
     pub fn build<B>(self) -> Client
     where
-        Svc: Service<Request<hyper::Body>, Response = Response<B>> + Send + 'static,
+        Svc: Service<Request<dyn Body>, Response = Response<B>> + Send + 'static,
         Svc::Future: Send + 'static,
         Svc::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
@@ -67,7 +67,7 @@ impl<Svc> ClientBuilder<Svc> {
     }
 }
 
-pub type GenericService = BoxService<Request<hyper::Body>, Response<Box<DynBody>>, BoxError>;
+pub type GenericService = BoxService<Request<dyn Body>, Response<Box<DynBody>>, BoxError>;
 
 impl TryFrom<Config> for ClientBuilder<GenericService> {
     type Error = Error;
@@ -97,14 +97,14 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 fn make_generic_builder<H>(connector: H, config: Config) -> Result<ClientBuilder<GenericService>, Error>
 where
     H: 'static + Clone + Send + Sync + Service<http::Uri>,
-    H::Response: 'static + Connection + AsyncRead + AsyncWrite + Send + Unpin,
+    H::Response: 'static + AsyncRead + AsyncWrite + Send + Unpin,
     H::Future: 'static + Send,
     H::Error: 'static + Send + Sync + std::error::Error,
 {
     let default_ns = config.default_namespace.clone();
     let auth_layer = config.auth_layer()?;
 
-    let client: hyper::Client<_, hyper::Body> = {
+    let client = {
         // Current TLS feature precedence when more than one are set:
         // 1. rustls-tls
         // 2. openssl-tls
@@ -127,7 +127,7 @@ where
         connector.set_read_timeout(config.read_timeout);
         connector.set_write_timeout(config.write_timeout);
 
-        hyper::Client::builder().build(connector)
+        HyperBuilder::builder().build(connector)
     };
 
     let stack = ServiceBuilder::new().layer(config.base_uri_layer()).into_inner();
@@ -145,7 +145,7 @@ where
             // Attribute names follow [Semantic Conventions].
             // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
             TraceLayer::new_for_http()
-                .make_span_with(|req: &Request<hyper::Body>| {
+                .make_span_with(|req: &Request<Body>| {
                     tracing::debug_span!(
                         "HTTP",
                          http.method = %req.method(),
@@ -156,10 +156,10 @@ where
                          otel.status_code = tracing::field::Empty,
                     )
                 })
-                .on_request(|_req: &Request<hyper::Body>, _span: &Span| {
+                .on_request(|_req: &Request<Body>, _span: &Span| {
                     tracing::debug!("requesting");
                 })
-                .on_response(|res: &Response<hyper::Body>, _latency: Duration, span: &Span| {
+                .on_response(|res: &Response<Body>, _latency: Duration, span: &Span| {
                     let status = res.status();
                     span.record("http.status_code", status.as_u16());
                     if status.is_client_error() || status.is_server_error() {
