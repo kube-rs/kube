@@ -10,7 +10,9 @@
 use either::{Either, Left, Right};
 use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
-use hyper::Body;
+use http_body::Body;
+use http_body_util::BodyStream;
+use hyper::body::Incoming;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
@@ -65,7 +67,7 @@ pub use builder::{ClientBuilder, DynBody};
 pub struct Client {
     // - `Buffer` for cheap clone
     // - `BoxService` for dynamic response future type
-    inner: Buffer<BoxService<Request<Body>, Response<Body>, BoxError>, Request<Body>>,
+    inner: Buffer<BoxService<Request<Incoming>, Response<Incoming>, BoxError>, Request<Incoming>>,
     default_ns: String,
 }
 
@@ -99,7 +101,7 @@ impl Client {
     /// ```
     pub fn new<S, B, T>(service: S, default_namespace: T) -> Self
     where
-        S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
+        S: Service<Request<Incoming>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
@@ -107,7 +109,7 @@ impl Client {
         T: Into<String>,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
-        let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
+        let service = MapResponseBodyLayer::new(|b: B| BodyStream::new(b.into_stream()))
             .layer(service)
             .map_err(|e| e.into());
         Self {
@@ -141,7 +143,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and return the raw response back.
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
-    pub async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
+    pub async fn send(&self, request: Request<Incoming>) -> Result<Response<Incoming>> {
         let mut svc = self.inner.clone();
         let res = svc
             .ready()

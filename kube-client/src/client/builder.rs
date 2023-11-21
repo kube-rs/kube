@@ -1,10 +1,13 @@
 use bytes::Bytes;
 use http::{header::HeaderMap, Request, Response};
-use http_body::Body;
-use hyper::client::conn::http1::{Builder as HyperBuilder, Connection};
+use http_body_util::{combinators::BoxBody, BodyExt, StreamBody};
+use hyper::{
+    body::{Body, Incoming},
+    client::conn::http1::{Builder as HyperBuilder, Connection},
+};
 use hyper_timeout::TimeoutConnector;
 use hyper_tls::HttpsConnector;
-use hyper_util::client::legacy::connect::HttpConnector; //uh private?
+use hyper_util::client::legacy::connect::HttpConnector;
 pub use kube_core::response::Status;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -18,8 +21,8 @@ use crate::{client::ConfigExt, Client, Config, Error, Result};
 
 /// HTTP body of a dynamic backing type.
 ///
-/// The suggested implementation type is [`Body`].
-pub type DynBody = dyn http_body::Body<Data = Bytes, Error = BoxError> + Send + Unpin;
+/// The suggested implementation type is [`hyper::Incoming`].
+pub type DynBody = dyn Body<Data = Bytes, Error = BoxError> + Send + Unpin;
 
 /// Builder for [`Client`] instances with customized [tower](`Service`) middleware.
 pub struct ClientBuilder<Svc> {
@@ -34,7 +37,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// which provides a default stack as a starting point.
     pub fn new(service: Svc, default_namespace: impl Into<String>) -> Self
     where
-        Svc: Service<Request<dyn Body>>,
+        Svc: Service<Request<Incoming>>,
     {
         Self {
             service,
@@ -57,7 +60,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// Build a [`Client`] instance with the current [`Service`] stack.
     pub fn build<B>(self) -> Client
     where
-        Svc: Service<Request<dyn Body>, Response = Response<B>> + Send + 'static,
+        Svc: Service<Request<Incoming>, Response = Response<B>> + Send + 'static,
         Svc::Future: Send + 'static,
         Svc::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
@@ -67,7 +70,7 @@ impl<Svc> ClientBuilder<Svc> {
     }
 }
 
-pub type GenericService = BoxService<Request<dyn Body>, Response<Box<DynBody>>, BoxError>;
+pub type GenericService = BoxService<Request<Incoming>, Response<Box<DynBody>>, BoxError>;
 
 impl TryFrom<Config> for ClientBuilder<GenericService> {
     type Error = Error;

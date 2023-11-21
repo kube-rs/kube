@@ -23,7 +23,7 @@ ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws", "tokio/macros"]
 oauth = ["client", "tame-oauth"]
 oidc = ["client", "form_urlencoded"]
 gzip = ["client", "tower-http/decompression-gzip"]
-client = ["config", "__non_core", "hyper", "http-body", "hyper-tls", "hyper-util", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
+client = ["config", "__non_core", "hyper", "http-body", "hyper-tls", "hyper-util", "http-body-util", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
@@ -62,6 +62,7 @@ hyper = { version = "1.0.1", optional = true, features = ["client", "http1"] }
 hyper-rustls = { version = "0.24.0", optional = true }
 hyper-tls = { version = "0.5.0", optional = true }
 hyper-util = { version = "0.1.1", optional = true, features = ["client-legacy", "tokio"] }
+http-body-util = { version = "0.1.0", optional = true }
 hyper-socks2 = { version = "0.8.0", optional = true, default-features = false }
 tokio-tungstenite = { version = "0.20.0", optional = true }
 tower = { version = "0.4.13", optional = true, features = ["buffer", "filter", "util"] }
