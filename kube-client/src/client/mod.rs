@@ -11,8 +11,8 @@ use either::{Either, Left, Right};
 use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
 use http_body::Body;
-use http_body_util::BodyStream;
-use hyper::body::Incoming;
+use http_body_util::{BodyExt, BodyStream, Full};
+use hyper::body::{Bytes, Incoming};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
@@ -67,7 +67,7 @@ pub use builder::{ClientBuilder, DynBody};
 pub struct Client {
     // - `Buffer` for cheap clone
     // - `BoxService` for dynamic response future type
-    inner: Buffer<BoxService<Request<Incoming>, Response<Incoming>, BoxError>, Request<Incoming>>,
+    inner: Buffer<BoxService<Request<Incoming>, Response<Full<Bytes>>, BoxError>, Request<Incoming>>,
     default_ns: String,
 }
 
@@ -143,7 +143,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and return the raw response back.
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
-    pub async fn send(&self, request: Request<Incoming>) -> Result<Response<Incoming>> {
+    pub async fn send(&self, request: Request<Incoming>) -> Result<Response<Full<Bytes>>> {
         let mut svc = self.inner.clone();
         let res = svc
             .ready()
@@ -227,13 +227,11 @@ impl Client {
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
     pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
-        let res = self.send(request.map(Body::from)).await?;
+        let res = self.send(request.map(Incoming::from)).await?; // TODO
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
-        let body_bytes = hyper::body::to_bytes(res.into_body())
-            .await
-            .map_err(Error::HyperError)?;
-        let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
+        let body_bytes = res.into_body().collect().await;
+        let text = String::from_utf8(body_bytes.to_bytes()).map_err(Error::FromUtf8)?;
         handle_api_errors(&text, status)?;
 
         Ok(text)
