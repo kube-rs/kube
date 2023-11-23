@@ -226,11 +226,11 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
-    pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
-        let res = self.send(request.map(Incoming::from)).await?; // TODO
+    pub async fn request_text(&self, request: Request<Incoming>) -> Result<String> {
+        let res = self.send(request).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
-        let body_bytes = res.into_body().collect().await;
+        let body_bytes = res.into_body().collect().await.unwrap(); // Infallible
         let text = String::from_utf8(body_bytes.to_bytes()).map_err(Error::FromUtf8)?;
         handle_api_errors(&text, status)?;
 
@@ -241,8 +241,8 @@ impl Client {
     ///
     /// The response can be processed using [`AsyncReadExt`](futures::AsyncReadExt)
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
-    pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead> {
-        let res = self.send(request.map(Body::from)).await?;
+    pub async fn request_stream(&self, request: Request<Incoming>) -> Result<impl AsyncBufRead> {
+        let res = self.send(request).await?;
         // Map the error, since we want to convert this into an `AsyncBufReader` using
         // `into_async_read` which specifies `std::io::Error` as the stream's error type.
         let body = res

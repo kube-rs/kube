@@ -148,7 +148,7 @@ where
             // Attribute names follow [Semantic Conventions].
             // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
             TraceLayer::new_for_http()
-                .make_span_with(|req: &Request<Body>| {
+                .make_span_with(|req: &Request<Incoming>| {
                     tracing::debug_span!(
                         "HTTP",
                          http.method = %req.method(),
@@ -159,10 +159,10 @@ where
                          otel.status_code = tracing::field::Empty,
                     )
                 })
-                .on_request(|_req: &Request<Body>, _span: &Span| {
+                .on_request(|_req: &Request<Incoming>, _span: &Span| {
                     tracing::debug!("requesting");
                 })
-                .on_response(|res: &Response<Body>, _latency: Duration, span: &Span| {
+                .on_response(|res: &Response<Incoming>, _latency: Duration, span: &Span| {
                     let status = res.status();
                     span.record("http.status_code", status.as_u16());
                     if status.is_client_error() || status.is_server_error() {
