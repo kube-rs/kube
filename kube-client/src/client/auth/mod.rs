@@ -10,7 +10,7 @@ use http::{
     header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,
 };
-use jsonpath_lib::select as jsonpath_select;
+use jsonpath_rust::JsonPathInst;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -440,9 +440,9 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
         if let Some(field) = provider.config.get("token-key") {
             let json_output: serde_json::Value =
                 serde_json::from_slice(&output.stdout).map_err(Error::ParseTokenKey)?;
-            let token = extract_value(&json_output, field)?;
+            let token = extract_value(&json_output, "token-key", field)?;
             if let Some(field) = provider.config.get("expiry-key") {
-                let expiry = extract_value(&json_output, field)?;
+                let expiry = extract_value(&json_output, "expiry-key", field)?;
                 let expiry = expiry
                     .parse::<DateTime<Utc>>()
                     .map_err(Error::MalformedTokenExpirationDate)?;
@@ -474,22 +474,32 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     }
 }
 
-fn extract_value(json: &serde_json::Value, path: &str) -> Result<String, Error> {
-    let pure_path = path.trim_matches(|c| c == '"' || c == '{' || c == '}');
-    match jsonpath_select(json, &format!("${pure_path}")) {
-        Ok(v) if !v.is_empty() => {
-            if let serde_json::Value::String(res) = v[0] {
-                Ok(res.clone())
-            } else {
-                Err(Error::AuthExec(format!(
-                    "Target value at {pure_path:} is not a string"
-                )))
-            }
-        }
+fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<String, Error> {
+    let parsed_path = path
+        .trim_matches(|c| c == '"' || c == '{' || c == '}')
+        .parse::<JsonPathInst>()
+        .map_err(|err| {
+            Error::AuthExec(format!(
+                "Failed to parse {context:?} as a JsonPath: {path}\n
+                 Error: {err}"
+            ))
+        })?;
 
-        Err(e) => Err(Error::AuthExec(format!("Could not extract JSON value: {e:}"))),
+    let res = parsed_path.find_slice(json);
 
-        _ => Err(Error::AuthExec(format!("Target value {pure_path:} not found"))),
+    let Some(res) = res.into_iter().next() else {
+        return Err(Error::AuthExec(format!(
+            "Target {context:?} value {path:?} not found"
+        )));
+    };
+
+    if let Some(val) = res.as_str() {
+        Ok(val.to_owned())
+    } else {
+        Err(Error::AuthExec(format!(
+            "Target {:?} value {:?} is not a string: {:?}",
+            context, path, *res
+        )))
     }
 }
 
