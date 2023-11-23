@@ -30,7 +30,7 @@ assert-json-diff = "2.0.1"
 garde = { version = "0.16.1", default-features = false, features = ["derive"] }
 anyhow = "1.0.44"
 futures = "0.3.17"
-jsonpath_lib = "0.3.0"
+jsonpath-rust = "0.3.4"
 kube = { path = "../kube", version = "^0.87.1", default-features = false, features = ["admission"] }
 kube-derive = { path = "../kube-derive", version = "^0.87.1", default-features = false } # only needed to opt out of schema
 k8s-openapi = { version = "0.20.0", default-features = false }
