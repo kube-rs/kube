@@ -83,12 +83,18 @@ impl ConfigLoader {
             .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
         let user_name = user.unwrap_or(&current_context.user);
-        let user = config
+        let mut user = config
             .auth_infos
             .iter()
             .find(|named_user| &named_user.name == user_name)
             .and_then(|named_user| named_user.auth_info.clone())
             .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
+
+        if let Some(exec_config) = &mut user.exec {
+            if exec_config.provide_cluster_info {
+                exec_config.cluster = Some((&cluster).try_into()?);
+            }
+        }
 
         Ok(ConfigLoader {
             current_context,
