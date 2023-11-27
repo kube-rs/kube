@@ -48,7 +48,7 @@ warp = { version = "0.3", default-features = false, features = ["tls"] }
 http = "0.2.5"
 json-patch = "1.0.0"
 tower = { version = "0.4.13", features = ["limit"] }
-tower-http = { version = "0.4.0", features = ["trace", "decompression-gzip"] }
+tower-http = { version = "0.5.0", features = ["trace", "decompression-gzip"] }
 hyper = { version = "0.14.13", features = ["client", "http1", "stream", "tcp"] }
 thiserror = "1.0.29"
 backoff = "0.4.0"
