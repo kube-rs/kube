@@ -15,6 +15,7 @@ use std::collections::HashMap;
     kind = "Foo",
     category = "clux",
     namespaced,
+    description = "Custom resource representing a Foo",
     derive = "PartialEq",
     shortname = "fo",
     shortname = "f"
@@ -195,7 +196,7 @@ fn test_crd_schema_matches_expected() {
                         "additionalPrinterColumns": [],
                         "schema": {
                             "openAPIV3Schema": {
-                                "description": "Auto-generated derived type for FooSpec via `CustomResource`",
+                                "description": "Custom resource representing a Foo",
                                 "properties": {
                                     "spec": {
                                         "properties": {
