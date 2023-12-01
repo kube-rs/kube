@@ -15,7 +15,7 @@ use std::collections::HashMap;
     kind = "Foo",
     category = "clux",
     namespaced,
-    description = "Custom resource representing a Foo",
+    doc = "Custom resource representing a Foo",
     derive = "PartialEq",
     shortname = "fo",
     shortname = "f"

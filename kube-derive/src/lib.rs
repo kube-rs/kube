@@ -141,7 +141,7 @@ mod custom_resource;
 /// ## `#[kube(category = "apps")]`
 /// Add a single category to `crd.spec.names.categories`.
 ///
-/// ## `#[kube(description = "description")]`
+/// ## `#[kube(doc = "description")]`
 /// Sets the description of the schema in the generated CRD. If not specified
 /// `Auto-generated derived type for {customResourceName} via CustomResource` will be used instead.
 ///
@@ -159,7 +159,7 @@ mod custom_resource;
 ///     kind = "Foo",
 ///     root = "FooCrd",
 ///     namespaced,
-///     description = "Custom resource representing a Foo",
+///     doc = "Custom resource representing a Foo",
 ///     status = "FooStatus",
 ///     derive = "PartialEq",
 ///     singular = "foot",
