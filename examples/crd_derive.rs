@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
     plural = "fooz",
     root = "FooCrd",
     namespaced,
-    description = "Custom resource representing a Foo",
+    doc = "Custom resource representing a Foo",
     status = "FooStatus",
     derive = "PartialEq",
     derive = "Default",
