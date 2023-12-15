@@ -70,6 +70,11 @@ impl<K: Resource> Api<K> {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    ///
+    /// # Warning
+    ///
+    /// This variant **can only `list` and `watch` namespaced resources** and is commonly used with a `watcher`.
+    /// If you need to create/patch/replace/get on a namespaced resource, you need a separate `Api::namespaced`.
     pub fn all_with(client: Client, dyntype: &K::DynamicType) -> Self {
         let url = K::url_path(dyntype, None);
         Self {
@@ -149,6 +154,11 @@ where
     /// use k8s_openapi::api::core::v1::Node;
     /// let api: Api<Node> = Api::all(client);
     /// ```
+    ///
+    /// # Warning
+    ///
+    /// This variant **can only `list` and `watch` namespaced resources** and is commonly used with a `watcher`.
+    /// If you need to create/patch/replace/get on a namespaced resource, you need a separate `Api::namespaced`.
     pub fn all(client: Client) -> Self {
         Self::all_with(client, &K::DynamicType::default())
     }
