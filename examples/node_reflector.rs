@@ -12,7 +12,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
-    let nodes: Api<Node> = Api::all(client.clone());
+    let nodes: Api<Node> = Api::cluster(client.clone());
     let wc = watcher::Config::default()
         .labels("kubernetes.io/arch=amd64") // filter instances by label
         .timeout(10); // short watch timeout in this example

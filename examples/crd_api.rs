@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
     let client = Client::try_default().await?;
 
     // Manage CRDs first
-    let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    let crds: Api<CustomResourceDefinition> = Api::cluster(client.clone());
 
     // Delete any old versions of it first:
     let dp = DeleteParams::default();

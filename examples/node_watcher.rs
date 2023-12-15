@@ -12,7 +12,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
     let events: Api<Event> = Api::all(client.clone());
-    let nodes: Api<Node> = Api::all(client.clone());
+    let nodes: Api<Node> = Api::cluster(client.clone());
 
     let use_watchlist = std::env::var("WATCHLIST").map(|s| s == "1").unwrap_or(false);
     let wc = if use_watchlist {

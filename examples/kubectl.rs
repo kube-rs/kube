@@ -228,12 +228,17 @@ fn dynamic_api(
     ns: Option<&str>,
     all: bool,
 ) -> Api<DynamicObject> {
-    if caps.scope == Scope::Cluster || all {
-        Api::all_with(client, &ar)
-    } else if let Some(namespace) = ns {
-        Api::namespaced_with(client, namespace, &ar)
-    } else {
-        Api::default_namespaced_with(client, &ar)
+    match caps.scope {
+        Scope::Cluster => Api::cluster_with(client, &ar),
+        Scope::Namespaced => {
+            if all {
+                Api::all_with(client, &ar)
+            } else if let Some(namespace) = ns {
+                Api::namespaced_with(client, namespace, &ar)
+            } else {
+                Api::default_namespaced_with(client, &ar)
+            }
+        }
     }
 }
 

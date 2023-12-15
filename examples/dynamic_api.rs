@@ -2,7 +2,7 @@
 
 use kube::{
     api::{Api, DynamicObject, ResourceExt},
-    discovery::{verbs, Discovery, Scope},
+    discovery::{verbs, Discovery},
     Client,
 };
 use tracing::*;
@@ -18,11 +18,7 @@ async fn main() -> anyhow::Result<()> {
             if !caps.supports_operation(verbs::LIST) {
                 continue;
             }
-            let api: Api<DynamicObject> = if caps.scope == Scope::Cluster {
-                Api::all_with(client.clone(), &ar)
-            } else {
-                Api::default_namespaced_with(client.clone(), &ar)
-            };
+            let api: Api<DynamicObject> = Api::dynamic(client.clone(), &ar, caps.scope);
 
             info!("{}/{} : {}", group.name(), ar.version, ar.kind);
 

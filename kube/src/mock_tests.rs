@@ -32,7 +32,7 @@ async fn watchers_respect_pagination_limits() {
     // NB: scenario only responds responds to TWO paginated list calls with two objects
     let mocksrv = fakeserver.run(Scenario::PaginatedList);
 
-    let api: Api<Hack> = Api::all(client);
+    let api: Api<Hack> = Api::cluster(client);
     let cfg = Config::default().page_size(1);
     let mut stream = watcher(api, cfg).applied_objects().boxed();
     let first: Hack = stream.try_next().await.unwrap().unwrap();

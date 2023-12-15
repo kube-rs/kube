@@ -574,7 +574,7 @@ mod test {
         }))?;
 
         let client = Client::try_default().await?;
-        let csr: Api<CertificateSigningRequest> = Api::all(client.clone());
+        let csr: Api<CertificateSigningRequest> = Api::cluster(client.clone());
         assert!(csr.create(&PostParams::default(), &dummy_csr).await.is_ok());
 
         // Patch the approval and approve the CSR
