@@ -93,6 +93,16 @@ impl Client {
 
 /// Client extensions to allow typed api calls without [`Api`]
 impl Client {
+    /// Get a cluster scoped resource
+    pub async fn get<K>(&self, name: &str) -> Result<K>
+    where
+        K: Resource<Scope = ClusterResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
+        <K as Resource>::DynamicType: Default,
+    {
+        let request = cluster_request::<K>();
+        self.get_raw(request, &GetParams::default(), name).await
+    }
+
     /// Get a namespaced resource
     pub async fn get_namespaced<K>(&self, name: &str, ns: &Namespace) -> Result<K>
     where
@@ -101,16 +111,6 @@ impl Client {
     {
         let request = namespaced_request::<K>(ns);
         self.get_raw(request, &GetParams::default(), name).await
-    }
-
-    /// List a namespaced resource
-    pub async fn list_namespaced<K>(&self, lp: &ListParams, ns: &Namespace) -> Result<ObjectList<K>>
-    where
-        K: Resource<Scope = NamespaceResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
-        <K as Resource>::DynamicType: Default,
-    {
-        let request = namespaced_request::<K>(ns);
-        self.list_raw(request, lp).await
     }
 
     /// List a cluster resource
@@ -123,14 +123,14 @@ impl Client {
         self.list_raw(request, lp).await
     }
 
-    /// Get a cluster scoped resource
-    pub async fn get<K>(&self, name: &str) -> Result<K>
+    /// List a namespaced resource
+    pub async fn list_namespaced<K>(&self, lp: &ListParams, ns: &Namespace) -> Result<ObjectList<K>>
     where
-        K: Resource<Scope = ClusterResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
+        K: Resource<Scope = NamespaceResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
         <K as Resource>::DynamicType: Default,
     {
-        let request = cluster_request::<K>();
-        self.get_raw(request, &GetParams::default(), name).await
+        let request = namespaced_request::<K>(ns);
+        self.list_raw(request, lp).await
     }
 
     /// List a namespaced resource across namespaces
