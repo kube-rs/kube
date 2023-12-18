@@ -113,6 +113,16 @@ impl Client {
         self.list_raw(request, lp).await
     }
 
+    /// List a cluster resource
+    pub async fn list<K>(&self, lp: &ListParams) -> Result<ObjectList<K>>
+    where
+        K: Resource<Scope = ClusterResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
+        <K as Resource>::DynamicType: Default,
+    {
+        let request = cluster_request::<K>();
+        self.list_raw(request, lp).await
+    }
+
     /// Get a cluster scoped resource
     pub async fn get<K>(&self, name: &str) -> Result<K>
     where
@@ -132,12 +142,6 @@ impl Client {
         let request = global_request::<K>();
         self.list_raw(request, lp).await
     }
-
-    /// Convenience helper to list namespaces
-    pub async fn list_available_namespaces(&self, lp: &ListParams) -> Result<ObjectList<k8sNs>> {
-        let request = cluster_request::<k8sNs>();
-        self.list_raw(request, lp).await
-    }
 }
 
 #[cfg(test)]
@@ -149,11 +153,11 @@ mod test {
     #[tokio::test]
     #[ignore = "needs cluster (will list namespaces)"]
     async fn list_pods_across_namespaces() -> Result<(), Box<dyn std::error::Error>> {
-        use k8s_openapi::api::core::v1::Pod;
+        use k8s_openapi::api::core::v1::{Namespace as k8sNs, Pod};
 
         let client = Client::try_default().await?;
         let lp = ListParams::default();
-        for ns in client.list_available_namespaces(&lp).await? {
+        for ns in client.list::<k8sNs>(&lp).await? {
             for p in client.list_namespaced::<Pod>(&lp, &(&ns).try_into()?).await? {
                 println!("Found pod {} in {}", p.name_any(), ns.name_any());
             }
