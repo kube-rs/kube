@@ -11,7 +11,6 @@ use tracing::*;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let events: Api<Event> = Api::all(client.clone());
     let nodes: Api<Node> = Api::all(client.clone());
 
     let use_watchlist = std::env::var("WATCHLIST").map(|s| s == "1").unwrap_or(false);
@@ -25,13 +24,13 @@ async fn main() -> anyhow::Result<()> {
 
     pin_mut!(obs);
     while let Some(n) = obs.try_next().await? {
-        check_for_node_failures(&events, n).await?;
+        check_for_node_failures(&client, n).await?;
     }
     Ok(())
 }
 
 // A simple node problem detector
-async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result<()> {
+async fn check_for_node_failures(client: &Client, o: Node) -> anyhow::Result<()> {
     let name = o.name_any();
     // Nodes often modify a lot - only print broken nodes
     if let Some(true) = o.spec.unwrap().unschedulable {
@@ -52,7 +51,7 @@ async fn check_for_node_failures(events: &Api<Event>, o: Node) -> anyhow::Result
         // Find events related to this node
         let opts =
             ListParams::default().fields(&format!("involvedObject.kind=Node,involvedObject.name={name}"));
-        let evlist = events.list(&opts).await?;
+        let evlist = client.list_all::<Event>(&opts).await?;
         for e in evlist {
             warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);
         }

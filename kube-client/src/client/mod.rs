@@ -31,6 +31,7 @@ mod body;
 mod builder;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
+#[cfg(any(feature = "unstable-client"))] mod client_ext;
 mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;

@@ -28,6 +28,7 @@ jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
 socks5 = ["hyper-socks2"]
+unstable-client = []
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
