@@ -91,7 +91,7 @@ impl Client {
     }
 }
 
-/// Methods for NamespaceResourceScope Resource implementors
+/// Client extensions to allow typed api calls without [`Api`]
 impl Client {
     /// Get a namespaced resource
     pub async fn get_namespaced<K>(&self, name: &str, ns: &Namespace) -> Result<K>
@@ -113,7 +113,7 @@ impl Client {
         self.list_raw(request, lp).await
     }
 
-    /// Get a namespaced resource
+    /// Get a cluster scoped resource
     pub async fn get<K>(&self, name: &str) -> Result<K>
     where
         K: Resource<Scope = ClusterResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
@@ -137,5 +137,27 @@ impl Client {
     pub async fn list_available_namespaces(&self, lp: &ListParams) -> Result<ObjectList<k8sNs>> {
         let request = cluster_request::<k8sNs>();
         self.list_raw(request, lp).await
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "client")]
+mod test {
+    use super::{Client, ListParams};
+    use kube_core::ResourceExt;
+
+    #[tokio::test]
+    #[ignore = "needs cluster (will list namespaces)"]
+    async fn list_pods_across_namespaces() -> Result<(), Box<dyn std::error::Error>> {
+        use k8s_openapi::api::core::v1::Pod;
+
+        let client = Client::try_default().await?;
+        let lp = ListParams::default();
+        for ns in client.list_available_namespaces(&lp).await? {
+            for p in client.list_namespaced::<Pod>(&lp, &(&ns).try_into()?).await? {
+                println!("Found pod {} in {}", p.name_any(), ns.name_any());
+            }
+        }
+        Ok(())
     }
 }
