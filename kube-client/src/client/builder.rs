@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use http::{header::HeaderMap, Request, Response};
+use http_body_util::Full;
 use hyper::{
     self,
     client::{connect::Connection, HttpConnector},
@@ -18,7 +19,7 @@ use crate::{client::ConfigExt, Client, Config, Error, Result};
 
 /// HTTP body of a dynamic backing type.
 ///
-/// The suggested implementation type is [`hyper::Body`].
+/// The suggested implementation type is [`Full<Bytes>`].
 pub type DynBody = dyn http_body::Body<Data = Bytes, Error = BoxError> + Send + Unpin;
 
 /// Builder for [`Client`] instances with customized [tower](`Service`) middleware.
@@ -34,7 +35,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// which provides a default stack as a starting point.
     pub fn new(service: Svc, default_namespace: impl Into<String>) -> Self
     where
-        Svc: Service<Request<hyper::Body>>,
+        Svc: Service<Request<Full<Bytes>>>,
     {
         Self {
             service,
@@ -57,7 +58,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// Build a [`Client`] instance with the current [`Service`] stack.
     pub fn build<B>(self) -> Client
     where
-        Svc: Service<Request<hyper::Body>, Response = Response<B>> + Send + 'static,
+        Svc: Service<Request<Full<Bytes>>, Response = Response<B>> + Send + 'static,
         Svc::Future: Send + 'static,
         Svc::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
@@ -67,7 +68,7 @@ impl<Svc> ClientBuilder<Svc> {
     }
 }
 
-pub type GenericService = BoxService<Request<hyper::Body>, Response<Box<DynBody>>, BoxError>;
+pub type GenericService = BoxService<Request<Full<Bytes>>, Response<Box<DynBody>>, BoxError>;
 
 impl TryFrom<Config> for ClientBuilder<GenericService> {
     type Error = Error;
@@ -104,7 +105,7 @@ where
     let default_ns = config.default_namespace.clone();
     let auth_layer = config.auth_layer()?;
 
-    let client: hyper::Client<_, hyper::Body> = {
+    let client: hyper::Client<_, Full<Bytes>> = {
         // Current TLS feature precedence when more than one are set:
         // 1. rustls-tls
         // 2. openssl-tls
@@ -145,7 +146,7 @@ where
             // Attribute names follow [Semantic Conventions].
             // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
             TraceLayer::new_for_http()
-                .make_span_with(|req: &Request<hyper::Body>| {
+                .make_span_with(|req: &Request<Full<Bytes>>| {
                     tracing::debug_span!(
                         "HTTP",
                          http.method = %req.method(),
@@ -156,10 +157,10 @@ where
                          otel.status_code = tracing::field::Empty,
                     )
                 })
-                .on_request(|_req: &Request<hyper::Body>, _span: &Span| {
+                .on_request(|_req: &Request<Full<Bytes>>, _span: &Span| {
                     tracing::debug!("requesting");
                 })
-                .on_response(|res: &Response<hyper::Body>, _latency: Duration, span: &Span| {
+                .on_response(|res: &Response<Full<Bytes>>, _latency: Duration, span: &Span| {
                     let status = res.status();
                     span.record("http.status_code", status.as_u16());
                     if status.is_client_error() || status.is_server_error() {

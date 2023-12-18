@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
+use bytes::Bytes;
 use chrono::{Duration, TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
     header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE},
     Method, Version,
 };
+use http_body_util::Full;
 use hyper::{body, client::HttpConnector, http::Uri, Client, Request};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
@@ -328,7 +330,7 @@ impl Refresher {
         let response = self.https_client.get(discovery).await?;
 
         if response.status().is_success() {
-            let body = body::to_bytes(response.into_body()).await?;
+            let body = Full::<Bytes>::new(response.into_body());
             let metadata = serde_json::from_slice::<Metadata>(body.as_ref())
                 .map_err(errors::RefreshError::InvalidMetadata)?;
 
@@ -416,7 +418,7 @@ impl Refresher {
             return Err(errors::RefreshError::RequestFailed(response.status()));
         }
 
-        let body = body::to_bytes(response.into_body()).await?;
+        let body = Full::<Bytes>::new(response.into_body());
         let token_response = serde_json::from_slice::<TokenResponse>(body.as_ref())
             .map_err(errors::RefreshError::InvalidTokenResponse)?;
 

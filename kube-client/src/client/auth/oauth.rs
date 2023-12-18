@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use http_body_util::Full;
 use tame_oauth::{
     gcp::{TokenOrRequest, TokenProvider, TokenProviderWrapper},
     Token,
@@ -123,12 +125,12 @@ impl Gcp {
                 let client = hyper::Client::builder().build::<_, hyper::Body>(https);
 
                 let res = client
-                    .request(request.map(hyper::Body::from))
+                    .request(request.map(Full::<Bytes>::new))
                     .await
                     .map_err(Error::RequestToken)?;
                 // Convert response body to `Vec<u8>` for parsing.
                 let (parts, body) = res.into_parts();
-                let bytes = hyper::body::to_bytes(body).await.map_err(Error::ConcatBuffers)?;
+                let bytes = body.await; // TODO figure this out after the client stuff is figured out
                 let response = http::Response::from_parts(parts, bytes.to_vec());
                 match self.provider.parse_token_response(scope_hash, response) {
                     Ok(token) => Ok(token),

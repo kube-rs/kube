@@ -7,10 +7,11 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
+use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
-use hyper::Body;
+use http_body_util::{Full, StreamBody};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
@@ -65,7 +66,7 @@ pub use builder::{ClientBuilder, DynBody};
 pub struct Client {
     // - `Buffer` for cheap clone
     // - `BoxService` for dynamic response future type
-    inner: Buffer<BoxService<Request<Body>, Response<Body>, BoxError>, Request<Body>>,
+    inner: Buffer<BoxService<Request<Full<Bytes>>, Response<Full<Bytes>>, BoxError>, Request<Full<Bytes>>>,
     default_ns: String,
 }
 
@@ -99,7 +100,7 @@ impl Client {
     /// ```
     pub fn new<S, B, T>(service: S, default_namespace: T) -> Self
     where
-        S: Service<Request<Body>, Response = Response<B>> + Send + 'static,
+        S: Service<Request<B>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
@@ -107,7 +108,7 @@ impl Client {
         T: Into<String>,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
-        let service = MapResponseBodyLayer::new(|b: B| Body::wrap_stream(b.into_stream()))
+        let service = MapResponseBodyLayer::new(|b: B| StreamBody::new(b.into_stream()))
             .layer(service)
             .map_err(|e| e.into());
         Self {
@@ -141,7 +142,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and return the raw response back.
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
-    pub async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
+    pub async fn send(&self, request: Request<Full<Bytes>>) -> Result<Response<Full<Bytes>>> {
         let mut svc = self.inner.clone();
         let res = svc
             .ready()
@@ -195,7 +196,7 @@ impl Client {
             HeaderValue::from_static(upgrade::WS_PROTOCOL),
         );
 
-        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        let res = self.send(Request::from_parts(parts, Full::new(body))).await?;
         upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => {
@@ -225,12 +226,10 @@ impl Client {
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
     pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
-        let res = self.send(request.map(Body::from)).await?;
+        let res = self.send(request.map(Full::new)).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
-        let body_bytes = hyper::body::to_bytes(res.into_body())
-            .await
-            .map_err(Error::HyperError)?;
+        let body_bytes = Full::from(res.into_body()).await.map_err(Error::HyperError)?;
         let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
         handle_api_errors(&text, status)?;
 
@@ -242,7 +241,7 @@ impl Client {
     /// The response can be processed using [`AsyncReadExt`](futures::AsyncReadExt)
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
     pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead> {
-        let res = self.send(request.map(Body::from)).await?;
+        let res = self.send(request.map(Full::new)).await?;
         // Map the error, since we want to convert this into an `AsyncBufReader` using
         // `into_async_read` which specifies `std::io::Error` as the stream's error type.
         let body = res
@@ -282,7 +281,7 @@ impl Client {
     where
         T: Clone + DeserializeOwned,
     {
-        let res = self.send(request.map(Body::from)).await?;
+        let res = self.send(request.map(Full::new)).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         tracing::trace!("headers: {:?}", res.headers());
 
