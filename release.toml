@@ -19,6 +19,8 @@ pre-release-commit-message = "release {{version}}"
 push = true
 tag = true
 tag-name = "{{version}}"
+sign-tag = true
+sign-commit = true
 # A Kubernetes version is normally supplied by the application consuming the library in the end.
 # Since we don't have that when verifying, supply one ourselves.
 enable-features = ["k8s-openapi/latest"]

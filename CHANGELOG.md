@@ -7,8 +7,18 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.87.2...main
 
-0.87.2 / 2023-12-22
+[0.87.2](https://github.com/kube-rs/kube/releases/tag/0.87.2) / 2023-12-22
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.87.2 -->
+
+## What's Changed
+### Added
+* Add support for `LogParams::since_time` by @clux in https://github.com/kube-rs/kube/pull/1342
+* Provide cluster info to exec plugins by @aviramha in https://github.com/kube-rs/kube/pull/1331
+* Allow setting a description on a derived CRD by @sbernauer in https://github.com/kube-rs/kube/pull/1359
+### Changed
+* Bump MSRV from 1.64 to 1.65 by @clux in https://github.com/kube-rs/kube/pull/1353
+* Switch from `jsonpath_lib` to `jsonpath-rust` by @ilya-bobyr in https://github.com/kube-rs/kube/pull/1345
 
 [0.87.1](https://github.com/kube-rs/kube/releases/tag/0.87.1) / 2023-11-01
 ===================
