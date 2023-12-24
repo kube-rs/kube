@@ -54,11 +54,12 @@ impl<T: Clone> ObjectList<T> {
     ///
     /// ```
     /// use kube::api::{ListMeta, ObjectList, TypeMeta};
+    /// use k8s_openapi::api::core::v1::Pod;
     ///
-    /// let types: TypeMeta = Default::default();
+    /// let types: TypeMeta = TypeMeta::list::<Pod>();
     /// let metadata: ListMeta = Default::default();
     /// let items = vec![1, 2, 3];
-    /// let objectlist = ObjectList { types, metadata, items };
+    /// # let objectlist = ObjectList { types, metadata, items };
     ///
     /// let first = objectlist.iter().next();
     /// println!("First element: {:?}", first); // prints "First element: Some(1)"
@@ -73,11 +74,12 @@ impl<T: Clone> ObjectList<T> {
     ///
     /// ```
     /// use kube::api::{ListMeta, ObjectList, TypeMeta};
+    /// use k8s_openapi::api::core::v1::Pod;
     ///
-    /// let types: TypeMeta = Default::default();
+    /// let types: TypeMeta = TypeMeta::list::<Pod>();
     /// let metadata: ListMeta = Default::default();
     /// let items = vec![1, 2, 3];
-    /// let mut objectlist = ObjectList { types, metadata, items };
+    /// # let mut objectlist = ObjectList { types, metadata, items };
     ///
     /// let mut first = objectlist.iter_mut().next();
     ///
