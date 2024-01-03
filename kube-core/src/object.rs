@@ -307,9 +307,9 @@ pub struct NotUsed {}
 
 #[cfg(test)]
 mod test {
-    use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, ListMeta};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 
-    use super::{ApiResource, HasSpec, HasStatus, NotUsed, Object, Resource, ObjectList, TypeMeta};
+    use super::{ApiResource, HasSpec, HasStatus, NotUsed, Object, ObjectList, Resource, TypeMeta};
     use crate::resource::ResourceExt;
 
     #[test]
@@ -346,10 +346,9 @@ mod test {
         assert_eq!(mypod.namespace().unwrap(), "dev");
         assert_eq!(mypod.name_unchecked(), "blog");
         assert!(mypod.status().is_none());
-        assert_eq!(
-            mypod.spec().containers[0],
-            ContainerSimple { image: "blog".into() }
-        );
+        assert_eq!(mypod.spec().containers[0], ContainerSimple {
+            image: "blog".into()
+        });
 
         assert_eq!(PodSimple::api_version(&ar), "v1");
         assert_eq!(PodSimple::version(&ar), "v1");
@@ -366,11 +365,11 @@ mod test {
         assert_eq!(ar.group, "");
         assert_eq!(ar.kind, "Pod");
         let podlist: ObjectList<Pod> = ObjectList {
-            types: TypeMeta{
+            types: TypeMeta {
                 api_version: ar.api_version,
                 kind: ar.kind + "List",
             },
-            metadata: ListMeta{..Default::default()},
+            metadata: ListMeta { ..Default::default() },
             items: vec![Pod {
                 metadata: ObjectMeta {
                     name: Some("test".into()),
