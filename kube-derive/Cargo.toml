@@ -1,13 +1,13 @@
 [package]
 name = "kube-derive"
 description = "Custom derives for the kube kubernetes crates"
-version = "0.87.1"
+version = "0.87.2"
 authors = [
   "clux <sszynrae@gmail.com>",
   "kazk <kazk.dev@gmail.com>",
 ]
 edition = "2021"
-rust-version = "1.65.0"
+rust-version = "1.70.0"
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"

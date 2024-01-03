@@ -1,6 +1,6 @@
 [package]
 name = "kube"
-version = "0.87.1"
+version = "0.87.2"
 description = "Kubernetes client and async controller runtime"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "client", "runtime", "cncf"]
 categories = ["network-programming", "caching", "api-bindings", "configuration", "encoding"]
-rust-version = "1.65.0"
+rust-version = "1.70.0"
 edition = "2021"
 
 [features]
@@ -45,10 +45,10 @@ features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jso
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-kube-derive = { path = "../kube-derive", version = "=0.87.1", optional = true }
-kube-core = { path = "../kube-core", version = "=0.87.1" }
-kube-client = { path = "../kube-client", version = "=0.87.1", default-features = false, optional = true }
-kube-runtime = { path = "../kube-runtime", version = "=0.87.1", optional = true}
+kube-derive = { path = "../kube-derive", version = "=0.87.2", optional = true }
+kube-core = { path = "../kube-core", version = "=0.87.2" }
+kube-client = { path = "../kube-client", version = "=0.87.2", default-features = false, optional = true }
+kube-runtime = { path = "../kube-runtime", version = "=0.87.2", optional = true}
 
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph

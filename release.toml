@@ -4,21 +4,23 @@
 #
 # 0. (optional) cargo release minor ; verify readme + changelog bumped; then git reset --hard
 # 1. PUBLISH_GRACE_SLEEP=20 cargo release minor --execute
-# 1X.  - on failure: follow plan manually, cd into next dirs and publish insequence with cargo publish --features=k8s-openapi/latest
-# 2. check consolidated commit
-# 2X.  - on failure: git commit --amend and insert version
-# 3. ./scripts/release-post.sh
+# In the event of failures:
+# - on partial cargo publish failures with unexpected build errors; yank partials and fix issues in a PR before retrying
+# - on cargo-release issues waiting for crates.io: resume publish in given order manually, cd into next dirs and publish in sequence with cargo publish --features=k8s-openapi/latest
+# - after publish; check consolidated commit, amend if needed, then create a manual signed tag without v prefix
 
 # Reference
-# https://github.com/sunng87/cargo-release/blob/master/docs/reference.md
+# https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
 
 consolidate-commits = true
 shared-version = true
 pre-release-hook = ["../scripts/release-pre.sh"]
 pre-release-commit-message = "release {{version}}"
-# leave tagging + pushing to postrelease script (due to potential failures in 1 and 2)
-push = false
-tag = false
+push = true
+tag = true
+tag-name = "{{version}}"
+sign-tag = true
+sign-commit = true
 # A Kubernetes version is normally supplied by the application consuming the library in the end.
 # Since we don't have that when verifying, supply one ourselves.
 enable-features = ["k8s-openapi/latest"]
