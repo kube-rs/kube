@@ -17,6 +17,42 @@ pub struct TypeMeta {
     pub kind: String,
 }
 
+impl TypeMeta {
+    /// Construct a new `TypeMeta` for the object list from the given resource.
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # use kube_core::TypeMeta;
+    ///
+    /// let type_meta = TypeMeta::list::<Pod>();
+    /// assert_eq!(type_meta.kind, "PodList");
+    /// assert_eq!(type_meta.api_version, "v1");
+    /// ```
+    pub fn list<K: Resource<DynamicType = ()>>() -> Self {
+        TypeMeta {
+            api_version: K::api_version(&()).into(),
+            kind: K::kind(&()).to_string() + "List",
+        }
+    }
+
+    /// Construct a new `TypeMeta` for the object from the given resource.
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # use kube_core::TypeMeta;
+    ///
+    /// let type_meta = TypeMeta::resource::<Pod>();
+    /// assert_eq!(type_meta.kind, "Pod");
+    /// assert_eq!(type_meta.api_version, "v1");
+    /// ```
+    pub fn resource<K: Resource<DynamicType = ()>>() -> Self {
+        TypeMeta {
+            api_version: K::api_version(&()).into(),
+            kind: K::kind(&()).into(),
+        }
+    }
+}
+
 /// A generic representation of any object with `ObjectMeta`.
 ///
 /// It allows clients to get access to a particular `ObjectMeta`
