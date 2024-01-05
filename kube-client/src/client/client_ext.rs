@@ -94,6 +94,17 @@ impl Client {
 /// Client extensions to allow typed api calls without [`Api`]
 impl Client {
     /// Get a cluster scoped resource
+    ///
+    /// ```no_run
+    /// # use k8s_openapi::api::rbac::v1::ClusterRole;
+    /// # use kube::{ResourceExt, api::GetParams};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let crole = client.get::<ClusterRole>("cluster-admin").await?;
+    /// assert_eq!(crole.name_unchecked(), "cluster-admin");
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn get<K>(&self, name: &str) -> Result<K>
     where
         K: Resource<Scope = ClusterResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
@@ -104,6 +115,18 @@ impl Client {
     }
 
     /// Get a namespaced resource
+    ///
+    /// ```no_run
+    /// # use k8s_openapi::api::core::v1::Service;
+    /// # use kube::{ResourceExt, api::GetParams};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let ns = "default".try_into()?;
+    /// let svc = client.get_namespaced::<Service>("kubernetes", &ns).await?;
+    /// assert_eq!(svc.name_unchecked(), "kubernetes");
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn get_namespaced<K>(&self, name: &str, ns: &Namespace) -> Result<K>
     where
         K: Resource<Scope = NamespaceResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
@@ -114,6 +137,19 @@ impl Client {
     }
 
     /// List a cluster resource
+    ///
+    /// ```no_run
+    /// # use k8s_openapi::api::rbac::v1::ClusterRole;
+    /// # use kube::{ResourceExt, api::ListParams};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let lp = ListParams::default();
+    /// for svc in client.list::<ClusterRole>(&lp).await? {
+    ///     println!("Found clusterrole {}", svc.name_any());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn list<K>(&self, lp: &ListParams) -> Result<ObjectList<K>>
     where
         K: Resource<Scope = ClusterResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
@@ -124,6 +160,20 @@ impl Client {
     }
 
     /// List a namespaced resource
+    ///
+    /// ```no_run
+    /// # use k8s_openapi::api::core::v1::Service;
+    /// # use kube::{ResourceExt, api::ListParams};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let lp = ListParams::default();
+    /// let ns = "default".try_into()?;
+    /// for svc in client.list_namespaced::<Service>(&lp, &ns).await? {
+    ///     println!("Found service {}", svc.name_any());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn list_namespaced<K>(&self, lp: &ListParams, ns: &Namespace) -> Result<ObjectList<K>>
     where
         K: Resource<Scope = NamespaceResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
@@ -134,6 +184,19 @@ impl Client {
     }
 
     /// List a namespaced resource across namespaces
+    ///
+    /// ```no_run
+    /// # use k8s_openapi::api::batch::v1::Job;
+    /// # use kube::{ResourceExt, api::ListParams};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let lp = ListParams::default();
+    /// for j in client.list_all::<Job>(&lp).await? {
+    ///     println!("Found job {} in {}", j.name_any(), j.namespace().unwrap());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn list_all<K>(&self, lp: &ListParams) -> Result<ObjectList<K>>
     where
         K: Resource<Scope = NamespaceResourceScope> + Serialize + DeserializeOwned + Clone + Debug,
@@ -147,21 +210,39 @@ impl Client {
 #[cfg(test)]
 #[cfg(feature = "client")]
 mod test {
-    use super::{Client, ListParams};
+    use super::{Client, ListParams, Namespace};
     use kube_core::ResourceExt;
 
     #[tokio::test]
-    #[ignore = "needs cluster (will list namespaces)"]
-    async fn list_pods_across_namespaces() -> Result<(), Box<dyn std::error::Error>> {
-        use k8s_openapi::api::core::v1::{Namespace as k8sNs, Pod};
+    #[ignore = "needs cluster (will list/get namespaces, pods, jobs, svcs, clusterroles)"]
+    async fn client_ext_list_get_pods_svcs() -> Result<(), Box<dyn std::error::Error>> {
+        use k8s_openapi::api::{
+            batch::v1::Job,
+            core::v1::{Namespace as k8sNs, Pod, Service},
+            rbac::v1::ClusterRole,
+        };
 
         let client = Client::try_default().await?;
         let lp = ListParams::default();
+        // cluster-scoped list
         for ns in client.list::<k8sNs>(&lp).await? {
+            // namespaced list
             for p in client.list_namespaced::<Pod>(&lp, &(&ns).try_into()?).await? {
                 println!("Found pod {} in {}", p.name_any(), ns.name_any());
             }
         }
+        // across-namespace list
+        for j in client.list_all::<Job>(&lp).await? {
+            println!("Found job {} in {}", j.name_any(), j.namespace().unwrap());
+        }
+        // namespaced get
+        let default: Namespace = "default".try_into()?;
+        let svc = client.get_namespaced::<Service>("kubernetes", &default).await?;
+        assert_eq!(svc.name_unchecked(), "kubernetes");
+        // global get
+        let ca = client.get::<ClusterRole>("cluster-admin").await?;
+        assert_eq!(ca.name_unchecked(), "cluster-admin");
+
         Ok(())
     }
 }
