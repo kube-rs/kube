@@ -1,7 +1,7 @@
 [package]
 name = "kube-derive"
 description = "Custom derives for the kube kubernetes crates"
-version = "0.87.2"
+version = "0.88.0"
 authors = [
   "clux <sszynrae@gmail.com>",
   "kazk <kazk.dev@gmail.com>",
