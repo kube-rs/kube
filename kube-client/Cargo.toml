@@ -51,8 +51,8 @@ thiserror = "1.0.29"
 futures = { version = "0.3.17", optional = true }
 pem = { version = "3.0.1", optional = true }
 openssl = { version = "0.10.36", optional = true }
-rustls = { version = "0.21.4", features = ["dangerous_configuration"], optional = true }
-rustls-pemfile = { version = "1.0.0", optional = true }
+rustls = { version = "0.22.2", optional = true }
+rustls-pemfile = { version = "2.0.0", optional = true }
 bytes = { version = "1.1.0", optional = true }
 tokio = { version = "1.14.0", features = ["time", "signal", "sync"], optional = true }
 kube-core = { path = "../kube-core", version = "=0.88.0" }
@@ -60,14 +60,14 @@ jsonpath-rust = { version = "0.4.0", optional = true }
 tokio-util = { version = "0.7.0", optional = true, features = ["io", "codec"] }
 hyper = { version = "1.1.0", optional = true, features = ["client", "http1"] }
 hyper-rustls = { version = "0.26.0", optional = true }
-hyper-tls = { version = "0.5.0", optional = true }
+hyper-tls = { version = "0.6.0", optional = true }
 hyper-util = { version = "0.1.1", optional = true, features = ["client-legacy", "tokio"] }
 http-body-util = { version = "0.1.0", optional = true }
 hyper-socks2 = { version = "0.8.0", optional = true, default-features = false }
-tokio-tungstenite = { version = "0.20.0", optional = true }
+tokio-tungstenite = { version = "0.21.0", optional = true }
 tower = { version = "0.4.13", optional = true, features = ["buffer", "filter", "util"] }
-tower-http = { version = "0.4.0", optional = true, features = ["auth", "map-response-body", "trace"] }
-hyper-timeout = {version = "0.4.1", optional = true }
+tower-http = { version = "0.5.1", optional = true, features = ["auth", "map-response-body", "trace"] }
+hyper-timeout = {version = "0.5.1", optional = true }
 tame-oauth = { version = "0.9.1", features = ["gcp"], optional = true }
 pin-project = { version = "1.0.4", optional = true }
 rand = { version = "0.8.3", optional = true }
