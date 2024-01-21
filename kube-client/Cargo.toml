@@ -1,6 +1,6 @@
 [package]
 name = "kube-client"
-version = "0.87.1"
+version = "0.88.0"
 description = "Kubernetes client"
 authors = [
   "clux <sszynrae@gmail.com>",
@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "client",]
 categories = ["web-programming::http-client", "configuration", "network-programming", "api-bindings"]
-rust-version = "1.65.0"
+rust-version = "1.70.0"
 edition = "2021"
 
 [features]
@@ -55,8 +55,8 @@ rustls = { version = "0.21.4", features = ["dangerous_configuration"], optional 
 rustls-pemfile = { version = "1.0.0", optional = true }
 bytes = { version = "1.1.0", optional = true }
 tokio = { version = "1.14.0", features = ["time", "signal", "sync"], optional = true }
-kube-core = { path = "../kube-core", version = "=0.87.1" }
-jsonpath-rust = { version = "0.3.4", optional = true }
+kube-core = { path = "../kube-core", version = "=0.88.0" }
+jsonpath-rust = { version = "0.4.0", optional = true }
 tokio-util = { version = "0.7.0", optional = true, features = ["io", "codec"] }
 hyper = { version = "1.0.1", optional = true, features = ["client", "http1"] }
 hyper-rustls = { version = "0.24.0", optional = true }
@@ -77,7 +77,7 @@ hyper-openssl = { version = "0.10.1", optional = true }
 form_urlencoded = { version = "1.2.0", optional = true }
 
 [dependencies.k8s-openapi]
-version = "0.20.0"
+version = "0.21.0"
 default-features = false
 features = []
 
@@ -90,6 +90,6 @@ tokio-test = "0.4.0"
 tower-test = "0.4.0"
 
 [dev-dependencies.k8s-openapi]
-version = "0.20.0"
+version = "0.21.0"
 default-features = false
 features = ["latest"]

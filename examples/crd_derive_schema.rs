@@ -85,8 +85,11 @@ pub struct FooSpec {
     #[serde(default)]
     #[schemars(schema_with = "set_listable_schema")]
     set_listable: Vec<u32>,
+    // Field with CEL validation
+    #[serde(default)]
+    #[schemars(schema_with = "cel_validations")]
+    cel_validated: Option<String>,
 }
-
 // https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
 fn set_listable_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
     serde_json::from_value(serde_json::json!({
@@ -97,6 +100,18 @@ fn set_listable_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::sche
             "type": "integer"
         },
         "x-kubernetes-list-type": "set"
+    }))
+    .unwrap()
+}
+
+// https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation-rules
+fn cel_validations(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    serde_json::from_value(serde_json::json!({
+        "type": "string",
+        "x-kubernetes-validations": [{
+            "rule": "self != 'illegal'",
+            "message": "string cannot be illegal"
+        }]
     }))
     .unwrap()
 }
@@ -144,6 +159,7 @@ async fn main() -> Result<()> {
         // Empty listables to be patched in later
         default_listable: Default::default(),
         set_listable: Default::default(),
+        cel_validated: Default::default(),
     });
 
     // Set up dynamic resource to test using raw values.
@@ -190,10 +206,8 @@ async fn main() -> Result<()> {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
             assert_eq!(err.status, "Failure");
-            assert_eq!(
-                err.message,
-                "Foo.clux.dev \"qux\" is invalid: spec.non_nullable: Required value"
-            );
+            assert!(err.message.contains("clux.dev \"qux\" is invalid"));
+            assert!(err.message.contains("spec.non_nullable: Required value"));
         }
         _ => panic!(),
     }
@@ -213,8 +227,39 @@ async fn main() -> Result<()> {
     assert_eq!(pres.spec.set_listable, vec![2, 3]);
     println!("{:?}", serde_json::to_value(pres.spec));
 
-    delete_crd(client.clone()).await?;
+    // cel validation triggers:
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "cel_validated": Some("illegal")
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_err());
+    match cel_res.err() {
+        Some(kube::Error::Api(err)) => {
+            assert_eq!(err.code, 422);
+            assert_eq!(err.reason, "Invalid");
+            assert_eq!(err.status, "Failure");
+            assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
+            assert!(err.message.contains("spec.cel_validated: Invalid value"));
+            assert!(err.message.contains("string cannot be illegal"));
+        }
+        _ => panic!(),
+    }
+    // cel validation happy:
+    let cel_patch_ok = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "cel_validated": Some("legal")
+        }
+    });
+    foos.patch("baz", &ssapply, &Patch::Apply(cel_patch_ok)).await?;
 
+    // all done
+    delete_crd(client.clone()).await?;
     Ok(())
 }
 

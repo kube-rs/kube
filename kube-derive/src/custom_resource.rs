@@ -10,6 +10,7 @@ struct KubeAttrs {
     group: String,
     version: String,
     kind: String,
+    doc: Option<String>,
     #[darling(rename = "root")]
     kind_struct: Option<String>,
     /// lowercase plural of kind (inferred if omitted)
@@ -145,6 +146,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         kind,
         kind_struct,
         version,
+        doc,
         namespaced,
         derives,
         schema: schema_mode,
@@ -239,7 +241,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }
 
-    let docstr = format!(" Auto-generated derived type for {ident} via `CustomResource`");
+    let docstr =
+        doc.unwrap_or_else(|| format!(" Auto-generated derived type for {ident} via `CustomResource`"));
     let quoted_serde = Literal::string(&serde.to_token_stream().to_string());
     let root_obj = quote! {
         #[doc = #docstr]

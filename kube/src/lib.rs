@@ -7,12 +7,12 @@
 //!
 //! The main modules are:
 //!
-//! - [`client`](crate::client) with the Kubernetes [`Client`](crate::Client) and its layers
-//! - [`config`](crate::config) for cluster [`Config`](crate::Config)
-//! - [`api`](crate::api) with the generic Kubernetes [`Api`](crate::Api)
-//! - [`derive`](kube_derive) with the [`CustomResource`](crate::CustomResource) derive for building controllers types
-//! - [`runtime`](crate::runtime) with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
-//! - [`core`](crate::core) with generics from `apimachinery`
+//! - [`client`] with the Kubernetes [`Client`] and its layers
+//! - [`config`] for cluster [`Config`]
+//! - [`api`] with the generic Kubernetes [`Api`]
+//! - [`derive`](kube_derive) with the [`CustomResource`] derive for building controllers types
+//! - [`runtime`] with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
+//! - [`core`] with generics from `apimachinery`
 //!
 //! You can use each of these as you need with the help of the [exported features](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
 //!
@@ -39,7 +39,7 @@
 //! For details, see:
 //!
 //! - [`Client`](crate::client) for the extensible Kubernetes client
-//! - [`Api`](crate::Api) for the generic api methods available on Kubernetes resources
+//! - [`Api`] for the generic api methods available on Kubernetes resources
 //! - [k8s-openapi](https://docs.rs/k8s-openapi/*/k8s_openapi/) for documentation about the generated Kubernetes types
 //!
 //! # Using the Runtime with the Derive macro
@@ -97,9 +97,9 @@
 //!
 //! For details, see:
 //!
-//! - [`CustomResource`](crate::CustomResource) for documentation how to configure custom resources
+//! - [`CustomResource`] for documentation how to configure custom resources
 //! - [`runtime::watcher`](crate::runtime::watcher()) for how to long-running watches work and why you want to use this over [`Api::watch`](crate::Api::watch)
-//! - [`runtime`](crate::runtime) for abstractions that help with more complicated Kubernetes application
+//! - [`runtime`] for abstractions that help with more complicated Kubernetes application
 //!
 //! # Examples
 //! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube/tree/main/examples).
