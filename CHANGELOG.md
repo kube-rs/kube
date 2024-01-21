@@ -7,8 +7,19 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.88.0...main
 
-0.88.0 / 2024-01-21
+[0.88.0](https://github.com/kube-rs/kube/releases/tag/0.88.0) / 2024-01-21
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.88.0 -->
+
+## Kubernetes `v1_29` support via `k8s-openapi` [0.21](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.21.0)
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+## What's Changed
+### Added
+* Add type meta data for list types by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1380
+### Changed
+* Bump MSRV to 1.70 by @clux in https://github.com/kube-rs/kube/pull/1384
+* Upgrade `k8s-openapi` for Kubernetes `v1_29` support by @clux in https://github.com/kube-rs/kube/pull/1394
 
 [0.87.2](https://github.com/kube-rs/kube/releases/tag/0.87.2) / 2023-12-22
 ===================
