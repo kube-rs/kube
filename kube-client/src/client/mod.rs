@@ -67,7 +67,7 @@ pub use builder::{ClientBuilder, DynBody};
 pub struct Client {
     // - `Buffer` for cheap clone
     // - `BoxService` for dynamic response future type
-    inner: Buffer<BoxService<Request<Incoming>, Response<Full<Bytes>>, BoxError>, Request<Incoming>>,
+    inner: Buffer<BoxService<Request<Bytes>, Response<BodyStream<Bytes>>, BoxError>, Request<Bytes>>,
     default_ns: String,
 }
 
@@ -101,7 +101,7 @@ impl Client {
     /// ```
     pub fn new<S, B, T>(service: S, default_namespace: T) -> Self
     where
-        S: Service<Request<Incoming>, Response = Response<B>> + Send + 'static,
+        S: Service<Request<Bytes>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
@@ -109,7 +109,7 @@ impl Client {
         T: Into<String>,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
-        let service = MapResponseBodyLayer::new(|b: B| BodyStream::new(b.into_stream()))
+        let service = MapResponseBodyLayer::new(BodyStream::new)
             .layer(service)
             .map_err(|e| e.into());
         Self {
@@ -143,7 +143,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and return the raw response back.
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
-    pub async fn send(&self, request: Request<Incoming>) -> Result<Response<Full<Bytes>>> {
+    pub async fn send(&self, request: Request<Bytes>) -> Result<Response<BodyStream<Bytes>>> {
         let mut svc = self.inner.clone();
         let res = svc
             .ready()
@@ -197,7 +197,7 @@ impl Client {
             HeaderValue::from_static(upgrade::WS_PROTOCOL),
         );
 
-        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        let res = self.send(Request::from_parts(parts, body.into())).await?;
         upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => {
@@ -216,7 +216,7 @@ impl Client {
     where
         T: DeserializeOwned,
     {
-        let text = self.request_text(request).await?;
+        let text = self.request_text(request.into()).await?; // TODO: must be Request<Bytes>
 
         serde_json::from_str(&text).map_err(|e| {
             tracing::warn!("{}, {:?}", text, e);
@@ -226,8 +226,8 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
-    pub async fn request_text(&self, request: Request<Incoming>) -> Result<String> {
-        let res = self.send(request).await?;
+    pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
+        let res = self.send(request.into()).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
         let body_bytes = res.into_body().collect().await.unwrap(); // Infallible
