@@ -63,7 +63,7 @@ hyper-rustls = { version = "0.26.0", optional = true }
 hyper-tls = { version = "0.6.0", optional = true }
 hyper-util = { version = "0.1.1", optional = true, features = ["client-legacy", "tokio"] }
 http-body-util = { version = "0.1.0", optional = true }
-hyper-socks2 = { version = "0.8.0", optional = true, default-features = false }
+#hyper-socks2 = { version = "0.8.0", optional = true, default-features = false } # using fork below
 tokio-tungstenite = { version = "0.21.0", optional = true }
 tower = { version = "0.4.13", optional = true, features = ["buffer", "filter", "util"] }
 tower-http = { version = "0.5.1", optional = true, features = ["auth", "map-response-body", "trace"] }
@@ -75,6 +75,13 @@ secrecy = { version = "0.8.0", features = ["alloc", "serde"] }
 tracing = { version = "0.1.36", features = ["log"], optional = true }
 hyper-openssl = { version = "0.10.1", optional = true }
 form_urlencoded = { version = "1.2.0", optional = true }
+
+[dependencies.hyper-socks2]
+git = "https://github.com/aviramha/hyper-socks2.git"
+#branch = "hyper1"
+rev = "947387f377ed441e42cc61a3397333a20932f28f"
+optional = true
+default-features = false
 
 [dependencies.k8s-openapi]
 version = "0.21.0"
