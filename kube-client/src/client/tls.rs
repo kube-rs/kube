@@ -5,7 +5,7 @@ pub mod rustls_tls {
         self,
         client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
         pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime},
-        CertificateError, ClientConfig, DigitallySignedStruct, SignatureScheme,
+        ClientConfig, DigitallySignedStruct, SignatureScheme,
     };
     use thiserror::Error;
 
@@ -28,6 +28,10 @@ pub mod rustls_tls {
         #[error("invalid private key: {0}")]
         InvalidPrivateKey(#[source] rustls::Error),
 
+        /// Invalid native roots
+        #[error("invalid native roots: {0}")]
+        InvalidNativeRoots(#[source] std::io::Error),
+
         /// Unknown private key format
         #[error("unknown private key format")]
         UnknownPrivateKeyFormat,
@@ -47,7 +51,9 @@ pub mod rustls_tls {
         let config_builder = if let Some(certs) = root_certs {
             ClientConfig::builder().with_root_certificates(root_store(certs)?)
         } else {
-            ClientConfig::builder().with_native_roots()
+            ClientConfig::builder()
+                .with_native_roots()
+                .map_err(Error::InvalidNativeRoots)?
         };
 
         let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {
@@ -84,12 +90,13 @@ pub mod rustls_tls {
         let mut rsa_key = None;
         let mut ec_key = None;
         let mut reader = std::io::Cursor::new(data);
-        for item in rustls_pemfile::read_all(&mut reader).map_err(Error::InvalidIdentityPem)? {
+        for res in rustls_pemfile::read_all(&mut reader) {
+            let item = res.map_err(Error::InvalidIdentityPem)?;
             match item {
                 Item::X509Certificate(cert) => cert_chain.push(CertificateDer::from(cert)),
-                Item::PKCS8Key(key) => pkcs8_key = Some(PrivateKeyDer::Pkcs8(key)),
-                Item::RSAKey(key) => rsa_key = Some(PrivateKeyDer::Pkcs1(key)),
-                Item::ECKey(key) => ec_key = Some(PrivateKeyDer::Sec1(key)),
+                Item::Pkcs8Key(key) => pkcs8_key = Some(PrivateKeyDer::Pkcs8(key)),
+                Item::Pkcs1Key(key) => rsa_key = Some(PrivateKeyDer::Pkcs1(key)),
+                Item::Sec1Key(key) => ec_key = Some(PrivateKeyDer::Sec1(key)),
                 _ => return Err(Error::UnknownPrivateKeyFormat),
             }
         }
