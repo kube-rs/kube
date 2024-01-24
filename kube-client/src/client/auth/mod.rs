@@ -19,10 +19,10 @@ use tower::{filter::AsyncPredicate, BoxError};
 
 use crate::config::{AuthInfo, AuthProviderConfig, ExecAuthCluster, ExecConfig, ExecInteractiveMode};
 
-#[cfg(feature = "oauth")] mod oauth;
-#[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
-#[cfg(feature = "oidc")] mod oidc;
-#[cfg(feature = "oidc")] pub use oidc::errors as oidc_errors;
+//#[cfg(feature = "oauth")] mod oauth;
+//#[cfg(feature = "oauth")] pub use oauth::Error as OAuthError;
+//#[cfg(feature = "oidc")] mod oidc;
+//#[cfg(feature = "oidc")] pub use oidc::errors as oidc_errors;
 #[cfg(target_os = "windows")] use std::os::windows::process::CommandExt;
 
 #[derive(Error, Debug)]

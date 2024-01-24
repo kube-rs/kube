@@ -1,5 +1,7 @@
+#![allow(unused_imports)] // TODO: remove
 use http::{self, Response, StatusCode};
-use hyper::Body;
+use http_body_util::{combinators::BoxBody, BodyStream};
+type VerifyBody = BoxBody<Vec<u8>, tower::BoxError>;
 use thiserror::Error;
 use tokio_tungstenite::tungstenite as ws;
 
@@ -41,7 +43,7 @@ pub enum UpgradeConnectionError {
 
 // Verify upgrade response according to RFC6455.
 // Based on `tungstenite` and added subprotocol verification.
-pub fn verify_response(res: &Response<Body>, key: &str) -> Result<(), UpgradeConnectionError> {
+pub fn verify_response(res: &Response<VerifyBody>, key: &str) -> Result<(), UpgradeConnectionError> {
     if res.status() != StatusCode::SWITCHING_PROTOCOLS {
         return Err(UpgradeConnectionError::ProtocolSwitch(res.status()));
     }
