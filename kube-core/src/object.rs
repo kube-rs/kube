@@ -16,7 +16,7 @@ use std::borrow::Cow;
 /// and is generally produced from list/watch/delete collection queries on an [`Resource`](super::Resource).
 ///
 /// This is almost equivalent to [`k8s_openapi::List<T>`](k8s_openapi::List), but iterable.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ObjectList<T>
 where
     T: Clone,
