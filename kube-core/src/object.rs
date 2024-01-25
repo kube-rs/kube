@@ -357,10 +357,9 @@ mod test {
         assert_eq!(mypod.namespace().unwrap(), "dev");
         assert_eq!(mypod.name_unchecked(), "blog");
         assert!(mypod.status().is_none());
-        assert_eq!(
-            mypod.spec().containers[0],
-            ContainerSimple { image: "blog".into() }
-        );
+        assert_eq!(mypod.spec().containers[0], ContainerSimple {
+            image: "blog".into()
+        });
 
         assert_eq!(PodSimple::api_version(&ar), "v1");
         assert_eq!(PodSimple::version(&ar), "v1");
