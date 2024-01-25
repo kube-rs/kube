@@ -22,7 +22,7 @@ where
     T: Clone,
 {
     /// The type fields, always present
-    #[serde(flatten, default)]
+    #[serde(flatten, deserialize_with = "deserialize_v1_list_as_default")]
     pub types: TypeMeta,
 
     /// ListMeta - only really used for its `resourceVersion`
@@ -36,6 +36,17 @@ where
         bound(deserialize = "Vec<T>: Deserialize<'de>")
     )]
     pub items: Vec<T>,
+}
+
+fn deserialize_v1_list_as_default<'de, D>(deserializer: D) -> Result<TypeMeta, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let meta = Option::<TypeMeta>::deserialize(deserializer)?;
+    Ok(meta.unwrap_or(TypeMeta {
+        api_version: "v1".to_owned(),
+        kind: "List".to_owned(),
+    }))
 }
 
 fn deserialize_null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -346,9 +357,10 @@ mod test {
         assert_eq!(mypod.namespace().unwrap(), "dev");
         assert_eq!(mypod.name_unchecked(), "blog");
         assert!(mypod.status().is_none());
-        assert_eq!(mypod.spec().containers[0], ContainerSimple {
-            image: "blog".into()
-        });
+        assert_eq!(
+            mypod.spec().containers[0],
+            ContainerSimple { image: "blog".into() }
+        );
 
         assert_eq!(PodSimple::api_version(&ar), "v1");
         assert_eq!(PodSimple::version(&ar), "v1");
@@ -393,5 +405,25 @@ mod test {
         assert_eq!(mypod.name_unchecked(), "test");
         assert!(mypod.status.is_none());
         assert!(mypod.spec.is_none());
+    }
+
+    #[test]
+    fn k8s_object_list_default_types() {
+        use k8s_openapi::api::core::v1::Pod;
+
+        let raw_value = serde_json::json!({
+            "metadata": {
+                "resourceVersion": ""
+            },
+            "items": []
+        });
+        let pod_list: ObjectList<Pod> = serde_json::from_value(raw_value).unwrap();
+        assert_eq!(
+            TypeMeta {
+                api_version: "v1".to_owned(),
+                kind: "List".to_owned(),
+            },
+            pod_list.types,
+        );
     }
 }
