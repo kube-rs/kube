@@ -7,8 +7,15 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.88.1...main
 
-0.88.1 / 2024-01-26
+[0.88.1](https://github.com/kube-rs/kube/releases/tag/0.88.1) / 2024-01-26
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.88.1 -->
+
+## What's Changed
+This is a bug fix release for a deserialization issue introduced in 0.88.0.
+
+### Fixed
+* Minor fixes to `ObjectList` by @flavio in https://github.com/kube-rs/kube/pull/1398
 
 [0.88.0](https://github.com/kube-rs/kube/releases/tag/0.88.0) / 2024-01-21
 ===================
