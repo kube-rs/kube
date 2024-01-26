@@ -8,16 +8,17 @@
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
 #![allow(unused_imports)] // TODO: remove
+use bytes::Bytes;
 use either::{Either, Left, Right};
 use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response, StatusCode};
 use http_body::Body;
 use http_body_util::{
     combinators::{BoxBody, UnsyncBoxBody},
-    BodyExt, BodyStream, Full,
+    BodyExt, Full,
 };
 use hyper::body::Incoming;
-type Bytes = Vec<u8>; // we use Vec<u8> internally everywhere - maybe try to move to Bytes..
+//type Bytes = Vec<u8>; // we use Vec<u8> internally everywhere - maybe try to move to Bytes..
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
@@ -73,7 +74,7 @@ pub struct Client {
     // - `Buffer` for cheap clone
     // - `BoxService` for dynamic response future type
     inner: Buffer<
-        BoxService<Request<Bytes>, Response<BodyStream<BoxBody<Bytes, BoxError>>>, BoxError>,
+        BoxService<Request<Bytes>, Response<UnsyncBoxBody<Bytes, BoxError>>, BoxError>,
         Request<Bytes>,
     >,
     default_ns: String,
@@ -109,7 +110,7 @@ impl Client {
     /// ```
     pub fn new<S, /*B,*/ T>(service: S, default_namespace: T) -> Self
     where
-        S: Service<Request<Bytes>, Response = Response<BoxBody<Bytes, BoxError>>> + Send + 'static,
+        S: Service<Request<Bytes>, Response = Response<UnsyncBoxBody<Bytes, BoxError>>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
         //B: http_body::Body<Data = Bytes> + Send + 'static,
@@ -117,7 +118,7 @@ impl Client {
         T: Into<String>,
     {
         // Transform response body to `hyper::Body` and use type erased error to avoid type parameters.
-        let service = MapResponseBodyLayer::new(|x| BodyStream::new(x))
+        let service = MapResponseBodyLayer::new(|x| x.into_stream())
             .layer(service)
             .map_err(|e| e.into());
         Self {
@@ -151,10 +152,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and return the raw response back.
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
-    pub async fn send(
-        &self,
-        request: Request<Bytes>,
-    ) -> Result<Response<BodyStream<BoxBody<Bytes, BoxError>>>> {
+    pub async fn send(&self, request: Request<Bytes>) -> Result<Response<UnsyncBoxBody<Bytes, BoxError>>> {
         let mut svc = self.inner.clone();
         let res = svc
             .ready()
@@ -243,11 +241,9 @@ impl Client {
         let res = self.send(request.into()).await?;
         let status = res.status();
         // trace!("Status = {:?} for {}", status, res.url());
-        // TODO: we have a BodyStream that does not implement Body
-        // so we cannot use collect on it? then what's the point of it!?
-        //..maybe BodyStream layer is a bad idea in genreal?
         let body_bytes = res.into_body().collect().await.unwrap(); // Infallible
-        let text = String::from_utf8(body_bytes.to_bytes()).map_err(Error::FromUtf8)?;
+        let bytes = body_bytes.to_bytes();
+        let text = String::from_utf8(bytes.to_vec()).map_err(Error::FromUtf8)?;
         handle_api_errors(&text, status)?;
 
         Ok(text)
@@ -436,7 +432,7 @@ impl Client {
         self.request(
             Request::builder()
                 .uri(url)
-                .body(vec![])
+                .body(Bytes::new())
                 .map_err(Error::HttpError)?,
         )
         .await

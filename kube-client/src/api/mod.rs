@@ -1,27 +1,28 @@
 //! API helpers for structured interaction with the Kubernetes API
 
-mod core_methods;
-#[cfg(feature = "ws")] mod remote_command;
+// TODO: reinstate..
+//mod core_methods;
+//#[cfg(feature = "ws")] mod remote_command;
 use std::fmt::Debug;
 
-#[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
-#[cfg(feature = "ws")] mod portforward;
-#[cfg(feature = "ws")] pub use portforward::Portforwarder;
+//#[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
+//#[cfg(feature = "ws")] mod portforward;
+//#[cfg(feature = "ws")] pub use portforward::Portforwarder;
 
-mod subresource;
-#[cfg(feature = "ws")]
+//mod subresource;
+/*#[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use subresource::{Attach, AttachParams, Execute, Portforward};
 pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
-
+*/
 // Ephemeral containers were stabilized in Kubernetes 1.25.
-k8s_openapi::k8s_if_ge_1_25! {
-    pub use subresource::Ephemeral;
-}
+//k8s_openapi::k8s_if_ge_1_25! {
+//    pub use subresource::Ephemeral;
+//}
 
-mod util;
+//mod util;
 
-pub mod entry;
+//pub mod entry;
 
 // Re-exports from kube-core
 #[cfg(feature = "admission")]
