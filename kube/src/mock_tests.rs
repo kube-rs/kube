@@ -96,6 +96,8 @@ impl ApiServerVerifier {
             assert!(!req_uri.contains("continue=")); // first list has no continue
 
             let respdata = json!({
+                "kind": "HackList",
+                "apiVersion": "kube.rs/v1",
                 "metadata": {
                   "continue": "first",
                 },
@@ -111,6 +113,8 @@ impl ApiServerVerifier {
             let req_uri = request.uri().to_string();
             assert!(req_uri.contains("&continue=first"));
             let respdata = json!({
+                "kind": "HackList",
+                "apiVersion": "kube.rs/v1",
                 "metadata": {
                     "continue": "",
                     "resourceVersion": "2"

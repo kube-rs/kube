@@ -14,11 +14,12 @@ license = "Apache-2.0"
 release = false
 
 [features]
-default = ["rustls-tls", "kubederive", "ws", "latest", "runtime", "refresh"]
+default = ["rustls-tls", "kubederive", "ws", "latest", "socks5", "runtime", "refresh"]
 kubederive = ["kube/derive"]
 openssl-tls = ["kube/client", "kube/openssl-tls"]
 rustls-tls = ["kube/client", "kube/rustls-tls"]
 runtime = ["kube/runtime", "kube/unstable-runtime"]
+socks5 = ["kube/socks5"]
 refresh = ["kube/oauth", "kube/oidc"]
 ws = ["kube/ws"]
 latest = ["k8s-openapi/latest"]
@@ -26,13 +27,13 @@ latest = ["k8s-openapi/latest"]
 [dev-dependencies]
 tokio-util = "0.7.0"
 assert-json-diff = "2.0.1"
-garde = { version = "0.15.0", default-features = false, features = ["derive"] }
+garde = { version = "0.18.0", default-features = false, features = ["derive"] }
 anyhow = "1.0.44"
 futures = "0.3.17"
-jsonpath_lib = "0.3.0"
-kube = { path = "../kube", version = "^0.86.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.86.0", default-features = false } # only needed to opt out of schema
-k8s-openapi = { version = "0.20.0", default-features = false }
+jsonpath-rust = "0.4.0"
+kube = { path = "../kube", version = "^0.88.1", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.88.1", default-features = false } # only needed to opt out of schema
+k8s-openapi = { version = "0.21.0", default-features = false }
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
 serde_yaml = "0.9.19"
@@ -175,6 +176,10 @@ path = "pod_reflector.rs"
 [[example]]
 name = "pod_watcher"
 path = "pod_watcher.rs"
+
+[[example]]
+name = "request_raw"
+path = "request_raw.rs"
 
 [[example]]
 name = "node_reflector"

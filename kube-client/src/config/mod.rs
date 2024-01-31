@@ -148,8 +148,7 @@ pub struct Config {
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
     pub auth_info: AuthInfo,
-    // TODO Actually support proxy or create an example with custom client
-    /// Optional proxy URL.
+    /// Optional proxy URL. Proxy support requires the `socks5` feature.
     pub proxy_url: Option<http::Uri>,
     /// If set, apiserver certificate will be validated to contain this string
     ///
@@ -170,7 +169,7 @@ impl Config {
             root_cert: None,
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
-            write_timeout: None,
+            write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
             proxy_url: None,
@@ -249,7 +248,7 @@ impl Config {
             root_cert: Some(root_cert),
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
-            write_timeout: None,
+            write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo {
                 token_file: Some(incluster_config::token_file()),
@@ -309,7 +308,7 @@ impl Config {
             root_cert,
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
-            write_timeout: None,
+            write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs,
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
@@ -377,11 +376,12 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
 // https://github.com/kube-rs/kube/issues/146#issuecomment-590924397
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
+const DEFAULT_WRITE_TIMEOUT: Duration = Duration::from_secs(295);
 
 // Expose raw config structs
 pub use file_config::{
-    AuthInfo, AuthProviderConfig, Cluster, Context, ExecConfig, ExecInteractiveMode, Kubeconfig,
-    NamedAuthInfo, NamedCluster, NamedContext, NamedExtension, Preferences,
+    AuthInfo, AuthProviderConfig, Cluster, Context, ExecAuthCluster, ExecConfig, ExecInteractiveMode,
+    Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext, NamedExtension, Preferences,
 };
 
 #[cfg(test)]

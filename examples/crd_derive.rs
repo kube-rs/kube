@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
     plural = "fooz",
     root = "FooCrd",
     namespaced,
+    doc = "Custom resource representing a Foo",
     status = "FooStatus",
     derive = "PartialEq",
     derive = "Default",
@@ -119,7 +120,7 @@ fn verify_crd() {
             ],
             "schema": {
               "openAPIV3Schema": {
-                "description": "Auto-generated derived type for MyFoo via `CustomResource`",
+                "description": "Custom resource representing a Foo",
                 "properties": {
                   "spec": {
                     "description": "Our spec for Foo\n\nA struct with our chosen Kind will be created for us, using the following kube attrs",
