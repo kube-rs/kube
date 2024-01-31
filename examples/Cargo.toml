@@ -61,6 +61,10 @@ name = "configmapgen_controller"
 path = "configmapgen_controller.rs"
 
 [[example]]
+name = "shared_stream_controllers"
+path = "shared_stream_controllers.rs"
+
+[[example]]
 name = "crd_api"
 path = "crd_api.rs"
 
