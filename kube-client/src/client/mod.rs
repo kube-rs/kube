@@ -50,13 +50,13 @@ pub use tls::openssl_tls::Error as OpensslTlsError;
 #[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
 #[cfg(feature = "ws")] mod upgrade;
 
-#[cfg(feature = "oauth")]
-#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
-pub use auth::OAuthError;
+//#[cfg(feature = "oauth")]
+//#[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
+//pub use auth::OAuthError;
 
-#[cfg(feature = "oidc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
-pub use auth::oidc_errors;
+//#[cfg(feature = "oidc")]
+//#[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
+//pub use auth::oidc_errors;
 
 #[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
 
@@ -73,10 +73,7 @@ pub use builder::{ClientBuilder, DynBody};
 pub struct Client {
     // - `Buffer` for cheap clone
     // - `BoxService` for dynamic response future type
-    inner: Buffer<
-        BoxService<Request<Bytes>, Response<UnsyncBoxBody<Bytes, BoxError>>, BoxError>,
-        Request<Bytes>,
-    >,
+    inner: Buffer<BoxService<Request<Bytes>, Response<BoxBody<Bytes, BoxError>>, BoxError>, Request<Bytes>>,
     default_ns: String,
 }
 
@@ -110,7 +107,7 @@ impl Client {
     /// ```
     pub fn new<S, /*B,*/ T>(service: S, default_namespace: T) -> Self
     where
-        S: Service<Request<Bytes>, Response = Response<UnsyncBoxBody<Bytes, BoxError>>> + Send + 'static,
+        S: Service<Request<Bytes>, Response = Response<BoxBody<Bytes, BoxError>>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
         //B: http_body::Body<Data = Bytes> + Send + 'static,
@@ -152,7 +149,7 @@ impl Client {
     /// Perform a raw HTTP request against the API and return the raw response back.
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
-    pub async fn send(&self, request: Request<Bytes>) -> Result<Response<UnsyncBoxBody<Bytes, BoxError>>> {
+    pub async fn send(&self, request: Request<Bytes>) -> Result<Response<BoxBody<Bytes, BoxError>>> {
         let mut svc = self.inner.clone();
         let res = svc
             .ready()

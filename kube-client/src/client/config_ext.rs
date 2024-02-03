@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use http::{header::HeaderName, HeaderValue};
-use hyper_tls::HttpsConnector;
 use hyper_util::client::legacy::connect::HttpConnector;
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
@@ -43,7 +42,7 @@ pub trait ConfigExt: private::Sealed {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
-    fn rustls_https_connector(&self) -> Result<HttpsConnector<HttpConnector>>;
+    fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<HttpConnector>>;
 
     /// Create [`HttpsConnector`] based on config and `connector`.
     ///
@@ -216,7 +215,7 @@ impl ConfigExt for Config {
     }
 
     #[cfg(feature = "rustls-tls")]
-    fn rustls_https_connector(&self) -> Result<HttpsConnector<HttpConnector>> {
+    fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<HttpConnector>> {
         let mut connector = HttpConnector::new();
         connector.enforce_http(false);
         self.rustls_https_connector_with_connector(connector)

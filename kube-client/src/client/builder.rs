@@ -3,11 +3,11 @@ use http::{header::HeaderMap, Request, Response};
 use http_body_util::{combinators::BoxBody, BodyExt, StreamBody};
 use hyper::{
     body::{Body, Incoming},
-    client::conn::http1::{Builder as HyperBuilder, Connection},
+    client::conn::http1::Connection,
 };
 use hyper_timeout::TimeoutConnector;
 use hyper_tls::HttpsConnector;
-use hyper_util::client::legacy::connect::HttpConnector;
+use hyper_util::client::legacy::{connect::HttpConnector, Builder as HyperBuilder};
 pub use kube_core::response::Status;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -60,7 +60,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// Build a [`Client`] instance with the current [`Service`] stack.
     pub fn build<B>(self) -> Client
     where
-        Svc: Service<Request<Incoming>, Response = Response<B>> + Send + 'static,
+        Svc: Service<Request<Bytes>, Response = Response<B>> + Send + 'static,
         Svc::Future: Send + 'static,
         Svc::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
@@ -70,7 +70,7 @@ impl<Svc> ClientBuilder<Svc> {
     }
 }
 
-pub type GenericService = BoxService<Request<Incoming>, Response<Box<DynBody>>, BoxError>;
+pub type GenericService = BoxService<Request<Bytes>, Response<BoxBody<Bytes, BoxError>>, BoxError>;
 
 impl TryFrom<Config> for ClientBuilder<GenericService> {
     type Error = Error;
@@ -123,14 +123,16 @@ where
             return Err(Error::TlsRequired);
         }
 
-        let mut connector = TimeoutConnector::new(connector);
+        //TODO: fix bound
+        //let mut connector = TimeoutConnector::new(connector);
 
         // Set the timeouts for the client
-        connector.set_connect_timeout(config.connect_timeout);
-        connector.set_read_timeout(config.read_timeout);
-        connector.set_write_timeout(config.write_timeout);
+        // connector.set_connect_timeout(config.connect_timeout);
+        // connector.set_read_timeout(config.read_timeout);
+        // connector.set_write_timeout(config.write_timeout);
 
-        HyperBuilder::builder().build(connector)
+        use hyper_util::rt::TokioExecutor; // seems necessary now
+        HyperBuilder::new(TokioExecutor::new()).build(connector)
     };
 
     let stack = ServiceBuilder::new().layer(config.base_uri_layer()).into_inner();
