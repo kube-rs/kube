@@ -35,4 +35,4 @@ jobs:
         with:
           version: '0.18.5'
           out-type: Xml
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
