@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "client",]
 categories = ["web-programming::http-client", "configuration", "network-programming", "api-bindings"]
-rust-version = "1.70.0"
+rust-version = "1.72.0"
 edition = "2021"
 
 [features]
