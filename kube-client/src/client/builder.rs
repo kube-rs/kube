@@ -20,8 +20,6 @@ use tracing::Span;
 use crate::{client::ConfigExt, Client, Config, Error, Result};
 
 /// HTTP body of a dynamic backing type.
-///
-/// The suggested implementation type is [`hyper::Incoming`].
 pub type DynBody = dyn Body<Data = Bytes, Error = BoxError> + Send + Unpin;
 
 /// Builder for [`Client`] instances with customized [tower](`Service`) middleware.
@@ -37,7 +35,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// which provides a default stack as a starting point.
     pub fn new(service: Svc, default_namespace: impl Into<String>) -> Self
     where
-        Svc: Service<Request<Incoming>>,
+        Svc: Service<Request<Bytes>>,
     {
         Self {
             service,
