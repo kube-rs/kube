@@ -5,7 +5,11 @@ use k8s_openapi::api::core::v1::{Pod, PodCondition, PodStatus};
 use kube::{
     api::{Patch, PatchParams},
     core::ObjectMeta,
-    runtime::{controller::Action, watcher, Config, Controller},
+    runtime::{
+        controller::Action,
+        reflector::{shared_reflector, store::Writer},
+        watcher, Config, Controller, WatchStreamExt,
+    },
     Api, Client, ResourceExt,
 };
 use tracing::{info, warn};
@@ -32,6 +36,11 @@ async fn main() -> anyhow::Result<()> {
     // ?
     let config = Config::default().concurrency(2);
     let ctx = Arc::new(Data { client });
+
+    // (1): Create a store & have it transform the stream to return arcs
+    let writer = Writer::<Pod>::new(Default::default());
+    let reader = writer.as_reader();
+    let reflector = shared_reflector(writer, watcher(pods.clone(), Default::default()));
 
 
     // Building a controller
@@ -105,8 +114,10 @@ async fn main() -> anyhow::Result<()> {
     //
     //  The scheduler is a bit tricky since it needs to deal with concurrent
     //  invocations and messages that have already been processed.
+    //
+
     tokio::spawn(
-        Controller::new(pods.clone(), watcher::Config::default())
+        Controller::for_shared_stream(reflector.applied_objects(), reader, ())
             .with_config(config.clone())
             .shutdown_on_signal()
             .run(
@@ -122,8 +133,12 @@ async fn main() -> anyhow::Result<()> {
             }),
     );
 
+    // (2): we can't share streams yet so we just use the same primitives
+    let writer2 = Writer::<Pod>::new(Default::default());
+    let reader2 = writer2.as_reader();
+    let reflector2 = shared_reflector(writer2, watcher(pods.clone(), Default::default()));
 
-    Controller::new(pods, watcher::Config::default())
+    Controller::for_shared_stream(reflector2.applied_objects(), reader2, ())
         .with_config(config)
         .shutdown_on_signal()
         .run(
@@ -139,6 +154,8 @@ async fn main() -> anyhow::Result<()> {
         })
         .await;
 
+    // (3): Figure out how to use the same store and create a shared stream from
+    // the shared reflector :)
 
     Ok(())
 }

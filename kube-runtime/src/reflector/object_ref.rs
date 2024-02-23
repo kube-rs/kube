@@ -8,6 +8,7 @@ use kube_client::{
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
+    sync::Arc,
 };
 
 #[derive(Derivative)]
@@ -111,6 +112,19 @@ impl<K: Resource> ObjectRef<K> {
         K: Resource,
     {
         let meta = obj.meta();
+        Self {
+            dyntype,
+            name: obj.name_unchecked(),
+            namespace: meta.namespace.clone(),
+            extra: Extra::from_obj_meta(meta),
+        }
+    }
+
+    pub fn from_shared_obj_with(obj: Arc<K>, dyntype: K::DynamicType) -> Self
+    where
+        K: Resource,
+    {
+        let meta = obj.as_ref().meta();
         Self {
             dyntype,
             name: obj.name_unchecked(),

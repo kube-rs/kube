@@ -7,7 +7,7 @@ pub use self::object_ref::{Extra as ObjectRefExtra, ObjectRef};
 use crate::watcher;
 use futures::{Stream, TryStreamExt};
 use kube_client::Resource;
-use std::hash::Hash;
+use std::{hash::Hash, sync::Arc};
 pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
@@ -96,6 +96,18 @@ where
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
     stream.inspect_ok(move |event| writer.apply_watcher_event(event))
+}
+
+pub fn shared_reflector<K, W>(
+    mut writer: store::Writer<K>,
+    stream: W,
+) -> impl Stream<Item = watcher::Result<watcher::Event<Arc<K>>>>
+where
+    K: Resource + Clone,
+    K::DynamicType: Eq + Hash + Clone,
+    W: Stream<Item = watcher::Result<watcher::Event<K>>>,
+{
+    stream.map_ok(move |event| writer.apply_with_arc(event))
 }
 
 #[cfg(test)]
