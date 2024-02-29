@@ -3,12 +3,20 @@ use kube_core::{
     object::ObjectList,
     params::{GetParams, ListParams},
     request::Request,
-    ClusterResourceScope, NamespaceResourceScope, Resource,
+    ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 use k8s_openapi::api::core::v1::Namespace as k8sNs;
+
+// Allow dynamic scopes to "impersonate" both cluster- and namespace scopes
+trait IsClusterScoped {}
+impl IsClusterScoped for ClusterResourceScope {}
+impl IsClusterScoped for DynamicResourceScope {}
+trait IsNamespaceScoped {}
+impl IsNamespaceScoped for NamespaceResourceScope {}
+impl IsNamespaceScoped for DynamicResourceScope {}
 
 pub trait ListScope<K> {
     fn url_path(&self) -> String;
@@ -34,8 +42,9 @@ where
 // Only cluster-scoped objects can be named globally
 impl<K> ObjectScope<K> for Cluster
 where
-    K: Resource<Scope = ClusterResourceScope>,
+    K: Resource,
     K::DynamicType: Default,
+    K::Scope: IsClusterScoped,
 {
     fn url_path(&self) -> String {
         K::url_path(&K::DynamicType::default(), None)
@@ -47,8 +56,9 @@ pub struct Namespace(String);
 // Only namespaced objects can be accessed via namespace
 impl<K> ListScope<K> for Namespace
 where
-    K: Resource<Scope = NamespaceResourceScope>,
+    K: Resource,
     K::DynamicType: Default,
+    K::Scope: IsNamespaceScoped,
 {
     fn url_path(&self) -> String {
         K::url_path(&K::DynamicType::default(), Some(&self.0))
@@ -57,8 +67,9 @@ where
 
 impl<K> ObjectScope<K> for Namespace
 where
-    K: Resource<Scope = NamespaceResourceScope>,
+    K: Resource,
     K::DynamicType: Default,
+    K::Scope: IsNamespaceScoped,
 {
     fn url_path(&self) -> String {
         K::url_path(&K::DynamicType::default(), Some(&self.0))
