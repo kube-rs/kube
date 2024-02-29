@@ -3,6 +3,7 @@ use crate::utils::predicate::{Predicate, PredicateFilter};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
+    reflector::{ObjectRef, Store},
     utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
     watcher,
 };
@@ -14,7 +15,8 @@ use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
-use super::reflect::ReflectShared;
+use super::reflect::ReflectHandle;
+
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
@@ -251,13 +253,13 @@ pub trait WatchStreamExt: Stream {
         Reflect::new(self, writer)
     }
 
-    fn reflect_shared<K>(self, writer: Writer<K>) -> ReflectShared<Self, K>
+    fn reflect_shared<K>(self, reader: Store<K>) -> ReflectHandle<Self, K>
     where
-        Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
+        Self: Stream<Item = ObjectRef<K>> + Sized,
         K: Resource + Clone + 'static,
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
-        ReflectShared::new(self, writer)
+        ReflectHandle::new(self, reader)
     }
 }
 

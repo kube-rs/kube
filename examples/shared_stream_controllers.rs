@@ -42,11 +42,11 @@ async fn main() -> anyhow::Result<()> {
     let reader = writer.as_reader();
     let root = watcher(pods.clone(), Default::default())
         .default_backoff()
-        .reflect_shared(writer);
-    let dup = root.subscribe();
+        .reflect(writer);
+    let dup = root.subscribe().reflect_shared(reader.clone());
 
     tokio::spawn(
-        Controller::for_stream(root.applied_objects(), reader.clone())
+        Controller::for_stream(root.applied_objects(), reader)
             .with_config(config.clone())
             .shutdown_on_signal()
             .run(
@@ -63,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // (2): we can't share streams yet so we just use the same primitives
-    Controller::for_shared_ref(dup, reader, ())
+    Controller::for_shared_stream(dup.reader(), dup, ())
         .with_config(config)
         .shutdown_on_signal()
         .run(

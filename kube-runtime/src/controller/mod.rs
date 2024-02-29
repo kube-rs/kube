@@ -753,8 +753,8 @@ where
     }
 
     pub fn for_shared_stream(
-        trigger: impl Stream<Item = Arc<K>> + Send + 'static,
         reader: Store<K>,
+        trigger: impl Stream<Item = Arc<K>> + Send + 'static,
         dyntype: K::DynamicType,
     ) -> Self {
         let mut trigger_selector = stream::SelectAll::new();

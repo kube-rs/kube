@@ -5,10 +5,12 @@ use crate::{
 };
 use ahash::AHashMap;
 use derivative::Derivative;
+use futures::{stream, Stream};
 use kube_client::Resource;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
+use tokio::sync::broadcast;
 
 type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
@@ -25,6 +27,7 @@ where
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
     ready_rx: Arc<DelayedInit<()>>,
+    pub(crate) broadcast_tx: broadcast::Sender<Option<ObjectRef<K>>>,
 }
 
 impl<K: 'static + Resource + Clone> Writer<K>
@@ -37,11 +40,13 @@ where
     /// `k8s_openapi` types) you can use `Default` instead.
     pub fn new(dyntype: K::DynamicType) -> Self {
         let (ready_tx, ready_rx) = DelayedInit::new();
+        let (broadcast_tx, _) = broadcast::channel(10);
         Writer {
             store: Default::default(),
             dyntype,
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
+            broadcast_tx,
         }
     }
 
@@ -55,6 +60,21 @@ where
             store: self.store.clone(),
             ready_rx: self.ready_rx.clone(),
         }
+    }
+
+    pub(crate) fn subscribe(&self) -> impl Stream<Item = ObjectRef<K>> {
+        stream::unfold(self.broadcast_tx.subscribe(), |mut rx| async {
+            loop {
+                match rx.recv().await {
+                    Ok(Some(ev)) => return Some((ev, rx)),
+                    Err(broadcast::error::RecvError::Lagged(count)) => {
+                        tracing::error!("stream lagged, skipped {count} events");
+                        continue;
+                    }
+                    _ => return None,
+                }
+            }
+        })
     }
 
     /// Applies a single watcher event to the store

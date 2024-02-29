@@ -35,12 +35,16 @@ where
     pub(super) fn new(stream: St, writer: Writer<K>) -> Reflect<St, K> {
         Self { stream, writer }
     }
+
+    pub fn subscribe(&self) -> impl Stream<Item = ObjectRef<K>> {
+        self.writer.subscribe()
+    }
 }
 
 impl<St, K> Stream for Reflect<St, K>
 where
     K: Resource + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
     St: Stream<Item = Result<Event<K>, Error>>,
 {
     type Item = Result<Event<K>, Error>;
@@ -49,14 +53,23 @@ where
         let mut me = self.project();
         me.stream.as_mut().poll_next(cx).map_ok(move |event| {
             me.writer.apply_watcher_event(&event);
+            match &event {
+                Event::Applied(obj) | Event::Deleted(obj) => {
+                    me.writer.broadcast_tx.send(Some(ObjectRef::from_obj(obj))).ok();
+                }
+                Event::Restarted(obj_list) => {
+                    for obj in obj_list.iter().map(ObjectRef::from_obj) {
+                        me.writer.broadcast_tx.send(Some(obj)).ok();
+                    }
+                }
+            };
             event
         })
     }
 }
 
 #[pin_project]
-#[must_use = "subscribers will not get events unless this stream is polled"]
-pub struct ReflectShared<St, K>
+pub struct ReflectHandle<St, K>
 where
     St: Stream,
     K: Resource + Clone + 'static,
@@ -64,62 +77,38 @@ where
 {
     #[pin]
     stream: St,
-    writer: Writer<K>,
-
-    tx: broadcast::Sender<Option<ObjectRef<K>>>,
+    reader: Store<K>,
 }
 
-impl<St, K> ReflectShared<St, K>
+impl<St, K> ReflectHandle<St, K>
 where
-    St: TryStream<Ok = Event<K>>,
+    St: Stream<Item = ObjectRef<K>>,
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
-    pub(super) fn new(stream: St, writer: Writer<K>) -> ReflectShared<St, K> {
-        let (tx, _) = broadcast::channel(10);
-        Self { stream, writer, tx }
+    pub(super) fn new(stream: St, reader: Store<K>) -> ReflectHandle<St, K> {
+        Self { stream, reader }
     }
 
-    pub fn subscribe(&self) -> impl Stream<Item = ObjectRef<K>> {
-        stream::unfold(self.tx.subscribe(), |mut rx| async {
-            loop {
-                match rx.recv().await {
-                    Ok(Some(ev)) => return Some((ev, rx)),
-                    Err(broadcast::error::RecvError::Lagged(count)) => {
-                        tracing::error!("stream lagged, skipped {count} events");
-                        continue;
-                    }
-                    _ => return None,
-                }
-            }
-        })
+    pub fn reader(&self) -> Store<K> {
+        self.reader.clone()
     }
 }
 
-impl<St, K> Stream for ReflectShared<St, K>
+impl<St, K> Stream for ReflectHandle<St, K>
 where
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone + Default,
-    St: Stream<Item = Result<Event<K>, Error>>,
+    St: Stream<Item = ObjectRef<K>>,
 {
-    type Item = St::Item;
+    type Item = Arc<K>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
-        me.stream.as_mut().poll_next(cx).map_ok(move |event| {
-            me.writer.apply_watcher_event(&event);
-            match &event {
-                Event::Applied(obj) | Event::Deleted(obj) => {
-                    me.tx.send(Some(ObjectRef::from_obj(obj))).ok();
-                }
-                Event::Restarted(obj_list) => {
-                    for obj in obj_list.iter().map(ObjectRef::from_obj) {
-                        me.tx.send(Some(obj)).ok();
-                    }
-                }
-            };
-            event
-        })
+        match ready!(me.stream.as_mut().poll_next(cx)) {
+            Some(obj_ref) => Poll::Ready(me.reader.get(&obj_ref)),
+            None => Poll::Ready(None),
+        }
     }
 }
 
