@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use futures::StreamExt;
+use futures::{Stream, StreamExt, TryStream, TryStreamExt};
 use k8s_openapi::api::core::v1::{Pod, PodCondition, PodStatus};
 use kube::{
     api::{Patch, PatchParams},
@@ -40,11 +40,13 @@ async fn main() -> anyhow::Result<()> {
     // (1): Create a store & have it transform the stream to return arcs
     let writer = Writer::<Pod>::new(Default::default());
     let reader = writer.as_reader();
-    let reflector = shared_reflector(writer, watcher(pods.clone(), Default::default()));
-
+    let root = watcher(pods.clone(), Default::default())
+        .default_backoff()
+        .reflect_shared(writer);
+    let dup = root.subscribe().map(|obj| Ok(obj)).applied_objects();
 
     tokio::spawn(
-        Controller::for_shared_stream(reflector.applied_objects(), reader, ())
+        Controller::for_shared_stream(dup, reader, ())
             .with_config(config.clone())
             .shutdown_on_signal()
             .run(
@@ -65,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
     let reader2 = writer2.as_reader();
     let reflector2 = shared_reflector(writer2, watcher(pods.clone(), Default::default()));
 
-    Controller::for_shared_stream(reflector2.applied_objects(), reader2, ())
+    Controller::for_shared_stream(root, reader2, ())
         .with_config(config)
         .shutdown_on_signal()
         .run(

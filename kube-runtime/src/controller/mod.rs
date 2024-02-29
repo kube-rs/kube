@@ -719,12 +719,12 @@ where
     }
 
     pub fn for_shared_stream(
-        trigger: impl Stream<Item = Result<Arc<K>, watcher::Error>> + Send + 'static,
+        trigger: impl Stream<Item = Arc<K>> + Send + 'static,
         reader: Store<K>,
         dyntype: K::DynamicType,
     ) -> Self {
         let mut trigger_selector = stream::SelectAll::new();
-        let self_watcher = trigger_self_shared(trigger, dyntype.clone()).boxed();
+        let self_watcher = trigger_self_shared(trigger.map(|obj| Ok(obj)), dyntype.clone()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
