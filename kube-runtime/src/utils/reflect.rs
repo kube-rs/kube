@@ -9,7 +9,7 @@ use pin_project::pin_project;
 use tokio::sync::broadcast;
 
 use crate::{
-    reflector::{store::Writer, Store},
+    reflector::{store::Writer, ObjectRef, Store},
     watcher::{self, Error, Event},
 };
 use kube_client::Resource;
@@ -66,7 +66,7 @@ where
     stream: St,
     writer: Writer<K>,
 
-    tx: broadcast::Sender<Option<Event<Arc<K>>>>,
+    tx: broadcast::Sender<Option<ObjectRef<K>>>,
 }
 
 impl<St, K> ReflectShared<St, K>
@@ -80,7 +80,7 @@ where
         Self { stream, writer, tx }
     }
 
-    pub fn subscribe(&self) -> impl Stream<Item = watcher::Event<Arc<K>>> {
+    pub fn subscribe(&self) -> impl Stream<Item = ObjectRef<K>> {
         stream::unfold(self.tx.subscribe(), |mut rx| async {
             loop {
                 match rx.recv().await {
@@ -99,26 +99,27 @@ where
 impl<St, K> Stream for ReflectShared<St, K>
 where
     K: Resource + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
     St: Stream<Item = Result<Event<K>, Error>>,
 {
-    type Item = Event<Arc<K>>;
+    type Item = St::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
-        match me.stream.as_mut().poll_next(cx) {
-            Poll::Ready(Some(Ok(ev))) => {
-                let ev = me.writer.apply_with_arc(ev);
-                me.tx.send(Some(ev.clone())).ok();
-                Poll::Ready(Some(ev))
-            }
-            Poll::Ready(Some(Err(error))) => Poll::Pending,
-            Poll::Ready(None) => {
-                me.tx.send(None).ok();
-                Poll::Ready(None)
-            }
-            Poll::Pending => Poll::Pending,
-        }
+        me.stream.as_mut().poll_next(cx).map_ok(move |event| {
+            me.writer.apply_watcher_event(&event);
+            match &event {
+                Event::Applied(obj) | Event::Deleted(obj) => {
+                    me.tx.send(Some(ObjectRef::from_obj(obj))).ok();
+                }
+                Event::Restarted(obj_list) => {
+                    for obj in obj_list.iter().map(ObjectRef::from_obj) {
+                        me.tx.send(Some(obj)).ok();
+                    }
+                }
+            };
+            event
+        })
     }
 }
 

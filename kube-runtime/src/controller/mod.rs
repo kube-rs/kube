@@ -718,6 +718,40 @@ where
         }
     }
 
+    pub fn for_shared_ref(
+        trigger: impl Stream<Item = ObjectRef<K>> + Send + 'static,
+        reader: Store<K>,
+        dyntype: K::DynamicType,
+    ) -> Self {
+        let mut trigger_selector = stream::SelectAll::new();
+        trigger_selector.push(
+            trigger
+                .map(move |obj| {
+                    Ok(ReconcileRequest {
+                        obj_ref: obj,
+                        reason: ReconcileReason::Unknown,
+                    })
+                })
+                .boxed(),
+        );
+
+        Self {
+            trigger_selector,
+            trigger_backoff: Box::<DefaultBackoff>::default(),
+            graceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            forceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            dyntype,
+            reader,
+            config: Default::default(),
+        }
+    }
+
     pub fn for_shared_stream(
         trigger: impl Stream<Item = Arc<K>> + Send + 'static,
         reader: Store<K>,
