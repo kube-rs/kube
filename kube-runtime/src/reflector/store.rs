@@ -88,44 +88,6 @@ where
             ready_tx.init(())
         }
     }
-
-    /// Applies a single watcher event to the store
-    pub fn apply_with_arc(&mut self, event: watcher::Event<K>) -> watcher::Event<Arc<K>> {
-        let ev = match event {
-            watcher::Event::Applied(obj) => {
-                let key = ObjectRef::from_obj_with(&obj, self.dyntype.clone());
-                let obj = Arc::new(obj.clone());
-                self.store.write().insert(key, obj.clone());
-                watcher::Event::Applied(obj)
-            }
-            watcher::Event::Deleted(obj) => {
-                let key = ObjectRef::from_obj_with(&obj, self.dyntype.clone());
-                self.store.write().remove(&key);
-                watcher::Event::Deleted(Arc::new(obj))
-            }
-            watcher::Event::Restarted(new_objs) => {
-                let new_objs = new_objs
-                    .iter()
-                    .map(|obj| {
-                        (
-                            ObjectRef::from_obj_with(obj, self.dyntype.clone()),
-                            Arc::new(obj.clone()),
-                        )
-                    })
-                    .collect::<AHashMap<_, _>>();
-                let objs_arced = new_objs.values().map(|obj| obj.to_owned()).collect();
-                *self.store.write() = new_objs;
-                watcher::Event::Restarted(objs_arced)
-            }
-        };
-
-        // Mark as ready after the first event, "releasing" any calls to Store::wait_until_ready()
-        if let Some(ready_tx) = self.ready_tx.take() {
-            ready_tx.init(())
-        }
-
-        ev
-    }
 }
 impl<K> Default for Writer<K>
 where
