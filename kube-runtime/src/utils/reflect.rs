@@ -4,14 +4,14 @@ use core::{
 };
 use std::sync::Arc;
 
-use futures::{poll, ready, stream, Stream, TryStream};
+use futures::{ready, Future, Stream, TryStream};
 use pin_project::pin_project;
-use tokio::sync::broadcast;
 
 use crate::{
     reflector::{store::Writer, ObjectRef, Store},
-    watcher::{self, Error, Event},
+    watcher::{Error, Event},
 };
+use async_broadcast::{InactiveReceiver, Receiver, Sender};
 use kube_client::Resource;
 
 /// Stream returned by the [`reflect`](super::WatchStreamExt::reflect) method
@@ -35,10 +35,6 @@ where
     pub(super) fn new(stream: St, writer: Writer<K>) -> Reflect<St, K> {
         Self { stream, writer }
     }
-
-    pub fn subscribe(&self) -> impl Stream<Item = ObjectRef<K>> {
-        self.writer.subscribe()
-    }
 }
 
 impl<St, K> Stream for Reflect<St, K>
@@ -53,41 +49,120 @@ where
         let mut me = self.project();
         me.stream.as_mut().poll_next(cx).map_ok(move |event| {
             me.writer.apply_watcher_event(&event);
-            match &event {
-                Event::Applied(obj) | Event::Deleted(obj) => {
-                    me.writer.broadcast_tx.send(Some(ObjectRef::from_obj(obj))).ok();
-                }
-                Event::Restarted(obj_list) => {
-                    for obj in obj_list.iter().map(ObjectRef::from_obj) {
-                        me.writer.broadcast_tx.send(Some(obj)).ok();
-                    }
-                }
-            };
             event
         })
     }
 }
 
+/// Stream returned by the [`reflect`](super::WatchStreamExt::reflect) method
 #[pin_project]
-pub struct ReflectHandle<St, K>
+pub struct SharedReflect<St, K>
 where
-    St: Stream,
     K: Resource + Clone + 'static,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     #[pin]
     stream: St,
-    reader: Store<K>,
+    writer: Writer<K>,
+    tx: Sender<ObjectRef<K>>,
+    rx: InactiveReceiver<ObjectRef<K>>,
 }
 
-impl<St, K> ReflectHandle<St, K>
+impl<St, K> SharedReflect<St, K>
 where
-    St: Stream<Item = ObjectRef<K>>,
+    St: TryStream<Ok = Event<K>>,
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
-    pub(super) fn new(stream: St, reader: Store<K>) -> ReflectHandle<St, K> {
-        Self { stream, reader }
+    pub(super) fn new(stream: St, writer: Writer<K>, buf_size: usize) -> SharedReflect<St, K> {
+        let (tx, rx) = async_broadcast::broadcast(buf_size);
+        Self {
+            stream,
+            writer,
+            tx,
+            rx: rx.deactivate(),
+        }
+    }
+
+    pub fn subscribe(&self) -> SubscribeHandle<K> {
+        // Note: broadcast::Sender::new_receiver() will return a new receiver
+        // that _will not_ replay any messages in the channel, effectively
+        // starting from the latest message.
+        //
+        // Since we create a reader and a writer when calling reflect_shared()
+        // this should be fine. All subsequent clones should go through
+        // SubscribeHandle::clone() to get a receiver that replays all of the
+        // messages in the channel.
+        SubscribeHandle::new(self.writer.as_reader(), self.tx.new_receiver())
+    }
+}
+
+impl<St, K> Stream for SharedReflect<St, K>
+where
+    K: Resource + Clone,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    St: Stream<Item = Result<Event<K>, Error>>,
+{
+    type Item = Result<Event<K>, Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut me = self.project();
+        let next = me.stream.as_mut().poll_next(cx).map_ok(move |event| {
+            me.writer.apply_watcher_event(&event);
+            event
+        });
+        let ev = match ready!(next) {
+            Some(Ok(event)) => event,
+            None => return Poll::Ready(None),
+            Some(Err(error)) => return Poll::Ready(Some(Err(error))),
+        };
+
+        match &ev {
+            Event::Applied(obj) | Event::Deleted(obj) => {
+                // No error handling for now
+                // Future resolves to a Result<Option<v>> if explicitly marked
+                // as non-blocking
+                let _ = ready!(me.tx.broadcast(ObjectRef::from_obj(obj)).as_mut().poll(cx));
+            }
+            Event::Restarted(obj_list) => {
+                for obj in obj_list.iter().map(ObjectRef::from_obj) {
+                    let _ = ready!(me.tx.broadcast(obj).as_mut().poll(cx));
+                }
+            }
+        }
+
+        Poll::Ready(Some(Ok(ev)))
+    }
+}
+
+#[pin_project]
+pub struct SubscribeHandle<K>
+where
+    K: Resource + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
+{
+    #[pin]
+    rx: Receiver<ObjectRef<K>>,
+    reader: Store<K>,
+}
+
+impl<K> Clone for SubscribeHandle<K>
+where
+    K: Resource + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
+{
+    fn clone(&self) -> Self {
+        SubscribeHandle::new(self.reader.clone(), self.rx.clone())
+    }
+}
+
+impl<K> SubscribeHandle<K>
+where
+    K: Resource + Clone,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
+{
+    pub(super) fn new(reader: Store<K>, rx: Receiver<ObjectRef<K>>) -> SubscribeHandle<K> {
+        Self { reader, rx }
     }
 
     pub fn reader(&self) -> Store<K> {
@@ -95,17 +170,18 @@ where
     }
 }
 
-impl<St, K> Stream for ReflectHandle<St, K>
+impl<K> Stream for SubscribeHandle<K>
 where
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone + Default,
-    St: Stream<Item = ObjectRef<K>>,
 {
     type Item = Arc<K>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
-        match ready!(me.stream.as_mut().poll_next(cx)) {
+        // If we use try_recv() here we could return Poll::Ready(Error) and let
+        // the controller's trigger_backoff come into play (?)
+        match ready!(me.rx.as_mut().poll_next(cx)) {
             Some(obj_ref) => Poll::Ready(me.reader.get(&obj_ref)),
             None => Poll::Ready(None),
         }

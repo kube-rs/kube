@@ -1,18 +1,15 @@
 use std::{sync::Arc, time::Duration};
 
-use futures::{Stream, StreamExt, TryStream, TryStreamExt};
+use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, PodCondition, PodStatus};
 use kube::{
     api::{Patch, PatchParams},
     core::ObjectMeta,
-    runtime::{
-        controller::Action,
-        reflector::{shared_reflector, store::Writer},
-        watcher, Config, Controller, WatchStreamExt,
-    },
+    runtime::{controller::Action, reflector::store::Writer, watcher, Config, Controller, WatchStreamExt},
     Api, Client, ResourceExt,
 };
-use tracing::{info, warn};
+use tokio::signal::unix::{signal, SignalKind};
+use tracing::{info, info_span, warn, Instrument};
 
 use thiserror::Error;
 
@@ -29,41 +26,76 @@ struct Data {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
+
     let client = Client::try_default().await?;
-
     let pods = Api::<Pod>::namespaced(client.clone(), "default");
-
-    // ?
     let config = Config::default().concurrency(2);
     let ctx = Arc::new(Data { client });
 
-    // (1): Create a store & have it transform the stream to return arcs
+    // (1): create a store
     let writer = Writer::<Pod>::new(Default::default());
-    let reader = writer.as_reader();
-    let root = watcher(pods.clone(), Default::default())
-        .default_backoff()
-        .reflect(writer);
-    let dup = root.subscribe().reflect_shared(reader.clone());
 
+    // (2): split the stream:
+    //      - create a handle that can be cloned to get more readers
+    //      - pass through events from root stream through a reflector
+    //
+    //  Note: if we wanted to, we could apply a backoff _before_ we spill into the reflector
+    let (subscriber, reflector) = watcher(pods.clone(), Default::default()).reflect_shared(writer, 256);
+
+    // (3): schedule the root stream with the runtime
+    //      - apply a backoff to the root stream
+    //      - poll it to handle errors
+    //  scheduling with the runtime ensures the stream will be polled continously and allow
+    //  readers to make progress.
     tokio::spawn(
-        Controller::for_stream(root.applied_objects(), reader)
-            .with_config(config.clone())
-            .shutdown_on_signal()
-            .run(
-                reconcile_metadata,
-                |_, _, _| Action::requeue(Duration::from_secs(1)),
-                ctx.clone(),
-            )
-            .for_each(|res| async move {
-                match res {
-                    Ok(v) => info!("reconciled {v:?}"),
-                    Err(error) => warn!(%error, "failed to reconcile object"),
+        async move {
+            // Pin on the heap so we don't overflow our stack
+            // Put a backoff on it.
+            // - Depending on how we want to handle backpressure, the backoff could help to relax
+            //   the flow of data
+            // i.e. the root stream has a buffer that objects get put into. When an object is in the
+            // buffer, it is cloned and sent to all readers. Once all readers have acked their copy,
+            // the item is removed from the buffer.
+            //
+            // A backoff here could ensure that when the buffer is full, we backpressure in the root
+            // stream by not consuming watcher output. We give clients enough time to make progress and
+            // ensure the next time the root stream is polled it can make progress by pushing into the
+            // buffer.
+            let mut reflector = reflector.default_backoff().boxed();
+            tracing::info!("Polling root");
+            while let Some(next) = reflector.next().await {
+                match next {
+                    Err(error) => tracing::error!(%error, "Received error from main watcher stream"),
+                    _ => {}
                 }
-            }),
+            }
+        }
+        .instrument(info_span!("root_stream")),
     );
 
-    // (2): we can't share streams yet so we just use the same primitives
-    Controller::for_shared_stream(dup.reader(), dup, ())
+
+    // Create metadata controller to edit annotations
+    let reader = subscriber.reader();
+    let metadata_controller = Controller::for_shared_stream(subscriber.clone(), reader)
+        .with_config(config.clone())
+        .shutdown_on_signal()
+        .run(
+            reconcile_metadata,
+            |_, _, _| Action::requeue(Duration::from_secs(1)),
+            ctx.clone(),
+        )
+        .for_each(|res| async move {
+            match res {
+                Ok(v) => info!("Reconciled {v:?}"),
+                Err(error) => warn!(%error, "Failed to reconcile object"),
+            }
+        })
+        .instrument(info_span!("metadata_controller"));
+    tokio::spawn(metadata_controller);
+
+    // Create status controller
+    let reader = subscriber.reader();
+    let status_controller = Controller::for_shared_stream(subscriber, reader)
         .with_config(config)
         .shutdown_on_signal()
         .run(
@@ -73,14 +105,32 @@ async fn main() -> anyhow::Result<()> {
         )
         .for_each(|res| async move {
             match res {
-                Ok(v) => info!("reconcile status for {v:?}"),
-                Err(error) => warn!(%error, "failed to reconcile status for object"),
+                Ok(v) => info!("Reconciled {v:?}"),
+                Err(error) => warn!(%error, "Failed to reconcile object"),
             }
         })
-        .await;
+        .instrument(info_span!("status_controller"));
+    tokio::spawn(status_controller);
 
-    // (3): Figure out how to use the same store and create a shared stream from
-    // the shared reflector :)
+    // Handle shutdown
+    //
+    // In a more nicely put together example we'd want to actually drain everything
+    // instead of having controllers manage signals on their own
+    //
+    // The lack of a drain abstraction atm made me skip it but when the example is ready we should
+    // consider handling shutdowns well to help users out
+    let mut interrupt = signal(SignalKind::interrupt())?;
+    let mut terminate = signal(SignalKind::terminate())?;
+    tokio::select! {
+        _ = interrupt.recv() => {
+            info!("Received SIGINT; terminating...");
+        },
+
+        _ = terminate.recv() => {
+            info!("Received SIGTERM; terminating...");
+        }
+
+    }
 
     Ok(())
 }
