@@ -219,10 +219,6 @@ name = "secret_syncer"
 path = "secret_syncer.rs"
 
 [[example]]
-name = "node_del"
-path = "node_del.rs"
-
-[[example]]
 name = "pod_shell_crossterm"
 path = "pod_shell_crossterm.rs"
 required-features = ["ws"]
