@@ -14,7 +14,7 @@ use std::{
 ///
 /// This trait is blanket-implemented for all [`Resource`] objects.
 #[allow(clippy::module_name_repetitions)]
-pub trait ToObjectRef {
+pub trait Lookup {
     /// Type information for types that do not know their resource information at compile time.
     /// This is equivalent to [`Resource::DynamicType`].
     type DynamicType;
@@ -62,7 +62,7 @@ pub trait ToObjectRef {
     }
 }
 
-impl<K: Resource> ToObjectRef for K {
+impl<K: Resource> Lookup for K {
     type DynamicType = K::DynamicType;
 
     fn kind(dyntype: &Self::DynamicType) -> Cow<'_, str> {
@@ -121,7 +121,7 @@ impl<K: Resource> ToObjectRef for K {
 /// );
 /// ```
 #[non_exhaustive]
-pub struct ObjectRef<K: ToObjectRef + ?Sized> {
+pub struct ObjectRef<K: Lookup + ?Sized> {
     pub dyntype: K::DynamicType,
     /// The name of the object
     pub name: String,
@@ -157,7 +157,7 @@ pub struct Extra {
     pub uid: Option<String>,
 }
 
-impl<K: ToObjectRef> ObjectRef<K>
+impl<K: Lookup> ObjectRef<K>
 where
     K::DynamicType: Default,
 {
@@ -169,13 +169,13 @@ where
     #[must_use]
     pub fn from_obj(obj: &K) -> Self
     where
-        K: ToObjectRef,
+        K: Lookup,
     {
         obj.to_object_ref(Default::default())
     }
 }
 
-impl<K: ToObjectRef> ObjectRef<K> {
+impl<K: Lookup> ObjectRef<K> {
     #[must_use]
     pub fn new_with(name: &str, dyntype: K::DynamicType) -> Self {
         Self {
@@ -196,7 +196,7 @@ impl<K: ToObjectRef> ObjectRef<K> {
     #[must_use]
     pub fn from_obj_with(obj: &K, dyntype: K::DynamicType) -> Self
     where
-        K: ToObjectRef,
+        K: Lookup,
     {
         obj.to_object_ref(dyntype)
     }
@@ -230,7 +230,7 @@ impl<K: ToObjectRef> ObjectRef<K> {
     /// Note that no checking is done on whether this conversion makes sense. For example, every `Service`
     /// has a corresponding `Endpoints`, but it wouldn't make sense to convert a `Pod` into a `Deployment`.
     #[must_use]
-    pub fn into_kind_unchecked<K2: ToObjectRef>(self, dt2: K2::DynamicType) -> ObjectRef<K2> {
+    pub fn into_kind_unchecked<K2: Lookup>(self, dt2: K2::DynamicType) -> ObjectRef<K2> {
         ObjectRef {
             dyntype: dt2,
             name: self.name,
@@ -255,7 +255,7 @@ impl<K: ToObjectRef> ObjectRef<K> {
     }
 }
 
-impl<K: ToObjectRef> From<ObjectRef<K>> for ObjectReference {
+impl<K: Lookup> From<ObjectRef<K>> for ObjectReference {
     fn from(val: ObjectRef<K>) -> Self {
         let ObjectRef {
             dyntype: dt,
@@ -278,7 +278,7 @@ impl<K: ToObjectRef> From<ObjectRef<K>> for ObjectReference {
     }
 }
 
-impl<K: ToObjectRef> Display for ObjectRef<K> {
+impl<K: Lookup> Display for ObjectRef<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

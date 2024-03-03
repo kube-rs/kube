@@ -1,4 +1,4 @@
-use super::{ObjectRef, ToObjectRef};
+use super::{ObjectRef, Lookup};
 use crate::{
     utils::delayed_init::{self, DelayedInit},
     watcher,
@@ -16,7 +16,7 @@ type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug)]
-pub struct Writer<K: 'static + ToObjectRef>
+pub struct Writer<K: 'static + Lookup>
 where
     K::DynamicType: Eq + Hash,
 {
@@ -26,7 +26,7 @@ where
     ready_rx: Arc<DelayedInit<()>>,
 }
 
-impl<K: 'static + ToObjectRef + Clone> Writer<K>
+impl<K: 'static + Lookup + Clone> Writer<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -85,7 +85,7 @@ where
 }
 impl<K> Default for Writer<K>
 where
-    K: ToObjectRef + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Default + Eq + Hash + Clone,
 {
     fn default() -> Self {
@@ -101,7 +101,7 @@ where
 /// use `Writer::as_reader()` instead.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
-pub struct Store<K: 'static + ToObjectRef>
+pub struct Store<K: 'static + Lookup>
 where
     K::DynamicType: Hash + Eq,
 {
@@ -113,7 +113,7 @@ where
 #[error("writer was dropped before store became ready")]
 pub struct WriterDropped(delayed_init::InitDropped);
 
-impl<K: 'static + Clone + ToObjectRef> Store<K>
+impl<K: 'static + Clone + Lookup> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -195,7 +195,7 @@ where
 #[must_use]
 pub fn store<K>() -> (Store<K>, Writer<K>)
 where
-    K: ToObjectRef + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Eq + Hash + Clone + Default,
 {
     let w = Writer::<K>::default();

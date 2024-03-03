@@ -3,7 +3,7 @@
 mod object_ref;
 pub mod store;
 
-pub use self::object_ref::{Extra as ObjectRefExtra, ObjectRef, ToObjectRef};
+pub use self::object_ref::{Extra as ObjectRefExtra, ObjectRef, Lookup};
 use crate::watcher;
 use futures::{Stream, TryStreamExt};
 use std::hash::Hash;
@@ -90,7 +90,7 @@ pub use store::{store, Store};
 /// Additionally, only `labels`, `annotations` and `managed_fields` are safe to drop from `ObjectMeta`.
 pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
-    K: ToObjectRef + Clone,
+    K: Lookup + Clone,
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
