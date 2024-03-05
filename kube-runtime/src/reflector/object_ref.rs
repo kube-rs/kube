@@ -13,7 +13,6 @@ use std::{
 /// Minimal lookup behaviour needed by a [reflector store](super::Store).
 ///
 /// This trait is blanket-implemented for all [`Resource`] objects.
-#[allow(clippy::module_name_repetitions)]
 pub trait Lookup {
     /// Type information for types that do not know their resource information at compile time.
     /// This is equivalent to [`Resource::DynamicType`].
