@@ -1,4 +1,4 @@
-use super::{ObjectRef, Lookup};
+use super::{Lookup, ObjectRef};
 use crate::{
     utils::delayed_init::{self, DelayedInit},
     watcher,
