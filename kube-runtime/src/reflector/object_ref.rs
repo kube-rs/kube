@@ -10,7 +10,7 @@ use std::{
     hash::Hash,
 };
 
-/// An object that can be indexed by a [reflector store](super::Store).
+/// Minimal lookup behaviour needed by a [reflector store](super::Store).
 ///
 /// This trait is blanket-implemented for all [`Resource`] objects.
 #[allow(clippy::module_name_repetitions)]
