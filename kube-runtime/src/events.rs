@@ -20,7 +20,7 @@ pub struct Event {
 
     /// The short reason explaining why the `action` was taken.
     ///
-    /// This must be at most 128 characters, and is often PascalCased. Shows up in `kubectl describe` as `Reason`.
+    /// This must be at most 128 characters, and is often `PascalCased`. Shows up in `kubectl describe` as `Reason`.
     /// Usually denoted
     pub reason: String,
 

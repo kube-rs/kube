@@ -39,11 +39,11 @@ async fn main() -> anyhow::Result<()> {
     let event_stream = watcher(events, conf).default_backoff().applied_objects();
     pin_mut!(event_stream);
 
-    println!("{0:<6} {1:<15} {2:<55} {3}", "AGE", "REASON", "OBJECT", "MESSAGE");
+    println!("{0} {1} {2} MESSAGE", "AGE", "REASON", "OBJECT");
     while let Some(ev) = event_stream.try_next().await? {
         let age = ev.creation_timestamp().map(format_creation).unwrap_or_default();
         let reason = ev.reason.unwrap_or_default();
-        let obj = ev.regarding.map(format_objref).flatten().unwrap_or_default();
+        let obj = ev.regarding.and_then(format_objref).unwrap_or_default();
         let note = ev.note.unwrap_or_default();
         println!("{0:<6} {1:<15} {2:<55} {3}", age, reason, obj, note);
     }

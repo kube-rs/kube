@@ -5,7 +5,6 @@ use hyper::{
     client::{connect::Connection, HttpConnector},
 };
 use hyper_timeout::TimeoutConnector;
-pub use kube_core::response::Status;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tower::{util::BoxService, BoxError, Layer, Service, ServiceBuilder};

@@ -189,7 +189,7 @@ mod tests {
         let mut runner = Box::pin(
             // The debounce period needs to zero because a debounce period > 0
             // will lead to the second request to be discarded.
-            Runner::new(scheduler(sched_rx), 0, |_| {
+            Runner::new(scheduler(sched_rx), 0, |()| {
                 count += 1;
                 // Panic if this ref is already held, to simulate some unsafe action..
                 let mutex_ref = rc.borrow_mut();

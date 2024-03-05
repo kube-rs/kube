@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     let list = pods.list(&list_params).await?;
 
     // Use the given JSONPATH to filter the ObjectList
-    let list_json = serde_json::to_value(&list)?;
+    let list_json = serde_json::to_value(list)?;
     for res in jsonpath.find_slice(&list_json) {
         info!("\t\t {}", *res);
     }
