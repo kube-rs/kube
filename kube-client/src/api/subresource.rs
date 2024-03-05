@@ -545,14 +545,9 @@ where
     K: Clone + DeserializeOwned + Execute,
 {
     /// Execute a command in a pod
-    pub async fn exec<I: Debug, T>(
-        &self,
-        name: &str,
-        command: I,
-        ap: &AttachParams,
-    ) -> Result<AttachedProcess>
+    pub async fn exec<I, T>(&self, name: &str, command: I, ap: &AttachParams) -> Result<AttachedProcess>
     where
-        I: IntoIterator<Item = T>,
+        I: IntoIterator<Item = T> + Debug,
         T: Into<String>,
     {
         let mut req = self
