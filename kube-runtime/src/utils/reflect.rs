@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use futures::{ready, Future, Stream, TryStream};
 use pin_project::pin_project;
+use tokio::time;
 
 use crate::{
     reflector::{store::Writer, ObjectRef, Store},
@@ -66,6 +67,10 @@ where
     writer: Writer<K>,
     tx: Sender<ObjectRef<K>>,
     rx: InactiveReceiver<ObjectRef<K>>,
+
+    #[pin]
+    sleep: time::Sleep,
+    deadline: time::Duration,
 }
 
 impl<St, K> SharedReflect<St, K>
@@ -81,6 +86,8 @@ where
             writer,
             tx,
             rx: rx.deactivate(),
+            sleep: time::sleep(time::Duration::ZERO),
+            deadline: time::Duration::from_secs(2),
         }
     }
 
@@ -117,20 +124,47 @@ where
             Some(Err(error)) => return Poll::Ready(Some(Err(error))),
         };
 
+        let mut futures = Vec::new();
         match &ev {
             Event::Applied(obj) | Event::Deleted(obj) => {
                 // No error handling for now
                 // Future resolves to a Result<Option<v>> if explicitly marked
                 // as non-blocking
-                let _ = ready!(me.tx.broadcast(ObjectRef::from_obj(obj)).as_mut().poll(cx));
+                futures.push((
+                    ObjectRef::from_obj(obj),
+                    me.tx.broadcast(ObjectRef::from_obj(obj)),
+                ));
+                //let _ = ready!(me.tx.broadcast(ObjectRef::from_obj(obj)).as_mut().poll(cx));
             }
             Event::Restarted(obj_list) => {
                 for obj in obj_list.iter().map(ObjectRef::from_obj) {
-                    let _ = ready!(me.tx.broadcast(obj).as_mut().poll(cx));
+                    futures.push((obj.clone(), me.tx.broadcast(obj)));
+
+                    //let _ = ready!(me.tx.broadcast(obj).as_mut().poll(cx));
                 }
             }
         }
 
+        tracing::info!("WE POLLING AGAIN?");
+        me.sleep.as_mut().reset(time::Instant::now() + *me.deadline);
+        for (i, f) in futures.into_iter().enumerate() {
+            let obj = f.0;
+            let mut fut = f.1;
+            let name = obj.name;
+            tracing::info!("PROCESSING {name}, iteration {i}");
+            match fut.as_mut().poll(cx) {
+                Poll::Ready(_) => {
+                    tracing::info!("READY");
+                }
+                Poll::Pending => {
+                    tracing::info!("GOT POLLED");
+                    ready!(me.sleep.as_mut().poll(cx));
+                    tracing::info!("BACKING OFF...");
+                }
+            }
+        }
+
+        tracing::info!("Returned");
         Poll::Ready(Some(Ok(ev)))
     }
 }
