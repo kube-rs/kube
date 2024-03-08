@@ -7,7 +7,7 @@ use std::{collections::VecDeque, sync::Arc};
 use futures::{ready, Future, Stream, TryStream};
 use pin_project::pin_project;
 use tokio::time;
-use tracing::info;
+use tracing::{debug, error, instrument, trace};
 
 use crate::{
     reflector::{store::Writer, ObjectRef, Store},
@@ -31,23 +31,9 @@ where
     rx: InactiveReceiver<ObjectRef<K>>,
 
     #[pin]
-    state: BroadcastState<K>,
+    sleep: time::Sleep,
+    buffer: VecDeque<ObjectRef<K>>,
     deadline: time::Duration,
-}
-
-#[pin_project(project = BroadcastStateProj)]
-enum BroadcastState<K>
-where
-    K: Resource + Clone + 'static,
-    K::DynamicType: Eq + std::hash::Hash + Clone,
-{
-    Reading,
-    BlockedOnWrite {
-        #[pin]
-        sleep: time::Sleep,
-        buffer: VecDeque<ObjectRef<K>>,
-        event: Event<K>,
-    },
 }
 
 impl<St, K> SharedReflect<St, K>
@@ -63,8 +49,9 @@ where
             writer,
             tx,
             rx: rx.deactivate(),
-            state: BroadcastState::Reading,
-            deadline: time::Duration::from_secs(2),
+            deadline: time::Duration::from_secs(10),
+            sleep: time::sleep(time::Duration::ZERO),
+            buffer: VecDeque::new(),
         }
     }
 
@@ -89,114 +76,104 @@ where
 {
     type Item = Result<Event<K>, Error>;
 
+    #[instrument(
+        name = "shared_stream",
+        skip_all, 
+        fields(active_readers = %self.tx.receiver_count(),
+        inner_queue_depth = %self.buffer.len())
+    )]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
-        info!("Polling");
         loop {
-            match this.state.as_mut().project() {
-                // Continue reading
-                BroadcastStateProj::Reading => {}
-                BroadcastStateProj::BlockedOnWrite {
-                    mut sleep,
-                    buffer,
-                    event,
-                } => {
-                    loop {
-                        let c = buffer.len();
-                        info!(count = %c, "Starting loop");
-                        if buffer.is_empty() {
-                            let event = event.to_owned();
-                            info!("Switched to Reading");
-                            this.state.set(BroadcastState::Reading);
-                            return Poll::Ready(Some(Ok(event)));
-                        }
-                        let next = buffer.pop_front().unwrap();
-                        match this.tx.try_broadcast(next) {
-                            Ok(_) => {
-                                let c = buffer.len();
-                                info!(count = %c, "Sent it");
-                            }
+            if let Some(msg) = this.buffer.pop_front() {
+                match this.tx.try_broadcast(msg) {
+                    Ok(_) => {
+                        trace!("Broadcast value");
+                    }
+                    Err(async_broadcast::TrySendError::Full(msg)) => {
+                        // When the broadcast buffer is full, retry with a
+                        // deadline.
+                        //
+                        // First, push the msg back to the front of the buffer
+                        // so ordering is preserved.
+                        this.buffer.push_front(msg);
+                        trace!(deadline_ms = %this.deadline.as_millis(), "Root stream's buffer is full, retrying with a deadline");
+                        ready!(this.sleep.as_mut().poll(cx));
+                        error!("Shared stream cannot make progress; ensure subscribers are being driven");
+                        // Reset timer
+                        this.sleep.as_mut().reset(time::Instant::now() + *this.deadline);
+                    }
+                    Err(error) if error.is_disconnected() => {
+                        // When the broadcast channel is disconnected, we have
+                        // no active receivers. We should clear the buffer and
+                        // avoid writing to the channel.
+                        this.buffer.clear();
+                        debug!("No active readers subscribed to shared stream");
+                    }
+                    _ => {
+                        // Other possible error is a closed channel.
+                        // We should never hit this since we are holding a
+                        // writer and an inactive reader.
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        let next = this.stream.as_mut().poll_next(cx).map_ok(|event| {
+            this.writer.apply_watcher_event(&event);
+            event
+        });
+
+        let event = match ready!(next) {
+            Some(Ok(event)) => event,
+            None => return Poll::Ready(None),
+            Some(Err(error)) => return Poll::Ready(Some(Err(error))),
+        };
+
+
+        match &event {
+            Event::Applied(obj) | Event::Deleted(obj) => {
+                let obj_ref = ObjectRef::from_obj(obj);
+                match this.tx.try_broadcast(obj_ref) {
+                    Ok(_) => {}
+                    Err(async_broadcast::TrySendError::Full(msg)) => {
+                        debug!(
+                            "Attempted to write to subscribers with no buffer space; applying backpressure"
+                        );
+                        this.buffer.push_back(msg);
+                    }
+                    // Channel is closed or we have no active readers.
+                    // In both cases there's not much we can do, so drive the
+                    // watch strem.
+                    _ => {}
+                }
+            }
+            Event::Restarted(obj_list) => {
+                let obj_list = obj_list.iter().map(ObjectRef::from_obj);
+                this.buffer.extend(obj_list);
+                loop {
+                    if let Some(msg) = this.buffer.pop_front() {
+                        match this.tx.try_broadcast(msg) {
+                            Ok(_) => {}
                             Err(async_broadcast::TrySendError::Full(msg)) => {
-                                let c = buffer.len();
-                                info!(count = %c, "oh nooo");
-                                // Enqueue value back up
-                                buffer.push_front(msg);
-                                tracing::info!("Getting ready to be slept");
-                                ready!(sleep.as_mut().poll(cx));
-                                tracing::info!("Stream is stuck");
-                                // Reset timer and re-start loop.
-                                sleep.as_mut().reset(time::Instant::now() + *this.deadline);
-                                return Poll::Pending;
+                                debug!(
+                            "Attempted to write to subscribers with no buffer space; applying backpressure"
+                            );
+                                this.buffer.push_front(msg);
+                                break;
                             }
                             _ => {}
                         }
+                    } else {
+                        break;
                     }
                 }
             }
+        };
 
-            let next = this.stream.as_mut().poll_next(cx).map_ok(|event| {
-                this.writer.apply_watcher_event(&event);
-                event
-            });
-
-            let ev = match ready!(next) {
-                Some(Ok(event)) => event,
-                None => return Poll::Ready(None),
-                Some(Err(error)) => return Poll::Ready(Some(Err(error))),
-            };
-
-
-            let buf = match &ev {
-                Event::Applied(obj) | Event::Deleted(obj) => {
-                    info!("Processing Applied | Deleted event");
-                    let obj_ref = ObjectRef::from_obj(obj);
-                    match this.tx.try_broadcast(obj_ref) {
-                        Ok(_) => {
-                            info!("First try in single event");
-                            return Poll::Ready(Some(Ok(ev)));
-                        }
-                        Err(async_broadcast::TrySendError::Full(msg)) => {
-                            info!("oh nooo, switch states");
-                            let mut buf = VecDeque::new();
-                            buf.push_back(msg);
-                            buf
-                        }
-                        _ => return Poll::Pending,
-                    }
-                }
-                Event::Restarted(obj_list) => {
-                    info!("Processing restarted event");
-                    let mut obj_list = obj_list
-                        .iter()
-                        .map(ObjectRef::from_obj)
-                        .collect::<VecDeque<ObjectRef<K>>>();
-
-                    loop {
-                        if obj_list.is_empty() {
-                            info!("First try very nice");
-                            return Poll::Ready(Some(Ok(ev)));
-                        }
-
-                        let obj_ref = obj_list.pop_front().unwrap();
-                        match this.tx.try_broadcast(obj_ref) {
-                            Ok(_) => {}
-                            Err(async_broadcast::TrySendError::Full(msg)) => {
-                                obj_list.push_front(msg);
-                                break obj_list;
-                            }
-                            _ => return Poll::Pending,
-                        }
-                    }
-                }
-            };
-
-            info!("Switched to BlockedOnWrite");
-            this.state.set(BroadcastState::BlockedOnWrite {
-                sleep: tokio::time::sleep(*this.deadline),
-                buffer: buf,
-                event: ev,
-            });
-        }
+        Poll::Ready(Some(Ok(event)))
     }
 }
 
