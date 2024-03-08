@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
     //      - pass through events from root stream through a reflector
     //
     //  Note: if we wanted to, we could apply a backoff _before_ we spill into the reflector
-    let (subscriber, reflector) = watcher(pods.clone(), Default::default()).reflect_shared(writer, 256);
+    let (subscriber, reflector) = watcher(pods.clone(), Default::default()).reflect_shared(writer, 1);
 
     // (3): schedule the root stream with the runtime
     //      - apply a backoff to the root stream

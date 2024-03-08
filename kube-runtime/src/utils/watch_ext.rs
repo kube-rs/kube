@@ -14,7 +14,7 @@ use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
-use super::reflect::{SharedReflect, SubscribeHandle};
+use super::{SharedReflect, SubscribeHandle};
 
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
