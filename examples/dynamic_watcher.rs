@@ -8,6 +8,9 @@ use tracing::*;
 
 use std::{env, fmt::Debug};
 
+#[derive(Clone, Debug)]
+struct MyStruct {}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
@@ -27,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
     let (ar, _caps) = kube::discovery::pinned_kind(&client, &gvk).await?;
 
     // Use the full resource info to create an Api with the ApiResource as its DynamicType
-    let api = Api::<DynamicObject>::all_with(client, &ar);
+    let api = Api::<MyStruct>::all_with(client, &ar);
     let wc = watcher::Config::default();
 
     // Start a metadata or a full resource watch

@@ -24,6 +24,12 @@ impl ResourceScope for DynamicResourceScope {}
 /// - `.metadata.resource_version`
 ///
 /// This avoids a bunch of the unnecessary unwrap mechanics for apps.
+#[diagnostic::on_unimplemented(
+    message = "The `kube::Resource` trait is not implemented for `{Self}`",
+    label = "Is this type a `k8s-openapi` top level Kubernetes type, or a dynamic type created via `CustomResource`",
+    note = "If this is a CustomResource, please use the generated top level struct (not the spec struct) for `Api`",
+    note = "If this is a fully typed openapi struct, ensure you use the top-level resource type (e.g. `Pod` over `PodSpec`) for `Api`"
+)]
 pub trait Resource {
     /// Type information for types that do not know their resource information at compile time.
     ///
