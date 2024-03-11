@@ -16,7 +16,6 @@ use crate::{
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
 use kube_client::Resource;
 
-
 /// Stream returned by the [`reflect`](super::WatchStreamExt::reflect) method
 #[pin_project]
 pub struct SharedReflect<St, K>
@@ -128,13 +127,17 @@ where
 
         let event = match ready!(next) {
             Some(Ok(event)) => event,
-            None => return Poll::Ready(None),
+            None => {
+                tracing::info!("Stream terminated");
+                return Poll::Ready(None);
+            },
             Some(Err(error)) => return Poll::Ready(Some(Err(error))),
         };
 
 
         match &event {
-            Event::Applied(obj) | Event::Deleted(obj) => {
+            // Only deal with Deleted events
+            Event::Applied(obj) => {
                 let obj_ref = ObjectRef::from_obj(obj);
                 match this.tx.try_broadcast(obj_ref) {
                     Ok(_) => {}
@@ -171,6 +174,10 @@ where
                     }
                 }
             }
+        // Delete events should refresh the store. There is no need to propagate
+        // them to subscribers since we have already updated the store by this
+        // point.
+        _ => {}
         };
 
         Poll::Ready(Some(Ok(event)))
@@ -220,12 +227,87 @@ where
     type Item = Arc<K>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut me = self.project();
-        // If we use try_recv() here we could return Poll::Ready(Error) and let
-        // the controller's trigger_backoff come into play (?)
-        match ready!(me.rx.as_mut().poll_next(cx)) {
-            Some(obj_ref) => Poll::Ready(me.reader.get(&obj_ref)),
-            None => Poll::Ready(None),
+        let mut this = self.project();
+        match ready!(this.rx.as_mut().poll_next(cx)) {
+            Some(obj_ref) => this.reader
+                    .get(&obj_ref)
+                    .map(|obj| Poll::Ready(Some(obj)))
+                    .unwrap_or(Poll::Pending),
+            None => Poll::Ready(None)
         }
+    }
+}
+
+
+#[cfg(test)]
+pub(crate) mod test {
+    use std::{task::Poll, vec};
+
+    use super::{Error, Event};
+    use crate::{reflector, utils::SharedReflect};
+    use futures::{pin_mut, poll, stream, StreamExt};
+    use k8s_openapi::api::core::v1::Pod;
+
+    const TEST_BUFFER_SIZE: usize = 10;
+
+    fn testpod(name: &str) -> Pod {
+        let mut pod = Pod::default();
+        pod.metadata.name = Some(name.to_string());
+        pod
+    }
+
+    /*
+     * A list of tests:
+     * Happy Path:
+     * - events are passed through (including errors);
+     *   - And on None it all works well
+     * - objects are shared through N subscribers;
+     * - objects are shared through N subscribers but deletes don't do anything;
+     * - when main stream shuts down readers can still receive
+     * Pathological cases
+     * - events are passed through on overflow and readers recover after delay;
+     * ( any chance to see how many times `sleep` has been called?)
+     * - when main stream shuts down readers can still receive after
+     * backpressure is applied (?) 
+     *
+     * Integration tests:
+     * - Three controllers. Can we get an integration test set-up with owned streams? */
+
+    #[tokio::test]
+    async fn shared_reflect_passes_events_through() {
+
+    }
+    async fn reflect_passes_events_through() {
+        let foo = testpod("foo");
+        let bar = testpod("bar");
+        let st = stream::iter([
+            Ok(Event::Applied(foo.clone())),
+            Err(Error::TooManyObjects),
+            Ok(Event::Restarted(vec![foo, bar])),
+        ]);
+        let (reader, writer) = reflector::store();
+
+        let reflect = SharedReflect::new(st, writer, TEST_BUFFER_SIZE);
+        pin_mut!(reflect);
+        assert_eq!(reader.len(), 0);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Applied(_))))
+        ));
+        assert_eq!(reader.len(), 1);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Err(Error::TooManyObjects)))
+        ));
+        assert_eq!(reader.len(), 1);
+
+        let restarted = poll!(reflect.next());
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Restarted(_))))));
+        assert_eq!(reader.len(), 2);
+
+        assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
+        assert_eq!(reader.len(), 2);
     }
 }

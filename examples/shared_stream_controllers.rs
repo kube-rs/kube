@@ -8,7 +8,6 @@ use kube::{
     runtime::{controller::Action, reflector::store::Writer, watcher, Config, Controller, WatchStreamExt},
     Api, Client, ResourceExt,
 };
-use tokio::signal::unix::{signal, SignalKind};
 use tracing::{info, info_span, warn, Instrument};
 
 use thiserror::Error;
@@ -17,6 +16,8 @@ pub mod condition {
     pub static UNDOCUMENTED_TYPE: &str = "UndocumentedPort";
     pub static STATUS_TRUE: &str = "True";
 }
+
+const SUBSCRIBE_BUFFER_SIZE: usize = 256;
 
 #[derive(Clone)]
 struct Data {
@@ -39,43 +40,45 @@ async fn main() -> anyhow::Result<()> {
     //      - create a handle that can be cloned to get more readers
     //      - pass through events from root stream through a reflector
     //
-    //  Note: if we wanted to, we could apply a backoff _before_ we spill into the reflector
-    let (subscriber, reflector) = watcher(pods.clone(), Default::default()).reflect_shared(writer, 1);
+    // Before splitting, we apply a backoff. This is completely optional, but it
+    // allows us to ensure the APIServer won't be overwhelmed when we retry
+    // watches on errors.
+    let (subscriber, reflector) = watcher(pods.clone(), Default::default())
+        .default_backoff()
+        .reflect_shared(writer, SUBSCRIBE_BUFFER_SIZE);
 
-    // (3): schedule the root stream with the runtime
-    //      - apply a backoff to the root stream
-    //      - poll it to handle errors
-    //  scheduling with the runtime ensures the stream will be polled continously and allow
-    //  readers to make progress.
-    tokio::spawn(
-        async move {
-            // Pin on the heap so we don't overflow our stack
-            // Put a backoff on it.
-            // - Depending on how we want to handle backpressure, the backoff could help to relax
-            //   the flow of data
-            // i.e. the root stream has a buffer that objects get put into. When an object is in the
-            // buffer, it is cloned and sent to all readers. Once all readers have acked their copy,
-            // the item is removed from the buffer.
-            //
-            // A backoff here could ensure that when the buffer is full, we backpressure in the root
-            // stream by not consuming watcher output. We give clients enough time to make progress and
-            // ensure the next time the root stream is polled it can make progress by pushing into the
-            // buffer.
-            let mut reflector = reflector.default_backoff().boxed();
-            tracing::info!("Polling root");
-            while let Some(next) = reflector.next().await {
-                match next {
-                    Err(error) => tracing::error!(%error, "Received error from main watcher stream"),
-                    _ => {}
-                }
+    // (3): schedule the root (i.e. shared) stream with the runtime.
+    //
+    //  The runtime (tokio) will drive this task to readiness; the stream is
+    //  polled continously and allows all downstream readers (i.e. subscribers)
+    //  to make progress.
+    tokio::spawn(async move {
+        // Pin on the heap so we don't overflow our stack
+        let mut reflector = reflector.boxed();
+        while let Some(next) = reflector.next().await {
+            // We are not interested in the returned events here, only in
+            // handling errors.
+            match next {
+                Err(error) => tracing::error!(%error, "Received error from main watcher stream"),
+                _ => {}
             }
         }
-        .instrument(info_span!("root_stream")),
-    );
+    });
 
 
-    // Create metadata controller to edit annotations
+    // (4): create a reader. We create a metadata controller that will mirror a
+    // pod's labels as annotations.
+    //
+    // To create a controller that operates on a shared stream, we need two
+    // handles:
+    // - A handle to the store.
+    // - A handle to a shared stream.
+    //
+    // The handle to the shared stream will be used to receive shared objects as
+    // they are applied by the reflector.
     let reader = subscriber.reader();
+    // Store readers can be created on-demand by calling `reader()` on a shared
+    // stream handle. Stream handles are cheap to clone.
     let metadata_controller = Controller::for_shared_stream(subscriber.clone(), reader)
         .with_config(config.clone())
         .shutdown_on_signal()
@@ -91,9 +94,13 @@ async fn main() -> anyhow::Result<()> {
             }
         })
         .instrument(info_span!("metadata_controller"));
-    tokio::spawn(metadata_controller);
 
-    // Create status controller
+    // (5): Create status controller. Our status controller write a condition
+    // whenever a pod has undocumented container ports (i.e. containers with no
+    // exposed ports).
+    //
+    // This is the last controller we will create, so we can just move the
+    // handle inside the controller.
     let reader = subscriber.reader();
     let status_controller = Controller::for_shared_stream(subscriber, reader)
         .with_config(config)
@@ -110,24 +117,20 @@ async fn main() -> anyhow::Result<()> {
             }
         })
         .instrument(info_span!("status_controller"));
-    tokio::spawn(status_controller);
 
-    // Handle shutdown
-    //
-    // In a more nicely put together example we'd want to actually drain everything
-    // instead of having controllers manage signals on their own
-    //
-    // The lack of a drain abstraction atm made me skip it but when the example is ready we should
-    // consider handling shutdowns well to help users out
-    let mut interrupt = signal(SignalKind::interrupt())?;
-    let mut terminate = signal(SignalKind::terminate())?;
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    // (6): Last step, drive controllers to readiness. Controllers are futures
+    // and need to be driven to make progress. A controller that's not driven
+    // and operates on a subscribed stream will eventually block the shared stream.
     tokio::select! {
-        _ = interrupt.recv() => {
-            info!("Received SIGINT; terminating...");
+        _ = metadata_controller => {
+        },
+
+        _ = status_controller => {
         },
 
         _ = terminate.recv() => {
-            info!("Received SIGTERM; terminating...");
+            info!("Received term signal; shutting down...")
         }
 
     }
