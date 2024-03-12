@@ -9,7 +9,6 @@ use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
 
-type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
 /// A writable Store handle
 ///
@@ -20,10 +19,9 @@ pub struct Writer<K: 'static + Lookup>
 where
     K::DynamicType: Eq + Hash,
 {
-    store: Cache<K>,
+    store: Arc<Inner<K>>,
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
-    ready_rx: Arc<DelayedInit<()>>,
 }
 
 impl<K: 'static + Lookup + Clone> Writer<K>
@@ -37,10 +35,12 @@ where
     pub fn new(dyntype: K::DynamicType) -> Self {
         let (ready_tx, ready_rx) = DelayedInit::new();
         Writer {
-            store: Default::default(),
+            store: Arc::new(Inner {
+                cache: Default::default(),
+                ready_rx,
+            }),
             dyntype,
             ready_tx: Some(ready_tx),
-            ready_rx: Arc::new(ready_rx),
         }
     }
 
@@ -52,7 +52,6 @@ where
     pub fn as_reader(&self) -> Store<K> {
         Store {
             store: self.store.clone(),
-            ready_rx: self.ready_rx.clone(),
         }
     }
 
@@ -62,18 +61,18 @@ where
             watcher::Event::Applied(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
-                self.store.write().insert(key, obj);
+                self.store.cache.write().insert(key, obj);
             }
             watcher::Event::Deleted(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
-                self.store.write().remove(&key);
+                self.store.cache.write().remove(&key);
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
                     .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
-                *self.store.write() = new_objs;
+                *self.store.cache.write() = new_objs;
             }
         }
 
@@ -105,8 +104,7 @@ pub struct Store<K: 'static + Lookup>
 where
     K::DynamicType: Hash + Eq,
 {
-    store: Cache<K>,
-    ready_rx: Arc<DelayedInit<()>>,
+    store: Arc<Inner<K>>,
 }
 
 #[derive(Debug, Error)]
@@ -125,7 +123,7 @@ where
     /// # Errors
     /// Returns an error if the [`Writer`] was dropped before any value was written.
     pub async fn wait_until_ready(&self) -> Result<(), WriterDropped> {
-        self.ready_rx.get().await.map_err(WriterDropped)
+        self.store.ready_rx.get().await.map_err(WriterDropped)
     }
 
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
@@ -139,7 +137,7 @@ where
     /// reasonable `error_policy`.
     #[must_use]
     pub fn get(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
-        let store = self.store.read();
+        let store = self.store.cache.read();
         store
             .get(key)
             // Try to erase the namespace and try again, in case the object is cluster-scoped
@@ -157,7 +155,7 @@ where
     /// Return a full snapshot of the current values
     #[must_use]
     pub fn state(&self) -> Vec<Arc<K>> {
-        let s = self.store.read();
+        let s = self.store.cache.read();
         s.values().cloned().collect()
     }
 
@@ -168,6 +166,7 @@ where
         P: Fn(&K) -> bool,
     {
         self.store
+            .cache
             .read()
             .iter()
             .map(|(_, k)| k)
@@ -178,13 +177,13 @@ where
     /// Return the number of elements in the store
     #[must_use]
     pub fn len(&self) -> usize {
-        self.store.read().len()
+        self.store.cache.read().len()
     }
 
     /// Return whether the store is empty
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.store.read().is_empty()
+        self.store.cache.read().is_empty()
     }
 }
 
@@ -201,6 +200,16 @@ where
     let w = Writer::<K>::default();
     let r = w.as_reader();
     (r, w)
+}
+
+/// Shared data between all facets (the [`Writer`] and all [readers](`Store`) of a store)
+///
+/// This should never be exposed outside of this module.
+#[derive(Derivative)]
+#[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"))]
+struct Inner<K: Lookup> {
+    cache: RwLock<AHashMap<ObjectRef<K>, Arc<K>>>,
+    ready_rx: DelayedInit<()>,
 }
 
 #[cfg(test)]
