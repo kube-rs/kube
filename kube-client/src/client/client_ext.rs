@@ -138,16 +138,16 @@ pub enum NamespaceError {
 /// ```no_run
 /// # use k8s_openapi::api::core::v1::Pod;
 /// # use k8s_openapi::api::core::v1::Service;
-/// # use kube::client::{Cluster, Namespace};
+/// # use kube::client::scope::{Cluster, Namespace};
 /// # use kube::{ResourceExt, api::ListParams};
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();
 /// let lp = ListParams::default();
-/// # List at cluster level:
+/// // List at Cluster level:
 /// for pod in client.list::<Pod>(&lp, &Cluster).await? {
 ///     println!("Found pod {} in {}", pod.name_any(), pod.namespace().unwrap());
 /// }
-/// # Namespaced get:
+/// // Namespaced Get:
 /// let svc = client.get::<Service>("kubernetes", &Namespace::from("default")).await?;
 /// assert_eq!(svc.name_unchecked(), "kubernetes");
 /// # Ok(())
@@ -159,7 +159,7 @@ impl Client {
     /// ```no_run
     /// # use k8s_openapi::api::rbac::v1::ClusterRole;
     /// # use k8s_openapi::api::core::v1::Service;
-    /// # use kube::client::{Cluster, Namespace};
+    /// # use kube::client::scope::{Cluster, Namespace};
     /// # use kube::{ResourceExt, api::GetParams};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
@@ -187,7 +187,7 @@ impl Client {
     /// ```no_run
     /// # use k8s_openapi::api::core::v1::Pod;
     /// # use k8s_openapi::api::core::v1::Service;
-    /// # use kube::client::{Cluster, Namespace};
+    /// # use kube::client::scope::{Cluster, Namespace};
     /// # use kube::{ResourceExt, api::ListParams};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
@@ -217,7 +217,8 @@ impl Client {
 #[cfg(test)]
 #[cfg(feature = "client")]
 mod test {
-    use super::{Client, Cluster, ListParams, Namespace};
+    use super::scope::{Cluster, Namespace};
+    use super::{Client, ListParams};
     use kube_core::ResourceExt;
 
     #[tokio::test]
