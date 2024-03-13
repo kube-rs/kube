@@ -217,8 +217,10 @@ impl Client {
 #[cfg(test)]
 #[cfg(feature = "client")]
 mod test {
-    use super::scope::{Cluster, Namespace};
-    use super::{Client, ListParams};
+    use super::{
+        scope::{Cluster, Namespace},
+        Client, ListParams,
+    };
     use kube_core::ResourceExt;
 
     #[tokio::test]
