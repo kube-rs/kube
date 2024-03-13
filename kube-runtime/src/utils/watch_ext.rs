@@ -8,13 +8,14 @@ use crate::{
 };
 use kube_client::Resource;
 
-use crate::{reflector::store::Writer, utils::Reflect};
+use crate::{
+    reflector::store::Writer,
+    utils::{Reflect, ReflectDispatcher, ReflectHandle},
+};
 
 use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
-
-use super::{SharedReflect, SubscribeHandle};
 
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
@@ -252,17 +253,17 @@ pub trait WatchStreamExt: Stream {
         Reflect::new(self, writer)
     }
 
-    fn reflect_shared<K>(
+    fn reflect_dispatch<K>(
         self,
         writer: Writer<K>,
         buf_size: usize,
-    ) -> (SubscribeHandle<K>, SharedReflect<Self, K>)
+    ) -> (ReflectHandle<K>, ReflectDispatcher<Self, K>)
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
         K: Resource + Clone + 'static,
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
-        let reflect = SharedReflect::new(self, writer, buf_size);
+        let reflect = ReflectDispatcher::new(self, writer, buf_size);
         (reflect.subscribe(), reflect)
     }
 }
