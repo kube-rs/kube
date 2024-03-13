@@ -17,7 +17,7 @@ pub(crate) struct Broadcaster<T> {
 
 impl<T> Broadcaster<T>
 where
-    T: Clone + Send + Sync,
+    T: Clone,
 {
     pub fn new(buffer_size: usize) -> Self {
         Self {
@@ -39,15 +39,14 @@ where
         )
         .flat_map_unordered(None, |(sub_id, mut tx)| {
             let value = value.clone();
-            stream::once(async move {
+            Box::pin(stream::once(async move {
                 match tx.send(value).await {
                     // Subscriber is still open
                     Ok(()) => None,
                     // Subscriber is closed, schedule for unsubscribing
                     Err(_) => Some(sub_id),
                 }
-            })
-            .boxed()
+            }))
         })
         .filter_map(|x: Option<SubscriberId>| async move { x })
         .collect::<Vec<_>>()
@@ -57,7 +56,7 @@ where
         }
     }
 
-    pub fn subscribe(&mut self) -> impl Stream<Item = T> + Send + Sync {
+    pub fn subscribe(&mut self) -> impl Stream<Item = T> {
         // Currently we allocate a buffer per subscriber, but it is configured over the whole stream
         // in order to give room to move to a shared buffer implementation later on.
         let (tx, rx) = mpsc::channel(self.buffer_size);
