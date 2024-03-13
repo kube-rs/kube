@@ -1,11 +1,10 @@
-use super::ObjectRef;
+use super::{Lookup, ObjectRef};
 use crate::{
     utils::delayed_init::{self, DelayedInit},
     watcher,
 };
 use ahash::AHashMap;
 use derivative::Derivative;
-use kube_client::Resource;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
@@ -17,7 +16,7 @@ type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug)]
-pub struct Writer<K: 'static + Resource>
+pub struct Writer<K: 'static + Lookup>
 where
     K::DynamicType: Eq + Hash,
 {
@@ -27,7 +26,7 @@ where
     ready_rx: Arc<DelayedInit<()>>,
 }
 
-impl<K: 'static + Resource + Clone> Writer<K>
+impl<K: 'static + Lookup + Clone> Writer<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -61,23 +60,18 @@ where
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
                 self.store.write().insert(key, obj);
             }
             watcher::Event::Deleted(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = obj.to_object_ref(self.dyntype.clone());
                 self.store.write().remove(&key);
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| {
-                        (
-                            ObjectRef::from_obj_with(obj, self.dyntype.clone()),
-                            Arc::new(obj.clone()),
-                        )
-                    })
+                    .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
                 *self.store.write() = new_objs;
             }
@@ -91,7 +85,7 @@ where
 }
 impl<K> Default for Writer<K>
 where
-    K: Resource + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Default + Eq + Hash + Clone,
 {
     fn default() -> Self {
@@ -107,7 +101,7 @@ where
 /// use `Writer::as_reader()` instead.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
-pub struct Store<K: 'static + Resource>
+pub struct Store<K: 'static + Lookup>
 where
     K::DynamicType: Hash + Eq,
 {
@@ -119,7 +113,7 @@ where
 #[error("writer was dropped before store became ready")]
 pub struct WriterDropped(delayed_init::InitDropped);
 
-impl<K: 'static + Clone + Resource> Store<K>
+impl<K: 'static + Clone + Lookup> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -201,7 +195,7 @@ where
 #[must_use]
 pub fn store<K>() -> (Store<K>, Writer<K>)
 where
-    K: Resource + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Eq + Hash + Clone + Default,
 {
     let w = Writer::<K>::default();

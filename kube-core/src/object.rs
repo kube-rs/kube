@@ -16,13 +16,13 @@ use std::borrow::Cow;
 /// and is generally produced from list/watch/delete collection queries on an [`Resource`](super::Resource).
 ///
 /// This is almost equivalent to [`k8s_openapi::List<T>`](k8s_openapi::List), but iterable.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ObjectList<T>
 where
     T: Clone,
 {
     /// The type fields, always present
-    #[serde(flatten, default)]
+    #[serde(flatten, deserialize_with = "deserialize_v1_list_as_default")]
     pub types: TypeMeta,
 
     /// ListMeta - only really used for its `resourceVersion`
@@ -36,6 +36,17 @@ where
         bound(deserialize = "Vec<T>: Deserialize<'de>")
     )]
     pub items: Vec<T>,
+}
+
+fn deserialize_v1_list_as_default<'de, D>(deserializer: D) -> Result<TypeMeta, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let meta = Option::<TypeMeta>::deserialize(deserializer)?;
+    Ok(meta.unwrap_or(TypeMeta {
+        api_version: "v1".to_owned(),
+        kind: "List".to_owned(),
+    }))
 }
 
 fn deserialize_null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -393,5 +404,25 @@ mod test {
         assert_eq!(mypod.name_unchecked(), "test");
         assert!(mypod.status.is_none());
         assert!(mypod.spec.is_none());
+    }
+
+    #[test]
+    fn k8s_object_list_default_types() {
+        use k8s_openapi::api::core::v1::Pod;
+
+        let raw_value = serde_json::json!({
+            "metadata": {
+                "resourceVersion": ""
+            },
+            "items": []
+        });
+        let pod_list: ObjectList<Pod> = serde_json::from_value(raw_value).unwrap();
+        assert_eq!(
+            TypeMeta {
+                api_version: "v1".to_owned(),
+                kind: "List".to_owned(),
+            },
+            pod_list.types,
+        );
     }
 }

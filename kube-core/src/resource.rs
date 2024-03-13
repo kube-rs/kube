@@ -47,14 +47,7 @@ pub trait Resource {
     fn version(dt: &Self::DynamicType) -> Cow<'_, str>;
     /// Returns apiVersion of this object
     fn api_version(dt: &Self::DynamicType) -> Cow<'_, str> {
-        let group = Self::group(dt);
-        if group.is_empty() {
-            return Self::version(dt);
-        }
-        let mut group = group.into_owned();
-        group.push('/');
-        group.push_str(&Self::version(dt));
-        group.into()
+        api_version_from_group_version(Self::group(dt), Self::version(dt))
     }
     /// Returns the plural name of the kind
     ///
@@ -113,6 +106,18 @@ pub trait Resource {
             ..OwnerReference::default()
         })
     }
+}
+
+/// Helper function that creates the `apiVersion` field from the group and version strings.
+pub fn api_version_from_group_version<'a>(group: Cow<'a, str>, version: Cow<'a, str>) -> Cow<'a, str> {
+    if group.is_empty() {
+        return version;
+    }
+
+    let mut output = group;
+    output.to_mut().push('/');
+    output.to_mut().push_str(&version);
+    output
 }
 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
