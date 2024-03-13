@@ -1,4 +1,5 @@
 use crate::{Client, Error, Result};
+use k8s_openapi::api::core::v1::Namespace as k8sNs;
 use kube_core::{
     object::ObjectList,
     params::{GetParams, ListParams},
@@ -8,28 +9,39 @@ use kube_core::{
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
-use k8s_openapi::api::core::v1::Namespace as k8sNs;
+/// A marker trait to indicate cluster-wide operations are available
+trait ClusterScope {}
+/// A marker trait to indicate namespace-scoped operations are available
+trait NamespaceScope {}
 
-// Allow dynamic scopes to "impersonate" both cluster- and namespace scopes
-trait IsClusterScoped {}
-impl IsClusterScoped for ClusterResourceScope {}
-impl IsClusterScoped for DynamicResourceScope {}
-trait IsNamespaceScoped {}
-impl IsNamespaceScoped for NamespaceResourceScope {}
-impl IsNamespaceScoped for DynamicResourceScope {}
+// k8s_openapi scopes get implementations for free
+impl ClusterScope for ClusterResourceScope {}
+impl NamespaceScope for NamespaceResourceScope {}
+// our DynamicResourceScope can masquerade as either
+impl NamespaceScope for DynamicResourceScope {}
+impl ClusterScope for DynamicResourceScope {}
 
-pub trait ListScope<K> {
+/// How to get the url for a collection
+///
+/// Pick one of `kube::client::Cluster` or `kube::client::Namespace`.
+pub trait CollectionUrl<K> {
     fn url_path(&self) -> String;
 }
 
-pub trait ObjectScope<K> {
+/// How to get the url for an object
+///
+/// Pick one of `kube::client::Cluster` or `kube::client::Namespace`.
+pub trait ObjectUrl<K> {
     fn url_path(&self) -> String;
 }
 
+/// Marker type for cluster level queries
 pub struct Cluster;
+/// Namespace newtype for namespace level queries
+pub struct Namespace(String);
 
 // All objects can be listed cluster-wide
-impl<K> ListScope<K> for Cluster
+impl<K> CollectionUrl<K> for Cluster
 where
     K: Resource,
     K::DynamicType: Default,
@@ -40,36 +52,34 @@ where
 }
 
 // Only cluster-scoped objects can be named globally
-impl<K> ObjectScope<K> for Cluster
+impl<K> ObjectUrl<K> for Cluster
 where
     K: Resource,
     K::DynamicType: Default,
-    K::Scope: IsClusterScoped,
+    K::Scope: ClusterScope,
 {
     fn url_path(&self) -> String {
         K::url_path(&K::DynamicType::default(), None)
     }
 }
 
-pub struct Namespace(String);
-
 // Only namespaced objects can be accessed via namespace
-impl<K> ListScope<K> for Namespace
+impl<K> CollectionUrl<K> for Namespace
 where
     K: Resource,
     K::DynamicType: Default,
-    K::Scope: IsNamespaceScoped,
+    K::Scope: NamespaceScope,
 {
     fn url_path(&self) -> String {
         K::url_path(&K::DynamicType::default(), Some(&self.0))
     }
 }
 
-impl<K> ObjectScope<K> for Namespace
+impl<K> ObjectUrl<K> for Namespace
 where
     K: Resource,
     K::DynamicType: Default,
-    K::Scope: IsNamespaceScoped,
+    K::Scope: NamespaceScope,
 {
     fn url_path(&self) -> String {
         K::url_path(&K::DynamicType::default(), Some(&self.0))
@@ -109,22 +119,31 @@ pub enum NamespaceError {
 }
 
 /// Client extensions to allow typed api calls without [`Api`]
+///
+/// These methods allow users to query across a wide-array of resources without needing
+/// to explicitly create an `Api` for each one of them.
+///
+/// The tradeoff is that you need to explicitly:
+/// - specify the level you are querying at via [`Cluster`] or [`Namespace`] as args
+/// - specify the resource type you are using for serialization (e.g. a top level k8s-openapi type)
 impl Client {
     /// Get a resource
     ///
     /// ```no_run
     /// # use k8s_openapi::api::rbac::v1::ClusterRole;
+    /// # use k8s_openapi::api::core::v1::Service;
+    /// # use kube::client::{Cluster, Namespace};
     /// # use kube::{ResourceExt, api::GetParams};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
-    /// let crole = client.get::<ClusterRole>("cluster-admin", &Cluster).await?;
-    /// assert_eq!(crole.name_unchecked(), "cluster-admin");
+    /// let cr = client.get::<ClusterRole>("cluster-admin", &Cluster).await?;
+    /// assert_eq!(cr.name_unchecked(), "cluster-admin");
     /// let svc = client.get::<Service>("kubernetes", &Namespace::from("default")).await?;
     /// assert_eq!(svc.name_unchecked(), "kubernetes");
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get<K>(&self, name: &str, scope: &impl ObjectScope<K>) -> Result<K>
+    pub async fn get<K>(&self, name: &str, scope: &impl ObjectUrl<K>) -> Result<K>
     where
         K: Resource + Serialize + DeserializeOwned + Clone + Debug,
         <K as Resource>::DynamicType: Default,
@@ -139,13 +158,15 @@ impl Client {
     /// List a resource
     ///
     /// ```no_run
-    /// # use k8s_openapi::api::rbac::v1::ClusterRole;
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # use k8s_openapi::api::core::v1::Service;
+    /// # use kube::client::{Cluster, Namespace};
     /// # use kube::{ResourceExt, api::ListParams};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
     /// let lp = ListParams::default();
-    /// for svc in client.list::<ClusterRole>(&lp).await? {
-    ///     println!("Found clusterrole {}", svc.name_any());
+    /// for pod in client.list::<Pod>(&lp, &Cluster).await? {
+    ///     println!("Found pod {} in {}", pod.name_any(), pod.namespace().unwrap());
     /// }
     /// for svc in client.list::<Service>(&lp, &Namespace::from("default")).await? {
     ///     println!("Found service {}", svc.name_any());
@@ -153,7 +174,7 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn list<K>(&self, lp: &ListParams, scope: &impl ListScope<K>) -> Result<ObjectList<K>>
+    pub async fn list<K>(&self, lp: &ListParams, scope: &impl CollectionUrl<K>) -> Result<ObjectList<K>>
     where
         K: Resource + Serialize + DeserializeOwned + Clone + Debug,
         <K as Resource>::DynamicType: Default,

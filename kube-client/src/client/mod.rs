@@ -31,17 +31,23 @@ mod body;
 mod builder;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
-#[cfg(feature = "unstable-client")] mod client_ext;
+#[cfg(feature = "unstable-client")]
+mod client_ext;
+#[cfg(feature = "unstable-client")]
+pub use client_ext::{Cluster, Namespace};
 mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
+mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
-#[cfg(feature = "ws")] mod upgrade;
+#[cfg(feature = "rustls-tls")]
+pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "ws")]
+mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -51,7 +57,8 @@ pub use auth::OAuthError;
 #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
 pub use auth::oidc_errors;
 
-#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
+#[cfg(feature = "ws")]
+pub use upgrade::UpgradeConnectionError;
 
 pub use builder::{ClientBuilder, DynBody};
 
