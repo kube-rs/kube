@@ -77,6 +77,11 @@ pub struct Client {
     default_ns: String,
 }
 
+/// Constructors and low-level api interfaces.
+///
+/// Most users only need [`Client::try_default`] or [`Client::new`] from this block.
+///
+/// The many various lower level interfaces here are for more advanced use-cases with specific requirements.
 impl Client {
     /// Create a [`Client`] using a custom `Service` stack.
     ///
@@ -130,6 +135,14 @@ impl Client {
     /// and then if that fails, trying the in-cluster environment variables.
     ///
     /// Will fail if neither configuration could be loaded.
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use kube::Client;
+    /// let client = Client::try_default().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead.
@@ -468,7 +481,9 @@ fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
 impl TryFrom<Config> for Client {
     type Error = Error;
 
-    /// Builds a default [`Client`] from a [`Config`], see [`ClientBuilder`] if more customization is required
+    /// Builds a default [`Client`] from a [`Config`].
+    ///
+    /// See [`ClientBuilder`] or [`Client::new`] if more customization is required
     fn try_from(config: Config) -> Result<Self> {
         Ok(ClientBuilder::try_from(config)?.build())
     }

@@ -123,16 +123,38 @@ pub enum NamespaceError {
     MissingName,
 }
 
-/// Client extensions to allow typed api calls without [`Api`]
+/// Generic client extensions for the `unstable-client` feature
 ///
 /// These methods allow users to query across a wide-array of resources without needing
-/// to explicitly create an `Api` for each one of them.
+/// to explicitly create an [`Api`](crate::Api) for each one of them.
 ///
-/// The tradeoff is that you need to explicitly:
-/// - specify the level you are querying at via [`Cluster`] or [`Namespace`] as args
-/// - specify the resource type you are using for serialization (e.g. a top level k8s-openapi type)
+/// ## Usage
+/// 1. Create a [`Client`]
+/// 2. Specify the level you are querying at via [`Cluster`] or [`Namespace`] as args
+/// 3. Specify the resource type you are using for serialization (e.g. a top level k8s-openapi type)
+///
+/// ## Example
+///
+/// ```no_run
+/// # use k8s_openapi::api::core::v1::Pod;
+/// # use k8s_openapi::api::core::v1::Service;
+/// # use kube::client::{Cluster, Namespace};
+/// # use kube::{ResourceExt, api::ListParams};
+/// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+/// # let client: kube::Client = todo!();
+/// let lp = ListParams::default();
+/// # List at cluster level:
+/// for pod in client.list::<Pod>(&lp, &Cluster).await? {
+///     println!("Found pod {} in {}", pod.name_any(), pod.namespace().unwrap());
+/// }
+/// # Namespaced get:
+/// let svc = client.get::<Service>("kubernetes", &Namespace::from("default")).await?;
+/// assert_eq!(svc.name_unchecked(), "kubernetes");
+/// # Ok(())
+/// # }
+/// ```
 impl Client {
-    /// Get a resource
+    /// Get a single instance of a `Resource` implementing type `K` at the specified scope.
     ///
     /// ```no_run
     /// # use k8s_openapi::api::rbac::v1::ClusterRole;
@@ -160,7 +182,7 @@ impl Client {
         self.request::<K>(req).await
     }
 
-    /// List a resource
+    /// List instances of a `Resource` implementing type `K` at the specified scope.
     ///
     /// ```no_run
     /// # use k8s_openapi::api::core::v1::Pod;
