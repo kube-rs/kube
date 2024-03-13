@@ -263,7 +263,7 @@ impl AttachParams {
         self
     }
 
-    fn validate(&self) -> Result<(), Error> {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
         if !self.stdin && !self.stdout && !self.stderr {
             return Err(Error::Validation(
                 "AttachParams: one of stdin, stdout, or stderr must be true".into(),
@@ -295,6 +295,22 @@ impl AttachParams {
         }
         if let Some(container) = &self.container {
             qp.append_pair("container", container);
+        }
+    }
+
+    // https://github.com/kubernetes/kubernetes/blob/466d9378dbb0a185df9680657f5cd96d5e5aab57/pkg/apis/core/types.go#L6005-L6013
+    pub(crate) fn append_to_url_serializer_local(&self, qp: &mut form_urlencoded::Serializer<String>) {
+        if self.stdin {
+            qp.append_pair("input", "1");
+        }
+        if self.stdout {
+            qp.append_pair("output", "1");
+        }
+        if self.stderr {
+            qp.append_pair("error", "1");
+        }
+        if self.tty {
+            qp.append_pair("tty", "1");
         }
     }
 }
