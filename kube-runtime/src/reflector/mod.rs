@@ -5,8 +5,9 @@ pub mod store;
 
 pub use self::object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef};
 use crate::watcher;
-use futures::{lock::Mutex, Stream, StreamExt, TryStreamExt};
-use std::{hash::Hash, sync::Arc};
+use async_stream::stream;
+use futures::{Stream, StreamExt};
+use std::hash::Hash;
 pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
@@ -88,23 +89,22 @@ pub use store::{store, Store};
 /// The `stream` can then be passed to `reflector` causing smaller objects to be written to its store.
 /// Note that you **cannot drop everything**; you minimally need the spec properties your app relies on.
 /// Additionally, only `labels`, `annotations` and `managed_fields` are safe to drop from `ObjectMeta`.
-pub fn reflector<K, W>(writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
+pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Lookup + Clone,
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
-    // TODO: Writer should be able to be owned by the closure, but I can't get the lifetimes to line up
-    // also not sure if we can get rid of the mutex...
-    let writer = Arc::new(Mutex::new(writer));
-    stream.and_then(move |event| {
-        let writer = writer.clone();
-        async move {
-            let mut writer = writer.lock().await;
-            writer.apply_watcher_event(&event).await;
-            Ok(event)
+    // TODO: why does pin! not work? not sure...
+    let mut stream = Box::pin(stream);
+    stream! {
+        while let Some(event) = stream.next().await {
+            if let Ok(event) = &event {
+                writer.apply_watcher_event(event).await;
+            }
+            yield event;
         }
-    })
+    }
 }
 
 #[cfg(test)]
