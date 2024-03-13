@@ -2,8 +2,8 @@ use futures::{pin_mut, TryStreamExt};
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
     api::{Api, ListParams, ResourceExt},
+    client::{scope, Client},
     runtime::{watcher, WatchStreamExt},
-    Client,
 };
 use tracing::*;
 
@@ -51,7 +51,7 @@ async fn check_for_node_failures(client: &Client, o: Node) -> anyhow::Result<()>
         // Find events related to this node
         let opts =
             ListParams::default().fields(&format!("involvedObject.kind=Node,involvedObject.name={name}"));
-        let evlist = client.list_all::<Event>(&opts).await?;
+        let evlist = client.list::<Event>(&opts, &scope::Cluster).await?;
         for e in evlist {
             warn!("Node event: {:?}", serde_json::to_string_pretty(&e)?);
         }

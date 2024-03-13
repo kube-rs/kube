@@ -40,6 +40,11 @@ pub struct Cluster;
 /// Namespace newtype for namespace level queries
 pub struct Namespace(String);
 
+/// Module for scope for ease of importing
+pub mod scope {
+    pub use super::{Cluster, Namespace};
+}
+
 // All objects can be listed cluster-wide
 impl<K> CollectionUrl<K> for Cluster
 where

@@ -1,6 +1,7 @@
 use super::parse::{self, GroupVersionData};
 use crate::{error::DiscoveryError, Client, Error, Result};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
+#[allow(unused_imports)]
 pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
 use kube_core::{
     gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
