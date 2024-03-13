@@ -16,7 +16,7 @@ use std::{
 pub trait Lookup {
     /// Type information for types that do not know their resource information at compile time.
     /// This is equivalent to [`Resource::DynamicType`].
-    type DynamicType;
+    type DynamicType: Send + Sync;
 
     /// The [kind](Resource::kind) for this object.
     fn kind(dyntype: &Self::DynamicType) -> Cow<'_, str>;

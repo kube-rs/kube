@@ -1,10 +1,14 @@
 use super::{Lookup, ObjectRef};
 use crate::{
-    utils::delayed_init::{self, DelayedInit},
+    utils::{
+        broadcast::Broadcaster,
+        delayed_init::{self, DelayedInit},
+    },
     watcher,
 };
-use ahash::AHashMap;
+use ahash::{AHashMap, HashSet};
 use derivative::Derivative;
+use futures::Stream;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
@@ -22,6 +26,7 @@ where
     store: Arc<Inner<K>>,
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
+    touched_objects_broadcaster: Broadcaster<Arc<ObjectRef<K>>>,
 }
 
 impl<K: 'static + Lookup + Clone> Writer<K>
@@ -41,6 +46,7 @@ where
             }),
             dyntype,
             ready_tx: Some(ready_tx),
+            touched_objects_broadcaster: Broadcaster::new(1),
         }
     }
 
@@ -55,24 +61,51 @@ where
         }
     }
 
+    /// Returns a [`Stream`] of objects that have been touched in any way (created/modified/deleted).
+    ///
+    /// Note that delays in handling objects may affect all subscribers, as well as the backing reflector (or other source).
+    pub fn subscribe_touched_objects(&mut self) -> impl Stream<Item = Arc<ObjectRef<K>>> {
+        self.touched_objects_broadcaster.subscribe()
+    }
+
     /// Applies a single watcher event to the store
-    pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
+    pub async fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
-                let key = obj.to_object_ref(self.dyntype.clone());
+                let key = Arc::new(obj.to_object_ref(self.dyntype.clone()));
                 let obj = Arc::new(obj.clone());
-                self.store.cache.write().insert(key, obj);
+                self.store.cache.write().insert(key.clone(), obj);
+                self.touched_objects_broadcaster.send(key).await;
             }
             watcher::Event::Deleted(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
-                self.store.cache.write().remove(&key);
+                let removed_obj = self.store.cache.write().remove_entry(&key);
+                if let Some((key, _)) = removed_obj {
+                    self.touched_objects_broadcaster.send(key).await;
+                }
             }
             watcher::Event::Restarted(new_objs) => {
-                let new_objs = new_objs
+                let mut new_objs = new_objs
                     .iter()
-                    .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())))
+                    .map(|obj| {
+                        (
+                            Arc::new(obj.to_object_ref(self.dyntype.clone())),
+                            Arc::new(obj.clone()),
+                        )
+                    })
                     .collect::<AHashMap<_, _>>();
-                *self.store.cache.write() = new_objs;
+                let mutated_obj_refs = {
+                    let mut cache = self.store.cache.write();
+                    std::mem::swap(&mut *cache, &mut new_objs);
+                    let old_objs = new_objs;
+                    old_objs
+                        .into_keys()
+                        .chain(cache.keys().cloned())
+                        .collect::<HashSet<_>>()
+                };
+                for key in mutated_obj_refs {
+                    self.touched_objects_broadcaster.send(key).await;
+                }
             }
         }
 
@@ -208,7 +241,7 @@ where
 #[derive(Derivative)]
 #[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"))]
 struct Inner<K: Lookup> {
-    cache: RwLock<AHashMap<ObjectRef<K>, Arc<K>>>,
+    cache: RwLock<AHashMap<Arc<ObjectRef<K>>, Arc<K>>>,
     ready_rx: DelayedInit<()>,
 }
 
@@ -219,8 +252,8 @@ mod tests {
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::api::ObjectMeta;
 
-    #[test]
-    fn should_allow_getting_namespaced_object_by_namespaced_ref() {
+    #[tokio::test]
+    async fn should_allow_getting_namespaced_object_by_namespaced_ref() {
         let cm = ConfigMap {
             metadata: ObjectMeta {
                 name: Some("obj".to_string()),
@@ -230,13 +263,15 @@ mod tests {
             ..ConfigMap::default()
         };
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        store_w
+            .apply_watcher_event(&watcher::Event::Applied(cm.clone()))
+            .await;
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
-    #[test]
-    fn should_not_allow_getting_namespaced_object_by_clusterscoped_ref() {
+    #[tokio::test]
+    async fn should_not_allow_getting_namespaced_object_by_clusterscoped_ref() {
         let cm = ConfigMap {
             metadata: ObjectMeta {
                 name: Some("obj".to_string()),
@@ -248,13 +283,13 @@ mod tests {
         let mut cluster_cm = cm.clone();
         cluster_cm.metadata.namespace = None;
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm));
+        store_w.apply_watcher_event(&watcher::Event::Applied(cm)).await;
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&cluster_cm)), None);
     }
 
-    #[test]
-    fn should_allow_getting_clusterscoped_object_by_clusterscoped_ref() {
+    #[tokio::test]
+    async fn should_allow_getting_clusterscoped_object_by_clusterscoped_ref() {
         let cm = ConfigMap {
             metadata: ObjectMeta {
                 name: Some("obj".to_string()),
@@ -264,12 +299,14 @@ mod tests {
             ..ConfigMap::default()
         };
         let (store, mut writer) = store();
-        writer.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        writer
+            .apply_watcher_event(&watcher::Event::Applied(cm.clone()))
+            .await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
-    #[test]
-    fn should_allow_getting_clusterscoped_object_by_namespaced_ref() {
+    #[tokio::test]
+    async fn should_allow_getting_clusterscoped_object_by_namespaced_ref() {
         let cm = ConfigMap {
             metadata: ObjectMeta {
                 name: Some("obj".to_string()),
@@ -282,13 +319,15 @@ mod tests {
         let mut nsed_cm = cm.clone();
         nsed_cm.metadata.namespace = Some("ns".to_string());
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        store_w
+            .apply_watcher_event(&watcher::Event::Applied(cm.clone()))
+            .await;
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(), Some(&cm));
     }
 
-    #[test]
-    fn find_element_in_store() {
+    #[tokio::test]
+    async fn find_element_in_store() {
         let cm = ConfigMap {
             metadata: ObjectMeta {
                 name: Some("obj".to_string()),
@@ -301,14 +340,16 @@ mod tests {
 
         let (reader, mut writer) = store::<ConfigMap>();
         assert!(reader.is_empty());
-        writer.apply_watcher_event(&watcher::Event::Applied(cm));
+        writer.apply_watcher_event(&watcher::Event::Applied(cm)).await;
 
         assert_eq!(reader.len(), 1);
         assert!(reader.find(|k| k.metadata.generation == Some(1234)).is_none());
 
         target_cm.metadata.name = Some("obj1".to_string());
         target_cm.metadata.generation = Some(1234);
-        writer.apply_watcher_event(&watcher::Event::Applied(target_cm.clone()));
+        writer
+            .apply_watcher_event(&watcher::Event::Applied(target_cm.clone()))
+            .await;
         assert!(!reader.is_empty());
         assert_eq!(reader.len(), 2);
         let found = reader.find(|k| k.metadata.generation == Some(1234));

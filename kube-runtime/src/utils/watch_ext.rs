@@ -3,12 +3,13 @@ use crate::utils::predicate::{Predicate, PredicateFilter};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::utils::stream_subscribe::StreamSubscribe;
 use crate::{
+    reflector,
     utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
     watcher,
 };
 use kube_client::Resource;
 
-use crate::{reflector::store::Writer, utils::Reflect};
+use crate::reflector::store::Writer;
 
 use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
@@ -239,13 +240,13 @@ pub trait WatchStreamExt: Stream {
     /// ```
     ///
     /// [`Store`]: crate::reflector::Store
-    fn reflect<K>(self, writer: Writer<K>) -> Reflect<Self, K>
+    fn reflect<K>(self, writer: Writer<K>) -> impl Stream<Item = Self::Item>
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
         K: Resource + Clone + 'static,
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
-        Reflect::new(self, writer)
+        reflector(writer, self)
     }
 }
 

@@ -8,6 +8,7 @@ struct SubscriberId(u64);
 ///
 /// Compared to [`tokio::sync::broadcast`], this backpressures the sender when the buffer is full,
 /// rather than dropping values.
+#[derive(Debug)]
 pub(crate) struct Broadcaster<T> {
     subscriber_txes: HashMap<SubscriberId, mpsc::Sender<T>>,
     next_id: SubscriberId,

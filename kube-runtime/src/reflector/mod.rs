@@ -5,8 +5,8 @@ pub mod store;
 
 pub use self::object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef};
 use crate::watcher;
-use futures::{Stream, TryStreamExt};
-use std::hash::Hash;
+use futures::{lock::Mutex, Stream, StreamExt, TryStreamExt};
+use std::{hash::Hash, sync::Arc};
 pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
@@ -88,13 +88,23 @@ pub use store::{store, Store};
 /// The `stream` can then be passed to `reflector` causing smaller objects to be written to its store.
 /// Note that you **cannot drop everything**; you minimally need the spec properties your app relies on.
 /// Additionally, only `labels`, `annotations` and `managed_fields` are safe to drop from `ObjectMeta`.
-pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
+pub fn reflector<K, W>(writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Lookup + Clone,
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
-    stream.inspect_ok(move |event| writer.apply_watcher_event(event))
+    // TODO: Writer should be able to be owned by the closure, but I can't get the lifetimes to line up
+    // also not sure if we can get rid of the mutex...
+    let writer = Arc::new(Mutex::new(writer));
+    stream.and_then(move |event| {
+        let writer = writer.clone();
+        async move {
+            let mut writer = writer.lock().await;
+            writer.apply_watcher_event(&event).await;
+            Ok(event)
+        }
+    })
 }
 
 #[cfg(test)]
