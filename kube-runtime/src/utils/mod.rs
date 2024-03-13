@@ -1,6 +1,7 @@
 //! Helpers for manipulating built-in streams
 
 mod backoff_reset_timer;
+pub(crate) mod broadcast;
 pub(crate) mod delayed_init;
 mod event_flatten;
 mod event_modify;
