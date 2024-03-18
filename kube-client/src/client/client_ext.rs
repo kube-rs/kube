@@ -215,7 +215,6 @@ impl Client {
 }
 
 #[cfg(test)]
-#[cfg(feature = "client")]
 mod test {
     use super::{
         scope::{Cluster, Namespace},
