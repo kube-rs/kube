@@ -10,6 +10,7 @@ use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::api::resource::Quantit
 use kube::{api::ListParams, Api, ResourceExt};
 use serde::Deserialize;
 
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let client = kube::Client::try_default().await?;
@@ -88,6 +89,7 @@ enum Metric {
     Memory { usage_bytes: usize },
 }
 
+
 fn print_table(summaries: Vec<NodeSummary>) {
     use headers::*;
 
@@ -139,6 +141,7 @@ fn print_table(summaries: Vec<NodeSummary>) {
         println!("{name:w_name$} {used_mem:<w_used_mem$} {percent_mem:<w_percent_mem$} {used_cpu:<w_used_cpu$} {percent_cpu:<w_percent_cpu$}");
     }
 }
+
 
 // === impl Metric ===
 
