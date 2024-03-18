@@ -4,33 +4,43 @@ use crate::{
     subresource::{AttachParams, LogParams},
     Request,
 };
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 /// Struct that hold all required parameters to call specific pod methods from node
-pub struct NodeProxyParams {
+#[derive(Default)]
+pub struct NodeProxyParams<'a> {
     /// Name of the pod
-    pub name: String,
+    pub name: &'a str,
     /// Namespace of the pod
-    pub namespace: String,
-    /// Container within the pod to perform the action
-    pub container: String,
+    pub namespace: &'a str,
+    /// Pod uid used to ensure that the pod name matches the pod uid
+    pub pod_uid: Option<&'a str>,
 }
 
-impl Display for NodeProxyParams {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}/{}/{}?", self.namespace, self.name, self.container)
+impl NodeProxyParams<'_> {
+    fn with_uid(&self) -> String {
+        if let Some(uid) = &self.pod_uid {
+            format!("{}/{}/{}", self.namespace, self.name, uid)
+        } else {
+            self.without_uid()
+        }
+    }
+
+    fn without_uid(&self) -> String {
+        format!("{}/{}", self.namespace, self.name)
     }
 }
 
 impl Request {
     /// Attach to pod directly from the node
     pub fn node_attach(
-        node_proxy_params: &NodeProxyParams,
+        node_proxy_params: &NodeProxyParams<'_>,
+        container: &str,
         ap: &AttachParams,
     ) -> Result<http::Request<Vec<u8>>, Error> {
         ap.validate()?;
 
-        let target = format!("/attach/{node_proxy_params}",);
+        let target = format!("/attach/{}/{container}?", node_proxy_params.with_uid());
         let mut qp = form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer_local(&mut qp);
 
@@ -40,7 +50,8 @@ impl Request {
 
     /// Execute a command in a pod directly from the node
     pub fn node_exec<I, T>(
-        node_proxy_params: &NodeProxyParams,
+        node_proxy_params: &NodeProxyParams<'_>,
+        container: &str,
         command: I,
         ap: &AttachParams,
     ) -> Result<http::Request<Vec<u8>>, Error>
@@ -50,7 +61,7 @@ impl Request {
     {
         ap.validate()?;
 
-        let target = format!("/exec/{node_proxy_params}",);
+        let target = format!("/exec/{}/{container}?", node_proxy_params.with_uid());
         let mut qp = form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer_local(&mut qp);
 
@@ -64,8 +75,7 @@ impl Request {
 
     /// Forward ports of a pod directly from the node
     pub fn node_portforward(
-        namespace: &str,
-        name: &str,
+        node_proxy_params: &NodeProxyParams<'_>,
         ports: &[u16],
     ) -> Result<http::Request<Vec<u8>>, Error> {
         if ports.is_empty() {
@@ -89,7 +99,7 @@ impl Request {
             }
         }
 
-        let base_url = format!("/portForward/{namespace}/{name}?");
+        let base_url = format!("/portForward/{}?", node_proxy_params.with_uid());
         let mut qp = form_urlencoded::Serializer::new(base_url);
         qp.append_pair(
             "port",
@@ -101,10 +111,12 @@ impl Request {
 
     /// Stream logs directly from node
     pub fn node_logs(
-        node_proxy_params: &NodeProxyParams,
+        node_proxy_params: &NodeProxyParams<'_>,
+        container: &str,
         lp: &LogParams,
     ) -> Result<http::Request<Vec<u8>>, Error> {
-        let target = format!("/containerLogs/{node_proxy_params}",);
+        // Node logs is the only one that doesn't accept an uid for pod
+        let target = format!("/containerLogs/{}/{container}?", node_proxy_params.without_uid());
 
         let mut qp = form_urlencoded::Serializer::new(target);
 
@@ -156,16 +168,17 @@ mod test {
     fn node_attach_test() {
         let req = Request::node_attach(
             &NodeProxyParams {
-                name: "some-name".to_string(),
-                namespace: "some-namespace".to_string(),
-                container: "some-container".to_string(),
+                name: "some-name",
+                namespace: "some-namespace",
+                pod_uid: Some("some-uid"),
             },
+            "some-container",
             &AttachParams::default().stdin(true).stderr(true).stdout(true),
         )
         .unwrap();
         assert_eq!(
             req.uri(),
-            "/attach/some-namespace/some-name/some-container?&input=1&output=1&error=1"
+            "/attach/some-namespace/some-name/some-uid/some-container?&input=1&output=1&error=1"
         );
     }
 
@@ -173,10 +186,11 @@ mod test {
     fn node_exec_test() {
         let req = Request::node_exec(
             &NodeProxyParams {
-                name: "some-name".to_string(),
-                namespace: "some-namespace".to_string(),
-                container: "some-container".to_string(),
+                name: "some-name",
+                namespace: "some-namespace",
+                pod_uid: None,
             },
+            "some-container",
             "ls -l".split_whitespace(),
             &AttachParams::interactive_tty(),
         )
@@ -197,10 +211,11 @@ mod test {
         };
         let req = Request::node_logs(
             &NodeProxyParams {
-                name: "some-name".to_string(),
-                namespace: "some-namespace".to_string(),
-                container: "some-container".to_string(),
+                name: "some-name",
+                namespace: "some-namespace",
+                pod_uid: None,
             },
+            "some-container",
             &lp,
         )
         .unwrap();
@@ -212,7 +227,15 @@ mod test {
 
     #[test]
     fn node_portforward_test() {
-        let req = Request::node_portforward(&"some-namespace", &"some-name", &[1204]).unwrap();
+        let req = Request::node_portforward(
+            &NodeProxyParams {
+                name: "some-name",
+                namespace: "some-namespace",
+                pod_uid: None,
+            },
+            &[1204],
+        )
+        .unwrap();
         assert_eq!(req.uri(), "/portForward/some-namespace/some-name?&port=1204");
     }
 }

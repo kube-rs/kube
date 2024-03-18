@@ -142,6 +142,10 @@ name = "pod_exec"
 path = "pod_exec.rs"
 
 [[example]]
+name = "pod_log_node_proxy"
+path = "pod_log_node_proxy.rs"
+
+[[example]]
 name = "pod_paged"
 path = "pod_paged.rs"
 

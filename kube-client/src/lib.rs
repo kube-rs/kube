@@ -765,82 +765,6 @@ mod test {
     #[tokio::test]
     #[ignore = "needs kubelet debug methods"]
     #[cfg(feature = "ws")]
-    async fn test_node_logs() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::{
-            api::{DeleteParams, EvictParams, ListParams, Patch, PatchParams, WatchEvent},
-            core::subresource::LogParams,
-        };
-
-        let client = Client::try_default().await?;
-        let pods: Api<Pod> = Api::default_namespaced(client);
-
-        // create busybox pod that's alive for at most 30s
-        let p: Pod = serde_json::from_value(json!({
-            "apiVersion": "v1",
-            "kind": "Pod",
-            "metadata": {
-                "name": "busybox-kube3",
-                "labels": { "app": "kube-rs-test" },
-            },
-            "spec": {
-                "terminationGracePeriodSeconds": 1,
-                "restartPolicy": "Never",
-                "containers": [{
-                  "name": "busybox",
-                  "image": "busybox:1.34.1",
-                  "command": ["sh", "-c", "for i in $(seq 1 5); do echo kube $i; sleep 0.1; done"],
-                }],
-            }
-        }))?;
-
-        match pods.create(&Default::default(), &p).await {
-            Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
-            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
-            Err(e) => return Err(e.into()),                         // any other case if a failure
-        }
-
-        // wait for container to finish
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        // Create a client for node proxy
-        let mut config = Config::infer().await?;
-        config.accept_invalid_certs = true;
-        config.cluster_url = "https://localhost:10250".to_string().parse::<Uri>().unwrap();
-        let client: Client = config.try_into()?;
-
-
-        let lp = LogParams::default();
-        let mut logs_stream = client
-            .node_logs(
-                &NodeProxyParams {
-                    name: "busybox-kube3".to_string(),
-                    namespace: "default".to_string(),
-                    container: "busybox".to_string(),
-                },
-                &lp,
-            )
-            .await?
-            .lines();
-
-
-        let mut output = vec![];
-        while let Some(line) = logs_stream.try_next().await? {
-            output.push(line);
-        }
-        assert_eq!(output, vec!["kube 1", "kube 2", "kube 3", "kube 4", "kube 5"]);
-
-        // evict the pod
-        let ep = EvictParams::default();
-        let eres = pods.evict("busybox-kube3", &ep).await?;
-        assert_eq!(eres.code, 201); // created
-        assert!(eres.is_success());
-
-        Ok(())
-    }
-
-
-    #[tokio::test]
-    #[ignore = "needs kubelet debug methods"]
-    #[cfg(feature = "ws")]
     async fn pod_can_exec_and_write_to_stdin_from_node_proxy() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
 
@@ -902,10 +826,11 @@ mod test {
             let mut attached = client
                 .node_exec(
                     &NodeProxyParams {
-                        name: "busybox-kube2".to_string(),
-                        namespace: "default".to_string(),
-                        container: "busybox".to_string(),
+                        name: "busybox-kube2",
+                        namespace: "default",
+                        ..Default::default()
                     },
+                    "busybox",
                     vec!["sh", "-c", "for i in $(seq 1 3); do echo $i; done"],
                     &AttachParams::default().stderr(false),
                 )
@@ -927,10 +852,11 @@ mod test {
             let mut attached = client
                 .node_exec(
                     &NodeProxyParams {
-                        name: "busybox-kube2".to_string(),
-                        namespace: "default".to_string(),
-                        container: "busybox".to_string(),
+                        name: "busybox-kube2",
+                        namespace: "default",
+                        ..Default::default()
                     },
+                    "busybox",
                     vec!["sh"],
                     &AttachParams::default().stdin(true).stderr(false),
                 )
