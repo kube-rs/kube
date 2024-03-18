@@ -38,9 +38,12 @@ pub trait ObjectUrl<K> {
 /// Marker type for cluster level queries
 pub struct Cluster;
 /// Namespace newtype for namespace level queries
+///
+/// You can create this directly, or convert `From` a `String` / `&str`, or `TryFrom` an `k8s_openapi::api::core::v1::Namespace`
 pub struct Namespace(String);
 
-/// Module for scope for ease of importing
+/// Scopes for `unstable-client` [`Client#impl-Client`] extension methods
+#[cfg_attr(docsrs, doc(cfg(any(feature = "unstable-client"))))]
 pub mod scope {
     pub use super::{Cluster, Namespace};
 }
@@ -130,7 +133,7 @@ pub enum NamespaceError {
 ///
 /// ## Usage
 /// 1. Create a [`Client`]
-/// 2. Specify the level you are querying at via [`Cluster`] or [`Namespace`] as args
+/// 2. Specify the [`scope`] you are querying at via [`Cluster`] or [`Namespace`] as args
 /// 3. Specify the resource type you are using for serialization (e.g. a top level k8s-openapi type)
 ///
 /// ## Example
@@ -143,16 +146,17 @@ pub enum NamespaceError {
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();
 /// let lp = ListParams::default();
-/// // List at Cluster level:
+/// // List at Cluster level for Pod resource:
 /// for pod in client.list::<Pod>(&lp, &Cluster).await? {
 ///     println!("Found pod {} in {}", pod.name_any(), pod.namespace().unwrap());
 /// }
-/// // Namespaced Get:
+/// // Namespaced Get for Service resource:
 /// let svc = client.get::<Service>("kubernetes", &Namespace::from("default")).await?;
 /// assert_eq!(svc.name_unchecked(), "kubernetes");
 /// # Ok(())
 /// # }
 /// ```
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
 impl Client {
     /// Get a single instance of a `Resource` implementing type `K` at the specified scope.
     ///
