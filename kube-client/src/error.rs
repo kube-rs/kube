@@ -1,9 +1,9 @@
-//! Error handling in [`kube`][crate]
+//! Error handling and error types
 use thiserror::Error;
 
 pub use kube_core::ErrorResponse;
 
-/// Possible errors when working with [`kube`][crate]
+/// Possible errors from the [`Client`](crate::Client)
 #[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
 #[derive(Error, Debug)]
 pub enum Error {
@@ -89,7 +89,7 @@ pub enum Error {
 }
 
 #[derive(Error, Debug)]
-/// Possible errors when using API discovery
+/// Possible errors when using API [discovery](crate::discovery)
 pub enum DiscoveryError {
     /// Invalid GroupVersion
     #[error("Invalid GroupVersion: {0}")]
