@@ -43,7 +43,6 @@ pub struct Cluster;
 pub struct Namespace(String);
 
 /// Scopes for `unstable-client` [`Client#impl-Client`] extension methods
-#[cfg_attr(docsrs, doc(cfg(any(feature = "unstable-client"))))]
 pub mod scope {
     pub use super::{Cluster, Namespace};
 }
@@ -156,7 +155,6 @@ pub enum NamespaceError {
 /// # Ok(())
 /// # }
 /// ```
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
 impl Client {
     /// Get a single instance of a `Resource` implementing type `K` at the specified scope.
     ///
