@@ -10,26 +10,6 @@ use std::fmt::Debug;
 /// Usage is the same as associated Pod api methods
 /// Service account must have `nodes/proxy` resources right
 /// `--enable-debugging-handlers ` must be set to true (default) in kubelet config
-/// ```no_run
-/// let mut config = kube::Config::new(format!("https://{node_ip}:10250").try_into().expect("uri"));
-/// config.accept_invalid_certs = true;
-/// config.auth_info.token = Some(token) // Service account token
-/// let client = kube::Client::try_from(config)?;
-/// let logs = client
-/// .node_logs(
-///     &namespace,
-///     &pod_name,
-///     &container_name,
-///     &LogParams {
-///         tail_lines: logs_params.tail,
-///         follow: logs_params.follow,
-///         timestamps: true,
-///         ..Default::default()
-///     },
-/// )
-/// .await;
-/// ```
-///
 impl Client {
     /// Attach to pod directly from the node
     pub async fn node_attach(
