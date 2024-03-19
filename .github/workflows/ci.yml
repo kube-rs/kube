@@ -164,7 +164,7 @@ jobs:
           # Used to avoid rate limits when fetching the releases from k3s repo.
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
-          k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:* -p 10250:10250"
+          k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       # Real CI work starts here
       - name: Build workspace
