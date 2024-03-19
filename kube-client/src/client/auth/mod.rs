@@ -10,7 +10,7 @@ use http::{
     header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,
 };
-use jsonpath_rust::JsonPathInst;
+use jsonpath_rust::{path::config::JsonPathConfig, JsonPathInst};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -479,6 +479,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 }
 
 fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<String, Error> {
+    let cfg = JsonPathConfig::default(); // no need for regex caching here
     let parsed_path = path
         .trim_matches(|c| c == '"' || c == '{' || c == '}')
         .parse::<JsonPathInst>()
@@ -489,7 +490,7 @@ fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<
             ))
         })?;
 
-    let res = parsed_path.find_slice(json);
+    let res = parsed_path.find_slice(json, cfg);
 
     let Some(res) = res.into_iter().next() else {
         return Err(Error::AuthExec(format!(
