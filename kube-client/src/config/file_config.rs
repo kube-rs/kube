@@ -556,7 +556,7 @@ pub struct ExecAuthCluster {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub insecure_skip_tls_verify: Option<bool>,
     /// PEM-encoded certificate authority certificates. Overrides `certificate_authority`
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "base64serde")]
     pub certificate_authority_data: Option<Vec<u8>>,
     /// URL to the proxy to be used for all requests.
