@@ -7,6 +7,7 @@
 //! Everything in this crate is re-exported from [`kube`](https://crates.io/crates/kube)
 //! (even with zero features) under [`kube::core`]((https://docs.rs/kube/*/kube/core/index.html)).
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![feature(diagnostic_namespace)]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
