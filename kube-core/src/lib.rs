@@ -33,7 +33,7 @@ pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 pub mod metadata;
 pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta};
 
-#[cfg(feature = "ws")] pub mod node_proxy;
+#[cfg(feature = "kubelet-debug")] pub mod kubelet_debug;
 
 pub mod object;
 pub use object::{NotUsed, Object, ObjectList};

@@ -36,7 +36,7 @@ pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
 
-#[cfg(feature = "ws")] mod node_proxy;
+#[cfg(feature = "kubelet_debug")] mod kubelet_debug;
 #[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
 #[cfg(feature = "openssl-tls")]
