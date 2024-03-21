@@ -34,13 +34,13 @@ impl KubeletDebugParams<'_> {
 impl Request {
     /// Attach to pod directly from the node
     pub fn node_attach(
-        node_proxy_params: &KubeletDebugParams<'_>,
+        kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
         ap: &AttachParams,
     ) -> Result<http::Request<Vec<u8>>, Error> {
         ap.validate()?;
 
-        let target = format!("/attach/{}/{container}?", node_proxy_params.with_uid());
+        let target = format!("/attach/{}/{container}?", kubelet_debug_params.with_uid());
         let mut qp = form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer_local(&mut qp);
 
@@ -50,7 +50,7 @@ impl Request {
 
     /// Execute a command in a pod directly from the node
     pub fn node_exec<I, T>(
-        node_proxy_params: &KubeletDebugParams<'_>,
+        kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
         command: I,
         ap: &AttachParams,
@@ -61,7 +61,7 @@ impl Request {
     {
         ap.validate()?;
 
-        let target = format!("/exec/{}/{container}?", node_proxy_params.with_uid());
+        let target = format!("/exec/{}/{container}?", kubelet_debug_params.with_uid());
         let mut qp = form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer_local(&mut qp);
 
@@ -75,7 +75,7 @@ impl Request {
 
     /// Forward ports of a pod directly from the node
     pub fn node_portforward(
-        node_proxy_params: &KubeletDebugParams<'_>,
+        kubelet_debug_params: &KubeletDebugParams<'_>,
         ports: &[u16],
     ) -> Result<http::Request<Vec<u8>>, Error> {
         if ports.is_empty() {
@@ -99,7 +99,7 @@ impl Request {
             }
         }
 
-        let base_url = format!("/portForward/{}?", node_proxy_params.with_uid());
+        let base_url = format!("/portForward/{}?", kubelet_debug_params.with_uid());
         let mut qp = form_urlencoded::Serializer::new(base_url);
         qp.append_pair(
             "port",
@@ -111,12 +111,15 @@ impl Request {
 
     /// Stream logs directly from node
     pub fn node_logs(
-        node_proxy_params: &KubeletDebugParams<'_>,
+        kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
         lp: &LogParams,
     ) -> Result<http::Request<Vec<u8>>, Error> {
         // Node logs is the only one that doesn't accept an uid for pod
-        let target = format!("/containerLogs/{}/{container}?", node_proxy_params.without_uid());
+        let target = format!(
+            "/containerLogs/{}/{container}?",
+            kubelet_debug_params.without_uid()
+        );
 
         let mut qp = form_urlencoded::Serializer::new(target);
 

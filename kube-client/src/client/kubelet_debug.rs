@@ -3,7 +3,7 @@ use crate::{
     client::AsyncBufRead,
     Client, Error, Result,
 };
-use kube_core::{node_proxy::KubeletDebugParams, Request};
+use kube_core::{kubelet_debug::KubeletDebugParams, Request};
 use std::fmt::Debug;
 
 /// Methods to access debug endpoints directly on `kubelet`
@@ -16,7 +16,7 @@ use std::fmt::Debug;
 /// ## Warning
 /// These methods require direct and insecure access to `kubelet` and is only available under the `kubelet_debug` feature.
 /// End-to-end usage is explored in the [pod_log_node_proxy](./examples/pod_log_node_proxy.rs) example.
-#[cfg(feature = "kubelet_debug")]
+#[cfg(feature = "kubelet-debug")]
 impl Client {
     /// Attach to pod directly from the node
     ///
@@ -24,10 +24,12 @@ impl Client {
     /// This method uses the insecure `kubelet_debug` interface.
     pub async fn node_attach(
         &self,
-        node_proxy_params: &KubeletDebugParams<'_>,
+        kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
+        ap: &AttachParams,
     ) -> Result<AttachedProcess> {
-        let mut req = Request::node_attach(node_proxy_params, container, ap).map_err(Error::BuildRequest)?;
+        let mut req =
+            Request::node_attach(kubelet_debug_params, container, ap).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("node_attach");
         let stream = self.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
@@ -39,7 +41,7 @@ impl Client {
     /// This method uses the insecure `kubelet_debug` interface.
     pub async fn node_exec<I, T>(
         &self,
-        node_proxy_params: &KubeletDebugParams<'_>,
+        kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
         command: I,
         ap: &AttachParams,
@@ -49,7 +51,7 @@ impl Client {
         T: Into<String>,
     {
         let mut req =
-            Request::node_exec(node_proxy_params, container, command, ap).map_err(Error::BuildRequest)?;
+            Request::node_exec(kubelet_debug_params, container, command, ap).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("node_exec");
         let stream = self.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
@@ -61,10 +63,10 @@ impl Client {
     /// This method uses the insecure `kubelet_debug` interface.
     pub async fn node_portforward(
         &self,
-        node_proxy_params: &KubeletDebugParams<'_>,
+        kubelet_debug_params: &KubeletDebugParams<'_>,
         ports: &[u16],
     ) -> Result<Portforwarder> {
-        let mut req = Request::node_portforward(node_proxy_params, ports).map_err(Error::BuildRequest)?;
+        let mut req = Request::node_portforward(kubelet_debug_params, ports).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("node_portforward");
         let stream = self.connect(req).await?;
         Ok(Portforwarder::new(stream, ports))
@@ -76,11 +78,11 @@ impl Client {
     /// This method uses the insecure `kubelet_debug` interface.
     pub async fn node_logs(
         &self,
-        node_proxy_params: &KubeletDebugParams<'_>,
+        kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
         lp: &LogParams,
     ) -> Result<impl AsyncBufRead> {
-        let mut req = Request::node_logs(node_proxy_params, container, lp).map_err(Error::BuildRequest)?;
+        let mut req = Request::node_logs(kubelet_debug_params, container, lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("node_log");
         self.request_stream(req).await
     }
