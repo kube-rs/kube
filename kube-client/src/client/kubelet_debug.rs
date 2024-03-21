@@ -3,7 +3,7 @@ use crate::{
     client::AsyncBufRead,
     Client, Error, Result,
 };
-use kube_core::{node_proxy::NodeProxyParams, Request};
+use kube_core::{node_proxy::KubeletDebugParams, Request};
 use std::fmt::Debug;
 
 /// Methods to access debug endpoints directly on `kubelet`
@@ -24,7 +24,7 @@ impl Client {
     /// This method uses the insecure `kubelet_debug` interface.
     pub async fn node_attach(
         &self,
-        node_proxy_params: &NodeProxyParams<'_>,
+        node_proxy_params: &KubeletDebugParams<'_>,
         container: &str,
     ) -> Result<AttachedProcess> {
         let mut req = Request::node_attach(node_proxy_params, container, ap).map_err(Error::BuildRequest)?;
@@ -39,7 +39,7 @@ impl Client {
     /// This method uses the insecure `kubelet_debug` interface.
     pub async fn node_exec<I, T>(
         &self,
-        node_proxy_params: &NodeProxyParams<'_>,
+        node_proxy_params: &KubeletDebugParams<'_>,
         container: &str,
         command: I,
         ap: &AttachParams,
@@ -61,7 +61,7 @@ impl Client {
     /// This method uses the insecure `kubelet_debug` interface.
     pub async fn node_portforward(
         &self,
-        node_proxy_params: &NodeProxyParams<'_>,
+        node_proxy_params: &KubeletDebugParams<'_>,
         ports: &[u16],
     ) -> Result<Portforwarder> {
         let mut req = Request::node_portforward(node_proxy_params, ports).map_err(Error::BuildRequest)?;
@@ -76,7 +76,7 @@ impl Client {
     /// This method uses the insecure `kubelet_debug` interface.
     pub async fn node_logs(
         &self,
-        node_proxy_params: &NodeProxyParams<'_>,
+        node_proxy_params: &KubeletDebugParams<'_>,
         container: &str,
         lp: &LogParams,
     ) -> Result<impl AsyncBufRead> {

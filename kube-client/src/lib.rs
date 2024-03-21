@@ -131,10 +131,11 @@ pub use kube_core as core;
 #[cfg(test)]
 mod test {
     #![allow(unused_imports)]
+    #[cfg(feature = "kubelet-debug")]
+    use crate::core::kubelet_debug::KubeletDebugParams;
     use crate::{
         api::{AttachParams, AttachedProcess},
         client::ConfigExt,
-        core::node_proxy::NodeProxyParams,
         Api, Client, Config, ResourceExt,
     };
     use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
@@ -764,7 +765,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs kubelet debug methods"]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "kubelet-debug")]
     async fn pod_can_exec_and_write_to_stdin_from_node_proxy() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
 
@@ -825,7 +826,7 @@ mod test {
         {
             let mut attached = client
                 .node_exec(
-                    &NodeProxyParams {
+                    &KubeletDebugParams {
                         name: "busybox-kube2",
                         namespace: "default",
                         ..Default::default()
@@ -851,7 +852,7 @@ mod test {
             use tokio::io::AsyncWriteExt;
             let mut attached = client
                 .node_exec(
-                    &NodeProxyParams {
+                    &KubeletDebugParams {
                         name: "busybox-kube2",
                         namespace: "default",
                         ..Default::default()

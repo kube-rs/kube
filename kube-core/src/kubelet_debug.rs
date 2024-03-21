@@ -8,7 +8,7 @@ use std::fmt::Debug;
 
 /// Struct that hold all required parameters to call specific pod methods from node
 #[derive(Default)]
-pub struct NodeProxyParams<'a> {
+pub struct KubeletDebugParams<'a> {
     /// Name of the pod
     pub name: &'a str,
     /// Namespace of the pod
@@ -17,7 +17,7 @@ pub struct NodeProxyParams<'a> {
     pub pod_uid: Option<&'a str>,
 }
 
-impl NodeProxyParams<'_> {
+impl KubeletDebugParams<'_> {
     fn with_uid(&self) -> String {
         if let Some(uid) = &self.pod_uid {
             format!("{}/{}/{}", self.namespace, self.name, uid)
@@ -34,7 +34,7 @@ impl NodeProxyParams<'_> {
 impl Request {
     /// Attach to pod directly from the node
     pub fn node_attach(
-        node_proxy_params: &NodeProxyParams<'_>,
+        node_proxy_params: &KubeletDebugParams<'_>,
         container: &str,
         ap: &AttachParams,
     ) -> Result<http::Request<Vec<u8>>, Error> {
@@ -50,7 +50,7 @@ impl Request {
 
     /// Execute a command in a pod directly from the node
     pub fn node_exec<I, T>(
-        node_proxy_params: &NodeProxyParams<'_>,
+        node_proxy_params: &KubeletDebugParams<'_>,
         container: &str,
         command: I,
         ap: &AttachParams,
@@ -75,7 +75,7 @@ impl Request {
 
     /// Forward ports of a pod directly from the node
     pub fn node_portforward(
-        node_proxy_params: &NodeProxyParams<'_>,
+        node_proxy_params: &KubeletDebugParams<'_>,
         ports: &[u16],
     ) -> Result<http::Request<Vec<u8>>, Error> {
         if ports.is_empty() {
@@ -111,7 +111,7 @@ impl Request {
 
     /// Stream logs directly from node
     pub fn node_logs(
-        node_proxy_params: &NodeProxyParams<'_>,
+        node_proxy_params: &KubeletDebugParams<'_>,
         container: &str,
         lp: &LogParams,
     ) -> Result<http::Request<Vec<u8>>, Error> {
@@ -160,14 +160,14 @@ impl Request {
 #[cfg(test)]
 mod test {
     use crate::{
-        node_proxy::NodeProxyParams,
+        kubelet_debug::KubeletDebugParams,
         subresource::{AttachParams, LogParams},
         Request,
     };
     #[test]
     fn node_attach_test() {
         let req = Request::node_attach(
-            &NodeProxyParams {
+            &KubeletDebugParams {
                 name: "some-name",
                 namespace: "some-namespace",
                 pod_uid: Some("some-uid"),
@@ -185,7 +185,7 @@ mod test {
     #[test]
     fn node_exec_test() {
         let req = Request::node_exec(
-            &NodeProxyParams {
+            &KubeletDebugParams {
                 name: "some-name",
                 namespace: "some-namespace",
                 pod_uid: None,
@@ -210,7 +210,7 @@ mod test {
             ..Default::default()
         };
         let req = Request::node_logs(
-            &NodeProxyParams {
+            &KubeletDebugParams {
                 name: "some-name",
                 namespace: "some-namespace",
                 pod_uid: None,
@@ -228,7 +228,7 @@ mod test {
     #[test]
     fn node_portforward_test() {
         let req = Request::node_portforward(
-            &NodeProxyParams {
+            &KubeletDebugParams {
                 name: "some-name",
                 namespace: "some-namespace",
                 pod_uid: None,

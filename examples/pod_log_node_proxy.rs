@@ -6,7 +6,7 @@ use futures::AsyncBufReadExt;
 use hyper::Uri;
 use kube::{
     api::{Api, DeleteParams, ResourceExt},
-    core::{node_proxy::NodeProxyParams, subresource::LogParams},
+    core::{node_proxy::KubeletDebugParams, subresource::LogParams},
     Client, Config,
 };
 use serde_json::json;
@@ -56,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let lp = LogParams::default();
     let mut logs_stream = client
         .node_logs(
-            &NodeProxyParams {
+            &KubeletDebugParams {
                 name: "example",
                 namespace: "default",
                 ..Default::default()

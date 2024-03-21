@@ -298,6 +298,7 @@ impl AttachParams {
         }
     }
 
+    #[cfg(feature = "kubelet-debug")]
     // https://github.com/kubernetes/kubernetes/blob/466d9378dbb0a185df9680657f5cd96d5e5aab57/pkg/apis/core/types.go#L6005-L6013
     pub(crate) fn append_to_url_serializer_local(&self, qp: &mut form_urlencoded::Serializer<String>) {
         if self.stdin {
