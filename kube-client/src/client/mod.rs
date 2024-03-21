@@ -226,14 +226,11 @@ impl Client {
     /// as a string
     pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
         let res = self.send(request.map(Body::from)).await?;
-        let status = res.status();
-        // trace!("Status = {:?} for {}", status, res.url());
+        let res = handle_api_errors(res).await?;
         let body_bytes = hyper::body::to_bytes(res.into_body())
             .await
             .map_err(Error::HyperError)?;
         let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
-        handle_api_errors(&text, status)?;
-
         Ok(text)
     }
 
@@ -243,6 +240,7 @@ impl Client {
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
     pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead> {
         let res = self.send(request.map(Body::from)).await?;
+        let res = handle_api_errors(res).await?;
         // Map the error, since we want to convert this into an `AsyncBufReader` using
         // `into_async_read` which specifies `std::io::Error` as the stream's error type.
         let body = res
@@ -434,26 +432,32 @@ impl Client {
 ///
 /// In either case, present an ApiError upstream.
 /// The latter is probably a bug if encountered.
-fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
-    if s.is_client_error() || s.is_server_error() {
+async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
+    let status = res.status();
+    if status.is_client_error() || status.is_server_error() {
+        // trace!("Status = {:?} for {}", status, res.url());
+        let body_bytes = hyper::body::to_bytes(res.into_body())
+            .await
+            .map_err(Error::HyperError)?;
+        let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
         // Print better debug when things do fail
         // trace!("Parsing error: {}", text);
-        if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(text) {
-            tracing::debug!("Unsuccessful: {:?}", errdata);
+        if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(&text) {
+            tracing::debug!("Unsuccessful: {errdata:?}");
             Err(Error::Api(errdata))
         } else {
             tracing::warn!("Unsuccessful data error parse: {}", text);
-            let ae = ErrorResponse {
-                status: s.to_string(),
-                code: s.as_u16(),
+            let error_response = ErrorResponse {
+                status: status.to_string(),
+                code: status.as_u16(),
                 message: format!("{text:?}"),
                 reason: "Failed to parse error data".into(),
             };
-            tracing::debug!("Unsuccessful: {:?} (reconstruct)", ae);
-            Err(Error::Api(ae))
+            tracing::debug!("Unsuccessful: {error_response:?} (reconstruct)");
+            Err(Error::Api(error_response))
         }
     } else {
-        Ok(())
+        Ok(res)
     }
 }
 
