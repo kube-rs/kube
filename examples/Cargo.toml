@@ -142,8 +142,9 @@ name = "pod_exec"
 path = "pod_exec.rs"
 
 [[example]]
-name = "pod_log_node_proxy"
-path = "pod_log_node_proxy.rs"
+name = "pod_log_kubelet_debug"
+path = "pod_log_kubelet_debug.rs"
+required-features = ["kubelet-debug"]
 
 [[example]]
 name = "pod_paged"
