@@ -5,7 +5,8 @@ pub mod store;
 
 pub use self::object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef};
 use crate::watcher;
-use futures::{Stream, TryStreamExt};
+use async_stream::stream;
+use futures::{Stream, StreamExt};
 use std::hash::Hash;
 pub use store::{store, Store};
 
@@ -94,7 +95,16 @@ where
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
-    stream.inspect_ok(move |event| writer.apply_watcher_event(event))
+    // TODO: why does pin! not work? not sure...
+    let mut stream = Box::pin(stream);
+    stream! {
+        while let Some(event) = stream.next().await {
+            if let Ok(event) = &event {
+                writer.apply_watcher_event(event).await;
+            }
+            yield event;
+        }
+    }
 }
 
 #[cfg(test)]
