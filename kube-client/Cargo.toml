@@ -29,17 +29,18 @@ jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
 socks5 = ["hyper-socks2"]
+unstable-client = []
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5"]
+features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-base64 = { version = "0.21.4", optional = true }
+base64 = { version = "0.22.0", optional = true }
 chrono = { version = "0.4.23", optional = true, default-features = false }
 home = { version = "0.5.4", optional = true }
 serde = { version = "1.0.130", features = ["derive"] }
@@ -57,7 +58,7 @@ rustls-pemfile = { version = "1.0.0", optional = true }
 bytes = { version = "1.1.0", optional = true }
 tokio = { version = "1.14.0", features = ["time", "signal", "sync"], optional = true }
 kube-core = { path = "../kube-core", version = "=0.88.1" }
-jsonpath-rust = { version = "0.4.0", optional = true }
+jsonpath-rust = { version = "0.5.0", optional = true }
 tokio-util = { version = "0.7.0", optional = true, features = ["io", "codec"] }
 hyper = { version = "0.14.13", optional = true, features = ["client", "http1", "stream", "tcp"] }
 hyper-rustls = { version = "0.24.0", optional = true }

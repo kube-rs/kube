@@ -122,7 +122,7 @@ pub enum LoadDataError {
 /// Prefer [`Config::infer`] unless you have particular issues, and avoid manually managing
 /// the data in this struct unless you have particular needs. It exists to be consumed by the [`Client`][crate::Client].
 ///
-/// If you are looking to parse the kubeconfig found in a user's home directory see [`Kubeconfig`](crate::config::Kubeconfig).
+/// If you are looking to parse the kubeconfig found in a user's home directory see [`Kubeconfig`].
 #[cfg_attr(docsrs, doc(cfg(feature = "config")))]
 #[derive(Debug, Clone)]
 pub struct Config {

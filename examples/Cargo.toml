@@ -16,8 +16,8 @@ release = false
 [features]
 default = ["rustls-tls", "kubederive", "ws", "latest", "socks5", "runtime", "refresh"]
 kubederive = ["kube/derive"]
-openssl-tls = ["kube/client", "kube/openssl-tls"]
-rustls-tls = ["kube/client", "kube/rustls-tls"]
+openssl-tls = ["kube/client", "kube/openssl-tls", "kube/unstable-client"]
+rustls-tls = ["kube/client", "kube/rustls-tls", "kube/unstable-client"]
 runtime = ["kube/runtime", "kube/unstable-runtime"]
 socks5 = ["kube/socks5"]
 refresh = ["kube/oauth", "kube/oidc"]
@@ -31,7 +31,7 @@ assert-json-diff = "2.0.1"
 garde = { version = "0.18.0", default-features = false, features = ["derive"] }
 anyhow = "1.0.44"
 futures = "0.3.17"
-jsonpath-rust = "0.4.0"
+jsonpath-rust = "0.5.0"
 kube = { path = "../kube", version = "^0.88.1", default-features = false, features = ["admission"] }
 kube-derive = { path = "../kube-derive", version = "^0.88.1", default-features = false } # only needed to opt out of schema
 k8s-openapi = { version = "0.21.0", default-features = false }

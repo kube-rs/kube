@@ -37,6 +37,7 @@ admission = ["kube-core/admission"]
 derive = ["kube-derive", "kube-core/schema"]
 runtime = ["kube-runtime"]
 unstable-runtime = ["kube-runtime/unstable-runtime"]
+unstable-client = ["kube-client/unstable-client"]
 socks5 = ["kube-client/socks5"]
 
 [package.metadata.docs.rs]
