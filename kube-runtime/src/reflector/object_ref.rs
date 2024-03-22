@@ -1,6 +1,6 @@
 use derivative::Derivative;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
-#[allow(unused_imports)] // docs
+#[cfg(doc)]
 use kube_client::core::ObjectMeta;
 use kube_client::{
     api::{DynamicObject, Resource},
