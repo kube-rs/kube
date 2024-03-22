@@ -50,10 +50,9 @@ kube-derive = { path = "../kube-derive", version = "=0.88.1", optional = true }
 kube-core = { path = "../kube-core", version = "=0.88.1" }
 kube-client = { path = "../kube-client", version = "=0.88.1", default-features = false, optional = true }
 kube-runtime = { path = "../kube-runtime", version = "=0.88.1", optional = true}
-k8s-openapi=
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
-{ workspace = true }
+k8s-openapi= { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
@@ -65,5 +64,4 @@ hyper = { workspace = true }
 http = { workspace = true }
 tower-test = { workspace = true }
 anyhow = { workspace = true }
-k8s-openapi=
-{ workspace = true, features = ["latest"] }
+k8s-openapi = { workspace = true, features = ["latest"] }

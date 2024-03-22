@@ -74,8 +74,7 @@ secrecy = { workspace = true, features = ["alloc", "serde"] }
 tracing = { workspace = true, features = ["log"], optional = true }
 hyper-openssl = { workspace = true, optional = true }
 form_urlencoded = { workspace = true, optional = true }
-k8s-openapi=
-{ workspace = true, features = [] }
+k8s-openapi= { workspace = true, features = [] }
 
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "ws"], version = "<1.0.0, >=0.61.0" }
@@ -84,5 +83,4 @@ tokio = { workspace = true, features = ["full"] }
 schemars = { workspace = true }
 tokio-test = { workspace = true }
 tower-test = { workspace = true }
-k8s-openapi=
-{ workspace = true, features = ["latest"] }
+k8s-openapi= { workspace = true, features = ["latest"] }
