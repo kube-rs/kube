@@ -227,7 +227,7 @@ impl<'a, K> OccupiedEntry<'a, K> {
             Some(_) => (),
         }
         match &mut meta.namespace {
-            ns @ None => *ns = self.api.namespace.clone(),
+            ns @ None => ns.clone_from(&self.api.namespace),
             Some(ns) if Some(ns.as_str()) != self.api.namespace.as_deref() => {
                 return Err(CommitValidationError::NamespaceMismatch {
                     object_namespace: Some(ns.clone()),

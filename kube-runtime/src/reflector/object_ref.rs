@@ -1,8 +1,9 @@
 use derivative::Derivative;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
+#[cfg(doc)] use kube_client::core::ObjectMeta;
 use kube_client::{
     api::{DynamicObject, Resource},
-    core::{api_version_from_group_version, ObjectMeta},
+    core::api_version_from_group_version,
 };
 use std::{
     borrow::Cow,
