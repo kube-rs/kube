@@ -131,8 +131,6 @@ pub use kube_core as core;
 #[cfg(test)]
 mod test {
     #![allow(unused_imports)]
-    #[cfg(feature = "kubelet-debug")]
-    use crate::core::kubelet_debug::KubeletDebugParams;
     use crate::{
         api::{AttachParams, AttachedProcess},
         client::ConfigExt,
@@ -767,7 +765,10 @@ mod test {
     #[ignore = "needs kubelet debug methods"]
     #[cfg(feature = "kubelet-debug")]
     async fn pod_can_exec_and_write_to_stdin_from_node_proxy() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
+        use crate::{
+            api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent},
+            core::kubelet_debug::KubeletDebugParams,
+        };
 
         let client = Client::try_default().await?;
         let pods: Api<Pod> = Api::default_namespaced(client);
@@ -820,12 +821,12 @@ mod test {
         let mut config = Config::infer().await?;
         config.accept_invalid_certs = true;
         config.cluster_url = "https://localhost:10250".to_string().parse::<Uri>().unwrap();
-        let client: Client = config.try_into()?;
+        let kubelet_client: Client = config.try_into()?;
 
         // Verify exec works and we can get the output
         {
-            let mut attached = client
-                .node_exec(
+            let mut attached = kubelet_client
+                .kubelet_node_exec(
                     &KubeletDebugParams {
                         name: "busybox-kube2",
                         namespace: "default",
@@ -850,8 +851,8 @@ mod test {
         // Verify we can write to Stdin
         {
             use tokio::io::AsyncWriteExt;
-            let mut attached = client
-                .node_exec(
+            let mut attached = kubelet_client
+                .kubelet_node_exec(
                     &KubeletDebugParams {
                         name: "busybox-kube2",
                         namespace: "default",

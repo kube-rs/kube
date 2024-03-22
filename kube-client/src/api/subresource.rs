@@ -132,6 +132,8 @@ where
 // ----------------------------------------------------------------------------
 
 /// Marker trait for objects that support the ephemeral containers sub resource.
+///
+/// See [`Api::get_ephemeral_containers`] et al.
 pub trait Ephemeral {}
 
 impl Ephemeral for k8s_openapi::api::core::v1::Pod {}
@@ -384,6 +386,8 @@ fn log_path() {
 }
 
 /// Marker trait for objects that has logs
+///
+/// See [`Api::logs`] and [`Api::log_stream`] for usage.
 pub trait Log {}
 
 impl Log for k8s_openapi::api::core::v1::Pod {}
@@ -446,6 +450,8 @@ fn evict_path() {
 }
 
 /// Marker trait for objects that can be evicted
+///
+/// See [`Api::evic`] for usage
 pub trait Evict {}
 
 impl Evict for k8s_openapi::api::core::v1::Pod {}
@@ -484,6 +490,8 @@ fn attach_path() {
 }
 
 /// Marker trait for objects that has attach
+///
+/// See [`Api::attach`] for usage
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub trait Attach {}
@@ -530,6 +538,8 @@ fn exec_path() {
 }
 
 /// Marker trait for objects that has exec
+///
+/// See [`Api::exec`] for usage.
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub trait Execute {}
@@ -577,6 +587,8 @@ fn portforward_path() {
 }
 
 /// Marker trait for objects that has portforward
+///
+/// See [`Api::portforward`] for usage.
 #[cfg(feature = "ws")]
 pub trait Portforward {}
 

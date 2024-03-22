@@ -33,7 +33,7 @@ impl KubeletDebugParams<'_> {
 
 impl Request {
     /// Attach to pod directly from the node
-    pub fn node_attach(
+    pub fn kubelet_node_attach(
         kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
         ap: &AttachParams,
@@ -49,7 +49,7 @@ impl Request {
     }
 
     /// Execute a command in a pod directly from the node
-    pub fn node_exec<I, T>(
+    pub fn kubelet_node_exec<I, T>(
         kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
         command: I,
@@ -74,7 +74,7 @@ impl Request {
     }
 
     /// Forward ports of a pod directly from the node
-    pub fn node_portforward(
+    pub fn kubelet_node_portforward(
         kubelet_debug_params: &KubeletDebugParams<'_>,
         ports: &[u16],
     ) -> Result<http::Request<Vec<u8>>, Error> {
@@ -110,7 +110,7 @@ impl Request {
     }
 
     /// Stream logs directly from node
-    pub fn node_logs(
+    pub fn kubelet_node_logs(
         kubelet_debug_params: &KubeletDebugParams<'_>,
         container: &str,
         lp: &LogParams,
@@ -169,7 +169,7 @@ mod test {
     };
     #[test]
     fn node_attach_test() {
-        let req = Request::node_attach(
+        let req = Request::kubelet_node_attach(
             &KubeletDebugParams {
                 name: "some-name",
                 namespace: "some-namespace",
@@ -187,7 +187,7 @@ mod test {
 
     #[test]
     fn node_exec_test() {
-        let req = Request::node_exec(
+        let req = Request::kubelet_node_exec(
             &KubeletDebugParams {
                 name: "some-name",
                 namespace: "some-namespace",
@@ -212,7 +212,7 @@ mod test {
             timestamps: true,
             ..Default::default()
         };
-        let req = Request::node_logs(
+        let req = Request::kubelet_node_logs(
             &KubeletDebugParams {
                 name: "some-name",
                 namespace: "some-namespace",
@@ -230,7 +230,7 @@ mod test {
 
     #[test]
     fn node_portforward_test() {
-        let req = Request::node_portforward(
+        let req = Request::kubelet_node_portforward(
             &KubeletDebugParams {
                 name: "some-name",
                 namespace: "some-namespace",
