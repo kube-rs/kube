@@ -31,6 +31,12 @@ mod body;
 mod builder;
 // Add `into_stream()` to `http::Body`
 use body::BodyStreamExt;
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
+#[cfg(feature = "unstable-client")]
+mod client_ext;
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
+#[cfg(feature = "unstable-client")]
+pub use client_ext::scope;
 mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
@@ -74,6 +80,11 @@ pub struct Client {
     default_ns: String,
 }
 
+/// Constructors and low-level api interfaces.
+///
+/// Most users only need [`Client::try_default`] or [`Client::new`] from this block.
+///
+/// The many various lower level interfaces here are for more advanced use-cases with specific requirements.
 impl Client {
     /// Create a [`Client`] using a custom `Service` stack.
     ///
@@ -127,6 +138,14 @@ impl Client {
     /// and then if that fails, trying the in-cluster environment variables.
     ///
     /// Will fail if neither configuration could be loaded.
+    ///
+    /// ```rust
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use kube::Client;
+    /// let client = Client::try_default().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead.
@@ -231,14 +250,11 @@ impl Client {
     /// as a string
     pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
         let res = self.send(request.map(Body::from)).await?;
-        let status = res.status();
-        // trace!("Status = {:?} for {}", status, res.url());
+        let res = handle_api_errors(res).await?;
         let body_bytes = hyper::body::to_bytes(res.into_body())
             .await
             .map_err(Error::HyperError)?;
         let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
-        handle_api_errors(&text, status)?;
-
         Ok(text)
     }
 
@@ -248,6 +264,7 @@ impl Client {
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
     pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead> {
         let res = self.send(request.map(Body::from)).await?;
+        let res = handle_api_errors(res).await?;
         // Map the error, since we want to convert this into an `AsyncBufReader` using
         // `into_async_read` which specifies `std::io::Error` as the stream's error type.
         let body = res
@@ -439,33 +456,41 @@ impl Client {
 ///
 /// In either case, present an ApiError upstream.
 /// The latter is probably a bug if encountered.
-fn handle_api_errors(text: &str, s: StatusCode) -> Result<()> {
-    if s.is_client_error() || s.is_server_error() {
+async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
+    let status = res.status();
+    if status.is_client_error() || status.is_server_error() {
+        // trace!("Status = {:?} for {}", status, res.url());
+        let body_bytes = hyper::body::to_bytes(res.into_body())
+            .await
+            .map_err(Error::HyperError)?;
+        let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
         // Print better debug when things do fail
         // trace!("Parsing error: {}", text);
-        if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(text) {
-            tracing::debug!("Unsuccessful: {:?}", errdata);
+        if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(&text) {
+            tracing::debug!("Unsuccessful: {errdata:?}");
             Err(Error::Api(errdata))
         } else {
             tracing::warn!("Unsuccessful data error parse: {}", text);
-            let ae = ErrorResponse {
-                status: s.to_string(),
-                code: s.as_u16(),
+            let error_response = ErrorResponse {
+                status: status.to_string(),
+                code: status.as_u16(),
                 message: format!("{text:?}"),
                 reason: "Failed to parse error data".into(),
             };
-            tracing::debug!("Unsuccessful: {:?} (reconstruct)", ae);
-            Err(Error::Api(ae))
+            tracing::debug!("Unsuccessful: {error_response:?} (reconstruct)");
+            Err(Error::Api(error_response))
         }
     } else {
-        Ok(())
+        Ok(res)
     }
 }
 
 impl TryFrom<Config> for Client {
     type Error = Error;
 
-    /// Builds a default [`Client`] from a [`Config`], see [`ClientBuilder`] if more customization is required
+    /// Builds a default [`Client`] from a [`Config`].
+    ///
+    /// See [`ClientBuilder`] or [`Client::new`] if more customization is required
     fn try_from(config: Config) -> Result<Self> {
         Ok(ClientBuilder::try_from(config)?.build())
     }

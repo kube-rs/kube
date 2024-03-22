@@ -59,7 +59,7 @@
 //! - [`Client`](crate::client) for the extensible Kubernetes client
 //! - [`Config`](crate::config) for the Kubernetes config abstraction
 //! - [`Api`](crate::Api) for the generic api methods available on Kubernetes resources
-//! - [k8s-openapi](https://docs.rs/k8s-openapi/*/k8s_openapi/) for how to create typed kubernetes objects directly
+//! - [k8s-openapi](https://docs.rs/k8s-openapi) for how to create typed kubernetes objects directly
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
