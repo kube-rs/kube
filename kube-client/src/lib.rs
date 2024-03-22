@@ -129,8 +129,8 @@ pub use kube_core as core;
 // Can be run with `cargo test -p kube-client --lib features=rustls-tls,ws -- --ignored`
 #[cfg(all(feature = "client", feature = "config"))]
 #[cfg(test)]
+#[allow(unused_imports)] // varying test imports depending on feature
 mod test {
-    #![allow(unused_imports)]
     use crate::{
         api::{AttachParams, AttachedProcess},
         client::ConfigExt,
