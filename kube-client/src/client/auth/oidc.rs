@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use chrono::{Duration, TimeZone, Utc};
+use super::TEN_SEC;
+use chrono::{TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
     header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE},
@@ -148,8 +149,6 @@ pub struct Oidc {
 impl Oidc {
     /// Config key for the ID token.
     const CONFIG_ID_TOKEN: &'static str = "id-token";
-    /// How many seconds before ID token expiration we want to refresh it.
-    const EXPIRY_DELTA_SECONDS: i64 = 10;
 
     /// Check whether the stored ID token can still be used.
     fn token_valid(&self) -> Result<bool, errors::IdTokenError> {
@@ -166,7 +165,7 @@ impl Oidc {
             .earliest()
             .ok_or(errors::IdTokenError::InvalidExpirationTimestamp)?;
 
-        let valid = Utc::now() + Duration::seconds(Self::EXPIRY_DELTA_SECONDS) < timestamp;
+        let valid = Utc::now() + TEN_SEC < timestamp;
 
         Ok(valid)
     }

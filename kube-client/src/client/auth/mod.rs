@@ -168,7 +168,10 @@ macro_rules! const_unwrap {
         }
     };
 }
-const TEN_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(10));
+
+/// Common constant for checking if an auth token is close to expiring
+pub const TEN_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(10));
+/// Common duration for time between reloads
 const SIXTY_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(60));
 
 // See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth
