@@ -27,37 +27,30 @@ features = ["k8s-openapi/latest", "unstable-runtime"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-futures = "0.3.17"
+futures.workspace = true
 kube-client = { path = "../kube-client", version = "=0.88.1", default-features = false, features = ["jsonpatch", "client"] }
-derivative = "2.1.1"
-serde = "1.0.130"
-smallvec = "1.7.0"
-ahash = "0.8"
-parking_lot = "0.12.0"
-pin-project = "1.0.2"
-tokio = { version = "1.14.0", features = ["time"] }
-tokio-util = { version = "0.7.0", features = ["time"] }
-tracing = "0.1.36"
-json-patch = "1.0.0"
-serde_json = "1.0.68"
-thiserror = "1.0.29"
-backoff = "0.4.0"
-async-trait = "0.1.64"
-hashbrown = "0.14.0"
-
-[dependencies.k8s-openapi]
-version = "0.21.0"
-default-features = false
+derivative.workspace = true
+serde.workspace = true
+smallvec.workspace = true
+ahash.workspace = true
+parking_lot.workspace = true
+pin-project.workspace = true
+tokio = { workspace = true, features = ["time"] }
+tokio-util = { workspace = true, features = ["time"] }
+tracing.workspace = true
+json-patch.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+backoff.workspace = true
+async-trait.workspace = true
+hashbrown.workspace = true
+k8s-openapi.workspace = true
 
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "<1.0.0, >=0.60.0" }
-serde_json = "1.0.68"
-tokio = { version = "1.14.0", features = ["full", "test-util"] }
-rand = "0.8.0"
-schemars = "0.8.6"
-tracing-subscriber = "0.3.17"
-
-[dev-dependencies.k8s-openapi]
-version = "0.21.0"
-default-features = false
-features = ["latest"]
+serde_json.workspace = true
+tokio = { workspace = true, features = ["full", "test-util"] }
+rand.workspace = true
+schemars.workspace = true
+tracing-subscriber.workspace = true
+k8s-openapi= { workspace = true, features = ["latest"] }
