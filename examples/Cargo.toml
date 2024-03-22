@@ -26,33 +26,33 @@ ws = ["kube/ws"]
 latest = ["k8s-openapi/latest"]
 
 [dev-dependencies]
-tokio-util = { workspace = true }
-assert-json-diff = { workspace = true }
+tokio-util.workspace = true
+assert-json-diff.workspace = true
 garde = { version = "0.18.0", default-features = false, features = ["derive"] }
-anyhow = { workspace = true }
-futures = { workspace = true }
-jsonpath-rust = { workspace = true }
+anyhow.workspace = true
+futures.workspace = true
+jsonpath-rust.workspace = true
 kube = { path = "../kube", version = "^0.88.1", default-features = false, features = ["admission"] }
 kube-derive = { path = "../kube-derive", version = "^0.88.1", default-features = false } # only needed to opt out of schema
-k8s-openapi = { workspace = true }
+k8s-openapi.workspace = true
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-serde_yaml = { workspace = true }
+serde_json.workspace = true
+serde_yaml.workspace = true
 tokio = { workspace = true, features = ["full"] }
-either = { workspace = true }
-schemars = { workspace = true }
+either.workspace = true
+schemars.workspace = true
 static_assertions = "1.1.0"
 tar = "0.4.37"
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 warp = { version = "0.3", default-features = false, features = ["tls"] }
-http = { workspace = true }
-json-patch = { workspace = true }
+http.workspace = true
+json-patch.workspace = true
 tower = { workspace = true, features = ["limit"] }
 tower-http = { workspace = true, features = ["trace", "decompression-gzip"] }
 hyper = { workspace = true, features = ["client", "http1", "stream", "tcp"] }
-thiserror = { workspace = true }
-backoff = { workspace = true }
+thiserror.workspace = true
+backoff.workspace = true
 clap = { version = "4.0", default-features = false, features = ["std", "cargo", "derive"] }
 edit = "0.1.3"
 tokio-stream = { version = "0.1.9", features = ["net"] }

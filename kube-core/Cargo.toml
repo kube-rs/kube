@@ -27,18 +27,18 @@ kubelet-debug = ["ws"]
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-form_urlencoded = { workspace = true }
-http = { workspace = true }
+serde_json.workspace = true
+thiserror.workspace = true
+form_urlencoded.workspace = true
+http.workspace = true
 json-patch = { workspace = true, optional = true }
-once_cell = { workspace = true }
+once_cell.workspace = true
 chrono = { workspace = true, features = ["clock"] }
 schemars = { workspace = true, optional = true }
-k8s-openapi= { workspace = true, features = [] }
+k8s-openapi.workspace = true
 
 [dev-dependencies]
-k8s-openapi= { workspace = true, features = ["latest"] }
-assert-json-diff = { workspace = true }
+k8s-openapi = { workspace = true, features = ["latest"] }
+assert-json-diff.workspace = true
 kube = { path = "../kube", version = "<1.0.0, >=0.53.0" }
-serde_yaml = { workspace = true }
+serde_yaml.workspace = true

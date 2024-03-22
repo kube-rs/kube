@@ -52,16 +52,16 @@ kube-client = { path = "../kube-client", version = "=0.88.1", default-features =
 kube-runtime = { path = "../kube-runtime", version = "=0.88.1", optional = true}
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
-k8s-openapi= { workspace = true }
+k8s-openapi.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
-futures = { workspace = true }
-serde_json = { workspace = true }
+futures.workspace = true
+serde_json.workspace = true
 serde = { workspace = true, features = ["derive"] }
-schemars = { workspace = true }
-hyper = { workspace = true }
-http = { workspace = true }
-tower-test = { workspace = true }
-anyhow = { workspace = true }
+schemars.workspace = true
+hyper.workspace = true
+http.workspace = true
+tower-test.workspace = true
+anyhow.workspace = true
 k8s-openapi = { workspace = true, features = ["latest"] }
