@@ -1,5 +1,4 @@
 //! A crate for kube's derive macros.
-#![deny(missing_docs)]
 #![recursion_limit = "1024"]
 extern crate proc_macro;
 #[macro_use] extern crate quote;

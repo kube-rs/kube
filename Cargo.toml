@@ -28,6 +28,7 @@ rust-version = "1.72.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+missing_docs = "deny"
 
 [workspace.dependencies]
 ahash = "0.8"

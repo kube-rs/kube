@@ -7,7 +7,6 @@
 //! Everything in this crate is re-exported from [`kube`](https://crates.io/crates/kube)
 //! (even with zero features) under [`kube::core`]((https://docs.rs/kube/*/kube/core/index.html)).
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![deny(missing_docs)]
 
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
 #[cfg(feature = "admission")]
