@@ -61,7 +61,7 @@ async fn timeout_after_1s(handle: tokio::task::JoinHandle<()>) {
 /// Scenarios we test for in ApiServerVerifier above
 enum Scenario {
     PaginatedList,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // remove when/if we start doing better mock tests that use this
     RadioSilence,
 }
 
