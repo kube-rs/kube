@@ -21,6 +21,7 @@ rustls-tls = ["kube/client", "kube/rustls-tls", "kube/unstable-client"]
 runtime = ["kube/runtime", "kube/unstable-runtime"]
 socks5 = ["kube/socks5"]
 refresh = ["kube/oauth", "kube/oidc"]
+kubelet-debug = ["kube/kubelet-debug"]
 ws = ["kube/ws"]
 latest = ["k8s-openapi/latest"]
 
@@ -140,6 +141,11 @@ path = "pod_attach.rs"
 [[example]]
 name = "pod_exec"
 path = "pod_exec.rs"
+
+[[example]]
+name = "pod_log_kubelet_debug"
+path = "pod_log_kubelet_debug.rs"
+required-features = ["kubelet-debug"]
 
 [[example]]
 name = "pod_paged"

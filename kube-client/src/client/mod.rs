@@ -41,6 +41,7 @@ mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
+
 #[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
 #[cfg(feature = "openssl-tls")]
@@ -57,6 +58,10 @@ pub use auth::OAuthError;
 pub use auth::oidc_errors;
 
 #[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
+
+#[cfg(feature = "kubelet-debug")]
+#[cfg_attr(docsrs, doc(cfg(feature = "kubelet-debug")))]
+mod kubelet_debug;
 
 pub use builder::{ClientBuilder, DynBody};
 

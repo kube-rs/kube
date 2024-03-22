@@ -28,6 +28,7 @@ openssl-tls = ["kube-client/openssl-tls"]
 
 # auxiliary features
 ws = ["kube-client/ws", "kube-core/ws"]
+kubelet-debug = ["kube-client/kubelet-debug", "kube-core/kubelet-debug"]
 oauth = ["kube-client/oauth"]
 oidc = ["kube-client/oidc"]
 gzip = ["kube-client/gzip"]

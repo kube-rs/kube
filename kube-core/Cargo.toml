@@ -23,6 +23,7 @@ ws = []
 admission = ["json-patch"]
 jsonpatch = ["json-patch"]
 schema = ["schemars"]
+kubelet-debug = ["ws"]
 
 [dependencies]
 serde = { version = "1.0.130", features = ["derive"] }
