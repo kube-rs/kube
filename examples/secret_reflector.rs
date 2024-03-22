@@ -10,6 +10,7 @@ use tracing::*;
 
 /// Example way to read secrets
 #[derive(Debug)]
+#[allow(dead_code)] // we only gather data in this ex, we don't print the secrets
 enum Decoded {
     /// Usually secrets are just short utf8 encoded strings
     Utf8(String),

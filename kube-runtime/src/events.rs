@@ -247,8 +247,6 @@ impl Recorder {
 
 #[cfg(test)]
 mod test {
-    #![allow(unused_imports)]
-
     use k8s_openapi::api::{
         core::v1::{Event as K8sEvent, Service},
         rbac::v1::ClusterRole,

@@ -9,7 +9,7 @@
 //! retrieve the resources served by the kubernetes API.
 use either::{Either, Left, Right};
 use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
-use http::{self, Request, Response, StatusCode};
+use http::{self, Request, Response};
 use hyper::Body;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
