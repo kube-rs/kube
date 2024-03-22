@@ -1,18 +1,15 @@
 [package]
 name = "kube-runtime"
-version = "0.88.1"
-description = "Kubernetes futures controller runtime"
-authors = [
-  "Natalie Klestrup Röijezon <nat@nullable.se>",
-  "clux <sszynrae@gmail.com>",
-]
-license = "Apache-2.0"
-repository = "https://github.com/kube-rs/kube"
-readme = "../README.md"
+description = "Kubernetes controller runtime"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
 categories = ["web-programming::http-client", "caching", "network-programming"]
-rust-version = "1.72.0"
-edition = "2021"
 
 [features]
 unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-predicates", "unstable-runtime-stream-control", "unstable-runtime-reconcile-on"]

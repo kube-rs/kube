@@ -1,14 +1,10 @@
 [package]
 name = "kube-examples"
-version = "0.1.0"
-authors = [
-  "clux <sszynrae@gmail.com>",
-  "Natalie Klestrup Röijezon <nat@nullable.se>",
-  "kazk <kazk.dev@gmail.com>",
-]
 publish = false
-edition = "2021"
-license = "Apache-2.0"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [package.metadata.release]
 release = false

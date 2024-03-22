@@ -13,6 +13,19 @@ members = [
   "examples",
 ]
 
+[workspace.package]
+version = "0.88.1"
+authors = [
+  "clux <sszynrae@gmail.com>",
+  "Natalie Klestrup Röijezon <nat@nullable.se>",
+  "kazk <kazk.dev@gmail.com>",
+]
+repository = "https://github.com/kube-rs/kube"
+readme = "README.md"
+license = "Apache-2.0"
+edition = "2021"
+rust-version = "1.72.0"
+
 [workspace.dependencies]
 ahash = "0.8"
 anyhow = "1.0.71"
