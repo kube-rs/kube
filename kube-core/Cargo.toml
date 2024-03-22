@@ -15,6 +15,9 @@ categories = ["api-bindings", "encoding", "parser-implementations"]
 features = ["ws", "admission", "jsonpatch", "k8s-openapi/latest"]
 rustdoc-args = ["--cfg", "docsrs"]
 
+[lints]
+workspace = true
+
 [features]
 ws = []
 admission = ["json-patch"]

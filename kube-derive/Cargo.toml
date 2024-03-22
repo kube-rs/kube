@@ -11,6 +11,9 @@ rust-version.workspace = true
 keywords = ["kubernetes", "macro", "customresource", "crd"]
 categories = ["api-bindings", "encoding"]
 
+[lints]
+workspace = true
+
 [dependencies]
 proc-macro2.workspace = true
 quote.workspace = true

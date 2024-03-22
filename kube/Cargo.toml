@@ -41,6 +41,9 @@ features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jso
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
+[lints]
+workspace = true
+
 [dependencies]
 kube-derive = { path = "../kube-derive", version = "=0.88.1", optional = true }
 kube-core = { path = "../kube-core", version = "=0.88.1" }

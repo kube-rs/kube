@@ -35,6 +35,9 @@ features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonp
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
+[lints]
+workspace = true
+
 [dependencies]
 base64 = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }

@@ -23,6 +23,9 @@ features = ["k8s-openapi/latest", "unstable-runtime"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
+[lints]
+workspace = true
+
 [dependencies]
 futures.workspace = true
 kube-client = { path = "../kube-client", version = "=0.88.1", default-features = false, features = ["jsonpatch", "client"] }

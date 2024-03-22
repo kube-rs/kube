@@ -26,6 +26,9 @@ license = "Apache-2.0"
 edition = "2021"
 rust-version = "1.72.0"
 
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
 [workspace.dependencies]
 ahash = "0.8"
 anyhow = "1.0.71"
