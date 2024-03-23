@@ -60,7 +60,6 @@ futures.workspace = true
 serde_json.workspace = true
 serde = { workspace = true, features = ["derive"] }
 schemars.workspace = true
-hyper.workspace = true
 http.workspace = true
 tower-test.workspace = true
 anyhow.workspace = true

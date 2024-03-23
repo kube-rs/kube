@@ -1,13 +1,17 @@
 // Custom client example with TraceLayer.
 use http::{Request, Response};
-use hyper::Body;
+use hyper::body::Incoming;
+use hyper_util::rt::TokioExecutor;
 use k8s_openapi::api::core::v1::Pod;
 use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_http::{decompression::DecompressionLayer, trace::TraceLayer};
 use tracing::{Span, *};
 
-use kube::{client::ConfigExt, Api, Client, Config, ResourceExt};
+use kube::{
+    client::{Body, ConfigExt},
+    Api, Client, Config, ResourceExt,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -40,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
                 .on_request(|request: &Request<Body>, _span: &Span| {
                     tracing::debug!("payload: {:?} headers: {:?}", request.body(), request.headers())
                 })
-                .on_response(|response: &Response<Body>, latency: Duration, span: &Span| {
+                .on_response(|response: &Response<Incoming>, latency: Duration, span: &Span| {
                     let status = response.status();
                     span.record("http.status_code", status.as_u16());
                     if status.is_client_error() || status.is_server_error() {
@@ -49,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
                     tracing::debug!("finished in {}ms", latency.as_millis())
                 }),
         )
-        .service(hyper::Client::builder().build(https));
+        .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
 
     let client = Client::new(service, config.default_namespace);
 
