@@ -4,10 +4,11 @@ use core::{
 };
 use std::{collections::VecDeque, sync::Arc};
 
-use futures::{ready, Future, Stream, TryStream};
+use async_stream::stream;
+use futures::{pin_mut, ready, Future, Stream, StreamExt, TryStream};
 use pin_project::pin_project;
 use tokio::time;
-use tracing::{debug, error, instrument, trace};
+use tracing::{debug, error, trace};
 
 use crate::{
     reflector::{store::Writer, ObjectRef, Store},
@@ -21,7 +22,7 @@ use kube_client::Resource;
 pub struct ReflectDispatcher<St, K>
 where
     K: Resource + Clone + 'static,
-    K::DynamicType: Eq + std::hash::Hash + Clone,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
 {
     #[pin]
     stream: St,
@@ -37,9 +38,9 @@ where
 
 impl<St, K> ReflectDispatcher<St, K>
 where
-    St: TryStream<Ok = Event<K>>,
+    St: Stream<Item = Result<Event<K>, Error>> + 'static,
     K: Resource + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
 {
     pub(super) fn new(stream: St, writer: Writer<K>, buf_size: usize) -> ReflectDispatcher<St, K> {
         let (tx, rx) = async_broadcast::broadcast(buf_size);
@@ -65,6 +66,32 @@ where
         // messages in the channel.
         ReflectHandle::new(self.writer.as_reader(), self.tx.new_receiver())
     }
+
+    // Hm, not the right interface for this...
+    pub fn into_stream(mut self) -> impl Stream<Item = Result<Event<K>, Error>> {
+        stream! {
+        let stream = self.stream;
+        pin_mut!(stream);
+        while let Some(event) = stream.next().await {
+            if let Ok(ev) = &event {
+                self.writer.apply_watcher_event(&ev);
+                match ev {
+                    Event::Applied(obj) => {
+                        let obj_ref = ObjectRef::from_obj(obj);
+                        tokio::select!{
+                            _ = self.tx.broadcast(obj_ref) => {},
+                        }
+                    },
+                    Event::Restarted(obj_refs) => {
+                    },
+                    _ => {}
+                }
+            }
+
+            yield event;
+            }
+        }
+    }
 }
 
 impl<St, K> Stream for ReflectDispatcher<St, K>
@@ -75,12 +102,6 @@ where
 {
     type Item = Result<Event<K>, Error>;
 
-    #[instrument(
-        name = "shared_stream",
-        skip_all, 
-        fields(active_readers = %self.tx.receiver_count(),
-        inner_queue_depth = %self.buffer.len())
-    )]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         loop {
@@ -97,11 +118,11 @@ where
                         // so ordering is preserved.
                         this.buffer.push_front(msg);
                         trace!(
-                            deadline_ms = %this.deadline.as_millis(), 
-                            queue_depth = %this.buffer.len(),
-                            active_readers = %this.tx.receiver_count(),
-                            "Root stream's buffer is full, retrying with a deadline"
-                            );
+                        deadline_ms = %this.deadline.as_millis(),
+                        queue_depth = %this.buffer.len(),
+                        active_readers = %this.tx.receiver_count(),
+                        "Root stream's buffer is full, retrying with a deadline"
+                        );
                         ready!(this.sleep.as_mut().poll(cx));
                         error!("Shared stream cannot make progress; ensure subscribers are being driven");
                         // Reset timer
@@ -136,10 +157,9 @@ where
                 tracing::info!("Stream terminated");
                 this.tx.close();
                 return Poll::Ready(None);
-            },
+            }
             Some(Err(error)) => return Poll::Ready(Some(Err(error))),
         };
-
 
         match &event {
             // Only deal with Deleted events
@@ -180,10 +200,10 @@ where
                     }
                 }
             }
-        // Delete events should refresh the store. There is no need to propagate
-        // them to subscribers since we have already updated the store by this
-        // point.
-        _ => {}
+            // Delete events should refresh the store. There is no need to propagate
+            // them to subscribers since we have already updated the store by this
+            // point.
+            _ => {}
         };
 
         Poll::Ready(Some(Ok(event)))
@@ -235,15 +255,15 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         match ready!(this.rx.as_mut().poll_next(cx)) {
-            Some(obj_ref) => this.reader
-                    .get(&obj_ref)
-                    .map(|obj| Poll::Ready(Some(obj)))
-                    .unwrap_or(Poll::Pending),
-            None => Poll::Ready(None)
+            Some(obj_ref) => this
+                .reader
+                .get(&obj_ref)
+                .map(|obj| Poll::Ready(Some(obj)))
+                .unwrap_or(Poll::Pending),
+            None => Poll::Ready(None),
         }
     }
 }
-
 
 #[cfg(test)]
 pub(crate) mod test {
@@ -322,18 +342,30 @@ pub(crate) mod test {
         pin_mut!(subscriber);
 
         // Deleted events should be skipped by subscriber.
-        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(Event::Deleted(_))))));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Deleted(_))))
+        ));
         assert!(matches!(poll!(subscriber.next()), Poll::Pending));
 
-        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(Event::Applied(_))))));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Applied(_))))
+        ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
 
         // Errors are not propagated to subscribers.
-        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Err(Error::TooManyObjects)))));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Err(Error::TooManyObjects)))
+        ));
         assert!(matches!(poll!(subscriber.next()), Poll::Pending));
 
         // Restart event will yield all objects in the list
-        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(Event::Restarted(_))))));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Restarted(_))))
+        ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(bar.clone())));
 
@@ -364,16 +396,21 @@ pub(crate) mod test {
         let subscriber = reflect.subscribe();
         pin_mut!(subscriber);
 
-        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(Event::Applied(_))))));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Applied(_))))
+        ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
-
 
         // Restart event will yield all objects in the list. Broadcast values
         // without polling and then drop.
         //
         // First, subscribers should be pending.
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
-        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(Event::Restarted(_))))));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Restarted(_))))
+        ));
         drop(reflect);
 
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
@@ -405,21 +442,27 @@ pub(crate) mod test {
         pin_mut!(subscriber);
         let subscriber_slow = reflect.subscribe();
         pin_mut!(subscriber_slow);
-        
+
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
         assert_eq!(poll!(subscriber_slow.next()), Poll::Pending);
 
         // Poll first subscriber, but not the second.
-        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(Event::Applied(_))))));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Applied(_))))
+        ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
         // One subscriber is not reading, so we need to apply backpressure until
-        // channel has capacity. 
+        // channel has capacity.
         //
         // At this point, the buffer is full. Polling again will trigger the
         // backpressure logic. This means, next event will be returned, but no
         // more progress will be made after that until subscriber_slow catches
         // up.
-        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(Event::Restarted(_))))));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Restarted(_))))
+        ));
         assert!(matches!(poll!(reflect.next()), Poll::Pending));
         // Our "fast" subscriber will also have nothing else to poll until the
         // slower subscriber advances its pointer in the buffer.
