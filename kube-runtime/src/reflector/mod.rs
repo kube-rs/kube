@@ -90,7 +90,7 @@ pub use store::{store, Store};
 /// Note that you **cannot drop everything**; you minimally need the spec properties your app relies on.
 /// Additionally, only `labels`, `annotations` and `managed_fields` are safe to drop from `ObjectMeta`.
 ///
-/// For more information check out: https://kube.rs/controllers/optimization/ for graphs and techniques.
+/// For more information check out: <https://kube.rs/controllers/optimization/> for graphs and techniques.
 pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Lookup + Clone,
