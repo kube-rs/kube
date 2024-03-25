@@ -11,7 +11,7 @@ use either::{Either, Left, Right};
 use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
-use hyper_util::rt::TokioIo;
+#[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;

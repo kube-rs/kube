@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use http::{header::HeaderName, HeaderValue};
-use hyper::rt::{Read, Write};
+#[cfg(feature = "openssl-tls")] use hyper::rt::{Read, Write};
 use hyper_util::client::legacy::connect::HttpConnector;
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
