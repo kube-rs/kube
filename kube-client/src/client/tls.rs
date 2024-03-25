@@ -3,8 +3,9 @@ pub mod rustls_tls {
     use hyper_rustls::ConfigBuilderExt;
     use rustls::{
         self,
-        client::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
-        Certificate, ClientConfig, DigitallySignedStruct, PrivateKey,
+        client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+        pki_types::{CertificateDer, PrivateKeyDer, ServerName},
+        ClientConfig, DigitallySignedStruct,
     };
     use thiserror::Error;
 
@@ -35,6 +36,10 @@ pub mod rustls_tls {
         /// Failed to add a root certificate
         #[error("failed to add a root certificate: {0}")]
         AddRootCertificate(#[source] Box<dyn std::error::Error + Send + Sync>),
+
+        /// No valid native root CA certificates found
+        #[error("No valid native root CA certificates found")]
+        NoValidNativeRootCA(#[source] std::io::Error),
     }
 
     /// Create `rustls::ClientConfig`.
@@ -44,11 +49,11 @@ pub mod rustls_tls {
         accept_invalid: bool,
     ) -> Result<ClientConfig, Error> {
         let config_builder = if let Some(certs) = root_certs {
-            ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(root_store(certs)?)
+            ClientConfig::builder().with_root_certificates(root_store(certs)?)
         } else {
-            ClientConfig::builder().with_safe_defaults().with_native_roots()
+            ClientConfig::builder()
+                .with_native_roots()
+                .map_err(Error::NoValidNativeRootCA)?
         };
 
         let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {
@@ -71,48 +76,54 @@ pub mod rustls_tls {
         let mut root_store = rustls::RootCertStore::empty();
         for der in root_certs {
             root_store
-                .add(&Certificate(der.clone()))
+                .add(CertificateDer::from(der.to_owned()))
                 .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
         }
         Ok(root_store)
     }
 
-    fn client_auth(data: &[u8]) -> Result<(Vec<Certificate>, PrivateKey), Error> {
+    fn client_auth(data: &[u8]) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>), Error> {
         use rustls_pemfile::Item;
 
         let mut cert_chain = Vec::new();
         let mut pkcs8_key = None;
-        let mut rsa_key = None;
-        let mut ec_key = None;
+        let mut pkcs1_key = None;
+        let mut sec1_key = None;
         let mut reader = std::io::Cursor::new(data);
-        for item in rustls_pemfile::read_all(&mut reader).map_err(Error::InvalidIdentityPem)? {
+        for item in rustls_pemfile::read_all(&mut reader)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Error::InvalidIdentityPem)?
+        {
             match item {
-                Item::X509Certificate(cert) => cert_chain.push(Certificate(cert)),
-                Item::PKCS8Key(key) => pkcs8_key = Some(PrivateKey(key)),
-                Item::RSAKey(key) => rsa_key = Some(PrivateKey(key)),
-                Item::ECKey(key) => ec_key = Some(PrivateKey(key)),
+                Item::X509Certificate(cert) => cert_chain.push(cert),
+                Item::Pkcs8Key(key) => pkcs8_key = Some(PrivateKeyDer::Pkcs8(key)),
+                Item::Pkcs1Key(key) => pkcs1_key = Some(PrivateKeyDer::from(key)),
+                Item::Sec1Key(key) => sec1_key = Some(PrivateKeyDer::from(key)),
                 _ => return Err(Error::UnknownPrivateKeyFormat),
             }
         }
 
-        let private_key = pkcs8_key.or(rsa_key).or(ec_key).ok_or(Error::MissingPrivateKey)?;
+        let private_key = pkcs8_key
+            .or(pkcs1_key)
+            .or(sec1_key)
+            .ok_or(Error::MissingPrivateKey)?;
         if cert_chain.is_empty() {
             return Err(Error::MissingCertificate);
         }
         Ok((cert_chain, private_key))
     }
 
+    #[derive(Debug)]
     struct NoCertificateVerification {}
 
     impl ServerCertVerifier for NoCertificateVerification {
         fn verify_server_cert(
             &self,
-            _end_entity: &Certificate,
-            _intermediates: &[Certificate],
-            _server_name: &rustls::client::ServerName,
-            _scts: &mut dyn Iterator<Item = &[u8]>,
+            _end_entity: &CertificateDer,
+            _intermediates: &[CertificateDer],
+            _server_name: &ServerName,
             _ocsp_response: &[u8],
-            _now: std::time::SystemTime,
+            _now: rustls::pki_types::UnixTime,
         ) -> Result<ServerCertVerified, rustls::Error> {
             tracing::warn!("Server cert bypassed");
             Ok(ServerCertVerified::assertion())
@@ -121,7 +132,7 @@ pub mod rustls_tls {
         fn verify_tls13_signature(
             &self,
             _message: &[u8],
-            _cert: &Certificate,
+            _cert: &CertificateDer,
             _dss: &DigitallySignedStruct,
         ) -> Result<HandshakeSignatureValid, rustls::Error> {
             Ok(HandshakeSignatureValid::assertion())
@@ -130,10 +141,29 @@ pub mod rustls_tls {
         fn verify_tls12_signature(
             &self,
             _message: &[u8],
-            _cert: &Certificate,
+            _cert: &CertificateDer,
             _dss: &DigitallySignedStruct,
         ) -> Result<HandshakeSignatureValid, rustls::Error> {
             Ok(HandshakeSignatureValid::assertion())
+        }
+
+        fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+            use rustls::SignatureScheme;
+            vec![
+                SignatureScheme::RSA_PKCS1_SHA1,
+                SignatureScheme::ECDSA_SHA1_Legacy,
+                SignatureScheme::RSA_PKCS1_SHA256,
+                SignatureScheme::ECDSA_NISTP256_SHA256,
+                SignatureScheme::RSA_PKCS1_SHA384,
+                SignatureScheme::ECDSA_NISTP384_SHA384,
+                SignatureScheme::RSA_PKCS1_SHA512,
+                SignatureScheme::ECDSA_NISTP521_SHA512,
+                SignatureScheme::RSA_PSS_SHA256,
+                SignatureScheme::RSA_PSS_SHA384,
+                SignatureScheme::RSA_PSS_SHA512,
+                SignatureScheme::ED25519,
+                SignatureScheme::ED448,
+            ]
         }
     }
 }

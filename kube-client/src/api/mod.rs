@@ -252,11 +252,10 @@ impl<K> Debug for Api<K> {
 /// Sanity test on scope restrictions
 #[cfg(test)]
 mod test {
-    use crate::{Api, Client};
+    use crate::{client::Body, Api, Client};
     use k8s_openapi::api::core::v1 as corev1;
 
     use http::{Request, Response};
-    use hyper::Body;
     use tower_test::mock;
 
     #[tokio::test]

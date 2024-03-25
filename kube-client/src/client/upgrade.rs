@@ -1,7 +1,8 @@
 use http::{self, Response, StatusCode};
-use hyper::Body;
 use thiserror::Error;
 use tokio_tungstenite::tungstenite as ws;
+
+use crate::client::Body;
 
 // Binary subprotocol v4. See `Client::connect`.
 pub const WS_PROTOCOL: &str = "v4.channel.k8s.io";

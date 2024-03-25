@@ -165,11 +165,13 @@ mod test {
     #[ignore = "needs cluster (lists pods)"]
     #[cfg(feature = "openssl-tls")]
     async fn custom_client_openssl_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
+        use hyper_util::rt::TokioExecutor;
+
         let config = Config::infer().await?;
         let https = config.openssl_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
-            .service(hyper::Client::builder().build(https));
+            .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         let client = Client::new(service, config.default_namespace);
         let pods: Api<Pod> = Api::default_namespaced(client);
         pods.list(&Default::default()).await?;

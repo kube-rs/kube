@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use http::{header::HeaderName, HeaderValue};
+use hyper::rt::{Read, Write};
+use hyper_util::client::legacy::connect::HttpConnector;
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
@@ -32,16 +34,17 @@ pub trait ConfigExt: private::Sealed {
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use kube::{client::ConfigExt, Config};
+    /// # use kube::{client::{Body, ConfigExt}, Config};
+    /// # use hyper_util::rt::TokioExecutor;
     /// let config = Config::infer().await?;
     /// let https = config.rustls_https_connector()?;
-    /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
+    /// let hyper_client: hyper_util::client::legacy::Client<_, Body> = hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https);
     /// # Ok(())
     /// # }
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
     #[cfg(feature = "rustls-tls")]
-    fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
+    fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<HttpConnector>>;
 
     /// Create [`hyper_rustls::HttpsConnector`] based on config and `connector`.
     ///
@@ -49,13 +52,13 @@ pub trait ConfigExt: private::Sealed {
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use kube::{client::ConfigExt, Config};
-    /// # use hyper::client::HttpConnector;
+    /// # use kube::{client::{Body, ConfigExt}, Config};
+    /// # use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
     /// let config = Config::infer().await?;
     /// let mut connector = HttpConnector::new();
     /// connector.enforce_http(false);
     /// let https = config.rustls_https_connector_with_connector(connector)?;
-    /// let hyper_client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
+    /// let hyper_client: hyper_util::client::legacy::Client<_, Body> = hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https);
     /// # Ok(())
     /// # }
     /// ```
@@ -71,7 +74,7 @@ pub trait ConfigExt: private::Sealed {
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use hyper::client::HttpConnector;
+    /// # use hyper_util::client::legacy::connect::HttpConnector;
     /// # use kube::{client::ConfigExt, Config};
     /// let config = Config::infer().await?;
     /// let https = {
@@ -100,14 +103,15 @@ pub trait ConfigExt: private::Sealed {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
     #[cfg(feature = "openssl-tls")]
-    fn openssl_https_connector(&self) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>>;
+    fn openssl_https_connector(&self)
+        -> Result<hyper_openssl::client::legacy::HttpsConnector<HttpConnector>>;
 
     /// Create [`hyper_openssl::HttpsConnector`] based on config and `connector`.
     /// # Example
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use hyper::client::HttpConnector;
+    /// # use hyper_util::client::legacy::connect::HttpConnector;
     /// # use kube::{client::ConfigExt, Config};
     /// let mut http = HttpConnector::new();
     /// http.enforce_http(false);
@@ -121,27 +125,26 @@ pub trait ConfigExt: private::Sealed {
     fn openssl_https_connector_with_connector<H>(
         &self,
         connector: H,
-    ) -> Result<hyper_openssl::HttpsConnector<H>>
+    ) -> Result<hyper_openssl::client::legacy::HttpsConnector<H>>
     where
         H: tower::Service<http::Uri> + Send,
         H::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
         H::Future: Send + 'static,
-        H::Response:
-            tokio::io::AsyncRead + tokio::io::AsyncWrite + hyper::client::connect::Connection + Unpin;
+        H::Response: Read + Write + hyper_util::client::legacy::connect::Connection + Unpin;
 
     /// Create [`openssl::ssl::SslConnectorBuilder`] based on config.
     /// # Example
     ///
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use hyper::client::HttpConnector;
+    /// # use hyper_util::client::legacy::connect::HttpConnector;
     /// # use kube::{client::ConfigExt, Client, Config};
     /// let config = Config::infer().await?;
     /// let https = {
     ///     let mut http = HttpConnector::new();
     ///     http.enforce_http(false);
     ///     let ssl = config.openssl_ssl_connector_builder()?;
-    ///     hyper_openssl::HttpsConnector::with_connector(http, ssl)?
+    ///     hyper_openssl::client::legacy::HttpsConnector::with_connector(http, ssl)?
     /// };
     /// # Ok(())
     /// # }
@@ -214,8 +217,8 @@ impl ConfigExt for Config {
     }
 
     #[cfg(feature = "rustls-tls")]
-    fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
-        let mut connector = hyper::client::HttpConnector::new();
+    fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<HttpConnector>> {
+        let mut connector = HttpConnector::new();
         connector.enforce_http(false);
         self.rustls_https_connector_with_connector(connector)
     }
@@ -244,8 +247,10 @@ impl ConfigExt for Config {
     }
 
     #[cfg(feature = "openssl-tls")]
-    fn openssl_https_connector(&self) -> Result<hyper_openssl::HttpsConnector<hyper::client::HttpConnector>> {
-        let mut connector = hyper::client::HttpConnector::new();
+    fn openssl_https_connector(
+        &self,
+    ) -> Result<hyper_openssl::client::legacy::HttpsConnector<HttpConnector>> {
+        let mut connector = HttpConnector::new();
         connector.enforce_http(false);
         self.openssl_https_connector_with_connector(connector)
     }
@@ -254,17 +259,18 @@ impl ConfigExt for Config {
     fn openssl_https_connector_with_connector<H>(
         &self,
         connector: H,
-    ) -> Result<hyper_openssl::HttpsConnector<H>>
+    ) -> Result<hyper_openssl::client::legacy::HttpsConnector<H>>
     where
         H: tower::Service<http::Uri> + Send,
         H::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
         H::Future: Send + 'static,
-        H::Response:
-            tokio::io::AsyncRead + tokio::io::AsyncWrite + hyper::client::connect::Connection + Unpin,
+        H::Response: Read + Write + hyper_util::client::legacy::connect::Connection + Unpin,
     {
-        let mut https =
-            hyper_openssl::HttpsConnector::with_connector(connector, self.openssl_ssl_connector_builder()?)
-                .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateHttpsConnector(e)))?;
+        let mut https = hyper_openssl::client::legacy::HttpsConnector::with_connector(
+            connector,
+            self.openssl_ssl_connector_builder()?,
+        )
+        .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateHttpsConnector(e)))?;
         if self.accept_invalid_certs {
             https.set_callback(|ssl, _uri| {
                 ssl.set_verify(openssl::ssl::SslVerifyMode::NONE);

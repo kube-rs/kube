@@ -5,9 +5,13 @@ use chrono::{TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
     header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE},
-    Method, Version,
+    Method, Request, Uri, Version,
 };
-use hyper::{body, client::HttpConnector, http::Uri, Client, Request};
+use http_body_util::BodyExt;
+use hyper_util::{
+    client::legacy::{connect::HttpConnector, Client},
+    rt::TokioExecutor,
+};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
 use serde_json::Number;
@@ -58,6 +62,9 @@ pub mod errors {
             #[from]
             openssl::error::ErrorStack,
         ),
+        /// No valid native root CA certificates found
+        #[error("No valid native root CA certificates found")]
+        NoValidNativeRootCA,
     }
 
     /// Possible errors when using the refresh token.
@@ -76,6 +83,13 @@ pub mod errors {
             #[source]
             #[from]
             hyper::Error,
+        ),
+        /// [`hyper_util::client::legacy::Error`] occurred during refreshing.
+        #[error("hyper-util error: {0}")]
+        HyperUtilError(
+            #[source]
+            #[from]
+            hyper_util::client::legacy::Error,
         ),
         /// Failed to parse the metadata received from the provider.
         #[error("invalid metadata received from the provider: {0}")]
@@ -297,13 +311,14 @@ impl Refresher {
         #[cfg(feature = "rustls-tls")]
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
+            .map_err(|_| errors::RefreshInitError::NoValidNativeRootCA)?
             .https_only()
             .enable_http1()
             .build();
         #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
         let https = hyper_openssl::HttpsConnector::new()?;
 
-        let https_client = hyper::Client::builder().build(https);
+        let https_client = hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https);
 
         Ok(Self {
             issuer,
@@ -327,7 +342,7 @@ impl Refresher {
         let response = self.https_client.get(discovery).await?;
 
         if response.status().is_success() {
-            let body = body::to_bytes(response.into_body()).await?;
+            let body = response.into_body().collect().await?.to_bytes();
             let metadata = serde_json::from_slice::<Metadata>(body.as_ref())
                 .map_err(errors::RefreshError::InvalidMetadata)?;
 
@@ -415,7 +430,7 @@ impl Refresher {
             return Err(errors::RefreshError::RequestFailed(response.status()));
         }
 
-        let body = body::to_bytes(response.into_body()).await?;
+        let body = response.into_body().collect().await?.to_bytes();
         let token_response = serde_json::from_slice::<TokenResponse>(body.as_ref())
             .map_err(errors::RefreshError::InvalidTokenResponse)?;
 
