@@ -1,22 +1,22 @@
 [package]
 name = "kube-core"
 description = "Kube shared types, traits and client-less behavior"
-version = "0.88.1"
-authors = [
-  "clux <sszynrae@gmail.com>",
-  "kazk <kazk.dev@gmail.com>",
-]
-edition = "2021"
-rust-version = "1.75.0"
-license = "Apache-2.0"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 keywords = ["kubernetes", "apimachinery"]
 categories = ["api-bindings", "encoding", "parser-implementations"]
-repository = "https://github.com/kube-rs/kube"
-readme = "../README.md"
 
 [package.metadata.docs.rs]
 features = ["ws", "admission", "jsonpatch", "k8s-openapi/latest"]
 rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
 
 [features]
 ws = []

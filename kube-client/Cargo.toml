@@ -1,19 +1,15 @@
 [package]
 name = "kube-client"
-version = "0.88.1"
 description = "Kubernetes client"
-authors = [
-  "clux <sszynrae@gmail.com>",
-  "Natalie Klestrup Röijezon <nat@nullable.se>",
-  "kazk <kazk.dev@gmail.com>",
-]
-license = "Apache-2.0"
-repository = "https://github.com/kube-rs/kube"
-readme = "../README.md"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 keywords = ["kubernetes", "client",]
 categories = ["web-programming::http-client", "configuration", "network-programming", "api-bindings"]
-rust-version = "1.75.0"
-edition = "2021"
 
 [features]
 default = ["client"]
@@ -38,6 +34,9 @@ __non_core = ["tracing", "serde_yaml", "base64"]
 features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
 
 [dependencies]
 base64 = { workspace = true, optional = true }

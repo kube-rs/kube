@@ -61,8 +61,6 @@
 //! - [`Api`](crate::Api) for the generic api methods available on Kubernetes resources
 //! - [k8s-openapi](https://docs.rs/k8s-openapi) for how to create typed kubernetes objects directly
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![deny(missing_docs)]
-#![forbid(unsafe_code)]
 // Nightly clippy (0.1.64) considers Drop a side effect, see https://github.com/rust-lang/rust-clippy/issues/9608
 #![allow(clippy::unnecessary_lazy_evaluations)]
 
