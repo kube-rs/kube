@@ -1,4 +1,4 @@
-FROM docker.io/rust:1.72.0-bullseye
+FROM docker.io/rust:1.75.0-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && apt upgrade -y

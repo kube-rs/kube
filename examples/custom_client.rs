@@ -1,3 +1,4 @@
+use hyper_util::rt::TokioExecutor;
 // Minimal custom client example.
 use k8s_openapi::api::core::v1::Pod;
 use tracing::*;
@@ -14,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let service = tower::ServiceBuilder::new()
         .layer(config.base_uri_layer())
         .option_layer(config.auth_layer()?)
-        .service(hyper::Client::builder().build(https));
+        .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
     let client = Client::new(service, config.default_namespace);
 
     let pods: Api<Pod> = Api::default_namespaced(client);

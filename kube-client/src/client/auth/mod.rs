@@ -102,6 +102,10 @@ pub enum Error {
     /// cluster spec missing while `provideClusterInfo` is true
     #[error("Cluster spec must be populated when `provideClusterInfo` is true")]
     ExecMissingClusterInfo,
+
+    /// No valid native root CA certificates found
+    #[error("No valid native root CA certificates found")]
+    NoValidNativeRootCA(#[source] std::io::Error),
 }
 
 #[derive(Debug, Clone)]

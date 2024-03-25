@@ -12,7 +12,7 @@ repository = "https://github.com/kube-rs/kube"
 readme = "../README.md"
 keywords = ["kubernetes", "client",]
 categories = ["web-programming::http-client", "configuration", "network-programming", "api-bindings"]
-rust-version = "1.72.0"
+rust-version = "1.75.0"
 edition = "2021"
 
 [features]
@@ -24,7 +24,7 @@ kubelet-debug = ["ws", "kube-core/kubelet-debug"]
 oauth = ["client", "tame-oauth"]
 oidc = ["client", "form_urlencoded"]
 gzip = ["client", "tower-http/decompression-gzip"]
-client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath-rust", "bytes", "futures", "tokio", "tokio-util", "either"]
+client = ["config", "__non_core", "hyper", "hyper-util", "http-body", "http-body-util", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath-rust", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
@@ -48,19 +48,21 @@ serde_json.workspace = true
 serde_yaml = { workspace = true, optional = true }
 http.workspace = true
 http-body = { workspace = true, optional = true }
+http-body-util = { workspace = true, optional = true }
 either = { workspace = true, optional = true }
 thiserror.workspace = true
 futures = { workspace = true, optional = true }
 pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }
-rustls = { workspace = true, features = ["dangerous_configuration"], optional = true }
+rustls = { workspace = true, optional = true }
 rustls-pemfile = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["time", "signal", "sync"], optional = true }
 kube-core = { path = "../kube-core", version = "=0.88.1" }
 jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
-hyper = { workspace = true, features = ["client", "http1", "stream", "tcp"], optional = true }
+hyper = { workspace = true, features = ["client", "http1"], optional = true }
+hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "tokio"], optional = true }
 hyper-rustls = { workspace = true, optional = true }
 hyper-socks2 = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
@@ -72,7 +74,7 @@ pin-project = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 secrecy = { workspace = true, features = ["alloc", "serde"] }
 tracing = { workspace = true, features = ["log"], optional = true }
-hyper-openssl = { workspace = true, optional = true }
+hyper-openssl = { workspace = true, features = ["client-legacy"], optional = true }
 form_urlencoded = { workspace = true, optional = true }
 k8s-openapi= { workspace = true, features = [] }
 
