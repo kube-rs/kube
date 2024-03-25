@@ -88,7 +88,7 @@ mod tests {
     }
 
     fn test_token(token: String) -> RefreshableToken {
-        let expiry = Utc::now() + Duration::seconds(60 * 60);
+        let expiry = Utc::now() + Duration::try_seconds(60 * 60).unwrap();
         let secret_token = SecretString::from(token);
         let info = AuthInfo {
             token: Some(secret_token.clone()),
