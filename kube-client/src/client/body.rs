@@ -46,8 +46,8 @@ impl Body {
     }
 
     /// Collect all the pieces of the body
-    pub fn collect(self) -> http_body_util::combinators::Collect<Self> {
-        <Self as BodyExt>::collect(self)
+    pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
+        Ok(<Self as BodyExt>::collect(self).await?.to_bytes())
     }
 }
 
