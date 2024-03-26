@@ -31,7 +31,7 @@ rust.unsafe_code = "forbid"
 
 [dependencies]
 futures.workspace = true
-kube-client = { path = "../kube-client", version = "=0.88.1", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "=0.89.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative.workspace = true
 serde.workspace = true
 smallvec.workspace = true

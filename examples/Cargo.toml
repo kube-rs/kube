@@ -28,8 +28,8 @@ garde = { version = "0.18.0", default-features = false, features = ["derive"] }
 anyhow.workspace = true
 futures.workspace = true
 jsonpath-rust.workspace = true
-kube = { path = "../kube", version = "^0.88.1", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.88.1", default-features = false } # only needed to opt out of schema
+kube = { path = "../kube", version = "^0.89.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.89.0", default-features = false } # only needed to opt out of schema
 k8s-openapi.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
