@@ -44,6 +44,11 @@ impl Body {
     {
         Body::new(Kind::Wrap(body.map_err(Into::into).boxed_unsync()))
     }
+
+    /// Collect all the pieces of the body
+    pub fn collect(self) -> http_body_util::combinators::Collect<Self> {
+        <Self as BodyExt>::collect(self)
+    }
 }
 
 impl From<Bytes> for Body {
