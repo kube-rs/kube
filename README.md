@@ -17,7 +17,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 ```toml
 [dependencies]
 kube = { version = "0.88.1", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.21.0", features = ["latest"] }
+k8s-openapi = { version = "0.21.1", features = ["latest"] }
 ```
 
 [Features are available](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).

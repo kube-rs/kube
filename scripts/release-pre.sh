@@ -21,6 +21,7 @@ sanity() {
   RECOMMENDED_K8S_OPENAPI="$(rg "k8s-openapi =" README.md | head -n 1)" # only check first instance
   if ! [[ $RECOMMENDED_K8S_OPENAPI =~ $USED_K8S_OPENAPI ]]; then
     echo "prerelease: abort: recommending k8s-openapi pinned to a different version to what we use"
+    echo "${RECOMMENDED_K8S_OPENAPI} vs. used: ${USED_K8S_OPENAPI}"
     exit 1
   fi
   # TODO: verify versions of tools for release?
