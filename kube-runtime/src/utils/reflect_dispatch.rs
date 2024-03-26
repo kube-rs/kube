@@ -2,7 +2,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::{collections::VecDeque, sync::Arc};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 
 use async_stream::stream;
 use futures::{pin_mut, ready, Future, Stream, StreamExt, TryStream};
@@ -24,15 +24,10 @@ where
     K: Resource + Clone + 'static,
     K::DynamicType: Eq + std::hash::Hash + Clone + Default,
 {
-    #[pin]
     stream: St,
     writer: Writer<K>,
     tx: Sender<ObjectRef<K>>,
-    rx: InactiveReceiver<ObjectRef<K>>,
 
-    #[pin]
-    sleep: time::Sleep,
-    buffer: VecDeque<ObjectRef<K>>,
     deadline: time::Duration,
 }
 
@@ -42,16 +37,12 @@ where
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone + Default,
 {
-    pub(super) fn new(stream: St, writer: Writer<K>, buf_size: usize) -> ReflectDispatcher<St, K> {
-        let (tx, rx) = async_broadcast::broadcast(buf_size);
+    pub(super) fn new(stream: St, writer: Writer<K>, tx: Sender<ObjectRef<K>>) -> ReflectDispatcher<St, K> {
         Self {
             stream,
             writer,
             tx,
-            rx: rx.deactivate(),
-            deadline: time::Duration::from_secs(10),
-            sleep: time::sleep(time::Duration::ZERO),
-            buffer: VecDeque::new(),
+            deadline: Duration::from_millis(10),
         }
     }
 

@@ -17,7 +17,6 @@ use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
-
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
     /// Apply the [`DefaultBackoff`] watcher [`Backoff`] policy
@@ -257,13 +256,14 @@ pub trait WatchStreamExt: Stream {
         self,
         writer: Writer<K>,
         buf_size: usize,
-    ) -> (ReflectHandle<K>, ReflectDispatcher<Self, K>)
+    ) -> (ReflectHandle<K>, impl Stream<Item = Self::Item>)
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
         K: Resource + Clone + 'static,
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
-        let reflect = ReflectDispatcher::new(self, writer, buf_size);
+        let (tx, rx) = async_broadcast::broadcast(buf_size);
+        let handle = ReflectHandle::new(writer.as_reader(), rx);
         (reflect.subscribe(), reflect)
     }
 }
