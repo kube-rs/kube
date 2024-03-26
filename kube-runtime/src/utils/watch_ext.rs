@@ -8,10 +8,7 @@ use crate::{
 };
 use kube_client::Resource;
 
-use crate::{
-    reflector::store::Writer,
-    utils::{Reflect, ReflectDispatcher, ReflectHandle},
-};
+use crate::{reflector::store::Writer, utils::Reflect};
 
 use crate::watcher::DefaultBackoff;
 use backoff::backoff::Backoff;
@@ -252,19 +249,13 @@ pub trait WatchStreamExt: Stream {
         Reflect::new(self, writer)
     }
 
-    fn reflect_dispatch<K>(
-        self,
-        writer: Writer<K>,
-        buf_size: usize,
-    ) -> (ReflectHandle<K>, impl Stream<Item = Self::Item>)
+    fn reflect_dispatch<K>(self, writer: Writer<K>) -> impl Stream<Item = Self::Item>
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
         K: Resource + Clone + 'static,
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
-        let (tx, rx) = async_broadcast::broadcast(buf_size);
-        let handle = ReflectHandle::new(writer.as_reader(), rx);
-        (reflect.subscribe(), reflect)
+        crate::reflector(writer, self)
     }
 }
 

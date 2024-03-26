@@ -38,7 +38,7 @@ where
 impl<St, K> Stream for Reflect<St, K>
 where
     K: Resource + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
     St: Stream<Item = Result<Event<K>, Error>>,
 {
     type Item = Result<Event<K>, Error>;
@@ -51,7 +51,6 @@ where
         })
     }
 }
-
 
 #[cfg(test)]
 pub(crate) mod test {
