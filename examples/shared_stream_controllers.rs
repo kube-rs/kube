@@ -33,19 +33,14 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::default().concurrency(2);
     let ctx = Arc::new(Data { client });
 
-    // (1): create a store
-    let writer = Writer::<Pod>::new(Default::default());
-
-    // (2): split the stream:
-    //      - create a handle that can be cloned to get more readers
-    //      - pass through events from root stream through a reflector
-    //
-    // Before splitting, we apply a backoff. This is completely optional, but it
-    // allows us to ensure the APIServer won't be overwhelmed when we retry
-    // watches on errors.
-    let (subscriber, reflector) = watcher(pods.clone(), Default::default())
+    // (1): create a store (with a dispatcher)
+    let writer = Writer::<Pod>::new_with_dispatch(Default::default(), SUBSCRIBE_BUFFER_SIZE);
+    // (2): create a subscriber
+    let subscriber = writer.subscribe();
+    // (2.5): create a watch stream
+    let pod_watch = watcher(pods.clone(), Default::default())
         .default_backoff()
-        .reflect_shared(writer, SUBSCRIBE_BUFFER_SIZE);
+        .reflect_dispatch(writer);
 
     // (3): schedule the root (i.e. shared) stream with the runtime.
     //
@@ -54,8 +49,8 @@ async fn main() -> anyhow::Result<()> {
     //  to make progress.
     tokio::spawn(async move {
         // Pin on the heap so we don't overflow our stack
-        let mut reflector = reflector.boxed();
-        while let Some(next) = reflector.next().await {
+        let mut watch = pod_watch.boxed();
+        while let Some(next) = watch.next().await {
             // We are not interested in the returned events here, only in
             // handling errors.
             match next {
@@ -64,7 +59,6 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     });
-
 
     // (4): create a reader. We create a metadata controller that will mirror a
     // pod's labels as annotations.
