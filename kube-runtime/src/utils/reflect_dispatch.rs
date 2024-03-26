@@ -2,7 +2,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::{collections::VecDeque, sync::Arc, time::Duration};
+use std::{collections::VecDeque, sync::Arc};
 
 use async_stream::stream;
 use futures::{pin_mut, ready, Future, Stream, StreamExt, TryStream};
@@ -22,12 +22,17 @@ use kube_client::Resource;
 pub struct ReflectDispatcher<St, K>
 where
     K: Resource + Clone + 'static,
-    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
 {
+    #[pin]
     stream: St,
     writer: Writer<K>,
     tx: Sender<ObjectRef<K>>,
+    rx: InactiveReceiver<ObjectRef<K>>,
 
+    #[pin]
+    sleep: time::Sleep,
+    buffer: VecDeque<ObjectRef<K>>,
     deadline: time::Duration,
 }
 
@@ -35,14 +40,18 @@ impl<St, K> ReflectDispatcher<St, K>
 where
     St: Stream<Item = Result<Event<K>, Error>> + 'static,
     K: Resource + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
 {
-    pub(super) fn new(stream: St, writer: Writer<K>, tx: Sender<ObjectRef<K>>) -> ReflectDispatcher<St, K> {
+    pub(super) fn new(stream: St, writer: Writer<K>, buf_size: usize) -> ReflectDispatcher<St, K> {
+        let (tx, rx) = async_broadcast::broadcast(buf_size);
         Self {
             stream,
             writer,
             tx,
-            deadline: Duration::from_millis(10),
+            rx: rx.deactivate(),
+            deadline: time::Duration::from_secs(10),
+            sleep: time::sleep(time::Duration::ZERO),
+            buffer: VecDeque::new(),
         }
     }
 
@@ -56,32 +65,6 @@ where
         // ReflectHandle::clone() to get a receiver that replays all of the
         // messages in the channel.
         ReflectHandle::new(self.writer.as_reader(), self.tx.new_receiver())
-    }
-
-    // Hm, not the right interface for this...
-    pub fn into_stream(mut self) -> impl Stream<Item = Result<Event<K>, Error>> {
-        stream! {
-        let stream = self.stream;
-        pin_mut!(stream);
-        while let Some(event) = stream.next().await {
-            if let Ok(ev) = &event {
-                self.writer.apply_watcher_event(&ev);
-                match ev {
-                    Event::Applied(obj) => {
-                        let obj_ref = ObjectRef::from_obj(obj);
-                        tokio::select!{
-                            _ = self.tx.broadcast(obj_ref) => {},
-                        }
-                    },
-                    Event::Restarted(obj_refs) => {
-                    },
-                    _ => {}
-                }
-            }
-
-            yield event;
-            }
-        }
     }
 }
 
