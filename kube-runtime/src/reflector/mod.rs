@@ -7,9 +7,10 @@ pub mod store;
 pub use self::dispatcher::ReflectHandle;
 pub use self::object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef};
 use crate::watcher;
-use futures::{Stream, TryStreamExt};
+use async_stream::stream;
+use futures::{Stream, StreamExt};
 use std::hash::Hash;
-pub use store::{store, Store};
+pub use store::{store, store_with_dispatch, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
 ///
@@ -99,7 +100,19 @@ where
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
-    stream.inspect_ok(move |event| writer.apply_watcher_event(event))
+    let mut stream = Box::pin(stream);
+    stream! {
+        while let Some(event) = stream.next().await {
+            match event {
+                Ok(ev) => {
+                    writer.apply_watcher_event(&ev);
+                    writer.dispatch_event(&ev).await;
+                    yield Ok(ev);
+                },
+                Err(ev) => yield Err(ev)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
