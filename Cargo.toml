@@ -43,7 +43,7 @@ darling = "0.20.3"
 derivative = "2.1.1"
 either = "1.6.1"
 form_urlencoded = "1.2.0"
-futures = "0.3.17"
+futures = { version = "0.3.17", default-features = false }
 hashbrown = "0.14.0"
 home = "0.5.4"
 http = "1.1.0"

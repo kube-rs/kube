@@ -26,7 +26,7 @@ tokio-util.workspace = true
 assert-json-diff.workspace = true
 garde = { version = "0.18.0", default-features = false, features = ["derive"] }
 anyhow.workspace = true
-futures.workspace = true
+futures = { workspace = true, features = ["async-await"] }
 jsonpath-rust.workspace = true
 kube = { path = "../kube", version = "^0.88.1", default-features = false, features = ["admission"] }
 kube-derive = { path = "../kube-derive", version = "^0.88.1", default-features = false } # only needed to opt out of schema
