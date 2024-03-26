@@ -32,7 +32,8 @@ impl Body {
         Body { kind }
     }
 
-    pub(crate) fn empty() -> Self {
+    /// Create an empty body
+    pub fn empty() -> Self {
         Self::new(Kind::Once(None))
     }
 
