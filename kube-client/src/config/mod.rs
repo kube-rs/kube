@@ -122,7 +122,7 @@ pub enum LoadDataError {
 /// Prefer [`Config::infer`] unless you have particular issues, and avoid manually managing
 /// the data in this struct unless you have particular needs. It exists to be consumed by the [`Client`][crate::Client].
 ///
-/// If you are looking to parse the kubeconfig found in a user's home directory see [`Kubeconfig`](crate::config::Kubeconfig).
+/// If you are looking to parse the kubeconfig found in a user's home directory see [`Kubeconfig`].
 #[cfg_attr(docsrs, doc(cfg(feature = "config")))]
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -231,9 +231,8 @@ impl Config {
     /// `/var/run/secrets/kubernetes.io/serviceaccount/`.
     ///
     /// This behavior does not match that of the official Kubernetes clients,
-    /// but this approach is compatible with the `rustls-tls` feature
-    /// without setting `tls_server_name`.
-    /// See <https://github.com/kube-rs/kube/issues/1003>.
+    /// but can be used as a consistent entrypoint in many clusters.
+    /// See <https://github.com/kube-rs/kube/issues/1003> for more info.
     pub fn incluster_dns() -> Result<Self, InClusterError> {
         Self::incluster_with_uri(incluster_config::kube_dns())
     }

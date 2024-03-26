@@ -28,6 +28,7 @@ type TerminalSizeSender = mpsc::Sender<TerminalSize>;
 /// TerminalSize define the size of a terminal
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+#[serde(rename_all = "PascalCase")]
 pub struct TerminalSize {
     /// width of the terminal
     pub width: u16,

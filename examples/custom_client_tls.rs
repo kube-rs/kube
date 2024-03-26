@@ -1,3 +1,4 @@
+use hyper_util::rt::TokioExecutor;
 // Custom client supporting both openssl-tls and rustls-tls
 // Must enable `rustls-tls` feature to run this.
 // Run with `USE_RUSTLS=1` to pick rustls.
@@ -19,13 +20,13 @@ async fn main() -> anyhow::Result<()> {
         let https = config.openssl_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
-            .service(hyper::Client::builder().build(https));
+            .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         Client::new(service, config.default_namespace)
     } else {
         let https = config.rustls_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
-            .service(hyper::Client::builder().build(https));
+            .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         Client::new(service, config.default_namespace)
     };
 

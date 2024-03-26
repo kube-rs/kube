@@ -10,7 +10,7 @@ use http::{
     header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,
 };
-use jsonpath_rust::JsonPathInst;
+use jsonpath_rust::{path::config::JsonPathConfig, JsonPathInst};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -102,6 +102,10 @@ pub enum Error {
     /// cluster spec missing while `provideClusterInfo` is true
     #[error("Cluster spec must be populated when `provideClusterInfo` is true")]
     ExecMissingClusterInfo,
+
+    /// No valid native root CA certificates found
+    #[error("No valid native root CA certificates found")]
+    NoValidNativeRootCA(#[source] std::io::Error),
 }
 
 #[derive(Debug, Clone)]
@@ -130,12 +134,12 @@ impl TokenFile {
             path: path.as_ref().to_owned(),
             token: SecretString::from(token),
             // Try to reload at least once a minute
-            expires_at: Utc::now() + Duration::seconds(60),
+            expires_at: Utc::now() + SIXTY_SEC,
         })
     }
 
     fn is_expiring(&self) -> bool {
-        Utc::now() + Duration::seconds(10) > self.expires_at
+        Utc::now() + TEN_SEC > self.expires_at
     }
 
     /// Get the cached token. Returns `None` if it's expiring.
@@ -153,11 +157,26 @@ impl TokenFile {
             if let Ok(token) = std::fs::read_to_string(&self.path) {
                 self.token = SecretString::from(token);
             }
-            self.expires_at = Utc::now() + Duration::seconds(60);
+            self.expires_at = Utc::now() + SIXTY_SEC;
         }
         self.token.expose_secret()
     }
 }
+
+// Questionable decisions by chrono: https://github.com/chronotope/chrono/issues/1491
+macro_rules! const_unwrap {
+    ($e:expr) => {
+        match $e {
+            Some(v) => v,
+            None => panic!(),
+        }
+    };
+}
+
+/// Common constant for checking if an auth token is close to expiring
+pub const TEN_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(10));
+/// Common duration for time between reloads
+const SIXTY_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(60));
 
 // See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth
 // for the list of auth-plugins supported by client-go.
@@ -205,7 +224,7 @@ impl RefreshableToken {
                 let mut locked_data = data.lock().await;
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
-                if Utc::now() + Duration::seconds(60) >= locked_data.1 {
+                if Utc::now() + SIXTY_SEC >= locked_data.1 {
                     // TODO Improve refreshing exec to avoid `Auth::try_from`
                     match Auth::try_from(&locked_data.2)? {
                         Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) | Auth::Certificate(_, _) => {
@@ -410,7 +429,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
             let expiry_date = expiry
                 .parse::<DateTime<Utc>>()
                 .map_err(Error::MalformedTokenExpirationDate)?;
-            if Utc::now() + Duration::seconds(60) < expiry_date {
+            if Utc::now() + SIXTY_SEC < expiry_date {
                 return Ok(ProviderToken::GcpCommand(access_token.clone(), Some(expiry_date)));
             }
         }
@@ -479,6 +498,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 }
 
 fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<String, Error> {
+    let cfg = JsonPathConfig::default(); // no need for regex caching here
     let parsed_path = path
         .trim_matches(|c| c == '"' || c == '{' || c == '}')
         .parse::<JsonPathInst>()
@@ -489,7 +509,7 @@ fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<
             ))
         })?;
 
-    let res = parsed_path.find_slice(json);
+    let res = parsed_path.find_slice(json, cfg);
 
     let Some(res) = res.into_iter().next() else {
         return Err(Error::AuthExec(format!(
@@ -620,7 +640,7 @@ mod test {
     #[tokio::test]
     #[ignore = "fails on windows mysteriously"]
     async fn exec_auth_command() -> Result<(), Error> {
-        let expiry = (Utc::now() + Duration::seconds(60 * 60)).to_rfc3339();
+        let expiry = (Utc::now() + SIXTY_SEC).to_rfc3339();
         let test_file = format!(
             r#"
         apiVersion: v1

@@ -20,8 +20,7 @@ pub struct Event {
 
     /// The short reason explaining why the `action` was taken.
     ///
-    /// This must be at most 128 characters, and is often PascalCased. Shows up in `kubectl describe` as `Reason`.
-    /// Usually denoted
+    /// This must be at most 128 characters, generally in `PascalCase`. Shows up in `kubectl describe` as `Reason`.
     pub reason: String,
 
     /// A optional description of the status of the `action`.
@@ -248,8 +247,6 @@ impl Recorder {
 
 #[cfg(test)]
 mod test {
-    #![allow(unused_imports)]
-
     use k8s_openapi::api::{
         core::v1::{Event as K8sEvent, Service},
         rbac::v1::ClusterRole,

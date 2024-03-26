@@ -84,7 +84,7 @@ e2e-job-musl features:
 
 k3d:
   k3d cluster create main --servers 1 --registry-create main --image rancher/k3s:v1.27.3-k3s1 \
-    --no-lb --no-rollback \
+    -p 10250:10250 --no-rollback \
     --k3s-arg "--disable=traefik,servicelb,metrics-server@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*' \
@@ -95,21 +95,12 @@ k3d:
 # Bump the msrv of kube; "just bump-msrv 1.60.0"
 bump-msrv msrv:
   #!/usr/bin/env bash
-  # TODO: warn if not msrv+2 not found
-  oldmsrv="$(rg "rust-version = \"(.*)\"" -r '$1' kube/Cargo.toml)"
-  fastmod -m -d . --extensions toml "rust-version = \"$oldmsrv\"" "rust-version = \"{{msrv}}\""
-  # sanity
-  if [[ $(cat ./*/Cargo.toml | grep "rust-version" | uniq | wc -l) -gt 1 ]]; then
-    echo "inconsistent rust-version keys set in various kube-crates:"
-    rg "rust-version" ./*/Cargo.toml
-    exit 1
-  fi
-  fullmsrv="{{msrv}}"
+  fullmsrv="{{msrv}}" # need a temporary var for this
   shortmsrv="${fullmsrv::-2}" # badge can use a short display version
   badge="[![Rust ${shortmsrv}](https://img.shields.io/badge/MSRV-${shortmsrv}-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/{{msrv}})"
+  sd "rust-version = \".*\"" "rust-version = \"{{msrv}}\"" Cargo.toml
   sd "^.+badge/MSRV.+$" "${badge}" README.md
-  sd "${oldmsrv}" "{{msrv}}" .devcontainer/Dockerfile
-  cargo msrv
+  sd "rust:.*-bullseye" "rust:{{msrv}}-bullseye" .devcontainer/Dockerfile
 
 # Increment the Kubernetes feature version from k8s-openapi for tests; "just bump-k8s"
 bump-k8s:

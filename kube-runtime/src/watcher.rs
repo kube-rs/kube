@@ -206,7 +206,7 @@ pub enum InitialListStrategy {
     /// List first, then watch from given resouce version
     ///
     /// This is the old and default way of watching. The watcher will do a paginated list call first before watching.
-    /// When using this mode, you can configure the page_size on the watcher.
+    /// When using this mode, you can configure the `page_size` on the watcher.
     #[default]
     ListWatch,
     /// Kubernetes 1.27 Streaming Lists
@@ -245,10 +245,10 @@ pub struct Config {
 
     /// Control how the watcher fetches the initial list of objects.
     ///
-    /// ListWatch: The watcher will fetch the initial list of objects using a list call.
-    /// StreamingList: The watcher will fetch the initial list of objects using a watch call.
+    /// - `ListWatch`: The watcher will fetch the initial list of objects using a list call.
+    /// - `StreamingList`: The watcher will fetch the initial list of objects using a watch call.
     ///
-    /// StreamingList is more efficient than ListWatch, but it requires the server to support
+    /// `StreamingList` is more efficient than `ListWatch`, but it requires the server to support
     /// streaming list bookmarks (opt-in feature gate in Kubernetes 1.27).
     ///
     /// See [upstream documentation on streaming lists](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists),

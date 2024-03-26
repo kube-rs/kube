@@ -8,7 +8,7 @@ use crate::{
 use anyhow::Result;
 use futures::{poll, StreamExt, TryStreamExt};
 use http::{Request, Response};
-use hyper::Body;
+use kube_client::client::Body;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,7 @@ async fn timeout_after_1s(handle: tokio::task::JoinHandle<()>) {
 /// Scenarios we test for in ApiServerVerifier above
 enum Scenario {
     PaginatedList,
+    #[allow(dead_code)] // remove when/if we start doing better mock tests that use this
     RadioSilence,
 }
 

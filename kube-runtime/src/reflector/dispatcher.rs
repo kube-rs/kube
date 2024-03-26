@@ -6,39 +6,16 @@ use std::sync::Arc;
 
 use futures::{ready, Stream};
 use pin_project::pin_project;
-use tokio::time;
 
 use crate::reflector::{ObjectRef, Store};
-use async_broadcast::{Receiver, Sender};
-use kube_client::Resource;
+use async_broadcast::Receiver;
 
-pub(crate) struct Dispatcher<K>
-where
-    K: Resource + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
-{
-    tx: Sender<ObjectRef<K>>,
-    deadline: time::Duration,
-}
-
-impl<K> Dispatcher<K>
-where
-    K: Resource + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
-{
-    pub(crate) fn new(tx: Sender<ObjectRef<K>>, deadline: time::Duration) -> Dispatcher<K> {
-        Self { tx, deadline }
-    }
-
-    pub(crate) async fn send(&mut self, value: ObjectRef<K>) {
-        self.tx.broadcast_direct(value).await;
-    }
-}
+use super::Lookup;
 
 #[pin_project]
 pub struct ReflectHandle<K>
 where
-    K: Resource + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     #[pin]
@@ -48,7 +25,7 @@ where
 
 impl<K> Clone for ReflectHandle<K>
 where
-    K: Resource + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     fn clone(&self) -> Self {
@@ -58,7 +35,7 @@ where
 
 impl<K> ReflectHandle<K>
 where
-    K: Resource + Clone,
+    K: Lookup + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     pub(super) fn new(reader: Store<K>, rx: Receiver<ObjectRef<K>>) -> ReflectHandle<K> {
@@ -72,7 +49,7 @@ where
 
 impl<K> Stream for ReflectHandle<K>
 where
-    K: Resource + Clone,
+    K: Lookup + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone + Default,
 {
     type Item = Arc<K>;

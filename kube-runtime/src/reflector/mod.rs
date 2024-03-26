@@ -5,10 +5,9 @@ mod object_ref;
 pub mod store;
 
 pub use self::dispatcher::ReflectHandle;
-pub use self::object_ref::{Extra as ObjectRefExtra, ObjectRef};
+pub use self::object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef};
 use crate::watcher;
 use futures::{Stream, TryStreamExt};
-use kube_client::Resource;
 use std::hash::Hash;
 pub use store::{store, Store};
 
@@ -61,9 +60,10 @@ pub use store::{store, Store};
 /// ## Memory Usage
 ///
 /// A reflector often constitutes one of the biggest components of a controller's memory use.
-/// Given ~two thousand pods in a cluster, a reflector around that quickly consumes 1GB of memory.
+/// Given a ~2000 pods cluster, a reflector saving everything (including injected sidecars, managed fields)
+/// can quickly consume a couple of hundred megabytes or more, depending on how much of this you are storing.
 ///
-/// While, sometimes acceptible, there are techniques you can leverage to reduce the memory usage
+/// While generally acceptable, there are techniques you can leverage to reduce the memory usage
 /// depending on your use case.
 ///
 /// 1. Reflect a [`PartialObjectMeta<K>`](kube_client::core::PartialObjectMeta) stream rather than a stream of `K`
@@ -91,9 +91,11 @@ pub use store::{store, Store};
 /// The `stream` can then be passed to `reflector` causing smaller objects to be written to its store.
 /// Note that you **cannot drop everything**; you minimally need the spec properties your app relies on.
 /// Additionally, only `labels`, `annotations` and `managed_fields` are safe to drop from `ObjectMeta`.
+///
+/// For more information check out: <https://kube.rs/controllers/optimization/> for graphs and techniques.
 pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
-    K: Resource + Clone,
+    K: Lookup + Clone,
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {

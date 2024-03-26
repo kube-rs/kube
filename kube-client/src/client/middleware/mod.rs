@@ -23,7 +23,6 @@ impl<S> Layer<S> for AuthLayer {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -33,20 +32,22 @@ mod tests {
     use chrono::{Duration, Utc};
     use futures::pin_mut;
     use http::{header::AUTHORIZATION, HeaderValue, Request, Response};
-    use hyper::Body;
     use secrecy::SecretString;
     use tokio::sync::Mutex;
     use tokio_test::assert_ready_ok;
     use tower::filter::AsyncFilterLayer;
     use tower_test::{mock, mock::Handle};
 
-    use crate::{client::AuthError, config::AuthInfo};
+    use crate::{
+        client::{AuthError, Body},
+        config::AuthInfo,
+    };
 
     #[tokio::test(flavor = "current_thread")]
     async fn valid_token() {
         const TOKEN: &str = "test";
         let auth = test_token(TOKEN.into());
-        let (mut service, handle): (_, Handle<Request<hyper::Body>, Response<hyper::Body>>) =
+        let (mut service, handle): (_, Handle<Request<Body>, Response<Body>>) =
             mock::spawn_layer(AsyncFilterLayer::new(auth));
 
         let spawned = tokio::spawn(async move {
@@ -87,7 +88,7 @@ mod tests {
     }
 
     fn test_token(token: String) -> RefreshableToken {
-        let expiry = Utc::now() + Duration::seconds(60 * 60);
+        let expiry = Utc::now() + Duration::try_seconds(60 * 60).unwrap();
         let secret_token = SecretString::from(token);
         let info = AuthInfo {
             token: Some(secret_token.clone()),

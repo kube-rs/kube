@@ -1,36 +1,35 @@
 [package]
 name = "kube-derive"
 description = "Custom derives for the kube kubernetes crates"
-version = "0.88.1"
-authors = [
-  "clux <sszynrae@gmail.com>",
-  "kazk <kazk.dev@gmail.com>",
-]
-edition = "2021"
-rust-version = "1.70.0"
-license = "Apache-2.0"
-repository = "https://github.com/kube-rs/kube"
-readme = "../README.md"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 keywords = ["kubernetes", "macro", "customresource", "crd"]
 categories = ["api-bindings", "encoding"]
 
+[lints]
+workspace = true
 
 [dependencies]
-proc-macro2 = "1.0.29"
-quote = "1.0.10"
-syn = { version = "2.0.38", features = ["extra-traits"] }
-serde_json = "1.0.68"
-darling = "0.20.3"
+proc-macro2.workspace = true
+quote.workspace = true
+syn = { workspace = true, features = ["extra-traits"] }
+serde_json.workspace = true
+darling.workspace = true
 
 [lib]
 proc-macro = true
 
 [dev-dependencies]
-serde = { version = "1.0.130", features = ["derive"] }
-serde_yaml = "0.9.19"
+serde = { workspace = true, features = ["derive"] }
+serde_yaml.workspace = true
 kube = { path = "../kube", version = "<1.0.0, >=0.61.0", features = ["derive", "client"] }
-k8s-openapi = { version = "0.21.0", default-features = false, features = ["latest"] }
-schemars = { version = "0.8.6", features = ["chrono"] }
-chrono = { version = "0.4.19", default-features = false }
-trybuild = "1.0.48"
-assert-json-diff = "2.0.2"
+k8s-openapi = { workspace = true, features = ["latest"] }
+schemars = { workspace = true, features = ["chrono"] }
+chrono.workspace = true
+trybuild.workspace = true
+assert-json-diff.workspace = true

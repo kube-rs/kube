@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use hyper_util::rt::TokioIo;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, DeleteParams, PostParams},
@@ -6,7 +8,8 @@ use kube::{
 };
 use tracing::*;
 
-use hyper::{body, Body, Request};
+use http::Request;
+use http_body_util::BodyExt;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -37,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
     let port = pf.take_stream(80).unwrap();
 
     // let hyper drive the HTTP state in our DuplexStream via a task
-    let (mut sender, connection) = hyper::client::conn::handshake(port).await?;
+    let (mut sender, connection) = hyper::client::conn::http1::handshake(TokioIo::new(port)).await?;
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             warn!("Error in connection: {}", e);
@@ -49,13 +52,13 @@ async fn main() -> anyhow::Result<()> {
         .header("Connection", "close")
         .header("Host", "127.0.0.1")
         .method("GET")
-        .body(Body::from(""))
+        .body(http_body_util::Empty::<Bytes>::new())
         .unwrap();
 
     let (parts, body) = sender.send_request(http_req).await?.into_parts();
     assert!(parts.status == 200);
 
-    let body_bytes = body::to_bytes(body).await?;
+    let body_bytes = body.collect().await?.to_bytes();
     let body_str = std::str::from_utf8(&body_bytes)?;
     assert!(body_str.contains("Welcome to nginx!"));
 

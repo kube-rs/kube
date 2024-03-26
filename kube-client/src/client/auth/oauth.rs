@@ -1,8 +1,12 @@
+use http_body_util::BodyExt;
+use hyper_util::rt::TokioExecutor;
 use tame_oauth::{
     gcp::{TokenOrRequest, TokenProvider, TokenProviderWrapper},
     Token,
 };
 use thiserror::Error;
+
+use crate::client::Body;
 
 #[derive(Error, Debug)]
 /// Possible errors when requesting token with OAuth
@@ -33,7 +37,7 @@ pub enum Error {
 
     /// Failed to request token
     #[error("failed to request token: {0}")]
-    RequestToken(#[source] hyper::Error),
+    RequestToken(#[source] hyper_util::client::legacy::Error),
 
     /// Failed to retrieve new credential
     #[error("failed to retrieve new credential {0:?}")]
@@ -50,6 +54,10 @@ pub enum Error {
     /// Failed to build a request
     #[error("failed to build request: {0}")]
     BuildRequest(#[source] http::Error),
+
+    /// No valid native root CA certificates found
+    #[error("No valid native root CA certificates found")]
+    NoValidNativeRootCA(#[source] std::io::Error),
 
     /// OAuth failed with unknown reason
     #[error("unknown OAuth error: {0}")]
@@ -113,6 +121,7 @@ impl Gcp {
                 #[cfg(feature = "rustls-tls")]
                 let https = hyper_rustls::HttpsConnectorBuilder::new()
                     .with_native_roots()
+                    .map_err(Error::NoValidNativeRootCA)?
                     .https_only()
                     .enable_http1()
                     .build();
@@ -120,15 +129,15 @@ impl Gcp {
                 let https =
                     hyper_openssl::HttpsConnector::new().map_err(Error::CreateOpensslHttpsConnector)?;
 
-                let client = hyper::Client::builder().build::<_, hyper::Body>(https);
+                let client = hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https);
 
                 let res = client
-                    .request(request.map(hyper::Body::from))
+                    .request(request.map(Body::from))
                     .await
                     .map_err(Error::RequestToken)?;
                 // Convert response body to `Vec<u8>` for parsing.
                 let (parts, body) = res.into_parts();
-                let bytes = hyper::body::to_bytes(body).await.map_err(Error::ConcatBuffers)?;
+                let bytes = body.collect().await.map_err(Error::ConcatBuffers)?.to_bytes();
                 let response = http::Response::from_parts(parts, bytes.to_vec());
                 match self.provider.parse_token_response(scope_hash, response) {
                     Ok(token) => Ok(token),

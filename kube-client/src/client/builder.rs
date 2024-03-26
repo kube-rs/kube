@@ -1,24 +1,29 @@
 use bytes::Bytes;
 use http::{header::HeaderMap, Request, Response};
 use hyper::{
-    self,
-    client::{connect::Connection, HttpConnector},
+    body::Incoming,
+    rt::{Read, Write},
 };
 use hyper_timeout::TimeoutConnector;
-pub use kube_core::response::Status;
+
+use hyper_util::{
+    client::legacy::connect::{Connection, HttpConnector},
+    rt::TokioExecutor,
+};
+
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncWrite};
 use tower::{util::BoxService, BoxError, Layer, Service, ServiceBuilder};
 use tower_http::{
     classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
 };
 use tracing::Span;
 
+use super::body::Body;
 use crate::{client::ConfigExt, Client, Config, Error, Result};
 
 /// HTTP body of a dynamic backing type.
 ///
-/// The suggested implementation type is [`hyper::Body`].
+/// The suggested implementation type is [`crate::client::Body`].
 pub type DynBody = dyn http_body::Body<Data = Bytes, Error = BoxError> + Send + Unpin;
 
 /// Builder for [`Client`] instances with customized [tower](`Service`) middleware.
@@ -34,7 +39,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// which provides a default stack as a starting point.
     pub fn new(service: Svc, default_namespace: impl Into<String>) -> Self
     where
-        Svc: Service<Request<hyper::Body>>,
+        Svc: Service<Request<Body>>,
     {
         Self {
             service,
@@ -57,7 +62,7 @@ impl<Svc> ClientBuilder<Svc> {
     /// Build a [`Client`] instance with the current [`Service`] stack.
     pub fn build<B>(self) -> Client
     where
-        Svc: Service<Request<hyper::Body>, Response = Response<B>> + Send + 'static,
+        Svc: Service<Request<Body>, Response = Response<B>> + Send + 'static,
         Svc::Future: Send + 'static,
         Svc::Error: Into<BoxError>,
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
@@ -67,7 +72,7 @@ impl<Svc> ClientBuilder<Svc> {
     }
 }
 
-pub type GenericService = BoxService<Request<hyper::Body>, Response<Box<DynBody>>, BoxError>;
+pub type GenericService = BoxService<Request<Body>, Response<Box<DynBody>>, BoxError>;
 
 impl TryFrom<Config> for ClientBuilder<GenericService> {
     type Error = Error;
@@ -97,14 +102,14 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 fn make_generic_builder<H>(connector: H, config: Config) -> Result<ClientBuilder<GenericService>, Error>
 where
     H: 'static + Clone + Send + Sync + Service<http::Uri>,
-    H::Response: 'static + Connection + AsyncRead + AsyncWrite + Send + Unpin,
+    H::Response: 'static + Connection + Read + Write + Send + Unpin,
     H::Future: 'static + Send,
     H::Error: 'static + Send + Sync + std::error::Error,
 {
     let default_ns = config.default_namespace.clone();
     let auth_layer = config.auth_layer()?;
 
-    let client: hyper::Client<_, hyper::Body> = {
+    let client: hyper_util::client::legacy::Client<_, Body> = {
         // Current TLS feature precedence when more than one are set:
         // 1. rustls-tls
         // 2. openssl-tls
@@ -127,7 +132,7 @@ where
         connector.set_read_timeout(config.read_timeout);
         connector.set_write_timeout(config.write_timeout);
 
-        hyper::Client::builder().build(connector)
+        hyper_util::client::legacy::Builder::new(TokioExecutor::new()).build(connector)
     };
 
     let stack = ServiceBuilder::new().layer(config.base_uri_layer()).into_inner();
@@ -145,7 +150,7 @@ where
             // Attribute names follow [Semantic Conventions].
             // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
             TraceLayer::new_for_http()
-                .make_span_with(|req: &Request<hyper::Body>| {
+                .make_span_with(|req: &Request<Body>| {
                     tracing::debug_span!(
                         "HTTP",
                          http.method = %req.method(),
@@ -156,10 +161,10 @@ where
                          otel.status_code = tracing::field::Empty,
                     )
                 })
-                .on_request(|_req: &Request<hyper::Body>, _span: &Span| {
+                .on_request(|_req: &Request<Body>, _span: &Span| {
                     tracing::debug!("requesting");
                 })
-                .on_response(|res: &Response<hyper::Body>, _latency: Duration, span: &Span| {
+                .on_response(|res: &Response<Incoming>, _latency: Duration, span: &Span| {
                     let status = res.status();
                     span.record("http.status_code", status.as_u16());
                     if status.is_client_error() || status.is_server_error() {
@@ -194,7 +199,7 @@ where
     Ok(ClientBuilder::new(
         BoxService::new(
             MapResponseBodyLayer::new(|body| {
-                Box::new(http_body::Body::map_err(body, BoxError::from)) as Box<DynBody>
+                Box::new(http_body_util::BodyExt::map_err(body, BoxError::from)) as Box<DynBody>
             })
             .layer(service),
         ),

@@ -1,11 +1,11 @@
-use super::ObjectRef;
+use super::{Lookup, ObjectRef, ReflectHandle};
 use crate::{
     utils::delayed_init::{self, DelayedInit},
     watcher,
 };
 use ahash::AHashMap;
+use async_broadcast::Sender;
 use derivative::Derivative;
-use kube_client::Resource;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
@@ -17,19 +17,20 @@ type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug)]
-pub struct Writer<K: 'static + Resource>
+pub struct Writer<K: 'static + Lookup + Clone>
 where
-    K::DynamicType: Eq + Hash,
+    K::DynamicType: Eq + Hash + Default + Clone,
 {
     store: Cache<K>,
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
     ready_rx: Arc<DelayedInit<()>>,
+    dispatch_tx: Sender<ObjectRef<K>>,
 }
 
-impl<K: 'static + Resource + Clone> Writer<K>
+impl<K: 'static + Lookup + Clone> Writer<K>
 where
-    K::DynamicType: Eq + Hash + Clone,
+    K::DynamicType: Eq + Hash + Default + Clone,
 {
     /// Creates a new Writer with the specified dynamic type.
     ///
@@ -37,11 +38,25 @@ where
     /// `k8s_openapi` types) you can use `Default` instead.
     pub fn new(dyntype: K::DynamicType) -> Self {
         let (ready_tx, ready_rx) = DelayedInit::new();
+        let (dispatch_tx, _) = async_broadcast::broadcast(1);
         Writer {
             store: Default::default(),
             dyntype,
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
+            dispatch_tx,
+        }
+    }
+
+    pub fn new_with_dispatch(dyntype: K::DynamicType, buf_size: usize) -> Self {
+        let (ready_tx, ready_rx) = DelayedInit::new();
+        let (dispatch_tx, _) = async_broadcast::broadcast(buf_size);
+        Writer {
+            store: Default::default(),
+            dyntype,
+            ready_tx: Some(ready_tx),
+            ready_rx: Arc::new(ready_rx),
+            dispatch_tx,
         }
     }
 
@@ -57,27 +72,26 @@ where
         }
     }
 
+    pub fn subscribe(&self) -> ReflectHandle<K> {
+        ReflectHandle::new(self.as_reader(), self.dispatcher)
+    }
+
     /// Applies a single watcher event to the store
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Applied(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
                 self.store.write().insert(key, obj);
             }
             watcher::Event::Deleted(obj) => {
-                let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
+                let key = obj.to_object_ref(self.dyntype.clone());
                 self.store.write().remove(&key);
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
                     .iter()
-                    .map(|obj| {
-                        (
-                            ObjectRef::from_obj_with(obj, self.dyntype.clone()),
-                            Arc::new(obj.clone()),
-                        )
-                    })
+                    .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
                 *self.store.write() = new_objs;
             }
@@ -88,10 +102,28 @@ where
             ready_tx.init(())
         }
     }
+
+    pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
+        match event {
+            watcher::Event::Applied(obj) => {
+                let obj_ref = obj.to_object_ref(self.dyntype.clone());
+                self.dispatch_tx.broadcast(obj_ref).await;
+            }
+
+            watcher::Event::Restarted(new_objs) => {
+                let objs = new_objs.iter().map(|obj| obj.to_object_ref(self.dyntype.clone()));
+                for obj in objs {
+                    self.dispatch_tx.broadcast(obj).await;
+                }
+            }
+            _ => {}
+        }
+    }
 }
+
 impl<K> Default for Writer<K>
 where
-    K: Resource + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Default + Eq + Hash + Clone,
 {
     fn default() -> Self {
@@ -107,7 +139,7 @@ where
 /// use `Writer::as_reader()` instead.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
-pub struct Store<K: 'static + Resource>
+pub struct Store<K: 'static + Lookup>
 where
     K::DynamicType: Hash + Eq,
 {
@@ -119,7 +151,7 @@ where
 #[error("writer was dropped before store became ready")]
 pub struct WriterDropped(delayed_init::InitDropped);
 
-impl<K: 'static + Clone + Resource> Store<K>
+impl<K: 'static + Clone + Lookup> Store<K>
 where
     K::DynamicType: Eq + Hash + Clone,
 {
@@ -201,7 +233,7 @@ where
 #[must_use]
 pub fn store<K>() -> (Store<K>, Writer<K>)
 where
-    K: Resource + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Eq + Hash + Clone + Default,
 {
     let w = Writer::<K>::default();

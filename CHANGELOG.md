@@ -5,7 +5,31 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.88.1...main
+ * see https://github.com/kube-rs/kube/compare/0.89.0...main
+
+[0.89.0](https://github.com/kube-rs/kube/releases/tag/0.89.0) / 2024-03-26
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.89.0 -->
+
+## Upgrading `hyper` and `http` to 1.0 and MSRV to `1.75.0`
+This release completes the hyper & http ecosystem upgrade [#1351](https://github.com/kube-rs/kube/issues/1351) via [#1438](https://github.com/kube-rs/kube/pull/1438). In particular, this change includes upgrades to `http`, `http-body`, `tower-http`, `hyper`, `hyper-openssl`, `hyper-rustls`, `hyper-socks2`, `hyper-timeout`, `tame-oauth`, `tokio-tungstenite`, `tower-http`, `rustls`, `rustls-pemfile`, as well as adopting the new `hyper_util` and `http_body_util` to make the change.
+
+While this change constitutes significant internal churn (and a new [`kube::client::Body`](https://docs.rs/kube/latest/kube/client/struct.Body.html)), our external api remains largely unchanged. Some minor changes are necessary for custom clients, and for integration testing using `tower_mock`. See the [controller-rs upgrade pr](https://github.com/kube-rs/controller-rs/pull/68) or the [examples folder in this commit](https://github.com/kube-rs/kube/commit/aeb4d3f62052c2072ebf6fa0a88083761b0f2404#diff-3f490bad6c4ca7e0e16f45f7be079809683095339108cec9affc94a508700bd9) for details.
+
+## What's Changed
+### Added
+* client_ext for `Client::get` and `Client::list` by @clux in https://github.com/kube-rs/kube/pull/1375
+* direct node access logs/portforward/exec/attach via kubelet debug interface by @XciD in https://github.com/kube-rs/kube/pull/1428
+### Changed
+* Bump MSRV to `1.75.0` by @clux in https://github.com/kube-rs/kube/pull/1408
+* Ease the bound for `reflector` to only request identifying metadata by @SOF3 in https://github.com/kube-rs/kube/pull/1393
+* Update base64 requirement from 0.21.4 to 0.22.0 by @dependabot in https://github.com/kube-rs/kube/pull/1422
+* upgrade `jsonpath-rust` to 0.5.0 by @clux in https://github.com/kube-rs/kube/pull/1429
+* update to hyper 1 by @tottoto in https://github.com/kube-rs/kube/pull/1438
+### Fixed
+* Serialize TerminalSize fields as PascalCase by @nightkr in https://github.com/kube-rs/kube/pull/1407
+* `Kubeconfig` allow `certificate_authority_data` not present in `ExecAuthCluster` by @ljun20160606 in https://github.com/kube-rs/kube/pull/1432
+* fix: check err on `Client::request_stream` by @XciD in https://github.com/kube-rs/kube/pull/1433
 
 [0.88.1](https://github.com/kube-rs/kube/releases/tag/0.88.1) / 2024-01-26
 ===================

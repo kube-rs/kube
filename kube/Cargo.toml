@@ -1,19 +1,15 @@
 [package]
 name = "kube"
-version = "0.88.1"
 description = "Kubernetes client and async controller runtime"
-authors = [
-  "clux <sszynrae@gmail.com>",
-  "Natalie Klestrup Röijezon <nat@nullable.se>",
-  "kazk <kazk.dev@gmail.com>",
-]
-license = "Apache-2.0"
-repository = "https://github.com/kube-rs/kube"
-readme = "../README.md"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 keywords = ["kubernetes", "client", "runtime", "cncf"]
 categories = ["network-programming", "caching", "api-bindings", "configuration", "encoding"]
-rust-version = "1.70.0"
-edition = "2021"
 
 [features]
 default = ["client", "rustls-tls"]
@@ -28,6 +24,7 @@ openssl-tls = ["kube-client/openssl-tls"]
 
 # auxiliary features
 ws = ["kube-client/ws", "kube-core/ws"]
+kubelet-debug = ["kube-client/kubelet-debug", "kube-core/kubelet-debug"]
 oauth = ["kube-client/oauth"]
 oidc = ["kube-client/oidc"]
 gzip = ["kube-client/gzip"]
@@ -36,6 +33,7 @@ admission = ["kube-core/admission"]
 derive = ["kube-derive", "kube-core/schema"]
 runtime = ["kube-runtime"]
 unstable-runtime = ["kube-runtime/unstable-runtime"]
+unstable-client = ["kube-client/unstable-client"]
 socks5 = ["kube-client/socks5"]
 
 [package.metadata.docs.rs]
@@ -43,30 +41,25 @@ features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jso
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
-[dependencies]
-kube-derive = { path = "../kube-derive", version = "=0.88.1", optional = true }
-kube-core = { path = "../kube-core", version = "=0.88.1" }
-kube-client = { path = "../kube-client", version = "=0.88.1", default-features = false, optional = true }
-kube-runtime = { path = "../kube-runtime", version = "=0.88.1", optional = true}
+[lints]
+workspace = true
 
+[dependencies]
+kube-derive = { path = "../kube-derive", version = "=0.89.0", optional = true }
+kube-core = { path = "../kube-core", version = "=0.89.0" }
+kube-client = { path = "../kube-client", version = "=0.89.0", default-features = false, optional = true }
+kube-runtime = { path = "../kube-runtime", version = "=0.89.0", optional = true}
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
-[dependencies.k8s-openapi]
-version = "0.21.0"
-default-features = false
+k8s-openapi.workspace = true
 
 [dev-dependencies]
-tokio = { version = "1.14.0", features = ["full"] }
-futures = "0.3.17"
-serde_json = "1.0.68"
-serde = { version = "1.0.130", features = ["derive"] }
-schemars = "0.8.6"
-hyper = "0.14.27"
-http = "0.2.9"
-tower-test = "0.4.0"
-anyhow = "1.0.71"
-
-[dev-dependencies.k8s-openapi]
-version = "0.21.0"
-default-features = false
-features = ["latest"]
+tokio = { workspace = true, features = ["full"] }
+futures.workspace = true
+serde_json.workspace = true
+serde = { workspace = true, features = ["derive"] }
+schemars.workspace = true
+http.workspace = true
+tower-test.workspace = true
+anyhow.workspace = true
+k8s-openapi = { workspace = true, features = ["latest"] }

@@ -4,25 +4,23 @@ use core::{
 };
 use std::{collections::VecDeque, sync::Arc};
 
-use async_stream::stream;
-use futures::{pin_mut, ready, Future, Stream, StreamExt, TryStream};
+use futures::{ready, Future, Stream, StreamExt, TryStream};
 use pin_project::pin_project;
 use tokio::time;
 use tracing::{debug, error, trace};
 
 use crate::{
-    reflector::{store::Writer, ObjectRef, Store},
+    reflector::{store::Writer, Lookup, ObjectRef, Store},
     watcher::{Error, Event},
 };
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
-use kube_client::Resource;
 
 /// Stream returned by the [`reflect`](super::WatchStreamExt::reflect) method
 #[pin_project]
 pub struct ReflectDispatcher<St, K>
 where
-    K: Resource + Clone + 'static,
-    K::DynamicType: Eq + std::hash::Hash + Clone,
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
 {
     #[pin]
     stream: St,
@@ -39,8 +37,8 @@ where
 impl<St, K> ReflectDispatcher<St, K>
 where
     St: Stream<Item = Result<Event<K>, Error>> + 'static,
-    K: Resource + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone,
+    K: Lookup + Clone,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
 {
     pub(super) fn new(stream: St, writer: Writer<K>, buf_size: usize) -> ReflectDispatcher<St, K> {
         let (tx, rx) = async_broadcast::broadcast(buf_size);
@@ -70,7 +68,7 @@ where
 
 impl<St, K> Stream for ReflectDispatcher<St, K>
 where
-    K: Resource + Clone,
+    K: Lookup + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone + Default,
     St: Stream<Item = Result<Event<K>, Error>>,
 {
@@ -187,7 +185,7 @@ where
 #[pin_project]
 pub struct ReflectHandle<K>
 where
-    K: Resource + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     #[pin]
@@ -197,7 +195,7 @@ where
 
 impl<K> Clone for ReflectHandle<K>
 where
-    K: Resource + Clone + 'static,
+    K: Lookup + Clone + 'static,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     fn clone(&self) -> Self {
@@ -207,7 +205,7 @@ where
 
 impl<K> ReflectHandle<K>
 where
-    K: Resource + Clone,
+    K: Lookup + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     pub(super) fn new(reader: Store<K>, rx: Receiver<ObjectRef<K>>) -> ReflectHandle<K> {
@@ -221,7 +219,7 @@ where
 
 impl<K> Stream for ReflectHandle<K>
 where
-    K: Resource + Clone,
+    K: Lookup + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone + Default,
 {
     type Item = Arc<K>;
