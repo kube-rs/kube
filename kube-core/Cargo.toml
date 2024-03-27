@@ -32,7 +32,6 @@ thiserror.workspace = true
 form_urlencoded.workspace = true
 http.workspace = true
 json-patch = { workspace = true, optional = true }
-once_cell.workspace = true
 chrono = { workspace = true, features = ["clock"] }
 schemars = { workspace = true, optional = true }
 k8s-openapi.workspace = true
