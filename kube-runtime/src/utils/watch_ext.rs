@@ -189,6 +189,7 @@ pub trait WatchStreamExt: Stream {
     fn stream_subscribe<K>(self) -> StreamSubscribe<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,
+        K: Clone,
     {
         StreamSubscribe::new(self)
     }
@@ -246,6 +247,15 @@ pub trait WatchStreamExt: Stream {
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
         Reflect::new(self, writer)
+    }
+
+    fn reflect_dispatch<K>(self, writer: Writer<K>) -> impl Stream<Item = Self::Item>
+    where
+        Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
+        K: Resource + Clone + 'static,
+        K::DynamicType: Eq + std::hash::Hash + Clone,
+    {
+        crate::reflector(writer, self)
     }
 }
 

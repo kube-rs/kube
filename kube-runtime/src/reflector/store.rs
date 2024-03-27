@@ -1,9 +1,10 @@
-use super::{Lookup, ObjectRef};
+use super::{Lookup, ObjectRef, ReflectHandle};
 use crate::{
     utils::delayed_init::{self, DelayedInit},
     watcher,
 };
 use ahash::AHashMap;
+use async_broadcast::{InactiveReceiver, Sender};
 use derivative::Derivative;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
@@ -16,14 +17,19 @@ type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug)]
-pub struct Writer<K: 'static + Lookup>
+pub struct Writer<K: 'static + Lookup + Clone>
 where
-    K::DynamicType: Eq + Hash,
+    K::DynamicType: Eq + Hash + Clone,
 {
     store: Cache<K>,
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
     ready_rx: Arc<DelayedInit<()>>,
+
+    dispatch_tx: Sender<ObjectRef<K>>,
+    // An inactive reader that prevents the channel from closing until the
+    // writer is dropped.
+    _dispatch_rx: InactiveReceiver<ObjectRef<K>>,
 }
 
 impl<K: 'static + Lookup + Clone> Writer<K>
@@ -36,11 +42,30 @@ where
     /// `k8s_openapi` types) you can use `Default` instead.
     pub fn new(dyntype: K::DynamicType) -> Self {
         let (ready_tx, ready_rx) = DelayedInit::new();
+        let (dispatch_tx, dispatch_rx) = async_broadcast::broadcast(1);
+        dispatch_tx.close();
         Writer {
             store: Default::default(),
             dyntype,
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
+            dispatch_tx,
+            _dispatch_rx: dispatch_rx.deactivate(),
+        }
+    }
+
+    pub fn new_with_dispatch(dyntype: K::DynamicType, buf_size: usize) -> Self {
+        let (ready_tx, ready_rx) = DelayedInit::new();
+        let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
+        // dont block on waiting for rx
+        dispatch_tx.set_await_active(false);
+        Writer {
+            store: Default::default(),
+            dyntype,
+            ready_tx: Some(ready_tx),
+            ready_rx: Arc::new(ready_rx),
+            dispatch_tx,
+            _dispatch_rx: dispatch_rx.deactivate(),
         }
     }
 
@@ -54,6 +79,10 @@ where
             store: self.store.clone(),
             ready_rx: self.ready_rx.clone(),
         }
+    }
+
+    pub fn subscribe(&self) -> ReflectHandle<K> {
+        ReflectHandle::new(self.as_reader(), self.dispatch_tx.new_receiver())
     }
 
     /// Applies a single watcher event to the store
@@ -82,7 +111,31 @@ where
             ready_tx.init(())
         }
     }
+
+    pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
+        if self.dispatch_tx.is_closed() {
+            return;
+        }
+
+        match event {
+            watcher::Event::Applied(obj) => {
+                let obj_ref = obj.to_object_ref(self.dyntype.clone());
+                // TODO: should this take a timeout to log when backpressure has
+                // been applied for too long, e.g. 10s
+                let _ = self.dispatch_tx.broadcast_direct(obj_ref).await;
+            }
+
+            watcher::Event::Restarted(new_objs) => {
+                let objs = new_objs.iter().map(|obj| obj.to_object_ref(self.dyntype.clone()));
+                for obj in objs {
+                    let _ = self.dispatch_tx.broadcast_direct(obj).await;
+                }
+            }
+            _ => {}
+        }
+    }
 }
+
 impl<K> Default for Writer<K>
 where
     K: Lookup + Clone + 'static,
@@ -199,6 +252,16 @@ where
     K::DynamicType: Eq + Hash + Clone + Default,
 {
     let w = Writer::<K>::default();
+    let r = w.as_reader();
+    (r, w)
+}
+
+pub fn store_with_dispatch<K>(buf_size: usize, dyntype: K::DynamicType) -> (Store<K>, Writer<K>)
+where
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + Hash + Clone + Default,
+{
+    let w = Writer::<K>::new_with_dispatch(dyntype, buf_size);
     let r = w.as_reader();
     (r, w)
 }

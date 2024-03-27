@@ -122,6 +122,23 @@ where
     })
 }
 
+pub fn trigger_self_shared<K, S>(
+    stream: S,
+    dyntype: K::DynamicType,
+) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
+where
+    S: TryStream<Ok = Arc<K>>,
+    K: Resource,
+    K::DynamicType: Clone,
+{
+    trigger_with(stream, move |obj| {
+        Some(ReconcileRequest {
+            obj_ref: ObjectRef::from_shared_obj_with(obj.clone(), dyntype.clone()),
+            reason: ReconcileReason::ObjectUpdated,
+        })
+    })
+}
+
 /// Enqueues any mapper returned `K` types for reconciliation
 fn trigger_others<S, K, I>(
     stream: S,
@@ -683,6 +700,42 @@ where
     ) -> Self {
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(trigger, dyntype.clone()).boxed();
+        trigger_selector.push(self_watcher);
+        Self {
+            trigger_selector,
+            trigger_backoff: Box::<DefaultBackoff>::default(),
+            graceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            forceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            dyntype,
+            reader,
+            config: Default::default(),
+        }
+    }
+
+    // TODO: do an entrypoint for shared streams of owned objects
+    //
+    // Is it better to use a concrete type (i.e. a SubscribeHandle as a trigger)
+    // or to pass in the reader out-of-band?
+    pub fn for_shared_stream(trigger: impl Stream<Item = Arc<K>> + Send + 'static, reader: Store<K>) -> Self
+    where
+        K::DynamicType: Default,
+    {
+        Self::for_shared_stream_with(trigger, reader, Default::default())
+    }
+
+    pub fn for_shared_stream_with(
+        trigger: impl Stream<Item = Arc<K>> + Send + 'static,
+        reader: Store<K>,
+        dyntype: K::DynamicType,
+    ) -> Self {
+        let mut trigger_selector = stream::SelectAll::new();
+        let self_watcher = trigger_self_shared(trigger.map(|obj| Ok(obj)), dyntype.clone()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
