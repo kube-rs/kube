@@ -7,7 +7,6 @@ mod event_modify;
 #[cfg(feature = "unstable-runtime-predicates")]
 mod predicate;
 mod reflect;
-mod reflect_dispatch;
 mod stream_backoff;
 #[cfg(feature = "unstable-runtime-subscribe")]
 pub mod stream_subscribe;
@@ -19,7 +18,6 @@ pub use event_modify::EventModify;
 #[cfg(feature = "unstable-runtime-predicates")]
 pub use predicate::{predicates, Predicate, PredicateFilter};
 pub use reflect::Reflect;
-pub use reflect_dispatch::{ReflectDispatcher, ReflectHandle};
 pub use stream_backoff::StreamBackoff;
 #[cfg(feature = "unstable-runtime-subscribe")]
 pub use stream_subscribe::StreamSubscribe;
