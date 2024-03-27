@@ -44,6 +44,11 @@ impl Body {
     {
         Body::new(Kind::Wrap(body.map_err(Into::into).boxed_unsync()))
     }
+
+    /// Collect all the pieces of the body
+    pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
+        Ok(<Self as BodyExt>::collect(self).await?.to_bytes())
+    }
 }
 
 impl From<Bytes> for Body {
