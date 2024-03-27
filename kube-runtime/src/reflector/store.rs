@@ -27,6 +27,8 @@ where
     ready_rx: Arc<DelayedInit<()>>,
 
     dispatch_tx: Sender<ObjectRef<K>>,
+    // An inactive reader that prevents the channel from closing until the
+    // writer is dropped.
     _dispatch_rx: InactiveReceiver<ObjectRef<K>>,
 }
 
@@ -118,6 +120,8 @@ where
         match event {
             watcher::Event::Applied(obj) => {
                 let obj_ref = obj.to_object_ref(self.dyntype.clone());
+                // TODO: should this take a timeout to log when backpressure has
+                // been applied for too long, e.g. 10s
                 let _ = self.dispatch_tx.broadcast_direct(obj_ref).await;
             }
 
