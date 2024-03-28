@@ -26,6 +26,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(tower::limit::ConcurrencyLimitLayer::new(4))
         // Add `DecompressionLayer` to make request headers interesting.
         .layer(DecompressionLayer::new())
+        .option_layer(config.auth_layer()?)
         .layer(
             // Attribute names follow [Semantic Conventions].
             // [Semantic Conventions]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md#http-client
