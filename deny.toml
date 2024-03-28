@@ -10,19 +10,6 @@ vulnerability = "deny"
 unmaintained = "warn"
 yanked = "warn"
 notice = "warn"
-ignore = [
-    # Ignoring issues related to `localtime_r` for now
-    # See https://github.com/kube-rs/kube/issues/650
-    #
-    # Potential segfault in the `time` crate
-    # Tracking issue: https://github.com/kube-rs/kube/issues/656
-    # PR to update `time`: https://github.com/chronotope/chrono/pull/578
-    "RUSTSEC-2020-0071",
-    # Potential segfault in `localtime_r` invocations
-    # Tracking issue: https://github.com/kube-rs/kube/issues/660
-    # Upstream issue: https://github.com/chronotope/chrono/issues/499
-    "RUSTSEC-2020-0159",
-]
 
 
 [licenses]
@@ -41,7 +28,6 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "LicenseRef-ring",
-    "LicenseRef-webpki",
 ]
 
 exceptions = [
@@ -59,22 +45,6 @@ name = "ring"
 expression = "LicenseRef-ring"
 license-files = [
     { path = "LICENSE", hash = 0xbd0eed23 },
-]
-
-
-[[licenses.clarify]]
-name = "webpki"
-expression = "LicenseRef-webpki"
-license-files = [
-    { path = "LICENSE", hash = 0x001c7e6c },
-]
-
-# rustls' webpki fork uses same license https://github.com/rustls/webpki
-[[licenses.clarify]]
-name = "rustls-webpki"
-expression = "LicenseRef-webpki"
-license-files = [
-    { path = "LICENSE", hash = 0x001c7e6c },
 ]
 
 [sources]
@@ -99,14 +69,6 @@ name = "syn"
 name = "base64"
 
 [[bans.skip]]
-# used by h2->hyper->hyper-openssl (we have latest)
-# newer used by serde_json
-name = "indexmap"
-[[bans.skip]]
-# via indexmap - have to also skip this
-name = "hashbrown"
-
-[[bans.skip]]
 # latest via openssl->hyper-openssl (we have latest)
 # newer via tower-http (we have latest)
 name = "bitflags"
@@ -117,7 +79,3 @@ name = "redox_syscall"
 
 [[bans.skip-tree]]
 name = "windows-sys"
-
-[[bans.skip]]
-# deep in dependency tree, dual use via tokio and hyper  (needs a bump there)
-name = "socket2"
