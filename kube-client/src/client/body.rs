@@ -7,7 +7,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::stream::Stream;
-use http_body::{Body as HttpBody, Frame};
+use http_body::{Body as HttpBody, Frame, SizeHint};
 use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
 use pin_project::pin_project;
 
@@ -82,6 +82,22 @@ impl HttpBody for Body {
                 ready!(Pin::new(stream).poll_frame(cx))
                     .map(|opt_chunk| opt_chunk.map_err(crate::Error::Service)),
             ),
+        }
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        match &self.kind {
+            Kind::Once(Some(bytes)) => SizeHint::with_exact(bytes.len() as u64),
+            Kind::Once(None) => SizeHint::with_exact(0),
+            Kind::Wrap(body) => body.size_hint(),
+        }
+    }
+
+    fn is_end_stream(&self) -> bool {
+        match &self.kind {
+            Kind::Once(Some(bytes)) => bytes.is_empty(),
+            Kind::Once(None) => true,
+            Kind::Wrap(body) => body.is_end_stream(),
         }
     }
 }
