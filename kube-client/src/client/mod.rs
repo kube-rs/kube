@@ -31,8 +31,6 @@ use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
 mod auth;
 mod body;
 mod builder;
-// Add `into_stream()` to `http::Body`
-use body::IntoBodyDataStream as _;
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
 #[cfg(feature = "unstable-client")]
 mod client_ext;
@@ -271,10 +269,7 @@ impl Client {
         let res = handle_api_errors(res).await?;
         // Map the error, since we want to convert this into an `AsyncBufReader` using
         // `into_async_read` which specifies `std::io::Error` as the stream's error type.
-        let body = BodyExt::map_err(res.into_body(), |e| {
-            std::io::Error::new(std::io::ErrorKind::Other, e)
-        })
-        .into_stream();
+        let body = res.into_body().into_stream().map_err(std::io::Error::other);
         Ok(body.into_async_read())
     }
 
@@ -314,17 +309,14 @@ impl Client {
         tracing::trace!("headers: {:?}", res.headers());
 
         let frames = FramedRead::new(
-            StreamReader::new(
-                BodyExt::map_err(res.into_body(), |e| {
-                    // Unexpected EOF from chunked decoder.
-                    // Tends to happen when watching for 300+s. This will be ignored.
-                    if e.to_string().contains("unexpected EOF during chunk") {
-                        return std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e);
-                    }
-                    std::io::Error::new(std::io::ErrorKind::Other, e)
-                })
-                .into_stream(),
-            ),
+            StreamReader::new(res.into_body().into_stream().map_err(|e| {
+                // Unexpected EOF from chunked decoder.
+                // Tends to happen when watching for 300+s. This will be ignored.
+                if e.to_string().contains("unexpected EOF during chunk") {
+                    return std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e);
+                }
+                std::io::Error::other(e)
+            })),
             LinesCodec::new(),
         );
 

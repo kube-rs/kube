@@ -44,6 +44,13 @@ impl Body {
     {
         Body::new(Kind::Wrap(body.map_err(Into::into).boxed_unsync()))
     }
+
+    pub(crate) fn into_stream(self) -> BodyDataStream<Self>
+    where
+        Self: Sized,
+    {
+        BodyDataStream::new(self)
+    }
 }
 
 impl From<Bytes> for Body {
@@ -136,14 +143,3 @@ where
         }
     }
 }
-
-pub trait IntoBodyDataStream: HttpBody {
-    fn into_stream(self) -> BodyDataStream<Self>
-    where
-        Self: Sized,
-    {
-        BodyDataStream::new(self)
-    }
-}
-
-impl<T> IntoBodyDataStream for T where T: HttpBody {}
