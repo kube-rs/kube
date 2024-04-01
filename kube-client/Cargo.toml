@@ -20,7 +20,7 @@ kubelet-debug = ["ws", "kube-core/kubelet-debug"]
 oauth = ["client", "tame-oauth"]
 oidc = ["client", "form_urlencoded"]
 gzip = ["client", "tower-http/decompression-gzip"]
-client = ["config", "__non_core", "hyper", "hyper-util", "http-body", "http-body-util", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath-rust", "bytes", "futures", "tokio", "tokio-util", "either"]
+client = ["config", "__non_core", "hyper", "hyper-util", "http-body", "http-body-util", "tower", "tower-http", "hyper-timeout", "chrono", "jsonpath-rust", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
@@ -69,7 +69,6 @@ tower = { workspace = true, features = ["buffer", "filter", "util"], optional = 
 tower-http = { workspace = true, features = ["auth", "map-response-body", "trace"], optional = true }
 hyper-timeout = { workspace = true, optional = true }
 tame-oauth = { workspace = true, features = ["gcp"], optional = true }
-pin-project = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 secrecy = { workspace = true, features = ["alloc", "serde"] }
 tracing = { workspace = true, features = ["log"], optional = true }

@@ -6,10 +6,9 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures::stream::Stream;
+use futures::{stream::Stream, TryStreamExt};
 use http_body::{Body as HttpBody, Frame, SizeHint};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
-use pin_project::pin_project;
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt, BodyStream};
 
 /// A request body.
 pub struct Body {
@@ -45,11 +44,10 @@ impl Body {
         Body::new(Kind::Wrap(body.map_err(Into::into).boxed_unsync()))
     }
 
-    pub(crate) fn into_stream(self) -> BodyDataStream<Self>
-    where
-        Self: Sized,
-    {
-        BodyDataStream::new(self)
+    pub(crate) fn into_data_stream(
+        self,
+    ) -> impl Stream<Item = Result<<Self as HttpBody>::Data, <Self as HttpBody>::Error>> {
+        Box::pin(BodyStream::new(self).try_filter_map(|frame| async { Ok(frame.into_data().ok()) }))
     }
 }
 
@@ -105,41 +103,6 @@ impl HttpBody for Body {
             Kind::Once(Some(bytes)) => bytes.is_empty(),
             Kind::Once(None) => true,
             Kind::Wrap(body) => body.is_end_stream(),
-        }
-    }
-}
-
-// Wrap `http_body::Body` to implement `Stream`.
-#[pin_project]
-pub struct BodyDataStream<B> {
-    #[pin]
-    body: B,
-}
-
-impl<B> BodyDataStream<B> {
-    pub(crate) fn new(body: B) -> Self {
-        Self { body }
-    }
-}
-
-impl<B> Stream for BodyDataStream<B>
-where
-    B: HttpBody<Data = Bytes>,
-{
-    type Item = Result<B::Data, B::Error>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        loop {
-            return match ready!(self.as_mut().project().body.poll_frame(cx)) {
-                Some(Ok(frame)) => {
-                    let Ok(bytes) = frame.into_data() else {
-                        continue;
-                    };
-                    Poll::Ready(Some(Ok(bytes)))
-                }
-                Some(Err(err)) => Poll::Ready(Some(Err(err))),
-                None => Poll::Ready(None),
-            };
         }
     }
 }
