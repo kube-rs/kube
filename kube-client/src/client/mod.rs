@@ -269,7 +269,7 @@ impl Client {
         let res = handle_api_errors(res).await?;
         // Map the error, since we want to convert this into an `AsyncBufReader` using
         // `into_async_read` which specifies `std::io::Error` as the stream's error type.
-        let body = res.into_body().into_stream().map_err(std::io::Error::other);
+        let body = res.into_body().into_data_stream().map_err(std::io::Error::other);
         Ok(body.into_async_read())
     }
 
@@ -309,7 +309,7 @@ impl Client {
         tracing::trace!("headers: {:?}", res.headers());
 
         let frames = FramedRead::new(
-            StreamReader::new(res.into_body().into_stream().map_err(|e| {
+            StreamReader::new(res.into_body().into_data_stream().map_err(|e| {
                 // Unexpected EOF from chunked decoder.
                 // Tends to happen when watching for 300+s. This will be ignored.
                 if e.to_string().contains("unexpected EOF during chunk") {
