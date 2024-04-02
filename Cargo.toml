@@ -52,7 +52,7 @@ http-body-util = "0.1.1"
 hyper = "1.2.0"
 hyper-util = "0.1.3"
 hyper-openssl = "0.10.2"
-hyper-rustls = "0.26.0"
+hyper-rustls = { version = "0.27.0", default-features = false }
 hyper-socks2 = { version = "0.9.0", default-features = false }
 hyper-timeout = "0.5.1"
 json-patch = "1.0.0"
@@ -65,7 +65,7 @@ pin-project = "1.0.4"
 proc-macro2 = "1.0.29"
 quote = "1.0.10"
 rand = "0.8.3"
-rustls = "0.22.0"
+rustls = { version = "0.23.0", default-features = false }
 rustls-pemfile = "2.0.0"
 schemars = "0.8.6"
 secrecy = "0.8.0"

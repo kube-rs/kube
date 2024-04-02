@@ -62,7 +62,7 @@ jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
 hyper = { workspace = true, features = ["client", "http1"], optional = true }
 hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "tokio"], optional = true }
-hyper-rustls = { workspace = true, optional = true }
+hyper-rustls = { workspace = true, features = ["http1", "logging", "native-tokio", "ring", "tls12"], optional = true }
 hyper-socks2 = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 tower = { workspace = true, features = ["buffer", "filter", "util"], optional = true }
