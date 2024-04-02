@@ -46,7 +46,7 @@ impl Body {
 
     /// Collect all the data frames and trailers of the request body
     pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
-        Ok(<Self as BodyExt>::collect(self).await?.to_bytes())
+        Ok(self.collect().await?.to_bytes())
     }
 
     pub(crate) fn into_data_stream(
