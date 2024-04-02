@@ -44,6 +44,11 @@ impl Body {
         Body::new(Kind::Wrap(body.map_err(Into::into).boxed_unsync()))
     }
 
+    /// Collect all the data frames and trailers of the request body
+    pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
+        Ok(self.collect().await?.to_bytes())
+    }
+
     pub(crate) fn into_data_stream(
         self,
     ) -> impl Stream<Item = Result<<Self as HttpBody>::Data, <Self as HttpBody>::Error>> {
