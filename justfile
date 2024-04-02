@@ -88,7 +88,7 @@ k3d:
     --k3s-arg "--disable=traefik,servicelb,metrics-server@server:*" \
     --k3s-arg '--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@agent:*' \
     --k3s-arg '--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@agent:*' \
-    --k3s-arg '--kube-apiserver-arg=feature-gates=WatchList=true'
+    --k3s-arg '--kube-apiserver-arg=feature-gates=WatchList=true@server:*'
 
 ## RELEASE RELATED
 

@@ -33,3 +33,4 @@ schemars = { workspace = true, features = ["chrono"] }
 chrono.workspace = true
 trybuild.workspace = true
 assert-json-diff.workspace = true
+runtime-macros = { git = "https://github.com/tyrone-wu/runtime-macros.git" }
