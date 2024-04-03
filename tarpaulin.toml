@@ -7,21 +7,19 @@
 
 [one_pass_coverage]
 workspace = true
-features = "kube/derive kube/runtime kube/ws"
+#features = "kube/derive kube/runtime kube/ws kube/jsonpatch kube/admission kube/gzip"
+all-features = true
 color = "Always"
-ignored = true
+ignored = true # integration tests
 timeout = "600s"
-exclude = ["e2e"]
-# NB: proc macro code is not picked up by tarpaulin - so could maybe skip kube-derive completely
-excluded_files = ["kube-derive/tests"]
+exclude = ["e2e", "kube-derive"] # proc-macro code not picked up by tarpaulin
+include-tests = true # include test coverage info to see what runs
 # NB: skipping Doctests because they are slow to build and generally marked no_run
 run-types = ["Tests"]
-ignore_tests = true
 
-# We could potentially pass in examples here
-# but: they don't help in covering kube-derive, and they force a full recompile
+# We could potentially pass in examples here - but better to write integration tests in kube
 #[example_pass]
-#features = "default"
 #packages = ["kube-examples"]
 #excluded_files = ["examples/"]
-#example = ["crd_derive_schema"]
+#workspace = true
+#run-types = ["Tests"]
