@@ -4,8 +4,10 @@ mod dispatcher;
 mod object_ref;
 pub mod store;
 
-pub use self::dispatcher::ReflectHandle;
-pub use self::object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef};
+pub use self::{
+    dispatcher::ReflectHandle,
+    object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef},
+};
 use crate::watcher;
 use async_stream::stream;
 use futures::{Stream, StreamExt};

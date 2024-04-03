@@ -2,8 +2,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use derivative::Derivative;
 use futures::{ready, Stream};
