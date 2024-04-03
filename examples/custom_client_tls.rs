@@ -20,12 +20,14 @@ async fn main() -> anyhow::Result<()> {
         let https = config.openssl_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
+            .option_layer(config.auth_layer()?)
             .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         Client::new(service, config.default_namespace)
     } else {
         let https = config.rustls_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
+            .option_layer(config.auth_layer()?)
             .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         Client::new(service, config.default_namespace)
     };
