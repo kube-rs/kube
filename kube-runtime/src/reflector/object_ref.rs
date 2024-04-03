@@ -203,7 +203,7 @@ impl<K: Lookup> ObjectRef<K> {
         obj.to_object_ref(dyntype)
     }
 
-    pub fn from_shared_obj_with(obj: Arc<K>, dyntype: K::DynamicType) -> Self
+    pub fn from_shared_obj_with(obj: &Arc<K>, dyntype: K::DynamicType) -> Self
     where
         K: Lookup,
     {

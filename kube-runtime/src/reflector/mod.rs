@@ -10,7 +10,7 @@ use crate::watcher;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use std::hash::Hash;
-pub use store::{shared_store, store, Store};
+pub use store::{store, store_shared, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
 ///

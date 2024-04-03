@@ -4,11 +4,7 @@ use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, PodCondition};
 use kube::{
     api::{Patch, PatchParams},
-    runtime::{
-        controller::Action,
-        reflector::{self, store::Writer},
-        watcher, Config, Controller, WatchStreamExt,
-    },
+    runtime::{controller::Action, reflector, watcher, Config, Controller, WatchStreamExt},
     Api, Client, ResourceExt,
 };
 use tokio::sync::mpsc;
@@ -130,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
     let ctx = Arc::new(Data { client });
 
     // Create a shared store with a predefined buffer that will be shared between subscribers.
-    let (reader, writer) = reflector::shared_store(SUBSCRIBE_BUFFER_SIZE);
+    let (reader, writer) = reflector::store_shared(SUBSCRIBE_BUFFER_SIZE);
     // Before threading an object watch through the store, create a subscriber.
     // Any number of subscribers can be created from one writer.
     let subscriber = writer

@@ -133,7 +133,7 @@ where
 {
     trigger_with(stream, move |obj| {
         Some(ReconcileRequest {
-            obj_ref: ObjectRef::from_shared_obj_with(obj.clone(), dyntype.clone()),
+            obj_ref: ObjectRef::from_obj_with(obj.as_ref(), dyntype.clone()),
             reason: ReconcileReason::ObjectUpdated,
         })
     })
@@ -735,7 +735,7 @@ where
         dyntype: K::DynamicType,
     ) -> Self {
         let mut trigger_selector = stream::SelectAll::new();
-        let self_watcher = trigger_self_shared(trigger.map(|obj| Ok(obj)), dyntype.clone()).boxed();
+        let self_watcher = trigger_self_shared(trigger.map(Ok), dyntype.clone()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,

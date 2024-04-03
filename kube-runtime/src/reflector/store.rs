@@ -72,7 +72,7 @@ where
     pub fn subscribe(&self) -> Option<ReflectHandle<K>> {
         self.dispatcher
             .as_ref()
-            .and_then(|dispatcher| Some(dispatcher.subscribe(self.as_reader())))
+            .map(|dispatcher| dispatcher.subscribe(self.as_reader()))
     }
 
     /// Applies a single watcher event to the store
@@ -118,7 +118,7 @@ where
                         dispatcher.broadcast(obj_ref).await;
                     }
                 }
-                _ => {}
+                watcher::Event::Deleted(_) => {}
             }
         }
     }
@@ -244,7 +244,9 @@ where
     (r, w)
 }
 
-pub fn shared_store<K>(buf_size: usize) -> (Store<K>, Writer<K>)
+#[must_use]
+#[allow(clippy::module_name_repetitions)]
+pub fn store_shared<K>(buf_size: usize) -> (Store<K>, Writer<K>)
 where
     K: Lookup + Clone + 'static,
     K::DynamicType: Eq + Hash + Clone + Default,

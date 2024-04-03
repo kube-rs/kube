@@ -77,9 +77,10 @@ where
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     pub(super) fn new(reader: Store<K>, rx: Receiver<ObjectRef<K>>) -> ReflectHandle<K> {
-        Self { reader, rx }
+        Self { rx, reader }
     }
 
+    #[must_use]
     pub fn reader(&self) -> Store<K> {
         self.reader.clone()
     }
@@ -98,8 +99,7 @@ where
             Some(obj_ref) => this
                 .reader
                 .get(&obj_ref)
-                .map(|obj| Poll::Ready(Some(obj)))
-                .unwrap_or(Poll::Pending),
+                .map_or(Poll::Pending, |obj| Poll::Ready(Some(obj))),
             None => Poll::Ready(None),
         }
     }
@@ -133,8 +133,8 @@ pub(crate) mod test {
             Ok(Event::Restarted(vec![foo, bar])),
         ]);
 
-        let (reader, writer) = reflector::store_with_dispatch(10, Default::default());
-        let reflect = st.reflect_dispatch(writer);
+        let (reader, writer) = reflector::store_shared(10);
+        let reflect = st.reflect_shared(writer);
         pin_mut!(reflect);
 
         // Prior to any polls, we should have an empty store.
@@ -178,9 +178,9 @@ pub(crate) mod test {
         let foo = Arc::new(foo);
         let bar = Arc::new(bar);
 
-        let (_, writer) = reflector::store_with_dispatch(10, Default::default());
-        let subscriber = writer.subscribe();
-        let reflect = st.reflect_dispatch(writer);
+        let (_, writer) = reflector::store_shared(10);
+        let subscriber = writer.subscribe().unwrap();
+        let reflect = st.reflect_shared(writer);
         pin_mut!(reflect);
         pin_mut!(subscriber);
 
@@ -231,9 +231,9 @@ pub(crate) mod test {
         let foo = Arc::new(foo);
         let bar = Arc::new(bar);
 
-        let (_, writer) = reflector::store_with_dispatch(10, Default::default());
-        let subscriber = writer.subscribe();
-        let mut reflect = Box::pin(st.reflect_dispatch(writer));
+        let (_, writer) = reflector::store_shared(10);
+        let subscriber = writer.subscribe().unwrap();
+        let mut reflect = Box::pin(st.reflect_shared(writer));
         pin_mut!(subscriber);
 
         assert!(matches!(
@@ -275,10 +275,10 @@ pub(crate) mod test {
         let foo = Arc::new(foo);
         let bar = Arc::new(bar);
 
-        let (_, writer) = reflector::store_with_dispatch(1, Default::default());
-        let subscriber = writer.subscribe();
-        let subscriber_slow = writer.subscribe();
-        let reflect = st.reflect_dispatch(writer);
+        let (_, writer) = reflector::store_shared(1);
+        let subscriber = writer.subscribe().unwrap();
+        let subscriber_slow = writer.subscribe().unwrap();
+        let reflect = st.reflect_shared(writer);
         pin_mut!(reflect);
         pin_mut!(subscriber);
         pin_mut!(subscriber_slow);
