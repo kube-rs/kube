@@ -147,7 +147,7 @@ async fn reconcile_metadata(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Err
     if pod.name_any() == "kube-system" {
         return Ok(Action::requeue(Duration::from_secs(300)));
     }
-    let labels = pod.metadata.labels.clone().unwrap_or_else(|| Default::default());
+    let labels = pod.metadata.labels();
     if labels.len() == 0 {
         return Ok(Action::requeue(Duration::from_secs(180)));
     }

@@ -249,7 +249,7 @@ pub trait WatchStreamExt: Stream {
         Reflect::new(self, writer)
     }
 
-    fn reflect_dispatch<K>(self, writer: Writer<K>) -> impl Stream<Item = Self::Item>
+    fn reflect_shared<K>(self, writer: Writer<K>) -> impl Stream<Item = Self::Item>
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
         K: Resource + Clone + 'static,
