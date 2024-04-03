@@ -2,15 +2,53 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
+use std::fmt::Debug;
 use std::sync::Arc;
 
+use derivative::Derivative;
 use futures::{ready, Stream};
 use pin_project::pin_project;
 
 use crate::reflector::{ObjectRef, Store};
-use async_broadcast::Receiver;
+use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
 use super::Lookup;
+
+#[derive(Derivative)]
+#[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
+pub(crate) struct Dispatcher<K>
+where
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
+{
+    dispatch_tx: Sender<ObjectRef<K>>,
+    // An inactive reader that prevents the channel from closing until the
+    // writer is dropped.
+    _dispatch_rx: InactiveReceiver<ObjectRef<K>>,
+}
+
+impl<K> Dispatcher<K>
+where
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
+{
+    pub(crate) fn new(buf_size: usize) -> Dispatcher<K> {
+        let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
+        dispatch_tx.set_await_active(false);
+        Self {
+            dispatch_tx,
+            _dispatch_rx: dispatch_rx.deactivate(),
+        }
+    }
+
+    pub(crate) async fn broadcast(&mut self, obj_ref: ObjectRef<K>) {
+        let _ = self.dispatch_tx.broadcast_direct(obj_ref).await;
+    }
+
+    pub(crate) fn subscribe(&self, reader: Store<K>) -> ReflectHandle<K> {
+        ReflectHandle::new(reader, self.dispatch_tx.new_receiver())
+    }
+}
 
 #[pin_project]
 pub struct ReflectHandle<K>

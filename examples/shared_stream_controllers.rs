@@ -1,136 +1,28 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::StreamExt;
-use k8s_openapi::api::core::v1::{Pod, PodCondition, PodStatus};
+use k8s_openapi::api::core::v1::{Pod, PodCondition};
 use kube::{
     api::{Patch, PatchParams},
-    core::ObjectMeta,
-    runtime::{controller::Action, reflector::store::Writer, watcher, Config, Controller, WatchStreamExt},
+    runtime::{
+        controller::Action,
+        reflector::{self, store::Writer},
+        watcher, Config, Controller, WatchStreamExt,
+    },
     Api, Client, ResourceExt,
 };
-use tracing::{info, info_span, warn, Instrument};
+use tokio::sync::mpsc;
+use tracing::{info, warn};
 
 use thiserror::Error;
 
+// Helper module that namespaces two constants describing a Kubernetes status condition
 pub mod condition {
     pub static UNDOCUMENTED_TYPE: &str = "UndocumentedPort";
     pub static STATUS_TRUE: &str = "True";
 }
 
 const SUBSCRIBE_BUFFER_SIZE: usize = 256;
-
-#[derive(Clone)]
-struct Data {
-    client: Client,
-}
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
-
-    let client = Client::try_default().await?;
-    let pods = Api::<Pod>::namespaced(client.clone(), "default");
-    let config = Config::default().concurrency(2);
-    let ctx = Arc::new(Data { client });
-
-    // (1): create a store (with a dispatcher)
-    let writer = Writer::<Pod>::new_with_dispatch(Default::default(), SUBSCRIBE_BUFFER_SIZE);
-    // (2): create a subscriber
-    let subscriber = writer.subscribe();
-    // (2.5): create a watch stream
-    let pod_watch = watcher(pods.clone(), Default::default())
-        .default_backoff()
-        .reflect_dispatch(writer);
-
-    // (3): schedule the root (i.e. shared) stream with the runtime.
-    //
-    //  The runtime (tokio) will drive this task to readiness; the stream is
-    //  polled continously and allows all downstream readers (i.e. subscribers)
-    //  to make progress.
-    tokio::spawn(async move {
-        // Pin on the heap so we don't overflow our stack
-        let mut watch = pod_watch.boxed();
-        while let Some(next) = watch.next().await {
-            // We are not interested in the returned events here, only in
-            // handling errors.
-            match next {
-                Err(error) => tracing::error!(%error, "Received error from main watcher stream"),
-                _ => {}
-            }
-        }
-    });
-
-    // (4): create a reader. We create a metadata controller that will mirror a
-    // pod's labels as annotations.
-    //
-    // To create a controller that operates on a shared stream, we need two
-    // handles:
-    // - A handle to the store.
-    // - A handle to a shared stream.
-    //
-    // The handle to the shared stream will be used to receive shared objects as
-    // they are applied by the reflector.
-    let reader = subscriber.reader();
-    // Store readers can be created on-demand by calling `reader()` on a shared
-    // stream handle. Stream handles are cheap to clone.
-    let metadata_controller = Controller::for_shared_stream(subscriber.clone(), reader)
-        .with_config(config.clone())
-        .shutdown_on_signal()
-        .run(
-            reconcile_metadata,
-            |_, _, _| Action::requeue(Duration::from_secs(1)),
-            ctx.clone(),
-        )
-        .for_each(|res| async move {
-            match res {
-                Ok(v) => info!("Reconciled {v:?}"),
-                Err(error) => warn!(%error, "Failed to reconcile object"),
-            }
-        })
-        .instrument(info_span!("metadata_controller"));
-
-    // (5): Create status controller. Our status controller write a condition
-    // whenever a pod has undocumented container ports (i.e. containers with no
-    // exposed ports).
-    //
-    // This is the last controller we will create, so we can just move the
-    // handle inside the controller.
-    let reader = subscriber.reader();
-    let status_controller = Controller::for_shared_stream(subscriber, reader)
-        .with_config(config)
-        .shutdown_on_signal()
-        .run(
-            reconcile_status,
-            |_, _, _| Action::requeue(Duration::from_secs(1)),
-            ctx,
-        )
-        .for_each(|res| async move {
-            match res {
-                Ok(v) => info!("Reconciled {v:?}"),
-                Err(error) => warn!(%error, "Failed to reconcile object"),
-            }
-        })
-        .instrument(info_span!("status_controller"));
-
-    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
-    // (6): Last step, drive controllers to readiness. Controllers are futures
-    // and need to be driven to make progress. A controller that's not driven
-    // and operates on a subscribed stream will eventually block the shared stream.
-    tokio::select! {
-        _ = metadata_controller => {
-        },
-
-        _ = status_controller => {
-        },
-
-        _ = terminate.recv() => {
-            info!("Received term signal; shutting down...")
-        }
-
-    }
-
-    Ok(())
-}
 
 #[derive(Debug, Error)]
 enum Error {
@@ -141,28 +33,30 @@ enum Error {
     MissingField(&'static str),
 }
 
-/// Controller will trigger this whenever our main pod has changed. The function
-/// reconciles a pod by copying over the labels to the annotations
+#[derive(Clone)]
+struct Data {
+    client: Client,
+}
+
+/// A simple reconciliation function that will copy a pod's labels into the annotations.
 async fn reconcile_metadata(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Error> {
     if pod.name_any() == "kube-system" {
-        return Ok(Action::requeue(Duration::from_secs(300)));
-    }
-    let labels = pod.metadata.labels();
-    if labels.len() == 0 {
-        return Ok(Action::requeue(Duration::from_secs(180)));
+        return Ok(Action::await_change());
     }
 
-    let annotations = labels.clone();
-    let p = Pod {
-        metadata: ObjectMeta {
-            name: Some(pod.name_any()),
-            labels: Some(labels),
-            annotations: Some(annotations),
-            ..ObjectMeta::default()
-        },
-        spec: pod.spec.clone(),
-        status: pod.status.clone(),
-    };
+    let labels = pod.labels();
+    if labels.is_empty() {
+        return Ok(Action::await_change());
+    }
+
+    let mut annotations = pod.annotations().clone();
+    for (key, value) in labels {
+        annotations.insert(key.to_owned(), value.to_owned());
+    }
+
+    let mut pod = (*pod).clone();
+    pod.metadata.annotations = Some(annotations);
+    pod.metadata.managed_fields = None;
 
     let pod_api = Api::<Pod>::namespaced(
         ctx.client.clone(),
@@ -174,9 +68,9 @@ async fn reconcile_metadata(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Err
 
     pod_api
         .patch(
-            &p.name_any(),
+            &pod.name_any(),
             &PatchParams::apply("controller-1"),
-            &Patch::Apply(&p),
+            &Patch::Apply(&pod),
         )
         .await
         .map_err(Error::WriteFailed)?;
@@ -184,57 +78,16 @@ async fn reconcile_metadata(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Err
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
-/// Controller will trigger this whenever our main pod has changed. The
-/// function reconciles a pod by writing a status if it does not document a
-/// port.
+/// Another reconiliation function that will add an 'UndocumentedPort' condition to pods that do
+/// do not have any ports declared across all containers.
 async fn reconcile_status(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Error> {
-    let mut conditions = pod
-        .status
-        .clone()
-        .unwrap_or_default()
-        .conditions
-        .unwrap_or_default();
-
-    // If the condition already exists, exit
-    for cond in conditions.iter() {
-        if cond.type_ == condition::UNDOCUMENTED_TYPE {
-            return Ok(Action::requeue(Duration::from_secs(300)));
+    for container in pod.spec.clone().unwrap_or_default().containers.iter() {
+        if container.ports.clone().unwrap_or_default().len() != 0 {
+            tracing::debug!(name = %pod.name_any(), "Skipped updating pod with documented ports");
+            return Ok(Action::await_change());
         }
     }
 
-    pod.spec
-        .clone()
-        .unwrap_or_default()
-        .containers
-        .iter()
-        .for_each(|c| {
-            if c.ports.clone().unwrap_or_default().len() == 0 {
-                conditions.push(PodCondition {
-                    type_: condition::UNDOCUMENTED_TYPE.into(),
-                    status: condition::STATUS_TRUE.into(),
-                    ..Default::default()
-                })
-            }
-        });
-
-    let mut current_conds = pod
-        .status
-        .clone()
-        .unwrap_or_default()
-        .conditions
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|c| c.type_ != condition::UNDOCUMENTED_TYPE && c.status != condition::STATUS_TRUE)
-        .collect::<Vec<PodCondition>>();
-
-    for condition in conditions {
-        current_conds.push(condition);
-    }
-
-    let status = PodStatus {
-        conditions: Some(current_conds),
-        ..Default::default()
-    };
     let pod_api = Api::<Pod>::namespaced(
         ctx.client.clone(),
         pod.metadata
@@ -243,18 +96,143 @@ async fn reconcile_status(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Error
             .ok_or_else(|| Error::MissingField(".metadata.name"))?,
     );
 
-    let name = pod.name_any();
+    let undocumented_condition = PodCondition {
+        type_: condition::UNDOCUMENTED_TYPE.into(),
+        status: condition::STATUS_TRUE.into(),
+        ..Default::default()
+    };
     let value = serde_json::json!({
-            "apiVersion": "v1",
+        "status": {
+            "name": pod.name_any(),
             "kind": "Pod",
-            "name": name,
-            "status": status,
+            "conditions": vec![undocumented_condition]
+        }
     });
-    let p = Patch::Merge(value);
     pod_api
-        .patch_status(&pod.name_any(), &PatchParams::apply("controller-2"), &p)
+        .patch_status(
+            &pod.name_any(),
+            &PatchParams::apply("controller-2"),
+            &Patch::Strategic(value),
+        )
         .await
         .map_err(Error::WriteFailed)?;
 
     Ok(Action::requeue(Duration::from_secs(300)))
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
+
+    let client = Client::try_default().await?;
+    let pods = Api::<Pod>::namespaced(client.clone(), "default");
+    let config = Config::default().concurrency(2);
+    let ctx = Arc::new(Data { client });
+
+    // Create a shared store with a predefined buffer that will be shared between subscribers.
+    let (reader, writer) = reflector::shared_store(SUBSCRIBE_BUFFER_SIZE);
+    // Before threading an object watch through the store, create a subscriber.
+    // Any number of subscribers can be created from one writer.
+    let subscriber = writer
+        .subscribe()
+        .expect("subscribers can only be created from shared stores");
+
+    // Reflect a stream of pod watch events into the store and apply a backoff. For subscribers to
+    // be able to consume updates, the reflector must be shared.
+    let mut pod_watch = watcher(pods.clone(), Default::default())
+        .default_backoff()
+        .reflect_shared(writer)
+        .boxed();
+
+    // Create the first controller using the reconcile_metadata function. Controllers accept
+    // subscribers through a dedicated interface.
+    let mut metadata_controller = Controller::for_shared_stream(subscriber.clone(), reader)
+        .with_config(config.clone())
+        .run(
+            reconcile_metadata,
+            |pod, error, _| {
+                tracing::error!(%error, name = %pod.name_any(), "Failed to reconcile metadata");
+                Action::requeue(Duration::from_secs(10))
+            },
+            ctx.clone(),
+        )
+        .boxed();
+
+    // Subscribers can be used to get a read handle on the store, if the initial handle has been
+    // moved or dropped.
+    let reader = subscriber.reader();
+    // Create the second controller using the reconcile_status function.
+    let mut status_controller = Controller::for_shared_stream(subscriber, reader)
+        .with_config(config)
+        .run(
+            reconcile_status,
+            |pod, error, _| {
+                tracing::error!(%error, name = %pod.name_any(), "Failed to reconcile status");
+                Action::requeue(Duration::from_secs(10))
+            },
+            ctx,
+        )
+        .boxed();
+
+    // A simple handler to shutdown on CTRL-C or SIGTERM.
+    let mut shutdown_rx = shutdown_handler();
+
+    // Drive streams to readiness. The initial watch (that is reflected) needs to be driven to
+    // consume events from the API Server and forward them to subscribers.
+    //
+    // Both controllers will operate on shared objects.
+    loop {
+        tokio::select! {
+            Some(res) = metadata_controller.next() => {
+                match res {
+                    Ok(v) => info!("Reconciled metadata {v:?}"),
+                    Err(error) => warn!(%error, "Failed to reconcile metadata"),
+                }
+            },
+
+            Some(res) = status_controller.next() => {
+                match res {
+                    Ok(v) => info!("Reconciled status {v:?}"),
+                    Err(error) => warn!(%error, "Failed to reconcile object"),
+                }
+            },
+
+            Some(item) = pod_watch.next() => {
+                match item {
+                    Err(error) => tracing::error!(%error, "Received error from main watcher stream"),
+                    _ => {}
+                }
+            },
+
+            _ = shutdown_rx.recv() => {
+                tracing::info!("Received shutdown signal; terminating...");
+                break;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// Create a channel that will hold at most one item. Whenever a signal is received it is sent
+// through the channel.
+// We do not use a oneshot because we don't want to clone the receiver in each loop iteration.
+fn shutdown_handler() -> mpsc::Receiver<()> {
+    let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("should not fail to register sighandler");
+    let ctrlc = tokio::signal::ctrl_c();
+    tokio::spawn(async move {
+        tokio::select! {
+            _ = terminate.recv() => {
+                shutdown_tx.send(()).await
+            },
+
+            _ = ctrlc => {
+                shutdown_tx.send(()).await
+            }
+        }
+    });
+
+    shutdown_rx
 }
