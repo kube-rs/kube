@@ -17,11 +17,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install tarpaulin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
       - uses: AbsaOSS/k3d-action@v2
         name: "Create Single Cluster"
         with:
@@ -31,8 +32,5 @@ jobs:
             -p 10250:10250
             --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
       - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          version: '0.27.3'
-          out-type: Xml
+        run: rustup run stable cargo tarpaulin -o xml
       - uses: codecov/codecov-action@v3
