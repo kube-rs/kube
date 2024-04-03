@@ -7,9 +7,36 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.90.0...main
 
-0.90.0 / 2024-04-03
+[0.90.0](https://github.com/kube-rs/kube/releases/tag/0.90.0) / 2024-04-03
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.90.0 -->
+## Highlights
+### [`kube::client::Body`](https://docs.rs/kube/latest/kube/client/struct.Body.html) Improvements
+- Unit testing helpers #1444 + #1445,
+- Accuracy; `size_hint` and `is_end_stream` implemented in #1452 + internal cleanups #1453 and #1455
 
+### Dependency Cleanups
+- `rustls` to 0.23 in #1457
+- `once_cell` removed in #1447 (no longer needed)
+- `futures` feature prune in #1442
+- `chrono` features prune in #1448, and bump its min version pin in #1458
+
+## What's Changed
+### Added
+* Add proxy `Body::collect_bytes` for easier unit tests by @clux in https://github.com/kube-rs/kube/pull/1445
+### Changed
+* update to `rustls` 0.23 by @tottoto in https://github.com/kube-rs/kube/pull/1457
+### Fixed
+* disable unused `futures` feature by @tottoto in https://github.com/kube-rs/kube/pull/1442
+* Expose `Body::empty` for easier tests by @clux in https://github.com/kube-rs/kube/pull/1444
+* replace `once_cell` Lazy with ordinary static by @tottoto in https://github.com/kube-rs/kube/pull/1447
+* replace `chrono` feature `clock` with `now` by @tottoto in https://github.com/kube-rs/kube/pull/1448
+* implement `http_body` trait method by @tottoto in https://github.com/kube-rs/kube/pull/1452
+* Fix examples for custom clients not authenticating by @clux in https://github.com/kube-rs/kube/pull/1450
+* Set a compatible minimum `chrono` version by @clux in https://github.com/kube-rs/kube/pull/1458
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/0.89.0...0.90.0
 [0.89.0](https://github.com/kube-rs/kube/releases/tag/0.89.0) / 2024-03-26
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.89.0 -->
