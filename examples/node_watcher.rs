@@ -1,4 +1,6 @@
-use futures::{pin_mut, TryStreamExt};
+use std::pin::pin;
+
+use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
     api::{Api, ListParams, ResourceExt},
@@ -20,9 +22,8 @@ async fn main() -> anyhow::Result<()> {
     } else {
         watcher::Config::default()
     };
-    let obs = watcher(nodes, wc).default_backoff().applied_objects();
+    let mut obs = pin!(watcher(nodes, wc).default_backoff().applied_objects());
 
-    pin_mut!(obs);
     while let Some(n) = obs.try_next().await? {
         check_for_node_failures(&client, n).await?;
     }

@@ -8,7 +8,7 @@
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
 use either::{Either, Left, Right};
-use futures::{self, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
+use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
 #[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
@@ -492,9 +492,10 @@ impl TryFrom<Config> for Client {
 
 #[cfg(test)]
 mod tests {
+    use std::pin::pin;
+
     use crate::{client::Body, Api, Client};
 
-    use futures::pin_mut;
     use http::{Request, Response};
     use k8s_openapi::api::core::v1::Pod;
     use tower_test::mock;
@@ -511,7 +512,7 @@ mod tests {
         let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
         let spawned = tokio::spawn(async move {
             // Receive a request for pod and respond with some data
-            pin_mut!(handle);
+            let mut handle = pin!(handle);
             let (request, send) = handle.next_request().await.expect("service not called");
             assert_eq!(request.method(), http::Method::GET);
             assert_eq!(request.uri().to_string(), "/api/v1/namespaces/default/pods/test");

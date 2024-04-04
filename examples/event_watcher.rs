@@ -1,4 +1,6 @@
-use futures::{pin_mut, TryStreamExt};
+use std::pin::pin;
+
+use futures::TryStreamExt;
 use k8s_openapi::{
     api::{core::v1::ObjectReference, events::v1::Event},
     apimachinery::pkg::apis::meta::v1::Time,
@@ -36,8 +38,7 @@ async fn main() -> anyhow::Result<()> {
             conf = conf.fields(&format!("regarding.kind={kind},regarding.name={name}"));
         }
     }
-    let event_stream = watcher(events, conf).default_backoff().applied_objects();
-    pin_mut!(event_stream);
+    let mut event_stream = pin!(watcher(events, conf).default_backoff().applied_objects());
 
     println!("{0:<6} {1:<15} {2:<55} {3}", "AGE", "REASON", "OBJECT", "MESSAGE");
     while let Some(ev) = event_stream.try_next().await? {

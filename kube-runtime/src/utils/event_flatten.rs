@@ -1,9 +1,9 @@
 use crate::watcher::{Error, Event};
 use core::{
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
-use futures::{ready, Stream, TryStream};
+use futures::{Stream, TryStream};
 use pin_project::pin_project;
 
 #[pin_project]
@@ -58,10 +58,10 @@ where
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::task::Poll;
+    use std::{pin::pin, task::Poll};
 
     use super::{Error, Event, EventFlatten};
-    use futures::{pin_mut, poll, stream, StreamExt};
+    use futures::{poll, stream, StreamExt};
 
     #[tokio::test]
     async fn watches_applies_uses_correct_eventflattened_stream() {
@@ -74,8 +74,7 @@ pub(crate) mod tests {
             Err(Error::TooManyObjects),
             Ok(Event::Applied(2)),
         ]);
-        let rx = EventFlatten::new(data, false);
-        pin_mut!(rx);
+        let mut rx = pin!(EventFlatten::new(data, false));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(0)))));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(1)))));
         // NB: no Deleted events here

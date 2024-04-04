@@ -46,10 +46,10 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{task::Poll, vec};
+    use std::{pin::pin, task::Poll, vec};
 
     use super::{Error, Event, EventModify};
-    use futures::{pin_mut, poll, stream, StreamExt};
+    use futures::{poll, stream, StreamExt};
 
     #[tokio::test]
     async fn eventmodify_modifies_innner_value_of_event() {
@@ -58,10 +58,9 @@ pub(crate) mod test {
             Err(Error::TooManyObjects),
             Ok(Event::Restarted(vec![10])),
         ]);
-        let ev_modify = EventModify::new(st, |x| {
+        let mut ev_modify = pin!(EventModify::new(st, |x| {
             *x += 1;
-        });
-        pin_mut!(ev_modify);
+        }));
 
         assert!(matches!(
             poll!(ev_modify.next()),

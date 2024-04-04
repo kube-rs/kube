@@ -99,15 +99,16 @@ impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
+    use std::pin::pin;
+
     use super::*;
-    use futures::{pin_mut, poll, stream, StreamExt};
+    use futures::{poll, stream, StreamExt};
 
     #[tokio::test]
     async fn stream_subscribe_continues_to_propagate_values() {
         let rx = stream::iter([Ok(0), Ok(1), Err(2), Ok(3), Ok(4)]);
-        let rx = StreamSubscribe::new(rx);
+        let mut rx = pin!(StreamSubscribe::new(rx));
 
-        pin_mut!(rx);
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Arc::new(Ok(0)))));
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Arc::new(Ok(1)))));
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Arc::new(Err(2)))));
@@ -120,14 +121,10 @@ mod tests {
     async fn all_subscribers_get_events() {
         let events = [Ok(0), Ok(1), Err(2), Ok(3), Ok(4)];
         let rx = stream::iter(events);
-        let rx = StreamSubscribe::new(rx);
+        let mut rx = pin!(StreamSubscribe::new(rx));
 
-        let rx_s1 = rx.subscribe();
-        let rx_s2 = rx.subscribe();
-
-        pin_mut!(rx);
-        pin_mut!(rx_s1);
-        pin_mut!(rx_s2);
+        let mut rx_s1 = pin!(rx.subscribe());
+        let mut rx_s2 = pin!(rx.subscribe());
 
         // Subscribers are pending until we start consuming the stream
         assert_eq!(poll!(rx_s1.next()), Poll::Pending, "rx_s1");
@@ -150,12 +147,9 @@ mod tests {
     async fn subscribers_can_catch_up_to_the_main_stream() {
         let events = (0..CHANNEL_CAPACITY).map(Ok::<_, ()>).collect::<Vec<_>>();
         let rx = stream::iter(events.clone());
-        let rx = StreamSubscribe::new(rx);
+        let mut rx = pin!(StreamSubscribe::new(rx));
 
-        let rx_s1 = rx.subscribe();
-
-        pin_mut!(rx);
-        pin_mut!(rx_s1);
+        let mut rx_s1 = pin!(rx.subscribe());
 
         for item in events.clone() {
             assert_eq!(poll!(rx.next()), Poll::Ready(Some(Arc::new(item))), "rx",);
@@ -177,12 +171,9 @@ mod tests {
         let overflow = 5;
         let events = (0..max_capacity + overflow).collect::<Vec<_>>();
         let rx = stream::iter(events.clone());
-        let rx = StreamSubscribe::new(rx);
+        let mut rx = pin!(StreamSubscribe::new(rx));
 
-        let rx_s1 = rx.subscribe();
-
-        pin_mut!(rx);
-        pin_mut!(rx_s1);
+        let mut rx_s1 = pin!(rx.subscribe());
 
         // Consume the entire stream, overflowing the inner channel
         for _ in events {
@@ -208,14 +199,10 @@ mod tests {
         let overflow = 5;
         let events = (0..max_capacity + overflow).collect::<Vec<_>>();
         let rx = stream::iter(events.clone());
-        let rx = StreamSubscribe::new(rx);
+        let mut rx = pin!(StreamSubscribe::new(rx));
 
-        let rx_s1 = rx.subscribe();
-        let rx_s2 = rx.subscribe();
-
-        pin_mut!(rx);
-        pin_mut!(rx_s1);
-        pin_mut!(rx_s2);
+        let mut rx_s1 = pin!(rx.subscribe());
+        let mut rx_s2 = pin!(rx.subscribe());
 
         for event in events {
             assert_eq!(poll!(rx_s1.next()), Poll::Pending, "rx_s1");

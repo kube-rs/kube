@@ -31,9 +31,10 @@ pub use store::{store, Store};
 /// or [controller-rs](https://github.com/kube-rs/controller-rs) for the similar controller integration with [actix-web](https://actix.rs/).
 ///
 /// ```no_run
+/// use std::future::ready;
 /// use k8s_openapi::api::core::v1::Node;
 /// use kube::runtime::{reflector, watcher, WatchStreamExt, watcher::Config};
-/// use futures::{StreamExt, future::ready};
+/// use futures::StreamExt;
 /// # use kube::api::Api;
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();

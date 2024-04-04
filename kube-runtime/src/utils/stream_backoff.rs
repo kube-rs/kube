@@ -1,7 +1,7 @@
-use std::{pin::Pin, task::Poll};
+use std::{future::Future, pin::Pin, task::Poll};
 
 use backoff::backoff::Backoff;
-use futures::{Future, Stream, TryStream};
+use futures::{Stream, TryStream};
 use pin_project::pin_project;
 use tokio::time::{sleep, Instant, Sleep};
 
@@ -96,19 +96,18 @@ impl<S: TryStream, B: Backoff> Stream for StreamBackoff<S, B> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::{task::Poll, time::Duration};
+    use std::{pin::pin, task::Poll, time::Duration};
 
     use super::StreamBackoff;
     use backoff::backoff::Backoff;
-    use futures::{channel::mpsc, pin_mut, poll, stream, StreamExt};
+    use futures::{channel::mpsc, poll, stream, StreamExt};
 
     #[tokio::test]
     async fn stream_should_back_off() {
         tokio::time::pause();
         let tick = Duration::from_secs(1);
         let rx = stream::iter([Ok(0), Ok(1), Err(2), Ok(3), Ok(4)]);
-        let rx = StreamBackoff::new(rx, backoff::backoff::Constant::new(tick));
-        pin_mut!(rx);
+        let mut rx = pin!(StreamBackoff::new(rx, backoff::backoff::Constant::new(tick)));
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Ok(0))));
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Ok(1))));
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Err(2))));
@@ -124,8 +123,7 @@ pub(crate) mod tests {
         tokio::time::pause();
         let (tx, rx) = mpsc::unbounded();
         // let rx = stream::iter([Ok(0), Ok(1), Err(2), Ok(3)]);
-        let rx = StreamBackoff::new(rx, LinearBackoff::new(Duration::from_secs(2)));
-        pin_mut!(rx);
+        let mut rx = pin!(StreamBackoff::new(rx, LinearBackoff::new(Duration::from_secs(2))));
         tx.unbounded_send(Ok(0)).unwrap();
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Ok(0))));
         tx.unbounded_send(Ok(1)).unwrap();

@@ -1,3 +1,5 @@
+use std::pin::pin;
+
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
@@ -29,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let stream = watcher(api, watcher::Config::default().any_semantic())
+    let mut stream = pin!(watcher(api, watcher::Config::default().any_semantic())
         .default_backoff()
         .modify(|pod| {
             // memory optimization for our store - we don't care about managed fields/annotations/status
@@ -39,8 +41,7 @@ async fn main() -> anyhow::Result<()> {
         })
         .reflect(writer)
         .applied_objects()
-        .predicate_filter(predicates::resource_version); // NB: requires an unstable feature
-    futures::pin_mut!(stream);
+        .predicate_filter(predicates::resource_version)); // NB: requires an unstable feature
 
     while let Some(pod) = stream.try_next().await? {
         info!("saw {}", pod.name_any());
