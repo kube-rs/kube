@@ -27,10 +27,9 @@ impl<S> Layer<S> for AuthLayer {
 mod tests {
     use super::*;
 
-    use std::{matches, sync::Arc};
+    use std::{matches, pin::pin, sync::Arc};
 
     use chrono::{Duration, Utc};
-    use futures::pin_mut;
     use http::{header::AUTHORIZATION, HeaderValue, Request, Response};
     use secrecy::SecretString;
     use tokio::sync::Mutex;
@@ -52,7 +51,7 @@ mod tests {
 
         let spawned = tokio::spawn(async move {
             // Receive the requests and respond
-            pin_mut!(handle);
+            let mut handle = pin!(handle);
             let (request, send) = handle.next_request().await.expect("service not called");
             assert_eq!(
                 request.headers().get(AUTHORIZATION).unwrap(),

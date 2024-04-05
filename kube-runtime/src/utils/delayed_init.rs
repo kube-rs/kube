@@ -102,10 +102,10 @@ pub struct InitDropped;
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
+    use std::{pin::pin, task::Poll};
 
     use super::DelayedInit;
-    use futures::{pin_mut, poll};
+    use futures::poll;
     use tracing::Level;
     use tracing_subscriber::util::SubscriberInitExt;
 
@@ -121,8 +121,7 @@ mod tests {
     async fn must_allow_single_reader() {
         let _tracing = setup_tracing();
         let (tx, rx) = DelayedInit::<u8>::new();
-        let get1 = rx.get();
-        pin_mut!(get1);
+        let mut get1 = pin!(rx.get());
         assert_eq!(poll!(get1.as_mut()), Poll::Pending);
         tx.init(1);
         assert_eq!(poll!(get1), Poll::Ready(Ok(1)));
@@ -132,10 +131,9 @@ mod tests {
     async fn must_allow_concurrent_readers_while_waiting() {
         let _tracing = setup_tracing();
         let (tx, rx) = DelayedInit::<u8>::new();
-        let get1 = rx.get();
-        let get2 = rx.get();
-        let get3 = rx.get();
-        pin_mut!(get1, get2, get3);
+        let mut get1 = pin!(rx.get());
+        let mut get2 = pin!(rx.get());
+        let mut get3 = pin!(rx.get());
         assert_eq!(poll!(get1.as_mut()), Poll::Pending);
         assert_eq!(poll!(get2.as_mut()), Poll::Pending);
         assert_eq!(poll!(get3.as_mut()), Poll::Pending);
@@ -149,8 +147,7 @@ mod tests {
     async fn must_allow_reading_after_init() {
         let _tracing = setup_tracing();
         let (tx, rx) = DelayedInit::<u8>::new();
-        let get1 = rx.get();
-        pin_mut!(get1);
+        let mut get1 = pin!(rx.get());
         assert_eq!(poll!(get1.as_mut()), Poll::Pending);
         tx.init(1);
         assert_eq!(poll!(get1), Poll::Ready(Ok(1)));
@@ -162,10 +159,9 @@ mod tests {
     async fn must_allow_concurrent_readers_in_any_order() {
         let _tracing = setup_tracing();
         let (tx, rx) = DelayedInit::<u8>::new();
-        let get1 = rx.get();
-        let get2 = rx.get();
-        let get3 = rx.get();
-        pin_mut!(get1, get2, get3);
+        let mut get1 = pin!(rx.get());
+        let mut get2 = pin!(rx.get());
+        let mut get3 = pin!(rx.get());
         assert_eq!(poll!(get1.as_mut()), Poll::Pending);
         assert_eq!(poll!(get2.as_mut()), Poll::Pending);
         assert_eq!(poll!(get3.as_mut()), Poll::Pending);

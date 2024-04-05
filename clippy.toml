@@ -1,1 +1,8 @@
 disallowed-names = []
+disallowed-macros = [
+  "futures::ready",             # use instead `std::task::ready`
+  "futures::pin_mut",           # use instead `std::pin::pin`
+]
+disallowed-methods = [
+  "futures::future::ready",     # use instead `std::future::ready`
+]

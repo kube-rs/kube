@@ -1,4 +1,6 @@
 //! Waits for objects to reach desired states
+use std::{future, pin::pin};
+
 use futures::TryStreamExt;
 use kube_client::{Api, Resource};
 use serde::de::DeserializeOwned;
@@ -52,11 +54,10 @@ where
     K: Clone + Debug + Send + DeserializeOwned + Resource + 'static,
 {
     // Skip updates until the condition is satisfied.
-    let stream = watch_object(api, name).try_skip_while(|obj| {
+    let mut stream = pin!(watch_object(api, name).try_skip_while(|obj| {
         let matches = cond.matches_object(obj.as_ref());
-        futures::future::ok(!matches)
-    });
-    futures::pin_mut!(stream);
+        future::ready(Ok(!matches))
+    }));
 
     // Then take the first update that satisfies the condition.
     let obj = stream

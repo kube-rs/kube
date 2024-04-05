@@ -1,3 +1,5 @@
+use std::pin::pin;
+
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
@@ -40,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
         .reflect(writer)
         .applied_objects()
         .predicate_filter(predicates::resource_version); // NB: requires an unstable feature
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
 
     while let Some(pod) = stream.try_next().await? {
         info!("saw {}", pod.name_any());

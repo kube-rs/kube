@@ -1,4 +1,6 @@
-use futures::{pin_mut, TryStreamExt};
+use std::pin::pin;
+
+use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{Api, ResourceExt},
@@ -23,6 +25,7 @@ async fn main() -> anyhow::Result<()> {
         .reflect(writer)
         .applied_objects()
         .predicate_filter(predicates::labels.combine(predicates::annotations)); // NB: requires an unstable feature
+    let mut stream = pin!(stream);
 
     // Periodically read our state in the background
     tokio::spawn(async move {
@@ -35,7 +38,6 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Log applied events with changes from the reflector
-    pin_mut!(stream);
     while let Some(node) = stream.try_next().await? {
         info!("saw node {} with new labels/annots", node.name_any());
     }

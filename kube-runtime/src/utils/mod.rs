@@ -22,14 +22,13 @@ pub use stream_subscribe::StreamSubscribe;
 pub use watch_ext::WatchStreamExt;
 
 use futures::{
-    pin_mut,
     stream::{self, Peekable},
     Future, FutureExt, Stream, StreamExt, TryStream, TryStreamExt,
 };
 use pin_project::pin_project;
 use std::{
     fmt::Debug,
-    pin::Pin,
+    pin::{pin, Pin},
     sync::{Arc, Mutex},
     task::Poll,
 };
@@ -77,8 +76,7 @@ where
         // TODO: remove #[allow] once fix reaches nightly.
         let inner = this.inner.lock().unwrap();
         let mut inner = Pin::new(inner);
-        let inner_peek = inner.as_mut().peek();
-        pin_mut!(inner_peek);
+        let inner_peek = pin!(inner.as_mut().peek());
         match inner_peek.poll(cx) {
             Poll::Ready(Some(x_ref)) => {
                 if (this.should_consume_item)(x_ref) {

@@ -54,11 +54,11 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{task::Poll, vec};
+    use std::{pin::pin, task::Poll, vec};
 
     use super::{Error, Event, Reflect};
     use crate::reflector;
-    use futures::{pin_mut, poll, stream, StreamExt};
+    use futures::{poll, stream, StreamExt};
     use k8s_openapi::api::core::v1::Pod;
 
     fn testpod(name: &str) -> Pod {
@@ -78,8 +78,7 @@ pub(crate) mod test {
         ]);
         let (reader, writer) = reflector::store();
 
-        let reflect = Reflect::new(st, writer);
-        pin_mut!(reflect);
+        let mut reflect = pin!(Reflect::new(st, writer));
         assert_eq!(reader.len(), 0);
 
         assert!(matches!(

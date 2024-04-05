@@ -77,10 +77,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
+    use std::{future, task::Poll};
 
     use super::FutureHashMap;
-    use futures::{channel::mpsc, future, poll, StreamExt};
+    use futures::{channel::mpsc, poll, StreamExt};
 
     #[tokio::test]
     async fn fhm_should_forward_all_values_and_shut_down() {
