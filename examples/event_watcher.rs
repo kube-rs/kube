@@ -38,7 +38,8 @@ async fn main() -> anyhow::Result<()> {
             conf = conf.fields(&format!("regarding.kind={kind},regarding.name={name}"));
         }
     }
-    let mut event_stream = pin!(watcher(events, conf).default_backoff().applied_objects());
+    let event_stream = watcher(events, conf).default_backoff().applied_objects();
+    let mut event_stream = pin!(event_stream);
 
     println!("{0:<6} {1:<15} {2:<55} {3}", "AGE", "REASON", "OBJECT", "MESSAGE");
     while let Some(ev) = event_stream.try_next().await? {

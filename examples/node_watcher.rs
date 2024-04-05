@@ -22,7 +22,8 @@ async fn main() -> anyhow::Result<()> {
     } else {
         watcher::Config::default()
     };
-    let mut obs = pin!(watcher(nodes, wc).default_backoff().applied_objects());
+    let obs = watcher(nodes, wc).default_backoff().applied_objects();
+    let mut obs = pin!(obs);
 
     while let Some(n) = obs.try_next().await? {
         check_for_node_failures(&client, n).await?;

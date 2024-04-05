@@ -20,11 +20,12 @@ async fn main() -> anyhow::Result<()> {
         .timeout(10); // short watch timeout in this example
 
     let (reader, writer) = reflector::store();
-    let mut stream = pin!(watcher(nodes, wc)
+    let stream = watcher(nodes, wc)
         .default_backoff()
         .reflect(writer)
         .applied_objects()
-        .predicate_filter(predicates::labels.combine(predicates::annotations))); // NB: requires an unstable feature
+        .predicate_filter(predicates::labels.combine(predicates::annotations)); // NB: requires an unstable feature
+    let mut stream = pin!(stream);
 
     // Periodically read our state in the background
     tokio::spawn(async move {

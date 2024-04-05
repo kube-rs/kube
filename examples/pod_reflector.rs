@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let mut stream = pin!(watcher(api, watcher::Config::default().any_semantic())
+    let stream = watcher(api, watcher::Config::default().any_semantic())
         .default_backoff()
         .modify(|pod| {
             // memory optimization for our store - we don't care about managed fields/annotations/status
@@ -41,7 +41,8 @@ async fn main() -> anyhow::Result<()> {
         })
         .reflect(writer)
         .applied_objects()
-        .predicate_filter(predicates::resource_version)); // NB: requires an unstable feature
+        .predicate_filter(predicates::resource_version); // NB: requires an unstable feature
+    let mut stream = pin!(stream);
 
     while let Some(pod) = stream.try_next().await? {
         info!("saw {}", pod.name_any());
