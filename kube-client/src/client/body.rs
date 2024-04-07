@@ -41,6 +41,7 @@ impl Body {
         Self::new(Kind::Once(None))
     }
 
+    // Create a body from an existing body
     pub(crate) fn wrap_body<B>(body: B) -> Self
     where
         B: HttpBody<Data = Bytes> + Send + 'static,
@@ -49,11 +50,12 @@ impl Body {
         Body::new(Kind::Wrap(body.map_err(Into::into).boxed_unsync()))
     }
 
-    /// Collect all the data frames and trailers of the request body
+    /// Collect all the data frames and trailers of this request body and return the data frame
     pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
         Ok(self.collect().await?.to_bytes())
     }
 
+    // Convert this body into `Stream` which iterates only data frame skipping the other kind of frame
     pub(crate) fn into_data_stream(self) -> impl Stream<Item = Result<Bytes, crate::Error>> {
         Box::pin(BodyStream::new(self).try_filter_map(|frame| async { Ok(frame.into_data().ok()) }))
     }
