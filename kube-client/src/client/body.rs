@@ -17,7 +17,12 @@ pub struct Body {
 
 impl fmt::Debug for Body {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Body").finish()
+        let mut builder = f.debug_struct("Body");
+        match self.kind {
+            Kind::Once(_) => builder.field("kind", &"Once"),
+            Kind::Wrap(_) => builder.field("kind", &"Wrap"),
+        };
+        builder.finish()
     }
 }
 
