@@ -54,9 +54,7 @@ impl Body {
         Ok(self.collect().await?.to_bytes())
     }
 
-    pub(crate) fn into_data_stream(
-        self,
-    ) -> impl Stream<Item = Result<<Self as HttpBody>::Data, <Self as HttpBody>::Error>> {
+    pub(crate) fn into_data_stream(self) -> impl Stream<Item = Result<Bytes, crate::Error>> {
         Box::pin(BodyStream::new(self).try_filter_map(|frame| async { Ok(frame.into_data().ok()) }))
     }
 }
