@@ -84,17 +84,11 @@ impl HttpBody for Body {
     fn poll_frame(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<http_body::Frame<Self::Data>, Self::Error>>> {
-        match self.kind {
-            Kind::Once(ref mut val) => {
-                if let Some(data) = val.take() {
-                    Poll::Ready(Some(Ok(Frame::data(data))))
-                } else {
-                    Poll::Ready(None)
-                }
-            }
-            Kind::Wrap(ref mut stream) => Poll::Ready(
-                ready!(Pin::new(stream).poll_frame(cx))
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        match &mut self.kind {
+            Kind::Once(val) => Poll::Ready(val.take().map(|bytes| Ok(Frame::data(bytes)))),
+            Kind::Wrap(body) => Poll::Ready(
+                ready!(Pin::new(body).poll_frame(cx))
                     .map(|opt_chunk| opt_chunk.map_err(crate::Error::Service)),
             ),
         }
