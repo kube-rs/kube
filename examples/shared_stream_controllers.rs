@@ -45,10 +45,9 @@ async fn reconcile_metadata(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Err
         return Ok(Action::await_change());
     }
 
-    let mut annotations = pod.annotations().clone();
-    for (key, value) in labels {
-        annotations.insert(key.to_owned(), value.to_owned());
-    }
+    // combine labels and annotations into a new map
+    let mut map = pod.labels_mut();
+    pod.annotations_mut().append(map);
 
     let mut pod = (*pod).clone();
     pod.metadata.annotations = Some(annotations);
