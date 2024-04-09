@@ -1,7 +1,7 @@
 use std::{
     error::Error as StdError,
     fmt,
-    pin::Pin,
+    pin::{pin, Pin},
     task::{ready, Context, Poll},
 };
 
@@ -88,8 +88,7 @@ impl HttpBody for Body {
         match &mut self.kind {
             Kind::Once(val) => Poll::Ready(val.take().map(|bytes| Ok(Frame::data(bytes)))),
             Kind::Wrap(body) => Poll::Ready(
-                ready!(Pin::new(body).poll_frame(cx))
-                    .map(|opt_chunk| opt_chunk.map_err(crate::Error::Service)),
+                ready!(pin!(body).poll_frame(cx)).map(|opt_chunk| opt_chunk.map_err(crate::Error::Service)),
             ),
         }
     }
