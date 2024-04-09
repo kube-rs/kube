@@ -2,7 +2,7 @@ use std::{
     error::Error as StdError,
     fmt,
     pin::{pin, Pin},
-    task::{ready, Context, Poll},
+    task::{Context, Poll},
 };
 
 use bytes::Bytes;
@@ -87,9 +87,7 @@ impl HttpBody for Body {
     ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
         match &mut self.kind {
             Kind::Once(val) => Poll::Ready(val.take().map(|bytes| Ok(Frame::data(bytes)))),
-            Kind::Wrap(body) => Poll::Ready(
-                ready!(pin!(body).poll_frame(cx)).map(|opt_chunk| opt_chunk.map_err(crate::Error::Service)),
-            ),
+            Kind::Wrap(body) => pin!(body).poll_frame(cx).map_err(crate::Error::Service),
         }
     }
 
