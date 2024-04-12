@@ -25,7 +25,7 @@ jobs:
       #     tool: cargo-tarpaulin
       - name: Install tarpaulin # Use dev tarpaulin from git repo for now, until it's pushed to release
         run: |
-          rustup run stable cargo install --git https://github.com/xd009642/tarpaulin.git cargo-tarpaulin
+          rustup run stable cargo install --git https://github.com/xd009642/tarpaulin.git --rev 2b05ebd4f809eeeeb590f68efb8e62758eb59214 cargo-tarpaulin
       - uses: AbsaOSS/k3d-action@v2
         name: "Create Single Cluster"
         with:
