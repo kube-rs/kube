@@ -15,6 +15,8 @@ use super::Lookup;
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
+// A helper type that holds a broadcast transmitter and a broadcast receiver,
+// used to fan-out events from a root stream to multiple listeners.
 pub(crate) struct Dispatcher<K>
 where
     K: Lookup + Clone + 'static,
@@ -32,7 +34,11 @@ where
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     pub(crate) fn new(buf_size: usize) -> Dispatcher<K> {
+        // Create a broadcast (tx, rx) pair
         let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
+        // The tx half will not wait for any receivers to be active before
+        // broadcasting events. If no receivers are active, events will be
+        // buffered.
         dispatch_tx.set_await_active(false);
         Self {
             dispatch_tx,
@@ -40,15 +46,35 @@ where
         }
     }
 
+    // Calls broadcast on the channel. Will return when the channel has enough
+    // space to send an event.
     pub(crate) async fn broadcast(&mut self, obj_ref: ObjectRef<K>) {
         let _ = self.dispatch_tx.broadcast_direct(obj_ref).await;
     }
 
+    // Creates a `ReflectHandle` by creating a receiver from the tx half.
+    // N.B: the new receiver will be fast-forwarded to the _latest_ event.
+    // The receiver won't have access to any events that are currently waiting
+    // to be acked by listeners.
     pub(crate) fn subscribe(&self, reader: Store<K>) -> ReflectHandle<K> {
         ReflectHandle::new(reader, self.dispatch_tx.new_receiver())
     }
 }
 
+/// A handle to a shared stream reader
+///
+/// [`ReflectHandle`]s are created by calling [`subscribe()`] on a [`Writer`],
+/// or by calling `clone()` on an already existing [`ReflectHandle`]. Each
+/// shared stream reader should be polled independently and driven to readiness
+/// to avoid deadlocks. When the [`Writer`]'s buffer is filled, backpressure
+/// will be applied on the root stream side.
+///
+/// When the root stream is dropped, or it ends, all [`ReflectHandle`]s
+/// subscribed to the stream will also terminate after all events yielded by
+/// the root stream have been observed. This means [`ReflectHandle`] streams
+/// can still be polled after the root stream has been dropped.
+///
+/// [`Writer`]: crate::reflector::Writer
 #[pin_project]
 pub struct ReflectHandle<K>
 where

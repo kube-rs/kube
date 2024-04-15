@@ -249,6 +249,84 @@ pub trait WatchStreamExt: Stream {
         Reflect::new(self, writer)
     }
 
+    /// Reflect a shared [`watcher()`] stream into a [`Store`] through a [`Writer`]
+    ///
+    /// Returns the stream unmodified, but passes every [`watcher::Event`]
+    /// through a [`Writer`]. This populates a [`Store`] as the stream is
+    /// polled. When the [`watcher::Event`] is not an error or a
+    /// [`watcher::Event::Deleted`] then its inner object will also be
+    /// propagated to subscribers.
+    ///
+    /// Subscribers can be created by calling [`subscribe()`] on a [`Writer`].
+    /// This will return a [`ReflectHandle`] stream that should be polled
+    /// independently. When the root stream is dropped, or it ends, all [`ReflectHandle`]s
+    /// subscribed to the stream will also terminate after all events yielded by
+    /// the root stream have been observed. This means [`ReflectHandle`] streams
+    /// can still be polled after the root stream has been dropped.
+    ///
+    /// **NB**: This adapter requires an
+    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
+    /// feature
+    ///
+    /// ## Warning
+    ///
+    /// If the root [`Stream`] is not polled, [`ReflectHandle`] streams will
+    /// never receive any events. This will cause the streams to deadlock since
+    /// the root stream will apply backpressure when downstream readers are not
+    /// consuming events.
+    ///
+    ///
+    /// [`Store`]: crate::reflector::Store
+    /// [`ReflectHandle`]: crate::reflector::dispatcher::ReflectHandle
+    /// ## Usage
+    /// ```no_run
+    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use std::time::Duration;
+    /// # use tracing::{info, warn};
+    /// use kube::{Api, Client, ResourceExt};
+    /// use kube_runtime::{watcher, WatchStreamExt, reflector};
+    /// use k8s_openapi::api::apps::v1::Deployment;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    ///
+    /// let deploys: Api<Deployment> = Api::default_namespaced(client);
+    /// let subscriber_buf_sz = 100;
+    /// let (reader, writer) = reflector::store_shared(subscriber_buf_sz)::<Deployment>();
+    /// let subscriber = &writer.subscribe().unwrap();
+    ///
+    /// tokio::spawn(async move {
+    ///     // start polling the store once the reader is ready
+    ///     reader.wait_until_ready().await.unwrap();
+    ///     loop {
+    ///         let names = reader.state().iter().map(|d| d.name_any()).collect::<Vec<_>>();
+    ///         info!("Current {} deploys: {:?}", names.len(), names);
+    ///         tokio::time::sleep(Duration::from_secs(10)).await;
+    ///     }
+    /// });
+    ///
+    /// // configure the watcher stream and populate the store while polling
+    /// watcher(deploys, watcher::Config::default())
+    ///     .reflect_shared(writer)
+    ///     .applied_objects()
+    ///     .for_each(|res| async move {
+    ///         match res {
+    ///             Ok(o) => info!("saw in root stream {}", o.name_any()),
+    ///             Err(e) => warn!("watcher error in root stream: {}", e),
+    ///         }
+    ///     })
+    ///     .await;
+    ///
+    /// // subscriber can be used to receive applied_objects
+    /// subscriber
+    /// .for_each(|obj| async move {
+    ///     info!("saw in subscriber {}", &obj.name_any())
+    /// })
+    /// await;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "unstable-runtime-subscribe")]
     fn reflect_shared<K>(self, writer: Writer<K>) -> impl Stream<Item = Self::Item>
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,

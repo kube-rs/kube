@@ -46,6 +46,16 @@ where
         }
     }
 
+    /// Creates a new Writer with the specified dynamic type and buffer size.
+    ///
+    /// When the Writer is created through `new_shared`, it will be able to
+    /// be subscribed. Stored objects will be propagated to all subscribers. The
+    /// buffer size is used for the underlying channel. An object is cleared
+    /// from the buffer only when all subscribers have seen it.
+    ///
+    /// If the dynamic type is default-able (for example when writer is used with
+    /// `k8s_openapi` types) you can use `Default` instead.
+    #[cfg(feature = "unstable-runtime-subscribe")]
     pub fn new_shared(dyntype: K::DynamicType, buf_size: usize) -> Self {
         let (ready_tx, ready_rx) = DelayedInit::new();
         Writer {
@@ -69,6 +79,10 @@ where
         }
     }
 
+    /// Return a handle to a subscriber
+    ///
+    /// Multiple subscribe handles may be obtained, by either calling
+    /// `subscribe` multiple times, or by calling `clone()`
     pub fn subscribe(&self) -> Option<ReflectHandle<K>> {
         self.dispatcher
             .as_ref()
@@ -102,6 +116,7 @@ where
         }
     }
 
+    /// Broadcast an event to any downstream listeners subscribed on the store
     pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
         if let Some(ref mut dispatcher) = self.dispatcher {
             match event {
@@ -244,8 +259,14 @@ where
     (r, w)
 }
 
+/// Create a (Reader, Writer) for a `Store<K>` for a typed resource `K`
+///
+/// The resulting `Writer` can be subscribed on in order to fan out events from
+/// a watcher. The `Writer` should be passed to a [`reflector`](crate::reflector()),
+/// and the [`Store`] is a read-only handle.
 #[must_use]
 #[allow(clippy::module_name_repetitions)]
+#[cfg(feature = "unstable-runtime-subscribe")]
 pub fn store_shared<K>(buf_size: usize) -> (Store<K>, Writer<K>)
 where
     K: Lookup + Clone + 'static,
