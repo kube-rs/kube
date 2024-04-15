@@ -4,10 +4,13 @@ use futures::StreamExt;
 use k8s_openapi::api::core::v1::{Pod, PodCondition};
 use kube::{
     api::{Patch, PatchParams},
-    runtime::{controller::Action, reflector, watcher, Config, Controller, WatchStreamExt},
+    runtime::{
+        controller::Action,
+        reflector::{self},
+        watcher, Config, Controller, WatchStreamExt,
+    },
     Api, Client, ResourceExt,
 };
-use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
 use thiserror::Error;
@@ -36,12 +39,8 @@ struct Data {
 
 /// A simple reconciliation function that will copy a pod's labels into the annotations.
 async fn reconcile_metadata(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Error> {
-    if pod.name_any() == "kube-system" {
-        return Ok(Action::await_change());
-    }
-
-    let labels = pod.labels();
-    if labels.is_empty() {
+    let namespace = &pod.namespace().unwrap_or_default();
+    if namespace == "kube-system" {
         return Ok(Action::await_change());
     }
 
