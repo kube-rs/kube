@@ -1,9 +1,9 @@
 use crate::{reflector::ObjectRef, watcher::Error};
 use core::{
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
-use futures::{ready, Stream};
+use futures::Stream;
 use kube_client::Resource;
 use pin_project::pin_project;
 use std::{
@@ -195,10 +195,10 @@ pub mod predicates {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::task::Poll;
+    use std::{pin::pin, task::Poll};
 
     use super::{predicates, Error, PredicateFilter};
-    use futures::{pin_mut, poll, stream, FutureExt, StreamExt};
+    use futures::{poll, stream, FutureExt, StreamExt};
     use kube_client::Resource;
     use serde_json::json;
 
@@ -229,8 +229,7 @@ pub(crate) mod tests {
             Ok(mkobj(1)),
             Ok(mkobj(2)),
         ]);
-        let rx = PredicateFilter::new(data, predicates::generation);
-        pin_mut!(rx);
+        let mut rx = pin!(PredicateFilter::new(data, predicates::generation));
 
         // mkobj(1) passed through
         let first = rx.next().now_or_never().unwrap().unwrap().unwrap();

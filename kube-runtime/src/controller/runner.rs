@@ -1,9 +1,10 @@
 use super::future_hash_map::FutureHashMap;
 use crate::scheduler::{ScheduleRequest, Scheduler};
-use futures::{future, Future, FutureExt, Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use pin_project::pin_project;
 use std::{
     convert::Infallible,
+    future::{self, Future},
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
@@ -29,7 +30,7 @@ pub struct Runner<T, R, F, MkF, Ready = future::Ready<Result<(), Infallible>>> {
     run_msg: MkF,
     slots: FutureHashMap<T, F>,
     #[pin]
-    ready_to_execute_after: future::Fuse<Ready>,
+    ready_to_execute_after: futures::future::Fuse<Ready>,
     is_ready_to_execute: bool,
     stopped: bool,
     max_concurrent_executions: u16,
@@ -163,8 +164,7 @@ mod tests {
     };
     use futures::{
         channel::{mpsc, oneshot},
-        future::{self},
-        poll, stream, Future, SinkExt, StreamExt, TryStreamExt,
+        future, poll, stream, Future, SinkExt, StreamExt, TryStreamExt,
     };
     use std::{
         cell::RefCell,

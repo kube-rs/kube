@@ -16,16 +16,17 @@ use derivative::Derivative;
 use futures::{
     channel,
     future::{self, BoxFuture},
-    ready, stream, Future, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
+    stream, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
 use kube_client::api::{Api, DynamicObject, Resource};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
     fmt::{Debug, Display},
+    future::Future,
     hash::Hash,
     sync::Arc,
-    task::Poll,
+    task::{ready, Poll},
     time::Duration,
 };
 use stream::BoxStream;
@@ -343,7 +344,8 @@ where
                                 .instrument(reconciler_span)
                                 .left_future()
                         }
-                        None => future::err(Error::ObjectNotFound(request.obj_ref.erase())).right_future(),
+                        None => std::future::ready(Err(Error::ObjectNotFound(request.obj_ref.erase())))
+                            .right_future(),
                     }
                 },
             )
@@ -1208,7 +1210,7 @@ where
     /// use kube::{Api, Client, ResourceExt};
     /// use kube_runtime::{
     ///     controller::{Controller, Action},
-    ///     watcher,  
+    ///     watcher,
     /// };
     /// use std::{convert::Infallible, sync::Arc};
     /// Controller::new(
@@ -1327,7 +1329,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{convert::Infallible, sync::Arc, time::Duration};
+    use std::{convert::Infallible, pin::pin, sync::Arc, time::Duration};
 
     use super::{Action, APPLIER_REQUEUE_BUF_SIZE};
     use crate::{
@@ -1336,7 +1338,7 @@ mod tests {
         watcher::{self, metadata_watcher, watcher, Event},
         Config, Controller,
     };
-    use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    use futures::{Stream, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::{core::ObjectMeta, Api, Resource};
     use serde::de::DeserializeOwned;
@@ -1401,7 +1403,7 @@ mod tests {
 
         let (queue_tx, queue_rx) = futures::channel::mpsc::unbounded::<ObjectRef<ConfigMap>>();
         let (store_rx, mut store_tx) = reflector::store();
-        let applier = applier(
+        let mut applier = pin!(applier(
             |obj, _| {
                 Box::pin(async move {
                     // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
@@ -1414,8 +1416,7 @@ mod tests {
             store_rx,
             queue_rx.map(Result::<_, Infallible>::Ok),
             Config::default(),
-        );
-        pin_mut!(applier);
+        ));
         for i in 0..items {
             let obj = ConfigMap {
                 metadata: ObjectMeta {

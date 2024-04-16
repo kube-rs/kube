@@ -599,8 +599,9 @@ fn to_plural(word: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::{env, fs};
+
     use super::*;
-    // TODO Unit test `derive`
 
     #[test]
     fn test_parse_default() {
@@ -615,5 +616,19 @@ mod tests {
         assert_eq!(kube_attrs.version, "v1".to_string());
         assert_eq!(kube_attrs.kind, "Foo".to_string());
         assert!(kube_attrs.namespaced);
+    }
+
+    #[test]
+    fn test_derive_crd() {
+        let path = env::current_dir().unwrap().join("tests").join("crd_enum_test.rs");
+        let file = fs::File::open(path).unwrap();
+        runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
+
+        let path = env::current_dir()
+            .unwrap()
+            .join("tests")
+            .join("crd_schema_test.rs");
+        let file = fs::File::open(path).unwrap();
+        runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
     }
 }

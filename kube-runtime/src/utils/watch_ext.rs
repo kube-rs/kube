@@ -61,20 +61,20 @@ pub trait WatchStreamExt: Stream {
     /// Stream shorthand for `stream.map_ok(|event| { event.modify(f) })`.
     ///
     /// ```no_run
-    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use std::pin::pin;
+    /// # use futures::{Stream, StreamExt, TryStreamExt};
     /// # use kube::{Api, Client, ResourceExt};
     /// # use kube_runtime::{watcher, WatchStreamExt};
     /// # use k8s_openapi::api::apps::v1::Deployment;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
     /// let deploys: Api<Deployment> = Api::all(client);
-    /// let truncated_deploy_stream = watcher(deploys, watcher::Config::default())
+    /// let mut truncated_deploy_stream = pin!(watcher(deploys, watcher::Config::default())
     ///     .modify(|deploy| {
     ///         deploy.managed_fields_mut().clear();
     ///         deploy.status = None;
     ///     })
-    ///     .applied_objects();
-    /// pin_mut!(truncated_deploy_stream);
+    ///     .applied_objects());
     ///
     /// while let Some(d) = truncated_deploy_stream.try_next().await? {
     ///    println!("Truncated Deployment: '{:?}'", serde_json::to_string(&d)?);
@@ -100,17 +100,17 @@ pub trait WatchStreamExt: Stream {
     ///
     /// ## Usage
     /// ```no_run
-    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use std::pin::pin;
+    /// # use futures::{Stream, StreamExt, TryStreamExt};
     /// use kube::{Api, Client, ResourceExt};
     /// use kube_runtime::{watcher, WatchStreamExt, predicates};
     /// use k8s_openapi::api::apps::v1::Deployment;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
     /// let deploys: Api<Deployment> = Api::default_namespaced(client);
-    /// let changed_deploys = watcher(deploys, watcher::Config::default())
+    /// let mut changed_deploys = pin!(watcher(deploys, watcher::Config::default())
     ///     .applied_objects()
-    ///     .predicate_filter(predicates::generation);
-    /// pin_mut!(changed_deploys);
+    ///     .predicate_filter(predicates::generation));
     ///
     /// while let Some(d) = changed_deploys.try_next().await? {
     ///    println!("saw Deployment '{} with hitherto unseen generation", d.name_any());
@@ -201,7 +201,7 @@ pub trait WatchStreamExt: Stream {
     ///
     /// ## Usage
     /// ```no_run
-    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use futures::{Stream, StreamExt, TryStreamExt};
     /// # use std::time::Duration;
     /// # use tracing::{info, warn};
     /// use kube::{Api, Client, ResourceExt};

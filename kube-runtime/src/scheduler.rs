@@ -286,8 +286,8 @@ mod tests {
 
     use super::{debounced_scheduler, scheduler, ScheduleRequest};
     use derivative::Derivative;
-    use futures::{channel::mpsc, future, pin_mut, poll, stream, FutureExt, SinkExt, StreamExt};
-    use std::task::Poll;
+    use futures::{channel::mpsc, future, poll, stream, FutureExt, SinkExt, StreamExt};
+    use std::{pin::pin, task::Poll};
     use tokio::time::{advance, pause, sleep, Duration, Instant};
 
     fn unwrap_poll<T>(poll: Poll<T>) -> T {
@@ -379,7 +379,7 @@ mod tests {
     #[tokio::test]
     async fn scheduler_should_emit_items_as_requested() {
         pause();
-        let scheduler = scheduler(
+        let mut scheduler = pin!(scheduler(
             stream::iter(vec![
                 ScheduleRequest {
                     message: 1_u8,
@@ -391,8 +391,7 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
-        );
-        pin_mut!(scheduler);
+        ));
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
         assert_eq!(scheduler.next().now_or_never().unwrap().unwrap(), 1);
@@ -406,7 +405,7 @@ mod tests {
     #[tokio::test]
     async fn scheduler_dedupe_should_keep_earlier_item() {
         pause();
-        let scheduler = scheduler(
+        let mut scheduler = pin!(scheduler(
             stream::iter(vec![
                 ScheduleRequest {
                     message: (),
@@ -418,8 +417,7 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
-        );
-        pin_mut!(scheduler);
+        ));
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
         scheduler.next().now_or_never().unwrap().unwrap();
@@ -430,7 +428,7 @@ mod tests {
     #[tokio::test]
     async fn scheduler_dedupe_should_replace_later_item() {
         pause();
-        let scheduler = scheduler(
+        let mut scheduler = pin!(scheduler(
             stream::iter(vec![
                 ScheduleRequest {
                     message: (),
@@ -442,8 +440,7 @@ mod tests {
                 },
             ])
             .on_complete(sleep(Duration::from_secs(5))),
-        );
-        pin_mut!(scheduler);
+        ));
         assert!(poll!(scheduler.next()).is_pending());
         advance(Duration::from_secs(2)).await;
         scheduler.next().now_or_never().unwrap().unwrap();
