@@ -160,7 +160,7 @@ pub trait WatchStreamExt: Stream {
     ///     impl Stream<Item = String> + Send + Sized + 'static,
     /// )
     /// where
-    ///     K: Debug + Send + Sync + 'static,
+    ///     K: Clone + Debug + Send + Sync + 'static,
     ///     S: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Send + Sized + 'static,
     /// {
     ///     // Create a stream that can be subscribed to
@@ -291,7 +291,7 @@ pub trait WatchStreamExt: Stream {
     ///
     /// let deploys: Api<Deployment> = Api::default_namespaced(client);
     /// let subscriber_buf_sz = 100;
-    /// let (reader, writer) = reflector::store_shared(subscriber_buf_sz)::<Deployment>();
+    /// let (reader, writer) = reflector::store_shared::<Deployment>(subscriber_buf_sz);
     /// let subscriber = &writer.subscribe().unwrap();
     ///
     /// tokio::spawn(async move {
@@ -317,11 +317,9 @@ pub trait WatchStreamExt: Stream {
     ///     .await;
     ///
     /// // subscriber can be used to receive applied_objects
-    /// subscriber
-    /// .for_each(|obj| async move {
+    /// subscriber.for_each(|obj| async move {
     ///     info!("saw in subscriber {}", &obj.name_any())
-    /// })
-    /// await;
+    /// }).await;
     ///
     /// # Ok(())
     /// # }

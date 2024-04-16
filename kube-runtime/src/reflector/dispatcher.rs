@@ -5,8 +5,9 @@ use core::{
 use std::{fmt::Debug, sync::Arc};
 
 use derivative::Derivative;
-use futures::{ready, Stream};
+use futures::Stream;
 use pin_project::pin_project;
+use std::task::ready;
 
 use crate::reflector::{ObjectRef, Store};
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
@@ -130,6 +131,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable-runtime-subscribe")]
 #[cfg(test)]
 pub(crate) mod test {
     use crate::{

@@ -48,8 +48,8 @@ backoff.workspace = true
 async-trait.workspace = true
 hashbrown.workspace = true
 k8s-openapi.workspace = true
-async-broadcast = "0.7.0"
-async-stream = "0.3.5"
+async-broadcast.workspace = true
+async-stream.workspace = true
 
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "<1.0.0, >=0.60.0" }

@@ -12,7 +12,9 @@ use crate::watcher;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use std::hash::Hash;
-pub use store::{store, store_shared, Store};
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub use store::store_shared;
+pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
 ///
