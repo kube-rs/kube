@@ -1,6 +1,7 @@
 use derivative::Derivative;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
-#[cfg(doc)] use kube_client::core::ObjectMeta;
+#[cfg(doc)]
+use kube_client::core::ObjectMeta;
 use kube_client::{
     api::{DynamicObject, Resource},
     core::api_version_from_group_version,
@@ -9,7 +10,6 @@ use std::{
     borrow::Cow,
     fmt::{Debug, Display},
     hash::Hash,
-    sync::Arc,
 };
 
 /// Minimal lookup behaviour needed by a [reflector store](super::Store).
@@ -200,13 +200,6 @@ impl<K: Lookup> ObjectRef<K> {
         K: Lookup,
     {
         obj.to_object_ref(dyntype)
-    }
-
-    pub fn from_shared_obj_with(obj: &Arc<K>, dyntype: K::DynamicType) -> Self
-    where
-        K: Lookup,
-    {
-        obj.as_ref().to_object_ref(dyntype)
     }
 
     /// Create an `ObjectRef` from an `OwnerReference`

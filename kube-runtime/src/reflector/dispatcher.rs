@@ -34,6 +34,16 @@ where
     K: Lookup + Clone + 'static,
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
+    /// Creates and returns a new self that wraps a broadcast sender and an
+    /// inactive broadcast receiver
+    ///
+    /// A buffer size is required to create the underlying broadcast channel.
+    /// Messages will be buffered until all active readers have received a copy
+    /// of the message. When the channel is full, senders will apply
+    /// backpressure by waiting for space to free up.
+    //
+    // N.B messages are eagerly broadcasted, meaning no active receivers are
+    // required for a message to be broadcasted.
     pub(crate) fn new(buf_size: usize) -> Dispatcher<K> {
         // Create a broadcast (tx, rx) pair
         let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);

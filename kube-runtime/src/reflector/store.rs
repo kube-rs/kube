@@ -56,7 +56,7 @@ where
     /// If the dynamic type is default-able (for example when writer is used with
     /// `k8s_openapi` types) you can use `Default` instead.
     #[cfg(feature = "unstable-runtime-subscribe")]
-    pub fn new_shared(dyntype: K::DynamicType, buf_size: usize) -> Self {
+    pub fn new_shared(buf_size: usize, dyntype: K::DynamicType) -> Self {
         let (ready_tx, ready_rx) = DelayedInit::new();
         Writer {
             store: Default::default(),
@@ -264,6 +264,9 @@ where
 /// The resulting `Writer` can be subscribed on in order to fan out events from
 /// a watcher. The `Writer` should be passed to a [`reflector`](crate::reflector()),
 /// and the [`Store`] is a read-only handle.
+///
+/// A buffer size is used for the underlying message channel. When the buffer is
+/// full, backpressure will be applied by waiting for capacity.
 #[must_use]
 #[allow(clippy::module_name_repetitions)]
 #[cfg(feature = "unstable-runtime-subscribe")]
@@ -272,7 +275,7 @@ where
     K: Lookup + Clone + 'static,
     K::DynamicType: Eq + Hash + Clone + Default,
 {
-    let w = Writer::<K>::new_shared(Default::default(), buf_size);
+    let w = Writer::<K>::new_shared(buf_size, Default::default());
     let r = w.as_reader();
     (r, w)
 }
