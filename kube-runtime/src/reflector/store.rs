@@ -1,4 +1,4 @@
-use super::{Lookup, ObjectRef};
+use super::{dispatcher::Dispatcher, Lookup, ObjectRef, ReflectHandle};
 use crate::{
     utils::delayed_init::{self, DelayedInit},
     watcher,
@@ -16,14 +16,15 @@ type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
 /// In particular, `Restarted` events will clobber the state of other connected reflectors.
 #[derive(Debug)]
-pub struct Writer<K: 'static + Lookup>
+pub struct Writer<K: 'static + Lookup + Clone>
 where
-    K::DynamicType: Eq + Hash,
+    K::DynamicType: Eq + Hash + Clone,
 {
     store: Cache<K>,
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
     ready_rx: Arc<DelayedInit<()>>,
+    dispatcher: Option<Dispatcher<K>>,
 }
 
 impl<K: 'static + Lookup + Clone> Writer<K>
@@ -41,6 +42,28 @@ where
             dyntype,
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
+            dispatcher: None,
+        }
+    }
+
+    /// Creates a new Writer with the specified dynamic type and buffer size.
+    ///
+    /// When the Writer is created through `new_shared`, it will be able to
+    /// be subscribed. Stored objects will be propagated to all subscribers. The
+    /// buffer size is used for the underlying channel. An object is cleared
+    /// from the buffer only when all subscribers have seen it.
+    ///
+    /// If the dynamic type is default-able (for example when writer is used with
+    /// `k8s_openapi` types) you can use `Default` instead.
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    pub fn new_shared(buf_size: usize, dyntype: K::DynamicType) -> Self {
+        let (ready_tx, ready_rx) = DelayedInit::new();
+        Writer {
+            store: Default::default(),
+            dyntype,
+            ready_tx: Some(ready_tx),
+            ready_rx: Arc::new(ready_rx),
+            dispatcher: Some(Dispatcher::new(buf_size)),
         }
     }
 
@@ -54,6 +77,16 @@ where
             store: self.store.clone(),
             ready_rx: self.ready_rx.clone(),
         }
+    }
+
+    /// Return a handle to a subscriber
+    ///
+    /// Multiple subscribe handles may be obtained, by either calling
+    /// `subscribe` multiple times, or by calling `clone()`
+    pub fn subscribe(&self) -> Option<ReflectHandle<K>> {
+        self.dispatcher
+            .as_ref()
+            .map(|dispatcher| dispatcher.subscribe(self.as_reader()))
     }
 
     /// Applies a single watcher event to the store
@@ -82,7 +115,30 @@ where
             ready_tx.init(())
         }
     }
+
+    /// Broadcast an event to any downstream listeners subscribed on the store
+    pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
+        if let Some(ref mut dispatcher) = self.dispatcher {
+            match event {
+                watcher::Event::Applied(obj) => {
+                    let obj_ref = obj.to_object_ref(self.dyntype.clone());
+                    // TODO (matei): should this take a timeout to log when backpressure has
+                    // been applied for too long, e.g. 10s
+                    dispatcher.broadcast(obj_ref).await;
+                }
+
+                watcher::Event::Restarted(new_objs) => {
+                    let obj_refs = new_objs.iter().map(|obj| obj.to_object_ref(self.dyntype.clone()));
+                    for obj_ref in obj_refs {
+                        dispatcher.broadcast(obj_ref).await;
+                    }
+                }
+                watcher::Event::Deleted(_) => {}
+            }
+        }
+    }
 }
+
 impl<K> Default for Writer<K>
 where
     K: Lookup + Clone + 'static,
@@ -199,6 +255,27 @@ where
     K::DynamicType: Eq + Hash + Clone + Default,
 {
     let w = Writer::<K>::default();
+    let r = w.as_reader();
+    (r, w)
+}
+
+/// Create a (Reader, Writer) for a `Store<K>` for a typed resource `K`
+///
+/// The resulting `Writer` can be subscribed on in order to fan out events from
+/// a watcher. The `Writer` should be passed to a [`reflector`](crate::reflector()),
+/// and the [`Store`] is a read-only handle.
+///
+/// A buffer size is used for the underlying message channel. When the buffer is
+/// full, backpressure will be applied by waiting for capacity.
+#[must_use]
+#[allow(clippy::module_name_repetitions)]
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub fn store_shared<K>(buf_size: usize) -> (Store<K>, Writer<K>)
+where
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + Hash + Clone + Default,
+{
+    let w = Writer::<K>::new_shared(buf_size, Default::default());
     let r = w.as_reader();
     (r, w)
 }

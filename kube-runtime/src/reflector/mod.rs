@@ -1,12 +1,18 @@
 //! Caches objects in memory
 
+mod dispatcher;
 mod object_ref;
 pub mod store;
 
-pub use self::object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef};
+pub use self::{
+    dispatcher::ReflectHandle,
+    object_ref::{Extra as ObjectRefExtra, Lookup, ObjectRef},
+};
 use crate::watcher;
-use futures::{Stream, TryStreamExt};
+use async_stream::stream;
+use futures::{Stream, StreamExt};
 use std::hash::Hash;
+#[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
 pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
@@ -98,7 +104,19 @@ where
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
-    stream.inspect_ok(move |event| writer.apply_watcher_event(event))
+    let mut stream = Box::pin(stream);
+    stream! {
+        while let Some(event) = stream.next().await {
+            match event {
+                Ok(ev) => {
+                    writer.apply_watcher_event(&ev);
+                    writer.dispatch_event(&ev).await;
+                    yield Ok(ev);
+                },
+                Err(ev) => yield Err(ev)
+            }
+        }
+    }
 }
 
 #[cfg(test)]

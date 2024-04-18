@@ -123,6 +123,28 @@ where
     })
 }
 
+/// Enqueues the object itself for reconciliation when the object is behind a
+/// shared pointer
+#[cfg(feature = "unstable-runtime-subscribe")]
+fn trigger_self_shared<K, S>(
+    stream: S,
+    dyntype: K::DynamicType,
+) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
+where
+    // Input stream has item as some Arc'd Resource (via
+    // Controller::for_shared_stream)
+    S: TryStream<Ok = Arc<K>>,
+    K: Resource,
+    K::DynamicType: Clone,
+{
+    trigger_with(stream, move |obj| {
+        Some(ReconcileRequest {
+            obj_ref: ObjectRef::from_obj_with(obj.as_ref(), dyntype.clone()),
+            reason: ReconcileReason::ObjectUpdated,
+        })
+    })
+}
+
 /// Enqueues any mapper returned `K` types for reconciliation
 fn trigger_others<S, K, I>(
     stream: S,
@@ -685,6 +707,117 @@ where
     ) -> Self {
         let mut trigger_selector = stream::SelectAll::new();
         let self_watcher = trigger_self(trigger, dyntype.clone()).boxed();
+        trigger_selector.push(self_watcher);
+        Self {
+            trigger_selector,
+            trigger_backoff: Box::<DefaultBackoff>::default(),
+            graceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            forceful_shutdown_selector: vec![
+                // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
+                future::pending().boxed(),
+            ],
+            dyntype,
+            reader,
+            config: Default::default(),
+        }
+    }
+
+    /// This is the same as [`Controller::for_stream`]. Instead of taking an
+    /// `Api` (e.g. [`Controller::new`]), a stream of resources is used. Shared
+    /// streams can be created out-of-band by subscribing on a store `Writer`.
+    /// Through this interface, multiple controllers can use the same root
+    /// (shared) input stream of resources to keep memory overheads smaller.
+    ///
+    /// **N.B**: This constructor requires an
+    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
+    /// feature.
+    ///
+    /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
+    /// need to share the stream.
+    ///
+    /// ## Warning:
+    ///
+    /// You **must** ensure the root stream (i.e. stream created through a `reflector()`)
+    /// is driven to readiness independently of this controller to ensure the
+    /// watcher never deadlocks.
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # use kube::runtime::controller::{Action, Controller};
+    /// # use kube::runtime::{predicates, watcher, reflector, WatchStreamExt};
+    /// # use kube::{Api, Client, Error, ResourceExt};
+    /// # use std::sync::Arc;
+    /// # async fn reconcile(_: Arc<Deployment>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<Deployment>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
+    /// # async fn doc(client: kube::Client) {
+    /// let api: Api<Deployment> = Api::default_namespaced(client);
+    /// let (reader, writer) = reflector::store_shared(128);
+    /// let subscriber = writer
+    ///     .subscribe()
+    ///     .expect("subscribers can only be created from shared stores");
+    /// let deploys = watcher(api, watcher::Config::default())
+    ///     .default_backoff()
+    ///     .reflect(writer)
+    ///     .applied_objects()
+    ///     .for_each(|ev| async move {
+    ///         match ev {
+    ///             Ok(obj) => tracing::info!("got obj {obj:?}"),
+    ///             Err(error) => tracing::error!(%error, "received error")
+    ///         }
+    ///     });
+    ///
+    /// let controller = Controller::for_shared_stream(subscriber, reader)
+    ///     .run(reconcile, error_policy, Arc::new(()))
+    ///     .for_each(|ev| async move {
+    ///         tracing::info!("reconciled {ev:?}")
+    ///     });
+    ///
+    /// // Drive streams using a select statement
+    /// tokio::select! {
+    ///   _ = deploys => {},
+    ///   _ = controller => {},
+    /// }
+    /// # }
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    pub fn for_shared_stream(trigger: impl Stream<Item = Arc<K>> + Send + 'static, reader: Store<K>) -> Self
+    where
+        K::DynamicType: Default,
+    {
+        Self::for_shared_stream_with(trigger, reader, Default::default())
+    }
+
+    /// This is the same as [`Controller::for_stream`]. Instead of taking an
+    /// `Api` (e.g. [`Controller::new`]), a stream of resources is used. Shared
+    /// streams can be created out-of-band by subscribing on a store `Writer`.
+    /// Through this interface, multiple controllers can use the same root
+    /// (shared) input stream of resources to keep memory overheads smaller.
+    ///
+    /// **N.B**: This constructor requires an
+    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
+    /// feature.
+    ///
+    /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
+    /// need to share the stream.
+    ///
+    /// This variant constructor is used for [`dynamic`] types found through
+    /// discovery. Prefer [`Controller::for_shared_stream`] for static types (i.e.
+    /// known at compile time).
+    ///
+    /// [`dynamic`]: kube_client::core::dynamic
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    pub fn for_shared_stream_with(
+        trigger: impl Stream<Item = Arc<K>> + Send + 'static,
+        reader: Store<K>,
+        dyntype: K::DynamicType,
+    ) -> Self {
+        let mut trigger_selector = stream::SelectAll::new();
+        let self_watcher = trigger_self_shared(trigger.map(Ok), dyntype.clone()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
