@@ -7,7 +7,6 @@ mod event_modify;
 #[cfg(feature = "unstable-runtime-predicates")] mod predicate;
 mod reflect;
 mod stream_backoff;
-#[cfg(feature = "unstable-runtime-subscribe")] pub mod stream_subscribe;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
@@ -17,8 +16,6 @@ pub use event_modify::EventModify;
 pub use predicate::{predicates, Predicate, PredicateFilter};
 pub use reflect::Reflect;
 pub use stream_backoff::StreamBackoff;
-#[cfg(feature = "unstable-runtime-subscribe")]
-pub use stream_subscribe::StreamSubscribe;
 pub use watch_ext::WatchStreamExt;
 
 use futures::{
