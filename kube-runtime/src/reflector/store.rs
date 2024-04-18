@@ -83,6 +83,10 @@ where
     ///
     /// Multiple subscribe handles may be obtained, by either calling
     /// `subscribe` multiple times, or by calling `clone()`
+    ///
+    /// This function returns a `Some` when the [`Writer`] is constructed through
+    /// [`Writer::new_shared`] or [`store_shared`], and a `None` otherwise.
+    #[cfg(feature = "unstable-runtime-subscribe")]
     pub fn subscribe(&self) -> Option<ReflectHandle<K>> {
         self.dispatcher
             .as_ref()
