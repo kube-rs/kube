@@ -277,6 +277,8 @@ pub trait WatchStreamExt: Stream {
     ///
     ///
     /// [`Store`]: crate::reflector::Store
+    /// [`subscribe()`]: crate::reflector::store::Writer::subscribe()
+    /// [`Stream`]: futures::stream::Stream
     /// [`ReflectHandle`]: crate::reflector::dispatcher::ReflectHandle
     /// ## Usage
     /// ```no_run

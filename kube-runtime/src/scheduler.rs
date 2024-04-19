@@ -1,4 +1,4 @@
-//! Delays and deduplicates [`Stream`] items
+//! Delays and deduplicates [`Stream`](futures::stream::Stream) items
 
 use futures::{stream::Fuse, Stream, StreamExt};
 use hashbrown::{hash_map::Entry, HashMap};
@@ -251,7 +251,7 @@ where
     }
 }
 
-/// Stream transformer that delays and deduplicates [`Stream`] items.
+/// Stream transformer that delays and deduplicates items.
 ///
 /// Items are deduplicated: if an item is submitted multiple times before being emitted then it will only be
 /// emitted at the earliest `Instant`.

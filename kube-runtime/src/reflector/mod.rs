@@ -17,7 +17,7 @@ pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
 ///
-/// Observes the raw [`Stream`] of [`watcher::Event`] objects, and modifies the cache.
+/// Observes the raw `Stream` of [`watcher::Event`] objects, and modifies the cache.
 /// It passes the raw [`watcher()`] stream through unmodified.
 ///
 /// ## Usage
@@ -98,6 +98,21 @@ pub use store::{store, Store};
 /// Additionally, only `labels`, `annotations` and `managed_fields` are safe to drop from `ObjectMeta`.
 ///
 /// For more information check out: <https://kube.rs/controllers/optimization/> for graphs and techniques.
+///
+/// ## Stream sharing
+///
+/// `reflector()` as an interface may optionally create a stream that can be
+/// shared with other components to help with resource usage.
+///
+/// To share a stream, the `Writer<K>` consumed by `reflector()` must be
+/// created through an interface that allows a store to be subscribed on, such
+/// as [`store_shared()`]. When the store supports being subscribed on, it will
+/// broadcast an event to all active listeners after caching any object
+/// contained in the event.
+///
+/// Creating subscribers requires an
+/// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
+/// feature
 pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Lookup + Clone,
