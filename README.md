@@ -20,7 +20,7 @@ kube = { version = "0.90.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.21.1", features = ["latest"] }
 ```
 
-[Features are available](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
+See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality.
 
 ## Upgrading
 
