@@ -3,7 +3,8 @@
 //! [`CustomResourceDefinition`]: `k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition`
 
 // Used in docs
-#[allow(unused_imports)] use schemars::gen::SchemaSettings;
+#[allow(unused_imports)]
+use schemars::gen::SchemaSettings;
 
 use schemars::{
     schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},
@@ -62,6 +63,15 @@ impl Visitor for StructuralSchemaRewriter {
                     .extensions
                     .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
             }
+        }
+
+        // As of version 1.30 Kubernetes does not support setting `uniqueItems` to `true`,
+        // so we need to remove this fields.
+        // TODO: Ideally we would set `x-kubernetes-list-type` instead, but the question is
+        // to what value (set or map) we should set it, see https://kubernetes.io/docs/reference/using-api/server-side-apply/
+        // for details.
+        if let Some(array) = &mut schema.array {
+            array.unique_items = None;
         }
     }
 }

@@ -5,7 +5,7 @@ use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
 #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -46,6 +46,8 @@ struct FooSpec {
 
     /// This is a untagged enum with a description
     untagged_enum_person: UntaggedEnumPerson,
+
+    set: HashSet<String>,
 }
 
 fn default_value() -> String {
@@ -126,20 +128,27 @@ fn test_shortnames() {
 #[test]
 fn test_serialized_matches_expected() {
     assert_json_eq!(
-        serde_json::to_value(Foo::new("bar", FooSpec {
-            non_nullable: "asdf".to_string(),
-            non_nullable_with_default: "asdf".to_string(),
-            nullable_skipped: None,
-            nullable: None,
-            nullable_skipped_with_default: None,
-            nullable_with_default: None,
-            timestamp: TimeZone::from_utc_datetime(&Utc, &NaiveDateTime::from_timestamp_opt(0, 0).unwrap()),
-            complex_enum: ComplexEnum::VariantOne { int: 23 },
-            untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
-                age: 42,
-                gender: Gender::Male,
-            })
-        }))
+        serde_json::to_value(Foo::new(
+            "bar",
+            FooSpec {
+                non_nullable: "asdf".to_string(),
+                non_nullable_with_default: "asdf".to_string(),
+                nullable_skipped: None,
+                nullable: None,
+                nullable_skipped_with_default: None,
+                nullable_with_default: None,
+                timestamp: TimeZone::from_utc_datetime(
+                    &Utc,
+                    &NaiveDateTime::from_timestamp_opt(0, 0).unwrap()
+                ),
+                complex_enum: ComplexEnum::VariantOne { int: 23 },
+                untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
+                    age: 42,
+                    gender: Gender::Male,
+                }),
+                set: HashSet::from(["foo".to_owned()])
+            }
+        ))
         .unwrap(),
         serde_json::json!({
             "apiVersion": "clux.dev/v1",
@@ -161,7 +170,8 @@ fn test_serialized_matches_expected() {
                 "untaggedEnumPerson": {
                     "age": 42,
                     "gender": "Male"
-                }
+                },
+                "set": ["foo"]
             }
         })
     )
@@ -299,11 +309,18 @@ fn test_crd_schema_matches_expected() {
                                                     }
                                                 ],
                                                 "description": "This is a untagged enum with a description"
-                                            }
+                                            },
+                                            "set": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                },
+                                            },
                                         },
                                         "required": [
                                             "complexEnum",
                                             "nonNullable",
+                                            "set",
                                             "timestamp",
                                             "untaggedEnumPerson"
                                         ],
