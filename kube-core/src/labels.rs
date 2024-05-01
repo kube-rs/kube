@@ -1,27 +1,65 @@
-use schemars::JsonSchema;
+#![allow(missing_docs)] // for now! prototyping
 use serde::{Deserialize, Serialize};
+//use schemars::JsonSchema;
 use std::{
     cmp::PartialEq,
     collections::{BTreeMap, BTreeSet},
     iter::FromIterator,
-    sync::Arc,
 };
 
-#[derive(Clone, Debug, Default)]
-pub struct Labels(Arc<Map>);
+/// Labels as extracted from a container
+/// TODO: users don't get the linkerd label type easily, rethink this...
+//#[derive(Clone, Debug, Default)]
+//pub struct Labels(Arc<Map>);
+// TODO: why is this Arc wrapped?
+// TODO: to_string impl
 
-pub type Map = BTreeMap<String, String>;
+// TODO: add impls on Labels to add in Expressions
 
-pub type Expressions = Vec<Expression>;
+// local type aliases
+type Map = BTreeMap<String, String>;
+type Expressions = Vec<Expression>;
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
+// TODO cfg attr jsonschema?
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Expression {
     key: String,
     operator: Operator,
     values: Option<BTreeSet<String>>,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
+impl Expression {
+    /// Create an "key in (values,..)" expression
+    pub fn key_in(key: String, values: BTreeSet<String>) -> Self {
+        Self {
+            key,
+            operator: Operator::In,
+            values: Some(values),
+        }
+    }
+
+    // TODO: more builders here
+
+    // need a serializer for this also..
+    pub fn to_string(&self) -> String {
+        if let Some(values) = &self.values {
+            let mut set_str = String::new(); // impl on Values?
+            for v in values {
+                set_str.push_str(v);
+                set_str.push(',');
+            }
+            // TODO: trailing ,
+            format!("{} {:?} ({set_str})", self.key, self.operator)
+        } else {
+            format!("{} {:?}", self.key, self.operator)
+        }
+    }
+}
+
+/// A selector operator
+///
+/// TODO: make this smarter? embed values in In/NotIn variants?
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Operator {
     In,
     NotIn,
@@ -29,16 +67,15 @@ pub enum Operator {
     DoesNotExist,
 }
 
-/// Selects a set of pods that expose a server. The result of `match_labels` and
-/// `match_expressions` are ANDed.
-#[derive(Clone, Debug, Eq, PartialEq, Default, Deserialize, Serialize, JsonSchema)]
+/// Selects a set of pods that expose a server
+///
+/// The result of `match_labels` and `match_expressions` are ANDed.
+#[derive(Clone, Debug, Eq, PartialEq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Selector {
     match_labels: Option<Map>,
     match_expressions: Option<Expressions>,
 }
-
-// === Selector ===
 
 impl Selector {
     #[cfg(test)]
@@ -49,6 +86,7 @@ impl Selector {
         }
     }
 
+    /// Create a selector from a vector of expressions
     fn from_expressions(exprs: Expressions) -> Self {
         Self {
             match_labels: None,
@@ -56,11 +94,33 @@ impl Selector {
         }
     }
 
+    /// Create a selector from a map of key=value label matches
     fn from_map(map: Map) -> Self {
         Self {
             match_labels: Some(map),
             match_expressions: None,
         }
+    }
+
+    /// Convert a selector to a string for the API
+    pub fn to_selector_string(&self) -> String {
+        let mut sel = String::new();
+        if let Some(labels) = &self.match_labels {
+            for (k, v) in labels {
+                sel.push_str(&k);
+                sel.push('=');
+                sel.push_str(&v);
+                sel.push(',');
+            }
+        }
+        if let Some(exprs) = &self.match_expressions {
+            for exp in exprs {
+                sel.push_str(&exp.to_string());
+                sel.push(',');
+            }
+        }
+        // TODO: trim trailing ','
+        sel
     }
 
     /// Indicates whether this label selector matches all pods
@@ -73,13 +133,14 @@ impl Selector {
         }
     }
 
+    // users don't get the linkerd label type easily, rethink this...
+    /*
     pub fn matches(&self, labels: &Labels) -> bool {
         for expr in self.match_expressions.iter().flatten() {
             if !expr.matches(labels.as_ref()) {
                 return false;
             }
         }
-
         if let Some(match_labels) = self.match_labels.as_ref() {
             for (k, v) in match_labels {
                 if labels.0.get(k) != Some(v) {
@@ -87,10 +148,12 @@ impl Selector {
                 }
             }
         }
-
         true
     }
+    */
 }
+
+// convenience conversions for Selector
 
 impl FromIterator<(String, String)> for Selector {
     fn from_iter<T: IntoIterator<Item = (String, String)>>(iter: T) -> Self {
@@ -114,6 +177,7 @@ impl FromIterator<Expression> for Selector {
     }
 }
 
+/*
 // === Labels ===
 
 impl From<Option<Map>> for Labels {
@@ -166,7 +230,7 @@ impl FromIterator<(&'static str, &'static str)> for Labels {
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
     }
-}
+}*/
 
 // === Expression ===
 
@@ -184,7 +248,7 @@ impl Expression {
             (Operator::Exists, key, None) => labels.contains_key(key),
             (Operator::DoesNotExist, key, None) => !labels.contains_key(key),
             (operator, key, values) => {
-                tracing::warn!(?operator, %key, ?values, "illegal match expression");
+                //tracing::warn!(?operator, %key, ?values, "illegal match expression");
                 false
             }
         }
