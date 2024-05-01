@@ -20,18 +20,19 @@ kube = { version = "0.90.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.21.1", features = ["latest"] }
 ```
 
-[Features are available](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
+See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality.
 
 ## Upgrading
 
-Please check the [CHANGELOG](https://github.com/kube-rs/kube/blob/main/CHANGELOG.md) when upgrading.
-All crates herein are versioned and [released](https://github.com/kube-rs/kube/blob/main/release.toml) together to guarantee [compatibility before 1.0](https://github.com/kube-rs/kube/issues/508).
+See [kube.rs/upgrading](https://kube.rs/upgrading/).
+Noteworthy changes are highlighted in [releases](https://github.com/kube-rs/kube/releases), and archived in the [changelog](https://kube.rs/changelog/).
 
 ## Usage
 
 See the **[examples directory](https://github.com/kube-rs/kube/blob/main/examples)** for how to use any of these crates.
 
 - **[kube API Docs](https://docs.rs/kube/)**
+- **[kube.rs](https://kube.rs)**
 
 Official examples:
 
@@ -42,14 +43,14 @@ For real world projects see [ADOPTERS](https://kube.rs/adopters/).
 
 ## Api
 
-The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
+The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with Kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
 let pods: Api<Pod> = Api::default_namespaced(client);
 
-let p = pods.get("blog").await?;
-println!("Got blog pod with containers: {:?}", p.spec.unwrap().containers);
+let pod = pods.get("blog").await?;
+println!("Got pod: {pod:?}");
 
 let patch = json!({"spec": {
     "activeDeadlineSeconds": 5
@@ -67,7 +68,7 @@ See the examples ending in `_api` examples for more detail.
 
 Working with custom resources uses automatic code-generation via [proc_macros in kube-derive](https://docs.rs/kube/latest/kube/derive.CustomResource.html).
 
-You need to `#[derive(CustomResource)]` and some `#[kube(attrs..)]` on a spec struct:
+You need to add `#[derive(CustomResource, JsonSchema)]` and some `#[kube(attrs..)]` on a __spec__ struct:
 
 ```rust
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
@@ -146,9 +147,11 @@ Controller::new(root_kind_api, Config::default())
 
 Here `reconcile` and `error_policy` refer to functions you define. The first will be called when the root or child elements change, and the second when the `reconciler` returns an `Err`.
 
+See the [controller guide](https://kube.rs/controllers/intro/) for how to write these.
+
 ## TLS
 
-By default [rustls](https://github.com/ctz/rustls) is used for TLS, but `openssl` is supported. To switch, turn off `default-features`, and enable the `openssl-tls` feature:
+By default [rustls](https://github.com/rustls/rustls) is used for TLS, but `openssl` is supported. To switch, turn off `default-features`, and enable the `openssl-tls` feature:
 
 ```toml
 [dependencies]

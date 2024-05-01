@@ -95,14 +95,60 @@ pub trait Resource {
     ///
     /// Note: this returns an `Option`, but for objects populated from the apiserver,
     /// this Option can be safely unwrapped.
+    ///
+    /// ```
+    /// use k8s_openapi::api::core::v1::ConfigMap;
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    /// use kube_core::Resource;
+    ///
+    /// let p = Pod::default();
+    /// let controller_ref = p.controller_owner_ref(&());
+    /// let cm = ConfigMap {
+    ///     metadata: ObjectMeta {
+    ///         name: Some("pod-configmap".to_string()),
+    ///         owner_references: Some(controller_ref.into_iter().collect()),
+    ///         ..ObjectMeta::default()
+    ///     },
+    ///     ..Default::default()
+    /// };
+    /// ```
     fn controller_owner_ref(&self, dt: &Self::DynamicType) -> Option<OwnerReference> {
+        Some(OwnerReference {
+            controller: Some(true),
+            ..self.owner_ref(dt)?
+        })
+    }
+
+    /// Generates an owner reference pointing to this resource
+    ///
+    /// Note: this returns an `Option`, but for objects populated from the apiserver,
+    /// this Option can be safely unwrapped.
+    ///
+    /// ```
+    /// use k8s_openapi::api::core::v1::ConfigMap;
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    /// use kube_core::Resource;
+    ///
+    /// let p = Pod::default();
+    /// let owner_ref = p.owner_ref(&());
+    /// let cm = ConfigMap {
+    ///     metadata: ObjectMeta {
+    ///         name: Some("pod-configmap".to_string()),
+    ///         owner_references: Some(owner_ref.into_iter().collect()),
+    ///         ..ObjectMeta::default()
+    ///     },
+    ///     ..Default::default()
+    /// };
+    /// ```
+    fn owner_ref(&self, dt: &Self::DynamicType) -> Option<OwnerReference> {
         let meta = self.meta();
         Some(OwnerReference {
             api_version: Self::api_version(dt).to_string(),
             kind: Self::kind(dt).to_string(),
             name: meta.name.clone()?,
             uid: meta.uid.clone()?,
-            controller: Some(true),
             ..OwnerReference::default()
         })
     }
