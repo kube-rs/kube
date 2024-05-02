@@ -67,9 +67,9 @@ impl Visitor for StructuralSchemaRewriter {
 
         // As of version 1.30 Kubernetes does not support setting `uniqueItems` to `true`,
         // so we need to remove this fields.
-        // TODO: Ideally we would set `x-kubernetes-list-type` instead, but the question is
-        // to what value (set or map) we should set it, see https://kubernetes.io/docs/reference/using-api/server-side-apply/
-        // for details.
+        // Users can still set `x-kubernetes-list-type=set` in case they want the apiserver
+        // to do validation, but we can't make an assumption about the Set contents here.
+        // See https://kubernetes.io/docs/reference/using-api/server-side-apply/ for details.
         if let Some(array) = &mut schema.array {
             array.unique_items = None;
         }
