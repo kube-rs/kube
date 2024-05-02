@@ -5,7 +5,7 @@ use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
 #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -46,6 +46,8 @@ struct FooSpec {
 
     /// This is a untagged enum with a description
     untagged_enum_person: UntaggedEnumPerson,
+
+    set: HashSet<String>,
 }
 
 fn default_value() -> String {
@@ -138,7 +140,8 @@ fn test_serialized_matches_expected() {
             untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
                 age: 42,
                 gender: Gender::Male,
-            })
+            }),
+            set: HashSet::from(["foo".to_owned()])
         }))
         .unwrap(),
         serde_json::json!({
@@ -161,7 +164,8 @@ fn test_serialized_matches_expected() {
                 "untaggedEnumPerson": {
                     "age": 42,
                     "gender": "Male"
-                }
+                },
+                "set": ["foo"]
             }
         })
     )
@@ -299,11 +303,18 @@ fn test_crd_schema_matches_expected() {
                                                     }
                                                 ],
                                                 "description": "This is a untagged enum with a description"
-                                            }
+                                            },
+                                            "set": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                },
+                                            },
                                         },
                                         "required": [
                                             "complexEnum",
                                             "nonNullable",
+                                            "set",
                                             "timestamp",
                                             "untaggedEnumPerson"
                                         ],
