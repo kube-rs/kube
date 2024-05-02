@@ -1064,7 +1064,7 @@ where
     ///
     /// ```no_run
     /// # use futures::StreamExt;
-    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
     /// # use kube::runtime::controller::{Action, Controller};
     /// # use kube::runtime::{predicates, watcher, reflector, WatchStreamExt};
     /// # use kube::{Api, Client, Error, ResourceExt};
@@ -1079,7 +1079,7 @@ where
     /// let subscriber = writer
     ///     .subscribe()
     ///     .expect("subscribers can only be created from shared stores");
-    /// let pods = watcher(api, watcher::Config::default())
+    /// let pods = watcher(pod_api, watcher::Config::default())
     ///     .default_backoff()
     ///     .reflect(writer)
     ///     .applied_objects()
@@ -1099,7 +1099,7 @@ where
     ///
     /// // Drive streams using a select statement
     /// tokio::select! {
-    ///   _ = deploys => {},
+    ///   _ = pods => {},
     ///   _ = controller => {},
     /// }
     /// # }
@@ -1344,11 +1344,11 @@ where
     /// # type CustomResource = ConfigMap;
     /// # async fn reconcile(_: Arc<CustomResource>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
     /// # fn error_policy(_: Arc<CustomResource>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
-    /// fn mapper(_: DaemonSet) -> Option<ObjectRef<CustomResource>> { todo!() }
+    /// fn mapper(_: Arc<DaemonSet>) -> Option<ObjectRef<CustomResource>> { todo!() }
     /// # async fn doc(client: kube::Client) {
     /// let api: Api<DaemonSet> = Api::all(client.clone());
     /// let cr: Api<CustomResource> = Api::all(client.clone());
-    /// let (reader, writer) = reflector::store_shared(128);
+    /// let (reader, writer) = kube_runtime::reflector::store_shared(128);
     /// let subscriber = writer
     ///     .subscribe()
     ///     .expect("subscribers can only be created from shared stores");
@@ -1362,15 +1362,14 @@ where
     ///         }
     ///     });
     ///
-    /// Controller::new(cr, watcher::Config::default())
+    /// let controller = Controller::new(cr, watcher::Config::default())
     ///     .watches_shared_stream(subscriber, mapper)
     ///     .run(reconcile, error_policy, Arc::new(()))
-    ///     .for_each(|_| std::future::ready(()))
-    ///     .await;
+    ///     .for_each(|_| std::future::ready(()));
     ///
     /// // Drive streams using a select statement
     /// tokio::select! {
-    ///   _ = deploys => {},
+    ///   _ = daemons => {},
     ///   _ = controller => {},
     /// }
     /// # }
