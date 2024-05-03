@@ -44,7 +44,7 @@ pub enum Error {
     HttpError(#[source] http::Error),
 
     /// Common error case when requesting parsing into own structs
-    #[error("Error deserializing response")]
+    #[error("Error deserializing response: {0}")]
     SerdeError(#[source] serde_json::Error),
 
     /// Failed to build request
