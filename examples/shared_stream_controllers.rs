@@ -1,14 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::StreamExt;
-use k8s_openapi::api::core::v1::{Pod, PodCondition};
+use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
 use kube::{
-    api::{Patch, PatchParams},
-    runtime::{
-        controller::Action,
-        reflector::{self},
-        watcher, Config, Controller, WatchStreamExt,
-    },
+    runtime::{controller::Action, reflector, watcher, Config, Controller, WatchStreamExt},
     Api, Client, ResourceExt,
 };
 use tracing::{debug, error, info, warn};
@@ -24,95 +19,20 @@ pub mod condition {
 const SUBSCRIBE_BUFFER_SIZE: usize = 256;
 
 #[derive(Debug, Error)]
-enum Error {
-    #[error("Failed to patch pod: {0}")]
-    WriteFailed(#[source] kube::Error),
+enum Infallible {}
 
-    #[error("Missing po field: {0}")]
-    MissingField(&'static str),
+// A generic reconciler that can be used with any object whose type is known at
+// compile time. Will simply log its kind on reconciliation.
+async fn reconcile<K>(_obj: Arc<K>, _ctx: Arc<()>) -> Result<Action, Infallible>
+where
+    K: ResourceExt<DynamicType = ()>,
+{
+    let kind = K::kind(&());
+    info!("Reconciled {kind}");
+    Ok(Action::await_change())
 }
 
-#[derive(Clone)]
-struct Data {
-    client: Client,
-}
-
-/// A simple reconciliation function that will copy a pod's labels into the annotations.
-async fn reconcile_metadata(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Error> {
-    let namespace = &pod.namespace().unwrap_or_default();
-    if namespace == "kube-system" {
-        return Ok(Action::await_change());
-    }
-
-    let mut pod = (*pod).clone();
-    pod.metadata.managed_fields = None;
-    // combine labels and annotations into a new map
-    let labels = pod.labels().clone().into_iter();
-    pod.annotations_mut().extend(labels);
-
-    let pod_api = Api::<Pod>::namespaced(
-        ctx.client.clone(),
-        pod.metadata
-            .namespace
-            .as_ref()
-            .ok_or_else(|| Error::MissingField(".metadata.name"))?,
-    );
-
-    pod_api
-        .patch(
-            &pod.name_any(),
-            &PatchParams::apply("controller-1"),
-            &Patch::Apply(&pod),
-        )
-        .await
-        .map_err(Error::WriteFailed)?;
-
-    Ok(Action::requeue(Duration::from_secs(300)))
-}
-
-/// Another reconiliation function that will add an 'UndocumentedPort' condition to pods that do
-/// do not have any ports declared across all containers.
-async fn reconcile_status(pod: Arc<Pod>, ctx: Arc<Data>) -> Result<Action, Error> {
-    for container in pod.spec.clone().unwrap_or_default().containers.iter() {
-        if container.ports.clone().unwrap_or_default().len() != 0 {
-            debug!(name = %pod.name_any(), "Skipped updating pod with documented ports");
-            return Ok(Action::await_change());
-        }
-    }
-
-    let pod_api = Api::<Pod>::namespaced(
-        ctx.client.clone(),
-        pod.metadata
-            .namespace
-            .as_ref()
-            .ok_or_else(|| Error::MissingField(".metadata.name"))?,
-    );
-
-    let undocumented_condition = PodCondition {
-        type_: condition::UNDOCUMENTED_TYPE.into(),
-        status: condition::STATUS_TRUE.into(),
-        ..Default::default()
-    };
-    let value = serde_json::json!({
-        "status": {
-            "name": pod.name_any(),
-            "kind": "Pod",
-            "conditions": vec![undocumented_condition]
-        }
-    });
-    pod_api
-        .patch_status(
-            &pod.name_any(),
-            &PatchParams::apply("controller-2"),
-            &Patch::Strategic(value),
-        )
-        .await
-        .map_err(Error::WriteFailed)?;
-
-    Ok(Action::requeue(Duration::from_secs(300)))
-}
-
-fn error_policy(obj: Arc<Pod>, error: &Error, _ctx: Arc<Data>) -> Action {
+fn error_policy<K: ResourceExt>(obj: Arc<K>, error: &Infallible, _ctx: Arc<()>) -> Action {
     error!(%error, name = %obj.name_any(), "Failed reconciliation");
     Action::requeue(Duration::from_secs(10))
 }
@@ -120,11 +40,10 @@ fn error_policy(obj: Arc<Pod>, error: &Error, _ctx: Arc<Data>) -> Action {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-
     let client = Client::try_default().await?;
-    let pods = Api::<Pod>::namespaced(client.clone(), "default");
+
+    let pods = Api::<Pod>::all(client.clone());
     let config = Config::default().concurrency(2);
-    let ctx = Arc::new(Data { client });
 
     // Create a shared store with a predefined buffer that will be shared between subscribers.
     let (reader, writer) = reflector::store_shared(SUBSCRIBE_BUFFER_SIZE);
@@ -146,30 +65,32 @@ async fn main() -> anyhow::Result<()> {
             }
         });
 
-    // Create the first controller using the reconcile_metadata function. Controllers accept
-    // subscribers through a dedicated interface.
-    let metadata_controller = Controller::for_shared_stream(subscriber.clone(), reader)
+    // Create the first controller; the controller will log whenever it
+    // reconciles a pod. The reconcile is a no-op.
+    // Controllers accept subscribers through a dedicated interface.
+    let pod_controller = Controller::for_shared_stream(subscriber.clone(), reader)
         .with_config(config.clone())
         .shutdown_on_signal()
-        .run(reconcile_metadata, error_policy, ctx.clone())
+        .run(reconcile, error_policy, Arc::new(()))
         .for_each(|res| async move {
             match res {
-                Ok(v) => info!("Reconciled metadata {v:?}"),
+                Ok(v) => debug!("Reconciled pod {v:?}"),
                 Err(error) => warn!(%error, "Failed to reconcile metadata"),
             }
         });
 
-    // Subscribers can be used to get a read handle on the store, if the initial handle has been
-    // moved or dropped.
-    let reader = subscriber.reader();
-    // Create the second controller using the reconcile_status function.
-    let status_controller = Controller::for_shared_stream(subscriber, reader)
+    // Create the second controller; the controller will log whenever it
+    // reconciles a deployment. Any changes to a pod will trigger a
+    // reconciliation to the owner (a deployment). Reconciliations are no-op.
+    let deploys = Api::<Deployment>::all(client.clone());
+    let deploy_controller = Controller::new(deploys, Default::default())
         .with_config(config)
+        .owns_shared_stream(subscriber)
         .shutdown_on_signal()
-        .run(reconcile_status, error_policy, ctx)
+        .run(reconcile, error_policy, Arc::new(()))
         .for_each(|res| async move {
             match res {
-                Ok(v) => info!("Reconciled status {v:?}"),
+                Ok(v) => debug!("Reconciled deployment {v:?}"),
                 Err(error) => warn!(%error, "Failed to reconcile status"),
             }
         });
@@ -179,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
     //
     // Both controllers will operate on shared objects.
     tokio::select! {
-        _ = futures::future::join(metadata_controller, status_controller) => {},
+        _ = futures::future::join(pod_controller, deploy_controller) => {},
         _ = pod_watch => {}
     }
 
