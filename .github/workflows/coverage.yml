@@ -23,14 +23,16 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-tarpaulin@0.28.0
-      - uses: AbsaOSS/k3d-action@v2
-        name: "Create Single Cluster"
+      - uses: nolar/setup-k3d-k3s@v1
         with:
-          cluster-name: "test-cluster-1"
-          args: >-
-            --image docker.io/rancher/k3s:v1.25.16-k3s1-amd64
-            -p 10250:10250
-            --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
+          version: v1.25
+          # k3d-kube
+          k3d-name: kube
+          # Used to avoid rate limits when fetching the releases from k3s repo.
+          # Anonymous access is limited to 60 requests / hour / worker
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
+          k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
+
       - name: Run cargo-tarpaulin
         run: |
           rustup run stable cargo tarpaulin -o xml --skip-clean
