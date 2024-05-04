@@ -107,8 +107,8 @@ bump-k8s:
   #!/usr/bin/env bash
   latest=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1 | choose -f ',' 1)
   # bumping supported version also bumps our mk8sv
-  mk8svnew=${latest::-2}$((${latest:3} - 4))
-  mk8svold=${latest::-2}$((${latest:3} - 5))
+  mk8svnew=${latest::-2}$((${latest:3} - 5))
+  mk8svold=${latest::-2}$((${latest:3} - 6))
   fastmod -m -d e2e -e toml "$mk8svold" "$mk8svnew"
   fastmod -m -d .github/workflows -e yml "${mk8svold/_/\.}" "${mk8svnew/_/.}"
   # bump mk8sv badge
