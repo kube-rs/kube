@@ -28,7 +28,7 @@ jobs:
         with:
           cluster-name: "test-cluster-1"
           args: >-
-            --image docker.io/rancher/k3s:v1.25.4-k3s1
+            --image docker.io/rancher/k3s:v1.25.16-k3s1
             -p 10250:10250
             --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
       - name: Run cargo-tarpaulin
