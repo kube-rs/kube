@@ -5,21 +5,24 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.90.0...main
+ * see https://github.com/kube-rs/kube/compare/0.91.0...main
+
+0.91.0 / 2024-05-06
+===================
 
 [0.90.0](https://github.com/kube-rs/kube/releases/tag/0.90.0) / 2024-04-03
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.90.0 -->
 ## Highlights
 ### [`kube::client::Body`](https://docs.rs/kube/latest/kube/client/struct.Body.html) Improvements
-- Unit testing helpers #1444 + #1445,
-- Accuracy; `size_hint` and `is_end_stream` implemented in #1452 + internal cleanups #1453 and #1455
+- Unit testing helpers [#1444](https://github.com/kube-rs/kube/issues/1444) + [#1445](https://github.com/kube-rs/kube/issues/1445),
+- Accuracy; `size_hint` and `is_end_stream` implemented in [#1452](https://github.com/kube-rs/kube/issues/1452) + internal cleanups [#1453](https://github.com/kube-rs/kube/issues/1453) and [#1455](https://github.com/kube-rs/kube/issues/1455)
 
 ### Dependency Cleanups
-- `rustls` to 0.23 in #1457
-- `once_cell` removed in #1447 (no longer needed)
-- `futures` feature prune in #1442
-- `chrono` features prune in #1448, and bump its min version pin in #1458
+- `rustls` to 0.23 in [#1457](https://github.com/kube-rs/kube/issues/1457)
+- `once_cell` removed in [#1447](https://github.com/kube-rs/kube/issues/1447) (no longer needed)
+- `futures` feature prune in [#1442](https://github.com/kube-rs/kube/issues/1442)
+- `chrono` features prune in [#1448](https://github.com/kube-rs/kube/issues/1448), and bump its min version pin in [#1458](https://github.com/kube-rs/kube/issues/1458)
 
 ## What's Changed
 ### Added
