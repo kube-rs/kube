@@ -7,8 +7,27 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.91.0...main
 
-0.91.0 / 2024-05-06
+[0.91.0](https://github.com/kube-rs/kube/releases/tag/0.91.0) / 2024-05-06
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.91.0 -->
+## Kubernetes `v1_30` support via `k8s-openapi` [0.22](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.22.0)
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+## Unstable Stream Sharing
+A more complete implementation that allows sharing `watcher` streams between multiple `Controller`s (for https://github.com/kube-rs/kube/issues/1080) has been added under the `unstable-runtime` [feature-flag](https://kube.rs/stability/#unstable-features) in #1449 and #1483 by @mateiidavid. This represents the first usable implementation of shared streams (and replaces the older prototype part in #1470). While some changes are expected, you can check the [shared_stream_controller example](https://github.com/kube-rs/kube/blob/main/examples/shared_stream_controllers.rs) for a high-level overview.
+
+## What's Changed
+### Added
+* Add shared stream interfaces by @mateiidavid in https://github.com/kube-rs/kube/pull/1449
+* Allow to create non-controller owner reference for resource by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1475
+* feat(runtime): support for owned shared streams by @mateiidavid in https://github.com/kube-rs/kube/pull/1483
+### Changed
+* Upgrade `k8s-openapi` to 0.22 and bump MK8SV to 1.25 by @clux in https://github.com/kube-rs/kube/pull/1485
+### Removed
+* Remove abandoned `StreamSubscribe` implementation by @clux in https://github.com/kube-rs/kube/pull/1470
+### Fixed
+* Include inner error message in Display for SerdeError by @XAMPPRocky in https://github.com/kube-rs/kube/pull/1481
+* Remove invalid `uniqueItems` property from CRDs when Sets are used  by @sbernauer in https://github.com/kube-rs/kube/pull/1484
 
 [0.90.0](https://github.com/kube-rs/kube/releases/tag/0.90.0) / 2024-04-03
 ===================
