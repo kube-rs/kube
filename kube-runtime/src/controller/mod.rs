@@ -472,7 +472,9 @@ where
                     obj_ref,
                     reason: reschedule_reason,
                 },
-                run_at: reconciler_finished_at + requeue_after,
+                run_at: reconciler_finished_at
+                    .checked_add(requeue_after)
+                    .unwrap_or_else(Instant::now),
             }),
             result: Some(result),
         }

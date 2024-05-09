@@ -74,6 +74,10 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             // Message is already pending, so we can't even expedite it
             return;
         }
+        let next_time = request
+            .run_at
+            .checked_add(*self.debounce)
+            .unwrap_or_else(Instant::now);
         match self.scheduled.entry(request.message) {
             // If new request is supposed to be earlier than the current entry's scheduled
             // time (for eg: the new request is user triggered and the current entry is the
@@ -81,9 +85,8 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             Entry::Occupied(mut old_entry) if old_entry.get().run_at >= request.run_at => {
                 // Old entry will run after the new request, so replace it..
                 let entry = old_entry.get_mut();
-                self.queue
-                    .reset_at(&entry.queue_key, request.run_at + *self.debounce);
-                entry.run_at = request.run_at + *self.debounce;
+                self.queue.reset_at(&entry.queue_key, next_time);
+                entry.run_at = next_time;
                 old_entry.replace_key();
             }
             Entry::Occupied(_old_entry) => {
@@ -93,8 +96,8 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
                 // No old entry, we're free to go!
                 let message = entry.key().clone();
                 entry.insert(ScheduledEntry {
-                    run_at: request.run_at + *self.debounce,
-                    queue_key: self.queue.insert_at(message, request.run_at + *self.debounce),
+                    run_at: next_time,
+                    queue_key: self.queue.insert_at(message, next_time),
                 });
             }
         }
