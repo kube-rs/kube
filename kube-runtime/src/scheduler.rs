@@ -77,7 +77,7 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
         let next_time = request
             .run_at
             .checked_add(*self.debounce)
-            .unwrap_or_else(Instant::now);
+            .unwrap_or_else(far_future);
         match self.scheduled.entry(request.message) {
             // If new request is supposed to be earlier than the current entry's scheduled
             // time (for eg: the new request is user triggered and the current entry is the
@@ -281,6 +281,13 @@ pub fn debounced_scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleReques
     debounce: Duration,
 ) -> Scheduler<T, S> {
     Scheduler::new(requests, debounce)
+}
+
+// internal fallback for overflows in schedule times
+pub(crate) fn far_future() -> Instant {
+    // private method from tokio for convenience - remove if upstream becomes pub
+    // https://github.com/tokio-rs/tokio/blob/6fcd9c02176bf3cd570bc7de88edaa3b95ea480a/tokio/src/time/instant.rs#L57-L63
+    Instant::now() + Duration::from_secs(86400 * 365 * 30)
 }
 
 #[cfg(test)]

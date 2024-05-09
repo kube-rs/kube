@@ -474,7 +474,7 @@ where
                 },
                 run_at: reconciler_finished_at
                     .checked_add(requeue_after)
-                    .unwrap_or_else(Instant::now),
+                    .unwrap_or_else(crate::scheduler::far_future),
             }),
             result: Some(result),
         }
