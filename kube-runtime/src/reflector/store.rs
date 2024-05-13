@@ -21,6 +21,7 @@ where
     K::DynamicType: Eq + Hash + Clone,
 {
     store: Cache<K>,
+    buffer: Cache<K>,
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
     ready_rx: Arc<DelayedInit<()>>,
@@ -39,6 +40,7 @@ where
         let (ready_tx, ready_rx) = DelayedInit::new();
         Writer {
             store: Default::default(),
+            buffer: Default::default(),
             dyntype,
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
@@ -60,6 +62,7 @@ where
         let (ready_tx, ready_rx) = DelayedInit::new();
         Writer {
             store: Default::default(),
+            buffer: Default::default(),
             dyntype,
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
@@ -105,18 +108,41 @@ where
                 let key = obj.to_object_ref(self.dyntype.clone());
                 self.store.write().remove(&key);
             }
-            watcher::Event::Restarted(new_objs) => {
+            watcher::Event::RestartedStart => {
+                let mut buffer = self.buffer.write();
+                *buffer = AHashMap::new();
+            }
+            watcher::Event::RestartedPage(new_objs) => {
                 let new_objs = new_objs
                     .iter()
                     .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
-                *self.store.write() = new_objs;
+                self.buffer.write().extend(new_objs);
             }
-        }
+            watcher::Event::RestartedDone => {
+                let mut store = self.store.write();
 
-        // Mark as ready after the first event, "releasing" any calls to Store::wait_until_ready()
-        if let Some(ready_tx) = self.ready_tx.take() {
-            ready_tx.init(())
+                // Swap the buffer into the store
+                let mut buffer = self.buffer.write();
+                std::mem::swap(&mut *store, &mut *buffer);
+
+                // Clear the buffer
+                *buffer = AHashMap::new();
+
+                // Mark as ready after the RestartedDone, "releasing" any calls to Store::wait_until_ready()
+                if let Some(ready_tx) = self.ready_tx.take() {
+                    ready_tx.init(())
+                }
+            }
+            watcher::Event::RestartedApplied(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                let obj = Arc::new(obj.clone());
+                self.buffer.write().insert(key, obj);
+            }
+            watcher::Event::RestartedDeleted(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                self.buffer.write().remove(&key);
+            }
         }
     }
 
@@ -124,20 +150,24 @@ where
     pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
         if let Some(ref mut dispatcher) = self.dispatcher {
             match event {
-                watcher::Event::Applied(obj) => {
+                watcher::Event::Applied(obj) | watcher::Event::RestartedApplied(obj) => {
                     let obj_ref = obj.to_object_ref(self.dyntype.clone());
                     // TODO (matei): should this take a timeout to log when backpressure has
                     // been applied for too long, e.g. 10s
                     dispatcher.broadcast(obj_ref).await;
                 }
 
-                watcher::Event::Restarted(new_objs) => {
+                watcher::Event::RestartedPage(new_objs) => {
                     let obj_refs = new_objs.iter().map(|obj| obj.to_object_ref(self.dyntype.clone()));
                     for obj_ref in obj_refs {
                         dispatcher.broadcast(obj_ref).await;
                     }
                 }
-                watcher::Event::Deleted(_) => {}
+
+                watcher::Event::RestartedStart
+                | watcher::Event::RestartedDone
+                | watcher::Event::Deleted(_)
+                | watcher::Event::RestartedDeleted(_) => {}
             }
         }
     }

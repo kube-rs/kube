@@ -36,8 +36,10 @@ where
             if let Some(item) = me.queue.next() {
                 break Some(Ok(item));
             }
-            break match ready!(me.stream.as_mut().poll_next(cx)) {
-                Some(Ok(Event::Applied(obj))) => Some(Ok(obj)),
+            let var_name = match ready!(me.stream.as_mut().poll_next(cx)) {
+                Some(Ok(
+                    Event::Applied(obj) | Event::RestartedApplied(obj) | Event::RestartedDeleted(obj),
+                )) => Some(Ok(obj)),
                 Some(Ok(Event::Deleted(obj))) => {
                     if *me.emit_deleted {
                         Some(Ok(obj))
@@ -45,13 +47,15 @@ where
                         continue;
                     }
                 }
-                Some(Ok(Event::Restarted(objs))) => {
+                Some(Ok(Event::RestartedPage(objs))) => {
                     *me.queue = objs.into_iter();
                     continue;
                 }
+                Some(Ok(Event::RestartedStart | Event::RestartedDone)) => continue,
                 Some(Err(err)) => Some(Err(err)),
                 None => return Poll::Ready(None),
             };
+            break var_name;
         })
     }
 }
@@ -70,7 +74,7 @@ pub(crate) mod tests {
             Ok(Event::Applied(1)),
             Ok(Event::Deleted(0)),
             Ok(Event::Applied(2)),
-            Ok(Event::Restarted(vec![1, 2])),
+            Ok(Event::RestartedPage(vec![1, 2])),
             Err(Error::TooManyObjects),
             Ok(Event::Applied(2)),
         ]);
