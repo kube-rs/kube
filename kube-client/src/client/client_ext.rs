@@ -1,10 +1,7 @@
 use crate::{Client, Error, Result};
 use k8s_openapi::api::core::v1::Namespace as k8sNs;
 use kube_core::{
-    object::ObjectList,
-    params::{GetParams, ListParams},
-    request::Request,
-    ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource,
+    object::ObjectList, params::{GetParams, ListParams}, request::Request, resource, ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
@@ -174,8 +171,8 @@ impl Client {
     /// ```
     pub async fn get<K>(&self, name: &str, scope: &impl ObjectUrl<K>) -> Result<K>
     where
-        K: Resource + Serialize + DeserializeOwned + Clone + Debug,
-        <K as Resource>::DynamicType: Default,
+        K: resource::Typed + Serialize + DeserializeOwned + Clone + Debug,
+        <K as resource::Typed>::DynamicType: Default,
     {
         let mut req = Request::new(scope.url_path())
             .get(name, &GetParams::default())
@@ -184,7 +181,7 @@ impl Client {
         self.request::<K>(req).await
     }
 
-    /// List instances of a `Resource` implementing type `K` at the specified scope.
+    /// List instances of a [resource](resource::Typed) implementing type `K` at the specified scope.
     ///
     /// ```no_run
     /// # use k8s_openapi::api::core::v1::Pod;
@@ -205,8 +202,8 @@ impl Client {
     /// ```
     pub async fn list<K>(&self, lp: &ListParams, scope: &impl CollectionUrl<K>) -> Result<ObjectList<K>>
     where
-        K: Resource + Serialize + DeserializeOwned + Clone + Debug,
-        <K as Resource>::DynamicType: Default,
+        K: resource::Typed + Serialize + DeserializeOwned + Clone + Debug,
+        <K as resource::Typed>::DynamicType: Default,
     {
         let mut req = Request::new(scope.url_path())
             .list(lp)

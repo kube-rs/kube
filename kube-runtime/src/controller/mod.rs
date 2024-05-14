@@ -18,7 +18,7 @@ use futures::{
     future::{self, BoxFuture},
     stream, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
 };
-use kube_client::api::{Api, DynamicObject, Resource};
+use kube_client::{api::{Api, DynamicObject, Resource}, core::resource};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
@@ -149,13 +149,13 @@ where
 fn trigger_others<S, K, I>(
     stream: S,
     mapper: impl Fn(S::Ok) -> I + Sync + Send + 'static,
-    dyntype: <S::Ok as Resource>::DynamicType,
+    dyntype: <S::Ok as resource::Typed>::DynamicType,
 ) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
 where
     // Input stream has items as some Resource (via Controller::watches)
     S: TryStream,
     S::Ok: Resource,
-    <S::Ok as Resource>::DynamicType: Clone,
+    <S::Ok as resource::Typed>::DynamicType: Clone,
     // Output stream is requests for the root type K
     K: Resource,
     K::DynamicType: Clone,
@@ -212,12 +212,12 @@ where
 pub fn trigger_owners<KOwner, S>(
     stream: S,
     owner_type: KOwner::DynamicType,
-    child_type: <S::Ok as Resource>::DynamicType,
+    child_type: <S::Ok as resource::Typed>::DynamicType,
 ) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
 where
     S: TryStream,
     S::Ok: Resource,
-    <S::Ok as Resource>::DynamicType: Clone,
+    <S::Ok as resource::Typed>::DynamicType: Clone,
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
