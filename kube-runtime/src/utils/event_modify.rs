@@ -56,7 +56,7 @@ pub(crate) mod test {
         let st = stream::iter([
             Ok(Event::Applied(0)),
             Err(Error::TooManyObjects),
-            Ok(Event::Restarted(vec![10])),
+            Ok(Event::RestartedPage(vec![10])),
         ]);
         let mut ev_modify = pin!(EventModify::new(st, |x| {
             *x += 1;
@@ -75,7 +75,7 @@ pub(crate) mod test {
         let restarted = poll!(ev_modify.next());
         assert!(matches!(
             restarted,
-            Poll::Ready(Some(Ok(Event::Restarted(vec)))) if vec == [11]
+            Poll::Ready(Some(Ok(Event::RestartedPage(vec)))) if vec == [11]
         ));
 
         assert!(matches!(poll!(ev_modify.next()), Poll::Ready(None)));
