@@ -12,7 +12,8 @@ use crate::watcher;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use std::hash::Hash;
-#[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub use store::store_shared;
 pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
@@ -245,7 +246,9 @@ mod tests {
             store_w,
             stream::iter(vec![
                 Ok(watcher::Event::Applied(cm_a.clone())),
-                Ok(watcher::Event::Restarted(vec![cm_b.clone()])),
+                Ok(watcher::Event::RestartedStart),
+                Ok(watcher::Event::RestartedPage(vec![cm_b.clone()])),
+                Ok(watcher::Event::RestartedDone),
             ]),
         )
         .map(|_| ())
