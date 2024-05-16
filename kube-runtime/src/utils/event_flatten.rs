@@ -37,21 +37,21 @@ where
                 break Some(Ok(item));
             }
             let var_name = match ready!(me.stream.as_mut().poll_next(cx)) {
-                Some(Ok(
-                    Event::Applied(obj) | Event::RestartedApplied(obj) | Event::RestartedDeleted(obj),
-                )) => Some(Ok(obj)),
-                Some(Ok(Event::Deleted(obj))) => {
+                Some(Ok(Event::Apply(obj) | Event::RestartApply(obj) | Event::RestartDelete(obj))) => {
+                    Some(Ok(obj))
+                }
+                Some(Ok(Event::Delete(obj))) => {
                     if *me.emit_deleted {
                         Some(Ok(obj))
                     } else {
                         continue;
                     }
                 }
-                Some(Ok(Event::RestartedPage(objs))) => {
+                Some(Ok(Event::RestartPage(objs))) => {
                     *me.queue = objs.into_iter();
                     continue;
                 }
-                Some(Ok(Event::RestartedStart | Event::RestartedDone)) => continue,
+                Some(Ok(Event::RestartInit | Event::Restart)) => continue,
                 Some(Err(err)) => Some(Err(err)),
                 None => return Poll::Ready(None),
             };
@@ -70,13 +70,13 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn watches_applies_uses_correct_eventflattened_stream() {
         let data = stream::iter([
-            Ok(Event::Applied(0)),
-            Ok(Event::Applied(1)),
-            Ok(Event::Deleted(0)),
-            Ok(Event::Applied(2)),
-            Ok(Event::RestartedPage(vec![1, 2])),
+            Ok(Event::Apply(0)),
+            Ok(Event::Apply(1)),
+            Ok(Event::Delete(0)),
+            Ok(Event::Apply(2)),
+            Ok(Event::RestartPage(vec![1, 2])),
             Err(Error::TooManyObjects),
-            Ok(Event::Applied(2)),
+            Ok(Event::Apply(2)),
         ]);
         let mut rx = pin!(EventFlatten::new(data, false));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(0)))));
