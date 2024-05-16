@@ -21,7 +21,7 @@ where
     K::DynamicType: Eq + Hash + Clone,
 {
     store: Cache<K>,
-    buffer: Cache<K>,
+    buffer: AHashMap<ObjectRef<K>, Arc<K>>,
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
     ready_rx: Arc<DelayedInit<()>>,
@@ -109,25 +109,23 @@ where
                 self.store.write().remove(&key);
             }
             watcher::Event::RestartInit => {
-                let mut buffer = self.buffer.write();
-                *buffer = AHashMap::new();
+                self.buffer = AHashMap::new();
             }
             watcher::Event::RestartPage(new_objs) => {
                 let new_objs = new_objs
                     .iter()
                     .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
-                self.buffer.write().extend(new_objs);
+                self.buffer.extend(new_objs);
             }
             watcher::Event::Restart => {
                 let mut store = self.store.write();
 
                 // Swap the buffer into the store
-                let mut buffer = self.buffer.write();
-                std::mem::swap(&mut *store, &mut *buffer);
+                std::mem::swap(&mut *store, &mut self.buffer);
 
                 // Clear the buffer
-                *buffer = AHashMap::new();
+                self.buffer = AHashMap::new();
 
                 // Mark as ready after the RestartedDone, "releasing" any calls to Store::wait_until_ready()
                 if let Some(ready_tx) = self.ready_tx.take() {
@@ -137,11 +135,11 @@ where
             watcher::Event::RestartApply(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
-                self.buffer.write().insert(key, obj);
+                self.buffer.insert(key, obj);
             }
             watcher::Event::RestartDelete(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
-                self.buffer.write().remove(&key);
+                self.buffer.remove(&key);
             }
         }
     }
