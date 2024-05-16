@@ -125,6 +125,8 @@ where
                 std::mem::swap(&mut *store, &mut self.buffer);
 
                 // Clear the buffer
+                // This is preferred over self.buffer.clear(), as clear() will keep the allocated memory for reuse.
+                // This way, the old buffer is dropped.
                 self.buffer = AHashMap::new();
 
                 // Mark as ready after the RestartedDone, "releasing" any calls to Store::wait_until_ready()
