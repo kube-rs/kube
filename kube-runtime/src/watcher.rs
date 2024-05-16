@@ -838,16 +838,20 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, Config::default().fields(&format!("metadata.name={name}"))).map(|event| match event? {
-        Event::Delete(_) | Event::RestartInit | Event::RestartDelete(_) | Event::Restart => Ok(None),
-        // We're filtering by object name, so getting more than one object means that either:
-        // 1. The apiserver is accepting multiple objects with the same name, or
-        // 2. The apiserver is ignoring our query
-        // In either case, the K8s apiserver is broken and our API will return invalid data, so
-        // we had better bail out ASAP.
-        Event::RestartPage(objs) if objs.len() > 1 => Err(Error::TooManyObjects),
-        Event::RestartPage(mut objs) => Ok(objs.pop()),
-        Event::Apply(obj) | Event::RestartApply(obj) => Ok(Some(obj)),
+    watcher(api, Config::default().fields(&format!("metadata.name={name}"))).filter_map(|event| async {
+        match event {
+            Ok(Event::Delete(_) | Event::RestartDelete(_)) => Some(Ok(None)),
+            // We're filtering by object name, so getting more than one object means that either:
+            // 1. The apiserver is accepting multiple objects with the same name, or
+            // 2. The apiserver is ignoring our query
+            // In either case, the K8s apiserver is broken and our API will return invalid data, so
+            // we had better bail out ASAP.
+            Ok(Event::RestartPage(objs)) if objs.len() > 1 => Some(Err(Error::TooManyObjects)),
+            Ok(Event::RestartPage(mut objs)) => Some(Ok(objs.pop())),
+            Ok(Event::Apply(obj) | Event::RestartApply(obj)) => Some(Ok(Some(obj))),
+            Ok(Event::Restart | Event::RestartInit) => None,
+            Err(err) => Some(Err(err)),
+        }
     })
 }
 
