@@ -46,16 +46,29 @@ pub enum Event<K> {
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use Finalizers instead.
     Delete(K),
-    /// The watch stream was restarted, so `Deleted` events may have been missed
+    /// The watch stream was restarted.
+    ///
+    /// If using the `ListWatch` strategy, `RestartPage` events will follow this event.
+    /// If using the `StreamingList` strategy, this event will be followed by `RestartApply` or `RestartDelete` events.
+    RestartInit,
+    /// A page of objects was received during the restart.
+    ///
+    /// This event is only returned when using the `ListWatch` strategy.
+    ///
+    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of the pages
+    /// should be assumed to have been [`Deleted`](Event::Deleted).
+    RestartPage(Vec<K>),
+    /// An object was added or modified during the initial watch.
+    ///
+    /// This event is only returned when using the `StreamingList` strategy.
+    RestartApply(K),
+    /// An object was deleted during the initial watch.
+    ///
+    /// This event is only returned when using the `StreamingList` strategy.
+    RestartDelete(K),
+    /// The restart is complete.
     ///
     /// Should be used as a signal to replace the store contents atomically.
-    ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in this event
-    /// should be assumed to have been [`Deleted`](Event::Deleted).
-    RestartInit,
-    RestartPage(Vec<K>),
-    RestartApply(K),
-    RestartDelete(K),
     Restart,
 }
 
@@ -820,7 +833,7 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
 /// Emits `None` if the object is deleted (or not found), and `Some` if an object is updated (or created/found).
 ///
 /// Compared to [`watcher`], `watch_object` does not return return [`Event`], since there is no need for an atomic
-/// [`Event::Restarted`] when only one object is covered anyway.
+/// [`Event::RestartedPage`] when only one object is covered anyway.
 pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     name: &str,
