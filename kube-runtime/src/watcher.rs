@@ -40,23 +40,23 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 /// Watch events returned from the [`watcher`]
 pub enum Event<K> {
     /// An object was added or modified
-    Applied(K),
+    Apply(K),
     /// An object was deleted
     ///
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use Finalizers instead.
-    Deleted(K),
+    Delete(K),
     /// The watch stream was restarted, so `Deleted` events may have been missed
     ///
     /// Should be used as a signal to replace the store contents atomically.
     ///
     /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in this event
     /// should be assumed to have been [`Deleted`](Event::Deleted).
-    RestartedStart,
-    RestartedPage(Vec<K>),
-    RestartedApplied(K),
-    RestartedDeleted(K),
-    RestartedDone,
+    RestartInit,
+    RestartPage(Vec<K>),
+    RestartApply(K),
+    RestartDelete(K),
+    Restart,
 }
 
 impl<K> Event<K> {
@@ -66,13 +66,13 @@ impl<K> Event<K> {
     /// emitted individually.
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Applied(obj) => SmallVec::from_buf([obj]),
-            Event::Deleted(_)
-            | Event::RestartedStart
-            | Event::RestartedDone
-            | Self::RestartedApplied(_)
-            | Self::RestartedDeleted(_) => SmallVec::new(),
-            Event::RestartedPage(objs) => SmallVec::from_vec(objs),
+            Event::Apply(obj) => SmallVec::from_buf([obj]),
+            Event::Delete(_)
+            | Event::RestartInit
+            | Event::Restart
+            | Self::RestartApply(_)
+            | Self::RestartDelete(_) => SmallVec::new(),
+            Event::RestartPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -84,12 +84,11 @@ impl<K> Event<K> {
     /// deleted objects.
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Applied(obj)
-            | Event::Deleted(obj)
-            | Event::RestartedApplied(obj)
-            | Event::RestartedDeleted(obj) => SmallVec::from_buf([obj]),
-            Event::RestartedStart | Event::RestartedDone => SmallVec::new(),
-            Event::RestartedPage(objs) => SmallVec::from_vec(objs),
+            Event::Apply(obj) | Event::Delete(obj) | Event::RestartApply(obj) | Event::RestartDelete(obj) => {
+                SmallVec::from_buf([obj])
+            }
+            Event::RestartInit | Event::Restart => SmallVec::new(),
+            Event::RestartPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -114,12 +113,11 @@ impl<K> Event<K> {
     #[must_use]
     pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
         match &mut self {
-            Event::Applied(obj)
-            | Event::Deleted(obj)
-            | Event::RestartedApplied(obj)
-            | Event::RestartedDeleted(obj) => (f)(obj),
-            Event::RestartedStart | Event::RestartedDone => {}
-            Event::RestartedPage(objs) => {
+            Event::Apply(obj) | Event::Delete(obj) | Event::RestartApply(obj) | Event::RestartDelete(obj) => {
+                (f)(obj)
+            }
+            Event::RestartInit | Event::Restart => {}
+            Event::RestartPage(objs) => {
                 for k in objs {
                     (f)(k)
                 }
@@ -477,7 +475,7 @@ where
     match state {
         State::Empty => match wc.initial_list_strategy {
             InitialListStrategy::ListWatch => (
-                Some(Ok(Event::RestartedStart)),
+                Some(Ok(Event::RestartInit)),
                 State::InitPage { continue_token: None },
             ),
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
@@ -499,7 +497,7 @@ where
                 Ok(list) => {
                     if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
                         (
-                            Some(Ok(Event::RestartedPage(list.items))),
+                            Some(Ok(Event::RestartPage(list.items))),
                             State::InitPage {
                                 continue_token: Some(continue_token),
                             },
@@ -508,7 +506,7 @@ where
                         list.metadata.resource_version.filter(|s| !s.is_empty())
                     {
                         (
-                            Some(Ok(Event::RestartedPage(list.items))),
+                            Some(Ok(Event::RestartPage(list.items))),
                             State::InitPageDone { resource_version },
                         )
                     } else {
@@ -525,25 +523,23 @@ where
                 }
             }
         }
-        State::InitPageDone { resource_version } => (
-            Some(Ok(Event::RestartedDone)),
-            State::InitListed { resource_version },
-        ),
+        State::InitPageDone { resource_version } => {
+            (Some(Ok(Event::Restart)), State::InitListed { resource_version })
+        }
         State::InitialWatch { mut stream } => {
             match stream.next().await {
-                Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => (
-                    Some(Ok(Event::RestartedApplied(obj))),
-                    State::InitialWatch { stream },
-                ),
+                Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
+                    (Some(Ok(Event::RestartApply(obj))), State::InitialWatch { stream })
+                }
                 Some(Ok(WatchEvent::Deleted(obj))) => (
-                    Some(Ok(Event::RestartedDeleted(obj))),
+                    Some(Ok(Event::RestartDelete(obj))),
                     State::InitialWatch { stream },
                 ),
                 Some(Ok(WatchEvent::Bookmark(bm))) => {
                     let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
                     if marks_initial_end {
                         (
-                            Some(Ok(Event::RestartedDone)),
+                            Some(Ok(Event::Restart)),
                             State::Watching {
                                 resource_version: bm.metadata.resource_version,
                                 stream,
@@ -610,7 +606,7 @@ where
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
                     (
-                        Some(Ok(Event::Applied(obj))),
+                        Some(Ok(Event::Apply(obj))),
                         State::Watching {
                             resource_version,
                             stream,
@@ -624,7 +620,7 @@ where
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
                     (
-                        Some(Ok(Event::Deleted(obj))),
+                        Some(Ok(Event::Delete(obj))),
                         State::Watching {
                             resource_version,
                             stream,
@@ -830,17 +826,15 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
     watcher(api, Config::default().fields(&format!("metadata.name={name}"))).map(|event| match event? {
-        Event::Deleted(_) | Event::RestartedStart | Event::RestartedDeleted(_) | Event::RestartedDone => {
-            Ok(None)
-        }
+        Event::Delete(_) | Event::RestartInit | Event::RestartDelete(_) | Event::Restart => Ok(None),
         // We're filtering by object name, so getting more than one object means that either:
         // 1. The apiserver is accepting multiple objects with the same name, or
         // 2. The apiserver is ignoring our query
         // In either case, the K8s apiserver is broken and our API will return invalid data, so
         // we had better bail out ASAP.
-        Event::RestartedPage(objs) if objs.len() > 1 => Err(Error::TooManyObjects),
-        Event::RestartedPage(mut objs) => Ok(objs.pop()),
-        Event::Applied(obj) | Event::RestartedApplied(obj) => Ok(Some(obj)),
+        Event::RestartPage(objs) if objs.len() > 1 => Err(Error::TooManyObjects),
+        Event::RestartPage(mut objs) => Ok(objs.pop()),
+        Event::Apply(obj) | Event::RestartApply(obj) => Ok(Some(obj)),
     })
 }
 

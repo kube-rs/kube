@@ -1772,7 +1772,7 @@ mod tests {
                 },
                 ..Default::default()
             };
-            store_tx.apply_watcher_event(&watcher::Event::Applied(obj.clone()));
+            store_tx.apply_watcher_event(&watcher::Event::Apply(obj.clone()));
             queue_tx.unbounded_send(ObjectRef::from_obj(&obj)).unwrap();
         }
 

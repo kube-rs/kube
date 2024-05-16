@@ -165,11 +165,11 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Applied(foo.clone())),
+            Ok(Event::Apply(foo.clone())),
             Err(Error::TooManyObjects),
-            Ok(Event::RestartedStart),
-            Ok(Event::RestartedPage(vec![foo, bar])),
-            Ok(Event::RestartedDone),
+            Ok(Event::RestartInit),
+            Ok(Event::RestartPage(vec![foo, bar])),
+            Ok(Event::Restart),
         ]);
 
         let (reader, writer) = reflector::store_shared(10);
@@ -180,7 +180,7 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 0);
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
 
         // Make progress and assert all events are seen
@@ -192,18 +192,15 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::RestartedStart)))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::RestartInit)))));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(
-            restarted,
-            Poll::Ready(Some(Ok(Event::RestartedPage(_))))
-        ));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::RestartPage(_))))));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::RestartedDone)))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Restart)))));
         assert_eq!(reader.len(), 2);
 
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
@@ -219,12 +216,12 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Deleted(foo.clone())),
-            Ok(Event::Applied(foo.clone())),
+            Ok(Event::Delete(foo.clone())),
+            Ok(Event::Apply(foo.clone())),
             Err(Error::TooManyObjects),
-            Ok(Event::RestartedStart),
-            Ok(Event::RestartedPage(vec![foo.clone(), bar.clone()])),
-            Ok(Event::RestartedDone),
+            Ok(Event::RestartInit),
+            Ok(Event::RestartPage(vec![foo.clone(), bar.clone()])),
+            Ok(Event::Restart),
         ]);
 
         let foo = Arc::new(foo);
@@ -239,13 +236,13 @@ pub(crate) mod test {
         // Deleted events should be skipped by subscriber.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Deleted(_))))
+            Poll::Ready(Some(Ok(Event::Delete(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
 
@@ -260,17 +257,17 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartedStart)))
+            Poll::Ready(Some(Ok(Event::RestartInit)))
         ));
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartedPage(_))))
+            Poll::Ready(Some(Ok(Event::RestartPage(_))))
         ));
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartedDone)))
+            Poll::Ready(Some(Ok(Event::Restart)))
         ));
 
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
@@ -288,10 +285,10 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Applied(foo.clone())),
-            Ok(Event::RestartedStart),
-            Ok(Event::RestartedPage(vec![foo.clone(), bar.clone()])),
-            Ok(Event::RestartedDone),
+            Ok(Event::Apply(foo.clone())),
+            Ok(Event::RestartInit),
+            Ok(Event::RestartPage(vec![foo.clone(), bar.clone()])),
+            Ok(Event::Restart),
         ]);
 
         let foo = Arc::new(foo);
@@ -304,7 +301,7 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
 
@@ -316,17 +313,17 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartedStart)))
+            Poll::Ready(Some(Ok(Event::RestartInit)))
         ));
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartedPage(_))))
+            Poll::Ready(Some(Ok(Event::RestartPage(_))))
         ));
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartedDone)))
+            Poll::Ready(Some(Ok(Event::Restart)))
         ));
         drop(reflect);
 
@@ -345,10 +342,10 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Applied(foo.clone())),
-            Ok(Event::RestartedStart),
-            Ok(Event::RestartedPage(vec![foo.clone(), bar.clone()])),
-            Ok(Event::RestartedDone),
+            Ok(Event::Apply(foo.clone())),
+            Ok(Event::RestartInit),
+            Ok(Event::RestartPage(vec![foo.clone(), bar.clone()])),
+            Ok(Event::Restart),
         ]);
 
         let foo = Arc::new(foo);
@@ -371,7 +368,7 @@ pub(crate) mod test {
         // we will still get an event from the root.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
         // One subscriber is not reading, so we need to apply backpressure until
@@ -396,7 +393,7 @@ pub(crate) mod test {
         assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(Some(foo.clone())));
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartedPage(_))))
+            Poll::Ready(Some(Ok(Event::RestartPage(_))))
         ));
         // Poll again to drain the queue.
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
