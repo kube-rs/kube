@@ -37,10 +37,8 @@ where
                 break Some(Ok(item));
             }
             let var_name = match ready!(me.stream.as_mut().poll_next(cx)) {
-                Some(Ok(Event::Apply(obj) | Event::RestartApply(obj) | Event::RestartDelete(obj))) => {
-                    Some(Ok(obj))
-                }
-                Some(Ok(Event::Delete(obj))) => {
+                Some(Ok(Event::Apply(obj) | Event::RestartApply(obj))) => Some(Ok(obj)),
+                Some(Ok(Event::Delete(obj) | Event::RestartDelete(obj))) => {
                     if *me.emit_deleted {
                         Some(Ok(obj))
                     } else {
