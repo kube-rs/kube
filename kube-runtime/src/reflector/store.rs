@@ -129,7 +129,7 @@ where
                 // This way, the old buffer is dropped.
                 self.buffer = AHashMap::new();
 
-                // Mark as ready after the RestartedDone, "releasing" any calls to Store::wait_until_ready()
+                // Mark as ready after the Restart, "releasing" any calls to Store::wait_until_ready()
                 if let Some(ready_tx) = self.ready_tx.take() {
                     ready_tx.init(())
                 }
@@ -164,10 +164,7 @@ where
                     }
                 }
 
-                watcher::Event::RestartInit
-                | watcher::Event::Restart
-                | watcher::Event::Delete(_)
-                | watcher::Event::RestartDelete(_) => {}
+                _ => {}
             }
         }
     }
