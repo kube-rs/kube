@@ -25,13 +25,14 @@ jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
 socks5 = ["hyper-socks2"]
+http_proxy = ["hyper-proxy2"]
 unstable-client = []
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde_yaml", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client"]
+features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client", "http-proxy"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -61,6 +62,7 @@ kube-core = { path = "../kube-core", version = "=0.91.0" }
 jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
 hyper = { workspace = true, features = ["client", "http1"], optional = true }
+hyper-proxy2 = {version = "0.1", optional = true}
 hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "tokio"], optional = true }
 hyper-rustls = { workspace = true, features = ["http1", "logging", "native-tokio", "ring", "tls12"], optional = true }
 hyper-socks2 = { workspace = true, optional = true }
