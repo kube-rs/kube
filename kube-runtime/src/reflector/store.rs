@@ -157,8 +157,12 @@ where
                     dispatcher.broadcast(obj_ref).await;
                 }
 
-                watcher::Event::RestartPage(new_objs) => {
-                    let obj_refs = new_objs.iter().map(|obj| obj.to_object_ref(self.dyntype.clone()));
+                watcher::Event::Restart => {
+                    let obj_refs: Vec<_> = {
+                        let store = self.store.read();
+                        store.keys().cloned().collect()
+                    };
+
                     for obj_ref in obj_refs {
                         dispatcher.broadcast(obj_ref).await;
                     }
