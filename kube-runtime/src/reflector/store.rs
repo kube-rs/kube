@@ -150,7 +150,7 @@ where
     pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
         if let Some(ref mut dispatcher) = self.dispatcher {
             match event {
-                watcher::Event::Apply(obj) | watcher::Event::RestartApply(obj) => {
+                watcher::Event::Apply(obj) => {
                     let obj_ref = obj.to_object_ref(self.dyntype.clone());
                     // TODO (matei): should this take a timeout to log when backpressure has
                     // been applied for too long, e.g. 10s
