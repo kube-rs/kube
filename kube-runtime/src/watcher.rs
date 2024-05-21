@@ -487,10 +487,9 @@ where
 {
     match state {
         State::Empty => match wc.initial_list_strategy {
-            InitialListStrategy::ListWatch => (
-                Some(Ok(Event::RestartInit)),
-                State::InitPage { continue_token: None },
-            ),
+            InitialListStrategy::ListWatch => (Some(Ok(Event::RestartInit)), State::InitPage {
+                continue_token: None,
+            }),
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
                 Ok(stream) => (None, State::InitialWatch { stream }),
                 Err(err) => {
@@ -509,19 +508,15 @@ where
             match api.list(&lp).await {
                 Ok(list) => {
                     if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
-                        (
-                            Some(Ok(Event::RestartPage(list.items))),
-                            State::InitPage {
-                                continue_token: Some(continue_token),
-                            },
-                        )
+                        (Some(Ok(Event::RestartPage(list.items))), State::InitPage {
+                            continue_token: Some(continue_token),
+                        })
                     } else if let Some(resource_version) =
                         list.metadata.resource_version.filter(|s| !s.is_empty())
                     {
-                        (
-                            Some(Ok(Event::RestartPage(list.items))),
-                            State::InitPageDone { resource_version },
-                        )
+                        (Some(Ok(Event::RestartPage(list.items))), State::InitPageDone {
+                            resource_version,
+                        })
                     } else {
                         (Some(Err(Error::NoResourceVersion)), State::Empty)
                     }
@@ -544,20 +539,18 @@ where
                 Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
                     (Some(Ok(Event::RestartApply(obj))), State::InitialWatch { stream })
                 }
-                Some(Ok(WatchEvent::Deleted(obj))) => (
-                    Some(Ok(Event::RestartDelete(obj))),
-                    State::InitialWatch { stream },
-                ),
+                Some(Ok(WatchEvent::Deleted(obj))) => {
+                    (Some(Ok(Event::RestartDelete(obj))), State::InitialWatch {
+                        stream,
+                    })
+                }
                 Some(Ok(WatchEvent::Bookmark(bm))) => {
                     let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
                     if marks_initial_end {
-                        (
-                            Some(Ok(Event::Restart)),
-                            State::Watching {
-                                resource_version: bm.metadata.resource_version,
-                                stream,
-                            },
-                        )
+                        (Some(Ok(Event::Restart)), State::Watching {
+                            resource_version: bm.metadata.resource_version,
+                            stream,
+                        })
                     } else {
                         (None, State::InitialWatch { stream })
                     }
@@ -589,23 +582,19 @@ where
         }
         State::InitListed { resource_version } => {
             match api.watch(&wc.to_watch_params(), &resource_version).await {
-                Ok(stream) => (
-                    None,
-                    State::Watching {
-                        resource_version,
-                        stream,
-                    },
-                ),
+                Ok(stream) => (None, State::Watching {
+                    resource_version,
+                    stream,
+                }),
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
                         debug!("watch initlist error: {err:?}");
                     }
-                    (
-                        Some(Err(Error::WatchStartFailed(err))),
-                        State::InitListed { resource_version },
-                    )
+                    (Some(Err(Error::WatchStartFailed(err))), State::InitListed {
+                        resource_version,
+                    })
                 }
             }
         }
@@ -618,13 +607,10 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (
-                        Some(Ok(Event::Apply(obj))),
-                        State::Watching {
-                            resource_version,
-                            stream,
-                        },
-                    )
+                    (Some(Ok(Event::Apply(obj))), State::Watching {
+                        resource_version,
+                        stream,
+                    })
                 }
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
@@ -632,22 +618,16 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (
-                        Some(Ok(Event::Delete(obj))),
-                        State::Watching {
-                            resource_version,
-                            stream,
-                        },
-                    )
+                    (Some(Ok(Event::Delete(obj))), State::Watching {
+                        resource_version,
+                        stream,
+                    })
                 }
             }
-            Some(Ok(WatchEvent::Bookmark(bm))) => (
-                None,
-                State::Watching {
-                    resource_version: bm.metadata.resource_version,
-                    stream,
-                },
-            ),
+            Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
+                resource_version: bm.metadata.resource_version,
+                stream,
+            }),
             Some(Ok(WatchEvent::Error(err))) => {
                 // HTTP GONE, means we have desynced and need to start over and re-list :(
                 let new_state = if err.code == 410 {
@@ -671,13 +651,10 @@ where
                 } else {
                     debug!("watcher error: {err:?}");
                 }
-                (
-                    Some(Err(Error::WatchFailed(err))),
-                    State::Watching {
-                        resource_version,
-                        stream,
-                    },
-                )
+                (Some(Err(Error::WatchFailed(err))), State::Watching {
+                    resource_version,
+                    stream,
+                })
             }
             None => (None, State::InitListed { resource_version }),
         },

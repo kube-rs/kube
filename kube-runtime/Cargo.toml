@@ -30,7 +30,7 @@ rust.unsafe_code = "forbid"
 #rust.missing_docs = "warn"
 
 [dependencies]
-futures.workspace = true
+futures = { workspace = true, features = ["async-await"] }
 kube-client = { path = "../kube-client", version = "=0.91.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative.workspace = true
 serde.workspace = true
