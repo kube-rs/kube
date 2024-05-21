@@ -4,8 +4,7 @@ mod backoff_reset_timer;
 pub(crate) mod delayed_init;
 mod event_flatten;
 mod event_modify;
-#[cfg(feature = "unstable-runtime-predicates")]
-mod predicate;
+#[cfg(feature = "unstable-runtime-predicates")] mod predicate;
 mod reflect;
 mod stream_backoff;
 mod watch_ext;
