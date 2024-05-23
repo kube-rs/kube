@@ -167,9 +167,9 @@ pub(crate) mod test {
         let st = stream::iter([
             Ok(Event::Apply(foo.clone())),
             Err(Error::TooManyObjects),
-            Ok(Event::RestartInit),
-            Ok(Event::RestartPage(vec![foo, bar])),
-            Ok(Event::Restart),
+            Ok(Event::Init),
+            Ok(Event::InitPage(vec![foo, bar])),
+            Ok(Event::Ready),
         ]);
 
         let (reader, writer) = reflector::store_shared(10);
@@ -192,15 +192,15 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::RestartInit)))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Init)))));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::RestartPage(_))))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitPage(_))))));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Restart)))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Ready)))));
         assert_eq!(reader.len(), 2);
 
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
@@ -219,13 +219,13 @@ pub(crate) mod test {
             Ok(Event::Delete(foo.clone())),
             Ok(Event::Apply(foo.clone())),
             Err(Error::TooManyObjects),
-            Ok(Event::RestartInit),
-            Ok(Event::RestartPage(vec![foo.clone(), bar.clone()])),
-            Ok(Event::Restart),
+            Ok(Event::Init),
+            Ok(Event::InitPage(vec![foo.clone(), bar.clone()])),
+            Ok(Event::Ready),
         ]);
 
         let foo = Arc::new(foo);
-        let bar = Arc::new(bar);
+        let _bar = Arc::new(bar);
 
         let (_, writer) = reflector::store_shared(10);
         let subscriber = writer.subscribe().unwrap();
@@ -257,17 +257,17 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartInit)))
+            Poll::Ready(Some(Ok(Event::Init)))
         ));
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartPage(_))))
+            Poll::Ready(Some(Ok(Event::InitPage(_))))
         ));
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Restart)))
+            Poll::Ready(Some(Ok(Event::Ready)))
         ));
 
         // these don't come back in order atm:
@@ -287,9 +287,9 @@ pub(crate) mod test {
         let bar = testpod("bar");
         let st = stream::iter([
             Ok(Event::Apply(foo.clone())),
-            Ok(Event::RestartInit),
-            Ok(Event::RestartPage(vec![foo.clone(), bar.clone()])),
-            Ok(Event::Restart),
+            Ok(Event::Init),
+            Ok(Event::InitPage(vec![foo.clone(), bar.clone()])),
+            Ok(Event::Ready),
         ]);
 
         let foo = Arc::new(foo);
@@ -314,19 +314,19 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartInit)))
+            Poll::Ready(Some(Ok(Event::Init)))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartPage(_))))
+            Poll::Ready(Some(Ok(Event::InitPage(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Restart)))
+            Poll::Ready(Some(Ok(Event::Ready)))
         ));
         drop(reflect);
 
@@ -346,6 +346,7 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
+            //TODO: include a ready event here to avoid dealing with Init?
             Ok(Event::Apply(foo.clone())),
             Ok(Event::Apply(bar.clone())),
             Ok(Event::Apply(foo.clone())),

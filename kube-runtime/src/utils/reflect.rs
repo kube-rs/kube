@@ -74,9 +74,9 @@ pub(crate) mod test {
         let st = stream::iter([
             Ok(Event::Apply(foo.clone())),
             Err(Error::TooManyObjects),
-            Ok(Event::RestartInit),
-            Ok(Event::RestartPage(vec![foo, bar])),
-            Ok(Event::Restart),
+            Ok(Event::Init),
+            Ok(Event::InitPage(vec![foo, bar])),
+            Ok(Event::Ready),
         ]);
         let (reader, writer) = reflector::store();
 
@@ -97,17 +97,17 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::RestartInit)))
+            Poll::Ready(Some(Ok(Event::Init)))
         ));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::RestartPage(_))))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitPage(_))))));
         assert_eq!(reader.len(), 1);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Restart)))
+            Poll::Ready(Some(Ok(Event::Ready)))
         ));
         assert_eq!(reader.len(), 2);
 

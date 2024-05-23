@@ -108,17 +108,22 @@ where
                 let key = obj.to_object_ref(self.dyntype.clone());
                 self.store.write().remove(&key);
             }
-            watcher::Event::RestartInit => {
+            watcher::Event::Init => {
                 self.buffer = AHashMap::new();
             }
-            watcher::Event::RestartPage(new_objs) => {
+            watcher::Event::InitPage(new_objs) => {
                 let new_objs = new_objs
                     .iter()
                     .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
                 self.buffer.extend(new_objs);
             }
-            watcher::Event::Restart => {
+            watcher::Event::InitApply(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                let obj = Arc::new(obj.clone());
+                self.buffer.insert(key, obj);
+            }
+            watcher::Event::Ready => {
                 let mut store = self.store.write();
 
                 // Swap the buffer into the store
@@ -134,15 +139,6 @@ where
                     ready_tx.init(())
                 }
             }
-            watcher::Event::RestartApply(obj) => {
-                let key = obj.to_object_ref(self.dyntype.clone());
-                let obj = Arc::new(obj.clone());
-                self.buffer.insert(key, obj);
-            }
-            watcher::Event::RestartDelete(obj) => {
-                let key = obj.to_object_ref(self.dyntype.clone());
-                self.buffer.remove(&key);
-            }
         }
     }
 
@@ -157,7 +153,7 @@ where
                     dispatcher.broadcast(obj_ref).await;
                 }
 
-                watcher::Event::Restart => {
+                watcher::Event::Ready => {
                     let obj_refs: Vec<_> = {
                         let store = self.store.read();
                         store.keys().cloned().collect()
