@@ -21,6 +21,7 @@ where
     K::DynamicType: Eq + Hash + Clone,
 {
     store: Cache<K>,
+    buffer: AHashMap<ObjectRef<K>, Arc<K>>,
     dyntype: K::DynamicType,
     ready_tx: Option<delayed_init::Initializer<()>>,
     ready_rx: Arc<DelayedInit<()>>,
@@ -39,6 +40,7 @@ where
         let (ready_tx, ready_rx) = DelayedInit::new();
         Writer {
             store: Default::default(),
+            buffer: Default::default(),
             dyntype,
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
@@ -60,6 +62,7 @@ where
         let (ready_tx, ready_rx) = DelayedInit::new();
         Writer {
             store: Default::default(),
+            buffer: Default::default(),
             dyntype,
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
@@ -96,27 +99,50 @@ where
     /// Applies a single watcher event to the store
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
-            watcher::Event::Applied(obj) => {
+            watcher::Event::Apply(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
                 self.store.write().insert(key, obj);
             }
-            watcher::Event::Deleted(obj) => {
+            watcher::Event::Delete(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 self.store.write().remove(&key);
             }
-            watcher::Event::Restarted(new_objs) => {
+            watcher::Event::RestartInit => {
+                self.buffer = AHashMap::new();
+            }
+            watcher::Event::RestartPage(new_objs) => {
                 let new_objs = new_objs
                     .iter()
                     .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())))
                     .collect::<AHashMap<_, _>>();
-                *self.store.write() = new_objs;
+                self.buffer.extend(new_objs);
             }
-        }
+            watcher::Event::Restart => {
+                let mut store = self.store.write();
 
-        // Mark as ready after the first event, "releasing" any calls to Store::wait_until_ready()
-        if let Some(ready_tx) = self.ready_tx.take() {
-            ready_tx.init(())
+                // Swap the buffer into the store
+                std::mem::swap(&mut *store, &mut self.buffer);
+
+                // Clear the buffer
+                // This is preferred over self.buffer.clear(), as clear() will keep the allocated memory for reuse.
+                // This way, the old buffer is dropped.
+                self.buffer = AHashMap::new();
+
+                // Mark as ready after the Restart, "releasing" any calls to Store::wait_until_ready()
+                if let Some(ready_tx) = self.ready_tx.take() {
+                    ready_tx.init(())
+                }
+            }
+            watcher::Event::RestartApply(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                let obj = Arc::new(obj.clone());
+                self.buffer.insert(key, obj);
+            }
+            watcher::Event::RestartDelete(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                self.buffer.remove(&key);
+            }
         }
     }
 
@@ -124,20 +150,25 @@ where
     pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
         if let Some(ref mut dispatcher) = self.dispatcher {
             match event {
-                watcher::Event::Applied(obj) => {
+                watcher::Event::Apply(obj) => {
                     let obj_ref = obj.to_object_ref(self.dyntype.clone());
                     // TODO (matei): should this take a timeout to log when backpressure has
                     // been applied for too long, e.g. 10s
                     dispatcher.broadcast(obj_ref).await;
                 }
 
-                watcher::Event::Restarted(new_objs) => {
-                    let obj_refs = new_objs.iter().map(|obj| obj.to_object_ref(self.dyntype.clone()));
+                watcher::Event::Restart => {
+                    let obj_refs: Vec<_> = {
+                        let store = self.store.read();
+                        store.keys().cloned().collect()
+                    };
+
                     for obj_ref in obj_refs {
                         dispatcher.broadcast(obj_ref).await;
                     }
                 }
-                watcher::Event::Deleted(_) => {}
+
+                _ => {}
             }
         }
     }
@@ -302,7 +333,7 @@ mod tests {
             ..ConfigMap::default()
         };
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        store_w.apply_watcher_event(&watcher::Event::Apply(cm.clone()));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
@@ -320,7 +351,7 @@ mod tests {
         let mut cluster_cm = cm.clone();
         cluster_cm.metadata.namespace = None;
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm));
+        store_w.apply_watcher_event(&watcher::Event::Apply(cm));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&cluster_cm)), None);
     }
@@ -336,7 +367,7 @@ mod tests {
             ..ConfigMap::default()
         };
         let (store, mut writer) = store();
-        writer.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        writer.apply_watcher_event(&watcher::Event::Apply(cm.clone()));
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
@@ -354,7 +385,7 @@ mod tests {
         let mut nsed_cm = cm.clone();
         nsed_cm.metadata.namespace = Some("ns".to_string());
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Applied(cm.clone()));
+        store_w.apply_watcher_event(&watcher::Event::Apply(cm.clone()));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(), Some(&cm));
     }
@@ -373,14 +404,14 @@ mod tests {
 
         let (reader, mut writer) = store::<ConfigMap>();
         assert!(reader.is_empty());
-        writer.apply_watcher_event(&watcher::Event::Applied(cm));
+        writer.apply_watcher_event(&watcher::Event::Apply(cm));
 
         assert_eq!(reader.len(), 1);
         assert!(reader.find(|k| k.metadata.generation == Some(1234)).is_none());
 
         target_cm.metadata.name = Some("obj1".to_string());
         target_cm.metadata.generation = Some(1234);
-        writer.apply_watcher_event(&watcher::Event::Applied(target_cm.clone()));
+        writer.apply_watcher_event(&watcher::Event::Apply(target_cm.clone()));
         assert!(!reader.is_empty());
         assert_eq!(reader.len(), 2);
         let found = reader.find(|k| k.metadata.generation == Some(1234));

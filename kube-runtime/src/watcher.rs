@@ -40,19 +40,36 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 /// Watch events returned from the [`watcher`]
 pub enum Event<K> {
     /// An object was added or modified
-    Applied(K),
+    Apply(K),
     /// An object was deleted
     ///
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use Finalizers instead.
-    Deleted(K),
-    /// The watch stream was restarted, so `Deleted` events may have been missed
+    Delete(K),
+    /// The watch stream was restarted.
+    ///
+    /// If using the `ListWatch` strategy, `RestartPage` events will follow this event.
+    /// If using the `StreamingList` strategy, this event will be followed by `RestartApply` or `RestartDelete` events.
+    RestartInit,
+    /// A page of objects was received during the restart.
+    ///
+    /// This event is only returned when using the `ListWatch` strategy.
+    ///
+    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of the pages
+    /// should be assumed to have been [`Deleted`](Event::Deleted).
+    RestartPage(Vec<K>),
+    /// An object was added or modified during the initial watch.
+    ///
+    /// This event is only returned when using the `StreamingList` strategy.
+    RestartApply(K),
+    /// An object was deleted during the initial watch.
+    ///
+    /// This event is only returned when using the `StreamingList` strategy.
+    RestartDelete(K),
+    /// The restart is complete.
     ///
     /// Should be used as a signal to replace the store contents atomically.
-    ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in this event
-    /// should be assumed to have been [`Deleted`](Event::Deleted).
-    Restarted(Vec<K>),
+    Restart,
 }
 
 impl<K> Event<K> {
@@ -62,9 +79,13 @@ impl<K> Event<K> {
     /// emitted individually.
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Applied(obj) => SmallVec::from_buf([obj]),
-            Event::Deleted(_) => SmallVec::new(),
-            Event::Restarted(objs) => SmallVec::from_vec(objs),
+            Event::Apply(obj) => SmallVec::from_buf([obj]),
+            Event::Delete(_)
+            | Event::RestartInit
+            | Event::Restart
+            | Self::RestartApply(_)
+            | Self::RestartDelete(_) => SmallVec::new(),
+            Event::RestartPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -76,8 +97,11 @@ impl<K> Event<K> {
     /// deleted objects.
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Applied(obj) | Event::Deleted(obj) => SmallVec::from_buf([obj]),
-            Event::Restarted(objs) => SmallVec::from_vec(objs),
+            Event::Apply(obj) | Event::Delete(obj) | Event::RestartApply(obj) | Event::RestartDelete(obj) => {
+                SmallVec::from_buf([obj])
+            }
+            Event::RestartInit | Event::Restart => SmallVec::new(),
+            Event::RestartPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -102,8 +126,11 @@ impl<K> Event<K> {
     #[must_use]
     pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
         match &mut self {
-            Event::Applied(obj) | Event::Deleted(obj) => (f)(obj),
-            Event::Restarted(objs) => {
+            Event::Apply(obj) | Event::Delete(obj) | Event::RestartApply(obj) | Event::RestartDelete(obj) => {
+                (f)(obj)
+            }
+            Event::RestartInit | Event::Restart => {}
+            Event::RestartPage(objs) => {
                 for k in objs {
                     (f)(k)
                 }
@@ -113,19 +140,20 @@ impl<K> Event<K> {
     }
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, Default)]
 #[derivative(Debug)]
 /// The internal finite state machine driving the [`watcher`]
 enum State<K> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
-    Empty {
-        continue_token: Option<String>,
-        objects: Vec<K>,
-    },
+    #[default]
+    Empty,
+    /// The Watcher is in the process of paginating through the initial LIST
+    InitPage { continue_token: Option<String> },
+    /// The Watcher has completed the initial LIST and is ready to start the watch
+    InitPageDone { resource_version: String },
     /// Kubernetes 1.27 Streaming Lists
     /// The initial watch is in progress
-    IntialWatch {
-        objects: Vec<K>,
+    InitialWatch {
         #[derivative(Debug = "ignore")]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
@@ -142,15 +170,6 @@ enum State<K> {
         #[derivative(Debug = "ignore")]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
-}
-
-impl<K: Resource + Clone> Default for State<K> {
-    fn default() -> Self {
-        Self::Empty {
-            continue_token: None,
-            objects: vec![],
-        }
-    }
 }
 
 /// Used to control whether the watcher receives the full object, or only the
@@ -467,43 +486,12 @@ where
     A::Value: Resource + 'static,
 {
     match state {
-        State::Empty {
-            continue_token,
-            mut objects,
-        } => match wc.initial_list_strategy {
-            InitialListStrategy::ListWatch => {
-                let mut lp = wc.to_list_params();
-                lp.continue_token = continue_token;
-                match api.list(&lp).await {
-                    Ok(list) => {
-                        objects.extend(list.items);
-                        if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
-                            (None, State::Empty {
-                                continue_token: Some(continue_token),
-                                objects,
-                            })
-                        } else if let Some(resource_version) =
-                            list.metadata.resource_version.filter(|s| !s.is_empty())
-                        {
-                            (Some(Ok(Event::Restarted(objects))), State::InitListed {
-                                resource_version,
-                            })
-                        } else {
-                            (Some(Err(Error::NoResourceVersion)), State::default())
-                        }
-                    }
-                    Err(err) => {
-                        if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                            warn!("watch list error with 403: {err:?}");
-                        } else {
-                            debug!("watch list error: {err:?}");
-                        }
-                        (Some(Err(Error::InitialListFailed(err))), State::default())
-                    }
-                }
-            }
+        State::Empty => match wc.initial_list_strategy {
+            InitialListStrategy::ListWatch => (Some(Ok(Event::RestartInit)), State::InitPage {
+                continue_token: None,
+            }),
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
-                Ok(stream) => (None, State::IntialWatch { stream, objects }),
+                Ok(stream) => (None, State::InitialWatch { stream }),
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
                         warn!("watch initlist error with 403: {err:?}");
@@ -514,31 +502,57 @@ where
                 }
             },
         },
-        State::IntialWatch {
-            mut objects,
-            mut stream,
-        } => {
+        State::InitPage { continue_token } => {
+            let mut lp = wc.to_list_params();
+            lp.continue_token = continue_token;
+            match api.list(&lp).await {
+                Ok(list) => {
+                    if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
+                        (Some(Ok(Event::RestartPage(list.items))), State::InitPage {
+                            continue_token: Some(continue_token),
+                        })
+                    } else if let Some(resource_version) =
+                        list.metadata.resource_version.filter(|s| !s.is_empty())
+                    {
+                        (Some(Ok(Event::RestartPage(list.items))), State::InitPageDone {
+                            resource_version,
+                        })
+                    } else {
+                        (Some(Err(Error::NoResourceVersion)), State::Empty)
+                    }
+                }
+                Err(err) => {
+                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                        warn!("watch list error with 403: {err:?}");
+                    } else {
+                        debug!("watch list error: {err:?}");
+                    }
+                    (Some(Err(Error::InitialListFailed(err))), State::Empty)
+                }
+            }
+        }
+        State::InitPageDone { resource_version } => {
+            (Some(Ok(Event::Restart)), State::InitListed { resource_version })
+        }
+        State::InitialWatch { mut stream } => {
             match stream.next().await {
                 Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
-                    objects.push(obj);
-                    (None, State::IntialWatch { objects, stream })
+                    (Some(Ok(Event::RestartApply(obj))), State::InitialWatch { stream })
                 }
                 Some(Ok(WatchEvent::Deleted(obj))) => {
-                    objects.retain(|o| o.name_any() != obj.name_any() && o.namespace() != obj.namespace());
-                    (None, State::IntialWatch { objects, stream })
+                    (Some(Ok(Event::RestartDelete(obj))), State::InitialWatch {
+                        stream,
+                    })
                 }
                 Some(Ok(WatchEvent::Bookmark(bm))) => {
                     let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
                     if marks_initial_end {
-                        (Some(Ok(Event::Restarted(objects))), State::Watching {
+                        (Some(Ok(Event::Restart)), State::Watching {
                             resource_version: bm.metadata.resource_version,
                             stream,
                         })
                     } else {
-                        (None, State::Watching {
-                            resource_version: bm.metadata.resource_version,
-                            stream,
-                        })
+                        (None, State::InitialWatch { stream })
                     }
                 }
                 Some(Ok(WatchEvent::Error(err))) => {
@@ -546,7 +560,7 @@ where
                     let new_state = if err.code == 410 {
                         State::default()
                     } else {
-                        State::IntialWatch { objects, stream }
+                        State::InitialWatch { stream }
                     };
                     if err.code == 403 {
                         warn!("watcher watchevent error 403: {err:?}");
@@ -561,10 +575,7 @@ where
                     } else {
                         debug!("watcher error: {err:?}");
                     }
-                    (Some(Err(Error::WatchFailed(err))), State::IntialWatch {
-                        objects,
-                        stream,
-                    })
+                    (Some(Err(Error::WatchFailed(err))), State::InitialWatch { stream })
                 }
                 None => (None, State::default()),
             }
@@ -596,7 +607,7 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (Some(Ok(Event::Applied(obj))), State::Watching {
+                    (Some(Ok(Event::Apply(obj))), State::Watching {
                         resource_version,
                         stream,
                     })
@@ -607,7 +618,7 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (Some(Ok(Event::Deleted(obj))), State::Watching {
+                    (Some(Ok(Event::Delete(obj))), State::Watching {
                         resource_version,
                         stream,
                     })
@@ -799,21 +810,25 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
 /// Emits `None` if the object is deleted (or not found), and `Some` if an object is updated (or created/found).
 ///
 /// Compared to [`watcher`], `watch_object` does not return return [`Event`], since there is no need for an atomic
-/// [`Event::Restarted`] when only one object is covered anyway.
+/// [`Event::RestartedPage`] when only one object is covered anyway.
 pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, Config::default().fields(&format!("metadata.name={name}"))).map(|event| match event? {
-        Event::Deleted(_) => Ok(None),
-        // We're filtering by object name, so getting more than one object means that either:
-        // 1. The apiserver is accepting multiple objects with the same name, or
-        // 2. The apiserver is ignoring our query
-        // In either case, the K8s apiserver is broken and our API will return invalid data, so
-        // we had better bail out ASAP.
-        Event::Restarted(objs) if objs.len() > 1 => Err(Error::TooManyObjects),
-        Event::Restarted(mut objs) => Ok(objs.pop()),
-        Event::Applied(obj) => Ok(Some(obj)),
+    watcher(api, Config::default().fields(&format!("metadata.name={name}"))).filter_map(|event| async {
+        match event {
+            Ok(Event::Delete(_) | Event::RestartDelete(_)) => Some(Ok(None)),
+            // We're filtering by object name, so getting more than one object means that either:
+            // 1. The apiserver is accepting multiple objects with the same name, or
+            // 2. The apiserver is ignoring our query
+            // In either case, the K8s apiserver is broken and our API will return invalid data, so
+            // we had better bail out ASAP.
+            Ok(Event::RestartPage(objs)) if objs.len() > 1 => Some(Err(Error::TooManyObjects)),
+            Ok(Event::RestartPage(mut objs)) => Some(Ok(objs.pop())),
+            Ok(Event::Apply(obj) | Event::RestartApply(obj)) => Some(Ok(Some(obj))),
+            Ok(Event::Restart | Event::RestartInit) => None,
+            Err(err) => Some(Err(err)),
+        }
     })
 }
 

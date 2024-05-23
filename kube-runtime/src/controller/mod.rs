@@ -1753,7 +1753,7 @@ mod tests {
             |obj, _| {
                 Box::pin(async move {
                     // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
-                    println!("reconciling {:?}", obj.metadata.name);
+                    //println!("reconciling {:?}", obj.metadata.name);
                     Ok(Action::requeue(Duration::ZERO))
                 })
             },
@@ -1763,6 +1763,7 @@ mod tests {
             queue_rx.map(Result::<_, Infallible>::Ok),
             Config::default(),
         ));
+        store_tx.apply_watcher_event(&watcher::Event::Restart);
         for i in 0..items {
             let obj = ConfigMap {
                 metadata: ObjectMeta {
@@ -1772,7 +1773,7 @@ mod tests {
                 },
                 ..Default::default()
             };
-            store_tx.apply_watcher_event(&watcher::Event::Applied(obj.clone()));
+            store_tx.apply_watcher_event(&watcher::Event::Apply(obj.clone()));
             queue_tx.unbounded_send(ObjectRef::from_obj(&obj)).unwrap();
         }
 
