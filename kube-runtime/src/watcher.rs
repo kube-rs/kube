@@ -49,7 +49,7 @@ pub enum Event<K> {
     /// The watch stream was restarted.
     ///
     /// If using the `ListWatch` strategy, this is a relist, and indicates that `InitlPage` events will follow.
-    /// If using the `StreamingList` strategy, this event will be followed by `InitApply` + `InitDelete` events.
+    /// If using the `StreamingList` strategy, this event will be followed by `InitApply` events.
     Init,
     /// A page of objects was received during `Init` with the `ListWatch` strategy.
     ///
@@ -75,8 +75,8 @@ impl<K> Event<K> {
     /// emitted individually.
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
-            Self::Apply(obj) => SmallVec::from_buf([obj]),
-            Self::Delete(_) | Self::Init | Self::Ready | Self::InitApply(_) => SmallVec::new(),
+            Self::Apply(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
+            Self::Delete(_) | Self::Init | Self::Ready => SmallVec::new(),
             Self::InitPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
