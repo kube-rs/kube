@@ -169,7 +169,7 @@ pub(crate) mod test {
             Err(Error::TooManyObjects),
             Ok(Event::Init),
             Ok(Event::InitPage(vec![foo, bar])),
-            Ok(Event::Ready),
+            Ok(Event::InitDone),
         ]);
 
         let (reader, writer) = reflector::store_shared(10);
@@ -200,7 +200,7 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Ready)))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitDone)))));
         assert_eq!(reader.len(), 2);
 
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
@@ -221,7 +221,7 @@ pub(crate) mod test {
             Err(Error::TooManyObjects),
             Ok(Event::Init),
             Ok(Event::InitPage(vec![foo.clone(), bar.clone()])),
-            Ok(Event::Ready),
+            Ok(Event::InitDone),
         ]);
 
         let foo = Arc::new(foo);
@@ -267,7 +267,7 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Ready)))
+            Poll::Ready(Some(Ok(Event::InitDone)))
         ));
 
         // these don't come back in order atm:
@@ -289,7 +289,7 @@ pub(crate) mod test {
             Ok(Event::Apply(foo.clone())),
             Ok(Event::Init),
             Ok(Event::InitPage(vec![foo.clone(), bar.clone()])),
-            Ok(Event::Ready),
+            Ok(Event::InitDone),
         ]);
 
         let foo = Arc::new(foo);
@@ -326,7 +326,7 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Ready)))
+            Poll::Ready(Some(Ok(Event::InitDone)))
         ));
         drop(reflect);
 

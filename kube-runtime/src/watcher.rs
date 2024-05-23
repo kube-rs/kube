@@ -65,7 +65,7 @@ pub enum Event<K> {
     ///
     /// Should be used as a signal to replace the store contents atomically.
     /// No more `InitPage` / `InitApply` events will happen until the next `Init` event.
-    Ready,
+    InitDone,
 }
 
 impl<K> Event<K> {
@@ -76,7 +76,7 @@ impl<K> Event<K> {
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
             Self::Apply(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
-            Self::Delete(_) | Self::Init | Self::Ready => SmallVec::new(),
+            Self::Delete(_) | Self::Init | Self::InitDone => SmallVec::new(),
             Self::InitPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
@@ -90,7 +90,7 @@ impl<K> Event<K> {
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
             Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
-            Self::Init | Self::Ready => SmallVec::new(),
+            Self::Init | Self::InitDone => SmallVec::new(),
             Self::InitPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
@@ -117,7 +117,7 @@ impl<K> Event<K> {
     pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
         match &mut self {
             Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => (f)(obj),
-            Self::Init | Self::Ready => {} // markers, nothing to modify
+            Self::Init | Self::InitDone => {} // markers, nothing to modify
             Self::InitPage(objs) => {
                 for k in objs {
                     (f)(k)
@@ -520,7 +520,7 @@ where
             }
         }
         State::InitPageDone { resource_version } => {
-            (Some(Ok(Event::Ready)), State::InitListed { resource_version })
+            (Some(Ok(Event::InitDone)), State::InitListed { resource_version })
         }
         State::InitialWatch { mut stream } => {
             match stream.next().await {
@@ -536,7 +536,7 @@ where
                 Some(Ok(WatchEvent::Bookmark(bm))) => {
                     let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
                     if marks_initial_end {
-                        (Some(Ok(Event::Ready)), State::Watching {
+                        (Some(Ok(Event::InitDone)), State::Watching {
                             resource_version: bm.metadata.resource_version,
                             stream,
                         })
@@ -815,7 +815,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
             Ok(Event::InitPage(objs)) if objs.len() > 1 => Some(Err(Error::TooManyObjects)),
             Ok(Event::InitPage(mut objs)) => Some(Ok(objs.pop())),
             Ok(Event::Apply(obj) | Event::InitApply(obj)) => Some(Ok(Some(obj))),
-            Ok(Event::Init | Event::Ready) => None,
+            Ok(Event::Init | Event::InitDone) => None,
             Err(err) => Some(Err(err)),
         }
     })

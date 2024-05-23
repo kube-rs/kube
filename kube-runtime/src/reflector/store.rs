@@ -122,7 +122,7 @@ where
                 let obj = Arc::new(obj.clone());
                 self.buffer.insert(key, obj);
             }
-            watcher::Event::Ready => {
+            watcher::Event::InitDone => {
                 let mut store = self.store.write();
 
                 // Swap the buffer into the store
@@ -152,7 +152,7 @@ where
                     dispatcher.broadcast(obj_ref).await;
                 }
 
-                watcher::Event::Ready => {
+                watcher::Event::InitDone => {
                     let obj_refs: Vec<_> = {
                         let store = self.store.read();
                         store.keys().cloned().collect()

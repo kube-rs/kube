@@ -49,7 +49,7 @@ where
                     *me.queue = objs.into_iter();
                     continue;
                 }
-                Some(Ok(Event::Init | Event::Ready)) => continue,
+                Some(Ok(Event::Init | Event::InitDone)) => continue,
                 Some(Err(err)) => Some(Err(err)),
                 None => return Poll::Ready(None),
             };

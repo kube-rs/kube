@@ -244,7 +244,7 @@ mod tests {
                 Ok(watcher::Event::Apply(cm_a.clone())),
                 Ok(watcher::Event::Init),
                 Ok(watcher::Event::InitPage(vec![cm_b.clone()])),
-                Ok(watcher::Event::Ready),
+                Ok(watcher::Event::InitDone),
             ]),
         )
         .map(|_| ())

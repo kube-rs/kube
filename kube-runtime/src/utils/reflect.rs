@@ -76,7 +76,7 @@ pub(crate) mod test {
             Err(Error::TooManyObjects),
             Ok(Event::Init),
             Ok(Event::InitPage(vec![foo, bar])),
-            Ok(Event::Ready),
+            Ok(Event::InitDone),
         ]);
         let (reader, writer) = reflector::store();
 
@@ -107,7 +107,7 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Ready)))
+            Poll::Ready(Some(Ok(Event::InitDone)))
         ));
         assert_eq!(reader.len(), 2);
 
