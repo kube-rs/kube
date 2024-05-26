@@ -25,7 +25,7 @@ jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
 socks5 = ["hyper-socks2"]
-http_proxy = ["hyper-proxy2"]
+http-proxy = ["hyper-proxy2"]
 unstable-client = []
 
 # private feature sets; do not use
