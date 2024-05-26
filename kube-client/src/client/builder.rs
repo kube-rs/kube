@@ -96,8 +96,8 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 
             #[cfg(feature = "http-proxy")]
             Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
-                let proxy = hyper_proxy2::Proxy::new(hyper_proxy2::Intercept::All, proxy_url.clone());
-                let connector = hyper_proxy2::ProxyConnector::from_proxy_unsecured(connector, proxy);
+                let proxy = hyper_http_proxy::Proxy::new(hyper_http_proxy::Intercept::All, proxy_url.clone());
+                let connector = hyper_http_proxy::ProxyConnector::from_proxy_unsecured(connector, proxy);
 
                 make_generic_builder(connector, config)
             }
