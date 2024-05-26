@@ -35,6 +35,7 @@ runtime = ["kube-runtime"]
 unstable-runtime = ["kube-runtime/unstable-runtime"]
 unstable-client = ["kube-client/unstable-client"]
 socks5 = ["kube-client/socks5"]
+http-proxy = ["kube-client/http-proxy"]
 
 [package.metadata.docs.rs]
 features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/latest", "unstable-runtime", "socks5", "http-proxy"]
