@@ -13,7 +13,7 @@ categories = ["web-programming::http-client", "configuration", "network-programm
 
 [features]
 default = ["client"]
-rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls"]
+rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls", "hyper-http-proxy?/rustls-tls-native-roots"]
 openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws", "tokio/macros"]
 kubelet-debug = ["ws", "kube-core/kubelet-debug"]
@@ -25,7 +25,7 @@ jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
 socks5 = ["hyper-socks2"]
-http-proxy = ["hyper-proxy2"]
+http-proxy = ["hyper-http-proxy"]
 unstable-client = []
 
 # private feature sets; do not use
@@ -62,7 +62,7 @@ kube-core = { path = "../kube-core", version = "=0.91.0" }
 jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
 hyper = { workspace = true, features = ["client", "http1"], optional = true }
-hyper-proxy2 = {version = "0.1", optional = true}
+hyper-http-proxy = { version = "1", default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "tokio"], optional = true }
 hyper-rustls = { workspace = true, features = ["http1", "logging", "native-tokio", "ring", "tls12"], optional = true }
 hyper-socks2 = { workspace = true, optional = true }
