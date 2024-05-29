@@ -201,6 +201,10 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert_eq!(reader.len(), 1);
+
+        let restarted = poll!(reflect.next());
         assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitDone)))));
         assert_eq!(reader.len(), 2);
 
@@ -266,6 +270,10 @@ pub(crate) mod test {
             poll!(reflect.next()),
             Poll::Ready(Some(Ok(Event::InitApply(_))))
         ));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
+        ));
 
         assert!(matches!(
             poll!(reflect.next()),
@@ -318,6 +326,12 @@ pub(crate) mod test {
         assert!(matches!(
             poll!(reflect.next()),
             Poll::Ready(Some(Ok(Event::Init)))
+        ));
+        assert_eq!(poll!(subscriber.next()), Poll::Pending);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 

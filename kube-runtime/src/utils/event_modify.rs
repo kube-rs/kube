@@ -46,7 +46,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{pin::pin, task::Poll, vec};
+    use std::{pin::pin, task::Poll};
 
     use super::{Error, Event, EventModify};
     use futures::{poll, stream, StreamExt};
