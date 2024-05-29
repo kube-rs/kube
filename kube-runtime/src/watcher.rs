@@ -14,7 +14,6 @@ use kube_client::{
     Api, Error as ClientErr,
 };
 use serde::de::DeserializeOwned;
-use smallvec::SmallVec;
 use std::{clone::Clone, fmt::Debug, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
@@ -66,10 +65,11 @@ impl<K> Event<K> {
     ///
     /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
     /// emitted individually.
+    #[deprecated(since = "0.92.0", note = "unnecessary to flatten a single object")]
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
-            Self::Apply(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
-            Self::Delete(_) | Self::Init | Self::InitDone => SmallVec::new(),
+            Self::Apply(obj) | Self::InitApply(obj) => Some(obj),
+            Self::Delete(_) | Self::Init | Self::InitDone => None,
         }
         .into_iter()
     }
@@ -79,10 +79,11 @@ impl<K> Event<K> {
     /// Note that `Deleted` events may be missed when restarting the stream. Use finalizers
     /// or owner references instead if you care about cleaning up external resources after
     /// deleted objects.
+    #[deprecated(since = "0.92.0", note = "unnecessary to flatten a single object")]
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
-            Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
-            Self::Init | Self::InitDone => SmallVec::new(),
+            Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => Some(obj),
+            Self::Init | Self::InitDone => None,
         }
         .into_iter()
     }
