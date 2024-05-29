@@ -22,6 +22,7 @@ pub mod controller;
 pub mod events;
 
 pub mod finalizer;
+pub mod raw_json;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;
@@ -30,6 +31,7 @@ pub mod watcher;
 
 pub use controller::{applier, Config, Controller};
 pub use finalizer::finalizer;
+pub use raw_json::RawJson;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
