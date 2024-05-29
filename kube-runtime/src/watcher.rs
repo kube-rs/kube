@@ -14,7 +14,7 @@ use kube_client::{
     Api, Error as ClientErr,
 };
 use serde::de::DeserializeOwned;
-use std::{clone::Clone, fmt::Debug, time::Duration};
+use std::{clone::Clone, collections::VecDeque, fmt::Debug, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
@@ -125,7 +125,7 @@ enum State<K> {
     /// The Watcher is in the process of paginating through the initial LIST
     InitPage {
         continue_token: Option<String>,
-        objects: Vec<K>,
+        objects: VecDeque<K>,
         last_bookmark: Option<String>,
     },
     /// Kubernetes 1.27 Streaming Lists
@@ -466,7 +466,7 @@ where
         State::Empty => match wc.initial_list_strategy {
             InitialListStrategy::ListWatch => (Some(Ok(Event::Init)), State::InitPage {
                 continue_token: None,
-                objects: vec![],
+                objects: VecDeque::default(),
                 last_bookmark: None,
             }),
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
@@ -486,7 +486,7 @@ where
             mut objects,
             last_bookmark,
         } => {
-            if let Some(next) = objects.pop() {
+            if let Some(next) = objects.pop_front() {
                 return (Some(Ok(Event::InitApply(next))), State::InitPage {
                     continue_token,
                     objects,
@@ -510,7 +510,7 @@ where
                     // until the objects buffer has drained
                     (None, State::InitPage {
                         continue_token,
-                        objects: list.items,
+                        objects: list.items.into_iter().collect(),
                         last_bookmark,
                     })
                 }
