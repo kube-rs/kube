@@ -31,8 +31,6 @@ pub enum Error {
     WatchFailed(#[source] kube_client::Error),
     #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
     NoResourceVersion,
-    #[error("too many objects matched search criteria")]
-    TooManyObjects,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -51,12 +49,7 @@ pub enum Event<K> {
     /// If using the `ListWatch` strategy, this is a relist, and indicates that `InitlPage` events will follow.
     /// If using the `StreamingList` strategy, this event will be followed by `InitApply` events.
     Init,
-    /// A page of objects was received during `Init` with the `ListWatch` strategy.
-    ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
-    /// the `InitPage` events should be assumed to have been [`Deleted`](Event::Deleted).
-    InitPage(Vec<K>),
-    /// An object received during `Init` with the `StreamingList` strategy.
+    /// An object received during `Init`
     ///
     /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
     /// the `InitAdd` events should be assumed to have been [`Deleted`](Event::Deleted).
@@ -64,7 +57,7 @@ pub enum Event<K> {
     /// The initialisation is complete.
     ///
     /// Should be used as a signal to replace the store contents atomically.
-    /// No more `InitPage` / `InitApply` events will happen until the next `Init` event.
+    /// No more `InitApply` events will happen until the next `Init` event.
     InitDone,
 }
 
@@ -77,7 +70,6 @@ impl<K> Event<K> {
         match self {
             Self::Apply(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
             Self::Delete(_) | Self::Init | Self::InitDone => SmallVec::new(),
-            Self::InitPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -91,7 +83,6 @@ impl<K> Event<K> {
         match self {
             Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
             Self::Init | Self::InitDone => SmallVec::new(),
-            Self::InitPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -118,11 +109,6 @@ impl<K> Event<K> {
         match &mut self {
             Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => (f)(obj),
             Self::Init | Self::InitDone => {} // markers, nothing to modify
-            Self::InitPage(objs) => {
-                for k in objs {
-                    (f)(k)
-                }
-            }
         }
         self
     }
@@ -136,9 +122,11 @@ enum State<K> {
     #[default]
     Empty,
     /// The Watcher is in the process of paginating through the initial LIST
-    InitPage { continue_token: Option<String> },
-    /// The Watcher has completed the initial LIST and is ready to start the watch
-    InitPageDone { resource_version: String },
+    InitPage {
+        continue_token: Option<String>,
+        objects: Vec<K>,
+        last_bookmark: Option<String>,
+    },
     /// Kubernetes 1.27 Streaming Lists
     /// The initial watch is in progress
     InitialWatch {
@@ -475,9 +463,11 @@ where
 {
     match state {
         State::Empty => match wc.initial_list_strategy {
-            InitialListStrategy::ListWatch => {
-                (Some(Ok(Event::Init)), State::InitPage { continue_token: None })
-            }
+            InitialListStrategy::ListWatch => (Some(Ok(Event::Init)), State::InitPage {
+                continue_token: None,
+                objects: vec![],
+                last_bookmark: None,
+            }),
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
                 Ok(stream) => (None, State::InitialWatch { stream }),
                 Err(err) => {
@@ -490,24 +480,38 @@ where
                 }
             },
         },
-        State::InitPage { continue_token } => {
+        State::InitPage {
+            continue_token,
+            mut objects,
+            last_bookmark,
+        } => {
+            if let Some(next) = objects.pop() {
+                return (Some(Ok(Event::InitApply(next))), State::InitPage {
+                    continue_token,
+                    objects,
+                    last_bookmark,
+                });
+            }
+            if let Some(resource_version) = last_bookmark {
+                // we have drained the last page - move on to next stage
+                return (Some(Ok(Event::InitDone)), State::InitListed { resource_version });
+            }
             let mut lp = wc.to_list_params();
             lp.continue_token = continue_token;
             match api.list(&lp).await {
                 Ok(list) => {
-                    if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
-                        (Some(Ok(Event::InitPage(list.items))), State::InitPage {
-                            continue_token: Some(continue_token),
-                        })
-                    } else if let Some(resource_version) =
-                        list.metadata.resource_version.filter(|s| !s.is_empty())
-                    {
-                        (Some(Ok(Event::InitPage(list.items))), State::InitPageDone {
-                            resource_version,
-                        })
-                    } else {
-                        (Some(Err(Error::NoResourceVersion)), State::Empty)
+                    let last_bookmark = list.metadata.resource_version.filter(|s| !s.is_empty());
+                    let continue_token = list.metadata.continue_.filter(|s| !s.is_empty());
+                    if last_bookmark.is_none() && continue_token.is_none() {
+                        return (Some(Err(Error::NoResourceVersion)), State::Empty);
                     }
+                    // Buffer page here, causing us to return to this enum branch (State::InitPage)
+                    // until the objects buffer has drained
+                    (None, State::InitPage {
+                        continue_token,
+                        objects: list.items,
+                        last_bookmark,
+                    })
                 }
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
@@ -518,9 +522,6 @@ where
                     (Some(Err(Error::InitialListFailed(err))), State::Empty)
                 }
             }
-        }
-        State::InitPageDone { resource_version } => {
-            (Some(Ok(Event::InitDone)), State::InitListed { resource_version })
         }
         State::InitialWatch { mut stream } => {
             match stream.next().await {
@@ -807,13 +808,8 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     watcher(api, Config::default().fields(&format!("metadata.name={name}"))).filter_map(|event| async {
         match event {
             Ok(Event::Delete(_)) => Some(Ok(None)),
-            // We're filtering by object name, so getting more than one object means that either:
-            // 1. The apiserver is accepting multiple objects with the same name, or
-            // 2. The apiserver is ignoring our query
-            // In either case, the K8s apiserver is broken and our API will return invalid data, so
-            // we had better bail out ASAP.
-            Ok(Event::InitPage(objs)) if objs.len() > 1 => Some(Err(Error::TooManyObjects)),
-            Ok(Event::InitPage(mut objs)) => Some(Ok(objs.pop())),
+            // We're filtering by object name, so we should only get one (provided the Api is scoped correctly)
+            // Take the first one:
             Ok(Event::Apply(obj) | Event::InitApply(obj)) => Some(Ok(Some(obj))),
             Ok(Event::Init | Event::InitDone) => None,
             Err(err) => Some(Err(err)),

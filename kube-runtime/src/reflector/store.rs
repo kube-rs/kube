@@ -111,12 +111,6 @@ where
             watcher::Event::Init => {
                 self.buffer = AHashMap::new();
             }
-            watcher::Event::InitPage(new_objs) => {
-                let new_objs = new_objs
-                    .iter()
-                    .map(|obj| (obj.to_object_ref(self.dyntype.clone()), Arc::new(obj.clone())));
-                self.buffer.extend(new_objs);
-            }
             watcher::Event::InitApply(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
