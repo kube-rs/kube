@@ -1750,7 +1750,7 @@ mod tests {
         let (queue_tx, queue_rx) = futures::channel::mpsc::unbounded::<ObjectRef<ConfigMap>>();
         let (store_rx, mut store_tx) = reflector::store();
         let mut applier = pin!(applier(
-            |obj, _| {
+            |_obj, _| {
                 Box::pin(async move {
                     // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
                     //println!("reconciling {:?}", obj.metadata.name);
@@ -1763,7 +1763,7 @@ mod tests {
             queue_rx.map(Result::<_, Infallible>::Ok),
             Config::default(),
         ));
-        store_tx.apply_watcher_event(&watcher::Event::Restart);
+        store_tx.apply_watcher_event(&watcher::Event::InitDone);
         for i in 0..items {
             let obj = ConfigMap {
                 metadata: ObjectMeta {

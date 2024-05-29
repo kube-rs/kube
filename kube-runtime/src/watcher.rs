@@ -48,28 +48,24 @@ pub enum Event<K> {
     Delete(K),
     /// The watch stream was restarted.
     ///
-    /// If using the `ListWatch` strategy, `RestartPage` events will follow this event.
-    /// If using the `StreamingList` strategy, this event will be followed by `RestartApply` or `RestartDelete` events.
-    RestartInit,
-    /// A page of objects was received during the restart.
+    /// If using the `ListWatch` strategy, this is a relist, and indicates that `InitlPage` events will follow.
+    /// If using the `StreamingList` strategy, this event will be followed by `InitApply` events.
+    Init,
+    /// A page of objects was received during `Init` with the `ListWatch` strategy.
     ///
-    /// This event is only returned when using the `ListWatch` strategy.
+    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
+    /// the `InitPage` events should be assumed to have been [`Deleted`](Event::Deleted).
+    InitPage(Vec<K>),
+    /// An object received during `Init` with the `StreamingList` strategy.
     ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of the pages
-    /// should be assumed to have been [`Deleted`](Event::Deleted).
-    RestartPage(Vec<K>),
-    /// An object was added or modified during the initial watch.
-    ///
-    /// This event is only returned when using the `StreamingList` strategy.
-    RestartApply(K),
-    /// An object was deleted during the initial watch.
-    ///
-    /// This event is only returned when using the `StreamingList` strategy.
-    RestartDelete(K),
-    /// The restart is complete.
+    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
+    /// the `InitAdd` events should be assumed to have been [`Deleted`](Event::Deleted).
+    InitApply(K),
+    /// The initialisation is complete.
     ///
     /// Should be used as a signal to replace the store contents atomically.
-    Restart,
+    /// No more `InitPage` / `InitApply` events will happen until the next `Init` event.
+    InitDone,
 }
 
 impl<K> Event<K> {
@@ -79,13 +75,9 @@ impl<K> Event<K> {
     /// emitted individually.
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Apply(obj) => SmallVec::from_buf([obj]),
-            Event::Delete(_)
-            | Event::RestartInit
-            | Event::Restart
-            | Self::RestartApply(_)
-            | Self::RestartDelete(_) => SmallVec::new(),
-            Event::RestartPage(objs) => SmallVec::from_vec(objs),
+            Self::Apply(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
+            Self::Delete(_) | Self::Init | Self::InitDone => SmallVec::new(),
+            Self::InitPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -97,11 +89,9 @@ impl<K> Event<K> {
     /// deleted objects.
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Apply(obj) | Event::Delete(obj) | Event::RestartApply(obj) | Event::RestartDelete(obj) => {
-                SmallVec::from_buf([obj])
-            }
-            Event::RestartInit | Event::Restart => SmallVec::new(),
-            Event::RestartPage(objs) => SmallVec::from_vec(objs),
+            Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => SmallVec::from_buf([obj]),
+            Self::Init | Self::InitDone => SmallVec::new(),
+            Self::InitPage(objs) => SmallVec::from_vec(objs),
         }
         .into_iter()
     }
@@ -126,11 +116,9 @@ impl<K> Event<K> {
     #[must_use]
     pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
         match &mut self {
-            Event::Apply(obj) | Event::Delete(obj) | Event::RestartApply(obj) | Event::RestartDelete(obj) => {
-                (f)(obj)
-            }
-            Event::RestartInit | Event::Restart => {}
-            Event::RestartPage(objs) => {
+            Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => (f)(obj),
+            Self::Init | Self::InitDone => {} // markers, nothing to modify
+            Self::InitPage(objs) => {
                 for k in objs {
                     (f)(k)
                 }
@@ -487,9 +475,9 @@ where
 {
     match state {
         State::Empty => match wc.initial_list_strategy {
-            InitialListStrategy::ListWatch => (Some(Ok(Event::RestartInit)), State::InitPage {
-                continue_token: None,
-            }),
+            InitialListStrategy::ListWatch => {
+                (Some(Ok(Event::Init)), State::InitPage { continue_token: None })
+            }
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
                 Ok(stream) => (None, State::InitialWatch { stream }),
                 Err(err) => {
@@ -508,13 +496,13 @@ where
             match api.list(&lp).await {
                 Ok(list) => {
                     if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
-                        (Some(Ok(Event::RestartPage(list.items))), State::InitPage {
+                        (Some(Ok(Event::InitPage(list.items))), State::InitPage {
                             continue_token: Some(continue_token),
                         })
                     } else if let Some(resource_version) =
                         list.metadata.resource_version.filter(|s| !s.is_empty())
                     {
-                        (Some(Ok(Event::RestartPage(list.items))), State::InitPageDone {
+                        (Some(Ok(Event::InitPage(list.items))), State::InitPageDone {
                             resource_version,
                         })
                     } else {
@@ -532,22 +520,23 @@ where
             }
         }
         State::InitPageDone { resource_version } => {
-            (Some(Ok(Event::Restart)), State::InitListed { resource_version })
+            (Some(Ok(Event::InitDone)), State::InitListed { resource_version })
         }
         State::InitialWatch { mut stream } => {
             match stream.next().await {
                 Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
-                    (Some(Ok(Event::RestartApply(obj))), State::InitialWatch { stream })
+                    (Some(Ok(Event::InitApply(obj))), State::InitialWatch { stream })
                 }
-                Some(Ok(WatchEvent::Deleted(obj))) => {
-                    (Some(Ok(Event::RestartDelete(obj))), State::InitialWatch {
-                        stream,
-                    })
+                Some(Ok(WatchEvent::Deleted(_obj))) => {
+                    // Kubernetes claims these events are impossible
+                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+                    error!("got deleted event during initial watch. this is a bug");
+                    (None, State::InitialWatch { stream })
                 }
                 Some(Ok(WatchEvent::Bookmark(bm))) => {
                     let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
                     if marks_initial_end {
-                        (Some(Ok(Event::Restart)), State::Watching {
+                        (Some(Ok(Event::InitDone)), State::Watching {
                             resource_version: bm.metadata.resource_version,
                             stream,
                         })
@@ -817,16 +806,16 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
     watcher(api, Config::default().fields(&format!("metadata.name={name}"))).filter_map(|event| async {
         match event {
-            Ok(Event::Delete(_) | Event::RestartDelete(_)) => Some(Ok(None)),
+            Ok(Event::Delete(_)) => Some(Ok(None)),
             // We're filtering by object name, so getting more than one object means that either:
             // 1. The apiserver is accepting multiple objects with the same name, or
             // 2. The apiserver is ignoring our query
             // In either case, the K8s apiserver is broken and our API will return invalid data, so
             // we had better bail out ASAP.
-            Ok(Event::RestartPage(objs)) if objs.len() > 1 => Some(Err(Error::TooManyObjects)),
-            Ok(Event::RestartPage(mut objs)) => Some(Ok(objs.pop())),
-            Ok(Event::Apply(obj) | Event::RestartApply(obj)) => Some(Ok(Some(obj))),
-            Ok(Event::Restart | Event::RestartInit) => None,
+            Ok(Event::InitPage(objs)) if objs.len() > 1 => Some(Err(Error::TooManyObjects)),
+            Ok(Event::InitPage(mut objs)) => Some(Ok(objs.pop())),
+            Ok(Event::Apply(obj) | Event::InitApply(obj)) => Some(Ok(Some(obj))),
+            Ok(Event::Init | Event::InitDone) => None,
             Err(err) => Some(Err(err)),
         }
     })

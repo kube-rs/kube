@@ -242,9 +242,9 @@ mod tests {
             store_w,
             stream::iter(vec![
                 Ok(watcher::Event::Apply(cm_a.clone())),
-                Ok(watcher::Event::RestartInit),
-                Ok(watcher::Event::RestartPage(vec![cm_b.clone()])),
-                Ok(watcher::Event::Restart),
+                Ok(watcher::Event::Init),
+                Ok(watcher::Event::InitPage(vec![cm_b.clone()])),
+                Ok(watcher::Event::InitDone),
             ]),
         )
         .map(|_| ())
