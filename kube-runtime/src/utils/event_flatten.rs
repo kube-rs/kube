@@ -62,7 +62,7 @@ pub(crate) mod tests {
             Ok(Event::Apply(2)),
             Ok(Event::InitApply(1)),
             Ok(Event::InitApply(2)),
-            Err(Error::TooManyObjects),
+            Err(Error::NoResourceVersion),
             Ok(Event::Apply(2)),
         ]);
         let mut rx = pin!(EventFlatten::new(data, false));
@@ -78,7 +78,7 @@ pub(crate) mod tests {
         // Error passed through
         assert!(matches!(
             poll!(rx.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(2)))));
         assert!(matches!(poll!(rx.next()), Poll::Ready(None)));

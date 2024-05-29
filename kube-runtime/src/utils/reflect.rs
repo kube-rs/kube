@@ -54,7 +54,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{pin::pin, task::Poll, vec};
+    use std::{pin::pin, task::Poll};
 
     use super::{Error, Event, Reflect};
     use crate::reflector;
@@ -73,9 +73,10 @@ pub(crate) mod test {
         let bar = testpod("bar");
         let st = stream::iter([
             Ok(Event::Apply(foo.clone())),
-            Err(Error::TooManyObjects),
+            Err(Error::NoResourceVersion),
             Ok(Event::Init),
-            Ok(Event::InitPage(vec![foo, bar])),
+            Ok(Event::InitApply(foo)),
+            Ok(Event::InitApply(bar)),
             Ok(Event::InitDone),
         ]);
         let (reader, writer) = reflector::store();
@@ -91,7 +92,7 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         assert_eq!(reader.len(), 1);
 
@@ -102,7 +103,10 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitPage(_))))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert_eq!(reader.len(), 1);
+        let restarted = poll!(reflect.next());
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
         assert_eq!(reader.len(), 1);
 
         assert!(matches!(
