@@ -45,18 +45,24 @@ pub enum Event<K> {
     Delete(K),
     /// The watch stream was restarted.
     ///
-    /// If using the `ListWatch` strategy, this is a relist, and indicates that `InitlPage` events will follow.
-    /// If using the `StreamingList` strategy, this event will be followed by `InitApply` events.
+    /// A series of `InitApply` events are expected to follow until all matching objects
+    /// have been listed. This event can be used to prepare a buffer for `InitApply` events.
     Init,
-    /// An object received during `Init`
+    /// Received an object received during `Init`
     ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
-    /// the `InitAdd` events should be assumed to have been [`Deleted`](Event::Deleted).
+    /// Objects returned here are either from the initial stream using the `StreamingList` strategy,
+    /// or events from pages using the `ListWatch` strategy.
+    ///
+    /// These events can be passed up if having a complete set of objects is not a concern.
+    /// If you want to wait for a complete set, please buffer these events until an `InitDone`.
     InitApply(K),
     /// The initialisation is complete.
     ///
-    /// Should be used as a signal to replace the store contents atomically.
+    /// This can be used as a signal to replace buffered store contents atomically.
     /// No more `InitApply` events will happen until the next `Init` event.
+    ///
+    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
+    /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Deleted).
     InitDone,
 }
 
