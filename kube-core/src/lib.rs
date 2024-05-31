@@ -41,7 +41,7 @@ pub mod params;
 pub mod request;
 pub use request::Request;
 
-mod resource;
+pub mod resource;
 pub use resource::{
     api_version_from_group_version, ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope,
     Resource, ResourceExt, ResourceScope, SubResourceScope,

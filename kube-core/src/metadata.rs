@@ -4,7 +4,7 @@ use std::{borrow::Cow, marker::PhantomData};
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
 
-use crate::{DynamicObject, Resource};
+use crate::{resource, DynamicObject, Resource};
 
 /// Type information that is flattened into every kubernetes object
 #[derive(Deserialize, Serialize, Clone, Default, Debug, Eq, PartialEq, Hash)]
@@ -146,7 +146,7 @@ impl PartialObjectMetaExt for ObjectMeta {
     }
 }
 
-impl<K: Resource> Resource for PartialObjectMeta<K> {
+impl<K: resource::Typed> resource::Typed for PartialObjectMeta<K> {
     type DynamicType = K::DynamicType;
     type Scope = K::Scope;
 
@@ -165,7 +165,9 @@ impl<K: Resource> Resource for PartialObjectMeta<K> {
     fn plural(dt: &Self::DynamicType) -> Cow<'_, str> {
         K::plural(dt)
     }
+}
 
+impl<K: Resource> Resource for PartialObjectMeta<K> {
     fn meta(&self) -> &ObjectMeta {
         &self.metadata
     }

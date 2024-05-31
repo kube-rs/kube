@@ -37,7 +37,7 @@ pub use kube_core::{
     watch::WatchEvent,
     Resource, ResourceExt,
 };
-use kube_core::{DynamicResourceScope, NamespaceResourceScope};
+use kube_core::{resource, DynamicResourceScope, NamespaceResourceScope};
 pub use params::{
     DeleteParams, GetParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
     ValidationDirective, VersionMatch, WatchParams,
@@ -66,7 +66,7 @@ pub struct Api<K> {
 /// Api constructors for Resource implementors with custom DynamicTypes
 ///
 /// This generally means resources created via [`DynamicObject`](crate::api::DynamicObject).
-impl<K: Resource> Api<K> {
+impl<K: resource::Typed> Api<K> {
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
@@ -131,9 +131,9 @@ impl<K: Resource> Api<K> {
 /// Api constructors for Resource implementors with Default DynamicTypes
 ///
 /// This generally means structs implementing `k8s_openapi::Resource`.
-impl<K: Resource> Api<K>
+impl<K: resource::Typed> Api<K>
 where
-    <K as Resource>::DynamicType: Default,
+    <K as resource::Typed>::DynamicType: Default,
 {
     /// Cluster level resources, or resources viewed across all namespaces
     ///

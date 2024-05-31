@@ -4,7 +4,7 @@
 pub use crate::discovery::ApiResource;
 use crate::{
     metadata::TypeMeta,
-    resource::{DynamicResourceScope, Resource},
+    resource::{self, DynamicResourceScope, Resource},
 };
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -75,7 +75,7 @@ impl DynamicObject {
     }
 }
 
-impl Resource for DynamicObject {
+impl resource::Typed for DynamicObject {
     type DynamicType = ApiResource;
     type Scope = DynamicResourceScope;
 
@@ -98,7 +98,9 @@ impl Resource for DynamicObject {
     fn plural(dt: &ApiResource) -> Cow<'_, str> {
         dt.plural.as_str().into()
     }
+}
 
+impl Resource for DynamicObject {
     fn meta(&self) -> &ObjectMeta {
         &self.metadata
     }

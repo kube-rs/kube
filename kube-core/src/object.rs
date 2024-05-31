@@ -2,7 +2,7 @@
 use crate::{
     discovery::ApiResource,
     metadata::{ListMeta, ObjectMeta, TypeMeta},
-    resource::{DynamicResourceScope, Resource},
+    resource::{self, DynamicResourceScope, Resource},
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use std::borrow::Cow;
@@ -241,7 +241,7 @@ where
     }
 }
 
-impl<P, U> Resource for Object<P, U>
+impl<P, U> resource::Typed for Object<P, U>
 where
     P: Clone,
     U: Clone,
@@ -268,7 +268,13 @@ where
     fn api_version(dt: &ApiResource) -> Cow<'_, str> {
         dt.api_version.as_str().into()
     }
+}
 
+impl<P, U> Resource for Object<P, U>
+where
+    P: Clone,
+    U: Clone,
+{
     fn meta(&self) -> &ObjectMeta {
         &self.metadata
     }

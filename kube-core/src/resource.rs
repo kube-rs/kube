@@ -1,3 +1,5 @@
+//! Types representing Kubernetes resource objects.
+
 pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::{
     api::core::v1::ObjectReference,
@@ -12,19 +14,9 @@ pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScop
 pub struct DynamicResourceScope {}
 impl ResourceScope for DynamicResourceScope {}
 
-/// An accessor trait for a kubernetes Resource.
-///
-/// This is for a subset of Kubernetes type that do not end in `List`.
-/// These types, using [`ObjectMeta`], SHOULD all have required properties:
-/// - `.metadata`
-/// - `.metadata.name`
-///
-/// And these optional properties:
-/// - `.metadata.namespace`
-/// - `.metadata.resource_version`
-///
-/// This avoids a bunch of the unnecessary unwrap mechanics for apps.
-pub trait Resource {
+/// Represents a type that can either statically imply a Kubernetes versioned resource type
+/// or resolve into one given specific data.
+pub trait Typed {
     /// Type information for types that do not know their resource information at compile time.
     ///
     /// Types that know their metadata at compile time should select `DynamicType = ()`.
@@ -72,7 +64,21 @@ pub trait Resource {
             plural = plural
         )
     }
+}
 
+/// An accessor trait for a kubernetes Resource.
+///
+/// This is for a subset of Kubernetes type that do not end in `List`.
+/// These types, using [`ObjectMeta`], SHOULD all have required properties:
+/// - `.metadata`
+/// - `.metadata.name`
+///
+/// And these optional properties:
+/// - `.metadata.namespace`
+/// - `.metadata.resource_version`
+///
+/// This avoids a bunch of the unnecessary unwrap mechanics for apps.
+pub trait Resource: Typed {
     /// Metadata that all persisted resources must have
     fn meta(&self) -> &ObjectMeta;
     /// Metadata that all persisted resources must have
@@ -166,8 +172,7 @@ pub fn api_version_from_group_version<'a>(group: Cow<'a, str>, version: Cow<'a, 
     output
 }
 
-/// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
-impl<K, S> Resource for K
+impl<K, S> Typed for K
 where
     K: k8s_openapi::Metadata<Ty = ObjectMeta>,
     K: k8s_openapi::Resource<Scope = S>,
@@ -194,7 +199,14 @@ where
     fn plural(_: &()) -> Cow<'_, str> {
         K::URL_PATH_SEGMENT.into()
     }
+}
 
+/// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
+impl<K, S> Resource for K
+where
+    K: k8s_openapi::Metadata<Ty = ObjectMeta>,
+    K: k8s_openapi::Resource<Scope = S>,
+{
     fn meta(&self) -> &ObjectMeta {
         self.metadata()
     }
