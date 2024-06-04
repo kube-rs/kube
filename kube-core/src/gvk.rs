@@ -2,6 +2,7 @@
 use std::str::FromStr;
 
 use crate::TypeMeta;
+use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -44,6 +45,35 @@ impl TryFrom<TypeMeta> for GroupVersionKind {
 
     fn try_from(tm: TypeMeta) -> Result<Self, Self::Error> {
         Ok(GroupVersion::from_str(&tm.api_version)?.with_kind(&tm.kind))
+    }
+}
+
+impl From<OwnerReference> for GroupVersionKind {
+    fn from(value: OwnerReference) -> Self {
+        let (group, version) = match value.api_version.split_once("/") {
+            Some((group, version)) => (group, version),
+            None => ("", value.api_version.as_str()),
+        };
+        Self {
+            group: group.into(),
+            version: version.into(),
+            kind: value.kind,
+        }
+    }
+}
+
+impl From<ObjectReference> for GroupVersionKind {
+    fn from(value: ObjectReference) -> Self {
+        let api_version = value.api_version.unwrap_or_default();
+        let (group, version) = match api_version.split_once("/") {
+            Some((group, version)) => (group, version),
+            None => ("", api_version.as_str()),
+        };
+        Self {
+            group: group.into(),
+            version: version.into(),
+            kind: value.kind.unwrap_or_default(),
+        }
     }
 }
 
