@@ -9,22 +9,17 @@ use pin_project::pin_project;
 #[pin_project]
 /// Stream returned by the [`applied_objects`](super::WatchStreamExt::applied_objects) and [`touched_objects`](super::WatchStreamExt::touched_objects) method.
 #[must_use = "streams do nothing unless polled"]
-pub struct EventFlatten<St, K> {
+pub struct EventFlatten<St> {
     #[pin]
     stream: St,
     emit_deleted: bool,
-    queue: std::vec::IntoIter<K>,
 }
-impl<St: TryStream<Ok = Event<K>>, K> EventFlatten<St, K> {
+impl<St: TryStream<Ok = Event<K>>, K> EventFlatten<St> {
     pub(super) fn new(stream: St, emit_deleted: bool) -> Self {
-        Self {
-            stream,
-            queue: vec![].into_iter(),
-            emit_deleted,
-        }
+        Self { stream, emit_deleted }
     }
 }
-impl<St, K> Stream for EventFlatten<St, K>
+impl<St, K> Stream for EventFlatten<St>
 where
     St: Stream<Item = Result<Event<K>, Error>>,
 {
@@ -33,9 +28,6 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
         Poll::Ready(loop {
-            if let Some(item) = me.queue.next() {
-                break Some(Ok(item));
-            }
             let var_name = match ready!(me.stream.as_mut().poll_next(cx)) {
                 Some(Ok(Event::Apply(obj) | Event::InitApply(obj))) => Some(Ok(obj)),
                 Some(Ok(Event::Delete(obj))) => {
@@ -44,10 +36,6 @@ where
                     } else {
                         continue;
                     }
-                }
-                Some(Ok(Event::InitPage(objs))) => {
-                    *me.queue = objs.into_iter();
-                    continue;
                 }
                 Some(Ok(Event::Init | Event::InitDone)) => continue,
                 Some(Err(err)) => Some(Err(err)),
@@ -72,8 +60,9 @@ pub(crate) mod tests {
             Ok(Event::Apply(1)),
             Ok(Event::Delete(0)),
             Ok(Event::Apply(2)),
-            Ok(Event::InitPage(vec![1, 2])),
-            Err(Error::TooManyObjects),
+            Ok(Event::InitApply(1)),
+            Ok(Event::InitApply(2)),
+            Err(Error::NoResourceVersion),
             Ok(Event::Apply(2)),
         ]);
         let mut rx = pin!(EventFlatten::new(data, false));
@@ -89,7 +78,7 @@ pub(crate) mod tests {
         // Error passed through
         assert!(matches!(
             poll!(rx.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(2)))));
         assert!(matches!(poll!(rx.next()), Poll::Ready(None)));

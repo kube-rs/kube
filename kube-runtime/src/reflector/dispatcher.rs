@@ -148,7 +148,7 @@ pub(crate) mod test {
         watcher::{Error, Event},
         WatchStreamExt,
     };
-    use std::{sync::Arc, task::Poll, vec};
+    use std::{sync::Arc, task::Poll};
 
     use crate::reflector;
     use futures::{pin_mut, poll, stream, StreamExt};
@@ -166,9 +166,10 @@ pub(crate) mod test {
         let bar = testpod("bar");
         let st = stream::iter([
             Ok(Event::Apply(foo.clone())),
-            Err(Error::TooManyObjects),
+            Err(Error::NoResourceVersion),
             Ok(Event::Init),
-            Ok(Event::InitPage(vec![foo, bar])),
+            Ok(Event::InitApply(foo)),
+            Ok(Event::InitApply(bar)),
             Ok(Event::InitDone),
         ]);
 
@@ -187,7 +188,7 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 1);
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         assert_eq!(reader.len(), 1);
 
@@ -196,7 +197,11 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitPage(_))))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert_eq!(reader.len(), 1);
+
+        let restarted = poll!(reflect.next());
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
@@ -218,9 +223,10 @@ pub(crate) mod test {
         let st = stream::iter([
             Ok(Event::Delete(foo.clone())),
             Ok(Event::Apply(foo.clone())),
-            Err(Error::TooManyObjects),
+            Err(Error::NoResourceVersion),
             Ok(Event::Init),
-            Ok(Event::InitPage(vec![foo.clone(), bar.clone()])),
+            Ok(Event::InitApply(foo.clone())),
+            Ok(Event::InitApply(bar.clone())),
             Ok(Event::InitDone),
         ]);
 
@@ -249,7 +255,7 @@ pub(crate) mod test {
         // Errors are not propagated to subscribers.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         assert!(matches!(poll!(subscriber.next()), Poll::Pending));
 
@@ -262,7 +268,11 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::InitPage(_))))
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
+        ));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
         ));
 
         assert!(matches!(
@@ -288,7 +298,8 @@ pub(crate) mod test {
         let st = stream::iter([
             Ok(Event::Apply(foo.clone())),
             Ok(Event::Init),
-            Ok(Event::InitPage(vec![foo.clone(), bar.clone()])),
+            Ok(Event::InitApply(foo.clone())),
+            Ok(Event::InitApply(bar.clone())),
             Ok(Event::InitDone),
         ]);
 
@@ -320,7 +331,13 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::InitPage(_))))
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
+        ));
+        assert_eq!(poll!(subscriber.next()), Poll::Pending);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
