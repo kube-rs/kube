@@ -806,19 +806,29 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
 ///
 /// Emits `None` if the object is deleted (or not found), and `Some` if an object is updated (or created/found).
 ///
-/// Compared to [`watcher`], `watch_object` does not return return [`Event`], since there is no need for an atomic
-/// [`Event::RestartedPage`] when only one object is covered anyway.
+/// Often invoked indirectly via [`await_condition`](crate::wait::await_condition()).
+///
+/// ## Scope Warning
+///
+/// When using this with an `Api::all` on namespaced resources there is a chance of duplicated names.
+/// To avoid getting confusing / wrong answers for this, use `Api::namespaced` bound to a specific namespace
+/// when watching for transitions to namespaced objects.
 pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, Config::default().fields(&format!("metadata.name={name}"))).filter_map(|event| async {
+    // filtering by object name in given scope, so there's at most one matching object
+    // footgun: Api::all may generate events from namespaced objects with the same name in different namespaces
+    let fields = format!("metadata.name={name}");
+    watcher(api, Config::default().fields(&fields)).filter_map(|event| async {
         match event {
-            Ok(Event::Delete(_)) => Some(Ok(None)),
-            // We're filtering by object name, so we should only get one (provided the Api is scoped correctly)
-            // Take the first one:
+            // Pass up `Some` for Found / Updated
             Ok(Event::Apply(obj) | Event::InitApply(obj)) => Some(Ok(Some(obj))),
+            // Pass up `None` for Deleted
+            Ok(Event::Delete(_)) => Some(Ok(None)),
+            // Ignore marker events
             Ok(Event::Init | Event::InitDone) => None,
+            // Bubble up errors
             Err(err) => Some(Err(err)),
         }
     })
