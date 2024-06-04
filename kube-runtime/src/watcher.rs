@@ -48,13 +48,13 @@ pub enum Event<K> {
     /// A series of `InitApply` events are expected to follow until all matching objects
     /// have been listed. This event can be used to prepare a buffer for `InitApply` events.
     Init,
-    /// Received an object received during `Init`
+    /// Received an object during `Init`.
     ///
     /// Objects returned here are either from the initial stream using the `StreamingList` strategy,
-    /// or events from pages using the `ListWatch` strategy.
+    /// or from pages using the `ListWatch` strategy.
     ///
     /// These events can be passed up if having a complete set of objects is not a concern.
-    /// If you want to wait for a complete set, please buffer these events until an `InitDone`.
+    /// If you need to wait for a complete set, please buffer these events until an `InitDone`.
     InitApply(K),
     /// The initialisation is complete.
     ///
