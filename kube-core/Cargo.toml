@@ -41,3 +41,4 @@ k8s-openapi = { workspace = true, features = ["latest"] }
 assert-json-diff.workspace = true
 kube = { path = "../kube", version = "<1.0.0, >=0.53.0" }
 serde_yaml.workspace = true
+jsonptr.workspace = true

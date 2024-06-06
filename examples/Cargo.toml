@@ -28,6 +28,7 @@ garde = { version = "0.18.0", default-features = false, features = ["derive"] }
 anyhow.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 jsonpath-rust.workspace = true
+jsonptr.workspace = true
 kube = { path = "../kube", version = "^0.91.0", default-features = false, features = ["admission"] }
 kube-derive = { path = "../kube-derive", version = "^0.91.0", default-features = false } # only needed to opt out of schema
 k8s-openapi.workspace = true

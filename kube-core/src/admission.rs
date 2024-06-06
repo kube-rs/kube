@@ -223,11 +223,12 @@ pub enum Operation {
 ///     .into_review();
 ///
 /// use json_patch::{AddOperation, Patch, PatchOperation};
+/// use jsonptr::Pointer;
 ///
 /// // A response adding a label to the resource.
 /// let _: AdmissionReview<_> = AdmissionResponse::from(&req)
 ///     .with_patch(Patch(vec![PatchOperation::Add(AddOperation {
-///         path: "/metadata/labels/my-label".to_owned(),
+///         path: Pointer::new(["metadata","labels","my-label"]),
 ///         value: serde_json::Value::String("my-value".to_owned()),
 ///     })]))
 ///     .unwrap()
