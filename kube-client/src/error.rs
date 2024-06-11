@@ -86,6 +86,12 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
     #[error("auth error: {0}")]
     Auth(#[source] crate::client::AuthError),
+
+    /// Error resolving resource reference
+    #[cfg(feature = "unstable-client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
+    #[error("Reference resolve error: {0}")]
+    RefResolve(String),
 }
 
 #[derive(Error, Debug)]
