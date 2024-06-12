@@ -7,8 +7,38 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.92.0...main
 
-0.92.0 / 2024-06-12
+[0.92.0](https://github.com/kube-rs/kube/releases/tag/0.92.0) / 2024-06-12
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.92.0 -->
+## Runtime: Decreased Memory Usage from `watcher`
+Buffering of [initial pages](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks) / [init streams](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists) is no longer a mandatory process with [`watcher::Event`](https://docs.rs/kube/latest/kube/runtime/watcher/enum.Event.html) gaining new `Init`, `InitApply`, and `InitDone` events. These events are read on the [store side](https://github.com/kube-rs/kube/blob/0f6cb6f0ac695444f6789f98fa07073f4980a127/kube-runtime/src/reflector/store.rs#L99-L134) maintaining the atomicity/completeness guarantees for `reflector` and `Store` users.
+
+This constitutes a significant memory decrease for all `watcher` users, and it has more details in a new [kube.rs/blog post](https://kube.rs/blog/2024/06/11/watcher-memory-improvements/).
+
+The downside is a **breaking change** to [`watcher::Event`](https://docs.rs/kube/latest/kube/runtime/watcher/enum.Event.html). Plain usage of `watcher` / `reflector` / `Controller` should generally not need to change anything, but custom stores / matches on `watcher::Event` will [need an update](https://kube.rs/blog/2024/06/11/watcher-memory-improvements/#breaking-change). If you are writing custom stores, the new signals should be helpful for improved caching.
+
+Thanks to @fabriziosestito via [Kubewarden](https://www.kubewarden.io/) for https://github.com/kube-rs/kube/pull/1494 . Follow-ups for this feature: https://github.com/kube-rs/kube/pull/1499 and https://github.com/kube-rs/kube/pull/1504.
+
+## Client: HTTP Proxy Support
+Support is now introduced under the `http-proxy` [feature](https://kube.rs/features) pulling in [hyper-http-proxy](https://crates.io/crates/hyper-http-proxy) complementing the already existing `socks5` proxy feature.
+
+Thanks to @aviramha via [MetalBear](https://metalbear.co/) for the support in https://github.com/kube-rs/kube/pull/1496, with follow-ups https://github.com/kube-rs/kube/pull/1501 + https://github.com/kube-rs/kube/pull/1502
+
+## What's Changed
+### Added
+* Added support for HTTP proxy with hyper-proxy2 by @aviramha in https://github.com/kube-rs/kube/pull/1496
+* Implement client native object reference fetching by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1511
+### Changed
+* Reduce buffering between watcher and Store by @fabriziosestito in https://github.com/kube-rs/kube/pull/1494
+* Rename new watcher Event names and remove one that cannot happen by @clux in https://github.com/kube-rs/kube/pull/1499
+* Update `tokio-tungstenite` to 0.23 by @Toasterson in https://github.com/kube-rs/kube/pull/1509
+* Align `watcher::Event` init/page variants by @clux in https://github.com/kube-rs/kube/pull/1504
+* Update json-patch to 2.0.0 by @bobsongplus in https://github.com/kube-rs/kube/pull/1507
+### Fixed
+* Fix potentially panicing unchecked duration adds in runtime by @clux in https://github.com/kube-rs/kube/pull/1489
+* ObjectList now accepts null metadata like upstream k8s does by @aviramha in https://github.com/kube-rs/kube/pull/1492
+* rename http_proxy feature to http-proxy and add it to the umbrella crate by @aviramha in https://github.com/kube-rs/kube/pull/1501
+* move from `hyper-proxy2` to `hyper-http-proxy` by @aviramha in https://github.com/kube-rs/kube/pull/1502
 
 [0.91.0](https://github.com/kube-rs/kube/releases/tag/0.91.0) / 2024-05-06
 ===================
