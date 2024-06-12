@@ -5,7 +5,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.91.0...main
+ * see https://github.com/kube-rs/kube/compare/0.92.0...main
+
+0.92.0 / 2024-06-12
+===================
 
 [0.91.0](https://github.com/kube-rs/kube/releases/tag/0.91.0) / 2024-05-06
 ===================
@@ -14,7 +17,7 @@ UNRELEASED
 Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
 
 ## Unstable Stream Sharing
-A more complete implementation that allows sharing `watcher` streams between multiple `Controller`s (for https://github.com/kube-rs/kube/issues/1080) has been added under the `unstable-runtime` [feature-flag](https://kube.rs/stability/#unstable-features) in #1449 and #1483 by @mateiidavid. This represents the first usable implementation of shared streams (and replaces the older prototype part in #1470). While some changes are expected, you can check the [shared_stream_controller example](https://github.com/kube-rs/kube/blob/main/examples/shared_stream_controllers.rs) for a high-level overview.
+A more complete implementation that allows sharing `watcher` streams between multiple `Controller`s (for https://github.com/kube-rs/kube/issues/1080) has been added under the `unstable-runtime` [feature-flag](https://kube.rs/stability/#unstable-features) in [#1449](https://github.com/kube-rs/kube/issues/1449) and [#1483](https://github.com/kube-rs/kube/issues/1483) by @mateiidavid. This represents the first usable implementation of shared streams (and replaces the older prototype part in [#1470](https://github.com/kube-rs/kube/issues/1470)). While some changes are expected, you can check the [shared_stream_controller example](https://github.com/kube-rs/kube/blob/main/examples/shared_stream_controllers.rs) for a high-level overview.
 
 ## What's Changed
 ### Added
