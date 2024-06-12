@@ -3,8 +3,8 @@
 # Dependencies: https://kube.rs/tools
 # Process: https://kube.rs/release-process/
 #
-# 0. (optional) cargo release minor ; verify readme + changelog bumped; then git reset --hard
-# 1. PUBLISH_GRACE_SLEEP=20 cargo release minor --execute
+# 0. (optional) cargo release minor --workspace ; verify readme + changelog bumped; then git reset --hard
+# 1. PUBLISH_GRACE_SLEEP=20 cargo release minor --workspace --execute
 # In the event of failures:
 # - on partial cargo publish failures with unexpected build errors; yank partials and fix issues in a PR before retrying
 # - on cargo-release issues waiting for crates.io: resume publish in given order manually, cd into next dirs and publish in sequence with cargo publish --features=k8s-openapi/latest
