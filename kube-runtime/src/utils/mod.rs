@@ -2,7 +2,7 @@
 
 mod backoff_reset_timer;
 pub(crate) mod delayed_init;
-mod event_flatten;
+mod event_filter;
 mod event_modify;
 #[cfg(feature = "unstable-runtime-predicates")] mod predicate;
 mod reflect;
@@ -10,7 +10,7 @@ mod stream_backoff;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
-pub use event_flatten::EventFlatten;
+pub use event_filter::EventFilter;
 pub use event_modify::EventModify;
 #[cfg(feature = "unstable-runtime-predicates")]
 pub use predicate::{predicates, Predicate, PredicateFilter};
