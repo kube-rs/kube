@@ -43,7 +43,7 @@ For real world projects see [ADOPTERS](https://kube.rs/adopters/).
 
 ## Api
 
-The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with Kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
+The [`Api`](https://docs.rs/kube/latest/kube/struct.Api.html) is what interacts with Kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/latest/kube/trait.Resource.html):
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
@@ -98,11 +98,11 @@ The `runtime` module exports the `kube_runtime` crate and contains higher level 
 
 ### Watchers
 
-A low level streaming interface (similar to informers) that presents `Applied`, `Deleted` or `Restarted` events.
+A low level streaming interface (similar to informers) that presents high level [`watcher::Event`](https://docs.rs/kube/latest/kube/runtime/watcher/enum.Event.html)s.
 
 ```rust
 let api = Api::<Pod>::default_namespaced(client);
-let stream = watcher(api, Config::default()).applied_objects();
+let stream = watcher(api, Config::default()).default_backoff().applied_objects();
 ```
 
 This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
@@ -113,7 +113,7 @@ while let Some(event) = stream.try_next().await? {
 }
 ```
 
-NB: the plain items in a `watcher` stream are different from `WatchEvent`. If you are following along to "see what changed", you should flatten it with one of the utilities from [`WatchStreamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html), such as `applied_objects`.
+The raw events are normally consumed by reflectors. See [`WatchStreamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html) for high-level constructs.
 
 ## Reflectors
 

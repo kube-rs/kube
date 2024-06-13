@@ -686,8 +686,8 @@ where
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
-/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+/// The events are intended to provide a safe input interface for a state store like a [`reflector`].
+/// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```no_run
 /// use kube::{
@@ -749,8 +749,8 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
-/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+/// The events are intended to provide a safe input interface for a state store like a [`reflector`].
+/// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```no_run
 /// use kube::{
