@@ -71,7 +71,10 @@ impl<K> Event<K> {
     ///
     /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
     /// emitted individually.
-    #[deprecated(since = "0.92.0", note = "unnecessary to flatten a single object")]
+    #[deprecated(
+        since = "0.92.0",
+        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
+    )]
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
             Self::Apply(obj) | Self::InitApply(obj) => Some(obj),
@@ -85,7 +88,10 @@ impl<K> Event<K> {
     /// Note that `Deleted` events may be missed when restarting the stream. Use finalizers
     /// or owner references instead if you care about cleaning up external resources after
     /// deleted objects.
-    #[deprecated(since = "0.92.0", note = "unnecessary to flatten a single object")]
+    #[deprecated(
+        since = "0.92.0",
+        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
+    )]
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
             Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => Some(obj),
