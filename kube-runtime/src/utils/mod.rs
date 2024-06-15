@@ -17,6 +17,12 @@ pub use predicate::{predicates, Predicate, PredicateFilter};
 pub use reflect::Reflect;
 pub use stream_backoff::StreamBackoff;
 pub use watch_ext::WatchStreamExt;
+/// Deprecated type alias for `EventFilter`
+#[deprecated(
+    since = "0.93.0",
+    note = "renamed to by `EventFilter`. This alias will be removed in 0.97.0."
+)]
+pub use EventFilter as EventFlatten;
 
 use futures::{
     stream::{self, Peekable},
