@@ -156,7 +156,7 @@ pub struct Config {
     /// If not set, the `cluster_url` is used instead
     pub tls_server_name: Option<String>,
     /// Headers to pass with every request.
-    pub headers: Vec<(HeaderName, HeaderValue)>
+    pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
 impl Config {
