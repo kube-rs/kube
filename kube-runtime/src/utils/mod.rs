@@ -20,7 +20,7 @@ pub use watch_ext::WatchStreamExt;
 /// Deprecated type alias for `EventFilter`
 #[deprecated(
     since = "0.93.0",
-    note = "renamed to by `EventFilter`. This alias will be removed in 0.97.0."
+    note = "renamed to `EventFilter`. This alias will be removed in 0.97.0."
 )]
 pub use EventFilter as EventFlatten;
 
