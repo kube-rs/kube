@@ -181,7 +181,7 @@ impl ConfigExt for Config {
     }
 
     fn extra_headers_layer(&self) -> Result<ExtraHeadersLayer> {
-        let mut headers = Vec::new();
+        let mut headers = self.headers.clone();
         if let Some(impersonate_user) = &self.auth_info.impersonate {
             headers.push((
                 HeaderName::from_static("impersonate-user"),
