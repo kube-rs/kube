@@ -837,18 +837,6 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     })
 }
 
-/// Default watch [`Backoff`] inspired by Kubernetes' client-go.
-///
-/// This fn has been moved into [`DefaultBackoff`].
-#[must_use]
-#[deprecated(
-    since = "0.84.0",
-    note = "replaced by `watcher::DefaultBackoff`. This fn will be removed in 0.88.0."
-)]
-pub fn default_backoff() -> DefaultBackoff {
-    DefaultBackoff::default()
-}
-
 /// Default watcher backoff inspired by Kubernetes' client-go.
 ///
 /// The parameters currently optimize for being kind to struggling apiservers.
