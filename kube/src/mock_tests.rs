@@ -29,7 +29,9 @@ impl Hack {
 #[tokio::test]
 async fn watchers_respect_pagination_limits() {
     let (client, fakeserver) = testcontext();
-    // NB: scenario only responds responds to TWO paginated list calls with two objects
+    // NB: page scenario which responds to 3 paginated list calls with 3 object (one per page).
+    // This ensures the watcher internal paging mechanism is not bypassed
+    // and that each page is actually drained before starting the long watch.
     let mocksrv = fakeserver.run(Scenario::PaginatedList);
 
     let api: Api<Hack> = Api::all(client);
@@ -39,6 +41,8 @@ async fn watchers_respect_pagination_limits() {
     assert_eq!(first.spec.num, 1);
     let second: Hack = stream.try_next().await.unwrap().unwrap();
     assert_eq!(second.spec.num, 2);
+    let third: Hack = stream.try_next().await.unwrap().unwrap();
+    assert_eq!(third.spec.num, 3);
     assert!(poll!(stream.next()).is_pending());
     timeout_after_1s(mocksrv).await;
 }
@@ -117,10 +121,28 @@ impl ApiServerVerifier {
                 "kind": "HackList",
                 "apiVersion": "kube.rs/v1",
                 "metadata": {
-                    "continue": "",
+                    "continue": "second",
                     "resourceVersion": "2"
                 },
                 "items": [Hack::test(2)]
+            });
+            let response = serde_json::to_vec(&respdata).unwrap(); // respond as the apiserver would have
+            send.send_response(Response::builder().body(Body::from(response)).unwrap());
+        }
+        {
+            // we expect a final list GET because we included a continue token
+            let (request, send) = self.0.next_request().await.expect("service not called 3");
+            assert_eq!(request.method(), http::Method::GET);
+            let req_uri = request.uri().to_string();
+            assert!(req_uri.contains("&continue=second"));
+            let respdata = json!({
+                "kind": "HackList",
+                "apiVersion": "kube.rs/v1",
+                "metadata": {
+                    "continue": "",
+                    "resourceVersion": "2"
+                },
+                "items": [Hack::test(3)]
             });
             let response = serde_json::to_vec(&respdata).unwrap(); // respond as the apiserver would have
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
