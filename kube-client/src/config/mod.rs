@@ -6,6 +6,7 @@
 //! Unless you have issues, prefer using [`Config::infer`], and pass it to a [`Client`][crate::Client].
 use std::{path::PathBuf, time::Duration};
 
+use http::{HeaderName, HeaderValue};
 use thiserror::Error;
 
 mod file_config;
@@ -154,6 +155,8 @@ pub struct Config {
     ///
     /// If not set, the `cluster_url` is used instead
     pub tls_server_name: Option<String>,
+    /// Headers to pass with every request.
+    pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
 impl Config {
@@ -174,6 +177,7 @@ impl Config {
             auth_info: AuthInfo::default(),
             proxy_url: None,
             tls_server_name: None,
+            headers: Vec::new(),
         }
     }
 
@@ -255,6 +259,7 @@ impl Config {
             },
             proxy_url: None,
             tls_server_name: None,
+            headers: Vec::new(),
         })
     }
 
@@ -312,6 +317,7 @@ impl Config {
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
             tls_server_name: loader.cluster.tls_server_name,
+            headers: Vec::new(),
         })
     }
 
