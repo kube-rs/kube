@@ -7,6 +7,17 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.92.0...main
 
+[0.92.1](https://github.com/kube-rs/kube/releases/tag/0.92.1) / 2024-06-19
+===================
+## Bugfix Release
+This release fixes [#1524](https://github.com/kube-rs/kube/issues/1524); a regression from [0.92.0](https://github.com/kube-rs/kube/releases/tag/0.92.0) causing `watcher` to skip pages on initial list. See [#1525](https://github.com/kube-rs/kube/pull/1525).
+
+It is recommended to upgrade from 0.92.0.
+
+## What's Changed
+### Fixed
+* Fix watcher not fully paginating on Init by @clux in https://github.com/kube-rs/kube/pull/1525
+
 [0.92.0](https://github.com/kube-rs/kube/releases/tag/0.92.0) / 2024-06-12
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.92.0 -->
