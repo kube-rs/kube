@@ -176,6 +176,38 @@ where
     })
 }
 
+/// Enqueues any mapper returned `Arc<K>` types for reconciliation
+#[cfg(feature = "unstable-runtime-subscribe")]
+fn trigger_others_shared<S, O, K, I>(
+    stream: S,
+    mapper: impl Fn(S::Ok) -> I + Sync + Send + 'static,
+    dyntype: O::DynamicType,
+) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
+where
+    // Input is some shared resource (`Arc<O>`) obtained via `reflect`
+    S: TryStream<Ok = Arc<O>>,
+    O: Resource,
+    O::DynamicType: Clone,
+    // Output stream is requests for the root type K
+    K: Resource,
+    K::DynamicType: Clone,
+    // but the mapper can produce many of them
+    I: 'static + IntoIterator<Item = ObjectRef<K>>,
+    I::IntoIter: Send,
+{
+    trigger_with(stream, move |obj| {
+        let watch_ref = ObjectRef::from_obj_with(obj.as_ref(), dyntype.clone()).erase();
+        mapper(obj)
+            .into_iter()
+            .map(move |mapped_obj_ref| ReconcileRequest {
+                obj_ref: mapped_obj_ref,
+                reason: ReconcileReason::RelatedObjectUpdated {
+                    obj_ref: Box::new(watch_ref.clone()),
+                },
+            })
+    })
+}
+
 /// Enqueues any owners of type `KOwner` for reconciliation
 pub fn trigger_owners<KOwner, S>(
     stream: S,
@@ -199,6 +231,35 @@ where
             .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
     };
     trigger_others(stream, mapper, child_type)
+}
+
+// TODO: do we really need to deal with a trystream? can we simplify this at
+// all?
+/// Enqueues any owners of type `KOwner` for reconciliation based on a stream of
+/// owned `K` objects
+#[cfg(feature = "unstable-runtime-subscribe")]
+fn trigger_owners_shared<KOwner, S, K>(
+    stream: S,
+    owner_type: KOwner::DynamicType,
+    child_type: K::DynamicType,
+) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
+where
+    S: TryStream<Ok = Arc<K>>,
+    K: Resource,
+    K::DynamicType: Clone,
+    KOwner: Resource,
+    KOwner::DynamicType: Clone,
+{
+    let mapper = move |obj: S::Ok| {
+        let meta = obj.meta().clone();
+        let ns = meta.namespace;
+        let owner_type = owner_type.clone();
+        meta.owner_references
+            .into_iter()
+            .flatten()
+            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
+    };
+    trigger_others_shared(stream, mapper, child_type)
 }
 
 /// A request to reconcile an object, annotated with why that request was made.
@@ -411,7 +472,9 @@ where
                     obj_ref,
                     reason: reschedule_reason,
                 },
-                run_at: reconciler_finished_at + requeue_after,
+                run_at: reconciler_finished_at
+                    .checked_add(requeue_after)
+                    .unwrap_or_else(crate::scheduler::far_future),
             }),
             result: Some(result),
         }
@@ -970,6 +1033,111 @@ where
         self
     }
 
+    /// This is the same as [`Controller::for_stream`]. Instead of taking an
+    /// `Api` (e.g. [`Controller::new`]), a stream of resources is used. Shared
+    /// streams can be created out-of-band by subscribing on a store `Writer`.
+    /// Through this interface, multiple controllers can use the same root
+    /// (shared) input stream of resources to keep memory overheads smaller.
+    ///
+    /// **N.B**: This constructor requires an
+    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
+    /// feature.
+    ///
+    /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
+    /// need to share the stream.
+    ///
+    /// ## Warning:
+    ///
+    /// You **must** ensure the root stream (i.e. stream created through a `reflector()`)
+    /// is driven to readiness independently of this controller to ensure the
+    /// watcher never deadlocks.
+    ///
+    ///
+    /// Trigger the reconciliation process for a shared stream of `Child`
+    /// objects of the owner `K`
+    ///
+    /// Conceptually the same as [`Controller::owns`], but a stream is used
+    /// instead of an `Api`. This interface behaves similarly to its non-shared
+    /// counterpart [`Controller::owns_stream`].
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
+    /// # use kube::runtime::controller::{Action, Controller};
+    /// # use kube::runtime::{predicates, watcher, reflector, WatchStreamExt};
+    /// # use kube::{Api, Client, Error, ResourceExt};
+    /// # use std::sync::Arc;
+    /// # async fn reconcile(_: Arc<Deployment>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<Deployment>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
+    /// # async fn doc(client: kube::Client) {
+    /// let deploys: Api<Deployment> = Api::default_namespaced(client.clone());
+    /// let pod_api: Api<Pod> = Api::default_namespaced(client);
+    ///
+    /// let (reader, writer) = reflector::store_shared(128);
+    /// let subscriber = writer
+    ///     .subscribe()
+    ///     .expect("subscribers can only be created from shared stores");
+    /// let pods = watcher(pod_api, watcher::Config::default())
+    ///     .default_backoff()
+    ///     .reflect(writer)
+    ///     .applied_objects()
+    ///     .for_each(|ev| async move {
+    ///         match ev {
+    ///             Ok(obj) => tracing::info!("got obj {obj:?}"),
+    ///             Err(error) => tracing::error!(%error, "received error")
+    ///         }
+    ///     });
+    ///
+    /// let controller = Controller::new(deploys, Default::default())
+    ///     .owns_shared_stream(subscriber)
+    ///     .run(reconcile, error_policy, Arc::new(()))
+    ///     .for_each(|ev| async move {
+    ///         tracing::info!("reconciled {ev:?}")
+    ///     });
+    ///
+    /// // Drive streams using a select statement
+    /// tokio::select! {
+    ///   _ = pods => {},
+    ///   _ = controller => {},
+    /// }
+    /// # }
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[must_use]
+    pub fn owns_shared_stream<Child: Resource<DynamicType = ()> + Send + 'static>(
+        self,
+        trigger: impl Stream<Item = Arc<Child>> + Send + 'static,
+    ) -> Self {
+        self.owns_shared_stream_with(trigger, ())
+    }
+
+    /// Trigger the reconciliation process for a shared stream of `Child` objects of the owner `K`
+    ///
+    /// Same as [`Controller::owns`], but instead of an `Api`, a shared stream of resources is used.
+    /// The source stream can be shared between multiple controllers, optimising
+    /// resource usage.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Same as [`Controller::owns_shared_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[must_use]
+    pub fn owns_shared_stream_with<Child: Resource<DynamicType = ()> + Send + 'static>(
+        mut self,
+        trigger: impl Stream<Item = Arc<Child>> + Send + 'static,
+        dyntype: Child::DynamicType,
+    ) -> Self
+    where
+        Child::DynamicType: Debug + Eq + Hash + Clone,
+    {
+        let child_watcher = trigger_owners_shared(trigger.map(Ok), self.dyntype.clone(), dyntype);
+        self.trigger_selector.push(child_watcher.boxed());
+        self
+    }
+
     /// Specify `Watched` object which `K` has a custom relation to and should be watched
     ///
     /// To define the `Watched` relation with `K`, you **must** define a custom relation mapper, which,
@@ -1128,7 +1296,7 @@ where
 
     /// Trigger the reconciliation process for a stream of `Other` objects related to a `K`
     ///
-    /// Same as [`Controller::owns`], but instead of an `Api`, a stream of resources is used.
+    /// Same as [`Controller::watches`], but instead of an `Api`, a stream of resources is used.
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
@@ -1150,6 +1318,104 @@ where
         I::IntoIter: Send,
     {
         let other_watcher = trigger_others(trigger, mapper, dyntype);
+        self.trigger_selector.push(other_watcher.boxed());
+        self
+    }
+
+    /// Trigger the reconciliation process for a shared stream of `Other`
+    /// objects related to a `K`
+    ///
+    /// Same as [`Controller::watches`], but instead of an `Api`, a shared
+    /// stream of resources is used. This allows for sharing input streams
+    /// between multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Watcher streams passed in here should be filtered first through `touched_objects`.
+    ///
+    /// # Example:
+    ///
+    /// ```no_run
+    /// # use futures::StreamExt;
+    /// # use k8s_openapi::api::core::v1::ConfigMap;
+    /// # use k8s_openapi::api::apps::v1::DaemonSet;
+    /// # use kube::runtime::controller::Action;
+    /// # use kube::runtime::{predicates, reflector::ObjectRef, watcher, Controller, WatchStreamExt};
+    /// # use kube::{Api, Client, Error, ResourceExt};
+    /// # use std::sync::Arc;
+    /// # type CustomResource = ConfigMap;
+    /// # async fn reconcile(_: Arc<CustomResource>, _: Arc<()>) -> Result<Action, Error> { Ok(Action::await_change()) }
+    /// # fn error_policy(_: Arc<CustomResource>, _: &kube::Error, _: Arc<()>) -> Action { Action::await_change() }
+    /// fn mapper(_: Arc<DaemonSet>) -> Option<ObjectRef<CustomResource>> { todo!() }
+    /// # async fn doc(client: kube::Client) {
+    /// let api: Api<DaemonSet> = Api::all(client.clone());
+    /// let cr: Api<CustomResource> = Api::all(client.clone());
+    /// let (reader, writer) = kube_runtime::reflector::store_shared(128);
+    /// let subscriber = writer
+    ///     .subscribe()
+    ///     .expect("subscribers can only be created from shared stores");
+    /// let daemons = watcher(api, watcher::Config::default())
+    ///     .reflect(writer)
+    ///     .touched_objects()
+    ///     .for_each(|ev| async move {
+    ///         match ev {
+    ///             Ok(obj) => {},
+    ///             Err(error) => tracing::error!(%error, "received err")
+    ///         }
+    ///     });
+    ///
+    /// let controller = Controller::new(cr, watcher::Config::default())
+    ///     .watches_shared_stream(subscriber, mapper)
+    ///     .run(reconcile, error_policy, Arc::new(()))
+    ///     .for_each(|_| std::future::ready(()));
+    ///
+    /// // Drive streams using a select statement
+    /// tokio::select! {
+    ///   _ = daemons => {},
+    ///   _ = controller => {},
+    /// }
+    /// # }
+    /// ```
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[must_use]
+    pub fn watches_shared_stream<Other, I>(
+        self,
+        trigger: impl Stream<Item = Arc<Other>> + Send + 'static,
+        mapper: impl Fn(Arc<Other>) -> I + Sync + Send + 'static,
+    ) -> Self
+    where
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Default + Debug + Clone,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
+        I::IntoIter: Send,
+    {
+        self.watches_shared_stream_with(trigger, mapper, Default::default())
+    }
+
+    /// Trigger the reconciliation process for a shared stream of `Other` objects related to a `K`
+    ///
+    /// Same as [`Controller::watches`], but instead of an `Api`, a shared
+    /// stream of resources is used. This allows for sharing of streams between
+    /// multiple controllers.
+    ///
+    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
+    ///
+    /// Same as [`Controller::watches_shared_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[must_use]
+    pub fn watches_shared_stream_with<Other, I>(
+        mut self,
+        trigger: impl Stream<Item = Arc<Other>> + Send + 'static,
+        mapper: impl Fn(Arc<Other>) -> I + Sync + Send + 'static,
+        dyntype: Other::DynamicType,
+    ) -> Self
+    where
+        Other: Clone + Resource + DeserializeOwned + Debug + Send + 'static,
+        Other::DynamicType: Debug + Clone,
+        I: 'static + IntoIterator<Item = ObjectRef<K>>,
+        I::IntoIter: Send,
+    {
+        let other_watcher = trigger_others_shared(trigger.map(Ok), mapper, dyntype);
         self.trigger_selector.push(other_watcher.boxed());
         self
     }
@@ -1484,10 +1750,10 @@ mod tests {
         let (queue_tx, queue_rx) = futures::channel::mpsc::unbounded::<ObjectRef<ConfigMap>>();
         let (store_rx, mut store_tx) = reflector::store();
         let mut applier = pin!(applier(
-            |obj, _| {
+            |_obj, _| {
                 Box::pin(async move {
                     // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
-                    println!("reconciling {:?}", obj.metadata.name);
+                    //println!("reconciling {:?}", obj.metadata.name);
                     Ok(Action::requeue(Duration::ZERO))
                 })
             },
@@ -1497,6 +1763,7 @@ mod tests {
             queue_rx.map(Result::<_, Infallible>::Ok),
             Config::default(),
         ));
+        store_tx.apply_watcher_event(&watcher::Event::InitDone);
         for i in 0..items {
             let obj = ConfigMap {
                 metadata: ObjectMeta {
@@ -1506,7 +1773,7 @@ mod tests {
                 },
                 ..Default::default()
             };
-            store_tx.apply_watcher_event(&watcher::Event::Applied(obj.clone()));
+            store_tx.apply_watcher_event(&watcher::Event::Apply(obj.clone()));
             queue_tx.unbounded_send(ObjectRef::from_obj(&obj)).unwrap();
         }
 

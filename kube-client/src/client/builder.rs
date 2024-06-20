@@ -82,18 +82,28 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
         let mut connector = HttpConnector::new();
         connector.enforce_http(false);
 
-        #[cfg(feature = "socks5")]
-        if let Some(proxy_addr) = config.proxy_url.clone() {
-            let connector = hyper_socks2::SocksConnector {
-                proxy_addr,
-                auth: None,
-                connector,
-            };
+        match config.proxy_url.as_ref() {
+            #[cfg(feature = "socks5")]
+            Some(proxy_url) if proxy_url.scheme_str() == Some("socks5") => {
+                let connector = hyper_socks2::SocksConnector {
+                    proxy_addr: proxy_url.clone(),
+                    auth: None,
+                    connector,
+                };
 
-            return make_generic_builder(connector, config);
+                make_generic_builder(connector, config)
+            }
+
+            #[cfg(feature = "http-proxy")]
+            Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
+                let proxy = hyper_http_proxy::Proxy::new(hyper_http_proxy::Intercept::All, proxy_url.clone());
+                let connector = hyper_http_proxy::ProxyConnector::from_proxy_unsecured(connector, proxy);
+
+                make_generic_builder(connector, config)
+            }
+
+            _ => make_generic_builder(connector, config),
         }
-
-        make_generic_builder(connector, config)
     }
 }
 

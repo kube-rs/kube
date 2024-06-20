@@ -1,3 +1,4 @@
+[graph]
 # examples sometimes lag behind as they use higher level dependencies
 # we exclude these from the check because they are not part of our
 # actual dependency tree
@@ -6,7 +7,9 @@ exclude = ["kube-examples"]
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-vulnerability = "deny"
+# these are deprecated, but not super helpful for us
+# https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html#the-version-field-optional
+# remove them when we have to
 unmaintained = "warn"
 yanked = "warn"
 notice = "warn"
@@ -15,11 +18,7 @@ notice = "warn"
 [licenses]
 # See https://spdx.org/licenses/ for list of possible licenses
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
-
 confidence-threshold = 1.0
-copyleft = "deny"
-default = "deny"
-unlicensed = "deny"
 
 # We are beholden to https://github.com/cncf/foundation/blob/master/allowed-third-party-license-policy.md#approved-licenses-for-allowlist
 allow = [
@@ -28,6 +27,9 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "LicenseRef-ring",
+    # Blanket addition for Unicode-3.0 libs for optional features (affects many deps, but it's a very clean license)
+    # https://github.com/unicode-org/icu4x/blob/main/LICENSE
+    "Unicode-3.0",
 ]
 
 exceptions = [
@@ -36,8 +38,7 @@ exceptions = [
     # included in the application. We do not distribute those data files so
     # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
     # for more details.
-    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" }
-
+    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
 ]
 
 [[licenses.clarify]]

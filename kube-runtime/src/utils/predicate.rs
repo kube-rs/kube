@@ -225,7 +225,7 @@ pub(crate) mod tests {
         };
         let data = stream::iter([
             Ok(mkobj(1)),
-            Err(Error::TooManyObjects),
+            Err(Error::NoResourceVersion),
             Ok(mkobj(1)),
             Ok(mkobj(2)),
         ]);
@@ -238,7 +238,7 @@ pub(crate) mod tests {
         // Error passed through
         assert!(matches!(
             poll!(rx.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         // (no repeat mkobj(1) - same generation)
         // mkobj(2) next

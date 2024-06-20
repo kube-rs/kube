@@ -63,6 +63,15 @@ impl Visitor for StructuralSchemaRewriter {
                     .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
             }
         }
+
+        // As of version 1.30 Kubernetes does not support setting `uniqueItems` to `true`,
+        // so we need to remove this fields.
+        // Users can still set `x-kubernetes-list-type=set` in case they want the apiserver
+        // to do validation, but we can't make an assumption about the Set contents here.
+        // See https://kubernetes.io/docs/reference/using-api/server-side-apply/ for details.
+        if let Some(array) = &mut schema.array {
+            array.unique_items = None;
+        }
     }
 }
 

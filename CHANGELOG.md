@@ -5,21 +5,87 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.90.0...main
+ * see https://github.com/kube-rs/kube/compare/0.92.0...main
+
+[0.92.1](https://github.com/kube-rs/kube/releases/tag/0.92.1) / 2024-06-19
+===================
+## Bugfix Release
+This release fixes [#1524](https://github.com/kube-rs/kube/issues/1524); a regression from [0.92.0](https://github.com/kube-rs/kube/releases/tag/0.92.0) causing `watcher` to skip pages on initial list. See [#1525](https://github.com/kube-rs/kube/pull/1525).
+
+It is recommended to upgrade from 0.92.0.
+
+## What's Changed
+### Fixed
+* Fix watcher not fully paginating on Init by @clux in https://github.com/kube-rs/kube/pull/1525
+
+[0.92.0](https://github.com/kube-rs/kube/releases/tag/0.92.0) / 2024-06-12
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.92.0 -->
+## Runtime: Decreased Memory Usage from `watcher`
+Buffering of [initial pages](https://kubernetes.io/docs/reference/using-api/api-concepts/#retrieving-large-results-sets-in-chunks) / [init streams](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists) is no longer a mandatory process with [`watcher::Event`](https://docs.rs/kube/latest/kube/runtime/watcher/enum.Event.html) gaining new `Init`, `InitApply`, and `InitDone` events. These events are read on the [store side](https://github.com/kube-rs/kube/blob/0f6cb6f0ac695444f6789f98fa07073f4980a127/kube-runtime/src/reflector/store.rs#L99-L134) maintaining the atomicity/completeness guarantees for `reflector` and `Store` users.
+
+This constitutes a significant memory decrease for all `watcher` users, and it has more details in a new [kube.rs/blog post](https://kube.rs/blog/2024/06/11/watcher-memory-improvements/).
+
+The downside is a **breaking change** to [`watcher::Event`](https://docs.rs/kube/latest/kube/runtime/watcher/enum.Event.html). Plain usage of `watcher` / `reflector` / `Controller` should generally not need to change anything, but custom stores / matches on `watcher::Event` will [need an update](https://kube.rs/blog/2024/06/11/watcher-memory-improvements/#breaking-change). If you are writing custom stores, the new signals should be helpful for improved caching.
+
+Thanks to @fabriziosestito via [Kubewarden](https://www.kubewarden.io/) for https://github.com/kube-rs/kube/pull/1494 . Follow-ups for this feature: https://github.com/kube-rs/kube/pull/1499 and https://github.com/kube-rs/kube/pull/1504.
+
+## Client: HTTP Proxy Support
+Support is now introduced under the `http-proxy` [feature](https://kube.rs/features) pulling in [hyper-http-proxy](https://crates.io/crates/hyper-http-proxy) complementing the already existing `socks5` proxy feature.
+
+Thanks to @aviramha via [MetalBear](https://metalbear.co/) for the support in https://github.com/kube-rs/kube/pull/1496, with follow-ups https://github.com/kube-rs/kube/pull/1501 + https://github.com/kube-rs/kube/pull/1502
+
+## What's Changed
+### Added
+* Added support for HTTP proxy with hyper-proxy2 by @aviramha in https://github.com/kube-rs/kube/pull/1496
+* Implement client native object reference fetching by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1511
+### Changed
+* Reduce buffering between watcher and Store by @fabriziosestito in https://github.com/kube-rs/kube/pull/1494
+* Rename new watcher Event names and remove one that cannot happen by @clux in https://github.com/kube-rs/kube/pull/1499
+* Update `tokio-tungstenite` to 0.23 by @Toasterson in https://github.com/kube-rs/kube/pull/1509
+* Align `watcher::Event` init/page variants by @clux in https://github.com/kube-rs/kube/pull/1504
+* Update json-patch to 2.0.0 by @bobsongplus in https://github.com/kube-rs/kube/pull/1507
+### Fixed
+* Fix potentially panicing unchecked duration adds in runtime by @clux in https://github.com/kube-rs/kube/pull/1489
+* ObjectList now accepts null metadata like upstream k8s does by @aviramha in https://github.com/kube-rs/kube/pull/1492
+* rename http_proxy feature to http-proxy and add it to the umbrella crate by @aviramha in https://github.com/kube-rs/kube/pull/1501
+* move from `hyper-proxy2` to `hyper-http-proxy` by @aviramha in https://github.com/kube-rs/kube/pull/1502
+
+[0.91.0](https://github.com/kube-rs/kube/releases/tag/0.91.0) / 2024-05-06
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.91.0 -->
+## Kubernetes `v1_30` support via `k8s-openapi` [0.22](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.22.0)
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+## Unstable Stream Sharing
+A more complete implementation that allows sharing `watcher` streams between multiple `Controller`s (for https://github.com/kube-rs/kube/issues/1080) has been added under the `unstable-runtime` [feature-flag](https://kube.rs/stability/#unstable-features) in [#1449](https://github.com/kube-rs/kube/issues/1449) and [#1483](https://github.com/kube-rs/kube/issues/1483) by @mateiidavid. This represents the first usable implementation of shared streams (and replaces the older prototype part in [#1470](https://github.com/kube-rs/kube/issues/1470)). While some changes are expected, you can check the [shared_stream_controller example](https://github.com/kube-rs/kube/blob/main/examples/shared_stream_controllers.rs) for a high-level overview.
+
+## What's Changed
+### Added
+* Add shared stream interfaces by @mateiidavid in https://github.com/kube-rs/kube/pull/1449
+* Allow to create non-controller owner reference for resource by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1475
+* feat(runtime): support for owned shared streams by @mateiidavid in https://github.com/kube-rs/kube/pull/1483
+### Changed
+* Upgrade `k8s-openapi` to 0.22 and bump MK8SV to 1.25 by @clux in https://github.com/kube-rs/kube/pull/1485
+### Removed
+* Remove abandoned `StreamSubscribe` implementation by @clux in https://github.com/kube-rs/kube/pull/1470
+### Fixed
+* Include inner error message in Display for SerdeError by @XAMPPRocky in https://github.com/kube-rs/kube/pull/1481
+* Remove invalid `uniqueItems` property from CRDs when Sets are used  by @sbernauer in https://github.com/kube-rs/kube/pull/1484
 
 [0.90.0](https://github.com/kube-rs/kube/releases/tag/0.90.0) / 2024-04-03
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.90.0 -->
 ## Highlights
 ### [`kube::client::Body`](https://docs.rs/kube/latest/kube/client/struct.Body.html) Improvements
-- Unit testing helpers #1444 + #1445,
-- Accuracy; `size_hint` and `is_end_stream` implemented in #1452 + internal cleanups #1453 and #1455
+- Unit testing helpers [#1444](https://github.com/kube-rs/kube/issues/1444) + [#1445](https://github.com/kube-rs/kube/issues/1445),
+- Accuracy; `size_hint` and `is_end_stream` implemented in [#1452](https://github.com/kube-rs/kube/issues/1452) + internal cleanups [#1453](https://github.com/kube-rs/kube/issues/1453) and [#1455](https://github.com/kube-rs/kube/issues/1455)
 
 ### Dependency Cleanups
-- `rustls` to 0.23 in #1457
-- `once_cell` removed in #1447 (no longer needed)
-- `futures` feature prune in #1442
-- `chrono` features prune in #1448, and bump its min version pin in #1458
+- `rustls` to 0.23 in [#1457](https://github.com/kube-rs/kube/issues/1457)
+- `once_cell` removed in [#1447](https://github.com/kube-rs/kube/issues/1447) (no longer needed)
+- `futures` feature prune in [#1442](https://github.com/kube-rs/kube/issues/1442)
+- `chrono` features prune in [#1448](https://github.com/kube-rs/kube/issues/1448), and bump its min version pin in [#1458](https://github.com/kube-rs/kube/issues/1458)
 
 ## What's Changed
 ### Added

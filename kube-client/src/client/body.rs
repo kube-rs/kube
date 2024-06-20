@@ -54,11 +54,6 @@ impl Body {
     pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
         Ok(self.collect().await?.to_bytes())
     }
-
-    // Convert this body into `Stream` which iterates only data frame skipping the other kind of frame
-    pub(crate) fn into_data_stream(self) -> impl Stream<Item = Result<Bytes, crate::Error>> {
-        Box::pin(BodyStream::new(self).try_filter_map(|frame| async { Ok(frame.into_data().ok()) }))
-    }
 }
 
 impl From<Bytes> for Body {

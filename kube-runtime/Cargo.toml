@@ -30,11 +30,10 @@ rust.unsafe_code = "forbid"
 #rust.missing_docs = "warn"
 
 [dependencies]
-futures.workspace = true
-kube-client = { path = "../kube-client", version = "=0.90.0", default-features = false, features = ["jsonpatch", "client"] }
+futures = { workspace = true, features = ["async-await"] }
+kube-client = { path = "../kube-client", version = "=0.92.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative.workspace = true
 serde.workspace = true
-smallvec.workspace = true
 ahash.workspace = true
 parking_lot.workspace = true
 pin-project.workspace = true
@@ -42,6 +41,7 @@ tokio = { workspace = true, features = ["time"] }
 tokio-util = { workspace = true, features = ["time"] }
 tracing.workspace = true
 json-patch.workspace = true
+jsonptr.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 backoff.workspace = true

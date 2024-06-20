@@ -44,7 +44,7 @@ pub enum Error {
     HttpError(#[source] http::Error),
 
     /// Common error case when requesting parsing into own structs
-    #[error("Error deserializing response")]
+    #[error("Error deserializing response: {0}")]
     SerdeError(#[source] serde_json::Error),
 
     /// Failed to build request
@@ -86,6 +86,12 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
     #[error("auth error: {0}")]
     Auth(#[source] crate::client::AuthError),
+
+    /// Error resolving resource reference
+    #[cfg(feature = "unstable-client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
+    #[error("Reference resolve error: {0}")]
+    RefResolve(String),
 }
 
 #[derive(Error, Debug)]

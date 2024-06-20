@@ -54,7 +54,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{pin::pin, task::Poll, vec};
+    use std::{pin::pin, task::Poll};
 
     use super::{Error, Event, Reflect};
     use crate::reflector;
@@ -72,9 +72,12 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Applied(foo.clone())),
-            Err(Error::TooManyObjects),
-            Ok(Event::Restarted(vec![foo, bar])),
+            Ok(Event::Apply(foo.clone())),
+            Err(Error::NoResourceVersion),
+            Ok(Event::Init),
+            Ok(Event::InitApply(foo)),
+            Ok(Event::InitApply(bar)),
+            Ok(Event::InitDone),
         ]);
         let (reader, writer) = reflector::store();
 
@@ -83,18 +86,33 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         assert_eq!(reader.len(), 1);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
+        ));
+        assert_eq!(reader.len(), 1);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Init)))
         ));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Restarted(_))))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert_eq!(reader.len(), 1);
+        let restarted = poll!(reflect.next());
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert_eq!(reader.len(), 1);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitDone)))
+        ));
         assert_eq!(reader.len(), 2);
 
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
