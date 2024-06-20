@@ -38,3 +38,34 @@ pub use watcher::{metadata_watcher, watcher};
 #[cfg(feature = "unstable-runtime-predicates")]
 pub use utils::{predicates, Predicate};
 pub use wait::conditions;
+
+pub mod prelude {
+    //! A "prelude" for kube runtime crate. Reduces the number of duplicated imports.
+    //!
+    //! This prelude is similar to the standard library's prelude in that you'll
+    //! almost always want to import its entire contents, but unlike the
+    //! standard library's prelude you'll have to do so manually:
+    //!
+    //! ```
+    //! use kube_runtime::prelude::*;
+    //! ```
+    //!
+    //! The prelude may grow over time as additional items see ubiquitous use.
+
+    pub use crate::reflector::Lookup as _;
+}
+
+#[cfg(feature = "unstable-runtime-predicates")]
+pub mod prelude_unstable {
+    //! A "prelude" for unstable or optional features for kube runtime crate. Reduces the number of duplicated imports.
+    //!
+    //! Usage of this prelude through libraries and enabling features might cause optional import shadowing.
+    //!
+    //! ```
+    //! use kube_runtime::prelude_unstable::*;
+    //! ```
+    //!
+    //! Some or all parts of prelude content will be moved to stable once it is ready.
+
+    pub use crate::{prelude::*, utils::WatchStreamExt as _};
+}
