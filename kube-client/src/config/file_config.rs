@@ -195,6 +195,7 @@ pub struct AuthInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_certificate: Option<String>,
     /// PEM-encoded data from a client cert file for TLS. Overrides `client_certificate`
+    /// this key should be base64 encoded instead of the decode string data
     #[serde(rename = "client-certificate-data")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_certificate_data: Option<String>,
@@ -204,6 +205,7 @@ pub struct AuthInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_key: Option<String>,
     /// PEM-encoded data from a client key file for TLS. Overrides `client_key`
+    /// this key should be base64 encoded instead of the decode string data
     #[serde(rename = "client-key-data")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     #[serde(
