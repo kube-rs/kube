@@ -175,17 +175,29 @@ mod tests {
     use async_trait::async_trait;
     use futures::stream::{self, BoxStream};
     use kube_client::{Result, ListParams, WatchParams, ObjectList, WatchEvent};
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Clone)]
+    struct TestResource {
+        // fields here
+    }
 
     struct TestApiMode {
-        list_response: ObjectList<TestResource>,
+        list_response: Vec<ObjectList<TestResource>>,
         watch_response: Vec<Result<WatchEvent<TestResource>>>,
+        list_call_count: Arc<Mutex<usize>>,
+        watch_call_count: Arc<Mutex<usize>>,
+        selectors: Arc<Mutex<Vec<ListParams>>>,
     }
 
     impl TestApiMode {
-        fn new(list_response: ObjectList<TestResource>, watch_response: Vec<Result<WatchEvent<TestResource>>>) -> Self {
+        fn new(list_response: Vec<ObjectList<TestResource>>, watch_response: Vec<Result<WatchEvent<TestResource>>>) -> Self {
             TestApiMode {
                 list_response,
                 watch_response,
+                list_call_count: Arc::new(Mutex::new(0)),
+                watch_call_count: Arc::new(Mutex::new(0)),
+                selectors: Arc::new(Mutex::new(Vec::new())),
             }
         }
     }
@@ -194,25 +206,50 @@ mod tests {
     impl ApiMode for TestApiMode {
         type Value = TestResource;
 
-        async fn list(&self, _lp: &ListParams) -> Result<ObjectList<Self::Value>> {
-            Ok(self.list_response.clone())
+        async fn list(&self, lp: &ListParams) -> Result<ObjectList<Self::Value>> {
+            let mut count = self.list_call_count.lock().unwrap();
+            *count += 1;
+
+            let mut selectors = self.selectors.lock().unwrap();
+            selectors.push(lp.clone());
+
+            Ok(self.list_response.get(*count - 1).cloned().unwrap_or_else(|| ObjectList::default()))
         }
 
-        async fn watch(&self, _wp: &WatchParams, _version: &str) -> Result<BoxStream<'static, Result<WatchEvent<Self::Value>>>> {
+        async fn watch(&self, wp: &WatchParams, _version: &str) -> Result<BoxStream<'static, Result<WatchEvent<Self::Value>>>> {
+            let mut count = self.watch_call_count.lock().unwrap();
+            *count += 1;
             Ok(stream::iter(self.watch_response.clone()).boxed())
         }
     }
 
     #[tokio::test]
     async fn test_watcher_behavior() {
-        let list_response = ObjectList::<TestResource> { items: vec![/* ... */], metadata: /* ... */ };
-        let watch_response = vec![Ok(WatchEvent::Added(TestResource { /* ... */ }))];
+        // Simulate paginated list responses
+        let list_response = vec![
+            ObjectList::<TestResource> { items: vec![TestResource { /* fields */ }], metadata: Default::default() },
+            ObjectList::<TestResource> { items: vec![TestResource { /* fields */ }], metadata: Default::default() },
+        ];
+        let watch_response = vec![Ok(WatchEvent::Added(TestResource { /* fields */ }))];
 
         let api_mode = TestApiMode::new(list_response, watch_response);
-        
-        // Test the watcher behavior using the TestApiMode
-        // E.g., verify that the watcher calls list() and watch() correctly,
-        // handles pagination, desynchronization, etc.
+
+        // Create the watcher using the TestApiMode
+        // Verify the watcher behavior with assertions
+
+        // Verify list call count
+        let list_call_count = api_mode.list_call_count.lock().unwrap();
+        assert_eq!(*list_call_count, 2);
+
+        // Verify watch call count
+        let watch_call_count = api_mode.watch_call_count.lock().unwrap();
+        assert_eq!(*watch_call_count, 1);
+
+        // Verify selectors consistency
+        let selectors = api_mode.selectors.lock().unwrap();
+        assert!(selectors.iter().all(|lp| lp.selector == expected_selector));
+
+        // Additional assertions for union of list and watch events and desync handling
     }
 }
 
