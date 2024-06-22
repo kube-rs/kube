@@ -157,16 +157,63 @@ enum State<K> {
 
 /// Used to control whether the watcher receives the full object, or only the
 /// metadata
-#[async_trait]
-trait ApiMode {
-    type Value: Clone;
+// #[async_trait]
+// trait ApiMode {
+//     type Value: Clone;
 
-    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>>;
-    async fn watch(
-        &self,
-        wp: &WatchParams,
-        version: &str,
-    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>>;
+//     async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>>;
+//     async fn watch(
+//         &self,
+//         wp: &WatchParams,
+//         version: &str,
+//     ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>>;
+// }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use futures::stream::{self, BoxStream};
+    use kube_client::{Result, ListParams, WatchParams, ObjectList, WatchEvent};
+
+    struct TestApiMode {
+        list_response: ObjectList<TestResource>,
+        watch_response: Vec<Result<WatchEvent<TestResource>>>,
+    }
+
+    impl TestApiMode {
+        fn new(list_response: ObjectList<TestResource>, watch_response: Vec<Result<WatchEvent<TestResource>>>) -> Self {
+            TestApiMode {
+                list_response,
+                watch_response,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl ApiMode for TestApiMode {
+        type Value = TestResource;
+
+        async fn list(&self, _lp: &ListParams) -> Result<ObjectList<Self::Value>> {
+            Ok(self.list_response.clone())
+        }
+
+        async fn watch(&self, _wp: &WatchParams, _version: &str) -> Result<BoxStream<'static, Result<WatchEvent<Self::Value>>>> {
+            Ok(stream::iter(self.watch_response.clone()).boxed())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_watcher_behavior() {
+        let list_response = ObjectList::<TestResource> { items: vec![/* ... */], metadata: /* ... */ };
+        let watch_response = vec![Ok(WatchEvent::Added(TestResource { /* ... */ }))];
+
+        let api_mode = TestApiMode::new(list_response, watch_response);
+        
+        // Test the watcher behavior using the TestApiMode
+        // E.g., verify that the watcher calls list() and watch() correctly,
+        // handles pagination, desynchronization, etc.
+    }
 }
 
 /// A wrapper around the `Api` of a `Resource` type that when used by the
