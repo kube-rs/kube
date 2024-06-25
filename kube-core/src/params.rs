@@ -1,5 +1,5 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
-use crate::request::Error;
+use crate::{labels, request::Error};
 use serde::Serialize;
 
 /// Controls how the resource version parameter is applied for list calls
@@ -163,6 +163,20 @@ impl ListParams {
     #[must_use]
     pub fn labels(mut self, label_selector: &str) -> Self {
         self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// Configure typed label selectors
+    ///
+    /// Configure typed selectors from [`Selector`](crate::labels::Selector) and [`Expression`](crate::label::Expression) lists.
+    ///
+    /// ```
+    /// let selector: Selector = Expression::in("env", ["development", "sandbox"]).into();
+    /// let lp = ListParams::default().labels_from(selector);
+    ///```
+    #[must_use]
+    pub fn labels_from(mut self, selector: labels::Selector) -> Self {
+        self.label_selector = Some(selector.to_selector_string());
         self
     }
 
