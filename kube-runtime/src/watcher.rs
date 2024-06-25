@@ -710,7 +710,7 @@ where
 ///             Ok(())
 ///         })
 ///         .await?;
-///    Ok(())
+///     Ok(())
 /// }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
@@ -773,7 +773,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///             Ok(())
 ///         })
 ///         .await?;
-///    Ok(())
+///     Ok(())
 /// }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
