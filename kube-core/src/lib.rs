@@ -66,3 +66,26 @@ pub use error::ErrorResponse;
 
 mod version;
 pub use version::Version;
+
+pub mod prelude {
+    //! A "prelude" for kube core crate. Reduces the number of duplicated imports.
+    //!
+    //! This prelude is similar to the standard library's prelude in that you'll
+    //! almost always want to import its entire contents, but unlike the
+    //! standard library's prelude you'll have to do so manually:
+    //!
+    //! ```
+    //! use kube_core::prelude::*;
+    //! ```
+    //!
+    //! The prelude may grow over time as additional items see ubiquitous use.
+
+
+    #[allow(unreachable_pub)] pub use crate::PartialObjectMetaExt as _;
+    pub use crate::{
+        crd::CustomResourceExt as _,
+        object::{HasSpec as _, HasStatus as _},
+        util::Restart as _,
+        Resource as _, ResourceExt as _,
+    };
+}

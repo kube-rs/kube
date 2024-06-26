@@ -123,6 +123,44 @@ pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
 /// Re-exports from kube_core
 pub use kube_core as core;
 
+pub mod prelude {
+    //! A "prelude" for kube client crate. Reduces the number of duplicated imports.
+    //!
+    //! This prelude is similar to the standard library's prelude in that you'll
+    //! almost always want to import its entire contents, but unlike the
+    //! standard library's prelude you'll have to do so manually:
+    //!
+    //! ```
+    //! use kube_client::prelude::*;
+    //! ```
+    //!
+    //! The prelude may grow over time as additional items see ubiquitous use.
+
+    #[allow(unreachable_pub)] pub use crate::client::ConfigExt as _;
+    pub use crate::{
+        api::{Ephemeral as _, Evict as _, Log as _},
+        core::prelude::*,
+    };
+}
+
+#[cfg(any(feature = "ws", feature = "unstable-client"))]
+pub mod prelude_unstable {
+    //! A "prelude" for unstable or optional features for kube client crate. Reduces the number of duplicated imports.
+    //!
+    //! Usage of this prelude through libraries and enabling features might cause optional import shadowing.
+    //!
+    //! ```
+    //! use kube_client::prelude_unstable::*;
+    //! ```
+    //!
+    //! Some or all parts of prelude content will be moved to stable once it is ready.
+
+    #[cfg(feature = "ws")]
+    pub use crate::api::{Attach as _, Execute as _, Portforward as _};
+    #[cfg(feature = "unstable-client")]
+    pub use crate::{client::scope::NamespacedRef, prelude::*};
+}
+
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube-client --lib features=rustls-tls,ws -- --ignored`
 #[cfg(all(feature = "client", feature = "config"))]
