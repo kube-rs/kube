@@ -22,6 +22,7 @@ pub mod controller;
 pub mod events;
 
 pub mod finalizer;
+#[cfg(feature = "unstable-metrics")] pub mod metrics;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;

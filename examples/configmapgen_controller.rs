@@ -103,7 +103,19 @@ async fn main() -> Result<()> {
     });
 
     // limit the controller to running a maximum of two concurrent reconciliations
-    let config = Config::default().concurrency(2);
+    let metrics = Arc::new(kube::runtime::metrics::Metrics::default());
+    let config = Config::default()
+        .concurrency(2)
+        .metrics(metrics.clone())
+        .debounce(Duration::from_secs(3));
+    tokio::spawn(async move {
+        // Show metric state every 5 seconds
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            let state = metrics.scheduler.read();
+            info!("Current metrics: {state:?}");
+        }
+    });
 
     Controller::new(cmgs, watcher::Config::default())
         .owns(cms, watcher::Config::default())

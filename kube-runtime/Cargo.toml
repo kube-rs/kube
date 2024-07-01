@@ -17,6 +17,7 @@ unstable-runtime-subscribe = []
 unstable-runtime-predicates = []
 unstable-runtime-stream-control = []
 unstable-runtime-reconcile-on = []
+unstable-metrics = []
 
 [package.metadata.docs.rs]
 features = ["k8s-openapi/latest", "unstable-runtime"]
