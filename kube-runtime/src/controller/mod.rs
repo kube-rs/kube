@@ -353,6 +353,11 @@ where
         channel::mpsc::channel::<ScheduleRequest<ReconcileRequest<K>>>(APPLIER_REQUEUE_BUF_SIZE);
     let error_policy = Arc::new(error_policy);
     let delay_store = store.clone();
+
+    #[cfg(feature = "unstable-metrics")]
+    let metrics = config.metrics.clone();
+
+    // TODO: how to share Metrics with debounced_scheduler?
     // Create a stream of ObjectRefs that need to be reconciled
     trystream_try_via(
         // input: stream combining scheduled tasks and user specified inputs event
@@ -378,6 +383,9 @@ where
         // all the Oks from the select gets passed through the scheduler stream, and are then executed
         move |s| {
             Runner::new(
+                #[cfg(feature = "unstable-metrics")]
+                debounced_scheduler(s, config.debounce).with_metrics(metrics.scheduler.clone()),
+                #[cfg(not(feature = "unstable-metrics"))]
                 debounced_scheduler(s, config.debounce),
                 config.concurrency,
                 move |request| {
@@ -515,6 +523,8 @@ where
 pub struct Config {
     debounce: Duration,
     concurrency: u16,
+    #[cfg(feature = "unstable-metrics")]
+    metrics: Arc<crate::metrics::Metrics>,
 }
 
 impl Config {
@@ -546,6 +556,13 @@ impl Config {
     #[must_use]
     pub fn concurrency(mut self, concurrency: u16) -> Self {
         self.concurrency = concurrency;
+        self
+    }
+
+    /// A loose idea of exposing metrics...
+    #[cfg(feature = "unstable-metrics")]
+    pub fn metrics(mut self, metrics: Arc<crate::metrics::Metrics>) -> Self {
+        self.metrics = metrics;
         self
     }
 }

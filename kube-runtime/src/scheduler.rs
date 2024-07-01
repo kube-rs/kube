@@ -1,12 +1,15 @@
 //! Delays and deduplicates [`Stream`](futures::stream::Stream) items
 
+#[cfg(feature = "unstable-metrics")] use crate::metrics::SchedulerMetrics;
 use futures::{stream::Fuse, Stream, StreamExt};
 use hashbrown::{hash_map::Entry, HashMap};
+use parking_lot::RwLock;
 use pin_project::pin_project;
 use std::{
     collections::HashSet,
     hash::Hash,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -51,6 +54,8 @@ pub struct Scheduler<T, R> {
     /// for a request to be emitted, if the scheduler is "uninterrupted" for the configured
     /// debounce period. Its primary purpose to deduplicate requests that expire instantly.
     debounce: Duration,
+    #[cfg(feature = "unstable-metrics")]
+    metrics: Arc<RwLock<SchedulerMetrics>>,
 }
 
 impl<T, R: Stream> Scheduler<T, R> {
@@ -61,7 +66,15 @@ impl<T, R: Stream> Scheduler<T, R> {
             pending: HashSet::new(),
             requests: requests.fuse(),
             debounce,
+            #[cfg(feature = "unstable-metrics")]
+            metrics: Default::default(),
         }
+    }
+
+    #[cfg(feature = "unstable-metrics")]
+    pub(crate) fn with_metrics(mut self, metrics: Arc<RwLock<SchedulerMetrics>>) -> Self {
+        self.metrics = metrics;
+        self
     }
 }
 
@@ -74,6 +87,9 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             // Message is already pending, so we can't even expedite it
             return;
         }
+        #[cfg(feature = "unstable-metrics")]
+        self.update_metrics();
+
         let next_time = request
             .run_at
             .checked_add(*self.debounce)
@@ -140,6 +156,12 @@ impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
             self.pending.insert(msg);
         }
     }
+
+    /// Update metrics when configured
+    #[cfg(feature = "unstable-metrics")]
+    pub(crate) fn update_metrics(&mut self) {
+        self.metrics.write().queue_depth = self.queue.len();
+    }
 }
 
 /// See [`Scheduler::hold`]
@@ -167,6 +189,8 @@ where
         }
 
         scheduler.pop_queue_message_into_pending(cx);
+        #[cfg(feature = "unstable-metrics")]
+        scheduler.update_metrics();
         Poll::Pending
     }
 }
