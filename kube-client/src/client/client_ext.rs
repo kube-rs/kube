@@ -243,8 +243,9 @@ pub enum NamespaceError {
 /// ```no_run
 /// # use k8s_openapi::api::core::v1::Pod;
 /// # use k8s_openapi::api::core::v1::Service;
-/// # use kube::client::scope::{Cluster, Namespace};
-/// # use kube::{ResourceExt, api::ListParams};
+/// # use kube::client::scope::{Namespace, Cluster};
+/// # use kube::prelude::*;
+/// # use kube::api::ListParams;
 /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
 /// # let client: kube::Client = todo!();
 /// let lp = ListParams::default();
@@ -264,8 +265,9 @@ impl Client {
     /// ```no_run
     /// # use k8s_openapi::api::rbac::v1::ClusterRole;
     /// # use k8s_openapi::api::core::v1::Service;
-    /// # use kube::client::scope::{Cluster, Namespace};
-    /// # use kube::{ResourceExt, api::GetParams};
+    /// # use kube::client::scope::{Namespace, Cluster};
+    /// # use kube::prelude::*;
+    /// # use kube::api::GetParams;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
     /// let cr = client.get::<ClusterRole>("cluster-admin", &Cluster).await?;
@@ -296,8 +298,8 @@ impl Client {
     /// # use k8s_openapi::api::core::v1::ObjectReference;
     /// # use k8s_openapi::api::core::v1::LocalObjectReference;
     /// # use k8s_openapi::api::core::v1::{Node, Pod};
-    /// # use kube::{Resource, ResourceExt, api::GetParams};
-    /// # use kube::client::scope::NamespacedRef;
+    /// # use kube::api::GetParams;
+    /// # use kube::prelude::*;
     /// # use kube::api::DynamicObject;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
@@ -355,8 +357,9 @@ impl Client {
     /// ```no_run
     /// # use k8s_openapi::api::core::v1::Pod;
     /// # use k8s_openapi::api::core::v1::Service;
-    /// # use kube::client::scope::{Cluster, Namespace};
-    /// # use kube::{ResourceExt, api::ListParams};
+    /// # use kube::client::scope::{Namespace, Cluster};
+    /// # use kube::prelude::*;
+    /// # use kube::api::ListParams;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
     /// let lp = ListParams::default();
@@ -400,14 +403,17 @@ fn url_path(r: &ApiResource, namespace: Option<String>) -> String {
 
 #[cfg(test)]
 mod test {
-    use crate::client::client_ext::NamespacedRef;
-
-    use super::{
-        scope::{Cluster, Namespace},
-        Client, ListParams,
+    use crate::{
+        client::{
+            client_ext::NamespacedRef as _,
+            scope::{Cluster, Namespace},
+        },
+        Client,
     };
+
+    use super::ListParams;
     use k8s_openapi::api::core::v1::LocalObjectReference;
-    use kube_core::{DynamicObject, Resource, ResourceExt};
+    use kube_core::{DynamicObject, Resource as _, ResourceExt as _};
 
     #[tokio::test]
     #[ignore = "needs cluster (will list/get namespaces, pods, jobs, svcs, clusterroles)"]

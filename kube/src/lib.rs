@@ -181,6 +181,29 @@ pub use kube_core as core;
 #[cfg(all(feature = "derive", feature = "runtime"))]
 mod mock_tests;
 
+pub mod prelude {
+    //! A "prelude" for kube client crate. Reduces the number of duplicated imports.
+    //!
+    //! This prelude is similar to the standard library's prelude in that you'll
+    //! almost always want to import its entire contents, but unlike the
+    //! standard library's prelude you'll have to do so manually:
+    //!
+    //! ```
+    //! use kube::prelude::*;
+    //! ```
+    //!
+    //! The prelude may grow over time as additional items see ubiquitous use.
+
+    #[allow(unreachable_pub)] pub use crate::client::ConfigExt as _;
+
+    #[cfg(feature = "unstable-client")] pub use crate::client::scope::NamespacedRef;
+
+    #[allow(unreachable_pub)] pub use crate::core::PartialObjectMetaExt as _;
+    pub use crate::{core::crd::CustomResourceExt as _, Resource as _, ResourceExt as _};
+
+    #[cfg(feature = "runtime")] pub use crate::runtime::utils::WatchStreamExt as _;
+}
+
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
 #[cfg(test)]
