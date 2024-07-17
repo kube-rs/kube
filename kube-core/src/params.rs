@@ -1,5 +1,5 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
-use crate::{labels, request::Error};
+use crate::{request::Error, Selector};
 use serde::Serialize;
 
 /// Controls how the resource version parameter is applied for list calls
@@ -168,20 +168,21 @@ impl ListParams {
 
     /// Configure typed label selectors
     ///
-    /// Configure typed selectors from [`Selector`](crate::labels::Selector) and [`Expression`](crate::label::Expression) lists.
+    /// Configure typed selectors from [`Selector`](crate::Selector) and [`Expression`](crate::Expression) lists.
     ///
     /// ```
     /// use kube::api::ListParams;
-    /// use kube_core::labels::{Expression, Selector};
+    /// use kube_core::{Expression, Selector};
     /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
     /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
-    /// let lp = ListParams::default().labels_from(selector);
+    /// let lp = ListParams::default().labels_from(&selector);
+    /// let lp = ListParams::default().labels_from(&Expression::Exists("foo".into()).into());
     /// // Alternatively the raw LabelSelector is accepted
-    /// let lp = ListParams::default().labels_from(LabelSelector::default().into());
+    /// let lp = ListParams::default().labels_from(&LabelSelector::default().into());
     ///```
     #[must_use]
-    pub fn labels_from(mut self, selector: labels::Selector) -> Self {
-        self.label_selector = Some(selector.to_selector_string());
+    pub fn labels_from(mut self, selector: &Selector) -> Self {
+        self.label_selector = Some(selector.to_string());
         self
     }
 
@@ -445,6 +446,26 @@ impl WatchParams {
     #[must_use]
     pub fn labels(mut self, label_selector: &str) -> Self {
         self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// Configure typed label selectors
+    ///
+    /// Configure typed selectors from [`Selector`](crate::Selector) and [`Expression`](crate::Expression) lists.
+    ///
+    /// ```
+    /// use kube::api::WatchParams;
+    /// use kube_core::{Expression, Selector};
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+    /// let wp = WatchParams::default().labels_from(&selector);
+    /// let wp = WatchParams::default().labels_from(&Expression::Exists("foo".into()).into());
+    /// // Alternatively the raw LabelSelector is accepted
+    /// let wp = WatchParams::default().labels_from(&LabelSelector::default().into());
+    ///```
+    #[must_use]
+    pub fn labels_from(mut self, selector: &Selector) -> Self {
+        self.label_selector = Some(selector.to_string());
         self
     }
 

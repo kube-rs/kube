@@ -1,25 +1,122 @@
 #![allow(missing_docs)]
+use core::fmt;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, LabelSelectorRequirement};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::PartialEq,
     collections::{BTreeMap, BTreeSet},
+    fmt::Display,
     iter::FromIterator,
+    option::IntoIter,
 };
 
+use crate::ResourceExt;
+
 // local type aliases
-type Map = BTreeMap<String, String>;
 type Expressions = Vec<Expression>;
+
+/// Extensions to [`ResourceExt`](crate::ResourceExt)
+/// Helper methods for resource selection based on provided Selector
+pub trait SelectorExt {
+    fn selector_map(&self) -> &BTreeMap<String, String>;
+
+    /// Perform a match on the resource using Matcher trait
+    ///
+    /// ```
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    /// use kube_core::SelectorExt;
+    /// use kube_core::Expression;
+    /// let matches = Pod::default().selector_matches(&LabelSelector::default());
+    /// assert!(matches);
+    /// let matches = Pod::default().selector_matches(&Expression::Exists("foo".into()));
+    /// assert!(!matches);
+    /// ```
+    fn selector_matches(&self, selector: &impl Matcher) -> bool {
+        selector.matches(self.selector_map())
+    }
+}
+
+impl<R: ResourceExt> SelectorExt for R {
+    fn selector_map(&self) -> &BTreeMap<String, String> {
+        self.labels()
+    }
+}
+
+/// Matcher trait for implementing alternalive Selectors
+pub trait Matcher {
+    // Perform a match check on the resource labels
+    fn matches(&self, labels: &BTreeMap<String, String>) -> bool;
+}
 
 /// A selector expression with existing operations
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Expression {
+    /// Key exists and in set:
+    ///
+    /// ```
+    /// use kube_core::Expression;
+    ///
+    /// let exp = Expression::In("foo".into(), ["bar".into(), "baz".into()].into()).to_string();
+    /// assert_eq!(exp, "foo in (bar,baz)");
+    /// let exp = Expression::In("foo".into(), vec!["bar".into(), "baz".into()].into_iter().collect()).to_string();
+    /// assert_eq!(exp, "foo in (bar,baz)");
+    /// ```
     In(String, BTreeSet<String>),
+
+    /// Key does not exists or not in set:
+    ///
+    /// ```
+    /// use kube_core::Expression;
+    ///
+    /// let exp = Expression::NotIn("foo".into(), ["bar".into(), "baz".into()].into()).to_string();
+    /// assert_eq!(exp, "foo notin (bar,baz)");
+    /// let exp = Expression::NotIn("foo".into(), vec!["bar".into(), "baz".into()].into_iter().collect()).to_string();
+    /// assert_eq!(exp, "foo notin (bar,baz)");
+    /// ```
     NotIn(String, BTreeSet<String>),
+
+    /// Key exists and is equal:
+    ///
+    /// ```
+    /// use kube_core::Expression;
+    ///
+    /// let exp = Expression::Equal("foo".into(), "bar".into()).to_string();
+    /// assert_eq!(exp, "foo=bar")
+    /// ```
     Equal(String, String),
+
+    /// Key does not exists or is not equal:
+    ///
+    /// ```
+    /// use kube_core::Expression;
+    ///
+    /// let exp = Expression::NotEqual("foo".into(), "bar".into()).to_string();
+    /// assert_eq!(exp, "foo!=bar")
+    /// ```
     NotEqual(String, String),
+
+    /// Key exists:
+    ///
+    /// ```
+    /// use kube_core::Expression;
+    ///
+    /// let exp = Expression::Exists("foo".into()).to_string();
+    /// assert_eq!(exp, "foo")
+    /// ```
     Exists(String),
+
+    /// Key does not exist:
+    ///
+    /// ```
+    /// use kube_core::Expression;
+    ///
+    /// let exp = Expression::DoesNotExist("foo".into()).to_string();
+    /// assert_eq!(exp, "!foo")
+    /// ```
     DoesNotExist(String),
+
+    /// Invalid combination. Always evaluates to false.
     Invalid,
 }
 
@@ -34,19 +131,8 @@ impl Selector {
     }
 
     /// Create a selector from a map of key=value label matches
-    fn from_map(map: Map) -> Self {
+    fn from_map(map: BTreeMap<String, String>) -> Self {
         Self(map.into_iter().map(|(k, v)| Expression::Equal(k, v)).collect())
-    }
-
-    /// Convert a selector to a string for the API
-    pub fn to_selector_string(&self) -> String {
-        let selectors: Vec<String> = self
-            .0
-            .iter()
-            .filter(|&e| e != &Expression::Invalid)
-            .map(|e| e.to_string())
-            .collect();
-        selectors.join(",")
     }
 
     /// Indicates whether this label selector matches all pods
@@ -54,7 +140,35 @@ impl Selector {
         self.0.is_empty()
     }
 
-    pub fn matches(&self, labels: &Map) -> bool {
+    /// Extend the list of expressions for the selector
+    ///
+    /// ```
+    /// use kube_core::Selector;
+    /// use kube_core::Expression;
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    ///
+    /// let label_selector: Selector = LabelSelector::default().into();
+    /// let mut selector = Selector::default();
+    /// selector.extend(Expression::Equal("environment".into(), "production".into()));
+    /// selector.extend([Expression::Exists("bar".into()), Expression::Exists("foo".into())].into_iter());
+    /// selector.extend(label_selector);
+    /// ```
+    pub fn extend(&mut self, exprs: impl IntoIterator<Item = Expression>) -> &Self {
+        self.0.extend(exprs);
+        self
+    }
+}
+
+impl Matcher for LabelSelector {
+    fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
+        let selector: Selector = self.clone().into();
+        selector.matches(labels)
+    }
+}
+
+impl Matcher for Selector {
+    // Perform a match check on the resource labels
+    fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
         for expr in self.0.iter() {
             if !expr.matches(labels) {
                 return false;
@@ -64,33 +178,8 @@ impl Selector {
     }
 }
 
-// === Expression ===
-
-impl Expression {
-    /// Perform conversion to string
-    pub fn to_string(&self) -> String {
-        match self {
-            Expression::In(key, values) => {
-                format!(
-                    "{key} in ({})",
-                    values.into_iter().cloned().collect::<Vec<_>>().join(",")
-                )
-            }
-            Expression::NotIn(key, values) => {
-                format!(
-                    "{key} notin ({})",
-                    values.into_iter().cloned().collect::<Vec<_>>().join(",")
-                )
-            }
-            Expression::Equal(key, value) => format!("{key}={value}"),
-            Expression::NotEqual(key, value) => format!("{key}!={value}"),
-            Expression::Exists(key) => format!("{key}"),
-            Expression::DoesNotExist(key) => format!("!{key}"),
-            Expression::Invalid => "".into(),
-        }
-    }
-
-    fn matches(&self, labels: &Map) -> bool {
+impl Matcher for Expression {
+    fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
         match self {
             Expression::In(key, values) => match labels.get(key) {
                 Some(v) => values.contains(v),
@@ -109,8 +198,59 @@ impl Expression {
     }
 }
 
+impl Display for Expression {
+    /// Perform conversion to string
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expression::In(key, values) => {
+                write!(
+                    f,
+                    "{key} in ({})",
+                    values.iter().cloned().collect::<Vec<_>>().join(",")
+                )
+            }
+            Expression::NotIn(key, values) => {
+                write!(
+                    f,
+                    "{key} notin ({})",
+                    values.iter().cloned().collect::<Vec<_>>().join(",")
+                )
+            }
+            Expression::Equal(key, value) => write!(f, "{key}={value}"),
+            Expression::NotEqual(key, value) => write!(f, "{key}!={value}"),
+            Expression::Exists(key) => write!(f, "{key}"),
+            Expression::DoesNotExist(key) => write!(f, "!{key}"),
+            Expression::Invalid => Ok(()),
+        }
+    }
+}
 
-// convenience conversions for Selector
+impl Display for Selector {
+    /// Convert a selector to a string for the API
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let selectors: Vec<String> = self.0.iter().map(|e| e.to_string()).collect();
+        write!(f, "{}", selectors.join(","))
+    }
+}
+// convenience conversions for Selector and Expression
+
+impl IntoIterator for Expression {
+    type IntoIter = IntoIter<Self::Item>;
+    type Item = Self;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Some(self).into_iter()
+    }
+}
+
+impl IntoIterator for Selector {
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = Expression;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
 
 impl FromIterator<(String, String)> for Selector {
     fn from_iter<T: IntoIterator<Item = (String, String)>>(iter: T) -> Self {
@@ -148,7 +288,7 @@ impl From<LabelSelector> for Selector {
         };
         let mut equality: Selector = value
             .match_labels
-            .and_then(|labels| Some(labels.into_iter().collect()))
+            .map(|labels| labels.into_iter().collect())
             .unwrap_or_default();
         equality.0.extend(expressions);
         equality
@@ -393,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    fn test_to_selector_string() {
+    fn test_to_string() {
         let selector = Selector(vec![
             Expression::In("foo".into(), ["bar".into(), "baz".into()].into()),
             Expression::NotIn("foo".into(), ["bar".into(), "baz".into()].into()),
@@ -402,7 +542,7 @@ mod tests {
             Expression::Exists("foo".into()),
             Expression::DoesNotExist("foo".into()),
         ])
-        .to_selector_string();
+        .to_string();
 
         assert_eq!(
             selector,

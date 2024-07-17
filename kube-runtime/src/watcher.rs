@@ -9,7 +9,7 @@ use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
-    core::{metadata::PartialObjectMeta, ObjectList},
+    core::{metadata::PartialObjectMeta, ObjectList, Selector},
     error::ErrorResponse,
     Api, Error as ClientErr,
 };
@@ -328,6 +328,26 @@ impl Config {
     #[must_use]
     pub fn labels(mut self, label_selector: &str) -> Self {
         self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// Configure typed label selectors
+    ///
+    /// Configure typed selectors from [`Selector`](kube_client::core::Selector) and [`Expression`](kube_client::core::Expression) lists.
+    ///
+    /// ```
+    /// use kube_runtime::watcher::Config;
+    /// use kube_client::core::{Expression, Selector};
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+    /// let cfg = Config::default().labels_from(&selector);
+    /// let cfg = Config::default().labels_from(&Expression::Exists("foo".into()).into());
+    /// // Alternatively the raw LabelSelector is accepted
+    /// let cfg = Config::default().labels_from(&LabelSelector::default().into());
+    ///```
+    #[must_use]
+    pub fn labels_from(mut self, selector: &Selector) -> Self {
+        self.label_selector = Some(selector.to_string());
         self
     }
 
