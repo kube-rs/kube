@@ -171,8 +171,13 @@ impl ListParams {
     /// Configure typed selectors from [`Selector`](crate::labels::Selector) and [`Expression`](crate::label::Expression) lists.
     ///
     /// ```
-    /// let selector: Selector = Expression::in("env", ["development", "sandbox"]).into();
+    /// use kube::api::ListParams;
+    /// use kube_core::labels::{Expression, Selector};
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
     /// let lp = ListParams::default().labels_from(selector);
+    /// // Alternatively the raw LabelSelector is accepted
+    /// let lp = ListParams::default().labels_from(LabelSelector::default().into());
     ///```
     #[must_use]
     pub fn labels_from(mut self, selector: labels::Selector) -> Self {

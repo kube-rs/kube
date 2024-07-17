@@ -1,157 +1,114 @@
-#![allow(missing_docs)] // for now! prototyping
+#![allow(missing_docs)]
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, LabelSelectorRequirement};
 use serde::{Deserialize, Serialize};
-//use schemars::JsonSchema;
 use std::{
     cmp::PartialEq,
     collections::{BTreeMap, BTreeSet},
     iter::FromIterator,
 };
 
-/// Labels as extracted from a container
-/// TODO: users don't get the linkerd label type easily, rethink this...
-//#[derive(Clone, Debug, Default)]
-//pub struct Labels(Arc<Map>);
-// TODO: why is this Arc wrapped?
-// TODO: to_string impl
-
-// TODO: add impls on Labels to add in Expressions
-
 // local type aliases
 type Map = BTreeMap<String, String>;
 type Expressions = Vec<Expression>;
 
-// TODO cfg attr jsonschema?
+/// A selector expression with existing operations
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct Expression {
-    key: String,
-    operator: Operator,
-    values: Option<BTreeSet<String>>,
+pub enum Expression {
+    In(String, BTreeSet<String>),
+    NotIn(String, BTreeSet<String>),
+    Equal(String, String),
+    NotEqual(String, String),
+    Exists(String),
+    DoesNotExist(String),
+    Invalid,
 }
 
-impl Expression {
-    /// Create an "key in (values,..)" expression
-    pub fn key_in(key: String, values: BTreeSet<String>) -> Self {
-        Self {
-            key,
-            operator: Operator::In,
-            values: Some(values),
-        }
-    }
-
-    // TODO: more builders here
-
-    // need a serializer for this also..
-    pub fn to_string(&self) -> String {
-        if let Some(values) = &self.values {
-            let mut set_str = String::new(); // impl on Values?
-            for v in values {
-                set_str.push_str(v);
-                set_str.push(',');
-            }
-            // TODO: trailing ,
-            format!("{} {:?} ({set_str})", self.key, self.operator)
-        } else {
-            format!("{} {:?}", self.key, self.operator)
-        }
-    }
-}
-
-/// A selector operator
-///
-/// TODO: make this smarter? embed values in In/NotIn variants?
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub enum Operator {
-    In,
-    NotIn,
-    Exists,
-    DoesNotExist,
-}
-
-/// Selects a set of pods that expose a server
-///
-/// The result of `match_labels` and `match_expressions` are ANDed.
+/// Perform selection on a list of expressions
 #[derive(Clone, Debug, Eq, PartialEq, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Selector {
-    match_labels: Option<Map>,
-    match_expressions: Option<Expressions>,
-}
+pub struct Selector(Expressions);
 
 impl Selector {
-    #[cfg(test)]
-    fn new(labels: Map, exprs: Expressions) -> Self {
-        Self {
-            match_labels: Some(labels),
-            match_expressions: Some(exprs),
-        }
-    }
-
     /// Create a selector from a vector of expressions
     fn from_expressions(exprs: Expressions) -> Self {
-        Self {
-            match_labels: None,
-            match_expressions: Some(exprs),
-        }
+        Self(exprs)
     }
 
     /// Create a selector from a map of key=value label matches
     fn from_map(map: Map) -> Self {
-        Self {
-            match_labels: Some(map),
-            match_expressions: None,
-        }
+        Self(map.into_iter().map(|(k, v)| Expression::Equal(k, v)).collect())
     }
 
     /// Convert a selector to a string for the API
     pub fn to_selector_string(&self) -> String {
-        let mut sel = String::new();
-        if let Some(labels) = &self.match_labels {
-            for (k, v) in labels {
-                sel.push_str(&k);
-                sel.push('=');
-                sel.push_str(&v);
-                sel.push(',');
-            }
-        }
-        if let Some(exprs) = &self.match_expressions {
-            for exp in exprs {
-                sel.push_str(&exp.to_string());
-                sel.push(',');
-            }
-        }
-        // TODO: trim trailing ','
-        sel
+        let selectors: Vec<String> = self
+            .0
+            .iter()
+            .filter(|&e| e != &Expression::Invalid)
+            .map(|e| e.to_string())
+            .collect();
+        selectors.join(",")
     }
 
     /// Indicates whether this label selector matches all pods
     pub fn selects_all(&self) -> bool {
-        match (self.match_labels.as_ref(), self.match_expressions.as_ref()) {
-            (None, None) => true,
-            (Some(l), None) => l.is_empty(),
-            (None, Some(e)) => e.is_empty(),
-            (Some(l), Some(e)) => l.is_empty() && e.is_empty(),
-        }
+        self.0.is_empty()
     }
 
-    // users don't get the linkerd label type easily, rethink this...
-    /*
-    pub fn matches(&self, labels: &Labels) -> bool {
-        for expr in self.match_expressions.iter().flatten() {
-            if !expr.matches(labels.as_ref()) {
+    pub fn matches(&self, labels: &Map) -> bool {
+        for expr in self.0.iter() {
+            if !expr.matches(labels) {
                 return false;
-            }
-        }
-        if let Some(match_labels) = self.match_labels.as_ref() {
-            for (k, v) in match_labels {
-                if labels.0.get(k) != Some(v) {
-                    return false;
-                }
             }
         }
         true
     }
-    */
 }
+
+// === Expression ===
+
+impl Expression {
+    /// Perform conversion to string
+    pub fn to_string(&self) -> String {
+        match self {
+            Expression::In(key, values) => {
+                format!(
+                    "{key} in ({})",
+                    values.into_iter().cloned().collect::<Vec<_>>().join(",")
+                )
+            }
+            Expression::NotIn(key, values) => {
+                format!(
+                    "{key} notin ({})",
+                    values.into_iter().cloned().collect::<Vec<_>>().join(",")
+                )
+            }
+            Expression::Equal(key, value) => format!("{key}={value}"),
+            Expression::NotEqual(key, value) => format!("{key}!={value}"),
+            Expression::Exists(key) => format!("{key}"),
+            Expression::DoesNotExist(key) => format!("!{key}"),
+            Expression::Invalid => "".into(),
+        }
+    }
+
+    fn matches(&self, labels: &Map) -> bool {
+        match self {
+            Expression::In(key, values) => match labels.get(key) {
+                Some(v) => values.contains(v),
+                None => false,
+            },
+            Expression::NotIn(key, values) => match labels.get(key) {
+                Some(v) => !values.contains(v),
+                None => true,
+            },
+            Expression::Exists(key) => labels.contains_key(key),
+            Expression::DoesNotExist(key) => !labels.contains_key(key),
+            Expression::Equal(key, value) => labels.get(key) == Some(value),
+            Expression::NotEqual(key, value) => labels.get(key) != Some(value),
+            Expression::Invalid => false,
+        }
+    }
+}
+
 
 // convenience conversions for Selector
 
@@ -177,80 +134,86 @@ impl FromIterator<Expression> for Selector {
     }
 }
 
-/*
-// === Labels ===
-
-impl From<Option<Map>> for Labels {
-    #[inline]
-    fn from(labels: Option<Map>) -> Self {
-        labels.unwrap_or_default().into()
+impl From<Expression> for Selector {
+    fn from(value: Expression) -> Self {
+        Self(vec![value])
     }
 }
 
-impl From<Map> for Labels {
-    #[inline]
-    fn from(labels: Map) -> Self {
-        Self(Arc::new(labels))
+impl From<LabelSelector> for Selector {
+    fn from(value: LabelSelector) -> Self {
+        let expressions = match value.match_expressions {
+            Some(requirements) => requirements.into_iter().map(Into::into).collect(),
+            None => vec![],
+        };
+        let mut equality: Selector = value
+            .match_labels
+            .and_then(|labels| Some(labels.into_iter().collect()))
+            .unwrap_or_default();
+        equality.0.extend(expressions);
+        equality
     }
 }
 
-impl AsRef<Map> for Labels {
-    #[inline]
-    fn as_ref(&self) -> &Map {
-        self.0.as_ref()
-    }
-}
-
-impl PartialEq<Self> for Labels {
-    #[inline]
-    fn eq(&self, t: &Self) -> bool {
-        self.0.as_ref().eq(t.as_ref())
-    }
-}
-
-impl PartialEq<Option<Map>> for Labels {
-    #[inline]
-    fn eq(&self, t: &Option<Map>) -> bool {
-        match t {
-            None => self.0.is_empty(),
-            Some(t) => t.eq(self.0.as_ref()),
+impl From<LabelSelectorRequirement> for Expression {
+    fn from(requirement: LabelSelectorRequirement) -> Self {
+        let key = requirement.key;
+        let values = requirement.values.map(|values| values.into_iter().collect());
+        match requirement.operator.as_str() {
+            "In" => match values {
+                Some(values) => Expression::In(key, values),
+                None => Expression::Invalid,
+            },
+            "NotIn" => match values {
+                Some(values) => Expression::NotIn(key, values),
+                None => Expression::Invalid,
+            },
+            "Exists" => Expression::Exists(key),
+            "DoesNotExist" => Expression::DoesNotExist(key),
+            _ => Expression::Invalid,
         }
     }
 }
 
-impl FromIterator<(String, String)> for Labels {
-    fn from_iter<T: IntoIterator<Item = (String, String)>>(iter: T) -> Self {
-        Self(Arc::new(iter.into_iter().collect()))
-    }
-}
-
-impl FromIterator<(&'static str, &'static str)> for Labels {
-    fn from_iter<T: IntoIterator<Item = (&'static str, &'static str)>>(iter: T) -> Self {
-        iter.into_iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect()
-    }
-}*/
-
-// === Expression ===
-
-impl Expression {
-    fn matches(&self, labels: &Map) -> bool {
-        match (self.operator, &self.key, self.values.as_ref()) {
-            (Operator::In, key, Some(values)) => match labels.get(key) {
-                Some(v) => values.contains(v),
-                None => false,
-            },
-            (Operator::NotIn, key, Some(values)) => match labels.get(key) {
-                Some(v) => !values.contains(v),
-                None => true,
-            },
-            (Operator::Exists, key, None) => labels.contains_key(key),
-            (Operator::DoesNotExist, key, None) => !labels.contains_key(key),
-            (operator, key, values) => {
-                //tracing::warn!(?operator, %key, ?values, "illegal match expression");
-                false
+impl From<Selector> for LabelSelector {
+    fn from(value: Selector) -> Self {
+        let mut equality = vec![];
+        let mut expressions = vec![];
+        for expr in value.0 {
+            match expr {
+                Expression::In(key, values) => expressions.push(LabelSelectorRequirement {
+                    key,
+                    operator: "In".into(),
+                    values: Some(values.into_iter().collect()),
+                }),
+                Expression::NotIn(key, values) => expressions.push(LabelSelectorRequirement {
+                    key,
+                    operator: "NotIn".into(),
+                    values: Some(values.into_iter().collect()),
+                }),
+                Expression::Equal(key, value) => equality.push((key, value)),
+                Expression::NotEqual(key, value) => expressions.push(LabelSelectorRequirement {
+                    key,
+                    operator: "NotIn".into(),
+                    values: Some(vec![value]),
+                }),
+                Expression::Exists(key) => expressions.push(LabelSelectorRequirement {
+                    key,
+                    operator: "Exists".into(),
+                    values: None,
+                }),
+                Expression::DoesNotExist(key) => expressions.push(LabelSelectorRequirement {
+                    key,
+                    operator: "DoesNotExist".into(),
+                    values: None,
+                }),
+                Expression::Invalid => (),
             }
+        }
+
+        LabelSelector {
+            match_labels: (!equality.is_empty()).then_some(equality.into_iter().collect()),
+            match_expressions: (!expressions.is_empty()).then_some(expressions),
         }
     }
 }
@@ -261,77 +224,189 @@ mod tests {
     use std::iter::FromIterator;
 
     #[test]
-    fn test_matches() {
+    fn test_raw_matches() {
         for (selector, labels, matches, msg) in &[
-            (Selector::default(), Labels::default(), true, "empty match"),
+            (Selector::default(), Default::default(), true, "empty match"),
             (
                 Selector::from_iter(Some(("foo", "bar"))),
-                Labels::from_iter(Some(("foo", "bar"))),
+                [("foo".to_string(), "bar".to_string())].into(),
                 true,
                 "exact label match",
             ),
             (
                 Selector::from_iter(Some(("foo", "bar"))),
-                Labels::from_iter(vec![("foo", "bar"), ("bah", "baz")]),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "baz".to_string()),
+                ]
+                .into(),
                 true,
                 "sufficient label match",
             ),
             (
-                Selector::from_iter(Some(Expression {
-                    key: "foo".into(),
-                    operator: Operator::In,
-                    values: Some(Some("bar".to_string()).into_iter().collect()),
-                })),
-                Labels::from_iter(vec![("foo", "bar"), ("bah", "baz")]),
+                Selector::from_iter(Some(Expression::In(
+                    "foo".into(),
+                    Some("bar".to_string()).into_iter().collect(),
+                ))),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "baz".to_string()),
+                ]
+                .into(),
                 true,
                 "In expression match",
             ),
             (
-                Selector::from_iter(Some(Expression {
-                    key: "foo".into(),
-                    operator: Operator::NotIn,
-                    values: Some(Some("quux".to_string()).into_iter().collect()),
-                })),
-                Labels::from_iter(vec![("foo", "bar"), ("bah", "baz")]),
+                Selector::from_iter(Some(Expression::Equal(
+                    "foo".into(),
+                    Some("bar".to_string()).into_iter().collect(),
+                ))),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "baz".to_string()),
+                ]
+                .into(),
+                true,
+                "Equal expression match",
+            ),
+            (
+                Selector::from_iter(Some(Expression::NotEqual(
+                    "foo".into(),
+                    Some("bar".to_string()).into_iter().collect(),
+                ))),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "baz".to_string()),
+                ]
+                .into(),
+                false,
+                "NotEqual expression match",
+            ),
+            (
+                Selector::from_iter(Some(Expression::In(
+                    "foo".into(),
+                    Some("bar".to_string()).into_iter().collect(),
+                ))),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "baz".to_string()),
+                ]
+                .into(),
+                true,
+                "In expression match",
+            ),
+            (
+                Selector::from_iter(Some(Expression::NotIn(
+                    "foo".into(),
+                    Some("quux".to_string()).into_iter().collect(),
+                ))),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "baz".to_string()),
+                ]
+                .into(),
                 true,
                 "NotIn expression match",
             ),
             (
-                Selector::from_iter(Some(Expression {
-                    key: "foo".into(),
-                    operator: Operator::NotIn,
-                    values: Some(Some("bar".to_string()).into_iter().collect()),
-                })),
-                Labels::from_iter(vec![("foo", "bar"), ("bah", "baz")]),
+                Selector::from_iter(Some(Expression::NotIn(
+                    "foo".into(),
+                    Some("bar".to_string()).into_iter().collect(),
+                ))),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "baz".to_string()),
+                ]
+                .into(),
                 false,
                 "NotIn expression non-match",
             ),
             (
-                Selector::new(Map::from([("foo".to_string(), "bar".to_string())]), vec![
-                    Expression {
-                        key: "bah".into(),
-                        operator: Operator::In,
-                        values: Some(Some("bar".to_string()).into_iter().collect()),
-                    },
+                Selector(vec![
+                    Expression::Equal("foo".to_string(), "bar".to_string()),
+                    Expression::In("bah".into(), Some("bar".to_string()).into_iter().collect()),
                 ]),
-                Labels::from_iter(vec![("foo", "bar"), ("bah", "baz")]),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "baz".to_string()),
+                ]
+                .into(),
                 false,
                 "matches labels but not expressions",
             ),
             (
-                Selector::new(Map::from([("foo".to_string(), "bar".to_string())]), vec![
-                    Expression {
-                        key: "bah".into(),
-                        operator: Operator::In,
-                        values: Some(Some("bar".to_string()).into_iter().collect()),
-                    },
+                Selector(vec![
+                    Expression::Equal("foo".to_string(), "bar".to_string()),
+                    Expression::In("bah".into(), Some("bar".to_string()).into_iter().collect()),
                 ]),
-                Labels::from_iter(vec![("foo", "bar"), ("bah", "bar")]),
+                [
+                    ("foo".to_string(), "bar".to_string()),
+                    ("bah".to_string(), "bar".to_string()),
+                ]
+                .into(),
                 true,
                 "matches both labels and expressions",
             ),
         ] {
             assert_eq!(selector.matches(labels), *matches, "{}", msg);
+            let label_selector: LabelSelector = selector.clone().into();
+            let converted_selector: Selector = label_selector.into();
+            assert_eq!(
+                converted_selector.matches(labels),
+                *matches,
+                "After conversion: {}",
+                msg
+            );
         }
+    }
+
+    #[test]
+    fn test_label_selector_matches() {
+        let selector: Selector = LabelSelector {
+            match_expressions: Some(vec![
+                LabelSelectorRequirement {
+                    key: "foo".into(),
+                    operator: "In".into(),
+                    values: Some(vec!["bar".into()]),
+                },
+                LabelSelectorRequirement {
+                    key: "foo".into(),
+                    operator: "NotIn".into(),
+                    values: Some(vec!["baz".into()]),
+                },
+                LabelSelectorRequirement {
+                    key: "foo".into(),
+                    operator: "Exists".into(),
+                    values: None,
+                },
+                LabelSelectorRequirement {
+                    key: "baz".into(),
+                    operator: "DoesNotExist".into(),
+                    values: None,
+                },
+            ]),
+            match_labels: Some([("foo".into(), "bar".into())].into()),
+        }
+        .into();
+        assert!(selector.matches(&[("foo".into(), "bar".into())].into()));
+        assert!(!selector.matches(&Default::default()));
+    }
+
+    #[test]
+    fn test_to_selector_string() {
+        let selector = Selector(vec![
+            Expression::In("foo".into(), ["bar".into(), "baz".into()].into()),
+            Expression::NotIn("foo".into(), ["bar".into(), "baz".into()].into()),
+            Expression::Equal("foo".into(), "bar".into()),
+            Expression::NotEqual("foo".into(), "bar".into()),
+            Expression::Exists("foo".into()),
+            Expression::DoesNotExist("foo".into()),
+        ])
+        .to_selector_string();
+
+        assert_eq!(
+            selector,
+            "foo in (bar,baz),foo notin (bar,baz),foo=bar,foo!=bar,foo,!foo"
+        )
     }
 }
