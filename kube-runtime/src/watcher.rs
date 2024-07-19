@@ -337,13 +337,14 @@ impl Config {
     ///
     /// ```
     /// use kube_runtime::watcher::Config;
-    /// use kube_client::core::{Expression, Selector};
+    /// use kube_client::core::{Expression, Selector, ParseExpressionError};
     /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
     /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
     /// let cfg = Config::default().labels_from(&selector);
     /// let cfg = Config::default().labels_from(&Expression::Exists("foo".into()).into());
-    /// // Alternatively the raw LabelSelector is accepted
-    /// let cfg = Config::default().labels_from(&LabelSelector::default().into());
+    /// let selector: Selector = LabelSelector::default().try_into()?;
+    /// let cfg = Config::default().labels_from(&selector);
+    /// # Ok::<(), ParseExpressionError>(())
     ///```
     #[must_use]
     pub fn labels_from(mut self, selector: &Selector) -> Self {
