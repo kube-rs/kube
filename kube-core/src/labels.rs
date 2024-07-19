@@ -11,7 +11,11 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::ResourceExt;
+mod private {
+    pub trait Sealed {}
+    impl Sealed for super::Expression {}
+    impl Sealed for super::Selector {}
+}
 
 #[derive(Debug, Error)]
 #[error("failed to parse value as expression: {0}")]
@@ -21,49 +25,18 @@ pub struct ParseExpressionError(pub String);
 // local type aliases
 type Expressions = Vec<Expression>;
 
-mod private {
-    pub trait Sealed {}
-    impl<R: super::ResourceExt> Sealed for R {}
-}
-
-/// Extensions to [`ResourceExt`](crate::ResourceExt)
-/// Helper methods for resource selection based on provided Selector
+/// Selector extension trait for querying selector like objects
+///
+/// Only implemented by `Selector` and `Expression`.
 pub trait SelectorExt: private::Sealed {
-    fn selector_map(&self) -> &BTreeMap<String, String>;
+    /// Collection type to compare with self
+    type Search;
 
-    /// Perform a match on the resource using Matcher trait
-    ///
-    /// ```
-    /// use k8s_openapi::api::core::v1::Pod;
-    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-    /// use kube_core::SelectorExt;
-    /// use kube_core::{Expression, Selector, ParseExpressionError};
-    ///
-    /// let selector: Selector = LabelSelector::default().try_into()?;
-    /// let matches = Pod::default().selector_matches(&selector);
-    /// assert!(matches);
-    /// let matches = Pod::default().selector_matches(&Expression::Exists("foo".into()));
-    /// assert!(!matches);
-    /// # Ok::<(), ParseExpressionError>(())
-    /// ```
-    fn selector_matches(&self, selector: &impl Matcher) -> bool {
-        selector.matches(self.selector_map())
-    }
-}
-
-impl<R: ResourceExt> SelectorExt for R {
-    fn selector_map(&self) -> &BTreeMap<String, String> {
-        self.labels()
-    }
-}
-
-/// Matcher trait for implementing alternalive Selectors
-pub trait Matcher {
-    /// Perform a match check on the resource labels
+    /// Perform a match check on the arbitrary components like labels
     ///
     /// ```
     /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-    /// use crate::kube_core::Matcher;
+    /// use crate::kube_core::SelectorExt;
     /// use crate::kube_core::Selector;
     /// use kube_core::ParseExpressionError;
     ///
@@ -71,7 +44,7 @@ pub trait Matcher {
     /// selector.matches(&Default::default());
     /// # Ok::<(), ParseExpressionError>(())
     /// ```
-    fn matches(&self, labels: &BTreeMap<String, String>) -> bool;
+    fn matches(&self, on: &Self::Search) -> bool;
 }
 
 /// A selector expression with existing operations
@@ -183,7 +156,9 @@ impl Selector {
     }
 }
 
-impl Matcher for Selector {
+impl SelectorExt for Selector {
+    type Search = BTreeMap<String, String>;
+
     /// Perform a match check on the resource labels
     fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
         for expr in self.0.iter() {
@@ -195,7 +170,9 @@ impl Matcher for Selector {
     }
 }
 
-impl Matcher for Expression {
+impl SelectorExt for Expression {
+    type Search = BTreeMap<String, String>;
+
     fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
         match self {
             Expression::In(key, values) => match labels.get(key) {
