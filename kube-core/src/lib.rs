@@ -52,7 +52,7 @@ pub use resource::{
 pub mod response;
 pub use response::Status;
 
-pub use labels::{Expression, Matcher, Selector, SelectorExt, ParseExpressionError};
+pub use labels::{Expression, Matcher, ParseExpressionError, Selector, SelectorExt};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
 #[cfg(feature = "schema")]

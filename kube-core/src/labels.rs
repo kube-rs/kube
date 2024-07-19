@@ -21,9 +21,14 @@ pub struct ParseExpressionError(pub String);
 // local type aliases
 type Expressions = Vec<Expression>;
 
+mod private {
+    pub trait Sealed {}
+    impl<R: super::ResourceExt> Sealed for R {}
+}
+
 /// Extensions to [`ResourceExt`](crate::ResourceExt)
 /// Helper methods for resource selection based on provided Selector
-pub trait SelectorExt {
+pub trait SelectorExt: private::Sealed {
     fn selector_map(&self) -> &BTreeMap<String, String>;
 
     /// Perform a match on the resource using Matcher trait
@@ -323,11 +328,15 @@ impl TryFrom<LabelSelectorRequirement> for Expression {
         match requirement.operator.as_str() {
             "In" => match values {
                 Some(values) => Ok(Expression::In(key, values)),
-                None => Err(ParseExpressionError("Expected values for In operator, got none".into())),
+                None => Err(ParseExpressionError(
+                    "Expected values for In operator, got none".into(),
+                )),
             },
             "NotIn" => match values {
                 Some(values) => Ok(Expression::NotIn(key, values)),
-                None => Err(ParseExpressionError("Expected values for In operator, got none".into())),
+                None => Err(ParseExpressionError(
+                    "Expected values for In operator, got none".into(),
+                )),
             },
             "Exists" => Ok(Expression::Exists(key)),
             "DoesNotExist" => Ok(Expression::DoesNotExist(key)),
@@ -622,7 +631,8 @@ mod tests {
             ]),
             match_labels: Some([("foo".into(), "bar".into())].into()),
         }
-        .try_into().unwrap();
+        .try_into()
+        .unwrap();
         assert!(selector.matches(&[("foo".into(), "bar".into())].into()));
         assert!(!selector.matches(&Default::default()));
     }

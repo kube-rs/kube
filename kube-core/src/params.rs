@@ -870,7 +870,9 @@ where
 }
 #[cfg(test)]
 mod test {
-    use super::{DeleteParams, PatchParams};
+    use crate::{params::WatchParams, Expression, Selector};
+
+    use super::{DeleteParams, ListParams, PatchParams};
     #[test]
     fn delete_param_serialize() {
         let mut dp = DeleteParams::default();
@@ -918,6 +920,24 @@ mod test {
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         assert_eq!(String::from("some/resource?&fieldValidation=Strict"), urlstr);
+    }
+
+    #[test]
+    fn list_params_serialize() {
+        let selector: Selector =
+            Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+        let lp = ListParams::default().labels_from(&selector);
+        let labels = lp.label_selector.unwrap();
+        assert_eq!(labels, "env in (development,sandbox)");
+    }
+
+    #[test]
+    fn watch_params_serialize() {
+        let selector: Selector =
+            Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+        let wp = WatchParams::default().labels_from(&selector);
+        let labels = wp.label_selector.unwrap();
+        assert_eq!(labels, "env in (development,sandbox)");
     }
 }
 

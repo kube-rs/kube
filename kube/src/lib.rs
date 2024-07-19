@@ -199,10 +199,8 @@ pub mod prelude {
     #[cfg(feature = "unstable-client")] pub use crate::client::scope::NamespacedRef;
 
     #[allow(unreachable_pub)] pub use crate::core::PartialObjectMetaExt as _;
-    pub use crate::{
-        core::{crd::CustomResourceExt as _, SelectorExt as _},
-        Resource as _, ResourceExt as _,
-    };
+    #[allow(unreachable_pub)] pub use crate::core::SelectorExt as _;
+    pub use crate::{core::crd::CustomResourceExt as _, Resource as _, ResourceExt as _};
 
     #[cfg(feature = "runtime")] pub use crate::runtime::utils::WatchStreamExt as _;
 }
