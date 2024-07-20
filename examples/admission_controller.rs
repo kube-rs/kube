@@ -3,9 +3,7 @@ use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, Resource, ResourceExt,
 };
-
-use kube::runtime::finalizer;
-use std::{convert::Infallible, error::Error, str::FromStr};
+use std::{convert::Infallible, error::Error};
 use tracing::*;
 use warp::{reply, Filter, Reply};
 
