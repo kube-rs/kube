@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+//! Type safe label selector logic
 use core::fmt;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, LabelSelectorRequirement};
 use serde::{Deserialize, Serialize};
@@ -25,9 +25,7 @@ pub struct ParseExpressionError(pub String);
 // local type aliases
 type Expressions = Vec<Expression>;
 
-/// Selector extension trait for querying selector like objects
-///
-/// Only implemented by `Selector` and `Expression`.
+/// Selector extension trait for querying selector-like objects
 pub trait SelectorExt: private::Sealed {
     /// Collection type to compare with self
     type Search;
@@ -36,13 +34,13 @@ pub trait SelectorExt: private::Sealed {
     ///
     /// ```
     /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-    /// use crate::kube_core::SelectorExt;
-    /// use crate::kube_core::Selector;
-    /// use kube_core::ParseExpressionError;
+    /// use kube::core::{SelectorExt, Selector};
+    /// # use std::collections::BTreeMap;
     ///
     /// let selector: Selector = LabelSelector::default().try_into()?;
-    /// selector.matches(&Default::default());
-    /// # Ok::<(), ParseExpressionError>(())
+    /// let search = BTreeMap::from([("app".to_string(), "myapp".to_string())]);
+    /// selector.matches(&search);
+    /// # Ok::<(), kube_core::ParseExpressionError>(())
     /// ```
     fn matches(&self, on: &Self::Search) -> bool;
 }
@@ -53,69 +51,65 @@ pub enum Expression {
     /// Key exists and in set:
     ///
     /// ```
-    /// use kube_core::Expression;
-    ///
-    /// let exp = Expression::In("foo".into(), ["bar".into(), "baz".into()].into()).to_string();
-    /// assert_eq!(exp, "foo in (bar,baz)");
-    /// let exp = Expression::In("foo".into(), vec!["bar".into(), "baz".into()].into_iter().collect()).to_string();
-    /// assert_eq!(exp, "foo in (bar,baz)");
+    /// # use kube_core::Expression;
+    /// let exp = Expression::In("foo".into(), ["bar".into(), "baz".into()].into());
+    /// assert_eq!(exp.to_string(), "foo in (bar,baz)");
+    /// let exp = Expression::In("foo".into(), ["bar".into(), "baz".into()].into_iter().collect());
+    /// assert_eq!(exp.to_string(), "foo in (bar,baz)");
     /// ```
     In(String, BTreeSet<String>),
 
     /// Key does not exists or not in set:
     ///
     /// ```
-    /// use kube_core::Expression;
-    ///
-    /// let exp = Expression::NotIn("foo".into(), ["bar".into(), "baz".into()].into()).to_string();
-    /// assert_eq!(exp, "foo notin (bar,baz)");
-    /// let exp = Expression::NotIn("foo".into(), vec!["bar".into(), "baz".into()].into_iter().collect()).to_string();
-    /// assert_eq!(exp, "foo notin (bar,baz)");
+    /// # use kube_core::Expression;
+    /// let exp = Expression::NotIn("foo".into(), ["bar".into(), "baz".into()].into());
+    /// assert_eq!(exp.to_string(), "foo notin (bar,baz)");
+    /// let exp = Expression::NotIn("foo".into(), ["bar".into(), "baz".into()].into_iter().collect());
+    /// assert_eq!(exp.to_string(), "foo notin (bar,baz)");
     /// ```
     NotIn(String, BTreeSet<String>),
 
     /// Key exists and is equal:
     ///
     /// ```
-    /// use kube_core::Expression;
-    ///
-    /// let exp = Expression::Equal("foo".into(), "bar".into()).to_string();
-    /// assert_eq!(exp, "foo=bar")
+    /// # use kube_core::Expression;
+    /// let exp = Expression::Equal("foo".into(), "bar".into());
+    /// assert_eq!(exp.to_string(), "foo=bar")
     /// ```
     Equal(String, String),
 
     /// Key does not exists or is not equal:
     ///
     /// ```
-    /// use kube_core::Expression;
-    ///
-    /// let exp = Expression::NotEqual("foo".into(), "bar".into()).to_string();
-    /// assert_eq!(exp, "foo!=bar")
+    /// # use kube_core::Expression;
+    /// let exp = Expression::NotEqual("foo".into(), "bar".into());
+    /// assert_eq!(exp.to_string(), "foo!=bar")
     /// ```
     NotEqual(String, String),
 
     /// Key exists:
     ///
     /// ```
-    /// use kube_core::Expression;
-    ///
-    /// let exp = Expression::Exists("foo".into()).to_string();
-    /// assert_eq!(exp, "foo")
+    /// # use kube_core::Expression;
+    /// let exp = Expression::Exists("foo".into());
+    /// assert_eq!(exp.to_string(), "foo")
     /// ```
     Exists(String),
 
     /// Key does not exist:
     ///
     /// ```
-    /// use kube_core::Expression;
-    ///
-    /// let exp = Expression::DoesNotExist("foo".into()).to_string();
-    /// assert_eq!(exp, "!foo")
+    /// # use kube_core::Expression;
+    /// let exp = Expression::DoesNotExist("foo".into());
+    /// assert_eq!(exp.to_string(), "!foo")
     /// ```
     DoesNotExist(String),
 }
 
 /// Perform selection on a list of expressions
+///
+/// Can be injected into [`WatchParams`](crate::params::WatchParams::labels_from) or [`ListParams`](crate::params::ListParams::labels_from).
 #[derive(Clone, Debug, Eq, PartialEq, Default, Deserialize, Serialize)]
 pub struct Selector(Expressions);
 
@@ -130,7 +124,7 @@ impl Selector {
         Self(map.into_iter().map(|(k, v)| Expression::Equal(k, v)).collect())
     }
 
-    /// Indicates whether this label selector matches all pods
+    /// Indicates whether this label selector matches everything
     pub fn selects_all(&self) -> bool {
         self.0.is_empty()
     }
@@ -138,17 +132,19 @@ impl Selector {
     /// Extend the list of expressions for the selector
     ///
     /// ```
-    /// use kube_core::Selector;
-    /// use kube_core::Expression;
+    /// use kube::core::{Selector, Expression};
     /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-    /// use kube_core::ParseExpressionError;
     ///
-    /// let label_selector: Selector = LabelSelector::default().try_into()?;
-    /// let mut selector = &mut Selector::default();
-    /// selector = selector.extend(Expression::Equal("environment".into(), "production".into()));
+    /// let mut selector = Selector::default();
+    ///
+    /// // Extend from expressions:
+    /// selector.extend(Expression::Equal("environment".into(), "production".into()));
     /// selector.extend([Expression::Exists("bar".into()), Expression::Exists("foo".into())].into_iter());
+    ///
+    /// // Extend from native selectors:
+    /// let label_selector: Selector = LabelSelector::default().try_into()?;
     /// selector.extend(label_selector);
-    /// # Ok::<(), ParseExpressionError>(())
+    /// # Ok::<(), kube_core::ParseExpressionError>(())
     /// ```
     pub fn extend(&mut self, exprs: impl IntoIterator<Item = Expression>) -> &mut Self {
         self.0.extend(exprs);

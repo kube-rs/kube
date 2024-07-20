@@ -171,13 +171,15 @@ impl ListParams {
     /// Configure typed selectors from [`Selector`](crate::Selector) and [`Expression`](crate::Expression) lists.
     ///
     /// ```
-    /// use kube::api::ListParams;
-    /// use kube_core::{Expression, Selector, ParseExpressionError};
+    /// use kube::core::{ListParams, Expression, Selector, ParseExpressionError};
     /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    ///
+    /// // From expressions
     /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
     /// let lp = ListParams::default().labels_from(&selector);
     /// let lp = ListParams::default().labels_from(&Expression::Exists("foo".into()).into());
-    /// // Alternatively the raw LabelSelector is accepted
+    ///
+    /// // Native LabelSelector
     /// let selector: Selector = LabelSelector::default().try_into()?;
     /// let lp = ListParams::default().labels_from(&selector);
     /// # Ok::<(), ParseExpressionError>(())
@@ -456,13 +458,15 @@ impl WatchParams {
     /// Configure typed selectors from [`Selector`](crate::Selector) and [`Expression`](crate::Expression) lists.
     ///
     /// ```
-    /// use kube::api::WatchParams;
-    /// use kube_core::{Expression, Selector, ParseExpressionError};
+    /// use kube::core::{WatchParams, Expression, Selector, ParseExpressionError};
     /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    ///
+    /// // From expressions
     /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
     /// let wp = WatchParams::default().labels_from(&selector);
     /// let wp = WatchParams::default().labels_from(&Expression::Exists("foo".into()).into());
-    /// // Alternatively the raw LabelSelector is accepted
+    ///
+    /// // Native LabelSelector
     /// let selector: Selector = LabelSelector::default().try_into()?;
     /// let wp = WatchParams::default().labels_from(&selector);
     /// # Ok::<(), ParseExpressionError>(())
