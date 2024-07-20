@@ -6,9 +6,8 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures::{stream::Stream, TryStreamExt};
 use http_body::{Body as HttpBody, Frame, SizeHint};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt, BodyStream};
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
 
 /// A request body.
 pub struct Body {
