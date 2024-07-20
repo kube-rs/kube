@@ -80,6 +80,7 @@ impl Request {
 
     /// Get a single instance
     pub fn get(&self, name: &str, gp: &GetParams) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         let urlstr = if let Some(rv) = &gp.resource_version {
             let target = format!("{}/{}?", self.url_path, name);
             form_urlencoded::Serializer::new(target)
@@ -106,6 +107,7 @@ impl Request {
 
     /// Delete an instance of a resource
     pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
@@ -149,6 +151,7 @@ impl Request {
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         pp.validate(patch)?;
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
@@ -171,6 +174,7 @@ impl Request {
         pp: &PostParams,
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
@@ -188,6 +192,7 @@ impl Request {
         subresource_name: &str,
         name: &str,
     ) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         let target = format!("{}/{}/{}", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
@@ -203,6 +208,7 @@ impl Request {
         pp: &PostParams,
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
@@ -219,6 +225,7 @@ impl Request {
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         pp.validate(patch)?;
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
@@ -240,6 +247,7 @@ impl Request {
         pp: &PostParams,
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
@@ -256,6 +264,7 @@ impl Request {
 impl Request {
     /// Get a single metadata instance for a named resource
     pub fn get_metadata(&self, name: &str, gp: &GetParams) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         let urlstr = if let Some(rv) = &gp.resource_version {
             let target = format!("{}/{}?", self.url_path, name);
             form_urlencoded::Serializer::new(target)
@@ -310,6 +319,7 @@ impl Request {
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
+        validate_name(name)?;
         pp.validate(patch)?;
         let target = format!("{}/{}?", self.url_path, name);
         let mut qp = form_urlencoded::Serializer::new(target);
@@ -324,6 +334,14 @@ impl Request {
     }
 }
 
+/// Names must not be empty as otherwise API server would interpret a `get` as `list`, or a `delete` as `delete_collection`
+fn validate_name(name: &str) -> Result<(), Error> {
+    if name.is_empty() {
+        return Err(Error::Validation("A non-empty name is required".into()));
+    }
+    Ok(())
+}
+
 /// Extensive tests for Request of k8s_openapi::Resource structs
 ///
 /// Cheap sanity check to ensure type maps work as expected
@@ -331,7 +349,7 @@ impl Request {
 mod test {
     use crate::{
         params::{GetParams, PostParams, VersionMatch, WatchParams},
-        request::Request,
+        request::{Error, Request},
         resource::Resource,
     };
     use http::header;
@@ -488,6 +506,13 @@ mod test {
             req.headers().get(header::ACCEPT).unwrap(),
             super::JSON_METADATA_MIME
         );
+    }
+
+    #[test]
+    fn get_empty_name() {
+        let url = appsv1::Deployment::url_path(&(), Some("ns"));
+        let req = Request::new(url).get("", &GetParams::any());
+        assert!(matches!(req, Err(Error::Validation(_))));
     }
 
     #[test]
