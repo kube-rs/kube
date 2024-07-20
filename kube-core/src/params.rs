@@ -1,5 +1,5 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
-use crate::request::Error;
+use crate::{request::Error, Selector};
 use serde::Serialize;
 
 /// Controls how the resource version parameter is applied for list calls
@@ -163,6 +163,28 @@ impl ListParams {
     #[must_use]
     pub fn labels(mut self, label_selector: &str) -> Self {
         self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// Configure typed label selectors
+    ///
+    /// Configure typed selectors from [`Selector`](crate::Selector) and [`Expression`](crate::Expression) lists.
+    ///
+    /// ```
+    /// use kube::api::ListParams;
+    /// use kube_core::{Expression, Selector, ParseExpressionError};
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+    /// let lp = ListParams::default().labels_from(&selector);
+    /// let lp = ListParams::default().labels_from(&Expression::Exists("foo".into()).into());
+    /// // Alternatively the raw LabelSelector is accepted
+    /// let selector: Selector = LabelSelector::default().try_into()?;
+    /// let lp = ListParams::default().labels_from(&selector);
+    /// # Ok::<(), ParseExpressionError>(())
+    ///```
+    #[must_use]
+    pub fn labels_from(mut self, selector: &Selector) -> Self {
+        self.label_selector = Some(selector.to_string());
         self
     }
 
@@ -426,6 +448,28 @@ impl WatchParams {
     #[must_use]
     pub fn labels(mut self, label_selector: &str) -> Self {
         self.label_selector = Some(label_selector.to_string());
+        self
+    }
+
+    /// Configure typed label selectors
+    ///
+    /// Configure typed selectors from [`Selector`](crate::Selector) and [`Expression`](crate::Expression) lists.
+    ///
+    /// ```
+    /// use kube::api::WatchParams;
+    /// use kube_core::{Expression, Selector, ParseExpressionError};
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+    /// let wp = WatchParams::default().labels_from(&selector);
+    /// let wp = WatchParams::default().labels_from(&Expression::Exists("foo".into()).into());
+    /// // Alternatively the raw LabelSelector is accepted
+    /// let selector: Selector = LabelSelector::default().try_into()?;
+    /// let wp = WatchParams::default().labels_from(&selector);
+    /// # Ok::<(), ParseExpressionError>(())
+    ///```
+    #[must_use]
+    pub fn labels_from(mut self, selector: &Selector) -> Self {
+        self.label_selector = Some(selector.to_string());
         self
     }
 
@@ -826,7 +870,9 @@ where
 }
 #[cfg(test)]
 mod test {
-    use super::{DeleteParams, PatchParams};
+    use crate::{params::WatchParams, Expression, Selector};
+
+    use super::{DeleteParams, ListParams, PatchParams};
     #[test]
     fn delete_param_serialize() {
         let mut dp = DeleteParams::default();
@@ -874,6 +920,24 @@ mod test {
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
         assert_eq!(String::from("some/resource?&fieldValidation=Strict"), urlstr);
+    }
+
+    #[test]
+    fn list_params_serialize() {
+        let selector: Selector =
+            Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+        let lp = ListParams::default().labels_from(&selector);
+        let labels = lp.label_selector.unwrap();
+        assert_eq!(labels, "env in (development,sandbox)");
+    }
+
+    #[test]
+    fn watch_params_serialize() {
+        let selector: Selector =
+            Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+        let wp = WatchParams::default().labels_from(&selector);
+        let labels = wp.label_selector.unwrap();
+        assert_eq!(labels, "env in (development,sandbox)");
     }
 }
 

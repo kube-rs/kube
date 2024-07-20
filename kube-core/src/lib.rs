@@ -31,6 +31,8 @@ pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 pub mod metadata;
 pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta};
 
+pub mod labels;
+
 #[cfg(feature = "kubelet-debug")] pub mod kubelet_debug;
 
 pub mod object;
@@ -49,6 +51,8 @@ pub use resource::{
 
 pub mod response;
 pub use response::Status;
+
+pub use labels::{Expression, ParseExpressionError, Selector, SelectorExt};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
 #[cfg(feature = "schema")]
