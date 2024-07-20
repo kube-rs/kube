@@ -215,8 +215,7 @@ mod custom_resource;
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
 /// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube/blob/main/examples/crd_derive.rs))
 /// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/kube-rs/kube/issues/129#issuecomment-750852916)
-/// - [`#[garde(...)]` field attributes for client-side validation](https://github.com/jprochazk/garde) (see [`crd_api`
-/// example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs))
+/// - [`#[garde(...)]` field attributes for client-side validation](https://github.com/jprochazk/garde) (see [`crd_api` example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs))
 ///
 /// You might need to override parts of the schemas (for fields in question) when you are:
 /// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
