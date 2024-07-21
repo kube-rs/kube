@@ -107,11 +107,84 @@ pub enum Expression {
     DoesNotExist(String),
 }
 
+/// Convinience expression macro for const expression evaluation
+///
+/// ```
+/// use kube_core::{expression, into};
+/// use kube_core::Selector;
+/// use kube_core::Expression;
+/// let key = "foo";
+/// let value = "bar";
+/// let array = ["bar".into(), "baz".into()];
+/// let selector = Selector(vec![
+///     expression!(key in array),
+///     expression!("foo" in "bar","baz"),
+///     expression!("foo" not in "bar", "baz"),
+///     expression!(key equal value),
+///     expression!("foo" equal "bar"),
+///     expression!("foo" == "bar"),
+///     expression!("foo" not equal "bar"),
+///     expression!("foo" != "bar"),
+///     expression!("foo"),
+///     expression!(not "foo"),
+///     expression!(!"foo"),
+/// ])
+/// .to_string();
+/// assert_eq!(
+///     selector,
+///     "foo in (bar,baz),foo in (bar,baz),foo notin (bar,baz),foo=bar,foo=bar,foo=bar,foo!=bar,foo!=bar,foo,!foo,!foo"
+/// )
+/// ```
+#[macro_export]
+macro_rules! expression {
+    ($item:tt) => {
+        Expression::Exists($item.into())
+    };
+    (not $item:tt) => {
+        Expression::DoesNotExist($item.into())
+    };
+    (!$item:tt) => {
+        Expression::DoesNotExist($item.into())
+    };
+    ($left:tt equal $right:tt) => {
+        Expression::Equal(into!($left), into!($right))
+    };
+    ($left:tt == $right:tt) => {
+        Expression::Equal(into!($left), into!($right))
+    };
+    ($left:tt not equal $right:tt) => {
+        Expression::NotEqual(into!($left), into!($right))
+    };
+    ($left:tt != $right:tt) => {
+        Expression::NotEqual(into!($left), into!($right))
+    };
+    ($left:tt in $($right:tt),+) => {
+        Expression::In(into!($left), into!($($right),+))
+    };
+    ($left:tt not in $($right:tt),+) => {
+        Expression::NotIn(into!($left), into!($($right),+))
+    };
+}
+
+/// into expression, for a from/into array conversion
+#[macro_export]
+macro_rules! into {
+    ($left:tt, $($right:tt),+) => {
+        [into!($left), into!($($right),+)].into()
+    };
+    ($item:literal) => {
+        $item.into()
+    };
+    ($item:ident) => {
+        $item.into()
+    };
+}
+
 /// Perform selection on a list of expressions
 ///
 /// Can be injected into [`WatchParams`](crate::params::WatchParams::labels_from) or [`ListParams`](crate::params::ListParams::labels_from).
 #[derive(Clone, Debug, Eq, PartialEq, Default, Deserialize, Serialize)]
-pub struct Selector(Expressions);
+pub struct Selector(pub Expressions);
 
 impl Selector {
     /// Create a selector from a vector of expressions
