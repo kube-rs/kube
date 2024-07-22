@@ -9,7 +9,7 @@ license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 keywords = ["kubernetes", "client", "runtime", "cncf"]
-categories = ["network-programming", "caching", "api-bindings", "configuration", "encoding"]
+categories = ["network-programming", "caching", "api-bindings", "encoding"]
 
 [features]
 default = ["client", "rustls-tls"]

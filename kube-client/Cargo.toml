@@ -9,7 +9,7 @@ license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 keywords = ["kubernetes", "client",]
-categories = ["web-programming::http-client", "configuration", "network-programming", "api-bindings"]
+categories = ["web-programming::http-client", "network-programming", "api-bindings"]
 
 [features]
 default = ["client"]
