@@ -31,7 +31,7 @@ rust.unsafe_code = "forbid"
 
 [dependencies]
 futures = { workspace = true, features = ["async-await"] }
-kube-client = { path = "../kube-client", version = "=0.92.0", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "=0.93.0", default-features = false, features = ["jsonpatch", "client"] }
 derivative.workspace = true
 serde.workspace = true
 ahash.workspace = true
