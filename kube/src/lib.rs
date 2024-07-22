@@ -14,7 +14,7 @@
 //! - [`runtime`] with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
 //! - [`core`] with generics from `apimachinery`
 //!
-//! You can use each of these as you need with the help of the [exported features](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
+//! You can use each of these as you need with the help of the [exported features](https://kube.rs/features/).
 //!
 //! # Using the Client
 //! ```no_run
