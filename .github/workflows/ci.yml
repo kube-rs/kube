@@ -47,6 +47,9 @@ jobs:
       - name: Build workspace
         run: cargo build
 
+      - name: Build no-features
+        run: cargo build -p kube --no-default-features
+        if: matrix.os == 'ubuntu-latest' # only linux tests all feature combinations
       - name: Build no-tls
         run: cargo build -p kube --no-default-features --features=client
         if: matrix.os == 'ubuntu-latest' # only linux tests all feature combinations
