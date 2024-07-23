@@ -194,7 +194,9 @@ pub mod prelude {
     //!
     //! The prelude may grow over time as additional items see ubiquitous use.
 
-    #[allow(unreachable_pub)] pub use crate::client::ConfigExt as _;
+    #[cfg(feature = "client")]
+    #[allow(unreachable_pub)]
+    pub use crate::client::ConfigExt as _;
 
     #[cfg(feature = "unstable-client")] pub use crate::client::scope::NamespacedRef;
 
