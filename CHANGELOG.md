@@ -10,8 +10,30 @@ UNRELEASED
 0.93.1 / 2024-07-23
 ===================
 
-0.93.0 / 2024-07-22
+[0.93.0](https://github.com/kube-rs/kube/releases/tag/0.93.0) / 2024-07-22
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.93.0 -->
+
+## Highlights
+Better [query validation](https://github.com/kube-rs/kube/pull/1541), better [client header customisation](https://github.com/kube-rs/kube/pull/1523), and two new modules:
+
+1. [`core::labels`](https://docs.rs/kube/latest/kube/core/labels/index.html) module for creating typed label selectors for  [`ListParams`](https://docs.rs/kube/latest/kube/core/params/struct.ListParams.html#method.labels_from) or [`WatchParams`](https://docs.rs/kube/latest/kube/core/params/struct.WatchParams.html#method.labels_from). Can be constructed from a native [`LabelSelector`](https://docs.rs/k8s-openapi/latest/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.LabelSelector.html), or directly from a [`Selector`](https://docs.rs/kube/latest/kube/core/struct.Selector.html) of [`Expression`](https://docs.rs/kube/latest/kube/core/enum.Expression.html)s. [PR](https://github.com/kube-rs/kube/pull/1539).
+2.  [`prelude`](https://docs.rs/kube/latest/kube/prelude/index.html) to simplify imports of extension traits. [PR](https://github.com/kube-rs/kube/pull/1539).
+
+A big thank you to everyone who contributed to this release!
+
+## What's Changed
+### Added
+* add option to provide headers to send as client by @aviramha in https://github.com/kube-rs/kube/pull/1523
+* Add prelude for blanket and extension traits across sub-crates by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1527
+* Label selector support by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1539
+### Changed
+* Update garde requirement from 0.19.0 to 0.20.0 by @dependabot in https://github.com/kube-rs/kube/pull/1535
+### Removed
+* runtime: remove deprecated default_backoff by @clux in https://github.com/kube-rs/kube/pull/1518
+### Fixed
+* Fix watcher not fully paginating on Init by @clux in https://github.com/kube-rs/kube/pull/1525 (ported to 0.92.1)
+* Prevent empty string object name requests from being sent to the apiserver by @xMAC94x in https://github.com/kube-rs/kube/pull/1541
 
 [0.92.1](https://github.com/kube-rs/kube/releases/tag/0.92.1) / 2024-06-19
 ===================
