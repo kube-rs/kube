@@ -9,7 +9,7 @@ license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 keywords = ["kubernetes", "client",]
-categories = ["web-programming::http-client", "configuration", "network-programming", "api-bindings"]
+categories = ["web-programming::http-client", "network-programming", "api-bindings"]
 
 [features]
 default = ["client"]
@@ -58,7 +58,7 @@ rustls = { workspace = true, optional = true }
 rustls-pemfile = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["time", "signal", "sync"], optional = true }
-kube-core = { path = "../kube-core", version = "=0.92.0" }
+kube-core = { path = "../kube-core", version = "=0.93.1" }
 jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
 hyper = { workspace = true, features = ["client", "http1"], optional = true }

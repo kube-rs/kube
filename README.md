@@ -16,7 +16,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.92.0", features = ["runtime", "derive"] }
+kube = { version = "0.93.1", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.22.0", features = ["latest"] }
 ```
 
@@ -98,7 +98,7 @@ The `runtime` module exports the `kube_runtime` crate and contains higher level 
 
 ### Watchers
 
-A low level streaming interface (similar to informers) that presents high level [`watcher::Event`](https://docs.rs/kube/latest/kube/runtime/watcher/enum.Event.html)s.
+A streaming interface (similar to informers) that presents [`watcher::Event`](https://docs.rs/kube/latest/kube/runtime/watcher/enum.Event.html)s and does automatic relists under the hood.
 
 ```rust
 let api = Api::<Pod>::default_namespaced(client);
@@ -113,7 +113,8 @@ while let Some(event) = stream.try_next().await? {
 }
 ```
 
-The raw events are normally consumed by reflectors. See [`WatchStreamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html) for high-level constructs.
+
+Note the base items from a `watcher` stream are an abstraction above the native `WatchEvent` to allow for store buffering. If you are following along to "see what changed", you can use utilities from [`WatchStreamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html), such as `applied_objects` to get a more conventional stream.
 
 ## Reflectors
 
@@ -155,7 +156,7 @@ By default [rustls](https://github.com/rustls/rustls) is used for TLS, but `open
 
 ```toml
 [dependencies]
-kube = { version = "0.92.0", default-features = false, features = ["client", "openssl-tls"] }
+kube = { version = "0.93.1", default-features = false, features = ["client", "openssl-tls"] }
 k8s-openapi = { version = "0.22.0", features = ["latest"] }
 ```
 

@@ -275,9 +275,9 @@ impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
 #[cfg(feature = "unstable-runtime-predicates")]
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
-    use crate::predicates;
-    use futures::StreamExt;
+    use super::watcher;
+    use crate::{predicates, WatchStreamExt as _};
+    use futures::prelude::*;
     use k8s_openapi::api::core::v1::Pod;
     use kube_client::{Api, Resource};
 

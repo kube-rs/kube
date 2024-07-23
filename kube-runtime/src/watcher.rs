@@ -9,7 +9,7 @@ use derivative::Derivative;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
-    core::{metadata::PartialObjectMeta, ObjectList},
+    core::{metadata::PartialObjectMeta, ObjectList, Selector},
     error::ErrorResponse,
     Api, Error as ClientErr,
 };
@@ -337,6 +337,27 @@ impl Config {
         self
     }
 
+    /// Configure typed label selectors
+    ///
+    /// Configure typed selectors from [`Selector`](kube_client::core::Selector) and [`Expression`](kube_client::core::Expression) lists.
+    ///
+    /// ```
+    /// use kube_runtime::watcher::Config;
+    /// use kube_client::core::{Expression, Selector, ParseExpressionError};
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+    /// let cfg = Config::default().labels_from(&selector);
+    /// let cfg = Config::default().labels_from(&Expression::Exists("foo".into()).into());
+    /// let selector: Selector = LabelSelector::default().try_into()?;
+    /// let cfg = Config::default().labels_from(&selector);
+    /// # Ok::<(), ParseExpressionError>(())
+    ///```
+    #[must_use]
+    pub fn labels_from(mut self, selector: &Selector) -> Self {
+        self.label_selector = Some(selector.to_string());
+        self
+    }
+
     /// Sets list semantic to configure re-list performance and consistency
     ///
     /// NB: This option only has an effect for [`InitialListStrategy::ListWatch`].
@@ -505,9 +526,12 @@ where
                     last_bookmark,
                 });
             }
-            if let Some(resource_version) = last_bookmark {
-                // we have drained the last page - move on to next stage
-                return (Some(Ok(Event::InitDone)), State::InitListed { resource_version });
+            // check if we need to perform more pages
+            if continue_token.is_none() {
+                if let Some(resource_version) = last_bookmark {
+                    // we have drained the last page - move on to next stage
+                    return (Some(Ok(Event::InitDone)), State::InitListed { resource_version });
+                }
             }
             let mut lp = wc.to_list_params();
             lp.continue_token = continue_token;
@@ -713,7 +737,7 @@ where
 ///             Ok(())
 ///         })
 ///         .await?;
-///    Ok(())
+///     Ok(())
 /// }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
@@ -730,7 +754,7 @@ where
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
-/// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
+/// an [`Event::Init`]. The internals mechanics of recovery should be considered an implementation detail.
 pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     watcher_config: Config,
@@ -776,7 +800,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///             Ok(())
 ///         })
 ///         .await?;
-///    Ok(())
+///     Ok(())
 /// }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
@@ -793,7 +817,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
-/// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
+/// an [`Event::Init`]. The internals mechanics of recovery should be considered an implementation detail.
 #[allow(clippy::module_name_repetitions)]
 pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
@@ -838,18 +862,6 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
             Err(err) => Some(Err(err)),
         }
     })
-}
-
-/// Default watch [`Backoff`] inspired by Kubernetes' client-go.
-///
-/// This fn has been moved into [`DefaultBackoff`].
-#[must_use]
-#[deprecated(
-    since = "0.84.0",
-    note = "replaced by `watcher::DefaultBackoff`. This fn will be removed in 0.88.0."
-)]
-pub fn default_backoff() -> DefaultBackoff {
-    DefaultBackoff::default()
 }
 
 /// Default watcher backoff inspired by Kubernetes' client-go.

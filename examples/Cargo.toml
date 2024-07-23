@@ -24,13 +24,13 @@ latest = ["k8s-openapi/latest"]
 [dev-dependencies]
 tokio-util.workspace = true
 assert-json-diff.workspace = true
-garde = { version = "0.19.0", default-features = false, features = ["derive"] }
+garde = { version = "0.20.0", default-features = false, features = ["derive"] }
 anyhow.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 jsonpath-rust.workspace = true
 jsonptr.workspace = true
-kube = { path = "../kube", version = "^0.92.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.92.0", default-features = false } # only needed to opt out of schema
+kube = { path = "../kube", version = "^0.93.1", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.93.1", default-features = false } # only needed to opt out of schema
 k8s-openapi.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

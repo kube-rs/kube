@@ -14,7 +14,7 @@
 //! - [`runtime`] with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
 //! - [`core`] with generics from `apimachinery`
 //!
-//! You can use each of these as you need with the help of the [exported features](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
+//! You can use each of these as you need with the help of the [exported features](https://kube.rs/features/).
 //!
 //! # Using the Client
 //! ```no_run
@@ -180,6 +180,32 @@ pub use kube_core as core;
 #[cfg(test)]
 #[cfg(all(feature = "derive", feature = "runtime"))]
 mod mock_tests;
+
+pub mod prelude {
+    //! A "prelude" for kube client crate. Reduces the number of duplicated imports.
+    //!
+    //! This prelude is similar to the standard library's prelude in that you'll
+    //! almost always want to import its entire contents, but unlike the
+    //! standard library's prelude you'll have to do so manually:
+    //!
+    //! ```
+    //! use kube::prelude::*;
+    //! ```
+    //!
+    //! The prelude may grow over time as additional items see ubiquitous use.
+
+    #[cfg(feature = "client")]
+    #[allow(unreachable_pub)]
+    pub use crate::client::ConfigExt as _;
+
+    #[cfg(feature = "unstable-client")] pub use crate::client::scope::NamespacedRef;
+
+    #[allow(unreachable_pub)] pub use crate::core::PartialObjectMetaExt as _;
+    #[allow(unreachable_pub)] pub use crate::core::SelectorExt as _;
+    pub use crate::{core::crd::CustomResourceExt as _, Resource as _, ResourceExt as _};
+
+    #[cfg(feature = "runtime")] pub use crate::runtime::utils::WatchStreamExt as _;
+}
 
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
