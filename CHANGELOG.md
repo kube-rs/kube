@@ -7,8 +7,13 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.93.1...main
 
-0.93.1 / 2024-07-23
+[0.93.1](https://github.com/kube-rs/kube/releases/tag/0.93.1) / 2024-07-23
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.93.1 -->
+
+## What's Changed
+### Fixed
+* add missing feature gate on ConfigExt for no-features build by @HoKim98 in https://github.com/kube-rs/kube/pull/1549
 
 [0.93.0](https://github.com/kube-rs/kube/releases/tag/0.93.0) / 2024-07-22
 ===================
