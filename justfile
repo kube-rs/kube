@@ -49,6 +49,9 @@ coverage:
   cargo tarpaulin --out=Html --output-dir=.
   {{open}} tarpaulin-report.html
 
+hack:
+  cargo hack check --feature-powerset --ignore-private --workspace --skip=oauth,oidc
+
 readme:
   rustdoc README.md --test --edition=2021
 
