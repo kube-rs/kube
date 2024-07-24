@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    paths:
-      - '*.toml'
+      # opt in to explicit stuff here, this test is slow
+      - hack-features
 
 jobs:
   cargo-hack:
