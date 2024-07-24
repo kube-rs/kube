@@ -1,0 +1,23 @@
+name: features
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - '*.toml'
+
+jobs:
+  cargo-hack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: extractions/setup-just@v2
+      - name: Run cargo-hack
+        run: just hack

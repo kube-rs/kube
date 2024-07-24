@@ -50,7 +50,13 @@ coverage:
   {{open}} tarpaulin-report.html
 
 hack:
-  cargo hack check --feature-powerset --ignore-private --workspace --skip=oauth,oidc
+  time cargo hack check --feature-powerset --no-private -p kube \
+    --skip=oauth,oidc \
+    --group-features=socks5,http-proxy,gzip \
+    --group-features=admission,jsonpatch
+  # Test groups features with minimal overlap that are grouped to reduce combinations.
+  # Without any grouping this test takes an hour and has to test >11k combinations.
+  # Skipped oauth and oidc, as these compile fails without a tls stack.
 
 readme:
   rustdoc README.md --test --edition=2021
