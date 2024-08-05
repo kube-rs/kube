@@ -10,9 +10,7 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 # these are deprecated, but not super helpful for us
 # https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html#the-version-field-optional
 # remove them when we have to
-unmaintained = "warn"
 yanked = "warn"
-notice = "warn"
 
 
 [licenses]
