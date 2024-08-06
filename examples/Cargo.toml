@@ -184,6 +184,10 @@ name = "pod_watcher"
 path = "pod_watcher.rs"
 
 [[example]]
+name = "errorbounded_configmap_watcher"
+path = "errorbounded_configmap_watcher.rs"
+
+[[example]]
 name = "request_raw"
 path = "request_raw.rs"
 
