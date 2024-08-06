@@ -11,6 +11,8 @@ use crate::Resource;
 /// A wrapper type for T that lets deserializing the parent object succeed, even if the T is invalid.
 ///
 /// For example, this can be used to still access valid objects from an `Api::list` call or `watcher`.
+// We can't implement Deserialize on Result<T, InvalidObject> directly, both because of the orphan rule and because
+// it would conflict with serde's blanket impl on Result<T, E>, even if E isn't Deserialize.
 #[derive(Debug, Clone)]
 pub struct ErrorBoundary<T>(pub Result<T, InvalidObject>);
 
@@ -43,6 +45,7 @@ where
     {
         #[derive(Deserialize)]
         struct ObjectMetaContainer {
+            #[serde(default)]
             metadata: ObjectMeta,
         }
 
@@ -91,5 +94,62 @@ impl<T: Resource> Resource for ErrorBoundary<T> {
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         self.0.as_mut().map_or_else(|err| &mut err.metadata, T::meta_mut)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use k8s_openapi::api::core::v1::{ConfigMap, Pod};
+    use serde_json::json;
+
+    use crate::{ErrorBoundary, Resource};
+
+    #[test]
+    fn should_parse_meta_of_invalid_objects() {
+        let pod_error = serde_json::from_value::<ErrorBoundary<Pod>>(json!({
+            "metadata": {
+                "name": "the-name",
+                "namespace": "the-namespace",
+            },
+            "spec": {
+                "containers": "not-a-list",
+            },
+        }))
+        .unwrap();
+        assert_eq!(pod_error.meta().name.as_deref(), Some("the-name"));
+        assert_eq!(pod_error.meta().namespace.as_deref(), Some("the-namespace"));
+        pod_error.0.unwrap_err();
+    }
+
+    #[test]
+    fn should_allow_valid_objects() {
+        let configmap = serde_json::from_value::<ErrorBoundary<ConfigMap>>(json!({
+            "metadata": {
+                "name": "the-name",
+                "namespace": "the-namespace",
+            },
+            "data": {
+                "foo": "bar",
+            },
+        }))
+        .unwrap();
+        assert_eq!(configmap.meta().name.as_deref(), Some("the-name"));
+        assert_eq!(configmap.meta().namespace.as_deref(), Some("the-namespace"));
+        assert_eq!(
+            configmap.0.unwrap().data,
+            Some([("foo".to_string(), "bar".to_string())].into())
+        )
+    }
+
+    #[test]
+    fn should_catch_invalid_objects() {
+        serde_json::from_value::<ErrorBoundary<Pod>>(json!({
+            "spec": {
+                "containers": "not-a-list"
+            }
+        }))
+        .unwrap()
+        .0
+        .unwrap_err();
     }
 }
