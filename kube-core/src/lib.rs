@@ -70,3 +70,6 @@ pub use error::ErrorResponse;
 
 mod version;
 pub use version::Version;
+
+pub mod error_boundary;
+pub use error_boundary::ErrorBoundary;
