@@ -105,7 +105,7 @@ fn print_table(summaries: Vec<NodeSummary>) {
             .iter()
             .map(|summary| summary.name.len())
             .max()
-            .unwrap_or_else(|| 0)
+            .unwrap_or(0)
             .max(NAME.len());
         max_name_width + 4
     };
@@ -120,7 +120,7 @@ fn print_table(summaries: Vec<NodeSummary>) {
             .get("memory")
             .map(|mem| {
                 let mem = mem.0.trim_end_matches("Ki");
-                mem.parse::<usize>().ok().unwrap_or_else(|| 1)
+                mem.parse::<usize>().ok().unwrap_or(1)
             })
             .unwrap_or_else(|| 1);
 
@@ -129,7 +129,7 @@ fn print_table(summaries: Vec<NodeSummary>) {
         let cpu_total = summary
             .allocatable
             .get("cpu")
-            .map(|mem| mem.0.parse::<usize>().ok().unwrap_or_else(|| 1))
+            .map(|mem| mem.0.parse::<usize>().ok().unwrap_or(1))
             .unwrap_or_else(|| 1);
 
         let name = summary.name;

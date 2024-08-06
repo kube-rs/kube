@@ -1,7 +1,7 @@
 #![recursion_limit = "256"]
 
 use assert_json_diff::assert_json_eq;
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -135,7 +135,7 @@ fn test_serialized_matches_expected() {
             nullable: None,
             nullable_skipped_with_default: None,
             nullable_with_default: None,
-            timestamp: TimeZone::from_utc_datetime(&Utc, &NaiveDateTime::from_timestamp_opt(0, 0).unwrap()),
+            timestamp: DateTime::from_timestamp(0, 0).unwrap(),
             complex_enum: ComplexEnum::VariantOne { int: 23 },
             untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
                 age: 42,

@@ -148,10 +148,10 @@ pub(crate) mod test {
         watcher::{Error, Event},
         WatchStreamExt,
     };
-    use std::{sync::Arc, task::Poll};
+    use std::{pin::pin, sync::Arc, task::Poll};
 
     use crate::reflector;
-    use futures::{pin_mut, poll, stream, StreamExt};
+    use futures::{poll, stream, StreamExt};
     use k8s_openapi::api::core::v1::Pod;
 
     fn testpod(name: &str) -> Pod {
@@ -174,8 +174,7 @@ pub(crate) mod test {
         ]);
 
         let (reader, writer) = reflector::store_shared(10);
-        let reflect = st.reflect_shared(writer);
-        pin_mut!(reflect);
+        let mut reflect = pin!(st.reflect_shared(writer));
 
         // Prior to any polls, we should have an empty store.
         assert_eq!(reader.len(), 0);
@@ -234,10 +233,8 @@ pub(crate) mod test {
         let _bar = Arc::new(bar);
 
         let (_, writer) = reflector::store_shared(10);
-        let subscriber = writer.subscribe().unwrap();
-        let reflect = st.reflect_shared(writer);
-        pin_mut!(reflect);
-        pin_mut!(subscriber);
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut reflect = pin!(st.reflect_shared(writer));
 
         // Deleted events should be skipped by subscriber.
         assert!(matches!(
@@ -307,9 +304,8 @@ pub(crate) mod test {
         let _bar = Arc::new(bar);
 
         let (_, writer) = reflector::store_shared(10);
-        let subscriber = writer.subscribe().unwrap();
+        let mut subscriber = pin!(writer.subscribe().unwrap());
         let mut reflect = Box::pin(st.reflect_shared(writer));
-        pin_mut!(subscriber);
 
         assert!(matches!(
             poll!(reflect.next()),
@@ -373,12 +369,9 @@ pub(crate) mod test {
         let bar = Arc::new(bar);
 
         let (_, writer) = reflector::store_shared(1);
-        let subscriber = writer.subscribe().unwrap();
-        let subscriber_slow = writer.subscribe().unwrap();
-        let reflect = st.reflect_shared(writer);
-        pin_mut!(reflect);
-        pin_mut!(subscriber);
-        pin_mut!(subscriber_slow);
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut subscriber_slow = pin!(writer.subscribe().unwrap());
+        let mut reflect = pin!(st.reflect_shared(writer));
 
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
         assert_eq!(poll!(subscriber_slow.next()), Poll::Pending);

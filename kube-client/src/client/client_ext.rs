@@ -506,11 +506,10 @@ mod test {
         {
             let owner = pod
                 .owner_references()
-                .to_vec()
-                .into_iter()
+                .iter()
                 .find(|r| r.kind == Node::kind(&()))
                 .ok_or("Not found")?;
-            let _: Node = client.fetch(&owner).await?;
+            let _: Node = client.fetch(owner).await?;
         }
 
         Ok(())
