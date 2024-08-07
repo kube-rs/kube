@@ -4,7 +4,7 @@ use futures::prelude::*;
 use k8s_openapi::{api::core::v1::Pod, NamespaceResourceScope};
 use kube::{
     api::{Api, ObjectMeta, ResourceExt},
-    core::ErrorBoundary,
+    core::DeserializeGuard,
     runtime::{reflector::ObjectRef, watcher, WatchStreamExt},
     Client, Resource,
 };
@@ -59,7 +59,7 @@ impl Resource for CaConfigMap {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
-    let api = Api::<ErrorBoundary<CaConfigMap>>::default_namespaced(client);
+    let api = Api::<DeserializeGuard<CaConfigMap>>::default_namespaced(client);
     let use_watchlist = std::env::var("WATCHLIST").map(|s| s == "1").unwrap_or(false);
     let wc = if use_watchlist {
         // requires WatchList feature gate on 1.27 or later

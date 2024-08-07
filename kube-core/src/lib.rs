@@ -72,4 +72,4 @@ mod version;
 pub use version::Version;
 
 pub mod error_boundary;
-pub use error_boundary::ErrorBoundary;
+pub use error_boundary::DeserializeGuard;

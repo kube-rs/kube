@@ -1,4 +1,4 @@
-//! Types for isolating deserialization failures. See [`ErrorBoundary`].
+//! Types for isolating deserialization failures. See [`DeserializeGuard`].
 
 use std::{borrow::Cow, fmt::Display};
 
@@ -14,9 +14,9 @@ use crate::{PartialObjectMeta, Resource};
 // We can't implement Deserialize on Result<K, InvalidObject> directly, both because of the orphan rule and because
 // it would conflict with serde's blanket impl on Result<K, E>, even if E isn't Deserialize.
 #[derive(Debug, Clone)]
-pub struct ErrorBoundary<K>(pub Result<K, InvalidObject>);
+pub struct DeserializeGuard<K>(pub Result<K, InvalidObject>);
 
-/// An object that failed to be deserialized by the [`ErrorBoundary`].
+/// An object that failed to be deserialized by the [`DeserializeGuard`].
 #[derive(Debug, Clone)]
 pub struct InvalidObject {
     // Should ideally be D::Error, but we don't know what type it has outside of Deserialize::deserialize()
@@ -33,7 +33,7 @@ impl Display for InvalidObject {
     }
 }
 
-impl<'de, K> Deserialize<'de> for ErrorBoundary<K>
+impl<'de, K> Deserialize<'de> for DeserializeGuard<K>
 where
     K: Deserialize<'de>,
     // Not actually used, but we assume that K is a Kubernetes-style resource with a `metadata` section
@@ -58,11 +58,11 @@ where
                     metadata,
                 }))
             })
-            .map(ErrorBoundary)
+            .map(DeserializeGuard)
     }
 }
 
-impl<K: Resource> Resource for ErrorBoundary<K> {
+impl<K: Resource> Resource for DeserializeGuard<K> {
     type DynamicType = K::DynamicType;
     type Scope = K::Scope;
 
@@ -96,11 +96,11 @@ mod tests {
     use k8s_openapi::api::core::v1::{ConfigMap, Pod};
     use serde_json::json;
 
-    use crate::{ErrorBoundary, Resource};
+    use crate::{DeserializeGuard, Resource};
 
     #[test]
     fn should_parse_meta_of_invalid_objects() {
-        let pod_error = serde_json::from_value::<ErrorBoundary<Pod>>(json!({
+        let pod_error = serde_json::from_value::<DeserializeGuard<Pod>>(json!({
             "metadata": {
                 "name": "the-name",
                 "namespace": "the-namespace",
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn should_allow_valid_objects() {
-        let configmap = serde_json::from_value::<ErrorBoundary<ConfigMap>>(json!({
+        let configmap = serde_json::from_value::<DeserializeGuard<ConfigMap>>(json!({
             "metadata": {
                 "name": "the-name",
                 "namespace": "the-namespace",
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn should_catch_invalid_objects() {
-        serde_json::from_value::<ErrorBoundary<Pod>>(json!({
+        serde_json::from_value::<DeserializeGuard<Pod>>(json!({
             "spec": {
                 "containers": "not-a-list"
             }
