@@ -6,7 +6,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::Deserialize;
 use serde_value::DeserializerError;
 
-use crate::Resource;
+use crate::{PartialObjectMeta, Resource};
 
 /// A wrapper type for T that lets deserializing the parent object succeed, even if the T is invalid.
 ///
@@ -43,12 +43,6 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct ObjectMetaContainer {
-            #[serde(default)]
-            metadata: ObjectMeta,
-        }
-
         // Deserialize::deserialize consumes the deserializer, and we want to retry parsing as an ObjectMetaContainer
         // if the initial parse fails, so that we can still implement Resource for the error case
         let buffer = serde_value::Value::deserialize(deserializer)?;
@@ -57,8 +51,8 @@ where
         T::deserialize(buffer.clone())
             .map(Ok)
             .or_else(|err| {
-                let ObjectMetaContainer { metadata } =
-                    ObjectMetaContainer::deserialize(buffer).map_err(DeserializerError::into_error)?;
+                let PartialObjectMeta { metadata, .. } =
+                    PartialObjectMeta::<T>::deserialize(buffer).map_err(DeserializerError::into_error)?;
                 Ok(Err(InvalidObject {
                     error: err.to_string(),
                     metadata,
