@@ -228,12 +228,21 @@ impl ConfigExt for Config {
         &self,
         connector: H,
     ) -> Result<hyper_rustls::HttpsConnector<H>> {
+        use hyper_rustls::FixedServerNameResolver;
+
+        use crate::client::tls::rustls_tls;
+
         let rustls_config = self.rustls_client_config()?;
         let mut builder = hyper_rustls::HttpsConnectorBuilder::new()
             .with_tls_config(rustls_config)
             .https_or_http();
         if let Some(tsn) = self.tls_server_name.as_ref() {
-            builder = builder.with_server_name(tsn.clone());
+            builder = builder.with_server_name_resolver(FixedServerNameResolver::new(
+                tsn.clone()
+                    .try_into()
+                    .map_err(rustls_tls::Error::InvalidServerName)
+                    .map_err(Error::RustlsTls)?,
+            ));
         }
         Ok(builder.enable_http1().wrap_connector(connector))
     }

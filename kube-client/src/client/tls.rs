@@ -4,7 +4,7 @@ pub mod rustls_tls {
     use rustls::{
         self,
         client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
-        pki_types::{CertificateDer, PrivateKeyDer, ServerName},
+        pki_types::{CertificateDer, InvalidDnsNameError, PrivateKeyDer, ServerName},
         ClientConfig, DigitallySignedStruct,
     };
     use thiserror::Error;
@@ -38,8 +38,12 @@ pub mod rustls_tls {
         AddRootCertificate(#[source] Box<dyn std::error::Error + Send + Sync>),
 
         /// No valid native root CA certificates found
-        #[error("No valid native root CA certificates found")]
+        #[error("no valid native root CA certificates found")]
         NoValidNativeRootCA(#[source] std::io::Error),
+
+        /// Invalid server name
+        #[error("invalid server name: {0}")]
+        InvalidServerName(#[source] InvalidDnsNameError),
     }
 
     /// Create `rustls::ClientConfig`.

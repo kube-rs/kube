@@ -189,7 +189,7 @@ mod tests {
         let mut runner = Box::pin(
             // The debounce period needs to zero because a debounce period > 0
             // will lead to the second request to be discarded.
-            Runner::new(scheduler(sched_rx), 0, |_| {
+            Runner::new(scheduler(sched_rx), 0, |()| {
                 count += 1;
                 // Panic if this ref is already held, to simulate some unsafe action..
                 let mutex_ref = rc.borrow_mut();
@@ -234,7 +234,7 @@ mod tests {
         // pause();
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
         let (result_tx, result_rx) = oneshot::channel();
-        let mut runner = Runner::new(scheduler(sched_rx), 0, |msg: &u8| futures::future::ready(*msg));
+        let mut runner = Runner::new(scheduler(sched_rx), 0, |msg: &u8| std::future::ready(*msg));
         // Start a background task that starts listening /before/ we enqueue the message
         // We can't just use Stream::poll_next(), since that bypasses the waker system
         Handle::current().spawn(async move { result_tx.send(runner.next().await).unwrap() });
@@ -277,7 +277,7 @@ mod tests {
                 0,
                 |msg| {
                     assert!(*is_ready.lock().unwrap());
-                    future::ready(*msg)
+                    std::future::ready(*msg)
                 },
             )
             .delay_tasks_until(ready.get()),
@@ -314,7 +314,7 @@ mod tests {
                 0,
                 |msg| {
                     assert!(*is_ready.lock().unwrap());
-                    future::ready(*msg)
+                    std::future::ready(*msg)
                 },
             )
             .delay_tasks_until(ready.get()),
@@ -352,7 +352,7 @@ mod tests {
                     panic!("run_msg should never be invoked if readiness gate fails");
                     // It's "useless", but it helps to direct rustc to the correct types
                     #[allow(unreachable_code)]
-                    future::ready(())
+                    std::future::ready(())
                 },
             )
             .delay_tasks_until(ready.get()),
