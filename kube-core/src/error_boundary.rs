@@ -1,10 +1,11 @@
 //! Types for isolating deserialization failures. See [`DeserializeGuard`].
 
-use std::{borrow::Cow, fmt::Display};
+use std::borrow::Cow;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::Deserialize;
 use serde_value::DeserializerError;
+use thiserror::Error;
 
 use crate::{PartialObjectMeta, Resource};
 
@@ -17,7 +18,8 @@ use crate::{PartialObjectMeta, Resource};
 pub struct DeserializeGuard<K>(pub Result<K, InvalidObject>);
 
 /// An object that failed to be deserialized by the [`DeserializeGuard`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Error)]
+#[error("{error}")]
 pub struct InvalidObject {
     // Should ideally be D::Error, but we don't know what type it has outside of Deserialize::deserialize()
     // It *could* be Box<std::error::Error>, but we don't know that it is Send+Sync
@@ -25,12 +27,6 @@ pub struct InvalidObject {
     pub error: String,
     /// The metadata of the invalid object.
     pub metadata: ObjectMeta,
-}
-
-impl Display for InvalidObject {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.error.fmt(f)
-    }
 }
 
 impl<'de, K> Deserialize<'de> for DeserializeGuard<K>
