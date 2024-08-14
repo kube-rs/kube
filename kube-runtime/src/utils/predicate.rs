@@ -11,7 +11,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-fn hash<T: Hash>(t: &T) -> u64 {
+fn hash<T: Hash + ?Sized>(t: &T) -> u64 {
     let mut hasher = DefaultHasher::new();
     t.hash(&mut hasher);
     hasher.finish()
@@ -190,6 +190,11 @@ pub mod predicates {
     /// Hash the annotations of a Resource K
     pub fn annotations<K: Resource>(obj: &K) -> Option<u64> {
         Some(hash(obj.annotations()))
+    }
+
+    /// Hash the finalizers of a Resource K
+    pub fn finalizers<K: Resource>(obj: &K) -> Option<u64> {
+        Some(hash(obj.finalizers()))
     }
 }
 
