@@ -78,3 +78,7 @@ name = "redox_syscall"
 
 [[bans.skip-tree]]
 name = "windows-sys"
+
+[[bans.skip]]
+# different sources of miniz_oxide which users will not generally see
+name = "miniz_oxide"
