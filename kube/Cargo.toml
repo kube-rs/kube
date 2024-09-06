@@ -21,6 +21,7 @@ rustls-tls = ["kube-client/rustls-tls", "client"]
 
 # alternative features
 openssl-tls = ["kube-client/openssl-tls", "client"]
+aws-lc-rs = ["kube-client?/aws-lc-rs"]
 
 # auxiliary features
 ws = ["kube-client/ws", "kube-core/ws"]
