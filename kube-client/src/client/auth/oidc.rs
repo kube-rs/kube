@@ -308,6 +308,11 @@ impl Refresher {
         let client_id = get_field(Self::CONFIG_CLIENT_ID)?.into();
         let client_secret = get_field(Self::CONFIG_CLIENT_SECRET)?.into();
 
+        #[cfg(all(feature = "rustls-tls", feature = "aws-lc-rs"))]
+        rustls::crypto::aws_lc_rs::default_provider()
+            .install_default()
+            .unwrap();
+
         #[cfg(feature = "rustls-tls")]
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
