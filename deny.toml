@@ -28,6 +28,9 @@ allow = [
     # Blanket addition for Unicode-3.0 libs for optional features (affects many deps, but it's a very clean license)
     # https://github.com/unicode-org/icu4x/blob/main/LICENSE
     "Unicode-3.0",
+    # Pulled in via aws_lc_rs when using rustls-tls and aws-lc-rs features
+    # https://openssl-library.org/source/license/index.html
+    "OpenSSL",
 ]
 
 exceptions = [
@@ -57,6 +60,9 @@ multiple-versions = "deny"
 
 [[bans.skip]]
 name = "hermit-abi"
+
+[[bans.skip]]
+name = "rustls-native-certs"
 
 [[bans.skip]]
 # Needs a complicated upgrade
