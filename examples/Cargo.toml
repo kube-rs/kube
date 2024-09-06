@@ -15,6 +15,7 @@ kubederive = ["kube/derive"]
 openssl-tls = ["kube/client", "kube/openssl-tls", "kube/unstable-client"]
 rustls-tls = ["kube/client", "kube/rustls-tls", "kube/unstable-client"]
 runtime = ["kube/runtime", "kube/unstable-runtime"]
+unstable-client = ["kube/unstable-client"]
 socks5 = ["kube/socks5"]
 refresh = ["kube/oauth", "kube/oidc"]
 kubelet-debug = ["kube/kubelet-debug"]
@@ -223,6 +224,11 @@ required-features = ["openssl-tls", "rustls-tls"]
 [[example]]
 name = "custom_client_trace"
 path = "custom_client_trace.rs"
+
+[[example]]
+name = "cert_check"
+path = "cert_check.rs"
+required-features = ["unstable-client"]
 
 [[example]]
 name = "secret_syncer"
