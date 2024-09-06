@@ -1,9 +1,14 @@
 use std::borrow::Cow;
 
-use k8s_openapi::api::core::v1::{ConfigMap, Namespace as Ns};
-use k8s_openapi::NamespaceResourceScope;
-use kube::client::scope::Namespace;
-use kube::{api::ObjectMeta, client::scope::Cluster, Client, Resource, ResourceExt};
+use k8s_openapi::{
+    api::core::v1::{ConfigMap, Namespace as Ns},
+    NamespaceResourceScope,
+};
+use kube::{
+    api::ObjectMeta,
+    client::scope::{Cluster, Namespace},
+    Client, Resource, ResourceExt,
+};
 use serde::{Deserialize, Serialize};
 use tracing::*;
 
