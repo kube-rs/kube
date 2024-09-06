@@ -3,9 +3,9 @@ use k8s_openapi::{
     ByteString,
 };
 use kube::api::ObjectMeta;
-use kube_derive::ResourceInherit;
+use kube_derive::Resource;
 
-#[derive(ResourceInherit, Default)]
+#[derive(Resource, Default)]
 #[inherit(resource = "ConfigMap")]
 struct TypedMap {
     metadata: ObjectMeta,
@@ -17,7 +17,7 @@ struct TypedData {
     field: String,
 }
 
-#[derive(ResourceInherit, Default)]
+#[derive(Resource, Default)]
 #[inherit(resource = "Secret")]
 struct TypedSecret {
     metadata: ObjectMeta,

@@ -4,7 +4,7 @@ extern crate proc_macro;
 #[macro_use] extern crate quote;
 
 mod custom_resource;
-mod resource_inherit;
+mod resource;
 
 /// A custom derive for kubernetes custom resource definitions.
 ///
@@ -325,12 +325,12 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// ```rust,no_run
 /// use kube::api::ObjectMeta;
 /// use k8s_openapi::api::core::v1::ConfigMap;
-/// use kube_derive::ResourceInherit;
+/// use kube_derive::Resource;
 /// use kube::Client;
 /// use kube::Api;
 /// use serde::Deserialize;
 ///
-/// #[derive(ResourceInherit, Clone, Debug, Deserialize)]
+/// #[derive(Resource, Clone, Debug, Deserialize)]
 /// #[inherit(resource = "ConfigMap")]
 /// struct FooMap {
 ///     metadata: ObjectMeta,
@@ -351,7 +351,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// ```
 /// // impl kube::Resource for FooMap { .. }
 /// ```
-#[proc_macro_derive(ResourceInherit, attributes(inherit))]
+#[proc_macro_derive(Resource, attributes(inherit))]
 pub fn derive_resource_inherit(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    resource_inherit::derive(proc_macro2::TokenStream::from(input)).into()
+    resource::derive(proc_macro2::TokenStream::from(input)).into()
 }

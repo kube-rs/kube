@@ -1,9 +1,7 @@
-use std::borrow::Cow;
-
 use futures::prelude::*;
-use k8s_openapi::{api::core::v1::Pod, NamespaceResourceScope};
+use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
-    api::{Api, ObjectMeta, ResourceExt},
+    api::{Api, ObjectMeta},
     core::DeserializeGuard,
     runtime::{reflector::ObjectRef, watcher, WatchStreamExt},
     Client, Resource,
@@ -13,7 +11,8 @@ use tracing::*;
 
 // Variant of ConfigMap that only accepts ConfigMaps with a CA certificate
 // to demonstrate parsing failure
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Resource, Deserialize, Debug, Clone)]
+#[inherit(resource = ConfigMap)]
 struct CaConfigMap {
     metadata: ObjectMeta,
     data: CaConfigMapData,
@@ -23,36 +22,6 @@ struct CaConfigMap {
 struct CaConfigMapData {
     #[serde(rename = "ca.crt")]
     ca_crt: String,
-}
-
-// Normally you would derive this, but ConfigMap doesn't follow the standard spec/status pattern
-impl Resource for CaConfigMap {
-    type DynamicType = ();
-    type Scope = NamespaceResourceScope;
-
-    fn kind(&(): &Self::DynamicType) -> Cow<'_, str> {
-        Cow::Borrowed("ConfigMap")
-    }
-
-    fn group(&(): &Self::DynamicType) -> Cow<'_, str> {
-        Cow::Borrowed("")
-    }
-
-    fn version(&(): &Self::DynamicType) -> Cow<'_, str> {
-        Cow::Borrowed("v1")
-    }
-
-    fn plural(&(): &Self::DynamicType) -> Cow<'_, str> {
-        Cow::Borrowed("configmaps")
-    }
-
-    fn meta(&self) -> &ObjectMeta {
-        &self.metadata
-    }
-
-    fn meta_mut(&mut self) -> &mut ObjectMeta {
-        &mut self.metadata
-    }
 }
 
 #[tokio::main]

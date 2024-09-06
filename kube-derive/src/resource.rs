@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn test_parse_inherit() {
         let input = quote! {
-            #[derive(ResourceInherit)]
+            #[derive(Resource)]
             #[inherit(resource = "ConfigMap")]
             struct Foo { metadata: ObjectMeta }
         };
