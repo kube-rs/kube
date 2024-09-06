@@ -6,7 +6,7 @@ use kube::api::ObjectMeta;
 use kube_derive::Resource;
 
 #[derive(Resource, Default)]
-#[inherit(resource = "ConfigMap")]
+#[resource(inherit = "ConfigMap")]
 struct TypedMap {
     metadata: ObjectMeta,
     data: Option<TypedData>,
@@ -18,7 +18,7 @@ struct TypedData {
 }
 
 #[derive(Resource, Default)]
-#[inherit(resource = "Secret")]
+#[resource(inherit = "Secret")]
 struct TypedSecret {
     metadata: ObjectMeta,
     data: Option<TypedSecretData>,

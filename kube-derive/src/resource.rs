@@ -6,9 +6,9 @@ use syn::{parse_quote, Data, DeriveInput, Path};
 
 /// Values we can parse from #[kube(attrs)]
 #[derive(Debug, FromDeriveInput)]
-#[darling(attributes(inherit))]
+#[darling(attributes(resource))]
 struct InheritAttrs {
-    resource: syn::Path,
+    inherit: syn::Path,
     #[darling(default)]
     crates: Crates,
 }
@@ -58,7 +58,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     };
 
     let InheritAttrs {
-        resource,
+        inherit: resource,
         crates: Crates {
             kube_core,
             k8s_openapi,
@@ -117,7 +117,7 @@ mod tests {
     fn test_parse_inherit() {
         let input = quote! {
             #[derive(Resource)]
-            #[inherit(resource = "ConfigMap")]
+            #[resource(inherit = "ConfigMap")]
             struct Foo { metadata: ObjectMeta }
         };
 

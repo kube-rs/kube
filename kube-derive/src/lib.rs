@@ -331,7 +331,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// use serde::Deserialize;
 ///
 /// #[derive(Resource, Clone, Debug, Deserialize)]
-/// #[inherit(resource = "ConfigMap")]
+/// #[resource(inherit = "ConfigMap")]
 /// struct FooMap {
 ///     metadata: ObjectMeta,
 ///     data: Option<FooMapSpec>,
@@ -351,7 +351,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// ```
 /// // impl kube::Resource for FooMap { .. }
 /// ```
-#[proc_macro_derive(Resource, attributes(inherit))]
-pub fn derive_resource_inherit(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_derive(Resource, attributes(resource))]
+pub fn derive_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     resource::derive(proc_macro2::TokenStream::from(input)).into()
 }

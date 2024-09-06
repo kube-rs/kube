@@ -12,7 +12,7 @@ use tracing::*;
 // Variant of ConfigMap that only accepts ConfigMaps with a CA certificate
 // to demonstrate parsing failure
 #[derive(Resource, Deserialize, Debug, Clone)]
-#[inherit(resource = ConfigMap)]
+#[resource(inherit = ConfigMap)]
 struct CaConfigMap {
     metadata: ObjectMeta,
     data: CaConfigMapData,
