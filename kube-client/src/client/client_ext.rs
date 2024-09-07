@@ -1,13 +1,16 @@
 use crate::{Client, Error, Result};
 use k8s_openapi::{
-    api::core::v1::{LocalObjectReference, Namespace as k8sNs, ObjectReference},
+    api::{
+        core::v1::{LocalObjectReference, Namespace as k8sNs, ObjectReference},
+    },
     apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
 use kube_core::{
     object::ObjectList,
-    params::{GetParams, ListParams},
+    params::{GetParams, ListParams, Patch, PatchParams},
     request::Request,
-    ApiResource, ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource,
+    ApiResource, ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, ObjectMeta, Resource,
+    ResourceExt,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
@@ -382,6 +385,76 @@ impl Client {
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("list");
         self.request::<ObjectList<K>>(req).await
+    }
+
+    /// Perform apply patch on the provided `Resource` implementing type `K`
+    ///
+    /// ```no_run
+    /// # use k8s_openapi::api::core::v1::;
+    /// # use k8s_openapi::api::core::v1::Service;
+    /// # use kube::client::scope::Namespace;
+    /// # use kube::prelude::*;
+    /// # use kube::api::{PatchParams, Patch};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pod: Pod = client.get("some_pod", &Namespace::from("default")).await?;
+    /// let pp = &PatchParams::apply("controller").force();
+    /// // Perform an apply patch on the resource
+    /// client.apply(pod, pp).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn apply<K, P: Serialize + Debug>(&self, resource: &K, pp: &PatchParams) -> Result<K>
+    where
+        K: ResourceExt + Serialize + DeserializeOwned + Clone + Debug,
+        <K as Resource>::DynamicType: Default,
+    {
+        let meta = resource.meta();
+        let name = meta.name.as_ref().ok_or(Error::NameResolve)?;
+        let url = K::url_path(&Default::default(), meta.namespace.as_deref());
+        let req = Request::new(url);
+
+        let mut resource = resource.clone();
+        resource.meta_mut().managed_fields = None;
+        let patch = &Patch::Apply(resource);
+        let req = req.patch(name, pp, patch).map_err(Error::BuildRequest)?;
+        self.request::<K>(req).await
+    }
+
+    /// Perform apply patch on the provided `Resource` status, implementing type `K`
+    ///
+    /// ```no_run
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # use k8s_openapi::api::core::v1::Service;
+    /// # use kube::client::scope::Namespace;
+    /// # use kube::prelude::*;
+    /// # use kube::api::{PatchParams, Patch};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pod: Pod = client.get("some_pod", &Namespace::from("default")).await?;
+    /// let pp = &PatchParams::apply("controller").force();
+    /// // Perform an apply patch on the resource status
+    /// client.apply(pod, pp).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn apply_status<K, P: Serialize + Debug>(&self, resource: &K, pp: &PatchParams) -> Result<K>
+    where
+        K: ResourceExt + Serialize + DeserializeOwned + Clone + Debug,
+        <K as Resource>::DynamicType: Default,
+    {
+        let meta = resource.meta();
+        let name = meta.name.as_ref().ok_or(Error::NameResolve)?;
+        let url = K::url_path(&Default::default(), meta.namespace.as_deref());
+        let req = Request::new(url);
+
+        let mut resource = resource.clone();
+        resource.meta_mut().managed_fields = None;
+        let patch = &Patch::Apply(resource);
+        let req = req
+            .patch_subresource("status", name, pp, patch)
+            .map_err(Error::BuildRequest)?;
+        self.request::<K>(req).await
     }
 }
 
