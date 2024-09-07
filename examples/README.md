@@ -70,7 +70,7 @@ cargo run --example crd_derive
 cargo run --example crd_derive_schema
 cargo run --example crd_derive_no_schema --no-default-features --features=openssl-tls,latest
 # collect kube-root configmaps from each namespace, with strictly typed serialization on ca.crt key
-cargo run --example cert_check --features="unstable-client"
+cargo run --example cert_check
 ```
 
 The last one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
