@@ -91,6 +91,7 @@ async fn main() -> Result<(), Error> {
         .map_err(Error::NamespaceList)?;
 
     for ns in namespaces {
+        // Equivalent ways to GET using different structs and different Resource impls, with added field validation on top.
         let _ca: ConfigMap = client
             .get("kube-root-ca.crt", &Namespace::from(ns.name_any()))
             .await?;
