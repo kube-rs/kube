@@ -7,8 +7,15 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.94.1...main
 
-0.94.1 / 2024-09-09
+[0.94.1](https://github.com/kube-rs/kube/releases/tag/0.94.1) / 2024-09-09
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.94.1 -->
+
+## What's Changed
+Convenience release. Adjusted a version bound to avoid possibility of running into version compatibility errors with `hyper-rustls`.
+
+### Fixed
+* Update hyper-rustls minimum version by @divergentdave in https://github.com/kube-rs/kube/pull/1575
 
 [0.94.0](https://github.com/kube-rs/kube/releases/tag/0.94.0) / 2024-09-09
 ===================
