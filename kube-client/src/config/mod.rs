@@ -118,7 +118,10 @@ pub enum LoadDataError {
     NoBase64DataOrFile,
 }
 
-/// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
+/// Configuration object for accessing a Kuernetes cluster
+///
+/// The configurable parameters for connecting like cluster URL, default namespace, root certificates, and timeouts.
+/// Normally created implicitly through [`Config::infer`] or [`Client::try_default`](crate::Client::try_default).
 ///
 /// # Usage
 /// Construct a [`Config`] instance by using one of the many constructors.

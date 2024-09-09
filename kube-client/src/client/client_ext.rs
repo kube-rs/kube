@@ -39,10 +39,12 @@ pub trait ObjectUrl<K> {
 }
 
 /// Marker type for cluster level queries
+#[derive(Debug, Clone)]
 pub struct Cluster;
 /// Namespace newtype for namespace level queries
 ///
 /// You can create this directly, or convert `From` a `String` / `&str`, or `TryFrom` an `k8s_openapi::api::core::v1::Namespace`
+#[derive(Debug, Clone)]
 pub struct Namespace(String);
 
 /// Referenced object name resolution

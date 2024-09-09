@@ -1,4 +1,4 @@
-//! Crate with types and traits necessary for interacting with the Kubernetes API
+//! Types and traits necessary for interacting with the Kubernetes API
 //!
 //! This crate provides the minimal apimachinery necessary to make requests to the kubernetes API.
 //!

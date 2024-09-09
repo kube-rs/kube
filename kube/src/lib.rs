@@ -10,7 +10,7 @@
 //! - [`client`] with the Kubernetes [`Client`] and its layers
 //! - [`config`] for cluster [`Config`]
 //! - [`api`] with the generic Kubernetes [`Api`]
-//! - [`derive`](kube_derive) with the [`CustomResource`] derive for building controllers types
+//! - [`derive`](kube_derive) with the [`CustomResource`] / [`Resource`] derive for building controllers types
 //! - [`runtime`] with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
 //! - [`core`] with generics from `apimachinery`
 //!
@@ -160,7 +160,6 @@ cfg_error! {
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
-/// Re-exports from [`kube-derive`](kube_derive)
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
@@ -169,16 +168,13 @@ pub use kube_derive::CustomResource;
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::Resource;
 
-/// Re-exports from `kube-runtime`
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 #[doc(inline)]
 pub use kube_runtime as runtime;
 
 pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
-/// Re-exports from `kube_core`
-#[doc(inline)]
-pub use kube_core as core;
+#[doc(inline)] pub use kube_core as core;
 
 // Mock tests for the runtime
 #[cfg(test)]
@@ -186,7 +182,7 @@ pub use kube_core as core;
 mod mock_tests;
 
 pub mod prelude {
-    //! A "prelude" for kube client crate. Reduces the number of duplicated imports.
+    //! A prelude for kube. Reduces the number of duplicated imports.
     //!
     //! This prelude is similar to the standard library's prelude in that you'll
     //! almost always want to import its entire contents, but unlike the

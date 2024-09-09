@@ -7,49 +7,34 @@ use k8s_openapi::{
 use kube::{
     api::ObjectMeta,
     client::scope::{Cluster, Namespace},
-    Client, Resource, ResourceExt,
+    Client, Resource,
 };
 use serde::{Deserialize, Serialize};
 use tracing::*;
 
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-enum Error {
-    #[error("Failed to open client: {0}")]
-    ClientSetup(#[source] kube::Error),
-    #[error("Failed to list namespaces: {0}")]
-    NamespaceList(#[source] kube::Error),
-    #[error("Failed to get ConfigMap: {0}")]
-    FetchFailed(#[from] kube::Error),
-    #[error("Expected certificate key in ConfigMap: {0}")]
-    MissingKey(#[from] serde_json::Error),
-}
-
-// Variant of ConfigMap that only accepts ConfigMaps with a CA certificate
-// to demonstrate manual implementation
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct CaConfigMapManual {
-    metadata: ObjectMeta,
-    data: CaConfigMapData,
-}
-
+// Our own way of representing data - partially typed in 2 ways
+// For a ConfigMap variant that only accepts CA certificates
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct CaConfigMapData {
     #[serde(rename = "ca.crt")]
     ca_crt: String,
 }
 
-// Variant of ConfigMap that only accepts ConfigMaps with a CA certificate
-// with inherited resource implementation
+// Method 1 :: inherit resource implementation from k8s_openapi's ConfigMap
 #[derive(Resource, Serialize, Deserialize, Debug, Clone)]
-#[resource(inherit = ConfigMap)]
+#[resource(inherit = ConfigMap)] // method 1
 struct CaConfigMap {
     metadata: ObjectMeta,
     data: CaConfigMapData,
 }
 
-// Display of a manual implementation
+// Method 2 :: manual Resource implementation
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CaConfigMapManual {
+    metadata: ObjectMeta,
+    data: CaConfigMapData,
+}
+// Method 2 :: manual Resource implementation
 impl Resource for CaConfigMapManual {
     type DynamicType = ();
     type Scope = NamespaceResourceScope;
@@ -79,33 +64,24 @@ impl Resource for CaConfigMapManual {
     }
 }
 
-
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let client = Client::try_default().await.map_err(Error::ClientSetup)?;
-    let namespaces = client
-        .list::<Ns>(&Default::default(), &Cluster)
-        .await
-        .map_err(Error::NamespaceList)?;
+    let client = Client::try_default().await?;
+    let namespaces = client.list::<Ns>(&Default::default(), &Cluster).await?;
+    let kube_root = "kube-root-ca.crt";
 
     for ns in namespaces {
+        let ns = Namespace::try_from(&ns)?;
         // Equivalent ways to GET using different structs and different Resource impls, with added field validation on top.
-        let _ca: ConfigMap = client
-            .get("kube-root-ca.crt", &Namespace::from(ns.name_any()))
-            .await?;
-        let _ca: CaConfigMapManual = client
-            .get("kube-root-ca.crt", &Namespace::from(ns.name_any()))
-            .await?;
-        let ca: CaConfigMap = client
-            .get("kube-root-ca.crt", &Namespace::from(ns.name_any()))
-            .await?;
-        info!(
-            "Found correct root ca config map in {}: {}",
-            ns.name_any(),
-            ca.name_any()
-        );
+        let ca1: ConfigMap = client.get(kube_root, &ns).await?;
+        let ca2: CaConfigMapManual = client.get(kube_root, &ns).await?;
+        let ca3: CaConfigMap = client.get(kube_root, &ns).await?;
+        info!("Found {kube_root} in {ns:?} with all 3 methods");
+        debug!("ca1: {ca1:?}");
+        debug!("ca2: {ca2:?}");
+        debug!("ca3: {ca3:?}");
     }
 
     Ok(())
