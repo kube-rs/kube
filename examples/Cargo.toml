@@ -225,6 +225,10 @@ name = "custom_client_trace"
 path = "custom_client_trace.rs"
 
 [[example]]
+name = "cert_check"
+path = "cert_check.rs"
+
+[[example]]
 name = "secret_syncer"
 path = "secret_syncer.rs"
 

@@ -165,6 +165,10 @@ cfg_error! {
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
+#[cfg(feature = "derive")]
+#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+pub use kube_derive::Resource;
+
 /// Re-exports from `kube-runtime`
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
