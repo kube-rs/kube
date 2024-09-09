@@ -6,7 +6,7 @@ Add the `derive` feature to `kube`:
 
 ```toml
 [dependencies]
-kube = { version = "0.94.0", feature = ["derive"] }
+kube = { version = "0.94.1", feature = ["derive"] }
 ```
 
 ## Usage
