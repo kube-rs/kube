@@ -69,11 +69,10 @@ cargo run --example crd_api
 cargo run --example crd_derive
 cargo run --example crd_derive_schema
 cargo run --example crd_derive_no_schema --no-default-features --features=openssl-tls,latest
-# collect kube-root configmaps from each namespace, with strictly typed serialization on ca.crt key
-cargo run --example cert_check
+cargo run --example cert_check # showcases partial typing with Resource derive
 ```
 
-The last one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
+The `no_schema` one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
 
 **However**: without the `schema` feature, it's left **up to you to fill in a valid openapi v3 schema**, as schemas are **required** for [v1::CustomResourceDefinitions](https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinition.html), and the generated crd will be rejected by the apiserver if it's missing. As the last example shows, you can do this directly without `schemars`.
 

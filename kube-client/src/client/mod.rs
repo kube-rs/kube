@@ -1,4 +1,4 @@
-//! A basic API client for interacting with the Kubernetes API
+//! API client for interacting with the Kubernetes API
 //!
 //! The [`Client`] uses standard kube error handling.
 //!
