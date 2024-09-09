@@ -22,7 +22,7 @@ struct CaConfigMapData {
 
 // Method 1 :: inherit resource implementation from k8s_openapi's ConfigMap
 #[derive(Resource, Serialize, Deserialize, Debug, Clone)]
-#[resource(inherit = ConfigMap)] // method 1
+#[resource(inherit = ConfigMap)]
 struct CaConfigMap {
     metadata: ObjectMeta,
     data: CaConfigMapData,
