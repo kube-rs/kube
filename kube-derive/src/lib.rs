@@ -312,13 +312,13 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 
 /// A custom derive for inheriting Resource impl for the type.
 ///
-/// This will generate a [`kube::Resource`] trait implementation, which inherits the specified
-/// resources trait implementation.
+/// This will generate a [`kube::Resource`] trait implementation,
+/// inheriting from a specified resource trait implementation.
 ///
-/// Such implementation allows to add strict typing to some typical resources like `Secret` or `ConfigMap`,
+/// This allows strict typing to some typical resources like `Secret` or `ConfigMap`,
 /// in cases when implementing CRD is not desirable or it does not fit the use-case.
 ///
-/// This object can be used with [`kube::Api`].
+/// Once derived, the type can be used with [`kube::Api`].
 ///
 /// # Example
 ///
@@ -351,6 +351,11 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// ```
 /// // impl kube::Resource for FooMap { .. }
 /// ```
+/// [`kube`]: https://docs.rs/kube
+/// [`kube::Api`]: https://docs.rs/kube/*/kube/struct.Api.html
+/// [`kube::Resource`]: https://docs.rs/kube/*/kube/trait.Resource.html
+/// [`kube::core::ApiResource`]: https://docs.rs/kube/*/kube/core/struct.ApiResource.html
+/// [`kube::CustomResourceExt`]: https://docs.rs/kube/*/kube/trait.CustomResourceExt.html
 #[proc_macro_derive(Resource, attributes(resource))]
 pub fn derive_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     resource::derive(proc_macro2::TokenStream::from(input)).into()

@@ -10,7 +10,7 @@
 //! - [`client`] with the Kubernetes [`Client`] and its layers
 //! - [`config`] for cluster [`Config`]
 //! - [`api`] with the generic Kubernetes [`Api`]
-//! - [`derive`](kube_derive) with the [`CustomResource`] / [`Resource`] derive for building controllers types
+//! - [`derive`](kube_derive) with the [`CustomResource`] / [`Resource`](kube_derive::Resource) derive for building controllers types
 //! - [`runtime`] with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
 //! - [`core`] with generics from `apimachinery`
 //!
