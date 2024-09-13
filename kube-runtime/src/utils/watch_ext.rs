@@ -1,7 +1,10 @@
-#[cfg(feature = "unstable-runtime-predicates")]
-use crate::utils::predicate::{Predicate, PredicateFilter};
 use crate::{
-    utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
+    utils::{
+        event_flatten::EventFlatten,
+        event_modify::EventModify,
+        predicate::{Predicate, PredicateFilter},
+        stream_backoff::StreamBackoff,
+    },
     watcher,
 };
 use kube_client::Resource;
@@ -116,7 +119,6 @@ pub trait WatchStreamExt: Stream {
     /// # Ok(())
     /// # }
     /// ```
-    #[cfg(feature = "unstable-runtime-predicates")]
     fn predicate_filter<K, P>(self, predicate: P) -> PredicateFilter<Self, K, P>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
@@ -272,7 +274,6 @@ pub trait WatchStreamExt: Stream {
 impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
 
 // Compile tests
-#[cfg(feature = "unstable-runtime-predicates")]
 #[cfg(test)]
 pub(crate) mod tests {
     use super::watcher;
