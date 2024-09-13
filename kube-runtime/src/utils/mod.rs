@@ -4,6 +4,7 @@ mod backoff_reset_timer;
 pub(crate) mod delayed_init;
 mod event_flatten;
 mod event_modify;
+mod predicate;
 mod reflect;
 mod stream_backoff;
 mod watch_ext;
