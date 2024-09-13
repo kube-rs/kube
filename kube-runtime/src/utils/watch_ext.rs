@@ -97,8 +97,6 @@ pub trait WatchStreamExt: Stream {
     /// Common use case for this is to avoid repeat events for status updates
     /// by filtering on [`predicates::generation`](crate::predicates::generation).
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// ## Usage
     /// ```no_run
     /// # use std::pin::pin;
