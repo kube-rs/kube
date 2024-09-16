@@ -17,7 +17,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 ```toml
 [dependencies]
 kube = { version = "0.94.2", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.22.0", features = ["latest"] }
+k8s-openapi = { version = "0.23.0", features = ["latest"] }
 ```
 
 See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality.
@@ -156,7 +156,7 @@ By default [rustls](https://github.com/rustls/rustls) is used for TLS, but `open
 ```toml
 [dependencies]
 kube = { version = "0.94.2", default-features = false, features = ["client", "openssl-tls"] }
-k8s-openapi = { version = "0.22.0", features = ["latest"] }
+k8s-openapi = { version = "0.23.0", features = ["latest"] }
 ```
 
 This will pull in `openssl` and `hyper-openssl`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `rustls`.
