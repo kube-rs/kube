@@ -59,28 +59,21 @@ allow-git = ["https://github.com/tyrone-wu/runtime-macros.git"]
 multiple-versions = "deny"
 
 [[bans.skip]]
-name = "hermit-abi"
-
-[[bans.skip]]
 name = "rustls-native-certs"
 
 [[bans.skip]]
-# Needs a complicated upgrade
+# We need to replace derivative to get rid of syn 1
+# https://github.com/kube-rs/kube/issues/1583
 name = "syn"
 
 [[bans.skip]]
-# waiting for pem to bump base64
-# https://github.com/jcreekmore/pem-rs/blob/master/Cargo.toml#L16
+# base64 did some annoying breaking changes
 name = "base64"
 
 [[bans.skip]]
 # latest via openssl->hyper-openssl (we have latest)
 # newer via tower-http (we have latest)
 name = "bitflags"
-
-[[bans.skip]]
-# deep in dependency tree, only dual use via dev dependency
-name = "redox_syscall"
 
 [[bans.skip-tree]]
 name = "windows-sys"
