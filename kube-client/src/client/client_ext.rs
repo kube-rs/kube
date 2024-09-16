@@ -243,8 +243,7 @@ pub enum NamespaceError {
 /// ## Example
 ///
 /// ```no_run
-/// # use k8s_openapi::api::core::v1::Pod;
-/// # use k8s_openapi::api::core::v1::Service;
+/// # use k8s_openapi::api::core::v1::{Pod, Service};
 /// # use kube::client::scope::{Namespace, Cluster};
 /// # use kube::prelude::*;
 /// # use kube::api::ListParams;
@@ -295,11 +294,10 @@ impl Client {
     ///
     /// ```no_run
     /// # use k8s_openapi::api::rbac::v1::ClusterRole;
-    /// # use k8s_openapi::api::core::v1::Service;
-    /// # use k8s_openapi::api::core::v1::Secret;
-    /// # use k8s_openapi::api::core::v1::ObjectReference;
-    /// # use k8s_openapi::api::core::v1::LocalObjectReference;
-    /// # use k8s_openapi::api::core::v1::{Node, Pod};
+    /// # use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
+    /// # use k8s_openapi::api::core::v1::{ObjectReference, LocalObjectReference};
+    /// # use k8s_openapi::api::core::v1::{Node, Pod, Service, Secret};
+    /// # use kube::client::scope::NamespacedRef;
     /// # use kube::api::GetParams;
     /// # use kube::prelude::*;
     /// # use kube::api::DynamicObject;
@@ -333,7 +331,7 @@ impl Client {
     ///     .image_pull_secrets
     ///     .unwrap_or_default()
     ///     .get(0)
-    ///     .unwrap_or(&LocalObjectReference{name: Some("pull_secret".into())});
+    ///     .unwrap_or(&LocalObjectReference{name: "pull_secret".into()});
     /// let secret: Secret = client.fetch(&secret_ref.within(pod.namespace())).await?;
     /// # Ok(())
     /// # }
