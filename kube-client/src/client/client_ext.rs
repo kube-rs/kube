@@ -140,7 +140,7 @@ where
         ObjectReference {
             api_version: K::api_version(&dt).to_string().into(),
             namespace: namespace.into(),
-            name: self.name.clone(),
+            name: Some(self.name.clone()),
             kind: K::kind(&dt).to_string().into(),
             ..Default::default()
         }
