@@ -11,13 +11,8 @@ use std::fmt::Debug;
 mod subresource;
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub use subresource::{Attach, AttachParams, Execute, Portforward};
+pub use subresource::{Attach, AttachParams, Ephemeral, Execute, Portforward};
 pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
-
-// Ephemeral containers were stabilized in Kubernetes 1.25.
-k8s_openapi::k8s_if_ge_1_25! {
-    pub use subresource::Ephemeral;
-}
 
 mod util;
 

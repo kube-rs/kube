@@ -19,7 +19,7 @@ path = "boot.rs"
 
 [features]
 latest = ["k8s-openapi/latest"]
-mk8sv = ["k8s-openapi/v1_25"]
+mk8sv = ["k8s-openapi/v1_26"]
 rustls = ["kube/rustls-tls"]
 openssl = ["kube/openssl-tls"]
 
