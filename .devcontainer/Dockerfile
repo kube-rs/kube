@@ -49,8 +49,8 @@ RUN scurl "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO
     | tar zvxf - --strip-components=1 -C $HOME/bin "cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl/cargo-deny"
 
 # Install cargo-tarpaulin
-ARG CARGO_TARPAULIN_VERSION=0.28.0
-RUN scurl "https://github.com/xd009642/tarpaulin/releases/download/${CARGO_TARPAULIN_VERSION}/cargo-tarpaulin-${CARGO_TARPAULIN_VERSION}-travis.tar.gz" \
+ARG CARGO_TARPAULIN_VERSION=0.31.2
+RUN scurl "https://github.com/xd009642/tarpaulin/releases/download/${CARGO_TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz" \
     | tar xzvf - -C $HOME/bin
 
 ARG JUST_VERSION=1.35.0
