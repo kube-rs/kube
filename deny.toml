@@ -62,11 +62,6 @@ multiple-versions = "deny"
 name = "rustls-native-certs"
 
 [[bans.skip]]
-# We need to replace derivative to get rid of syn 1
-# https://github.com/kube-rs/kube/issues/1583
-name = "syn"
-
-[[bans.skip]]
 # base64 did some annoying breaking changes
 name = "base64"
 

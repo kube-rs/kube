@@ -12,7 +12,7 @@ use crate::{
     watcher::{self, metadata_watcher, watcher, DefaultBackoff},
 };
 use backoff::backoff::Backoff;
-use derivative::Derivative;
+use educe::Educe;
 use futures::{
     channel,
     future::{self, BoxFuture},
@@ -267,19 +267,20 @@ where
 /// NOTE: The reason is ignored for comparison purposes. This means that, for example,
 /// an object can only occupy one scheduler slot, even if it has been scheduled for multiple reasons.
 /// In this case, only *the first* reason is stored.
-#[derive(Derivative)]
-#[derivative(
-    Debug(bound = "K::DynamicType: Debug"),
-    Clone(bound = "K::DynamicType: Clone"),
-    PartialEq(bound = "K::DynamicType: PartialEq"),
-    Eq(bound = "K::DynamicType: Eq"),
-    Hash(bound = "K::DynamicType: Hash")
+#[derive(Educe)]
+#[educe(
+    Debug(bound("K::DynamicType: Debug")),
+    Clone(bound("K::DynamicType: Clone")),
+    PartialEq(bound("K::DynamicType: PartialEq")),
+    Hash(bound("K::DynamicType: Hash"))
 )]
 pub struct ReconcileRequest<K: Resource> {
     pub obj_ref: ObjectRef<K>,
-    #[derivative(PartialEq = "ignore", Hash = "ignore")]
+    #[educe(PartialEq(ignore), Hash(ignore))]
     pub reason: ReconcileReason,
 }
+
+impl<K: Resource> Eq for ReconcileRequest<K> where K::DynamicType: Eq {}
 
 impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
     fn from(obj_ref: ObjectRef<K>) -> Self {
