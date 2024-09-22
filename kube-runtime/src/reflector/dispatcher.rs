@@ -4,7 +4,7 @@ use core::{
 };
 use std::{fmt::Debug, sync::Arc};
 
-use derivative::Derivative;
+use educe::Educe;
 use futures::Stream;
 use pin_project::pin_project;
 use std::task::ready;
@@ -14,8 +14,8 @@ use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
 use super::Lookup;
 
-#[derive(Derivative)]
-#[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
+#[derive(Educe)]
+#[educe(Debug(bound("K: Debug, K::DynamicType: Debug")), Clone)]
 // A helper type that holds a broadcast transmitter and a broadcast receiver,
 // used to fan-out events from a root stream to multiple listeners.
 pub(crate) struct Dispatcher<K>

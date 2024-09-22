@@ -295,7 +295,7 @@ mod tests {
     use crate::utils::KubeRuntimeStreamExt;
 
     use super::{debounced_scheduler, scheduler, ScheduleRequest};
-    use derivative::Derivative;
+    use educe::Educe;
     use futures::{channel::mpsc, future, poll, stream, FutureExt, SinkExt, StreamExt};
     use std::{pin::pin, task::Poll};
     use tokio::time::{advance, pause, sleep, Duration, Instant};
@@ -309,9 +309,9 @@ mod tests {
     }
 
     /// Message type that is always considered equal to itself
-    #[derive(Derivative, Eq, Clone, Debug)]
-    #[derivative(PartialEq, Hash)]
-    struct SingletonMessage(#[derivative(PartialEq = "ignore", Hash = "ignore")] u8);
+    #[derive(Educe, Eq, Clone, Debug)]
+    #[educe(PartialEq, Hash)]
+    struct SingletonMessage(#[educe(PartialEq(ignore), Hash(ignore))] u8);
 
     #[tokio::test]
     async fn scheduler_should_hold_and_release_items() {

@@ -10,9 +10,11 @@
 
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-// Triggered by many derive macros (kube-derive, derivative)
+// Triggered by many derive macros (kube-derive, educe)
 #![allow(clippy::default_trait_access)]
 #![allow(clippy::type_repetition_in_bounds)]
+// Triggered by educe derives on enums
+#![allow(clippy::used_underscore_binding)]
 // Triggered by Tokio macros
 #![allow(clippy::semicolon_if_nothing_returned)]
 // Triggered by nightly clippy on idiomatic code

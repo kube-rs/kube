@@ -4,7 +4,7 @@ use crate::{
     watcher,
 };
 use ahash::AHashMap;
-use derivative::Derivative;
+use educe::Educe;
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
@@ -179,8 +179,8 @@ where
 ///
 /// Cannot be constructed directly since one writer handle is required,
 /// use `Writer::as_reader()` instead.
-#[derive(Derivative)]
-#[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
+#[derive(Educe)]
+#[educe(Debug(bound("K: Debug, K::DynamicType: Debug")), Clone)]
 pub struct Store<K: 'static + Lookup>
 where
     K::DynamicType: Hash + Eq,
