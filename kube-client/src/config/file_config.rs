@@ -149,7 +149,7 @@ where
     D: Deserializer<'de>,
 {
     match Option::<String>::deserialize(deserializer) {
-        Ok(Some(secret)) => Ok(Some(SecretString::new(secret))),
+        Ok(Some(secret)) => Ok(Some(SecretString::new(secret.into()))),
         Ok(None) => Ok(None),
         Err(e) => Err(e),
     }
@@ -533,10 +533,7 @@ impl AuthInfo {
         // TODO Shouldn't error when `self.client_key_data.is_none() && self.client_key.is_none()`
 
         load_from_base64_or_file(
-            &self
-                .client_key_data
-                .as_ref()
-                .map(|secret| secret.expose_secret().as_str()),
+            &self.client_key_data.as_ref().map(|secret| secret.expose_secret()),
             &self.client_key,
         )
         .map_err(KubeconfigError::LoadClientKey)
