@@ -71,7 +71,7 @@ rand = "0.8.3"
 rustls = { version = "0.23.0", default-features = false }
 rustls-pemfile = "2.0.0"
 schemars = "0.8.6"
-secrecy = "0.8.0"
+secrecy = "0.10.2"
 serde = "1.0.130"
 serde_json = "1.0.68"
 serde-value = "0.7.0"
