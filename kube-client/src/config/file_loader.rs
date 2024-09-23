@@ -117,8 +117,6 @@ impl ConfigLoader {
         let nonempty = |o: Option<String>| o.filter(|s| !s.is_empty());
 
         if let Some(proxy) = nonempty(self.cluster.proxy_url.clone())
-            .or_else(|| nonempty(std::env::var("HTTP_PROXY").ok()))
-            .or_else(|| nonempty(std::env::var("http_proxy").ok()))
             .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
             .or_else(|| nonempty(std::env::var("https_proxy").ok()))
         {
