@@ -73,7 +73,7 @@ tower-http = { workspace = true, features = ["auth", "map-response-body", "trace
 hyper-timeout = { workspace = true, optional = true }
 tame-oauth = { workspace = true, features = ["gcp"], optional = true }
 rand = { workspace = true, optional = true }
-secrecy = { workspace = true, features = ["alloc", "serde"] }
+secrecy = { workspace = true }
 tracing = { workspace = true, features = ["log"], optional = true }
 hyper-openssl = { workspace = true, features = ["client-legacy"], optional = true }
 form_urlencoded = { workspace = true, optional = true }

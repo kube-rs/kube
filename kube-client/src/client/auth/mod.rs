@@ -144,7 +144,7 @@ impl TokenFile {
 
     /// Get the cached token. Returns `None` if it's expiring.
     fn cached_token(&self) -> Option<&str> {
-        (!self.is_expiring()).then(|| self.token.expose_secret().as_ref())
+        (!self.is_expiring()).then(|| self.token.expose_secret())
     }
 
     /// Get a token. Reloads from file if the cached token is expiring.

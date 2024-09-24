@@ -149,7 +149,7 @@ where
     D: Deserializer<'de>,
 {
     match Option::<String>::deserialize(deserializer) {
-        Ok(Some(secret)) => Ok(Some(SecretString::new(secret))),
+        Ok(Some(secret)) => Ok(Some(SecretString::new(secret.into()))),
         Ok(None) => Ok(None),
         Err(e) => Err(e),
     }
@@ -533,10 +533,7 @@ impl AuthInfo {
         // TODO Shouldn't error when `self.client_key_data.is_none() && self.client_key.is_none()`
 
         load_from_base64_or_file(
-            &self
-                .client_key_data
-                .as_ref()
-                .map(|secret| secret.expose_secret().as_str()),
+            &self.client_key_data.as_ref().map(|secret| secret.expose_secret()),
             &self.client_key,
         )
         .map_err(KubeconfigError::LoadClientKey)
@@ -664,7 +661,6 @@ mod tests {
 
     use super::*;
     use serde_json::{json, Value};
-    use std::str::FromStr;
 
     #[test]
     fn kubeconfig_merge() {
@@ -673,7 +669,7 @@ mod tests {
             auth_infos: vec![NamedAuthInfo {
                 name: "red-user".into(),
                 auth_info: Some(AuthInfo {
-                    token: Some(SecretString::from_str("first-token").unwrap()),
+                    token: Some(SecretString::new("first-token".into())),
                     ..Default::default()
                 }),
             }],
@@ -685,7 +681,7 @@ mod tests {
                 NamedAuthInfo {
                     name: "red-user".into(),
                     auth_info: Some(AuthInfo {
-                        token: Some(SecretString::from_str("second-token").unwrap()),
+                        token: Some(SecretString::new("second-token".into())),
                         username: Some("red-user".into()),
                         ..Default::default()
                     }),
@@ -693,7 +689,7 @@ mod tests {
                 NamedAuthInfo {
                     name: "green-user".into(),
                     auth_info: Some(AuthInfo {
-                        token: Some(SecretString::from_str("new-token").unwrap()),
+                        token: Some(SecretString::new("new-token".into())),
                         ..Default::default()
                     }),
                 },
@@ -713,8 +709,8 @@ mod tests {
                 .unwrap()
                 .token
                 .as_ref()
-                .map(|t| t.expose_secret().to_string()),
-            Some("first-token".to_string())
+                .map(|t| t.expose_secret()),
+            Some("first-token")
         );
         // Even if it's not conflicting
         assert_eq!(merged.auth_infos[0].auth_info.as_ref().unwrap().username, None);
@@ -910,7 +906,7 @@ password: kube_rs
         let authinfo_debug_output = format!("{authinfo:?}");
         let expected_output = "AuthInfo { \
         username: Some(\"user\"), \
-        password: Some(Secret([REDACTED alloc::string::String])), \
+        password: Some(SecretBox<str>([REDACTED])), \
         token: None, token_file: None, client_certificate: None, \
         client_certificate_data: None, client_key: None, \
         client_key_data: None, impersonate: None, \
