@@ -14,6 +14,7 @@ categories = ["web-programming::http-client", "network-programming", "api-bindin
 [features]
 default = ["client"]
 rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls", "hyper-http-proxy?/rustls-tls-native-roots"]
+webpki-roots = ["hyper-rustls/webpki-roots"]
 aws-lc-rs = ["rustls?/aws-lc-rs"]
 openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws", "tokio/macros"]

@@ -31,6 +31,8 @@ allow = [
     # Pulled in via aws_lc_rs when using rustls-tls and aws-lc-rs features
     # https://openssl-library.org/source/license/index.html
     "OpenSSL",
+    # Pulled in via hyper-rustls when using the webpki-roots feature
+    "MPL-2.0",
 ]
 
 exceptions = [
