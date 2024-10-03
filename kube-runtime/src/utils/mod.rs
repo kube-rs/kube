@@ -4,25 +4,26 @@ mod backoff_reset_timer;
 pub(crate) mod delayed_init;
 mod event_filter;
 mod event_modify;
-#[cfg(feature = "unstable-runtime-predicates")] mod predicate;
+#[cfg(feature = "unstable-runtime-predicates")]
+mod predicate;
 mod reflect;
 mod stream_backoff;
 mod watch_ext;
 
 pub use backoff_reset_timer::ResetTimerBackoff;
-pub use event_filter::EventFilter;
+pub use event_filter::EventDecode;
 pub use event_modify::EventModify;
 #[cfg(feature = "unstable-runtime-predicates")]
 pub use predicate::{predicates, Predicate, PredicateFilter};
 pub use reflect::Reflect;
 pub use stream_backoff::StreamBackoff;
 pub use watch_ext::WatchStreamExt;
-/// Deprecated type alias for `EventFilter`
+/// Deprecated type alias for `EventDecode`
 #[deprecated(
-    since = "0.93.0",
-    note = "renamed to `EventFilter`. This alias will be removed in 0.97.0."
+    since = "0.96.0",
+    note = "renamed to by `EventDecode`. This alias will be removed in 0.100.0."
 )]
-pub use EventFilter as EventFlatten;
+pub use EventDecode as EventFlatten;
 
 use futures::{
     stream::{self, Peekable},

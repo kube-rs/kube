@@ -1,7 +1,7 @@
 #[cfg(feature = "unstable-runtime-predicates")]
 use crate::utils::predicate::{Predicate, PredicateFilter};
 use crate::{
-    utils::{event_filter::EventFilter, event_modify::EventModify, stream_backoff::StreamBackoff},
+    utils::{event_filter::EventDecode, event_modify::EventModify, stream_backoff::StreamBackoff},
     watcher,
 };
 use kube_client::Resource;
@@ -36,21 +36,21 @@ pub trait WatchStreamExt: Stream {
     /// Filter a [`watcher()`] stream into a stream of applied objects
     ///
     /// All Added/Modified events are passed through, and critical errors bubble up.
-    fn applied_objects<K>(self) -> EventFilter<Self>
+    fn applied_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
-        EventFilter::new(self, false)
+        EventDecode::new(self, false)
     }
 
     /// Filter a [`watcher()`] stream into a stream of touched objects
     ///
     /// All Added/Modified/Deleted events are passed through, and critical errors bubble up.
-    fn touched_objects<K>(self) -> EventFilter<Self>
+    fn touched_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
-        EventFilter::new(self, true)
+        EventDecode::new(self, true)
     }
 
     /// Modify elements of a [`watcher()`] stream.

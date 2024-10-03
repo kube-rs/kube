@@ -9,17 +9,17 @@ use pin_project::pin_project;
 #[pin_project]
 /// Stream returned by the [`applied_objects`](super::WatchStreamExt::applied_objects) and [`touched_objects`](super::WatchStreamExt::touched_objects) method.
 #[must_use = "streams do nothing unless polled"]
-pub struct EventFilter<St> {
+pub struct EventDecode<St> {
     #[pin]
     stream: St,
     emit_deleted: bool,
 }
-impl<St: TryStream<Ok = Event<K>>, K> EventFilter<St> {
+impl<St: TryStream<Ok = Event<K>>, K> EventDecode<St> {
     pub(super) fn new(stream: St, emit_deleted: bool) -> Self {
         Self { stream, emit_deleted }
     }
 }
-impl<St, K> Stream for EventFilter<St>
+impl<St, K> Stream for EventDecode<St>
 where
     St: Stream<Item = Result<Event<K>, Error>>,
 {
@@ -50,7 +50,7 @@ where
 pub(crate) mod tests {
     use std::{pin::pin, task::Poll};
 
-    use super::{Error, Event, EventFilter};
+    use super::{Error, Event, EventDecode};
     use futures::{poll, stream, StreamExt};
 
     #[tokio::test]
@@ -65,7 +65,7 @@ pub(crate) mod tests {
             Err(Error::NoResourceVersion),
             Ok(Event::Apply(2)),
         ]);
-        let mut rx = pin!(EventFilter::new(data, false));
+        let mut rx = pin!(EventDecode::new(data, false));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(0)))));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(1)))));
         // NB: no Deleted events here
