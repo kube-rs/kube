@@ -1,4 +1,4 @@
-//! Crate with types and traits necessary for interacting with the Kubernetes API
+//! Types and traits necessary for interacting with the Kubernetes API
 //!
 //! This crate provides the minimal apimachinery necessary to make requests to the kubernetes API.
 //!
@@ -70,3 +70,6 @@ pub use error::ErrorResponse;
 
 mod version;
 pub use version::Version;
+
+pub mod error_boundary;
+pub use error_boundary::DeserializeGuard;

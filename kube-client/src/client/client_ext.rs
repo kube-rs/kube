@@ -39,10 +39,12 @@ pub trait ObjectUrl<K> {
 }
 
 /// Marker type for cluster level queries
+#[derive(Debug, Clone)]
 pub struct Cluster;
 /// Namespace newtype for namespace level queries
 ///
 /// You can create this directly, or convert `From` a `String` / `&str`, or `TryFrom` an `k8s_openapi::api::core::v1::Namespace`
+#[derive(Debug, Clone)]
 pub struct Namespace(String);
 
 /// Referenced object name resolution
@@ -138,7 +140,7 @@ where
         ObjectReference {
             api_version: K::api_version(&dt).to_string().into(),
             namespace: namespace.into(),
-            name: self.name.clone(),
+            name: Some(self.name.clone()),
             kind: K::kind(&dt).to_string().into(),
             ..Default::default()
         }
@@ -241,8 +243,7 @@ pub enum NamespaceError {
 /// ## Example
 ///
 /// ```no_run
-/// # use k8s_openapi::api::core::v1::Pod;
-/// # use k8s_openapi::api::core::v1::Service;
+/// # use k8s_openapi::api::core::v1::{Pod, Service};
 /// # use kube::client::scope::{Namespace, Cluster};
 /// # use kube::prelude::*;
 /// # use kube::api::ListParams;
@@ -293,11 +294,10 @@ impl Client {
     ///
     /// ```no_run
     /// # use k8s_openapi::api::rbac::v1::ClusterRole;
-    /// # use k8s_openapi::api::core::v1::Service;
-    /// # use k8s_openapi::api::core::v1::Secret;
-    /// # use k8s_openapi::api::core::v1::ObjectReference;
-    /// # use k8s_openapi::api::core::v1::LocalObjectReference;
-    /// # use k8s_openapi::api::core::v1::{Node, Pod};
+    /// # use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
+    /// # use k8s_openapi::api::core::v1::{ObjectReference, LocalObjectReference};
+    /// # use k8s_openapi::api::core::v1::{Node, Pod, Service, Secret};
+    /// # use kube::client::scope::NamespacedRef;
     /// # use kube::api::GetParams;
     /// # use kube::prelude::*;
     /// # use kube::api::DynamicObject;
@@ -331,7 +331,7 @@ impl Client {
     ///     .image_pull_secrets
     ///     .unwrap_or_default()
     ///     .get(0)
-    ///     .unwrap_or(&LocalObjectReference{name: Some("pull_secret".into())});
+    ///     .unwrap_or(&LocalObjectReference{name: "pull_secret".into()});
     /// let secret: Secret = client.fetch(&secret_ref.within(pod.namespace())).await?;
     /// # Ok(())
     /// # }
@@ -506,11 +506,10 @@ mod test {
         {
             let owner = pod
                 .owner_references()
-                .to_vec()
-                .into_iter()
+                .iter()
                 .find(|r| r.kind == Node::kind(&()))
                 .ok_or("Not found")?;
-            let _: Node = client.fetch(&owner).await?;
+            let _: Node = client.fetch(owner).await?;
         }
 
         Ok(())

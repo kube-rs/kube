@@ -17,25 +17,27 @@ default = ["client", "rustls-tls"]
 # default features
 client = ["kube-client/client", "config"]
 config = ["kube-client/config"]
-rustls-tls = ["kube-client/rustls-tls"]
+rustls-tls = ["kube-client/rustls-tls", "client"]
 
 # alternative features
-openssl-tls = ["kube-client/openssl-tls"]
+openssl-tls = ["kube-client/openssl-tls", "client"]
+aws-lc-rs = ["kube-client?/aws-lc-rs"]
 
 # auxiliary features
 ws = ["kube-client/ws", "kube-core/ws"]
 kubelet-debug = ["kube-client/kubelet-debug", "kube-core/kubelet-debug"]
-oauth = ["kube-client/oauth"]
-oidc = ["kube-client/oidc"]
-gzip = ["kube-client/gzip"]
+oauth = ["kube-client/oauth", "client"]
+oidc = ["kube-client/oidc", "client"]
+gzip = ["kube-client/gzip", "client"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 derive = ["kube-derive", "kube-core/schema"]
 runtime = ["kube-runtime"]
-unstable-runtime = ["kube-runtime/unstable-runtime"]
-unstable-client = ["kube-client/unstable-client"]
-socks5 = ["kube-client/socks5"]
-http-proxy = ["kube-client/http-proxy"]
+unstable-runtime = ["kube-runtime/unstable-runtime", "runtime"]
+unstable-client = ["kube-client/unstable-client", "client"]
+socks5 = ["kube-client/socks5", "client"]
+http-proxy = ["kube-client/http-proxy", "client"]
+webpki-roots = ["kube-client/webpki-roots", "client"]
 
 [package.metadata.docs.rs]
 features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/latest", "unstable-runtime", "socks5", "http-proxy"]
@@ -46,10 +48,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-kube-derive = { path = "../kube-derive", version = "=0.93.1", optional = true }
-kube-core = { path = "../kube-core", version = "=0.93.1" }
-kube-client = { path = "../kube-client", version = "=0.93.1", default-features = false, optional = true }
-kube-runtime = { path = "../kube-runtime", version = "=0.93.1", optional = true}
+kube-derive = { path = "../kube-derive", version = "=0.95.0", optional = true }
+kube-core = { path = "../kube-core", version = "=0.95.0" }
+kube-client = { path = "../kube-client", version = "=0.95.0", default-features = false, optional = true }
+kube-runtime = { path = "../kube-runtime", version = "=0.95.0", optional = true}
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
 k8s-openapi.workspace = true

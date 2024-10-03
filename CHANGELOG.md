@@ -5,7 +5,63 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.93.1...main
+ * see https://github.com/kube-rs/kube/compare/0.95.0...main
+
+[0.95.0](https://github.com/kube-rs/kube/releases/tag/0.95.0) / 2024-09-16
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.95.0 -->
+## Kubernetes `v1_31` support via `k8s-openapi` [0.23](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.23.0)
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+New minimum versions: [MSRV](https://kube.rs/rust-version/) 1.77.2, [MK8SV](https://kube.rs/kubernetes-version/): 1.26
+
+## What's Changed
+### Changed
+* Update tokio-tungstenite requirement from 0.23.0 to 0.24.0 by @dependabot in https://github.com/kube-rs/kube/pull/1579
+* Bump `k8s-openapi` to 0.23 for Kubernetes 1.31 support by @clux in https://github.com/kube-rs/kube/pull/1581
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/0.94.2...0.95.0
+[0.94.2](https://github.com/kube-rs/kube/releases/tag/0.94.2) / 2024-09-13
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.94.2 -->
+
+## What's Changed
+Fixes a runtime regression in [`watch_object`](https://docs.rs/kube/latest/kube/runtime/watcher/fn.watch_object.html).
+
+### Fixed
+* Ensure `watch_object` handles objects removed before init by @markdingram in https://github.com/kube-rs/kube/pull/1577
+
+[0.94.1](https://github.com/kube-rs/kube/releases/tag/0.94.1) / 2024-09-09
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.94.1 -->
+
+## What's Changed
+Convenience release. Adjusted a version bound to avoid possibility of running into version compatibility errors with `hyper-rustls`.
+
+### Fixed
+* Update hyper-rustls minimum version by @divergentdave in https://github.com/kube-rs/kube/pull/1575
+
+[0.94.0](https://github.com/kube-rs/kube/releases/tag/0.94.0) / 2024-09-09
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.94.0 -->
+## Highlights
+Support for `rustls`'s [aws-lc-rs](https://aws.amazon.com/blogs/opensource/introducing-aws-libcrypto-for-rust-an-open-source-cryptographic-library-for-rust/) is available under a new `kube/aws-lc-rs` feature. Via https://github.com/kube-rs/kube/pull/1568 for https://github.com/kube-rs/kube/issues/1562
+
+Furthermore, there are improvements to [partial typing](https://kube.rs/controllers/object/#partially-typed-resource):
+
+1. Added a [`DeserializeGuard`](https://docs.rs/kube/latest/kube/core/struct.DeserializeGuard.html) safety wrapper to lift deserialisation errors (to e.g. not break watchers). See the [errorbound example](https://github.com/kube-rs/kube/blob/main/examples/errorbounded_configmap_watcher.rs) and [core module](https://docs.rs/kube/latest/kube/core/error_boundary/index.html) module.  Wrapped type be used with e.g. `Api::<DeserializeGuard<CaConfigMap>>`. Via https://github.com/kube-rs/kube/pull/1556
+2. A derive macro for [`Resource`](https://docs.rs/kube/latest/kube/trait.Resource.html); [`#[derive(Resource)]`](https://docs.rs/kube/latest/kube/derive.Resource.html) allows inheriting existing `k8s-openapi` resource implementations to avoid stepping down to the dynamic api. See the [cert check example](https://github.com/kube-rs/kube/blob/main/examples/cert_check.rs) for usage. Via https://github.com/kube-rs/kube/pull/1565
+
+## What's Changed
+### Added
+* Add error boundary wrapper type by @nightkr in https://github.com/kube-rs/kube/pull/1556
+* Implement Error for error_boundary::InvalidObject by @nightkr in https://github.com/kube-rs/kube/pull/1558
+* Add finalizers predicate filter by @ivan-kiselev in https://github.com/kube-rs/kube/pull/1560
+* optional feature to use `aws-lc-rs` rustls feature by @mcluseau in https://github.com/kube-rs/kube/pull/1568
+* Add `Resource` derive macro by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1565
+### Changed
+* Make implicitly dependent feature explicitly depend on each other by @clux in https://github.com/kube-rs/kube/pull/1551
 
 [0.93.1](https://github.com/kube-rs/kube/releases/tag/0.93.1) / 2024-07-23
 ===================

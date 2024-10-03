@@ -1,12 +1,12 @@
 # kube-rs
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
-[![Rust 1.75](https://img.shields.io/badge/MSRV-1.75-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.75.0)
-[![Tested against Kubernetes v1_25 and above](https://img.shields.io/badge/MK8SV-v1_25-326ce5.svg)](https://kube.rs/kubernetes-version)
+[![Rust 1.77](https://img.shields.io/badge/MSRV-1.77-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.77.2)
+[![Tested against Kubernetes v1_26 and above](https://img.shields.io/badge/MK8SV-v1_26-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 
-A [Rust](https://rust-lang.org/) client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go), a runtime abstraction inspired by [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime), and a derive macro for [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/) inspired by [kubebuilder](https://book.kubebuilder.io/reference/generating-crd.html). Hosted by [CNCF](https://cncf.io/) as a [Sandbox Project](https://www.cncf.io/sandbox-projects/)
+A [Rust](https://rust-lang.org/) client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go), a runtime abstraction inspired by [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime), and a derive macro for [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/) inspired by [kubebuilder](https://book.kubebuilder.io/reference/generating-crd.html). Hosted by [CNCF](https://cncf.io/) as a [Sandbox Project](https://www.cncf.io/sandbox-projects/).
 
 These crates build upon Kubernetes [apimachinery](https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go) + [api concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/) to enable generic abstractions. These abstractions allow Rust reinterpretations of reflectors, controllers, and custom resource interfaces, so that you can write applications easily.
 
@@ -16,8 +16,8 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.93.1", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.22.0", features = ["latest"] }
+kube = { version = "0.95.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.23.0", features = ["latest"] }
 ```
 
 See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality.
@@ -156,8 +156,8 @@ By default [rustls](https://github.com/rustls/rustls) is used for TLS, but `open
 
 ```toml
 [dependencies]
-kube = { version = "0.93.1", default-features = false, features = ["client", "openssl-tls"] }
-k8s-openapi = { version = "0.22.0", features = ["latest"] }
+kube = { version = "0.95.0", default-features = false, features = ["client", "openssl-tls"] }
+k8s-openapi = { version = "0.23.0", features = ["latest"] }
 ```
 
 This will pull in `openssl` and `hyper-openssl`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `rustls`.

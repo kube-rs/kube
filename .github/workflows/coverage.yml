@@ -25,7 +25,7 @@ jobs:
           tool: cargo-tarpaulin@0.28.0
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.25
+          version: v1.26
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.

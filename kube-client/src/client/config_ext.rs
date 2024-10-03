@@ -167,14 +167,14 @@ impl ConfigExt for Config {
     fn auth_layer(&self) -> Result<Option<AuthLayer>> {
         Ok(match Auth::try_from(&self.auth_info).map_err(Error::Auth)? {
             Auth::None => None,
-            Auth::Basic(user, pass) => Some(AuthLayer(Either::A(
+            Auth::Basic(user, pass) => Some(AuthLayer(Either::Left(
                 AddAuthorizationLayer::basic(&user, pass.expose_secret()).as_sensitive(true),
             ))),
-            Auth::Bearer(token) => Some(AuthLayer(Either::A(
+            Auth::Bearer(token) => Some(AuthLayer(Either::Left(
                 AddAuthorizationLayer::bearer(token.expose_secret()).as_sensitive(true),
             ))),
             Auth::RefreshableToken(refreshable) => {
-                Some(AuthLayer(Either::B(AsyncFilterLayer::new(refreshable))))
+                Some(AuthLayer(Either::Right(AsyncFilterLayer::new(refreshable))))
             }
             Auth::Certificate(_client_certificate_data, _client_key_data) => None,
         })
@@ -228,12 +228,21 @@ impl ConfigExt for Config {
         &self,
         connector: H,
     ) -> Result<hyper_rustls::HttpsConnector<H>> {
+        use hyper_rustls::FixedServerNameResolver;
+
+        use crate::client::tls::rustls_tls;
+
         let rustls_config = self.rustls_client_config()?;
         let mut builder = hyper_rustls::HttpsConnectorBuilder::new()
             .with_tls_config(rustls_config)
             .https_or_http();
         if let Some(tsn) = self.tls_server_name.as_ref() {
-            builder = builder.with_server_name(tsn.clone());
+            builder = builder.with_server_name_resolver(FixedServerNameResolver::new(
+                tsn.clone()
+                    .try_into()
+                    .map_err(rustls_tls::Error::InvalidServerName)
+                    .map_err(Error::RustlsTls)?,
+            ));
         }
         Ok(builder.enable_http1().wrap_connector(connector))
     }

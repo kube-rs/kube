@@ -69,9 +69,10 @@ cargo run --example crd_api
 cargo run --example crd_derive
 cargo run --example crd_derive_schema
 cargo run --example crd_derive_no_schema --no-default-features --features=openssl-tls,latest
+cargo run --example cert_check # showcases partial typing with Resource derive
 ```
 
-The last one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
+The `no_schema` one opts out from the default `schema` feature from `kube-derive` (and thus the need for you to derive/impl `JsonSchema`).
 
 **However**: without the `schema` feature, it's left **up to you to fill in a valid openapi v3 schema**, as schemas are **required** for [v1::CustomResourceDefinitions](https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apiextensions_apiserver/pkg/apis/apiextensions/v1/struct.CustomResourceDefinition.html), and the generated crd will be rejected by the apiserver if it's missing. As the last example shows, you can do this directly without `schemars`.
 
@@ -93,6 +94,8 @@ cargo run --example multi_watcher
 cargo run --example node_watcher
 # watch arbitrary, untyped objects across all namespaces
 cargo run --example dynamic_watcher
+# watch arbitrary, typed config map objects, with error toleration
+cargo run --example errorbounded_configmap_watcher
 ```
 
 The `node_` and `pod_` watcher also allows using [Kubernetes 1.27 Streaming lists](https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists) via `WATCHLIST=1`:

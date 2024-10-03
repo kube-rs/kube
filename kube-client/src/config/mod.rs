@@ -1,4 +1,7 @@
-//! Kubernetes configuration objects from `~/.kube/config`, `$KUBECONFIG`, or the [cluster environment](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod).
+//! Kubernetes configuration objects.
+//!
+//! Reads locally from `$KUBECONFIG` or `~/.kube/config`,
+//! and in-cluster from the [pod environment](https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/#accessing-the-api-from-within-a-pod).
 //!
 //! # Usage
 //! The [`Config`] has several constructors plus logic to infer environment.
@@ -115,7 +118,10 @@ pub enum LoadDataError {
     NoBase64DataOrFile,
 }
 
-/// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
+/// Configuration object for accessing a Kuernetes cluster
+///
+/// The configurable parameters for connecting like cluster URL, default namespace, root certificates, and timeouts.
+/// Normally created implicitly through [`Config::infer`] or [`Client::try_default`](crate::Client::try_default).
 ///
 /// # Usage
 /// Construct a [`Config`] instance by using one of the many constructors.

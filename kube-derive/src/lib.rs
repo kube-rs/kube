@@ -4,6 +4,7 @@ extern crate proc_macro;
 #[macro_use] extern crate quote;
 
 mod custom_resource;
+mod resource;
 
 /// A custom derive for kubernetes custom resource definitions.
 ///
@@ -307,4 +308,55 @@ mod custom_resource;
 #[proc_macro_derive(CustomResource, attributes(kube))]
 pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     custom_resource::derive(proc_macro2::TokenStream::from(input)).into()
+}
+
+/// A custom derive for inheriting Resource impl for the type.
+///
+/// This will generate a [`kube::Resource`] trait implementation,
+/// inheriting from a specified resource trait implementation.
+///
+/// This allows strict typing to some typical resources like `Secret` or `ConfigMap`,
+/// in cases when implementing CRD is not desirable or it does not fit the use-case.
+///
+/// Once derived, the type can be used with [`kube::Api`].
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use kube::api::ObjectMeta;
+/// use k8s_openapi::api::core::v1::ConfigMap;
+/// use kube_derive::Resource;
+/// use kube::Client;
+/// use kube::Api;
+/// use serde::Deserialize;
+///
+/// #[derive(Resource, Clone, Debug, Deserialize)]
+/// #[resource(inherit = "ConfigMap")]
+/// struct FooMap {
+///     metadata: ObjectMeta,
+///     data: Option<FooMapSpec>,
+/// }
+///
+/// #[derive(Clone, Debug, Deserialize)]
+/// struct FooMapSpec {
+///     field: String,
+/// }
+///
+/// let client: Client = todo!();
+/// let api: Api<FooMap> = Api::default_namespaced(client);
+/// let config_map = api.get("with-field");
+/// ```
+///
+/// The example above will generate:
+/// ```
+/// // impl kube::Resource for FooMap { .. }
+/// ```
+/// [`kube`]: https://docs.rs/kube
+/// [`kube::Api`]: https://docs.rs/kube/*/kube/struct.Api.html
+/// [`kube::Resource`]: https://docs.rs/kube/*/kube/trait.Resource.html
+/// [`kube::core::ApiResource`]: https://docs.rs/kube/*/kube/core/struct.ApiResource.html
+/// [`kube::CustomResourceExt`]: https://docs.rs/kube/*/kube/trait.CustomResourceExt.html
+#[proc_macro_derive(Resource, attributes(resource))]
+pub fn derive_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    resource::derive(proc_macro2::TokenStream::from(input)).into()
 }

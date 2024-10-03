@@ -5,7 +5,7 @@
 use crate::utils::ResetTimerBackoff;
 use async_trait::async_trait;
 use backoff::{backoff::Backoff, ExponentialBackoff};
-use derivative::Derivative;
+use educe::Educe;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
@@ -14,7 +14,7 @@ use kube_client::{
     Api, Error as ClientErr,
 };
 use serde::de::DeserializeOwned;
-use std::{clone::Clone, collections::VecDeque, fmt::Debug, time::Duration};
+use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
@@ -127,8 +127,8 @@ impl<K> Event<K> {
     }
 }
 
-#[derive(Derivative, Default)]
-#[derivative(Debug)]
+#[derive(Educe, Default)]
+#[educe(Debug)]
 /// The internal finite state machine driving the [`watcher`]
 enum State<K> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
@@ -143,7 +143,7 @@ enum State<K> {
     /// Kubernetes 1.27 Streaming Lists
     /// The initial watch is in progress
     InitialWatch {
-        #[derivative(Debug = "ignore")]
+        #[educe(Debug(ignore))]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
     /// The initial LIST was successful, so we should move on to starting the actual watch.
@@ -156,7 +156,7 @@ enum State<K> {
     /// with `Empty`.
     Watching {
         resource_version: String,
-        #[derivative(Debug = "ignore")]
+        #[educe(Debug(ignore))]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
 }
@@ -850,18 +850,36 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
     // filtering by object name in given scope, so there's at most one matching object
     // footgun: Api::all may generate events from namespaced objects with the same name in different namespaces
     let fields = format!("metadata.name={name}");
-    watcher(api, Config::default().fields(&fields)).filter_map(|event| async {
-        match event {
-            // Pass up `Some` for Found / Updated
-            Ok(Event::Apply(obj) | Event::InitApply(obj)) => Some(Ok(Some(obj))),
-            // Pass up `None` for Deleted
-            Ok(Event::Delete(_)) => Some(Ok(None)),
-            // Ignore marker events
-            Ok(Event::Init | Event::InitDone) => None,
-            // Bubble up errors
-            Err(err) => Some(Err(err)),
-        }
-    })
+    watcher(api, Config::default().fields(&fields))
+        // The `obj_seen` state is used to track whether the object exists in each Init / InitApply / InitDone
+        // sequence of events. If the object wasn't seen in any particular sequence it is treated as deleted and
+        // `None` is emitted when the InitDone event is received.
+        //
+        // The first check ensures `None` is emitted if the object was already gone (or not found), subsequent
+        // checks ensure `None` is emitted even if for some reason the Delete event wasn't received, which
+        // could happen given K8S events aren't guaranteed delivery.
+        .scan(false, |obj_seen, event| {
+            if matches!(event, Ok(Event::Init)) {
+                *obj_seen = false;
+            } else if matches!(event, Ok(Event::InitApply(_))) {
+                *obj_seen = true;
+            }
+            future::ready(Some((*obj_seen, event)))
+        })
+        .filter_map(|(obj_seen, event)| async move {
+            match event {
+                // Pass up `Some` for Found / Updated
+                Ok(Event::Apply(obj) | Event::InitApply(obj)) => Some(Ok(Some(obj))),
+                // Pass up `None` for Deleted
+                Ok(Event::Delete(_)) => Some(Ok(None)),
+                // Pass up `None` if the object wasn't seen in the initial list
+                Ok(Event::InitDone) if !obj_seen => Some(Ok(None)),
+                // Ignore marker events
+                Ok(Event::Init | Event::InitDone) => None,
+                // Bubble up errors
+                Err(err) => Some(Err(err)),
+            }
+        })
 }
 
 /// Default watcher backoff inspired by Kubernetes' client-go.

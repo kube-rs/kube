@@ -1,4 +1,4 @@
-//! A basic API client for interacting with the Kubernetes API
+//! API client for interacting with the Kubernetes API
 //!
 //! The [`Client`] uses standard kube error handling.
 //!
@@ -8,7 +8,7 @@
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
 use either::{Either, Left, Right};
-use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt};
+use futures::{future::BoxFuture, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
 #[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
@@ -75,8 +75,8 @@ pub use builder::{ClientBuilder, DynBody};
 #[derive(Clone)]
 pub struct Client {
     // - `Buffer` for cheap clone
-    // - `BoxService` for dynamic response future type
-    inner: Buffer<BoxService<Request<Body>, Response<Body>, BoxError>, Request<Body>>,
+    // - `BoxFuture` for dynamic response future type
+    inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
     default_ns: String,
 }
 
@@ -102,13 +102,14 @@ impl Client {
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
     /// use kube::{client::ConfigExt, Client, Config};
-    /// use tower::ServiceBuilder;
+    /// use tower::{BoxError, ServiceBuilder};
     /// use hyper_util::rt::TokioExecutor;
     ///
     /// let config = Config::infer().await?;
     /// let service = ServiceBuilder::new()
     ///     .layer(config.base_uri_layer())
     ///     .option_layer(config.auth_layer()?)
+    ///     .map_err(BoxError::from)
     ///     .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build_http());
     /// let client = Client::new(service, config.default_namespace);
     /// # Ok(())

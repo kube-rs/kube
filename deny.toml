@@ -10,9 +10,7 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 # these are deprecated, but not super helpful for us
 # https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html#the-version-field-optional
 # remove them when we have to
-unmaintained = "warn"
 yanked = "warn"
-notice = "warn"
 
 
 [licenses]
@@ -30,6 +28,9 @@ allow = [
     # Blanket addition for Unicode-3.0 libs for optional features (affects many deps, but it's a very clean license)
     # https://github.com/unicode-org/icu4x/blob/main/LICENSE
     "Unicode-3.0",
+    # Pulled in via aws_lc_rs when using rustls-tls and aws-lc-rs features
+    # https://openssl-library.org/source/license/index.html
+    "OpenSSL",
 ]
 
 exceptions = [
@@ -39,6 +40,9 @@ exceptions = [
     # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
     # for more details.
     { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
+    # Pulled in via hyper-rustls when using the webpki-roots feature,
+    # which is off by default.
+    { allow = ["MPL-2.0"], name = "webpki-roots" },
 ]
 
 [[licenses.clarify]]
@@ -58,15 +62,10 @@ allow-git = ["https://github.com/tyrone-wu/runtime-macros.git"]
 multiple-versions = "deny"
 
 [[bans.skip]]
-name = "hermit-abi"
+name = "rustls-native-certs"
 
 [[bans.skip]]
-# Needs a complicated upgrade
-name = "syn"
-
-[[bans.skip]]
-# waiting for pem to bump base64
-# https://github.com/jcreekmore/pem-rs/blob/master/Cargo.toml#L16
+# base64 did some annoying breaking changes
 name = "base64"
 
 [[bans.skip]]
@@ -74,9 +73,9 @@ name = "base64"
 # newer via tower-http (we have latest)
 name = "bitflags"
 
-[[bans.skip]]
-# deep in dependency tree, only dual use via dev dependency
-name = "redox_syscall"
-
 [[bans.skip-tree]]
 name = "windows-sys"
+
+[[bans.skip]]
+# different sources of miniz_oxide which users will not generally see
+name = "miniz_oxide"

@@ -145,16 +145,18 @@ mod test {
     use tower::ServiceBuilder;
 
     // hard disabled test atm due to k3d rustls issues: https://github.com/kube-rs/kube/issues?q=is%3Aopen+is%3Aissue+label%3Arustls
-    #[cfg(feature = "when_rustls_works_with_k3d")]
-    #[tokio::test]
+    #[allow(dead_code)]
+    // #[tokio::test]
     #[ignore = "needs cluster (lists pods)"]
     #[cfg(feature = "rustls-tls")]
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
+        use hyper_util::rt::TokioExecutor;
+
         let config = Config::infer().await?;
         let https = config.rustls_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
-            .service(hyper::Client::builder().build(https));
+            .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         let client = Client::new(service, config.default_namespace);
         let pods: Api<Pod> = Api::default_namespaced(client);
         pods.list(&Default::default()).await?;
@@ -180,7 +182,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (lists api resources)"]
-    #[cfg(feature = "discovery")]
+    #[cfg(feature = "client")]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{core::DynamicObject, discovery};
         let client = Client::try_default().await?;
