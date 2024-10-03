@@ -65,6 +65,10 @@ multiple-versions = "deny"
 name = "rustls-native-certs"
 
 [[bans.skip]]
+# blocked on us swapping out serde_yaml
+name = "hashbrown"
+
+[[bans.skip]]
 # base64 did some annoying breaking changes
 name = "base64"
 
