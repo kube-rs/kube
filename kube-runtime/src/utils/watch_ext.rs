@@ -1,7 +1,7 @@
 #[cfg(feature = "unstable-runtime-predicates")]
 use crate::utils::predicate::{Predicate, PredicateFilter};
 use crate::{
-    utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
+    utils::{event_decode::EventDecode, event_modify::EventModify, stream_backoff::StreamBackoff},
     watcher,
 };
 use kube_client::Resource;
@@ -33,24 +33,24 @@ pub trait WatchStreamExt: Stream {
         StreamBackoff::new(self, b)
     }
 
-    /// Flatten a [`watcher()`] stream into a stream of applied objects
+    /// Decode a [`watcher()`] stream into a stream of applied objects
     ///
     /// All Added/Modified events are passed through, and critical errors bubble up.
-    fn applied_objects<K>(self) -> EventFlatten<Self>
+    fn applied_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
-        EventFlatten::new(self, false)
+        EventDecode::new(self, false)
     }
 
-    /// Flatten a [`watcher()`] stream into a stream of touched objects
+    /// Decode a [`watcher()`] stream into a stream of touched objects
     ///
     /// All Added/Modified/Deleted events are passed through, and critical errors bubble up.
-    fn touched_objects<K>(self) -> EventFlatten<Self>
+    fn touched_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
-        EventFlatten::new(self, true)
+        EventDecode::new(self, true)
     }
 
     /// Modify elements of a [`watcher()`] stream.
@@ -88,7 +88,7 @@ pub trait WatchStreamExt: Stream {
         EventModify::new(self, f)
     }
 
-    /// Filter out a flattened stream on [`predicates`](crate::predicates).
+    /// Filter a stream based on on [`predicates`](crate::predicates).
     ///
     /// This will filter out repeat calls where the predicate returns the same result.
     /// Common use case for this is to avoid repeat events for status updates

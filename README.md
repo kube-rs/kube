@@ -43,7 +43,7 @@ For real world projects see [ADOPTERS](https://kube.rs/adopters/).
 
 ## Api
 
-The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with Kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
+The [`Api`](https://docs.rs/kube/latest/kube/struct.Api.html) is what interacts with Kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/latest/kube/trait.Resource.html):
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
@@ -102,7 +102,7 @@ A streaming interface (similar to informers) that presents [`watcher::Event`](ht
 
 ```rust
 let api = Api::<Pod>::default_namespaced(client);
-let stream = watcher(api, Config::default()).applied_objects();
+let stream = watcher(api, Config::default()).default_backoff().applied_objects();
 ```
 
 This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
@@ -112,6 +112,7 @@ while let Some(event) = stream.try_next().await? {
     println!("Applied: {}", event.name_any());
 }
 ```
+
 
 Note the base items from a `watcher` stream are an abstraction above the native `WatchEvent` to allow for store buffering. If you are following along to "see what changed", you can use utilities from [`WatchStreamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html), such as `applied_objects` to get a more conventional stream.
 
