@@ -410,7 +410,7 @@ impl Client {
     /// let pod: Pod = client.get("some_pod", &Namespace::from("default")).await?;
     /// let pp = &PatchParams::apply("controller").force();
     /// // Perform an apply patch on the resource
-    /// client.apply(pod, pp).await?;
+    /// client.apply(&pod, pp).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -451,7 +451,7 @@ impl Client {
     /// let pod: Pod = client.get("some_pod", &Namespace::from("default")).await?;
     /// let pp = &PatchParams::apply("controller").force();
     /// // Perform an apply patch on the resource status
-    /// client.apply(pod, pp).await?;
+    /// client.apply_status(&pod, pp).await?;
     /// # Ok(())
     /// # }
     /// ```
