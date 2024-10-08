@@ -65,7 +65,7 @@ impl<T, R: Stream> Scheduler<T, R> {
     }
 }
 
-impl<'a, T: Hash + Eq + Clone, R> SchedulerProj<'a, T, R> {
+impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
     /// Attempt to schedule a message into the queue.
     ///
     /// If the message is already in the queue then the earlier `request.run_at` takes precedence.
@@ -147,7 +147,7 @@ pub struct Hold<'a, T, R> {
     scheduler: Pin<&'a mut Scheduler<T, R>>,
 }
 
-impl<'a, T, R> Stream for Hold<'a, T, R>
+impl<T, R> Stream for Hold<'_, T, R>
 where
     T: Eq + Hash + Clone,
     R: Stream<Item = ScheduleRequest<T>>,
@@ -177,7 +177,7 @@ pub struct HoldUnless<'a, T, R, C> {
     can_take_message: C,
 }
 
-impl<'a, T, R, C> Stream for HoldUnless<'a, T, R, C>
+impl<T, R, C> Stream for HoldUnless<'_, T, R, C>
 where
     T: Eq + Hash + Clone,
     R: Stream<Item = ScheduleRequest<T>>,
