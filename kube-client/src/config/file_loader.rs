@@ -83,12 +83,21 @@ impl ConfigLoader {
             .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
         let user_name = user.unwrap_or(&current_context.user);
+
+        // client-go doesn't fail on empty/missing user, so we don't either
+        // see https://github.com/kube-rs/kube/issues/1594
         let mut user = config
             .auth_infos
             .iter()
             .find(|named_user| &named_user.name == user_name)
             .and_then(|named_user| named_user.auth_info.clone())
-            .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
+            .unwrap_or_else(|| {
+                // assuming that empty user is ok but if it's not empty user we should warn
+                if !user_name.is_empty() {
+                    tracing::warn!("User {user_name} wasn't found in kubeconfig, using null auth");
+                }
+                AuthInfo::default()
+            });
 
         if let Some(exec_config) = &mut user.exec {
             if exec_config.provide_cluster_info {
@@ -117,8 +126,6 @@ impl ConfigLoader {
         let nonempty = |o: Option<String>| o.filter(|s| !s.is_empty());
 
         if let Some(proxy) = nonempty(self.cluster.proxy_url.clone())
-            .or_else(|| nonempty(std::env::var("HTTP_PROXY").ok()))
-            .or_else(|| nonempty(std::env::var("http_proxy").ok()))
             .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
             .or_else(|| nonempty(std::env::var("https_proxy").ok()))
         {

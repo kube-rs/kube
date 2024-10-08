@@ -1,6 +1,5 @@
 use std::{fmt::Debug, sync::Mutex, task::Poll};
 
-use derivative::Derivative;
 use futures::{channel, Future, FutureExt};
 use thiserror::Error;
 use tracing::trace;
@@ -26,8 +25,7 @@ impl<T> Debug for Initializer<T> {
 ///
 /// Can be considered equivalent to a [`channel::oneshot`] channel, except for that
 /// the value produced is retained for subsequent calls to [`Self::get`].
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(Debug)]
 pub struct DelayedInit<T> {
     state: Mutex<ReceiverState<T>>,
 }

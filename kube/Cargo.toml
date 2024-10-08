@@ -37,6 +37,7 @@ unstable-runtime = ["kube-runtime/unstable-runtime", "runtime"]
 unstable-client = ["kube-client/unstable-client", "client"]
 socks5 = ["kube-client/socks5", "client"]
 http-proxy = ["kube-client/http-proxy", "client"]
+webpki-roots = ["kube-client/webpki-roots", "client"]
 
 [package.metadata.docs.rs]
 features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/latest", "unstable-runtime", "socks5", "http-proxy"]
@@ -47,10 +48,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-kube-derive = { path = "../kube-derive", version = "=0.94.2", optional = true }
-kube-core = { path = "../kube-core", version = "=0.94.2" }
-kube-client = { path = "../kube-client", version = "=0.94.2", default-features = false, optional = true }
-kube-runtime = { path = "../kube-runtime", version = "=0.94.2", optional = true}
+kube-derive = { path = "../kube-derive", version = "=0.95.0", optional = true }
+kube-core = { path = "../kube-core", version = "=0.95.0" }
+kube-client = { path = "../kube-client", version = "=0.95.0", default-features = false, optional = true }
+kube-runtime = { path = "../kube-runtime", version = "=0.95.0", optional = true}
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
 k8s-openapi.workspace = true

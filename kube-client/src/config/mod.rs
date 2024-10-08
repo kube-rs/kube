@@ -53,10 +53,6 @@ pub enum KubeconfigError {
     #[error("failed to load the cluster of context: {0}")]
     LoadClusterOfContext(String),
 
-    /// Failed to find named user
-    #[error("failed to find named user: {0}")]
-    FindUser(String),
-
     /// Failed to find the path of kubeconfig
     #[error("failed to find the path of kubeconfig")]
     FindPath,

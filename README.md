@@ -1,8 +1,8 @@
 # kube-rs
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
-[![Rust 1.75](https://img.shields.io/badge/MSRV-1.75-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.75.0)
-[![Tested against Kubernetes v1_25 and above](https://img.shields.io/badge/MK8SV-v1_25-326ce5.svg)](https://kube.rs/kubernetes-version)
+[![Rust 1.77](https://img.shields.io/badge/MSRV-1.77-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.77.2)
+[![Tested against Kubernetes v1_26 and above](https://img.shields.io/badge/MK8SV-v1_26-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 
@@ -16,8 +16,8 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.94.2", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.22.0", features = ["latest"] }
+kube = { version = "0.95.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.23.0", features = ["latest"] }
 ```
 
 See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality.
@@ -43,7 +43,7 @@ For real world projects see [ADOPTERS](https://kube.rs/adopters/).
 
 ## Api
 
-The [`Api`](https://docs.rs/kube/*/kube/struct.Api.html) is what interacts with Kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/*/kube/trait.Resource.html):
+The [`Api`](https://docs.rs/kube/latest/kube/struct.Api.html) is what interacts with Kubernetes resources, and is generic over [`Resource`](https://docs.rs/kube/latest/kube/trait.Resource.html):
 
 ```rust
 use k8s_openapi::api::core::v1::Pod;
@@ -102,7 +102,7 @@ A streaming interface (similar to informers) that presents [`watcher::Event`](ht
 
 ```rust
 let api = Api::<Pod>::default_namespaced(client);
-let stream = watcher(api, Config::default()).applied_objects();
+let stream = watcher(api, Config::default()).default_backoff().applied_objects();
 ```
 
 This now gives a continual stream of events and you do not need to care about the watch having to restart, or connections dropping.
@@ -112,6 +112,7 @@ while let Some(event) = stream.try_next().await? {
     println!("Applied: {}", event.name_any());
 }
 ```
+
 
 Note the base items from a `watcher` stream are an abstraction above the native `WatchEvent` to allow for store buffering. If you are following along to "see what changed", you can use utilities from [`WatchStreamExt`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html), such as `applied_objects` to get a more conventional stream.
 
@@ -155,8 +156,8 @@ By default [rustls](https://github.com/rustls/rustls) is used for TLS, but `open
 
 ```toml
 [dependencies]
-kube = { version = "0.94.2", default-features = false, features = ["client", "openssl-tls"] }
-k8s-openapi = { version = "0.22.0", features = ["latest"] }
+kube = { version = "0.95.0", default-features = false, features = ["client", "openssl-tls"] }
+k8s-openapi = { version = "0.23.0", features = ["latest"] }
 ```
 
 This will pull in `openssl` and `hyper-openssl`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `rustls`.

@@ -167,14 +167,14 @@ impl ConfigExt for Config {
     fn auth_layer(&self) -> Result<Option<AuthLayer>> {
         Ok(match Auth::try_from(&self.auth_info).map_err(Error::Auth)? {
             Auth::None => None,
-            Auth::Basic(user, pass) => Some(AuthLayer(Either::A(
+            Auth::Basic(user, pass) => Some(AuthLayer(Either::Left(
                 AddAuthorizationLayer::basic(&user, pass.expose_secret()).as_sensitive(true),
             ))),
-            Auth::Bearer(token) => Some(AuthLayer(Either::A(
+            Auth::Bearer(token) => Some(AuthLayer(Either::Left(
                 AddAuthorizationLayer::bearer(token.expose_secret()).as_sensitive(true),
             ))),
             Auth::RefreshableToken(refreshable) => {
-                Some(AuthLayer(Either::B(AsyncFilterLayer::new(refreshable))))
+                Some(AuthLayer(Either::Right(AsyncFilterLayer::new(refreshable))))
             }
             Auth::Certificate(_client_certificate_data, _client_key_data) => None,
         })

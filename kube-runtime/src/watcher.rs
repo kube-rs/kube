@@ -5,7 +5,7 @@
 use crate::utils::ResetTimerBackoff;
 use async_trait::async_trait;
 use backoff::{backoff::Backoff, ExponentialBackoff};
-use derivative::Derivative;
+use educe::Educe;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
@@ -71,7 +71,10 @@ impl<K> Event<K> {
     ///
     /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
     /// emitted individually.
-    #[deprecated(since = "0.92.0", note = "unnecessary to flatten a single object")]
+    #[deprecated(
+        since = "0.92.0",
+        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
+    )]
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
             Self::Apply(obj) | Self::InitApply(obj) => Some(obj),
@@ -85,7 +88,10 @@ impl<K> Event<K> {
     /// Note that `Deleted` events may be missed when restarting the stream. Use finalizers
     /// or owner references instead if you care about cleaning up external resources after
     /// deleted objects.
-    #[deprecated(since = "0.92.0", note = "unnecessary to flatten a single object")]
+    #[deprecated(
+        since = "0.92.0",
+        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
+    )]
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
             Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => Some(obj),
@@ -121,8 +127,8 @@ impl<K> Event<K> {
     }
 }
 
-#[derive(Derivative, Default)]
-#[derivative(Debug)]
+#[derive(Educe, Default)]
+#[educe(Debug)]
 /// The internal finite state machine driving the [`watcher`]
 enum State<K> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
@@ -137,7 +143,7 @@ enum State<K> {
     /// Kubernetes 1.27 Streaming Lists
     /// The initial watch is in progress
     InitialWatch {
-        #[derivative(Debug = "ignore")]
+        #[educe(Debug(ignore))]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
     /// The initial LIST was successful, so we should move on to starting the actual watch.
@@ -150,7 +156,7 @@ enum State<K> {
     /// with `Empty`.
     Watching {
         resource_version: String,
-        #[derivative(Debug = "ignore")]
+        #[educe(Debug(ignore))]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
 }
@@ -710,8 +716,8 @@ where
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
-/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+/// The events are intended to provide a safe input interface for a state store like a [`reflector`].
+/// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```no_run
 /// use kube::{
@@ -773,8 +779,8 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
-/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+/// The events are intended to provide a safe input interface for a state store like a [`reflector`].
+/// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```no_run
 /// use kube::{

@@ -187,7 +187,7 @@ impl Oidc {
     /// Retrieve the ID token. If the stored ID token is or will soon be expired, try refreshing it first.
     pub async fn id_token(&mut self) -> Result<String, errors::Error> {
         if self.token_valid()? {
-            return Ok(self.id_token.expose_secret().clone());
+            return Ok(self.id_token.expose_secret().to_string());
         }
 
         let id_token = self.refresher.as_mut().map_err(|e| e.clone())?.id_token().await?;
@@ -313,10 +313,16 @@ impl Refresher {
             .install_default()
             .unwrap();
 
-        #[cfg(feature = "rustls-tls")]
+        #[cfg(all(feature = "rustls-tls", not(feature = "webpki-roots")))]
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
             .map_err(|_| errors::RefreshInitError::NoValidNativeRootCA)?
+            .https_only()
+            .enable_http1()
+            .build();
+        #[cfg(all(feature = "rustls-tls", feature = "webpki-roots"))]
+        let https = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_webpki_roots()
             .https_only()
             .enable_http1()
             .build();
@@ -394,8 +400,8 @@ impl Refresher {
             }
             AuthStyle::Params => {
                 params.extend([
-                    ("client_id", self.client_id.expose_secret().as_str()),
-                    ("client_secret", self.client_secret.expose_secret().as_str()),
+                    ("client_id", self.client_id.expose_secret()),
+                    ("client_secret", self.client_secret.expose_secret()),
                 ]);
             }
         };

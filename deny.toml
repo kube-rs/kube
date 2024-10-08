@@ -40,6 +40,9 @@ exceptions = [
     # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
     # for more details.
     { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
+    # Pulled in via hyper-rustls when using the webpki-roots feature,
+    # which is off by default.
+    { allow = ["MPL-2.0"], name = "webpki-roots" },
 ]
 
 [[licenses.clarify]]
@@ -59,28 +62,20 @@ allow-git = ["https://github.com/tyrone-wu/runtime-macros.git"]
 multiple-versions = "deny"
 
 [[bans.skip]]
-name = "hermit-abi"
-
-[[bans.skip]]
 name = "rustls-native-certs"
 
 [[bans.skip]]
-# Needs a complicated upgrade
-name = "syn"
+# blocked on us swapping out serde_yaml
+name = "hashbrown"
 
 [[bans.skip]]
-# waiting for pem to bump base64
-# https://github.com/jcreekmore/pem-rs/blob/master/Cargo.toml#L16
+# base64 did some annoying breaking changes
 name = "base64"
 
 [[bans.skip]]
 # latest via openssl->hyper-openssl (we have latest)
 # newer via tower-http (we have latest)
 name = "bitflags"
-
-[[bans.skip]]
-# deep in dependency tree, only dual use via dev dependency
-name = "redox_syscall"
 
 [[bans.skip-tree]]
 name = "windows-sys"

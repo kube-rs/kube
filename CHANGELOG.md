@@ -5,8 +5,23 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.94.2...main
+ * see https://github.com/kube-rs/kube/compare/0.95.0...main
 
+[0.95.0](https://github.com/kube-rs/kube/releases/tag/0.95.0) / 2024-09-16
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.95.0 -->
+## Kubernetes `v1_31` support via `k8s-openapi` [0.23](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.23.0)
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+New minimum versions: [MSRV](https://kube.rs/rust-version/) 1.77.2, [MK8SV](https://kube.rs/kubernetes-version/): 1.26
+
+## What's Changed
+### Changed
+* Update tokio-tungstenite requirement from 0.23.0 to 0.24.0 by @dependabot in https://github.com/kube-rs/kube/pull/1579
+* Bump `k8s-openapi` to 0.23 for Kubernetes 1.31 support by @clux in https://github.com/kube-rs/kube/pull/1581
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/0.94.2...0.95.0
 [0.94.2](https://github.com/kube-rs/kube/releases/tag/0.94.2) / 2024-09-13
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.94.2 -->
