@@ -100,7 +100,6 @@ impl<T: Clone> ObjectList<T> {
     ///     *elem = 2;
     ///     println!("First element: {:?}", elem); // prints "First element: 2"
     /// }
-
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
         self.items.iter_mut()
     }
