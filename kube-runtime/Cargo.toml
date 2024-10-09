@@ -12,9 +12,8 @@ keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
 categories = ["web-programming::http-client", "caching", "network-programming"]
 
 [features]
-unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-predicates", "unstable-runtime-stream-control", "unstable-runtime-reconcile-on"]
+unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-stream-control", "unstable-runtime-reconcile-on"]
 unstable-runtime-subscribe = []
-unstable-runtime-predicates = []
 unstable-runtime-stream-control = []
 unstable-runtime-reconcile-on = []
 

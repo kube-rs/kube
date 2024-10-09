@@ -1,7 +1,10 @@
-#[cfg(feature = "unstable-runtime-predicates")]
-use crate::utils::predicate::{Predicate, PredicateFilter};
 use crate::{
-    utils::{event_decode::EventDecode, event_modify::EventModify, stream_backoff::StreamBackoff},
+    utils::{
+        event_decode::EventDecode,
+        event_modify::EventModify,
+        predicate::{Predicate, PredicateFilter},
+        stream_backoff::StreamBackoff,
+    },
     watcher,
 };
 use kube_client::Resource;
@@ -94,8 +97,6 @@ pub trait WatchStreamExt: Stream {
     /// Common use case for this is to avoid repeat events for status updates
     /// by filtering on [`predicates::generation`](crate::predicates::generation).
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// ## Usage
     /// ```no_run
     /// # use std::pin::pin;
@@ -116,7 +117,6 @@ pub trait WatchStreamExt: Stream {
     /// # Ok(())
     /// # }
     /// ```
-    #[cfg(feature = "unstable-runtime-predicates")]
     fn predicate_filter<K, P>(self, predicate: P) -> PredicateFilter<Self, K, P>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
@@ -272,7 +272,6 @@ pub trait WatchStreamExt: Stream {
 impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
 
 // Compile tests
-#[cfg(feature = "unstable-runtime-predicates")]
 #[cfg(test)]
 pub(crate) mod tests {
     use super::watcher;
