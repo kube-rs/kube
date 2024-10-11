@@ -46,7 +46,7 @@ educe = { version = "0.6.0", default-features = false }
 either = "1.6.1"
 form_urlencoded = "1.2.0"
 futures = { version = "0.3.17", default-features = false }
-hashbrown = "0.14.0"
+hashbrown = "0.15.0"
 home = "0.5.4"
 http = "1.1.0"
 http-body = "1.0.0"
