@@ -2,7 +2,7 @@
 use crate::controller::Action;
 use futures::{TryFuture, TryFutureExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
-use jsonptr::Pointer;
+use jsonptr::PointerBuf;
 use kube_client::{
     api::{Patch, PatchParams},
     Api, Resource, ResourceExt,
@@ -142,12 +142,12 @@ where
                     // `Test` ensures that we fail instead of deleting someone else's finalizer
                     // (in which case a new `Cleanup` event will be sent)
                     PatchOperation::Test(TestOperation {
-                        path: Pointer::from_str(finalizer_path.as_str())
+                        path: PointerBuf::from_str(finalizer_path.as_str())
                             .map_err(|_err| Error::InvalidFinalizer)?,
                         value: finalizer_name.into(),
                     }),
                     PatchOperation::Remove(RemoveOperation {
-                        path: Pointer::from_str(finalizer_path.as_str())
+                        path: PointerBuf::from_str(finalizer_path.as_str())
                             .map_err(|_err| Error::InvalidFinalizer)?,
                     }),
                 ])),
@@ -164,12 +164,12 @@ where
             let patch = json_patch::Patch(if obj.finalizers().is_empty() {
                 vec![
                     PatchOperation::Test(TestOperation {
-                        path: Pointer::from_str("/metadata/finalizers")
+                        path: PointerBuf::from_str("/metadata/finalizers")
                             .map_err(|_err| Error::InvalidFinalizer)?,
                         value: serde_json::Value::Null,
                     }),
                     PatchOperation::Add(AddOperation {
-                        path: Pointer::from_str("/metadata/finalizers")
+                        path: PointerBuf::from_str("/metadata/finalizers")
                             .map_err(|_err| Error::InvalidFinalizer)?,
                         value: vec![finalizer_name].into(),
                     }),
@@ -180,12 +180,12 @@ where
                     // https://github.com/kube-rs/kube/issues/964#issuecomment-1197311254),
                     // so we need to fail and retry if anyone else has added the finalizer in the meantime
                     PatchOperation::Test(TestOperation {
-                        path: Pointer::from_str("/metadata/finalizers")
+                        path: PointerBuf::from_str("/metadata/finalizers")
                             .map_err(|_err| Error::InvalidFinalizer)?,
                         value: obj.finalizers().into(),
                     }),
                     PatchOperation::Add(AddOperation {
-                        path: Pointer::from_str("/metadata/finalizers/-")
+                        path: PointerBuf::from_str("/metadata/finalizers/-")
                             .map_err(|_err| Error::InvalidFinalizer)?,
                         value: finalizer_name.into(),
                     }),
