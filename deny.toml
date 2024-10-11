@@ -31,6 +31,8 @@ allow = [
     # Pulled in via aws_lc_rs when using rustls-tls and aws-lc-rs features
     # https://openssl-library.org/source/license/index.html
     "OpenSSL",
+    # Pulled in via hashbrown through its foldhash dependency
+    "Zlib",
 ]
 
 exceptions = [
@@ -63,10 +65,6 @@ multiple-versions = "deny"
 
 [[bans.skip]]
 name = "rustls-native-certs"
-
-[[bans.skip]]
-# blocked on us swapping out serde_yaml
-name = "hashbrown"
 
 [[bans.skip]]
 # base64 did some annoying breaking changes

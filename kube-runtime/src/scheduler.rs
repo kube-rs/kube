@@ -1,7 +1,7 @@
 //! Delays and deduplicates [`Stream`](futures::stream::Stream) items
 
 use futures::{stream::Fuse, Stream, StreamExt};
-use hashbrown::{hash_map::Entry, HashMap};
+use hashbrown::{hash_map::RawEntryMut, HashMap};
 use pin_project::pin_project;
 use std::{
     collections::HashSet,
@@ -78,24 +78,24 @@ impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
             .run_at
             .checked_add(*self.debounce)
             .unwrap_or_else(far_future);
-        match self.scheduled.entry(request.message) {
+        match self.scheduled.raw_entry_mut().from_key(&request.message) {
             // If new request is supposed to be earlier than the current entry's scheduled
             // time (for eg: the new request is user triggered and the current entry is the
             // reconciler's usual retry), then give priority to the new request.
-            Entry::Occupied(mut old_entry) if old_entry.get().run_at >= request.run_at => {
+            RawEntryMut::Occupied(mut old_entry) if old_entry.get().run_at >= request.run_at => {
                 // Old entry will run after the new request, so replace it..
                 let entry = old_entry.get_mut();
                 self.queue.reset_at(&entry.queue_key, next_time);
                 entry.run_at = next_time;
-                old_entry.replace_key();
+                old_entry.insert_key(request.message);
             }
-            Entry::Occupied(_old_entry) => {
+            RawEntryMut::Occupied(_old_entry) => {
                 // Old entry will run before the new request, so ignore the new request..
             }
-            Entry::Vacant(entry) => {
+            RawEntryMut::Vacant(entry) => {
                 // No old entry, we're free to go!
-                let message = entry.key().clone();
-                entry.insert(ScheduledEntry {
+                let message = request.message.clone();
+                entry.insert(request.message, ScheduledEntry {
                     run_at: next_time,
                     queue_key: self.queue.insert_at(message, next_time),
                 });
