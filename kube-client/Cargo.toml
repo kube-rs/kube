@@ -23,6 +23,8 @@ oauth = ["client", "tame-oauth"]
 oidc = ["client", "form_urlencoded"]
 gzip = ["client", "tower-http/decompression-gzip"]
 client = ["config", "__non_core", "hyper", "hyper-util", "http-body", "http-body-util", "tower", "tower-http", "hyper-timeout", "chrono", "jsonpath-rust", "bytes", "futures", "tokio", "tokio-util", "either"]
+openapi = ["k8s-openapi", "kube-core/openapi"]
+pb = ["k8s-pb", "kube-core/pb"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
@@ -78,7 +80,8 @@ secrecy = { workspace = true }
 tracing = { workspace = true, features = ["log"], optional = true }
 hyper-openssl = { workspace = true, features = ["client-legacy"], optional = true }
 form_urlencoded = { workspace = true, optional = true }
-k8s-openapi= { workspace = true, features = [] }
+k8s-openapi = { workspace = true, optional = true, features = [] }
+k8s-pb = { workspace = true, optional = true }
 
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "ws"], version = "<1.0.0, >=0.61.0" }
