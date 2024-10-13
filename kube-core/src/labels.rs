@@ -1,6 +1,6 @@
 //! Type safe label selector logic
+use crate::k8s::{LabelSelector, LabelSelectorRequirement};
 use core::fmt;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, LabelSelectorRequirement};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::PartialEq,

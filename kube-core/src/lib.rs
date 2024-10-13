@@ -8,6 +8,8 @@
 //! (even with zero features) under [`kube::core`]((https://docs.rs/kube/*/kube/core/index.html)).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+pub mod k8s;
+
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
 #[cfg(feature = "admission")]
 pub mod admission;
@@ -22,7 +24,9 @@ pub use duration::Duration;
 pub mod dynamic;
 pub use dynamic::{ApiResource, DynamicObject};
 
+#[cfg(feature = "openapi")]
 pub mod crd;
+#[cfg(feature = "openapi")]
 pub use crd::CustomResourceExt;
 
 pub mod gvk;
@@ -33,7 +37,8 @@ pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt
 
 pub mod labels;
 
-#[cfg(feature = "kubelet-debug")] pub mod kubelet_debug;
+#[cfg(feature = "kubelet-debug")]
+pub mod kubelet_debug;
 
 pub mod object;
 pub use object::{NotUsed, Object, ObjectList};

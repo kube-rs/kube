@@ -1,12 +1,8 @@
-pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use k8s_openapi::{
-    api::core::v1::ObjectReference,
-    apimachinery::pkg::apis::meta::v1::{ManagedFieldsEntry, OwnerReference, Time},
-};
+pub use crate::k8s::ObjectMeta;
+pub use crate::k8s::{ClusterResourceScope, NamespaceResourceScope, ResourceScope, SubResourceScope};
+use crate::k8s::{ManagedFieldsEntry, ObjectReference, OwnerReference, Time};
 
 use std::{borrow::Cow, collections::BTreeMap};
-
-pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScope, SubResourceScope};
 
 /// Indicates that a [`Resource`] is of an indeterminate dynamic scope.
 pub struct DynamicResourceScope {}
@@ -169,8 +165,8 @@ pub fn api_version_from_group_version<'a>(group: Cow<'a, str>, version: Cow<'a, 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
 impl<K, S> Resource for K
 where
-    K: k8s_openapi::Metadata<Ty = ObjectMeta>,
-    K: k8s_openapi::Resource<Scope = S>,
+    K: crate::k8s::Metadata<Ty = ObjectMeta>,
+    K: crate::k8s::Resource<Scope = S>,
 {
     type DynamicType = ();
     type Scope = S;

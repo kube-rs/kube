@@ -2,12 +2,11 @@
 //!
 //! For concrete usage see [examples prefixed with dynamic_](https://github.com/kube-rs/kube/tree/main/examples).
 pub use crate::discovery::ApiResource;
+use crate::k8s::ObjectMeta;
 use crate::{
     metadata::TypeMeta,
     resource::{DynamicResourceScope, Resource},
 };
-
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use std::borrow::Cow;
 use thiserror::Error;
 
@@ -22,17 +21,18 @@ pub struct ParseDynamicObjectError {
 /// A dynamic representation of a kubernetes object
 ///
 /// This will work with any non-list type object.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "openapi", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DynamicObject {
     /// The type fields, not always present
-    #[serde(flatten, default)]
+    #[cfg_attr(feature = "openapi", serde(flatten, default))]
     pub types: Option<TypeMeta>,
     /// Object metadata
-    #[serde(default)]
+    #[cfg_attr(feature = "openapi", serde(default))]
     pub metadata: ObjectMeta,
 
     /// All other keys
-    #[serde(flatten)]
+    #[cfg_attr(feature = "openapi", serde(flatten))]
     pub data: serde_json::Value,
 }
 
@@ -68,6 +68,7 @@ impl DynamicObject {
     }
 
     /// Attempt to convert this `DynamicObject` to a `Resource`
+    #[cfg(feature = "openapi")]
     pub fn try_parse<K: Resource + for<'a> serde::Deserialize<'a>>(
         self,
     ) -> Result<K, ParseDynamicObjectError> {

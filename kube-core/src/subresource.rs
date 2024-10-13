@@ -6,7 +6,7 @@ use crate::{
     request::{Error, Request, JSON_MIME},
 };
 
-pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
+pub use crate::k8s::{Scale, ScaleSpec, ScaleStatus};
 
 // ----------------------------------------------------------------------------
 // Log subresource
