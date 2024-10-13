@@ -1,7 +1,7 @@
 //! Utils and helpers
 
-use crate::k8s::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
 use crate::{
+    k8s::{DaemonSet, Deployment, ReplicaSet, StatefulSet},
     params::{Patch, PatchParams},
     request, Request,
 };

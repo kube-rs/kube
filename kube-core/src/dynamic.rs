@@ -2,8 +2,8 @@
 //!
 //! For concrete usage see [examples prefixed with dynamic_](https://github.com/kube-rs/kube/tree/main/examples).
 pub use crate::discovery::ApiResource;
-use crate::k8s::ObjectMeta;
 use crate::{
+    k8s::ObjectMeta,
     metadata::TypeMeta,
     resource::{DynamicResourceScope, Resource},
 };

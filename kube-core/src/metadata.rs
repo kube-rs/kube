@@ -178,8 +178,7 @@ impl<K: Resource> Resource for PartialObjectMeta<K> {
 #[cfg(test)]
 mod test {
     use super::{ObjectMeta, PartialObjectMeta, PartialObjectMetaExt};
-    use crate::k8s::Pod;
-    use crate::Resource;
+    use crate::{k8s::Pod, Resource};
 
     #[test]
     fn can_convert_and_derive_partial_metadata() {

@@ -1,8 +1,10 @@
 //! Type information structs for dynamic resources.
 use std::str::FromStr;
 
-use crate::k8s::{ObjectReference, OwnerReference};
-use crate::TypeMeta;
+use crate::{
+    k8s::{ObjectReference, OwnerReference},
+    TypeMeta,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

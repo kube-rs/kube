@@ -24,10 +24,8 @@ pub use duration::Duration;
 pub mod dynamic;
 pub use dynamic::{ApiResource, DynamicObject};
 
-#[cfg(feature = "openapi")]
-pub mod crd;
-#[cfg(feature = "openapi")]
-pub use crd::CustomResourceExt;
+#[cfg(feature = "openapi")] pub mod crd;
+#[cfg(feature = "openapi")] pub use crd::CustomResourceExt;
 
 pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
@@ -37,8 +35,7 @@ pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt
 
 pub mod labels;
 
-#[cfg(feature = "kubelet-debug")]
-pub mod kubelet_debug;
+#[cfg(feature = "kubelet-debug")] pub mod kubelet_debug;
 
 pub mod object;
 pub use object::{NotUsed, Object, ObjectList};
