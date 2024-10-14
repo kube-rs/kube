@@ -50,6 +50,7 @@ impl TryFrom<TypeMeta> for GroupVersionKind {
     }
 }
 
+#[cfg(feature = "openapi")] // does not work for pb, ownerref.api_version is optional
 impl From<OwnerReference> for GroupVersionKind {
     fn from(value: OwnerReference) -> Self {
         let (group, version) = match value.api_version.split_once("/") {

@@ -141,13 +141,22 @@ pub trait Resource {
     /// ```
     fn owner_ref(&self, dt: &Self::DynamicType) -> Option<OwnerReference> {
         let meta = self.meta();
-        Some(OwnerReference {
+        #[cfg(feature = "openapi")]
+        return Some(OwnerReference {
             api_version: Self::api_version(dt).to_string(),
             kind: Self::kind(dt).to_string(),
             name: meta.name.clone()?,
             uid: meta.uid.clone()?,
             ..OwnerReference::default()
-        })
+        });
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return Some(OwnerReference {
+            api_version: Some(Self::api_version(dt).to_string()),
+            kind: Some(Self::kind(dt).to_string()),
+            name: meta.name.clone(),
+            uid: meta.uid.clone(),
+            ..OwnerReference::default()
+        });
     }
 }
 
@@ -193,11 +202,17 @@ where
     }
 
     fn meta(&self) -> &ObjectMeta {
-        self.metadata()
+        #[cfg(feature = "openapi")]
+        return self.metadata();
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return self.metadata().unwrap(); // not great
     }
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
-        self.metadata_mut()
+        #[cfg(feature = "openapi")]
+        return self.metadata_mut();
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return self.metadata_mut().unwrap();
     }
 }
 

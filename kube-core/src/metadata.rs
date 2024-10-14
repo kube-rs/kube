@@ -59,17 +59,18 @@ impl TypeMeta {
 /// schema without knowing the details of the version.
 ///
 /// See the [`PartialObjectMetaExt`] trait for how to construct one safely.
-#[derive(Deserialize, Serialize, Clone, Default, Debug)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Default, Debug)]
+#[cfg_attr(feature = "openapi", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", serde(rename_all = "camelCase"))]
 pub struct PartialObjectMeta<K = DynamicObject> {
     /// The type fields, not always present
-    #[serde(flatten, default)]
+    #[cfg_attr(feature = "openapi", serde(flatten, default))]
     pub types: Option<TypeMeta>,
     /// Standard object's metadata
-    #[serde(default)]
+    #[cfg_attr(feature = "openapi", serde(default))]
     pub metadata: ObjectMeta,
     /// Type information for static dispatch
-    #[serde(skip, default)]
+    #[cfg_attr(feature = "openapi", serde(skip, default))]
     pub _phantom: PhantomData<K>,
 }
 

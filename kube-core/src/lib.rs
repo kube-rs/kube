@@ -33,7 +33,7 @@ pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 pub mod metadata;
 pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta};
 
-pub mod labels;
+#[cfg(feature = "openapi")] pub mod labels;
 
 #[cfg(feature = "kubelet-debug")] pub mod kubelet_debug;
 
@@ -54,6 +54,7 @@ pub use resource::{
 pub mod response;
 pub use response::Status;
 
+#[cfg(feature = "openapi")]
 pub use labels::{Expression, ParseExpressionError, Selector, SelectorExt};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
@@ -73,5 +74,5 @@ pub use error::ErrorResponse;
 mod version;
 pub use version::Version;
 
-pub mod error_boundary;
-pub use error_boundary::DeserializeGuard;
+#[cfg(feature = "openapi")] pub mod error_boundary;
+#[cfg(feature = "openapi")] pub use error_boundary::DeserializeGuard;

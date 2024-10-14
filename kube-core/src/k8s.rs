@@ -3,6 +3,7 @@
 /// Re-export k8s-openapi types by default
 #[cfg(feature = "openapi")]
 pub use k8s_openapi::{
+    api,
     api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet},
     api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus},
     api::core::v1::{ConfigMap, ObjectReference, Pod},
@@ -16,6 +17,7 @@ pub use k8s_openapi::{
 /// Re-export k8s-pb types when only pb feature enabled
 #[cfg(all(not(feature = "openapi"), feature = "pb"))]
 pub use k8s_pb::{
+    api,
     api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet},
     api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus},
     api::core::v1::{ConfigMap, ObjectReference, Pod},
