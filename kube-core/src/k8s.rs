@@ -8,6 +8,7 @@ pub use k8s_openapi::{
     api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus},
     api::core::v1::{ConfigMap, ObjectReference, Pod},
     apiextensions_apiserver::pkg::apis::apiextensions,
+    apimachinery,
     apimachinery::pkg::apis::meta::v1::{
         LabelSelector, LabelSelectorRequirement, ListMeta, ManagedFieldsEntry, ObjectMeta, OwnerReference,
         Time,
@@ -22,6 +23,7 @@ pub use k8s_pb::{
     api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus},
     api::core::v1::{ConfigMap, ObjectReference, Pod},
     apiextensions_apiserver::pkg::apis::apiextensions,
+    apimachinery,
     apimachinery::pkg::apis::meta::v1::{
         LabelSelector, LabelSelectorRequirement, ListMeta, ManagedFieldsEntry, ObjectMeta, OwnerReference,
         Time,

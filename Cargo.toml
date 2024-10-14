@@ -61,7 +61,7 @@ json-patch = "3"
 jsonptr = "0.6"
 jsonpath-rust = "0.5.0"
 k8s-openapi = { version = "0.23.0", default-features = false }
-k8s-pb = "0.6.0"
+k8s-pb = "0.6.1"
 #k8s-pb = { path = "../k8s-pb/k8s-pb" }
 openssl = "0.10.36"
 parking_lot = "0.12.0"

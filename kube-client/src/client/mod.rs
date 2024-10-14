@@ -7,12 +7,13 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
+use apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use either::{Either, Left, Right};
 use futures::{future::BoxFuture, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
 #[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
+use kube_core::k8s::apimachinery;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
@@ -372,7 +373,8 @@ impl Client {
 /// The following methods might be deprecated to avoid confusion between similarly named types within `discovery`.
 impl Client {
     /// Returns apiserver version.
-    pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
+    #[cfg(feature = "openapi")] // Info struct does not exist for pbs
+    pub async fn apiserver_version(&self) -> Result<apimachinery::pkg::version::Info> {
         self.request(
             Request::builder()
                 .uri("/version")
@@ -497,8 +499,8 @@ mod tests {
 
     use crate::{client::Body, Api, Client};
 
+    use crate::core::k8s::api::core::v1::Pod;
     use http::{Request, Response};
-    use k8s_openapi::api::core::v1::Pod;
     use tower_test::mock;
 
     #[tokio::test]

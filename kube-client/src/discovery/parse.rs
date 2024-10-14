@@ -1,9 +1,9 @@
 //! Abstractions on top of k8s_openapi::apimachinery::pkg::apis::meta::v1
 use crate::{error::DiscoveryError, Error, Result};
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList};
 use kube_core::{
     discovery::{ApiCapabilities, ApiResource, Scope},
     gvk::{GroupVersion, ParseGroupVersionError},
+    k8s::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList},
 };
 
 /// Creates an `ApiResource` from a `meta::v1::APIResource` instance + its groupversion.

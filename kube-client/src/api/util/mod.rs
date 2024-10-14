@@ -2,11 +2,14 @@ use crate::{
     api::{Api, Resource},
     Error, Result,
 };
-use k8s_openapi::api::{
-    authentication::v1::TokenRequest,
-    core::v1::{Node, ServiceAccount},
+use kube_core::{
+    k8s::api::{
+        authentication::v1::TokenRequest,
+        core::v1::{Node, ServiceAccount},
+    },
+    params::PostParams,
+    util::Restart,
 };
-use kube_core::{params::PostParams, util::Restart};
 use serde::de::DeserializeOwned;
 
 mod csr;
@@ -66,7 +69,7 @@ mod test {
         api::{Api, DeleteParams, ListParams, PostParams},
         Client,
     };
-    use k8s_openapi::api::{
+    use kube_core::k8s::api::{
         authentication::v1::{TokenRequest, TokenRequestSpec, TokenReview, TokenReviewSpec},
         core::v1::{Node, ServiceAccount},
     };
