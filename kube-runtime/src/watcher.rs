@@ -899,12 +899,12 @@ impl Default for DefaultBackoff {
     fn default() -> Self {
         Self(ResetTimerBackoff::new(
             backoff::ExponentialBackoffBuilder::new()
-            .with_initial_interval(Duration::from_millis(800))
-            .with_max_interval(Duration::from_secs(30))
-            .with_randomization_factor(1.0)
-            .with_multiplier(2.0)
-            .with_max_elapsed_time(None)
-            .build(),
+                .with_initial_interval(Duration::from_millis(800))
+                .with_max_interval(Duration::from_secs(30))
+                .with_randomization_factor(1.0)
+                .with_multiplier(2.0)
+                .with_max_elapsed_time(None)
+                .build(),
             Duration::from_secs(120),
         ))
     }
