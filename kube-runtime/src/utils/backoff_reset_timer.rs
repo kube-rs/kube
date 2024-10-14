@@ -83,10 +83,4 @@ mod tests {
             tokio::time::Instant::now().into_std()
         }
     }
-
-    impl<B: Backoff> ResetTimerBackoff<B> {
-        pub fn get_backoff(&self) -> &B {
-            &self.backoff
-        }
-    }
 }

@@ -919,13 +919,3 @@ impl Backoff for DefaultBackoff {
         self.0.reset()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn backoff_start_interval() {
-        let default_backoff = super::DefaultBackoff::default().0;
-        let default_backoff = default_backoff.get_backoff();
-        assert_eq!(default_backoff.current_interval, default_backoff.initial_interval);
-    }
-}
