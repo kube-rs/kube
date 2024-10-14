@@ -1,8 +1,10 @@
 //! Type information structs for dynamic resources.
 use std::str::FromStr;
 
-use crate::TypeMeta;
-use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
+use crate::{
+    k8s::{ObjectReference, OwnerReference},
+    TypeMeta,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -48,6 +50,7 @@ impl TryFrom<TypeMeta> for GroupVersionKind {
     }
 }
 
+#[cfg(feature = "openapi")] // does not work for pb, ownerref.api_version is optional
 impl From<OwnerReference> for GroupVersionKind {
     fn from(value: OwnerReference) -> Self {
         let (group, version) = match value.api_version.split_once("/") {

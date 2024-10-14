@@ -16,25 +16,32 @@ use std::borrow::Cow;
 /// and is generally produced from list/watch/delete collection queries on an [`Resource`](super::Resource).
 ///
 /// This is almost equivalent to [`k8s_openapi::List<T>`](k8s_openapi::List), but iterable.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "openapi", derive(serde::Serialize, serde::Deserialize))]
 pub struct ObjectList<T>
 where
     T: Clone,
 {
     /// The type fields, always present
-    #[serde(flatten, deserialize_with = "deserialize_v1_list_as_default")]
+    #[cfg_attr(
+        feature = "openapi",
+        serde(flatten, deserialize_with = "deserialize_v1_list_as_default")
+    )]
     pub types: TypeMeta,
 
     /// ListMeta - only really used for its `resourceVersion`
     ///
     /// See [ListMeta](k8s_openapi::apimachinery::pkg::apis::meta::v1::ListMeta)
-    #[serde(default)]
+    #[cfg_attr(feature = "openapi", serde(default))]
     pub metadata: ListMeta,
 
     /// The items we are actually interested in. In practice; `T := Resource<T,U>`.
-    #[serde(
-        deserialize_with = "deserialize_null_as_default",
-        bound(deserialize = "Vec<T>: Deserialize<'de>")
+    #[cfg_attr(
+        feature = "openapi",
+        serde(
+            deserialize_with = "deserialize_null_as_default",
+            bound(deserialize = "Vec<T>: Deserialize<'de>")
+        )
     )]
     pub items: Vec<T>,
 }
@@ -182,14 +189,15 @@ pub trait HasStatus {
 ///
 /// This can be used to tie existing resources to smaller, local struct variants to optimize for memory use.
 /// E.g. if you are only interested in a few fields, but you store tons of them in memory with reflectors.
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "openapi", derive(serde::Serialize, serde::Deserialize))]
 pub struct Object<P, U>
 where
     P: Clone,
     U: Clone,
 {
     /// The type fields, not always present
-    #[serde(flatten, default)]
+    #[cfg_attr(feature = "openapi", serde(flatten, default))]
     pub types: Option<TypeMeta>,
 
     /// Resource metadata
@@ -207,7 +215,7 @@ where
     ///
     /// This publishes the state of the Resource as observed by the controller.
     /// Use `U = NotUsed` when a status does not exist.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "openapi", serde(default, skip_serializing_if = "Option::is_none"))]
     pub status: Option<U>,
 }
 

@@ -1,7 +1,8 @@
 use crate::{api::Api, Error, Result};
-use k8s_openapi::api::certificates::v1::CertificateSigningRequest;
-use kube_core::params::{Patch, PatchParams};
-
+use kube_core::{
+    k8s::api::certificates::v1::CertificateSigningRequest,
+    params::{Patch, PatchParams},
+};
 
 impl Api<CertificateSigningRequest> {
     /// Partially update approval of the specified CertificateSigningRequest.

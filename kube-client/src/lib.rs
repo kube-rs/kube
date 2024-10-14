@@ -119,7 +119,8 @@ cfg_error! {
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
-pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
+#[cfg(feature = "openapi")] pub use crate::core::CustomResourceExt;
+pub use crate::core::{Resource, ResourceExt};
 /// Re-exports from kube_core
 pub use kube_core as core;
 
@@ -136,8 +137,8 @@ mod test {
     };
     use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
     use hyper::Uri;
-    use k8s_openapi::api::core::v1::{EphemeralContainer, Pod, PodSpec};
     use kube_core::{
+        k8s::api::core::v1::{EphemeralContainer, Pod, PodSpec},
         params::{DeleteParams, Patch, PatchParams, PostParams, WatchParams},
         response::StatusSummary,
     };
@@ -558,9 +559,12 @@ mod test {
     #[tokio::test]
     #[ignore = "needs cluster (will create a CertificateSigningRequest)"]
     async fn csr_can_be_approved() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::api::PostParams;
-        use k8s_openapi::api::certificates::v1::{
-            CertificateSigningRequest, CertificateSigningRequestCondition, CertificateSigningRequestStatus,
+        use crate::{
+            api::PostParams,
+            core::k8s::api::certificates::v1::{
+                CertificateSigningRequest, CertificateSigningRequestCondition,
+                CertificateSigningRequestStatus,
+            },
         };
 
         let csr_name = "fake";

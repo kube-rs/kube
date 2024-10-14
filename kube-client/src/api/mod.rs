@@ -1,6 +1,5 @@
 //! API helpers for structured interaction with the Kubernetes API
-
-mod core_methods;
+#[cfg(feature = "openapi")] mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 use std::fmt::Debug;
 
@@ -8,13 +7,14 @@ use std::fmt::Debug;
 #[cfg(feature = "ws")] mod portforward;
 #[cfg(feature = "ws")] pub use portforward::Portforwarder;
 
-mod subresource;
-#[cfg(feature = "ws")]
+#[cfg(feature = "openapi")] mod subresource;
+#[cfg(all(feature = "ws", feature = "openapi"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use subresource::{Attach, AttachParams, Ephemeral, Execute, Portforward};
+#[cfg(feature = "openapi")]
 pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
 
-mod util;
+#[cfg(feature = "openapi")] mod util;
 
 pub mod entry;
 
@@ -247,8 +247,7 @@ impl<K> Debug for Api<K> {
 /// Sanity test on scope restrictions
 #[cfg(test)]
 mod test {
-    use crate::{client::Body, Api, Client};
-    use k8s_openapi::api::core::v1 as corev1;
+    use crate::{client::Body, core::k8s::api::core::v1 as corev1, Api, Client};
 
     use http::{Request, Response};
     use tower_test::mock;

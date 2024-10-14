@@ -10,12 +10,13 @@ license.workspace = true
 release = false
 
 [features]
-default = ["rustls-tls", "kubederive", "ws", "latest", "socks5", "runtime", "refresh"]
+default = ["rustls-tls", "kubederive", "ws", "latest", "socks5", "runtime", "refresh", "openapi"]
 kubederive = ["kube/derive"]
 openssl-tls = ["kube/client", "kube/openssl-tls", "kube/unstable-client"]
 rustls-tls = ["kube/client", "kube/rustls-tls", "kube/unstable-client"]
 runtime = ["kube/runtime", "kube/unstable-runtime"]
 socks5 = ["kube/socks5"]
+openapi = ["kube/openapi"]
 refresh = ["kube/oauth", "kube/oidc"]
 kubelet-debug = ["kube/kubelet-debug"]
 ws = ["kube/ws"]

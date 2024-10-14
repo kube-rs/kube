@@ -8,6 +8,8 @@
 //! (even with zero features) under [`kube::core`]((https://docs.rs/kube/*/kube/core/index.html)).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+pub mod k8s;
+
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
 #[cfg(feature = "admission")]
 pub mod admission;
@@ -22,8 +24,8 @@ pub use duration::Duration;
 pub mod dynamic;
 pub use dynamic::{ApiResource, DynamicObject};
 
-pub mod crd;
-pub use crd::CustomResourceExt;
+#[cfg(feature = "openapi")] pub mod crd;
+#[cfg(feature = "openapi")] pub use crd::CustomResourceExt;
 
 pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
@@ -31,7 +33,7 @@ pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 pub mod metadata;
 pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta};
 
-pub mod labels;
+#[cfg(feature = "openapi")] pub mod labels;
 
 #[cfg(feature = "kubelet-debug")] pub mod kubelet_debug;
 
@@ -52,6 +54,7 @@ pub use resource::{
 pub mod response;
 pub use response::Status;
 
+#[cfg(feature = "openapi")]
 pub use labels::{Expression, ParseExpressionError, Selector, SelectorExt};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
@@ -71,5 +74,5 @@ pub use error::ErrorResponse;
 mod version;
 pub use version::Version;
 
-pub mod error_boundary;
-pub use error_boundary::DeserializeGuard;
+#[cfg(feature = "openapi")] pub mod error_boundary;
+#[cfg(feature = "openapi")] pub use error_boundary::DeserializeGuard;

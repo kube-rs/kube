@@ -1,11 +1,11 @@
 //! Utils and helpers
 
 use crate::{
+    k8s::{DaemonSet, Deployment, ReplicaSet, StatefulSet},
     params::{Patch, PatchParams},
     request, Request,
 };
 use chrono::Utc;
-use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
 
 /// Restartable Resource marker trait
 pub trait Restart {}
