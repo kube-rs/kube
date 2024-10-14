@@ -898,14 +898,13 @@ type Strategy = ResetTimerBackoff<ExponentialBackoff>;
 impl Default for DefaultBackoff {
     fn default() -> Self {
         Self(ResetTimerBackoff::new(
-            backoff::ExponentialBackoff {
-                initial_interval: Duration::from_millis(800),
-                max_interval: Duration::from_secs(30),
-                randomization_factor: 1.0,
-                multiplier: 2.0,
-                max_elapsed_time: None,
-                ..ExponentialBackoff::default()
-            },
+            backoff::ExponentialBackoffBuilder::new()
+            .with_initial_interval(Duration::from_millis(800))
+            .with_max_interval(Duration::from_secs(30))
+            .with_randomization_factor(1.0)
+            .with_multiplier(2.0)
+            .with_max_elapsed_time(None)
+            .build(),
             Duration::from_secs(120),
         ))
     }
