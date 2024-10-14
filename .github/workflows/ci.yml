@@ -96,7 +96,7 @@ jobs:
     # Run `cargo check` on our minimum supported Rust version
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@main
+    - uses: actions/checkout@v4
     - name: Find MSRV
       id: msrv
       run: |
@@ -143,11 +143,7 @@ jobs:
         k8s: [v1.26, v1.30]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          override: true
-          toolchain: stable
-          profile: minimal
+      - uses: dtolnay/rust-toolchain@stable
       # Smart caching for Rust projects.
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
@@ -201,11 +197,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          override: true
-          toolchain: stable
-          profile: minimal
+      - uses: dtolnay/rust-toolchain@stable
       # Smart caching for Rust projects.
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
