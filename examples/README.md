@@ -68,7 +68,7 @@ How deriving `CustomResource` works in practice, and how it interacts with the [
 cargo run --example crd_api
 cargo run --example crd_derive
 cargo run --example crd_derive_schema
-cargo run --example crd_derive_no_schema --no-default-features --features=openssl-tls,latest
+cargo run --example crd_derive_no_schema --no-default-features --features=openssl-tls,openapi,latest
 cargo run --example cert_check # showcases partial typing with Resource derive
 ```
 
@@ -143,5 +143,5 @@ The `crd_reflector` will just await changes. You can run `kubectl apply -f crd-b
 Disable default features and enable `openssl-tls`:
 
 ```sh
-cargo run --example pod_watcher --no-default-features --features=openssl-tls,latest,runtime
+cargo run --example pod_watcher --no-default-features --features=openssl-tls,openapi,latest,runtime
 ```

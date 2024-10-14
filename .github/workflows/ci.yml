@@ -48,10 +48,10 @@ jobs:
         run: cargo build
 
       - name: Build no-features
-        run: cargo build -p kube --no-default-features
+        run: cargo build -p kube --no-default-features --features=openapi
         if: matrix.os == 'ubuntu-latest' # only linux tests all feature combinations
       - name: Build no-tls
-        run: cargo build -p kube --no-default-features --features=client
+        run: cargo build -p kube --no-default-features --features=client,openapi
         if: matrix.os == 'ubuntu-latest' # only linux tests all feature combinations
 
       # Workspace unit tests with various feature sets
