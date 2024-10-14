@@ -261,12 +261,6 @@ pub trait ResourceExt: Resource {
 
 static EMPTY_MAP: BTreeMap<String, String> = BTreeMap::new();
 
-#[cfg(feature = "openapi")]
-type MetaMap<K, V> = BTreeMap<K, V>;
-#[cfg(feature = "pb")]
-type MetaMap<K, V> = HashMap<K, V>;
-// TODO: needs to be HashMap for k8s-pb unless we can tweak prost output
-
 impl<K: Resource> ResourceExt for K {
     fn name_unchecked(&self) -> String {
         self.meta().name.clone().expect(".metadata.name missing")
@@ -296,73 +290,73 @@ impl<K: Resource> ResourceExt for K {
         self.meta().creation_timestamp.clone()
     }
 
-    fn labels(&self) -> &MetaMap<String, String> {
+    fn labels(&self) -> &BTreeMap<String, String> {
         #[cfg(feature = "openapi")]
         return self.meta().labels.as_ref().unwrap_or(&EMPTY_MAP);
-        #[cfg(feature = "pb")]
-        return self.meta().labels;
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &self.meta().labels;
     }
 
-    fn labels_mut(&mut self) -> &mut MetaMap<String, String> {
+    fn labels_mut(&mut self) -> &mut BTreeMap<String, String> {
         #[cfg(feature = "openapi")]
         return self.meta_mut().labels.get_or_insert_with(BTreeMap::new);
-        #[cfg(feature = "pb")]
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
         return &mut self.meta_mut().labels;
     }
 
-    fn annotations(&self) -> &MetaMap<String, String> {
+    fn annotations(&self) -> &BTreeMap<String, String> {
         #[cfg(feature = "openapi")]
         return self.meta().annotations.as_ref().unwrap_or(&EMPTY_MAP);
-        #[cfg(feature = "pb")]
-        return self.meta().annotations;
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &self.meta().annotations;
     }
 
-    fn annotations_mut(&mut self) -> &mut MetaMap<String, String> {
+    fn annotations_mut(&mut self) -> &mut BTreeMap<String, String> {
         #[cfg(feature = "openapi")]
         return self.meta_mut().annotations.get_or_insert_with(BTreeMap::new);
-        #[cfg(feature = "pb")]
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
         return &mut self.meta_mut().annotations;
     }
 
     fn owner_references(&self) -> &[OwnerReference] {
         #[cfg(feature = "openapi")]
         return self.meta().owner_references.as_deref().unwrap_or_default();
-        #[cfg(feature = "pb")]
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
         return self.meta().owner_references.as_ref();
     }
 
     fn owner_references_mut(&mut self) -> &mut Vec<OwnerReference> {
         #[cfg(feature = "openapi")]
         return self.meta_mut().owner_references.get_or_insert_with(Vec::new);
-        #[cfg(feature = "pb")]
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
         return &mut self.meta_mut().owner_references;
     }
 
     fn finalizers(&self) -> &[String] {
         #[cfg(feature = "openapi")]
         return self.meta().finalizers.as_deref().unwrap_or_default();
-        #[cfg(feature = "pb")]
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
         return self.meta().finalizers.as_ref();
     }
 
     fn finalizers_mut(&mut self) -> &mut Vec<String> {
         #[cfg(feature = "openapi")]
         return self.meta_mut().finalizers.get_or_insert_with(Vec::new);
-        #[cfg(feature = "pb")]
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
         return &mut self.meta_mut().finalizers;
     }
 
     fn managed_fields(&self) -> &[ManagedFieldsEntry] {
         #[cfg(feature = "openapi")]
         return self.meta().managed_fields.as_deref().unwrap_or_default();
-        #[cfg(feature = "pb")]
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
         return self.meta().managed_fields.as_ref();
     }
 
     fn managed_fields_mut(&mut self) -> &mut Vec<ManagedFieldsEntry> {
         #[cfg(feature = "openapi")]
         return self.meta_mut().managed_fields.get_or_insert_with(Vec::new);
-        #[cfg(feature = "pb")]
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
         return &mut self.meta_mut().managed_fields;
     }
 }
