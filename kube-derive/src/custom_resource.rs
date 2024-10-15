@@ -32,8 +32,8 @@ struct KubeAttrs {
     shortnames: Vec<String>,
     #[darling(multiple, rename = "printcolumn")]
     printcolums: Vec<String>,
-    #[darling(multiple, rename = "selectablefield")]
-    selectable_fields: Vec<String>,
+    #[darling(multiple)]
+    selectable: Vec<String>,
     scale: Option<String>,
     #[darling(default)]
     crates: Crates,
@@ -161,7 +161,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         categories,
         shortnames,
         printcolums,
-        selectable_fields,
+        selectable,
         scale,
         crates:
             Crates {
@@ -356,7 +356,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     // Compute a bunch of crd props
     let printers = format!("[ {} ]", printcolums.join(",")); // hacksss
-    let fields: Vec<String> = selectable_fields
+    let fields: Vec<String> = selectable
         .iter()
         .map(|s| format!(r#"{{ "jsonPath": "{s}" }}"#))
         .collect();
@@ -405,7 +405,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    let selectable = if !selectable_fields.is_empty() {
+    let selectable = if !selectable.is_empty() {
         quote! { "selectableFields": fields, }
     } else {
         quote! {}

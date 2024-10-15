@@ -19,8 +19,8 @@ use std::collections::{HashMap, HashSet};
     derive = "PartialEq",
     shortname = "fo",
     shortname = "f",
-    selectablefield = ".spec.nonNullable",
-    selectablefield = ".spec.nullable",
+    selectable = ".spec.nonNullable",
+    selectable = ".spec.nullable"
 )]
 #[serde(rename_all = "camelCase")]
 struct FooSpec {

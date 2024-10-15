@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
     shortname = "f",
     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
-    selectablefield = "spec.name"
+    selectable = "spec.name"
 )]
 pub struct MyFoo {
     name: String,
