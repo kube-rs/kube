@@ -166,6 +166,7 @@ mod resource;
 ///     shortname = "f",
 ///     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
 ///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
+/// 
 /// )]
 /// #[serde(rename_all = "camelCase")]
 /// struct FooSpec {

@@ -18,7 +18,9 @@ use std::collections::{HashMap, HashSet};
     doc = "Custom resource representing a Foo",
     derive = "PartialEq",
     shortname = "fo",
-    shortname = "f"
+    shortname = "f",
+    selectablefield = ".spec.nonNullable",
+    selectablefield = ".spec.nullable",
 )]
 #[serde(rename_all = "camelCase")]
 struct FooSpec {
@@ -198,6 +200,11 @@ fn test_crd_schema_matches_expected() {
                         "served": true,
                         "storage": true,
                         "additionalPrinterColumns": [],
+                        "selectableFields": [{
+                            "jsonPath": ".spec.nonNullable"
+                        }, {
+                            "jsonPath": ".spec.nullable"
+                        }],
                         "schema": {
                             "openAPIV3Schema": {
                                 "description": "Custom resource representing a Foo",

@@ -78,6 +78,7 @@ fn test_crd_schema_matches_expected() {
             "versions": [
               {
                 "additionalPrinterColumns": [],
+                "selectableFields": [],
                 "name": "v1",
                 "schema": {
                   "openAPIV3Schema": {
