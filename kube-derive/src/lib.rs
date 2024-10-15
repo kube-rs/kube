@@ -165,8 +165,8 @@ mod resource;
 ///     plural = "feetz",
 ///     shortname = "f",
 ///     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
-///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
-///
+///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+///     selectable = "spec.replicasCount"
 /// )]
 /// #[serde(rename_all = "camelCase")]
 /// struct FooSpec {
