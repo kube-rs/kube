@@ -32,6 +32,8 @@ struct KubeAttrs {
     shortnames: Vec<String>,
     #[darling(multiple, rename = "printcolumn")]
     printcolums: Vec<String>,
+    #[darling(multiple)]
+    selectable: Vec<String>,
     scale: Option<String>,
     #[darling(default)]
     crates: Crates,
@@ -159,6 +161,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         categories,
         shortnames,
         printcolums,
+        selectable,
         scale,
         crates:
             Crates {
@@ -353,6 +356,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     // Compute a bunch of crd props
     let printers = format!("[ {} ]", printcolums.join(",")); // hacksss
+    let fields: Vec<String> = selectable
+        .iter()
+        .map(|s| format!(r#"{{ "jsonPath": "{s}" }}"#))
+        .collect();
+    let fields = format!("[ {} ]", fields.join(","));
     let scale_code = if let Some(s) = scale { s } else { "".to_string() };
 
     // Ensure it generates for the correct CRD version (only v1 supported now)
@@ -397,6 +405,12 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
+    let selectable = if !selectable.is_empty() {
+        quote! { "selectableFields": fields, }
+    } else {
+        quote! {}
+    };
+
     let jsondata = quote! {
         #schemagen
 
@@ -420,6 +434,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                         "openAPIV3Schema": schema,
                     },
                     "additionalPrinterColumns": columns,
+                    #selectable
                     "subresources": subres,
                 }],
             }
@@ -432,6 +447,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
             fn crd() -> #apiext::CustomResourceDefinition {
                 let columns : Vec<#apiext::CustomResourceColumnDefinition> = #serde_json::from_str(#printers).expect("valid printer column json");
+                let fields : Vec<#apiext::SelectableField> = #serde_json::from_str(#fields).expect("valid selectableField column json");
                 let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                     None
                 } else {
