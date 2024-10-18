@@ -411,6 +411,17 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         quote! {}
     };
 
+    // Known constraints that are hard to enforce elsewhere
+    let compile_constraints = if !selectable.is_empty() {
+        quote! {
+            #k8s_openapi::k8s_if_le_1_29! {
+                compile_error!("selectable fields require Kubernetes >= 1.30");
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let jsondata = quote! {
         #schemagen
 
@@ -493,6 +504,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     // Concat output
     quote! {
+        #compile_constraints
         #root_obj
         #impl_resource
         #impl_default
