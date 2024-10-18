@@ -82,24 +82,22 @@ impl ConfigLoader {
             .and_then(|named_cluster| named_cluster.cluster.clone())
             .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
-        let user_name = user.unwrap_or(&current_context.user);
+        let user_name = user.or_else(|| current_context.user.as_ref());
 
         // client-go doesn't fail on empty/missing user, so we don't either
         // see https://github.com/kube-rs/kube/issues/1594
-        let mut user = config
-            .auth_infos
-            .iter()
-            .find(|named_user| &named_user.name == user_name)
-            .and_then(|named_user| named_user.auth_info.clone())
-            .unwrap_or_else(|| {
-                // assuming that empty user is ok but if it's not empty user we should warn
-                if !user_name.is_empty() {
-                    tracing::warn!("User {user_name} wasn't found in kubeconfig, using null auth");
-                }
-                AuthInfo::default()
-            });
+        let mut auth_info = if let Some(user) = user_name {
+            config
+                .auth_infos
+                .iter()
+                .find(|named_user| &named_user.name == user)
+                .and_then(|named_user| named_user.auth_info.clone())
+                .unwrap_or_else(AuthInfo::default)
+        } else {
+            AuthInfo::default()
+        };
 
-        if let Some(exec_config) = &mut user.exec {
+        if let Some(exec_config) = &mut auth_info.exec {
             if exec_config.provide_cluster_info {
                 exec_config.cluster = Some((&cluster).try_into()?);
             }
@@ -108,7 +106,7 @@ impl ConfigLoader {
         Ok(ConfigLoader {
             current_context,
             cluster,
-            user,
+            user: auth_info,
         })
     }
 
