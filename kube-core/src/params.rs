@@ -1,5 +1,6 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
-use crate::{request::Error, Selector};
+use crate::request::Error;
+#[cfg(feature = "openapi")] use crate::Selector;
 use serde::Serialize;
 
 /// Controls how the resource version parameter is applied for list calls
@@ -186,6 +187,7 @@ impl ListParams {
     /// # Ok::<(), ParseExpressionError>(())
     ///```
     #[must_use]
+    #[cfg(feature = "openapi")]
     pub fn labels_from(mut self, selector: &Selector) -> Self {
         self.label_selector = Some(selector.to_string());
         self
@@ -473,6 +475,7 @@ impl WatchParams {
     /// let wp = WatchParams::default().labels_from(&selector);
     /// # Ok::<(), ParseExpressionError>(())
     ///```
+    #[cfg(feature = "openapi")]
     #[must_use]
     pub fn labels_from(mut self, selector: &Selector) -> Self {
         self.label_selector = Some(selector.to_string());

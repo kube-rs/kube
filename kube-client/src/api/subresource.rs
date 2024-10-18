@@ -14,7 +14,7 @@ pub use kube_core::subresource::{EvictParams, LogParams};
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use kube_core::subresource::AttachParams;
 
-pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
+pub use kube_core::k8s::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
 #[cfg(feature = "ws")] use crate::api::portforward::Portforwarder;
 #[cfg(feature = "ws")] use crate::api::remote_command::AttachedProcess;
@@ -136,7 +136,7 @@ where
 /// See [`Api::get_ephemeral_containers`] et al.
 pub trait Ephemeral {}
 
-impl Ephemeral for k8s_openapi::api::core::v1::Pod {}
+impl Ephemeral for kube_core::k8s::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
@@ -160,7 +160,7 @@ where
     /// Example of using `replace_ephemeral_containers`:
     ///
     /// ```no_run
-    /// use k8s_openapi::api::core::v1::Pod;
+    /// use kube_core::k8s::api::core::v1::Pod;
     /// use kube::{Api, api::PostParams};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client = kube::Client::try_default().await?;
@@ -229,7 +229,7 @@ where
     ///
     /// ```no_run
     /// use kube::api::{Api, PatchParams, Patch};
-    /// use k8s_openapi::api::core::v1::Pod;
+    /// use kube_core::k8s::api::core::v1::Pod;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client = kube::Client::try_default().await?;
     /// let pods: Api<Pod> = Api::namespaced(client, "apps");
@@ -310,7 +310,7 @@ where
     ///
     /// ```no_run
     /// use kube::api::{Api, PatchParams, Patch};
-    /// use k8s_openapi::api::batch::v1::Job;
+    /// use kube_core::k8s::api::batch::v1::Job;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client = kube::Client::try_default().await?;
     /// let jobs: Api<Job> = Api::namespaced(client, "apps");
@@ -347,7 +347,7 @@ where
     ///
     /// ```no_run
     /// use kube::api::{Api, PostParams};
-    /// use k8s_openapi::api::batch::v1::{Job, JobStatus};
+    /// use kube_core::k8s::api::batch::v1::{Job, JobStatus};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// #   let client = kube::Client::try_default().await?;
     /// let jobs: Api<Job> = Api::namespaced(client, "apps");
@@ -375,7 +375,7 @@ where
 #[test]
 fn log_path() {
     use crate::api::{Request, Resource};
-    use k8s_openapi::api::core::v1 as corev1;
+    use kube_core::k8s::api::core::v1 as corev1;
     let lp = LogParams {
         container: Some("blah".into()),
         ..LogParams::default()
@@ -390,7 +390,7 @@ fn log_path() {
 /// See [`Api::logs`] and [`Api::log_stream`] for usage.
 pub trait Log {}
 
-impl Log for k8s_openapi::api::core::v1::Pod {}
+impl Log for kube_core::k8s::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
@@ -412,7 +412,7 @@ where
     ///
     /// ```no_run
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # use kube_core::k8s::api::core::v1::Pod;
     /// # use kube::{api::{Api, LogParams}, Client};
     /// # let client: Client = todo!();
     /// use futures::{AsyncBufReadExt, TryStreamExt};
@@ -442,7 +442,7 @@ where
 #[test]
 fn evict_path() {
     use crate::api::{Request, Resource};
-    use k8s_openapi::api::core::v1 as corev1;
+    use kube_core::k8s::api::core::v1 as corev1;
     let ep = EvictParams::default();
     let url = corev1::Pod::url_path(&(), Some("ns"));
     let req = Request::new(url).evict("foo", &ep).unwrap();
@@ -454,7 +454,7 @@ fn evict_path() {
 /// See [`Api::evic`] for usage
 pub trait Evict {}
 
-impl Evict for k8s_openapi::api::core::v1::Pod {}
+impl Evict for kube_core::k8s::api::core::v1::Pod {}
 
 impl<K> Api<K>
 where
@@ -476,7 +476,7 @@ where
 #[test]
 fn attach_path() {
     use crate::api::{Request, Resource};
-    use k8s_openapi::api::core::v1 as corev1;
+    use kube_core::k8s::api::core::v1 as corev1;
     let ap = AttachParams {
         container: Some("blah".into()),
         ..AttachParams::default()
@@ -498,7 +498,7 @@ pub trait Attach {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl Attach for k8s_openapi::api::core::v1::Pod {}
+impl Attach for kube_core::k8s::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
@@ -522,7 +522,7 @@ where
 #[test]
 fn exec_path() {
     use crate::api::{Request, Resource};
-    use k8s_openapi::api::core::v1 as corev1;
+    use kube_core::k8s::api::core::v1 as corev1;
     let ap = AttachParams {
         container: Some("blah".into()),
         ..AttachParams::default()
@@ -546,7 +546,7 @@ pub trait Execute {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-impl Execute for k8s_openapi::api::core::v1::Pod {}
+impl Execute for kube_core::k8s::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
@@ -577,7 +577,7 @@ where
 #[test]
 fn portforward_path() {
     use crate::api::{Request, Resource};
-    use k8s_openapi::api::core::v1 as corev1;
+    use kube_core::k8s::api::core::v1 as corev1;
     let url = corev1::Pod::url_path(&(), Some("ns"));
     let req = Request::new(url).portforward("foo", &[80, 1234]).unwrap();
     assert_eq!(
@@ -593,7 +593,7 @@ fn portforward_path() {
 pub trait Portforward {}
 
 #[cfg(feature = "ws")]
-impl Portforward for k8s_openapi::api::core::v1::Pod {}
+impl Portforward for kube_core::k8s::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
 impl<K> Api<K>

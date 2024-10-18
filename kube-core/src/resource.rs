@@ -1,12 +1,9 @@
-pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use k8s_openapi::{
-    api::core::v1::ObjectReference,
-    apimachinery::pkg::apis::meta::v1::{ManagedFieldsEntry, OwnerReference, Time},
+pub use crate::k8s::{
+    ClusterResourceScope, NamespaceResourceScope, ObjectMeta, ResourceScope, SubResourceScope,
 };
+use crate::k8s::{ManagedFieldsEntry, ObjectReference, OwnerReference, Time};
 
 use std::{borrow::Cow, collections::BTreeMap};
-
-pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScope, SubResourceScope};
 
 /// Indicates that a [`Resource`] is of an indeterminate dynamic scope.
 pub struct DynamicResourceScope {}
@@ -144,13 +141,22 @@ pub trait Resource {
     /// ```
     fn owner_ref(&self, dt: &Self::DynamicType) -> Option<OwnerReference> {
         let meta = self.meta();
-        Some(OwnerReference {
+        #[cfg(feature = "openapi")]
+        return Some(OwnerReference {
             api_version: Self::api_version(dt).to_string(),
             kind: Self::kind(dt).to_string(),
             name: meta.name.clone()?,
             uid: meta.uid.clone()?,
             ..OwnerReference::default()
-        })
+        });
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return Some(OwnerReference {
+            api_version: Some(Self::api_version(dt).to_string()),
+            kind: Some(Self::kind(dt).to_string()),
+            name: meta.name.clone(),
+            uid: meta.uid.clone(),
+            ..OwnerReference::default()
+        });
     }
 }
 
@@ -169,8 +175,8 @@ pub fn api_version_from_group_version<'a>(group: Cow<'a, str>, version: Cow<'a, 
 /// Implement accessor trait for any ObjectMeta-using Kubernetes Resource
 impl<K, S> Resource for K
 where
-    K: k8s_openapi::Metadata<Ty = ObjectMeta>,
-    K: k8s_openapi::Resource<Scope = S>,
+    K: crate::k8s::Metadata<Ty = ObjectMeta>,
+    K: crate::k8s::Resource<Scope = S>,
 {
     type DynamicType = ();
     type Scope = S;
@@ -196,11 +202,17 @@ where
     }
 
     fn meta(&self) -> &ObjectMeta {
-        self.metadata()
+        #[cfg(feature = "openapi")]
+        return self.metadata();
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return self.metadata().unwrap(); // not great
     }
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
-        self.metadata_mut()
+        #[cfg(feature = "openapi")]
+        return self.metadata_mut();
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return self.metadata_mut().unwrap();
     }
 }
 
@@ -294,42 +306,72 @@ impl<K: Resource> ResourceExt for K {
     }
 
     fn labels(&self) -> &BTreeMap<String, String> {
-        self.meta().labels.as_ref().unwrap_or(&EMPTY_MAP)
+        #[cfg(feature = "openapi")]
+        return self.meta().labels.as_ref().unwrap_or(&EMPTY_MAP);
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &self.meta().labels;
     }
 
     fn labels_mut(&mut self) -> &mut BTreeMap<String, String> {
-        self.meta_mut().labels.get_or_insert_with(BTreeMap::new)
+        #[cfg(feature = "openapi")]
+        return self.meta_mut().labels.get_or_insert_with(BTreeMap::new);
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &mut self.meta_mut().labels;
     }
 
     fn annotations(&self) -> &BTreeMap<String, String> {
-        self.meta().annotations.as_ref().unwrap_or(&EMPTY_MAP)
+        #[cfg(feature = "openapi")]
+        return self.meta().annotations.as_ref().unwrap_or(&EMPTY_MAP);
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &self.meta().annotations;
     }
 
     fn annotations_mut(&mut self) -> &mut BTreeMap<String, String> {
-        self.meta_mut().annotations.get_or_insert_with(BTreeMap::new)
+        #[cfg(feature = "openapi")]
+        return self.meta_mut().annotations.get_or_insert_with(BTreeMap::new);
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &mut self.meta_mut().annotations;
     }
 
     fn owner_references(&self) -> &[OwnerReference] {
-        self.meta().owner_references.as_deref().unwrap_or_default()
+        #[cfg(feature = "openapi")]
+        return self.meta().owner_references.as_deref().unwrap_or_default();
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return self.meta().owner_references.as_ref();
     }
 
     fn owner_references_mut(&mut self) -> &mut Vec<OwnerReference> {
-        self.meta_mut().owner_references.get_or_insert_with(Vec::new)
+        #[cfg(feature = "openapi")]
+        return self.meta_mut().owner_references.get_or_insert_with(Vec::new);
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &mut self.meta_mut().owner_references;
     }
 
     fn finalizers(&self) -> &[String] {
-        self.meta().finalizers.as_deref().unwrap_or_default()
+        #[cfg(feature = "openapi")]
+        return self.meta().finalizers.as_deref().unwrap_or_default();
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return self.meta().finalizers.as_ref();
     }
 
     fn finalizers_mut(&mut self) -> &mut Vec<String> {
-        self.meta_mut().finalizers.get_or_insert_with(Vec::new)
+        #[cfg(feature = "openapi")]
+        return self.meta_mut().finalizers.get_or_insert_with(Vec::new);
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &mut self.meta_mut().finalizers;
     }
 
     fn managed_fields(&self) -> &[ManagedFieldsEntry] {
-        self.meta().managed_fields.as_deref().unwrap_or_default()
+        #[cfg(feature = "openapi")]
+        return self.meta().managed_fields.as_deref().unwrap_or_default();
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return self.meta().managed_fields.as_ref();
     }
 
     fn managed_fields_mut(&mut self) -> &mut Vec<ManagedFieldsEntry> {
-        self.meta_mut().managed_fields.get_or_insert_with(Vec::new)
+        #[cfg(feature = "openapi")]
+        return self.meta_mut().managed_fields.get_or_insert_with(Vec::new);
+        #[cfg(all(not(feature = "openapi"), feature = "pb"))]
+        return &mut self.meta_mut().managed_fields;
     }
 }

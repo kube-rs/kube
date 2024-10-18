@@ -23,6 +23,8 @@ ws = []
 admission = ["json-patch"]
 jsonpatch = ["json-patch"]
 schema = ["schemars"]
+openapi = ["k8s-openapi"]
+pb = ["k8s-pb"]
 kubelet-debug = ["ws"]
 
 [dependencies]
@@ -34,7 +36,8 @@ http.workspace = true
 json-patch = { workspace = true, optional = true }
 chrono = { workspace = true, features = ["now"] }
 schemars = { workspace = true, optional = true }
-k8s-openapi.workspace = true
+k8s-openapi = { workspace = true, optional = true }
+k8s-pb = { workspace = true, optional = true }
 serde-value.workspace = true
 
 [dev-dependencies]

@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use crate::k8s::ObjectMeta;
 use serde::Deserialize;
 use serde_value::DeserializerError;
 use thiserror::Error;
@@ -89,7 +89,7 @@ impl<K: Resource> Resource for DeserializeGuard<K> {
 
 #[cfg(test)]
 mod tests {
-    use k8s_openapi::api::core::v1::{ConfigMap, Pod};
+    use crate::k8s::{ConfigMap, Pod};
     use serde_json::json;
 
     use crate::{DeserializeGuard, Resource};

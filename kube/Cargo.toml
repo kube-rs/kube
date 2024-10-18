@@ -12,16 +12,18 @@ keywords = ["kubernetes", "client", "runtime", "cncf"]
 categories = ["network-programming", "caching", "api-bindings", "encoding"]
 
 [features]
-default = ["client", "rustls-tls"]
+default = ["client", "rustls-tls", "openapi"]
 
 # default features
 client = ["kube-client/client", "config"]
 config = ["kube-client/config"]
 rustls-tls = ["kube-client/rustls-tls", "client"]
+openapi = ["k8s-openapi", "kube-client/openapi", "kube-core/openapi"]
 
 # alternative features
 openssl-tls = ["kube-client/openssl-tls", "client"]
 aws-lc-rs = ["kube-client?/aws-lc-rs"]
+pb = ["k8s-pb", "kube-client/pb", "kube-core/pb"]
 
 # auxiliary features
 ws = ["kube-client/ws", "kube-core/ws"]
@@ -54,7 +56,8 @@ kube-client = { path = "../kube-client", version = "=0.96.0", default-features =
 kube-runtime = { path = "../kube-runtime", version = "=0.96.0", optional = true}
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
-k8s-openapi.workspace = true
+k8s-openapi = { workspace = true, optional = true }
+k8s-pb = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

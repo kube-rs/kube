@@ -75,6 +75,10 @@ name = "base64"
 # newer via tower-http (we have latest)
 name = "bitflags"
 
+[[bans.skip]]
+# different versions deep done in prost vs aws-lc
+name = "itertools"
+
 [[bans.skip-tree]]
 name = "windows-sys"
 
