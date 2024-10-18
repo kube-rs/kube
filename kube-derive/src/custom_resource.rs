@@ -447,7 +447,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
             fn crd() -> #apiext::CustomResourceDefinition {
                 let columns : Vec<#apiext::CustomResourceColumnDefinition> = #serde_json::from_str(#printers).expect("valid printer column json");
-                let fields : Vec<#apiext::SelectableField> = #serde_json::from_str(#fields).expect("valid selectableField column json");
+                #k8s_openapi::k8s_if_ge_1_30! {
+                    let fields : Vec<#apiext::SelectableField> = #serde_json::from_str(#fields).expect("valid selectableField column json");
+                }
                 let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
                     None
                 } else {
