@@ -445,6 +445,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let impl_crd = quote! {
         impl #extver::CustomResourceExt for #rootident {
 
+            k8s_openapi::k8s_if_ge_1_30! {
             fn crd() -> #apiext::CustomResourceDefinition {
                 let columns : Vec<#apiext::CustomResourceColumnDefinition> = #serde_json::from_str(#printers).expect("valid printer column json");
                 let fields : Vec<#apiext::SelectableField> = #serde_json::from_str(#fields).expect("valid selectableField column json");
@@ -471,6 +472,35 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 #jsondata
                 #serde_json::from_value(jsondata)
                     .expect("valid custom resource from #[kube(attrs..)]")
+            }
+            }
+            k8s_openapi::k8s_if_le_1_29! {
+            fn crd() -> #apiext::CustomResourceDefinition {
+                let columns : Vec<#apiext::CustomResourceColumnDefinition> = #serde_json::from_str(#printers).expect("valid printer column json");
+                let scale: Option<#apiext::CustomResourceSubresourceScale> = if #scale_code.is_empty() {
+                    None
+                } else {
+                    #serde_json::from_str(#scale_code).expect("valid scale subresource json")
+                };
+                let categories: Vec<String> = #serde_json::from_str(#categories_json).expect("valid categories");
+                let shorts : Vec<String> = #serde_json::from_str(#short_json).expect("valid shortnames");
+                let subres = if #has_status {
+                    if let Some(s) = &scale {
+                        #serde_json::json!({
+                            "status": {},
+                            "scale": scale
+                        })
+                    } else {
+                        #serde_json::json!({"status": {} })
+                    }
+                } else {
+                    #serde_json::json!({})
+                };
+
+                #jsondata
+                #serde_json::from_value(jsondata)
+                    .expect("valid custom resource from #[kube(attrs..)]")
+            }
             }
 
             fn crd_name() -> &'static str {
