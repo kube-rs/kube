@@ -19,7 +19,6 @@ pub use {
     api::core::v1 as corev1,
     api::discovery::v1 as discoveryv1,
     api::events::v1 as eventsv1,
-    api::flowcontrol::v1 as flowcontrolv1,
     api::networking::v1 as networkingv1,
     api::node::v1 as nodev1,
     api::policy::v1 as policyv1,
@@ -29,3 +28,8 @@ pub use {
     apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiextensionsv1,
     apimachinery::pkg::apis::meta::v1 as metav1,
 };
+
+// Names with version gates
+k8s_openapi::k8s_if_ge_1_26! {
+    pub use api::flowcontrol::v1 as flowcontrolv1;
+}
