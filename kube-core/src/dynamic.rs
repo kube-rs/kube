@@ -7,7 +7,7 @@ use crate::{
     resource::{DynamicResourceScope, Resource},
 };
 
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use crate::k8s::metav1::ObjectMeta;
 use std::borrow::Cow;
 use thiserror::Error;
 
@@ -113,11 +113,11 @@ mod test {
     use crate::{
         dynamic::{ApiResource, DynamicObject},
         gvk::GroupVersionKind,
+        k8s::corev1::Pod,
         params::{Patch, PatchParams, PostParams},
         request::Request,
         resource::Resource,
     };
-    use k8s_openapi::api::core::v1::Pod;
 
     #[test]
     fn raw_custom_resource() {

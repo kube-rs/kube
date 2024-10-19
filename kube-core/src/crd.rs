@@ -1,6 +1,6 @@
 //! Traits and tyes for CustomResources
 
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions as apiexts;
+use crate::k8s::apiextensions_apiserver::pkg::apis::apiextensions as apiexts;
 
 /// Types for v1 CustomResourceDefinitions
 pub mod v1 {
