@@ -1,6 +1,6 @@
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
 use kube::{
     core::object::{HasSpec, HasStatus},
+    k8s::metav1::Condition,
     CustomResource, CustomResourceExt, Resource,
 };
 use schemars::JsonSchema;

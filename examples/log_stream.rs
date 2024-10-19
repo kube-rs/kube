@@ -1,11 +1,8 @@
 use futures::{AsyncBufReadExt, TryStreamExt};
-use k8s_openapi::{
-    api::core::v1::Pod,
-    chrono::{DateTime, Utc},
-};
+use k8s_openapi::chrono::{DateTime, Utc};
 use kube::{
     api::{Api, LogParams},
-    Client,
+    k8s::corev1::Pod,
 };
 use tracing::*;
 
@@ -39,7 +36,7 @@ struct App {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let app: App = clap::Parser::parse();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
 
     info!("Fetching logs for {:?}", app.pod);
     let pods: Api<Pod> = Api::default_namespaced(client);

@@ -2,7 +2,6 @@
 use http::{Request, Response};
 use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;
-use k8s_openapi::api::core::v1::Pod;
 use std::time::Duration;
 use tower::{BoxError, ServiceBuilder};
 use tower_http::{decompression::DecompressionLayer, trace::TraceLayer};
@@ -59,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
 
     let client = Client::new(service, config.default_namespace);
 
-    let pods: Api<Pod> = Api::default_namespaced(client);
+    let pods: Api<kube::k8s::corev1::Pod> = Api::default_namespaced(client);
     for p in pods.list(&Default::default()).await? {
         info!("{}", p.name_any());
     }

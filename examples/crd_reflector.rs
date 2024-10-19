@@ -1,9 +1,9 @@
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use tracing::*;
 
 use kube::{
     api::{Api, Patch, PatchParams, ResourceExt},
+    k8s::apiextensionsv1::CustomResourceDefinition,
     runtime::{reflector, watcher, WatchStreamExt},
     Client, CustomResource, CustomResourceExt,
 };

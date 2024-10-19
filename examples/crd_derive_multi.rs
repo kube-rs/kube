@@ -1,7 +1,7 @@
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{Api, Patch, PatchParams},
     core::crd::merge_crds,
+    k8s::apiextensionsv1::CustomResourceDefinition,
     runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt, ResourceExt,
 };

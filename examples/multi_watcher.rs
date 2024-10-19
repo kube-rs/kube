@@ -1,19 +1,18 @@
 use futures::{stream, StreamExt, TryStreamExt};
-use k8s_openapi::api::{
-    apps::v1::Deployment,
-    core::v1::{ConfigMap, Secret},
-};
 use kube::{
     api::{Api, ResourceExt},
+    k8s::{
+        appsv1::Deployment,
+        corev1::{ConfigMap, Secret},
+    },
     runtime::{watcher, WatchStreamExt},
-    Client,
 };
 use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
 
     let deploys: Api<Deployment> = Api::default_namespaced(client.clone());
     let cms: Api<ConfigMap> = Api::default_namespaced(client.clone());

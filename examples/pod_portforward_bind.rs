@@ -10,9 +10,9 @@ use tokio::{
 use tokio_stream::wrappers::TcpListenerStream;
 use tracing::*;
 
-use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, DeleteParams, PostParams},
+    k8s::corev1::Pod,
     runtime::wait::{await_condition, conditions::is_pod_running},
     Client, ResourceExt,
 };

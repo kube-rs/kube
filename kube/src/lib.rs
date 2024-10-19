@@ -173,7 +173,7 @@ pub use kube_derive::Resource;
 #[doc(inline)]
 pub use kube_runtime as runtime;
 
-pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
+pub use crate::core::{k8s, CustomResourceExt, Resource, ResourceExt};
 #[doc(inline)] pub use kube_core as core;
 
 // Mock tests for the runtime

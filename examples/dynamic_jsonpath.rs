@@ -1,8 +1,8 @@
 use anyhow::{Context, Error};
 use jsonpath_rust::JsonPathInst;
-use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, ListParams},
+    k8s::corev1::Pod,
     Client,
 };
 use tracing::*;

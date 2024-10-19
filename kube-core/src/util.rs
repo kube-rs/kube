@@ -1,11 +1,11 @@
 //! Utils and helpers
 
 use crate::{
+    k8s::appsv1::{DaemonSet, Deployment, ReplicaSet, StatefulSet},
     params::{Patch, PatchParams},
     request, Request,
 };
 use chrono::Utc;
-use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
 
 /// Restartable Resource marker trait
 pub trait Restart {}
@@ -61,12 +61,15 @@ impl Request {
 
 #[cfg(test)]
 mod test {
-    use crate::{params::Patch, request::Request, resource::Resource};
+    use crate::{
+        k8s::{appsv1, corev1},
+        params::Patch,
+        request::Request,
+        resource::Resource,
+    };
 
     #[test]
     fn restart_patch_is_correct() {
-        use k8s_openapi::api::apps::v1 as appsv1;
-
         let url = appsv1::Deployment::url_path(&(), Some("ns"));
         let req = Request::new(url).restart("mydeploy").unwrap();
         assert_eq!(req.uri(), "/apis/apps/v1/namespaces/ns/deployments/mydeploy?");
@@ -79,9 +82,7 @@ mod test {
 
     #[test]
     fn cordon_patch_is_correct() {
-        use k8s_openapi::api::core::v1::Node;
-
-        let url = Node::url_path(&(), Some("ns"));
+        let url = corev1::Node::url_path(&(), Some("ns"));
         let req = Request::new(url).cordon("mynode").unwrap();
         assert_eq!(req.uri(), "/api/v1/namespaces/ns/nodes/mynode?");
         assert_eq!(req.method(), "PATCH");

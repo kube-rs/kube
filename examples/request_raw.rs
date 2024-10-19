@@ -6,8 +6,8 @@
 //! By default, node summary metrics data is fetched by Kubernetes from the
 //! kubelet. The kubelet itself supports statistics access through CRI, or
 //! through cAdvisor.
-use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::api::resource::Quantity};
-use kube::{api::ListParams, Api, ResourceExt};
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
+use kube::{api::ListParams, k8s::corev1::Node, Api, ResourceExt};
 use serde::Deserialize;
 
 #[tokio::main]

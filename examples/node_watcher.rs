@@ -1,10 +1,10 @@
 use std::pin::pin;
 
 use futures::TryStreamExt;
-use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
     api::{Api, ListParams, ResourceExt},
     client::{scope, Client},
+    k8s::corev1::{Event, Node},
     runtime::{watcher, WatchStreamExt},
 };
 use tracing::*;

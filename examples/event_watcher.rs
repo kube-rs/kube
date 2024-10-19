@@ -1,12 +1,9 @@
 use std::pin::pin;
 
 use futures::TryStreamExt;
-use k8s_openapi::{
-    api::{core::v1::ObjectReference, events::v1::Event},
-    apimachinery::pkg::apis::meta::v1::Time,
-    chrono::Utc,
-};
+use k8s_openapi::chrono::Utc;
 use kube::{
+    k8s::{corev1::ObjectReference, eventsv1::Event, metav1::Time},
     runtime::{watcher, WatchStreamExt},
     Api, Client, ResourceExt,
 };

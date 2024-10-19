@@ -1,7 +1,6 @@
-use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    Client,
+    k8s::corev1::Pod,
 };
 use tracing::*;
 
@@ -14,7 +13,7 @@ const PAGE_SIZE: u32 = 5;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
     let api = Api::<Pod>::default_namespaced(client);
 
     let mut continue_token: Option<String> = None;

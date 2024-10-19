@@ -1,12 +1,10 @@
 use std::borrow::Cow;
 
-use k8s_openapi::{
-    api::core::v1::{ConfigMap, Namespace as Ns},
-    NamespaceResourceScope,
-};
 use kube::{
     api::ObjectMeta,
     client::scope::{Cluster, Namespace},
+    core::NamespaceResourceScope,
+    k8s::corev1::{ConfigMap, Namespace as Ns},
     Client, Resource,
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +18,7 @@ struct CaConfigMapData {
     ca_crt: String,
 }
 
-// Method 1 :: inherit resource implementation from k8s_openapi's ConfigMap
+// Method 1 :: inherit resource implementation from the official ConfigMap
 #[derive(Resource, Serialize, Deserialize, Debug, Clone)]
 #[resource(inherit = ConfigMap)]
 struct CaConfigMap {

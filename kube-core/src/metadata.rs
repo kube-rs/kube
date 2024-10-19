@@ -1,7 +1,7 @@
 //! Metadata structs used in traits, lists, and dynamic objects.
 use std::{borrow::Cow, marker::PhantomData};
 
-pub use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
+pub use crate::k8s::metav1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
 
 use crate::{DynamicObject, Resource};
@@ -178,8 +178,7 @@ impl<K: Resource> Resource for PartialObjectMeta<K> {
 #[cfg(test)]
 mod test {
     use super::{ObjectMeta, PartialObjectMeta, PartialObjectMetaExt};
-    use crate::Resource;
-    use k8s_openapi::api::core::v1::Pod;
+    use crate::{k8s::corev1::Pod, Resource};
 
     #[test]
     fn can_convert_and_derive_partial_metadata() {
