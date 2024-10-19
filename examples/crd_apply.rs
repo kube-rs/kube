@@ -4,11 +4,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::*;
 
-use apiexts::CustomResourceDefinition;
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
-
 use kube::{
     api::{Api, Patch, PatchParams, ResourceExt},
+    k8s::apiextensionsv1::CustomResourceDefinition,
     runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt,
 };

@@ -1,16 +1,15 @@
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::api::core::v1::Pod;
 use tracing::*;
 
 use kube::{
     api::{Api, AttachParams, DeleteParams, PostParams, ResourceExt, WatchEvent, WatchParams},
-    Client,
+    k8s::corev1::Pod,
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
 
     let p: Pod = serde_json::from_value(serde_json::json!({
         "apiVersion": "v1",

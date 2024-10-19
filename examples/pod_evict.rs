@@ -1,17 +1,16 @@
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 use tracing::*;
 
 use kube::{
     api::{Api, EvictParams, PostParams, ResourceExt, WatchEvent, WatchParams},
-    Client,
+    k8s::corev1::Pod,
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
 
     // Create a Job
     let pod_name = "empty-pod";

@@ -1,17 +1,16 @@
-use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 use tracing::*;
 
 use kube::{
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
+    k8s::corev1::Pod,
     runtime::wait::{await_condition, conditions::is_pod_running},
-    Client,
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
 
     // Manage pods
     let pods: Api<Pod> = Api::default_namespaced(client);

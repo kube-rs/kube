@@ -1,5 +1,4 @@
 use futures::TryStreamExt;
-use k8s_openapi::api::core::v1::Pod;
 use tracing::*;
 
 use futures::AsyncBufReadExt;
@@ -7,6 +6,7 @@ use hyper::Uri;
 use kube::{
     api::{Api, DeleteParams, ResourceExt},
     core::{kubelet_debug::KubeletDebugParams, subresource::LogParams},
+    k8s::corev1::Pod,
     Client, Config,
 };
 use serde_json::json;

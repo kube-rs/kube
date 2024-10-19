@@ -3,11 +3,12 @@
 //! with labels and namespace selectors supported.
 use anyhow::{bail, Context, Result};
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc};
+use k8s_openapi::chrono::Utc;
 use kube::{
     api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
     core::GroupVersionKind,
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
+    k8s::metav1::Time,
     runtime::{
         wait::{await_condition, conditions::is_deleted},
         watcher, WatchStreamExt,

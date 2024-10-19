@@ -1,6 +1,6 @@
-use k8s_openapi::api::batch::v1::Job;
 use kube::{
     api::{Api, DeleteParams, PostParams},
+    k8s::batchv1::Job,
     runtime::wait::{await_condition, conditions},
     Client,
 };

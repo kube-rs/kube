@@ -1,18 +1,17 @@
 use std::pin::pin;
 
 use futures::TryStreamExt;
-use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{Api, ResourceExt},
+    k8s::corev1::Node,
     runtime::{predicates, reflector, watcher, Predicate, WatchStreamExt},
-    Client,
 };
 use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
 
     let nodes: Api<Node> = Api::all(client.clone());
     let wc = watcher::Config::default()

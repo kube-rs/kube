@@ -1,10 +1,9 @@
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
-use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
     api::{Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, TerminalSize},
+    k8s::corev1::Pod,
     runtime::wait::{await_condition, conditions::is_pod_running},
-    Client,
 };
 #[cfg(unix)] use tokio::signal;
 use tokio::{io::AsyncWriteExt, select};
@@ -39,7 +38,7 @@ async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), a
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     let p: Pod = serde_json::from_value(serde_json::json!({

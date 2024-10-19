@@ -3,9 +3,9 @@
 
 use anyhow::Result;
 use futures::StreamExt;
-use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ObjectMeta, Patch, PatchParams, Resource},
+    k8s::corev1::ConfigMap,
     runtime::{
         controller::{Action, Config, Controller},
         watcher,

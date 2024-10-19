@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{
         Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams,
         WatchEvent, WatchParams,
     },
+    k8s::apiextensionsv1::CustomResourceDefinition,
     runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt,
 };

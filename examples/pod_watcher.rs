@@ -1,16 +1,15 @@
 use futures::prelude::*;
-use k8s_openapi::api::core::v1::Pod;
 use kube::{
     api::{Api, ResourceExt},
+    k8s::corev1::Pod,
     runtime::{watcher, WatchStreamExt},
-    Client,
 };
 use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
     let api = Api::<Pod>::default_namespaced(client);
     let use_watchlist = std::env::var("WATCHLIST").map(|s| s == "1").unwrap_or(false);
     let wc = if use_watchlist {

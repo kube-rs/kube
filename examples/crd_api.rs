@@ -8,10 +8,10 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::*;
 
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
     core::crd::CustomResourceExt,
+    k8s::apiextensionsv1::CustomResourceDefinition,
     Client, CustomResource,
 };
 

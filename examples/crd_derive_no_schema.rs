@@ -1,7 +1,5 @@
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
-    CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps,
-};
-use kube_derive::CustomResource;
+use apiext::{CustomResourceDefinition, CustomResourceValidation, JSONSchemaProps};
+use kube::{k8s::apiextensionsv1 as apiext, CustomResource};
 use serde::{Deserialize, Serialize};
 
 /// CustomResource with manually implemented schema

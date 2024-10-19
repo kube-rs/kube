@@ -4,10 +4,10 @@
 // If you actually want to clean up other Kubernetes objects then you should use `ownerReferences` instead and let
 // k8s garbage collect the children.
 use futures::StreamExt;
-use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 use kube::{
     api::{Api, DeleteParams, ObjectMeta, Patch, PatchParams, Resource},
     error::ErrorResponse,
+    k8s::corev1::{ConfigMap, Secret},
     runtime::{
         controller::{Action, Controller},
         finalizer::{finalizer, Event},

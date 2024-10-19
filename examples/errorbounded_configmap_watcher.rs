@@ -1,8 +1,8 @@
 use futures::prelude::*;
-use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, ObjectMeta},
     core::DeserializeGuard,
+    k8s::corev1::ConfigMap,
     runtime::{reflector::ObjectRef, watcher, WatchStreamExt},
     Client, Resource,
 };

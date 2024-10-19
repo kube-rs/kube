@@ -2,7 +2,6 @@ use hyper_util::rt::TokioExecutor;
 // Custom client supporting both openssl-tls and rustls-tls
 // Must enable `rustls-tls` feature to run this.
 // Run with `USE_RUSTLS=1` to pick rustls.
-use k8s_openapi::api::core::v1::Pod;
 use tower::ServiceBuilder;
 use tracing::*;
 
@@ -32,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
         Client::new(service, config.default_namespace)
     };
 
-    let pods: Api<Pod> = Api::default_namespaced(client);
+    let pods: Api<kube::k8s::corev1::Pod> = Api::default_namespaced(client);
     for p in pods.list(&Default::default()).await? {
         info!("{}", p.name_any());
     }

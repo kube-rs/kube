@@ -1,8 +1,8 @@
 use std::{ops::Deref, sync::Arc, time::Duration};
 
 use futures::{future, StreamExt};
-use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
 use kube::{
+    k8s::{appsv1::Deployment, corev1::Pod},
     runtime::{
         controller::Action,
         predicates,

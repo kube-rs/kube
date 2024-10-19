@@ -2,19 +2,17 @@ use std::io::Write;
 use tracing::*;
 
 use futures::{join, stream, StreamExt, TryStreamExt};
-use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
-    api::{
-        Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, WatchEvent, WatchParams,
-    },
-    Client,
+    api::{AttachParams, AttachedProcess, DeleteParams, PostParams, WatchEvent, WatchParams},
+    k8s::corev1::Pod,
+    Api, ResourceExt,
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = kube::Client::try_default().await?;
 
     info!("Creating a Pod that outputs numbers for 15s");
     let p: Pod = serde_json::from_value(serde_json::json!({
