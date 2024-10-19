@@ -31,6 +31,6 @@ pub use k8s_openapi::{
 };
 
 // Names with version gates
-k8s_openapi::k8s_if_ge_1_26! {
+k8s_openapi::k8s_if_ge_1_29! {
     pub use k8s_openapi::api::flowcontrol::v1 as flowcontrolv1;
 }
