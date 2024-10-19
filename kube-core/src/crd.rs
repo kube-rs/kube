@@ -1,10 +1,8 @@
 //! Traits and tyes for CustomResources
 
-use crate::k8s::apiextensions_apiserver::pkg::apis::apiextensions as apiexts;
-
 /// Types for v1 CustomResourceDefinitions
 pub mod v1 {
-    use super::apiexts::v1::CustomResourceDefinition as Crd;
+    use crate::k8s::apiextensionsv1::CustomResourceDefinition as Crd;
     /// Extension trait that is implemented by kube-derive
     pub trait CustomResourceExt {
         /// Helper to generate the CRD including the JsonSchema

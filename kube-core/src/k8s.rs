@@ -1,12 +1,13 @@
-//! Indirection layer for generated structs for easier imports
+//! Flat indirection layer of stable apis for generated structs
+//!
+//! These are exclusively the generated **modules** found in [`k8s-openapi`](https://docs.rs/k8s_openapi).
+#![allow(unused_imports)]
 
-/// Re-export k8s-openapi root modules
-pub use k8s_openapi::{api, apiextensions_apiserver, apimachinery};
 /// Re-export versioned stable modules as the client-go like equivalent names
 ///
 /// Names should generally match https://pkg.go.dev/k8s.io/client-go/kubernetes/typed
 #[rustfmt::skip]
-pub use {
+pub use k8s_openapi::{
     api::admissionregistration::v1 as admissionregistrationv1,
     api::apps::v1 as appsv1,
     api::authentication::v1 as authenticationv1,
@@ -31,5 +32,5 @@ pub use {
 
 // Names with version gates
 k8s_openapi::k8s_if_ge_1_26! {
-    pub use api::flowcontrol::v1 as flowcontrolv1;
+    pub use k8s_openapi::api::flowcontrol::v1 as flowcontrolv1;
 }
