@@ -41,10 +41,10 @@ async fn main() -> anyhow::Result<()> {
     let event_stream = watcher(events, conf).default_backoff().applied_objects();
     let mut event_stream = pin!(event_stream);
 
-    #[allow(clippy::print_literal)] // for consistency
-    {
-        println!("{0:<6} {1:<15} {2:<55} {3}", "AGE", "REASON", "OBJECT", "MESSAGE");
+    fn print_event(age: &str, reason: &str, obj: &str, note: &str) {
+        println!("{age:<6} {reason:<15} {obj:<55} {note}");
     }
+    print_event("AGE", "REASON", "OBJECT", "MESSAGE");
     while let Some(ev) = event_stream.next().await {
         match ev {
             Ok(ev) => {
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
                 let reason = ev.reason.unwrap_or_default();
                 let obj = ev.regarding.and_then(format_objref).unwrap_or_default();
                 let note = ev.note.unwrap_or_default();
-                println!("{0:<6} {1:<15} {2:<55} {3}", age, reason, obj, note);
+                print_event(&age, &reason, &obj, &note);
             }
             Err(err) => eprintln!("{:?}", anyhow::Error::new(err)),
         }
