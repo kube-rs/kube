@@ -36,6 +36,8 @@ async fn main() -> anyhow::Result<()> {
     if let Some(forval) = app.r#for {
         if let Some((kind, name)) = forval.split_once('/') {
             conf = conf.fields(&format!("regarding.kind={kind},regarding.name={name}"));
+        } else {
+            return Err(anyhow::Error::msg("Usage: --for=<KIND>/<NAME>"));
         }
     }
     let event_stream = watcher(events, conf).default_backoff().applied_objects();
