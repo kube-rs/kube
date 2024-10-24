@@ -1,6 +1,6 @@
 use std::pin::pin;
 
-use futures::TryStreamExt;
+use futures::StreamExt;
 use k8s_openapi::{
     api::{core::v1::ObjectReference, events::v1::Event},
     apimachinery::pkg::apis::meta::v1::Time,
@@ -45,12 +45,17 @@ async fn main() -> anyhow::Result<()> {
     {
         println!("{0:<6} {1:<15} {2:<55} {3}", "AGE", "REASON", "OBJECT", "MESSAGE");
     }
-    while let Some(ev) = event_stream.try_next().await? {
-        let age = ev.creation_timestamp().map(format_creation).unwrap_or_default();
-        let reason = ev.reason.unwrap_or_default();
-        let obj = ev.regarding.and_then(format_objref).unwrap_or_default();
-        let note = ev.note.unwrap_or_default();
-        println!("{0:<6} {1:<15} {2:<55} {3}", age, reason, obj, note);
+    while let Some(ev) = event_stream.next().await {
+        match ev {
+            Ok(ev) => {
+                let age = ev.creation_timestamp().map(format_creation).unwrap_or_default();
+                let reason = ev.reason.unwrap_or_default();
+                let obj = ev.regarding.and_then(format_objref).unwrap_or_default();
+                let note = ev.note.unwrap_or_default();
+                println!("{0:<6} {1:<15} {2:<55} {3}", age, reason, obj, note);
+            }
+            Err(err) => eprintln!("{:?}", anyhow::Error::new(err)),
+        }
     }
     Ok(())
 }
