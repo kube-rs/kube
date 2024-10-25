@@ -309,9 +309,13 @@ impl Refresher {
         let client_secret = get_field(Self::CONFIG_CLIENT_SECRET)?.into();
 
         #[cfg(all(feature = "rustls-tls", feature = "aws-lc-rs"))]
-        rustls::crypto::aws_lc_rs::default_provider()
-            .install_default()
-            .unwrap();
+        {
+            if rustls::crypto::CryptoProvider::get_default().is_none() {
+                // the only error here is if it's been initialized in between: we can ignore it
+                // since our semantic is only to set the default value if it does not exist.
+                let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+            }
+        }
 
         #[cfg(all(feature = "rustls-tls", not(feature = "webpki-roots")))]
         let https = hyper_rustls::HttpsConnectorBuilder::new()
