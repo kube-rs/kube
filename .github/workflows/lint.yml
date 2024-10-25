@@ -30,12 +30,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1.0.7
-        with:
-          profile: minimal
-          toolchain: nightly
-          components: rustfmt
-          override: true
-      - name: Run rustfmt
-        id: rustfmt
-        run: rustfmt +nightly --edition 2018 --check $(find . -type f -iname *.rs)
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: rustfmt +nightly --edition 2018 --check $(find . -type f -iname *.rs)
