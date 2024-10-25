@@ -148,7 +148,6 @@ where
     /// ```no_run
     /// # use kube::Api;
     /// use k8s_openapi::api::core::v1::Pod;
-
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
     /// let pods: Api<Pod> = Api::namespaced(client, "apps");
@@ -262,10 +261,8 @@ where
     /// use kube::api::{Api, DeleteParams};
     /// use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
     /// use apiexts::CustomResourceDefinition;
-
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client: kube::Client = todo!();
-
     /// let crds: Api<CustomResourceDefinition> = Api::all(client);
     /// crds.delete("foos.clux.dev", &DeleteParams::default()).await?
     ///     .map_left(|o| println!("Deleting CRD: {:?}", o.status))

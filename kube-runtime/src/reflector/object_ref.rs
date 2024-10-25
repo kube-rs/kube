@@ -168,11 +168,17 @@ where
     }
 
     #[must_use]
-    pub fn from_obj(obj: &K) -> Self
-    where
-        K: Lookup,
-    {
+    pub fn from_obj(obj: &K) -> Self {
         obj.to_object_ref(Default::default())
+    }
+}
+
+impl<K: Lookup> From<&K> for ObjectRef<K>
+where
+    K::DynamicType: Default,
+{
+    fn from(obj: &K) -> Self {
+        Self::from_obj(obj)
     }
 }
 

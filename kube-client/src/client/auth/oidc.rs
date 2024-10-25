@@ -317,10 +317,16 @@ impl Refresher {
             }
         }
 
-        #[cfg(feature = "rustls-tls")]
+        #[cfg(all(feature = "rustls-tls", not(feature = "webpki-roots")))]
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
             .map_err(|_| errors::RefreshInitError::NoValidNativeRootCA)?
+            .https_only()
+            .enable_http1()
+            .build();
+        #[cfg(all(feature = "rustls-tls", feature = "webpki-roots"))]
+        let https = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_webpki_roots()
             .https_only()
             .enable_http1()
             .build();

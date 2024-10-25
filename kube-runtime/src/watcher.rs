@@ -71,7 +71,10 @@ impl<K> Event<K> {
     ///
     /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
     /// emitted individually.
-    #[deprecated(since = "0.92.0", note = "unnecessary to flatten a single object")]
+    #[deprecated(
+        since = "0.92.0",
+        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
+    )]
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
             Self::Apply(obj) | Self::InitApply(obj) => Some(obj),
@@ -85,7 +88,10 @@ impl<K> Event<K> {
     /// Note that `Deleted` events may be missed when restarting the stream. Use finalizers
     /// or owner references instead if you care about cleaning up external resources after
     /// deleted objects.
-    #[deprecated(since = "0.92.0", note = "unnecessary to flatten a single object")]
+    #[deprecated(
+        since = "0.92.0",
+        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
+    )]
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
             Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => Some(obj),
@@ -710,8 +716,8 @@ where
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
-/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+/// The events are intended to provide a safe input interface for a state store like a [`reflector`].
+/// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```no_run
 /// use kube::{
@@ -773,8 +779,8 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
-/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+/// The events are intended to provide a safe input interface for a state store like a [`reflector`].
+/// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```no_run
 /// use kube::{
@@ -892,14 +898,13 @@ type Strategy = ResetTimerBackoff<ExponentialBackoff>;
 impl Default for DefaultBackoff {
     fn default() -> Self {
         Self(ResetTimerBackoff::new(
-            backoff::ExponentialBackoff {
-                initial_interval: Duration::from_millis(800),
-                max_interval: Duration::from_secs(30),
-                randomization_factor: 1.0,
-                multiplier: 2.0,
-                max_elapsed_time: None,
-                ..ExponentialBackoff::default()
-            },
+            backoff::ExponentialBackoffBuilder::new()
+                .with_initial_interval(Duration::from_millis(800))
+                .with_max_interval(Duration::from_secs(30))
+                .with_randomization_factor(1.0)
+                .with_multiplier(2.0)
+                .with_max_elapsed_time(None)
+                .build(),
             Duration::from_secs(120),
         ))
     }

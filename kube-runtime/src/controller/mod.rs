@@ -332,6 +332,7 @@ const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
 #[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::type_complexity)]
 pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
     mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
     error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,

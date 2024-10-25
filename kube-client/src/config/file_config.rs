@@ -328,7 +328,7 @@ pub struct Context {
     /// Name of the cluster for this context
     pub cluster: String,
     /// Name of the `AuthInfo` for this context
-    pub user: String,
+    pub user: Option<String>,
     /// The default namespace to use on unspecified requests
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,

@@ -4,7 +4,7 @@ use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;
 use k8s_openapi::api::core::v1::Pod;
 use std::time::Duration;
-use tower::ServiceBuilder;
+use tower::{BoxError, ServiceBuilder};
 use tower_http::{decompression::DecompressionLayer, trace::TraceLayer};
 use tracing::{Span, *};
 
@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
                     tracing::debug!("finished in {}ms", latency.as_millis())
                 }),
         )
+        .map_err(BoxError::from)
         .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
 
     let client = Client::new(service, config.default_namespace);

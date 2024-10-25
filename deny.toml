@@ -31,6 +31,8 @@ allow = [
     # Pulled in via aws_lc_rs when using rustls-tls and aws-lc-rs features
     # https://openssl-library.org/source/license/index.html
     "OpenSSL",
+    # Pulled in via hashbrown through its foldhash dependency
+    "Zlib",
 ]
 
 exceptions = [
@@ -40,6 +42,9 @@ exceptions = [
     # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
     # for more details.
     { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
+    # Pulled in via hyper-rustls when using the webpki-roots feature,
+    # which is off by default.
+    { allow = ["MPL-2.0"], name = "webpki-roots" },
 ]
 
 [[licenses.clarify]]

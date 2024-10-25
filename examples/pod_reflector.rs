@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
         })
         .reflect(writer)
         .applied_objects()
-        .predicate_filter(predicates::resource_version); // NB: requires an unstable feature
+        .predicate_filter(predicates::resource_version);
     let mut stream = pin!(stream);
 
     while let Some(pod) = stream.try_next().await? {

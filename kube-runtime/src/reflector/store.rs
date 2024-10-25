@@ -1,4 +1,6 @@
-use super::{dispatcher::Dispatcher, Lookup, ObjectRef, ReflectHandle};
+use super::{dispatcher::Dispatcher, Lookup, ObjectRef};
+#[cfg(feature = "unstable-runtime-subscribe")]
+use crate::reflector::ReflectHandle;
 use crate::{
     utils::delayed_init::{self, DelayedInit},
     watcher,

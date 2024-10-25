@@ -5,7 +5,30 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.95.0...main
+ * see https://github.com/kube-rs/kube/compare/0.96.0...main
+
+[0.96.0](https://github.com/kube-rs/kube/releases/tag/0.96.0) / 2024-10-09
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.96.0 -->
+## Highlights
+- **[Features](https://kube.rs/features/)**: `webpki-roots` added #1323, and [predicates](https://docs.rs/kube/latest/kube/runtime/utils/predicates/index.html) no longer require `unstable-runtime` #1578
+- **Local auth**: improve leniency/kubectl-alignment #1595, remove http proxy vars #1520
+- **Dependencies**: upgrades to `tower` and `secrecy`, and `derivative` swapped for `educe`
+
+## What's Changed
+### Added
+* rustls: optionally use WebPKI roots to avoid panicking on Android & iOS by @ewilken in https://github.com/kube-rs/kube/pull/1323
+* Stabilise runtime predicates by @clux in https://github.com/kube-rs/kube/pull/1578
+* Add `ObjectRef::from` as alias for `::from_obj` by @nightkr in https://github.com/kube-rs/kube/pull/1598
+### Changed
+* Bump `secrecy` to 0.10 by @clux in https://github.com/kube-rs/kube/pull/1588
+* Upgrades `tower` to 0.5.1 by @markdingram in https://github.com/kube-rs/kube/pull/1589
+* runtime: rename references from Flatten to Decode by @clux in https://github.com/kube-rs/kube/pull/1520
+### Removed
+* remove using HTTP PROXY from environment variable by @aviramha in https://github.com/kube-rs/kube/pull/1587
+### Fixed
+* replace derivative dependency with educe by @rorosen in https://github.com/kube-rs/kube/pull/1585
+* change auth behavior to match upstream on unknown/empty user - use null auth by @aviramha in https://github.com/kube-rs/kube/pull/1595
 
 [0.95.0](https://github.com/kube-rs/kube/releases/tag/0.95.0) / 2024-09-16
 ===================

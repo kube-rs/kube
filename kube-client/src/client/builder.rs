@@ -213,6 +213,7 @@ where
                     }
                 }),
         )
+        .map_err(BoxError::from)
         .service(client);
 
     Ok(ClientBuilder::new(

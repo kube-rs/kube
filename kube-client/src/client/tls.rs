@@ -55,9 +55,18 @@ pub mod rustls_tls {
         let config_builder = if let Some(certs) = root_certs {
             ClientConfig::builder().with_root_certificates(root_store(certs)?)
         } else {
-            ClientConfig::builder()
-                .with_native_roots()
-                .map_err(Error::NoValidNativeRootCA)?
+            #[cfg(feature = "webpki-roots")]
+            {
+                // Use WebPKI roots.
+                ClientConfig::builder().with_webpki_roots()
+            }
+            #[cfg(not(feature = "webpki-roots"))]
+            {
+                // Use native roots. This will panic on Android and iOS.
+                ClientConfig::builder()
+                    .with_native_roots()
+                    .map_err(Error::NoValidNativeRootCA)?
+            }
         };
 
         let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {

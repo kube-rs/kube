@@ -12,9 +12,8 @@ keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
 categories = ["web-programming::http-client", "caching", "network-programming"]
 
 [features]
-unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-predicates", "unstable-runtime-stream-control", "unstable-runtime-reconcile-on"]
+unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-stream-control", "unstable-runtime-reconcile-on"]
 unstable-runtime-subscribe = []
-unstable-runtime-predicates = []
 unstable-runtime-stream-control = []
 unstable-runtime-reconcile-on = []
 
@@ -31,7 +30,7 @@ rust.unsafe_code = "forbid"
 
 [dependencies]
 futures = { workspace = true, features = ["async-await"] }
-kube-client = { path = "../kube-client", version = "=0.95.0", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "=0.96.0", default-features = false, features = ["jsonpatch", "client"] }
 educe = { workspace = true, features = ["Clone", "Debug", "Hash", "PartialEq"] }
 serde.workspace = true
 ahash.workspace = true
