@@ -3,7 +3,7 @@ use hyper_util::rt::TokioExecutor;
 // Must enable `rustls-tls` feature to run this.
 // Run with `USE_RUSTLS=1` to pick rustls.
 use k8s_openapi::api::core::v1::Pod;
-use tower::ServiceBuilder;
+use tower::{BoxError, ServiceBuilder};
 use tracing::*;
 
 use kube::{client::ConfigExt, Api, Client, Config, ResourceExt};
@@ -21,6 +21,7 @@ async fn main() -> anyhow::Result<()> {
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
             .option_layer(config.auth_layer()?)
+            .map_err(BoxError::from)
             .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         Client::new(service, config.default_namespace)
     } else {
@@ -28,6 +29,7 @@ async fn main() -> anyhow::Result<()> {
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
             .option_layer(config.auth_layer()?)
+            .map_err(BoxError::from)
             .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         Client::new(service, config.default_namespace)
     };

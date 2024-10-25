@@ -78,7 +78,7 @@ jobs:
       # Examples
       - name: Test examples
         if: matrix.os != 'windows-latest'
-        run: cargo test -p kube-examples --examples -j6
+        run: cargo test -p kube-examples --examples -j6 --all-features
 
   doc:
     runs-on: ubuntu-latest
