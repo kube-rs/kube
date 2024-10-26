@@ -15,6 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
       - run: rustfmt +nightly --edition 2018 $(find . -type f -iname *.rs)
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
