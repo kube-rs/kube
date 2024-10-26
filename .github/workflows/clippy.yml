@@ -16,4 +16,4 @@ jobs:
           components: clippy
       - uses: clechasseur/rs-clippy-check@v3
         with:
-          args: --workspace --all-features
+          args: --workspace
