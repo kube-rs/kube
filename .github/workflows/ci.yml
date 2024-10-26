@@ -20,11 +20,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
         with:
-          override: true
-          toolchain: stable
-          profile: minimal
+          tool: ripgrep
       # Smart caching for Rust projects.
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
@@ -96,42 +95,35 @@ jobs:
     # Run `cargo check` on our minimum supported Rust version
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@main
-    - name: Find MSRV
-      id: msrv
-      run: |
-        MSRV=$(grep MSRV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+")
-        echo $MSRV
-        echo "msrv=${MSRV}" >> $GITHUB_OUTPUT
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ steps.msrv.outputs.msrv }}
-        profile: minimal
-        override: true
-    - uses: Swatinem/rust-cache@v2
-    - name: Check
-      uses: actions-rs/cargo@v1
-      with:
-        command: check
-        args: --workspace
-
-    - name: Check rust-version keys matches advertised MSRV
-      run: |
-        if ! cat Cargo.toml | grep "rust-version" | grep "${{ steps.msrv.outputs.msrv }}"; then
-          echo "msrv policy inconsistent with rust-version key"
-          exit 1
-        fi
-
-    - name: Check devcontainer matches MSRV
-      run: |
-        versions=$(sed -nE 's|^FROM (.*/)?rust:([^ ]+)|\2|p' .devcontainer/Dockerfile)
-        echo "Versions: $versions"
-        mismatches=$(echo "$versions" | grep -v '^${{ steps.msrv.outputs.msrv }}' || true)
-        echo "Mismatches: $mismatches"
-        if [ -n "$mismatches" ]; then
-          echo "::error ::Devcontainer includes incorrect rust version(s): $mismatches"
-          exit 1
-        fi
+      - uses: actions/checkout@v4
+      - name: Find MSRV
+        id: msrv
+        run: |
+          MSRV=$(grep MSRV README.md | grep -oE "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+")
+          echo $MSRV
+          echo "msrv=${MSRV}" >> $GITHUB_OUTPUT
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.msrv }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: cargo check --workspace
+      - name: Check rust-version keys matches advertised MSRV
+        run: |
+          if ! cat Cargo.toml | grep "rust-version" | grep "${{ steps.msrv.outputs.msrv }}"; then
+            echo "msrv policy inconsistent with rust-version key"
+            exit 1
+          fi
+      - name: Check devcontainer matches MSRV
+        run: |
+          versions=$(sed -nE 's|^FROM (.*/)?rust:([^ ]+)|\2|p' .devcontainer/Dockerfile)
+          echo "Versions: $versions"
+          mismatches=$(echo "$versions" | grep -v '^${{ steps.msrv.outputs.msrv }}' || true)
+          echo "Mismatches: $mismatches"
+          if [ -n "$mismatches" ]; then
+            echo "::error ::Devcontainer includes incorrect rust version(s): $mismatches"
+            exit 1
+          fi
 
   integration:
     runs-on: ubuntu-latest
@@ -143,11 +135,7 @@ jobs:
         k8s: [v1.26, v1.30]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          override: true
-          toolchain: stable
-          profile: minimal
+      - uses: dtolnay/rust-toolchain@stable
       # Smart caching for Rust projects.
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
@@ -201,11 +189,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          override: true
-          toolchain: stable
-          profile: minimal
+      - uses: dtolnay/rust-toolchain@stable
       # Smart caching for Rust projects.
       # Includes workaround for macos cache corruption.
       # - https://github.com/rust-lang/cargo/issues/8603
