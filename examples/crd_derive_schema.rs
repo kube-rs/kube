@@ -7,7 +7,7 @@ use kube::{
         WatchEvent, WatchParams,
     },
     runtime::wait::{await_condition, conditions},
-    Client, CustomResource, CustomResourceExt,
+    Client, CustomResource, CustomResourceExt, Validated,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,9 @@ use serde::{Deserialize, Serialize};
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable
 
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
+#[derive(
+    CustomResource, Validated, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
+)]
 #[kube(
     group = "clux.dev",
     version = "v1",
@@ -85,9 +87,15 @@ pub struct FooSpec {
     #[serde(default)]
     #[schemars(schema_with = "set_listable_schema")]
     set_listable: Vec<u32>,
+
     // Field with CEL validation
-    #[serde(default)]
-    #[schemars(schema_with = "cel_validations")]
+    #[serde(default = "default_legal")]
+    #[validated(
+        method = cel_validated,
+        rule = Rule{rule: "self != 'illegal'".into(), message: Some(Message::Expression("'string cannot be illegal'".into())), reason: Some(Reason::FieldValueForbidden), ..Default::default()},
+        rule = Rule{rule: "self != 'not legal'".into(), reason: Some(Reason::FieldValueInvalid), ..Default::default()}
+    )]
+    #[schemars(schema_with = "cel_validated")]
     cel_validated: Option<String>,
 }
 // https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
@@ -104,20 +112,12 @@ fn set_listable_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::sche
     .unwrap()
 }
 
-// https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation-rules
-fn cel_validations(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-    serde_json::from_value(serde_json::json!({
-        "type": "string",
-        "x-kubernetes-validations": [{
-            "rule": "self != 'illegal'",
-            "message": "string cannot be illegal"
-        }]
-    }))
-    .unwrap()
-}
-
 fn default_value() -> String {
     "default_value".into()
+}
+
+fn default_legal() -> Option<String> {
+    Some("legal".into())
 }
 
 fn default_nullable() -> Option<String> {
@@ -194,6 +194,7 @@ async fn main() -> Result<()> {
     // Listables
     assert_eq!(serde_json::to_string(&val["spec"]["default_listable"])?, "[2]");
     assert_eq!(serde_json::to_string(&val["spec"]["set_listable"])?, "[2]");
+    assert_eq!(serde_json::to_string(&val["spec"]["cel_validated"])?, "\"legal\"");
 
     // Missing required field (non-nullable without default) is an error
     let data = DynamicObject::new("qux", &api_resource).data(serde_json::json!({
@@ -243,11 +244,34 @@ async fn main() -> Result<()> {
             assert_eq!(err.reason, "Invalid");
             assert_eq!(err.status, "Failure");
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
-            assert!(err.message.contains("spec.cel_validated: Invalid value"));
+            assert!(err.message.contains("spec.cel_validated: Forbidden"));
             assert!(err.message.contains("string cannot be illegal"));
         }
         _ => panic!(),
     }
+
+    // cel validation triggers:
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "cel_validated": Some("not legal")
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_err());
+    match cel_res.err() {
+        Some(kube::Error::Api(err)) => {
+            assert_eq!(err.code, 422);
+            assert_eq!(err.reason, "Invalid");
+            assert_eq!(err.status, "Failure");
+            assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
+            assert!(err.message.contains("spec.cel_validated: Invalid value"));
+            assert!(err.message.contains("failed rule: self != 'not legal'"));
+        }
+        _ => panic!(),
+    }
+
     // cel validation happy:
     let cel_patch_ok = serde_json::json!({
         "apiVersion": "clux.dev/v1",
