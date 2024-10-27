@@ -310,9 +310,41 @@ mod resource;
 /// [`kube::Resource`]: https://docs.rs/kube/*/kube/trait.Resource.html
 /// [`kube::core::ApiResource`]: https://docs.rs/kube/*/kube/core/struct.ApiResource.html
 /// [`kube::CustomResourceExt`]: https://docs.rs/kube/*/kube/trait.CustomResourceExt.html
-#[proc_macro_derive(CustomResource, attributes(kube))]
+#[proc_macro_derive(CustomResource, attributes(kube, validated))]
 pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     custom_resource::derive(proc_macro2::TokenStream::from(input)).into()
+}
+
+/// Generates a JsonSchema patch with a set of CEL expression validation rules applied on the CRD.
+///
+/// This macro should be placed before the `#[derive(JsonSchema)]` macro on the struct being validated,
+/// as it performs addition of the #[schemars(schema_with = "<validation_injector>")] derive macro
+/// on the validated field.
+///
+/// # Example
+///
+/// ```rust
+/// use kube::cel_validation;
+/// use kube::CustomResource;
+/// use serde::Deserialize;
+/// use serde::Serialize;
+/// use schemars::JsonSchema;
+/// use kube::core::crd::CustomResourceExt;
+///
+/// #[cel_validation]
+/// #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, JsonSchema)]
+/// #[kube(group = "kube.rs", version = "v1", kind = "Struct")]
+/// struct MyStruct {
+///     #[validated(rule = "self != ''")]
+///     field: String,
+/// }
+///
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains("x-kubernetes-validations"));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self != ''""#));
+/// ```
+#[proc_macro_attribute]
+pub fn cel_validation(args: proc_macro::TokenStream, input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    custom_resource::cel_validation(args.into(), input.into()).into()
 }
 
 /// A custom derive for inheriting Resource impl for the type.
