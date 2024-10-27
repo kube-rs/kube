@@ -552,10 +552,7 @@ pub(crate) fn cel_validation(_: TokenStream, input: TokenStream) -> TokenStream 
         Ok(di) => di,
     };
 
-    if !ast
-        .attrs
-        .iter().any(|attr| attr.path().is_ident("derive"))
-    {
+    if !ast.attrs.iter().any(|attr| attr.path().is_ident("derive")) {
         return syn::Error::new(
             ast.ident.span(),
             r#"#[cel_validation] macro should be placed before the #[derive(JsonSchema)] macro"#,

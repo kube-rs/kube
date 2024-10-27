@@ -89,8 +89,8 @@ pub struct FooSpec {
     set_listable: Vec<u32>,
     // Field with CEL validation
     #[serde(default)]
-    #[validated(rule="self != 'illegal'", message="string cannot be illegal")]
-    #[validated(rule="self != 'not legal'")]
+    #[validated(rule = "self != 'illegal'", message = "string cannot be illegal")]
+    #[validated(rule = "self != 'not legal'")]
     cel_validated: Option<String>,
 }
 // https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
