@@ -9,7 +9,7 @@ use kube::{
     runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt,
 };
-use kube_derive::cel_validation;
+use kube::cel_validation;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -89,7 +89,7 @@ pub struct FooSpec {
     set_listable: Vec<u32>,
     // Field with CEL validation
     #[serde(default)]
-    #[validated(rule = "self != 'illegal'", message = "string cannot be illegal")]
+    #[validated(rule = "self != 'illegal'", message_expression = "'string cannot be illegal'")]
     #[validated(rule = "self != 'not legal'")]
     cel_validated: Option<String>,
 }
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
     println!("Creating CRD v1");
     let client = Client::try_default().await?;
     delete_crd(client.clone()).await?;
-    assert!(create_crd(client.clone()).await.is_ok());
+    assert!(dbg!(create_crd(client.clone()).await).is_ok());
 
     // Test creating Foo resource.
     let foos = Api::<Foo>::default_namespaced(client.clone());

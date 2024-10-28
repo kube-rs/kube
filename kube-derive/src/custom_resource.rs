@@ -141,6 +141,21 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             .to_compile_error()
         }
     }
+
+    if let Data::Struct(struct_data) = &derive_input.data {
+        if let syn::Fields::Named(fields) = &struct_data.fields {
+            for field in &fields.named {
+                if let Some(attr) = field.attrs.iter().find(|attr| attr.path().is_ident("validated")) {
+                    return syn::Error::new_spanned(
+                        attr,
+                        r#"#[cel_validation] macro should be placed before the #[derive(JsonSchema)] macro to use with #[validated]"#,
+                    )
+                    .to_compile_error();
+                }
+            }
+        }
+    }
+
     let kube_attrs = match KubeAttrs::from_derive_input(&derive_input) {
         Err(err) => return err.write_errors(),
         Ok(attrs) => attrs,
@@ -544,6 +559,9 @@ fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident, kube_core: &Path) ->
 struct CELAttr {
     rule: String,
     message: Option<String>,
+    message_expression: Option<String>,
+    field_path: Option<String>,
+    reason: Option<String>,
 }
 
 pub(crate) fn cel_validation(_: TokenStream, input: TokenStream) -> TokenStream {
@@ -560,8 +578,9 @@ pub(crate) fn cel_validation(_: TokenStream, input: TokenStream) -> TokenStream 
         .to_compile_error();
     }
 
+    // Create a struct name for added validation rules, following the original struct name + "Validation"
     let struct_name = ast.ident.to_string() + "Validation";
-    let anchor = Ident::new(&struct_name, Span::call_site());
+    let validation_struct = Ident::new(&struct_name, Span::call_site());
 
     let mut validations: Vec<TokenStream> = vec![];
 
@@ -584,24 +603,61 @@ pub(crate) fn cel_validation(_: TokenStream, input: TokenStream) -> TokenStream 
                 .iter()
                 .filter(|attr| attr.path().is_ident("validated"))
             {
-                let CELAttr { rule, message } = match CELAttr::from_attributes(&vec![attr.clone()]) {
+                let CELAttr {
+                    rule,
+                    message,
+                    field_path,
+                    message_expression,
+                    reason,
+                } = match CELAttr::from_attributes(&vec![attr.clone()]) {
                     Ok(cel) => cel,
                     Err(e) => return e.with_span(&attr.meta).write_errors(),
                 };
+                if let (Some(_), Some(_)) = (&message, &message_expression) {
+                    return syn::Error::new_spanned(
+                        attr,
+                        r#"Either message or message_expression should be specified at once"#,
+                    ).to_compile_error()
+                }
                 let message = if let Some(message) = message {
-                    quote! { "message": #message }
+                    quote! { "message": #message, }
+                } else {
+                    quote! {}
+                };
+                let field_path = if let Some(field_path) = field_path {
+                    quote! { "fieldPath": #field_path, }
+                } else {
+                    quote! {}
+                };
+                let message_expression = if let Some(message_expression) = message_expression {
+                    quote! { "messageExpression": #message_expression, }
+                } else {
+                    quote! {}
+                };
+                let reason = if let Some(reason) = reason {
+                    quote! { "reason": #reason, }
                 } else {
                     quote! {}
                 };
                 rules.push(quote! {{
                     "rule": #rule,
                     #message
+                    #field_path
+                    #message_expression
+                    #reason
                 },});
             }
 
             if rules.is_empty() {
                 continue;
             }
+
+            field.attrs = field
+                .attrs
+                .clone()
+                .into_iter()
+                .filter(|attr| !attr.path().is_ident("validated"))
+                .collect();
 
             let validation_method_name = field.ident.as_ref().map(|i| i.to_string()).unwrap_or_default();
             let name = Ident::new(&validation_method_name, Span::call_site());
@@ -638,9 +694,9 @@ pub(crate) fn cel_validation(_: TokenStream, input: TokenStream) -> TokenStream 
     }
 
     quote! {
-        struct #anchor {}
+        struct #validation_struct {}
 
-        impl #anchor {
+        impl #validation_struct {
             #(#validations)*
         }
 
