@@ -238,6 +238,13 @@ pub trait WatchStreamExt: Stream {
     ///     }
     /// });
     ///
+    /// tokio::spawn(async move {
+    ///     // subscriber can be used to receive applied_objects
+    ///     subscriber.for_each(|obj| async move {
+    ///         info!("saw in subscriber {}", &obj.name_any())
+    ///     }).await;
+    /// });
+    ///
     /// // configure the watcher stream and populate the store while polling
     /// watcher(deploys, watcher::Config::default())
     ///     .reflect_shared(writer)
@@ -249,11 +256,6 @@ pub trait WatchStreamExt: Stream {
     ///         }
     ///     })
     ///     .await;
-    ///
-    /// // subscriber can be used to receive applied_objects
-    /// subscriber.for_each(|obj| async move {
-    ///     info!("saw in subscriber {}", &obj.name_any())
-    /// }).await;
     ///
     /// # Ok(())
     /// # }
