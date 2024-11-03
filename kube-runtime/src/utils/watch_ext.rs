@@ -214,10 +214,10 @@ pub trait WatchStreamExt: Stream {
     /// [`ReflectHandle`]: crate::reflector::dispatcher::ReflectHandle
     /// ## Usage
     /// ```no_run
-    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use futures::StreamExt;
     /// # use std::time::Duration;
     /// # use tracing::{info, warn};
-    /// use kube::{Api, Client, ResourceExt};
+    /// use kube::{Api, ResourceExt};
     /// use kube_runtime::{watcher, WatchStreamExt, reflector};
     /// use k8s_openapi::api::apps::v1::Deployment;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
@@ -226,7 +226,7 @@ pub trait WatchStreamExt: Stream {
     /// let deploys: Api<Deployment> = Api::default_namespaced(client);
     /// let subscriber_buf_sz = 100;
     /// let (reader, writer) = reflector::store_shared::<Deployment>(subscriber_buf_sz);
-    /// let subscriber = &writer.subscribe().unwrap();
+    /// let subscriber = writer.subscribe().unwrap();
     ///
     /// tokio::spawn(async move {
     ///     // start polling the store once the reader is ready
@@ -236,6 +236,13 @@ pub trait WatchStreamExt: Stream {
     ///         info!("Current {} deploys: {:?}", names.len(), names);
     ///         tokio::time::sleep(Duration::from_secs(10)).await;
     ///     }
+    /// });
+    ///
+    /// tokio::spawn(async move {
+    ///     // subscriber can be used to receive applied_objects
+    ///     subscriber.for_each(|obj| async move {
+    ///         info!("saw in subscriber {}", &obj.name_any())
+    ///     }).await;
     /// });
     ///
     /// // configure the watcher stream and populate the store while polling
@@ -249,11 +256,6 @@ pub trait WatchStreamExt: Stream {
     ///         }
     ///     })
     ///     .await;
-    ///
-    /// // subscriber can be used to receive applied_objects
-    /// subscriber.for_each(|obj| async move {
-    ///     info!("saw in subscriber {}", &obj.name_any())
-    /// }).await;
     ///
     /// # Ok(())
     /// # }

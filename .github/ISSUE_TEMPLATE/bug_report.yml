@@ -29,7 +29,7 @@ body:
       description: |
         What type of kubernetes cluster you are running aginst (k3s/eks/aks/gke/other) and what is OS in your `Dockerfile`?
       placeholder: |
-        Output of `kubectl version --short`
+        Output of `kubectl version`
         Dockerfile OS
     validations:
       required: true
