@@ -6,10 +6,10 @@ use kube::{
         Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams,
         WatchEvent, WatchParams,
     },
+    cel_validation,
     runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt,
 };
-use kube::cel_validation;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable
 
-#[cel_validation]
+#[cel_validation(struct_name = "FooSpecValidation")]
 #[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
 #[kube(
     group = "clux.dev",
