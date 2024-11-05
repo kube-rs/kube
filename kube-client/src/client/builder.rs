@@ -158,7 +158,13 @@ where
     #[cfg(feature = "gzip")]
     let stack = ServiceBuilder::new()
         .layer(stack)
-        .layer(tower_http::decompression::DecompressionLayer::new())
+        .layer(
+            tower_http::decompression::DecompressionLayer::new()
+                .no_br()
+                .no_deflate()
+                .no_zstd()
+                .gzip(!config.disable_compression),
+        )
         .into_inner();
 
     let service = ServiceBuilder::new()
@@ -225,4 +231,71 @@ where
         ),
         default_ns,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "gzip")] use super::*;
+
+    #[cfg(feature = "gzip")]
+    #[tokio::test]
+    async fn test_no_accept_encoding_header_sent_when_compression_disabled(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use http::Uri;
+        use std::net::SocketAddr;
+        use tokio::net::{TcpListener, TcpStream};
+
+        // setup a server that echoes back any encoding header value
+        let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
+        let listener = TcpListener::bind(addr).await?;
+        let local_addr = listener.local_addr()?;
+        let uri: Uri = format!("http://{}", local_addr).parse()?;
+
+        tokio::spawn(async move {
+            use http_body_util::Full;
+            use hyper::{server::conn::http1, service::service_fn};
+            use hyper_util::rt::{TokioIo, TokioTimer};
+            use std::convert::Infallible;
+
+            loop {
+                let (tcp, _) = listener.accept().await.unwrap();
+                let io: TokioIo<TcpStream> = TokioIo::new(tcp);
+
+                tokio::spawn(async move {
+                    let _ = http1::Builder::new()
+                        .timer(TokioTimer::new())
+                        .serve_connection(
+                            io,
+                            service_fn(|req| async move {
+                                let response = req
+                                    .headers()
+                                    .get(http::header::ACCEPT_ENCODING)
+                                    .map(|b| Bytes::copy_from_slice(b.as_bytes()))
+                                    .unwrap_or_default();
+                                Ok::<_, Infallible>(Response::new(Full::new(response)))
+                            }),
+                        )
+                        .await
+                        .unwrap();
+                });
+            }
+        });
+
+        // confirm gzip echoed back with default config
+        let config = Config { ..Config::new(uri) };
+        let client = make_generic_builder(HttpConnector::new(), config.clone())?.build();
+        let response = client.request_text(http::Request::default()).await?;
+        assert_eq!(&response, "gzip");
+
+        // now disable and check empty string echoed back
+        let config = Config {
+            disable_compression: true,
+            ..config
+        };
+        let client = make_generic_builder(HttpConnector::new(), config)?.build();
+        let response = client.request_text(http::Request::default()).await?;
+        assert_eq!(&response, "");
+
+        Ok(())
+    }
 }
