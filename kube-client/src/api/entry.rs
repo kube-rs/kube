@@ -134,7 +134,7 @@ enum Dirtiness {
     New,
 }
 
-impl<'a, K> OccupiedEntry<'a, K> {
+impl<K> OccupiedEntry<'_, K> {
     /// Borrow the object
     pub fn get(&self) -> &K {
         &self.object

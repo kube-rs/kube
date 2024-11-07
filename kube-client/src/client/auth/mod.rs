@@ -10,7 +10,7 @@ use http::{
     header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,
 };
-use jsonpath_rust::{path::config::JsonPathConfig, JsonPathInst};
+use jsonpath_rust::JsonPath;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -498,10 +498,9 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 }
 
 fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<String, Error> {
-    let cfg = JsonPathConfig::default(); // no need for regex caching here
     let parsed_path = path
         .trim_matches(|c| c == '"' || c == '{' || c == '}')
-        .parse::<JsonPathInst>()
+        .parse::<JsonPath>()
         .map_err(|err| {
             Error::AuthExec(format!(
                 "Failed to parse {context:?} as a JsonPath: {path}\n
@@ -509,7 +508,7 @@ fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<
             ))
         })?;
 
-    let res = parsed_path.find_slice(json, cfg);
+    let res = parsed_path.find_slice(json);
 
     let Some(res) = res.into_iter().next() else {
         return Err(Error::AuthExec(format!(
@@ -517,12 +516,12 @@ fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<
         )));
     };
 
-    if let Some(val) = res.as_str() {
+    if let Some(val) = res.clone().to_path() {
         Ok(val.to_owned())
     } else {
         Err(Error::AuthExec(format!(
             "Target {:?} value {:?} is not a string: {:?}",
-            context, path, *res
+            context, path, res
         )))
     }
 }
