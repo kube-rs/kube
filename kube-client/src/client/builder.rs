@@ -92,26 +92,46 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
         }
 
         match config.proxy_url.as_ref() {
-            #[cfg(feature = "socks5")]
             Some(proxy_url) if proxy_url.scheme_str() == Some("socks5") => {
-                let connector = hyper_socks2::SocksConnector {
-                    proxy_addr: proxy_url.clone(),
-                    auth: None,
-                    connector,
-                };
+                #[cfg(feature = "socks5")]
+                {
+                    let connector = hyper_socks2::SocksConnector {
+                        proxy_addr: proxy_url.clone(),
+                        auth: None,
+                        connector,
+                    };
+                    make_generic_builder(connector, config)
+                }
 
-                make_generic_builder(connector, config)
+                #[cfg(not(feature = "socks5"))]
+                Err(Error::ProxyProtocolDisabled {
+                    proxy_url: proxy_url.clone(),
+                    protocol_feature: "kube/socks5",
+                })
             }
 
-            #[cfg(feature = "http-proxy")]
             Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
-                let proxy = hyper_http_proxy::Proxy::new(hyper_http_proxy::Intercept::All, proxy_url.clone());
-                let connector = hyper_http_proxy::ProxyConnector::from_proxy_unsecured(connector, proxy);
+                #[cfg(feature = "http-proxy")]
+                {
+                    let proxy =
+                        hyper_http_proxy::Proxy::new(hyper_http_proxy::Intercept::All, proxy_url.clone());
+                    let connector = hyper_http_proxy::ProxyConnector::from_proxy_unsecured(connector, proxy);
 
-                make_generic_builder(connector, config)
+                    make_generic_builder(connector, config)
+                }
+
+                #[cfg(not(feature = "http-proxy"))]
+                Err(Error::ProxyProtocolDisabled {
+                    proxy_url: proxy_url.clone(),
+                    protocol_feature: "kube/http-proxy",
+                })
             }
 
-            _ => make_generic_builder(connector, config),
+            Some(proxy_url) => Err(Error::ProxyProtocolUnsupported {
+                proxy_url: proxy_url.clone(),
+            }),
+
+            None => make_generic_builder(connector, config),
         }
     }
 }
