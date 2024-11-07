@@ -35,9 +35,7 @@ async fn main() -> anyhow::Result<()> {
     // Use the given JSONPATH to filter the ObjectList
     let list_json = serde_json::to_value(&list)?;
     for res in jsonpath.find_slice(&list_json) {
-        if let Some(path) = res.to_path() {
-            info!("\t\t: {path}");
-        }
+        info!("\t\t {}", res.to_data());
     }
     Ok(())
 }
