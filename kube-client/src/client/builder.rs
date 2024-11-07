@@ -91,52 +91,47 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
             }
         }
 
-        const PROXY_SCHEME_SOCKS5: &str = "socks5";
-        const PROXY_SCHEME_HTTP: &str = "http";
-
         match config.proxy_url.as_ref() {
-            #[cfg(feature = "socks5")]
-            Some(proxy_url) if proxy_url.scheme_str() == Some(PROXY_SCHEME_SOCKS5) => {
-                let connector = hyper_socks2::SocksConnector {
-                    proxy_addr: proxy_url.clone(),
-                    auth: None,
-                    connector,
-                };
-
-                make_generic_builder(connector, config)
-            }
-
-            #[cfg(feature = "http-proxy")]
-            Some(proxy_url) if proxy_url.scheme_str() == Some(PROXY_SCHEME_HTTP) => {
-                let proxy = hyper_http_proxy::Proxy::new(hyper_http_proxy::Intercept::All, proxy_url.clone());
-                let connector = hyper_http_proxy::ProxyConnector::from_proxy_unsecured(connector, proxy);
-
-                make_generic_builder(connector, config)
-            }
-
-            proxy_url => {
-                if let Some(proxy_url) = proxy_url {
-                    let missing_proxy_feature = match proxy_url.scheme_str() {
-                        Some(PROXY_SCHEME_SOCKS5) => Some("kube/socks5"),
-                        Some(PROXY_SCHEME_HTTP) => Some("kube/http-proxy"),
-                        _ => None,
+            Some(proxy_url) if proxy_url.scheme_str() == Some("socks5") => {
+                #[cfg(feature = "socks5")]
+                {
+                    let connector = hyper_socks2::SocksConnector {
+                        proxy_addr: proxy_url.clone(),
+                        auth: None,
+                        connector,
                     };
-                    if let Some(missing_proxy_feature) = missing_proxy_feature {
-                        tracing::warn!(
-                            ?proxy_url,
-                            missing_proxy_feature,
-                            "proxy URL is set but kube was built without support for that protocol, ignoring..."
-                        );
-                    } else {
-                        tracing::warn!(
-                            ?proxy_url,
-                            "proxy URL is set but kube does not support that protocol, ignoring..."
-                        );
-                    }
+                    make_generic_builder(connector, config)
                 }
 
-                make_generic_builder(connector, config)
+                #[cfg(not(feature = "socks5"))]
+                Err(Error::ProxyProtocolDisabled {
+                    proxy_url: proxy_url.clone(),
+                    protocol_feature: "kube/socks5",
+                })
             }
+
+            Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
+                #[cfg(feature = "http-proxy")]
+                {
+                    let proxy =
+                        hyper_http_proxy::Proxy::new(hyper_http_proxy::Intercept::All, proxy_url.clone());
+                    let connector = hyper_http_proxy::ProxyConnector::from_proxy_unsecured(connector, proxy);
+
+                    make_generic_builder(connector, config)
+                }
+
+                #[cfg(not(feature = "http-proxy"))]
+                Err(Error::ProxyProtocolDisabled {
+                    proxy_url: proxy_url.clone(),
+                    protocol_feature: "kube/http-proxy",
+                })
+            }
+
+            Some(proxy_url) => Err(Error::ProxyProtocolUnsupported {
+                proxy_url: proxy_url.clone(),
+            }),
+
+            None => make_generic_builder(connector, config),
         }
     }
 }
