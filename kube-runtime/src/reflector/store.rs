@@ -257,6 +257,21 @@ where
             .cloned()
     }
 
+    /// Retrieve all `clone()` of the entries found by the given predicate
+    #[must_use]
+    pub fn find_all<P>(&self, predicate: P) -> Vec<Arc<K>>
+    where
+        P: Fn(&K) -> bool,
+    {
+        self.store
+            .read()
+            .iter()
+            .map(|(_, k)| k)
+            .filter(|k| predicate(k.as_ref()))
+            .cloned()
+            .collect()
+    }
+
     /// Return the number of elements in the store
     #[must_use]
     pub fn len(&self) -> usize {
