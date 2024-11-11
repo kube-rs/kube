@@ -516,7 +516,12 @@ fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<
         )));
     };
 
-    Ok(res.to_data().to_string())
+    let jval = res.to_data();
+    let val = jval.as_str().ok_or(Error::AuthExec(format!(
+        "Target {context:?} value {path:?} is not a string"
+    )))?;
+
+    Ok(val.to_string())
 }
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
