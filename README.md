@@ -5,7 +5,7 @@
 [![Tested against Kubernetes v1_26 and above](https://img.shields.io/badge/MK8SV-v1_26-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
-[![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20kube-rs%20Guru-006BFF)](https://gurubase.io/g/kube-rs)
+[![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20kube--rs%20Guru-006BFF)](https://gurubase.io/g/kube-rs)
 
 A [Rust](https://rust-lang.org/) client for [Kubernetes](http://kubernetes.io) in the style of a more generic [client-go](https://github.com/kubernetes/client-go), a runtime abstraction inspired by [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime), and a derive macro for [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/) inspired by [kubebuilder](https://book.kubebuilder.io/reference/generating-crd.html). Hosted by [CNCF](https://cncf.io/) as a [Sandbox Project](https://www.cncf.io/sandbox-projects/).
 
