@@ -3,7 +3,7 @@
 
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro2::{Ident, Literal, Span, TokenStream};
-use quote::ToTokens;
+use quote::{ToTokens, TokenStreamExt};
 use syn::{parse_quote, Data, DeriveInput, Path, Visibility};
 
 /// Values we can parse from #[kube(attrs)]
@@ -37,6 +37,44 @@ struct KubeAttrs {
     scale: Option<String>,
     #[darling(default)]
     crates: Crates,
+    #[darling(multiple, rename = "annotation")]
+    annotations: Vec<KVTuple>,
+    #[darling(multiple, rename = "label")]
+    labels: Vec<KVTuple>,
+}
+
+#[derive(Debug)]
+struct KVTuple(String, String);
+
+impl FromMeta for KVTuple {
+    fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
+        if items.len() == 2 {
+            if let (
+                darling::ast::NestedMeta::Lit(syn::Lit::Str(key)),
+                darling::ast::NestedMeta::Lit(syn::Lit::Str(value)),
+            ) = (&items[0], &items[1])
+            {
+                return Ok(KVTuple(key.value(), value.value()));
+            }
+        }
+
+        Err(darling::Error::unsupported_format(
+            "expected `\"key\", \"value\"` format",
+        ))
+    }
+}
+
+impl From<(&'static str, &'static str)> for KVTuple {
+    fn from((key, value): (&'static str, &'static str)) -> Self {
+        Self(key.to_string(), value.to_string())
+    }
+}
+
+impl ToTokens for KVTuple {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let (k, v) = (&self.0, &self.1);
+        tokens.append_all(quote! { (#k, #v) });
+    }
 }
 
 #[derive(Debug, FromMeta)]
@@ -172,6 +210,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 serde_json,
                 std,
             },
+        annotations,
+        labels,
     } = kube_attrs;
 
     let struct_name = kind_struct.unwrap_or_else(|| kind.clone());
@@ -247,6 +287,18 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }
 
+    let meta_annotations = if !annotations.is_empty() {
+        quote! { Some(std::collections::BTreeMap::from([#((#annotations.0.to_string(), #annotations.1.to_string()),)*])) }
+    } else {
+        quote! { None }
+    };
+
+    let meta_labels = if !labels.is_empty() {
+        quote! { Some(std::collections::BTreeMap::from([#((#labels.0.to_string(), #labels.1.to_string()),)*])) }
+    } else {
+        quote! { None }
+    };
+
     let docstr =
         doc.unwrap_or_else(|| format!(" Auto-generated derived type for {ident} via `CustomResource`"));
     let quoted_serde = Literal::string(&serde.to_token_stream().to_string());
@@ -268,6 +320,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             pub fn new(name: &str, spec: #ident) -> Self {
                 Self {
                     metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                        annotations: #meta_annotations,
+                        labels: #meta_labels,
                         name: Some(name.to_string()),
                         ..Default::default()
                     },
@@ -382,7 +436,17 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let categories_json = serde_json::to_string(&categories).unwrap();
     let short_json = serde_json::to_string(&shortnames).unwrap();
     let crd_meta_name = format!("{plural}.{group}");
-    let crd_meta = quote! { { "name": #crd_meta_name } };
+
+    let mut crd_meta = TokenStream::new();
+    crd_meta.extend(quote! { "name": #crd_meta_name });
+
+    if !annotations.is_empty() {
+        crd_meta.extend(quote! { , "annotations": #meta_annotations });
+    }
+
+    if !labels.is_empty() {
+        crd_meta.extend(quote! { , "labels": #meta_labels });
+    }
 
     let schemagen = if schema_mode.use_in_crd() {
         quote! {
@@ -426,7 +490,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #schemagen
 
         let jsondata = #serde_json::json!({
-            "metadata": #crd_meta,
+            "metadata": {
+                #crd_meta
+            },
             "spec": {
                 "group": #group,
                 "scope": #scope,
