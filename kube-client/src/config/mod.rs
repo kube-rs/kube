@@ -151,6 +151,8 @@ pub struct Config {
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
     pub auth_info: AuthInfo,
+    /// Whether to disable compression (would only have an effect when the `gzip` feature is enabled)
+    pub disable_compression: bool,
     /// Optional proxy URL. Proxy support requires the `socks5` feature.
     pub proxy_url: Option<http::Uri>,
     /// If set, apiserver certificate will be validated to contain this string
@@ -177,6 +179,7 @@ impl Config {
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
+            disable_compression: false,
             proxy_url: None,
             tls_server_name: None,
             headers: Vec::new(),
@@ -259,6 +262,7 @@ impl Config {
                 token_file: Some(incluster_config::token_file()),
                 ..Default::default()
             },
+            disable_compression: false,
             proxy_url: None,
             tls_server_name: None,
             headers: Vec::new(),
@@ -302,6 +306,8 @@ impl Config {
             .unwrap_or_else(|| String::from("default"));
 
         let accept_invalid_certs = loader.cluster.insecure_skip_tls_verify.unwrap_or(false);
+        let disable_compression = loader.cluster.disable_compression.unwrap_or(false);
+
         let mut root_cert = None;
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
@@ -316,6 +322,7 @@ impl Config {
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs,
+            disable_compression,
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
             tls_server_name: loader.cluster.tls_server_name,

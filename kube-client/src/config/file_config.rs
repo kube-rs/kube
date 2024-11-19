@@ -111,6 +111,14 @@ pub struct Cluster {
     #[serde(rename = "proxy-url")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxy_url: Option<String>,
+    /// Compression is enabled by default with the `gzip` feature.
+    /// `disable_compression` allows client to opt-out of response compression for all requests to the server.
+    /// This is useful to speed up requests (specifically lists) when client-server network bandwidth is ample,
+    /// by saving time on compression (server-side) and decompression (client-side):
+    /// https://github.com/kubernetes/kubernetes/issues/112296
+    #[serde(rename = "disable-compression")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disable_compression: Option<bool>,
     /// Name used to check server certificate.
     ///
     /// If `tls_server_name` is `None`, the hostname used to contact the server is used.
