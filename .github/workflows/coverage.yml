@@ -37,6 +37,6 @@ jobs:
         run: |
           rustup run stable cargo tarpaulin -o xml --skip-clean
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
