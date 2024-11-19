@@ -85,3 +85,7 @@ name = "windows-sys"
 [[bans.skip]]
 # different sources of miniz_oxide which users will not generally see
 name = "miniz_oxide"
+
+[[bans.skip]]
+# currently multiple version of thiserror in flight due to its major bump
+name = "thiserror"
