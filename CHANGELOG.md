@@ -5,14 +5,17 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.96.0...main
+ * see https://github.com/kube-rs/kube/compare/0.97.0...main
+
+0.97.0 / 2024-11-20
+===================
 
 [0.96.0](https://github.com/kube-rs/kube/releases/tag/0.96.0) / 2024-10-09
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 0.96.0 -->
 ## Highlights
-- **[Features](https://kube.rs/features/)**: `webpki-roots` added #1323, and [predicates](https://docs.rs/kube/latest/kube/runtime/utils/predicates/index.html) no longer require `unstable-runtime` #1578
-- **Local auth**: improve leniency/kubectl-alignment #1595, remove http proxy vars #1520
+- **[Features](https://kube.rs/features/)**: `webpki-roots` added [#1323](https://github.com/kube-rs/kube/issues/1323), and [predicates](https://docs.rs/kube/latest/kube/runtime/utils/predicates/index.html) no longer require `unstable-runtime` [#1578](https://github.com/kube-rs/kube/issues/1578)
+- **Local auth**: improve leniency/kubectl-alignment [#1595](https://github.com/kube-rs/kube/issues/1595), remove http proxy vars [#1520](https://github.com/kube-rs/kube/issues/1520)
 - **Dependencies**: upgrades to `tower` and `secrecy`, and `derivative` swapped for `educe`
 
 ## What's Changed

@@ -48,10 +48,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-kube-derive = { path = "../kube-derive", version = "=0.96.0", optional = true }
-kube-core = { path = "../kube-core", version = "=0.96.0" }
-kube-client = { path = "../kube-client", version = "=0.96.0", default-features = false, optional = true }
-kube-runtime = { path = "../kube-runtime", version = "=0.96.0", optional = true}
+kube-derive = { path = "../kube-derive", version = "=0.97.0", optional = true }
+kube-core = { path = "../kube-core", version = "=0.97.0" }
+kube-client = { path = "../kube-client", version = "=0.97.0", default-features = false, optional = true }
+kube-runtime = { path = "../kube-runtime", version = "=0.97.0", optional = true}
 # Not used directly, but required by resolver 2.0 to ensure that the k8s-openapi dependency
 # is considered part of the "deps" graph rather than just the "dev-deps" graph
 k8s-openapi.workspace = true
