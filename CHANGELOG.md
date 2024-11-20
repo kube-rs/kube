@@ -7,8 +7,39 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.97.0...main
 
-0.97.0 / 2024-11-20
+[0.97.0](https://github.com/kube-rs/kube/releases/tag/0.97.0) / 2024-11-20
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.97.0 -->
+
+## Highlights
+
+- [`CustomResource`](https://docs.rs/kube/latest/kube/derive.CustomResource.html) derive added features for crd yaml output:
+  * selectable fields #1605 + #1610
+  * annotations and labels #1631
+- Configuration edge cases:
+  * Avoid double installations of `aws-lc-rs` (rustls crypto) provider #1617
+  * Kubeconfig fix for `null` user; #1608
+  * Default runtime watcher backoff alignment with `client-go` #1603
+- Feature use:
+  *  Client proxy feature-set misuse prevention #1626
+  * Allow disabling `gzip` via `Config` #1627
+- Depedency minors: `thiserror`, `hashbrown`, `jsonptr`, `json-patch`. Killed `lazy_static` / `once_cell`
+
+## What's Changed
+### Added
+* Feature: Allow to pass selectableFields for CRD definition by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1605
+* add support for CRD annotations and labels in kube-derive by @verokarhu in https://github.com/kube-rs/kube/pull/1631
+* Feature: Add config setting to disable gzip compression #1627 by @markdingram in https://github.com/kube-rs/kube/pull/1628
+### Changed
+* upgrade to hashbrown 0.15.0 by @rorosen in https://github.com/kube-rs/kube/pull/1599
+* update jsonptr + json-patch by @aviramha in https://github.com/kube-rs/kube/pull/1600
+### Fixed
+* fix(kube-runtime): setup backoff with builder pattern by @tiagolobocastro in https://github.com/kube-rs/kube/pull/1603
+* allow null user in kubeconfig's context by @aviramha in https://github.com/kube-rs/kube/pull/1608
+* Gauge SelectableField by k8s 1.30 version by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1610
+* Add a compile_error if setting selectable fields on K8s < 1.30 by @clux in https://github.com/kube-rs/kube/pull/1612
+* conditionally install `aws-lc-rs` by @goenning in https://github.com/kube-rs/kube/pull/1617
+* Warn when trying to use an unsupported proxy protocol by @nightkr in https://github.com/kube-rs/kube/pull/1626
 
 [0.96.0](https://github.com/kube-rs/kube/releases/tag/0.96.0) / 2024-10-09
 ===================
