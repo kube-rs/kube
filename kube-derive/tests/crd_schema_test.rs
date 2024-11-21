@@ -19,6 +19,8 @@ use std::collections::{HashMap, HashSet};
     derive = "PartialEq",
     shortname = "fo",
     shortname = "f",
+    served = false,
+    storage = false,
     selectable = ".spec.nonNullable",
     selectable = ".spec.nullable",
     annotation("clux.dev", "cluxingv1"),
@@ -134,21 +136,24 @@ fn test_shortnames() {
 #[test]
 fn test_serialized_matches_expected() {
     assert_json_eq!(
-        serde_json::to_value(Foo::new("bar", FooSpec {
-            non_nullable: "asdf".to_string(),
-            non_nullable_with_default: "asdf".to_string(),
-            nullable_skipped: None,
-            nullable: None,
-            nullable_skipped_with_default: None,
-            nullable_with_default: None,
-            timestamp: DateTime::from_timestamp(0, 0).unwrap(),
-            complex_enum: ComplexEnum::VariantOne { int: 23 },
-            untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
-                age: 42,
-                gender: Gender::Male,
-            }),
-            set: HashSet::from(["foo".to_owned()])
-        }))
+        serde_json::to_value(Foo::new(
+            "bar",
+            FooSpec {
+                non_nullable: "asdf".to_string(),
+                non_nullable_with_default: "asdf".to_string(),
+                nullable_skipped: None,
+                nullable: None,
+                nullable_skipped_with_default: None,
+                nullable_with_default: None,
+                timestamp: DateTime::from_timestamp(0, 0).unwrap(),
+                complex_enum: ComplexEnum::VariantOne { int: 23 },
+                untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
+                    age: 42,
+                    gender: Gender::Male,
+                }),
+                set: HashSet::from(["foo".to_owned()])
+            }
+        ))
         .unwrap(),
         serde_json::json!({
             "apiVersion": "clux.dev/v1",
@@ -217,8 +222,8 @@ fn test_crd_schema_matches_expected() {
                 "versions": [
                     {
                         "name": "v1",
-                        "served": true,
-                        "storage": true,
+                        "served": false,
+                        "storage": false,
                         "additionalPrinterColumns": [],
                         "selectableFields": [{
                             "jsonPath": ".spec.nonNullable"
