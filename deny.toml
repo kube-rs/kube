@@ -91,3 +91,9 @@ name = "miniz_oxide"
 name = "thiserror"
 [[bans.skip]]
 name = "thiserror-impl"
+
+# 2 deps from 2 different version of rustls-native-certs not fully upgradeable yet
+[[bans.skip]]
+name = "security-framework"
+[[bans.skip]]
+name = "core-foundation"
