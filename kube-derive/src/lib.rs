@@ -1,8 +1,7 @@
 //! A crate for kube's derive macros.
 #![recursion_limit = "1024"]
 extern crate proc_macro;
-#[macro_use]
-extern crate quote;
+#[macro_use] extern crate quote;
 
 mod custom_resource;
 mod resource;
