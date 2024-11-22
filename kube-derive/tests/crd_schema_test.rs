@@ -19,6 +19,8 @@ use std::collections::{HashMap, HashSet};
     derive = "PartialEq",
     shortname = "fo",
     shortname = "f",
+    served = false,
+    storage = false,
     selectable = ".spec.nonNullable",
     selectable = ".spec.nullable",
     annotation("clux.dev", "cluxingv1"),
@@ -217,8 +219,8 @@ fn test_crd_schema_matches_expected() {
                 "versions": [
                     {
                         "name": "v1",
-                        "served": true,
-                        "storage": true,
+                        "served": false,
+                        "storage": false,
                         "additionalPrinterColumns": [],
                         "selectableFields": [{
                             "jsonPath": ".spec.nonNullable"

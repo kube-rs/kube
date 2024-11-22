@@ -41,6 +41,18 @@ struct KubeAttrs {
     annotations: Vec<KVTuple>,
     #[darling(multiple, rename = "label")]
     labels: Vec<KVTuple>,
+
+    /// Sets the `storage` property to `true` or `false`.
+    ///
+    /// Defaults to `true`.
+    #[darling(default = default_storage_arg)]
+    storage: bool,
+
+    /// Sets the `served` property to `true` or `false`.
+    ///
+    /// Defaults to `true`.
+    #[darling(default = default_served_arg)]
+    served: bool,
 }
 
 #[derive(Debug)]
@@ -75,6 +87,16 @@ impl ToTokens for KVTuple {
         let (k, v) = (&self.0, &self.1);
         tokens.append_all(quote! { (#k, #v) });
     }
+}
+
+fn default_storage_arg() -> bool {
+    // This defaults to true to be backwards compatible.
+    true
+}
+
+fn default_served_arg() -> bool {
+    // This defaults to true to be backwards compatible.
+    true
 }
 
 #[derive(Debug, FromMeta)]
@@ -201,6 +223,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         printcolums,
         selectable,
         scale,
+        storage,
+        served,
         crates:
             Crates {
                 kube_core,
@@ -505,8 +529,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 },
                 "versions": [{
                     "name": #version,
-                    "served": true,
-                    "storage": true,
+                    "served": #served,
+                    "storage": #storage,
                     "schema": {
                         "openAPIV3Schema": schema,
                     },

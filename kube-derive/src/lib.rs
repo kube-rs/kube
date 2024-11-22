@@ -154,6 +154,12 @@ mod resource;
 /// ## `#[kube(label("LABEL_KEY", "LABEL_VALUE"))]`
 /// Add a single label to the generated CRD.
 ///
+/// ## `#[kube(storage = true)]`
+/// Sets the `storage` property to `true` or `false`.
+///
+/// ## `#[kube(served = true)]`
+/// Sets the `served` property to `true` or `false`.
+///
 /// ## Example with all properties
 ///
 /// ```rust
