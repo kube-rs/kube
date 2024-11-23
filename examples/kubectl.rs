@@ -6,6 +6,7 @@ use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc};
 use kube::{
     api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
+    config::KubeConfigOptions,
     core::GroupVersionKind,
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
     runtime::{
@@ -26,6 +27,8 @@ struct App {
     selector: Option<String>,
     #[arg(long, short)]
     namespace: Option<String>,
+    #[arg(long, short)]
+    context: Option<String>,
     #[arg(long, short = 'A')]
     all: bool,
     verb: Verb,
@@ -185,7 +188,14 @@ impl App {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let app: App = clap::Parser::parse();
-    let client = Client::try_default().await?;
+
+    let options = KubeConfigOptions {
+        context: app.context.clone(),
+        cluster: None,
+        user: None,
+    };
+    let config = kube::Config::from_kubeconfig(&options).await?;
+    let client = Client::try_from(config)?;
 
     // discovery (to be able to infer apis from kind/plural only)
     let discovery = Discovery::new(client.clone()).run().await?;
