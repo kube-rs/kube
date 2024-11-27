@@ -34,7 +34,7 @@ pub struct FooStatus {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     let ssapply = PatchParams::apply("crd_apply_example").force();
 
@@ -53,11 +53,14 @@ async fn main() -> anyhow::Result<()> {
     let foos: Api<Foo> = Api::default_namespaced(client.clone());
 
     // 1. Apply from a full struct (e.g. equivalent to replace w/o resource_version)
-    let foo = Foo::new("baz", FooSpec {
-        name: "baz".into(),
-        info: Some("old baz".into()),
-        replicas: 3,
-    });
+    let foo = Foo::new(
+        "baz",
+        FooSpec {
+            name: "baz".into(),
+            info: Some("old baz".into()),
+            replicas: 3,
+        },
+    );
     info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
     let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
     // NB: kubernetes < 1.20 will fail to admit scale subresources - see #387

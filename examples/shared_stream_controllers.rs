@@ -45,7 +45,7 @@ fn error_policy<K: ResourceExt>(obj: Arc<K>, error: &Infallible, _ctx: Arc<()>) 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     let pods = Api::<Pod>::all(client.clone());
     let config = Config::default().concurrency(2);

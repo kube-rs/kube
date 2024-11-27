@@ -10,7 +10,7 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
     let api = Api::<Pod>::default_namespaced(client);
     let use_watchlist = std::env::var("WATCHLIST").map(|s| s == "1").unwrap_or(false);
     let wc = if use_watchlist {

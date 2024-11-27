@@ -40,7 +40,7 @@ pub struct FooStatus {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     // Manage CRDs first
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
@@ -85,11 +85,14 @@ async fn main() -> Result<()> {
 
     // Create Foo baz
     info!("Creating Foo instance baz");
-    let f1 = Foo::new("baz", FooSpec {
-        name: "baz".into(),
-        info: "old baz".into(),
-        replicas: 1,
-    });
+    let f1 = Foo::new(
+        "baz",
+        FooSpec {
+            name: "baz".into(),
+            info: "old baz".into(),
+            replicas: 1,
+        },
+    );
     let o = foos.create(&pp, &f1).await?;
     assert_eq!(ResourceExt::name_any(&f1), ResourceExt::name_any(&o));
     info!("Created {}", o.name_any());
@@ -123,11 +126,14 @@ async fn main() -> Result<()> {
 
     // Create Foo qux with status
     info!("Create Foo instance qux");
-    let f2 = Foo::new("qux", FooSpec {
-        name: "qux".into(),
-        replicas: 0,
-        info: "unpatched qux".into(),
-    });
+    let f2 = Foo::new(
+        "qux",
+        FooSpec {
+            name: "qux".into(),
+            replicas: 0,
+            info: "unpatched qux".into(),
+        },
+    );
 
     let o = foos.create(&pp, &f2).await?;
     info!("Created {}", o.name_any());
@@ -198,11 +204,14 @@ async fn main() -> Result<()> {
 
     // Check that validation is being obeyed
     info!("Verifying validation rules");
-    let fx = Foo::new("x", FooSpec {
-        name: "x".into(),
-        info: "failing validation obj".into(),
-        replicas: 1,
-    });
+    let fx = Foo::new(
+        "x",
+        FooSpec {
+            name: "x".into(),
+            info: "failing validation obj".into(),
+            replicas: 1,
+        },
+    );
     // using derived Validate rules locally:
     assert!(fx.spec.validate().is_err());
     // check rejection from apiserver (validation rules embedded in JsonSchema)

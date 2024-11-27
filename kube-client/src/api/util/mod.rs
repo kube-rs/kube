@@ -75,7 +75,7 @@ mod test {
     #[tokio::test]
     #[ignore = "needs kubeconfig"]
     async fn node_cordon_and_uncordon_works() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
 
         let node_name = "fakenode";
         let fake_node = serde_json::from_value(json!({
@@ -107,7 +107,7 @@ mod test {
     #[tokio::test]
     #[ignore = "requires a cluster"]
     async fn create_token_request() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
 
         let serviceaccount_name = "fakesa";
         let serviceaccount_namespace = "default";
@@ -128,29 +128,36 @@ mod test {
 
         // Create TokenRequest
         let tokenrequest = serviceaccounts
-            .create_token_request(serviceaccount_name, &PostParams::default(), &TokenRequest {
-                metadata: Default::default(),
-                spec: TokenRequestSpec {
-                    audiences: audiences.clone(),
-                    bound_object_ref: None,
-                    expiration_seconds: None,
+            .create_token_request(
+                serviceaccount_name,
+                &PostParams::default(),
+                &TokenRequest {
+                    metadata: Default::default(),
+                    spec: TokenRequestSpec {
+                        audiences: audiences.clone(),
+                        bound_object_ref: None,
+                        expiration_seconds: None,
+                    },
+                    status: None,
                 },
-                status: None,
-            })
+            )
             .await?;
         let token = tokenrequest.status.unwrap().token;
         assert!(!token.is_empty());
 
         // Check created token is valid with TokenReview
         let tokenreview = tokenreviews
-            .create(&PostParams::default(), &TokenReview {
-                metadata: Default::default(),
-                spec: TokenReviewSpec {
-                    audiences: Some(audiences.clone()),
-                    token: Some(token),
+            .create(
+                &PostParams::default(),
+                &TokenReview {
+                    metadata: Default::default(),
+                    spec: TokenReviewSpec {
+                        audiences: Some(audiences.clone()),
+                        token: Some(token),
+                    },
+                    status: None,
                 },
-                status: None,
-            })
+            )
             .await?;
         let tokenreviewstatus = tokenreview.status.unwrap();
         assert_eq!(tokenreviewstatus.audiences, Some(audiences));

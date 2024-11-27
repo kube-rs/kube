@@ -90,7 +90,7 @@ impl Discovery {
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs, Scope}, ResourceExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
+    ///     let client = Client::try_default()?;
     ///     let discovery = Discovery::new(client.clone()).run().await?;
     ///     for group in discovery.groups() {
     ///         for (ar, caps) in group.recommended_resources() {

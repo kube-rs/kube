@@ -12,7 +12,7 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     let nodes: Api<Node> = Api::all(client.clone());
     let wc = watcher::Config::default()

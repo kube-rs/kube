@@ -39,20 +39,23 @@ struct App {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let app: App = clap::Parser::parse();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     info!("Fetching logs for {:?}", app.pod);
     let pods: Api<Pod> = Api::default_namespaced(client);
     let mut logs = pods
-        .log_stream(&app.pod, &LogParams {
-            follow: app.follow,
-            container: app.container,
-            tail_lines: app.tail,
-            since_seconds: app.since,
-            since_time: app.since_time,
-            timestamps: app.timestamps,
-            ..LogParams::default()
-        })
+        .log_stream(
+            &app.pod,
+            &LogParams {
+                follow: app.follow,
+                container: app.container,
+                tail_lines: app.tail,
+                since_seconds: app.since,
+                since_time: app.since_time,
+                timestamps: app.timestamps,
+                ..LogParams::default()
+            },
+        )
         .await?
         .lines();
 

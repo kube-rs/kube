@@ -195,8 +195,8 @@ impl Config {
     ///
     /// [`Config::apply_debug_overrides`] is used to augment the loaded
     /// configuration based on the environment.
-    pub async fn infer() -> Result<Self, InferConfigError> {
-        let mut config = match Self::from_kubeconfig(&KubeConfigOptions::default()).await {
+    pub fn infer() -> Result<Self, InferConfigError> {
+        let mut config = match Self::from_kubeconfig(&KubeConfigOptions::default()) {
             Err(kubeconfig_err) => {
                 tracing::trace!(
                     error = &kubeconfig_err as &dyn std::error::Error,
@@ -274,23 +274,23 @@ impl Config {
     /// This will respect the `$KUBECONFIG` evar, but otherwise default to `~/.kube/config`.
     /// You can also customize what context/cluster/user you want to use here,
     /// but it will default to the current-context.
-    pub async fn from_kubeconfig(options: &KubeConfigOptions) -> Result<Self, KubeconfigError> {
-        let loader = ConfigLoader::new_from_options(options).await?;
-        Self::new_from_loader(loader).await
+    pub fn from_kubeconfig(options: &KubeConfigOptions) -> Result<Self, KubeconfigError> {
+        let loader = ConfigLoader::new_from_options(options)?;
+        Self::new_from_loader(loader)
     }
 
     /// Create configuration from a [`Kubeconfig`] struct
     ///
     /// This bypasses kube's normal config parsing to obtain custom functionality.
-    pub async fn from_custom_kubeconfig(
+    pub fn from_custom_kubeconfig(
         kubeconfig: Kubeconfig,
         options: &KubeConfigOptions,
     ) -> Result<Self, KubeconfigError> {
-        let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
-        Self::new_from_loader(loader).await
+        let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options)?;
+        Self::new_from_loader(loader)
     }
 
-    async fn new_from_loader(loader: ConfigLoader) -> Result<Self, KubeconfigError> {
+    fn new_from_loader(loader: ConfigLoader) -> Result<Self, KubeconfigError> {
         let cluster_url = loader
             .cluster
             .server

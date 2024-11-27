@@ -51,7 +51,7 @@ fn spawn_periodic_reader(reader: Store<Secret>) {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     let secrets: Api<Secret> = Api::default_namespaced(client);
     let wc = watcher::Config::default().timeout(10); // short watch timeout in this example

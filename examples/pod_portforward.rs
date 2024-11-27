@@ -13,7 +13,7 @@ use tokio::io::AsyncWriteExt;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     let p: Pod = serde_json::from_value(serde_json::json!({
         "apiVersion": "v1",

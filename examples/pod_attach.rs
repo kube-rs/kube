@@ -14,7 +14,7 @@ use kube::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     info!("Creating a Pod that outputs numbers for 15s");
     let p: Pod = serde_json::from_value(serde_json::json!({

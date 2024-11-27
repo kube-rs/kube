@@ -34,7 +34,7 @@ mod v2 {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
     let ssapply = PatchParams::apply("crd_derive_multi").force();
 
     let crd1 = v1::ManyDerive::crd();
@@ -49,20 +49,26 @@ async fn main() -> anyhow::Result<()> {
     let v2api: Api<v2::ManyDerive> = Api::default_namespaced(client.clone());
 
     // create a v1 version
-    let v1m = v1::ManyDerive::new("old", v1::ManyDeriveSpec {
-        name: "i am old".into(),
-        oldprop: 5,
-    });
+    let v1m = v1::ManyDerive::new(
+        "old",
+        v1::ManyDeriveSpec {
+            name: "i am old".into(),
+            oldprop: 5,
+        },
+    );
     let oldvarv1 = v1api.patch("old", &ssapply, &Patch::Apply(&v1m)).await?;
     info!("old instance on v1: {:?}", oldvarv1.spec);
     let oldvarv2 = v2api.get("old").await?;
     info!("old instance on v2 truncates: {:?}", oldvarv2.spec);
 
     // create a v2 version
-    let v2m = v2::ManyDerive::new("new", v2::ManyDeriveSpec {
-        name: "i am new".into(),
-        extra: Some("hi".into()),
-    });
+    let v2m = v2::ManyDerive::new(
+        "new",
+        v2::ManyDeriveSpec {
+            name: "i am new".into(),
+            extra: Some("hi".into()),
+        },
+    );
     let newvarv2 = v2api.patch("new", &ssapply, &Patch::Apply(&v2m)).await?;
     info!("new instance on v2 is force downgraded: {:?}", newvarv2.spec); // no extra field
     let cannot_fetch_as_old = v1api.get("new").await.unwrap_err();
@@ -83,10 +89,13 @@ async fn main() -> anyhow::Result<()> {
 
     // note we can apply old versions without them being truncated to the v2 schema
     // in our case this means we cannot fetch them with our v1 schema (breaking change to not have oldprop)
-    let v1m2 = v1::ManyDerive::new("old", v1::ManyDeriveSpec {
-        name: "i am old2".into(),
-        oldprop: 5,
-    });
+    let v1m2 = v1::ManyDerive::new(
+        "old",
+        v1::ManyDeriveSpec {
+            name: "i am old2".into(),
+            oldprop: 5,
+        },
+    );
     let v1err = v1api
         .patch("old", &ssapply, &Patch::Apply(&v1m2))
         .await

@@ -211,35 +211,38 @@ impl Recorder {
         // for more detail on the fields
         // and what's expected: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#event-v125
         self.events
-            .create(&PostParams::default(), &K8sEvent {
-                action: Some(ev.action),
-                reason: Some(ev.reason),
-                deprecated_count: None,
-                deprecated_first_timestamp: None,
-                deprecated_last_timestamp: None,
-                deprecated_source: None,
-                event_time: Some(MicroTime(Utc::now())),
-                regarding: Some(self.reference.clone()),
-                note: ev.note.map(Into::into),
-                metadata: ObjectMeta {
-                    namespace: self.reference.namespace.clone(),
-                    generate_name: Some(format!("{}-", self.reporter.controller)),
-                    ..Default::default()
+            .create(
+                &PostParams::default(),
+                &K8sEvent {
+                    action: Some(ev.action),
+                    reason: Some(ev.reason),
+                    deprecated_count: None,
+                    deprecated_first_timestamp: None,
+                    deprecated_last_timestamp: None,
+                    deprecated_source: None,
+                    event_time: Some(MicroTime(Utc::now())),
+                    regarding: Some(self.reference.clone()),
+                    note: ev.note.map(Into::into),
+                    metadata: ObjectMeta {
+                        namespace: self.reference.namespace.clone(),
+                        generate_name: Some(format!("{}-", self.reporter.controller)),
+                        ..Default::default()
+                    },
+                    reporting_controller: Some(self.reporter.controller.clone()),
+                    reporting_instance: Some(
+                        self.reporter
+                            .instance
+                            .clone()
+                            .unwrap_or_else(|| self.reporter.controller.clone()),
+                    ),
+                    series: None,
+                    type_: match ev.type_ {
+                        EventType::Normal => Some("Normal".into()),
+                        EventType::Warning => Some("Warning".into()),
+                    },
+                    related: ev.secondary,
                 },
-                reporting_controller: Some(self.reporter.controller.clone()),
-                reporting_instance: Some(
-                    self.reporter
-                        .instance
-                        .clone()
-                        .unwrap_or_else(|| self.reporter.controller.clone()),
-                ),
-                series: None,
-                type_: match ev.type_ {
-                    EventType::Normal => Some("Normal".into()),
-                    EventType::Warning => Some("Warning".into()),
-                },
-                related: ev.secondary,
-            })
+            )
             .await?;
         Ok(())
     }
@@ -258,7 +261,7 @@ mod test {
     #[tokio::test]
     #[ignore = "needs cluster (creates an event for the default kubernetes service)"]
     async fn event_recorder_attaches_events() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
 
         let svcs: Api<Service> = Api::namespaced(client.clone(), "default");
         let s = svcs.get("kubernetes").await?; // always a kubernetes service in default
@@ -287,7 +290,7 @@ mod test {
     #[tokio::test]
     #[ignore = "needs cluster (creates an event for the default kubernetes service)"]
     async fn event_recorder_attaches_events_without_namespace() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
 
         let svcs: Api<ClusterRole> = Api::all(client.clone());
         let s = svcs.get("system:basic-user").await?; // always get this default ClusterRole

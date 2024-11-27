@@ -27,7 +27,7 @@ use kube_core::{
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
+///     let client = Client::try_default()?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
@@ -63,7 +63,7 @@ pub async fn group(client: &Client, apigroup: &str) -> Result<ApiGroup> {
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
+///     let client = Client::try_default()?;
 ///     let gv = "apiregistration.k8s.io/v1".parse()?;
 ///     let apigroup = discovery::pinned_group(&client, &gv).await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
@@ -91,7 +91,7 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 /// use kube::{Client, api::{Api, DynamicObject, GroupVersionKind}, discovery, ResourceExt};
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
+///     let client = Client::try_default()?;
 ///     let gvk = GroupVersionKind::gvk("apiregistration.k8s.io", "v1", "APIService");
 ///     let (ar, caps) = discovery::pinned_kind(&client, &gvk).await?;
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);

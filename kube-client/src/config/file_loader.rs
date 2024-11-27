@@ -25,20 +25,19 @@ pub struct ConfigLoader {
 
 impl ConfigLoader {
     /// Returns a config loader based on the cluster information from the kubeconfig file.
-    pub async fn new_from_options(options: &KubeConfigOptions) -> Result<Self, KubeconfigError> {
+    pub fn new_from_options(options: &KubeConfigOptions) -> Result<Self, KubeconfigError> {
         let config = Kubeconfig::read()?;
         let loader = Self::load(
             config,
             options.context.as_ref(),
             options.cluster.as_ref(),
             options.user.as_ref(),
-        )
-        .await?;
+        )?;
 
         Ok(loader)
     }
 
-    pub async fn new_from_kubeconfig(
+    pub fn new_from_kubeconfig(
         config: Kubeconfig,
         options: &KubeConfigOptions,
     ) -> Result<Self, KubeconfigError> {
@@ -47,13 +46,12 @@ impl ConfigLoader {
             options.context.as_ref(),
             options.cluster.as_ref(),
             options.user.as_ref(),
-        )
-        .await?;
+        )?;
 
         Ok(loader)
     }
 
-    pub async fn load(
+    pub fn load(
         config: Kubeconfig,
         context: Option<&String>,
         cluster: Option<&String>,

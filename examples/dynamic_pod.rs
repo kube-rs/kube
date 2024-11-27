@@ -8,7 +8,7 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     // Here we replace heavy type k8s_openapi::api::core::v1::PodSpec with
     #[derive(Clone, Deserialize, Debug)]

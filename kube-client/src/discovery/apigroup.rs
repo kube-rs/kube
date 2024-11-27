@@ -19,7 +19,7 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
+///     let client = Client::try_default()?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///      for (apiresource, caps) in apigroup.versioned_resources("v1") {
 ///          println!("Found ApiResource {}", apiresource.kind);
@@ -43,7 +43,7 @@ use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
 /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
+///     let client = Client::try_default()?;
 ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
 ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
 ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
@@ -232,7 +232,7 @@ impl ApiGroup {
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
+    ///     let client = Client::try_default()?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for (ar, caps) in apigroup.recommended_resources() {
     ///         if !caps.supports_operation(verbs::LIST) {
@@ -261,7 +261,7 @@ impl ApiGroup {
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{self, verbs}, ResourceExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
+    ///     let client = Client::try_default()?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     for (ar, caps) in apigroup.resources_by_stability() {
     ///         if !caps.supports_operation(verbs::LIST) {
@@ -301,7 +301,7 @@ impl ApiGroup {
     /// use kube::{Client, api::{Api, DynamicObject}, discovery, ResourceExt};
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = Client::try_default().await?;
+    ///     let client = Client::try_default()?;
     ///     let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
     ///     let (ar, caps) = apigroup.recommended_kind("APIService").unwrap();
     ///     let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);

@@ -424,7 +424,7 @@ mod test {
             rbac::v1::ClusterRole,
         };
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let lp = ListParams::default();
         // cluster-scoped list
         for ns in client.list::<k8sNs>(&lp, &Cluster).await? {
@@ -456,7 +456,7 @@ mod test {
             rbac::v1::ClusterRole,
         };
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         // namespaced fetch
         let svc: Service = client
             .fetch(&ObjectReference {
@@ -521,7 +521,7 @@ mod test {
         use crate::error::Error;
         use k8s_openapi::api::core::v1::{ObjectReference, Pod, Service};
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         // namespaced fetch
         let svc: Service = client
             .fetch(&ObjectReference {

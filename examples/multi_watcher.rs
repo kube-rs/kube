@@ -13,7 +13,7 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     let deploys: Api<Deployment> = Api::default_namespaced(client.clone());
     let cms: Api<ConfigMap> = Api::default_namespaced(client.clone());

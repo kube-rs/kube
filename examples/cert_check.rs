@@ -68,7 +68,7 @@ impl Resource for CaConfigMapManual {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
     let namespaces = client.list::<Ns>(&Default::default(), &Cluster).await?;
     let kube_root = "kube-root-ca.crt";
 

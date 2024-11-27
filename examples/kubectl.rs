@@ -194,7 +194,7 @@ async fn main() -> Result<()> {
         cluster: None,
         user: None,
     };
-    let config = kube::Config::from_kubeconfig(&options).await?;
+    let config = kube::Config::from_kubeconfig(&options)?;
     let client = Client::try_from(config)?;
 
     // discovery (to be able to infer apis from kind/plural only)

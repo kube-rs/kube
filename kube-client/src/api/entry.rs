@@ -3,7 +3,8 @@
 //! [`Api::entry`] is the primary entry point for this API.
 
 // Import used in docs
-#[allow(unused_imports)] use std::collections::HashMap;
+#[allow(unused_imports)]
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use crate::{Api, Error, Result};
@@ -21,7 +22,7 @@ impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     /// # use std::collections::BTreeMap;
     /// # use k8s_openapi::api::core::v1::ConfigMap;
     /// # async fn wrapper() -> Result <(), Box<dyn std::error::Error>> {
-    /// let kube = kube::Client::try_default().await?;
+    /// let kube = kube::Client::try_default()?;
     /// let cms = kube::Api::<ConfigMap>::namespaced(kube, "default");
     /// cms
     ///     // Try to get `entry-example` if it exists
@@ -328,7 +329,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_create_missing_object() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let api = Api::<ConfigMap>::default_namespaced(client);
 
         let object_name = "entry-missing-cm";
@@ -409,22 +410,25 @@ mod tests {
     #[tokio::test]
     #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_update_existing_object() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let api = Api::<ConfigMap>::default_namespaced(client);
 
         let object_name = "entry-existing-cm";
         if api.get_opt(object_name).await?.is_some() {
             api.delete(object_name, &DeleteParams::default()).await?;
         }
-        api.create(&PostParams::default(), &ConfigMap {
-            metadata: ObjectMeta {
-                namespace: api.namespace.clone(),
-                name: Some(object_name.to_string()),
-                ..ObjectMeta::default()
+        api.create(
+            &PostParams::default(),
+            &ConfigMap {
+                metadata: ObjectMeta {
+                    namespace: api.namespace.clone(),
+                    name: Some(object_name.to_string()),
+                    ..ObjectMeta::default()
+                },
+                data: Some([("key".to_string(), "value".to_string())].into()),
+                ..ConfigMap::default()
             },
-            data: Some([("key".to_string(), "value".to_string())].into()),
-            ..ConfigMap::default()
-        })
+        )
         .await?;
 
         let mut entry = match api.entry(object_name).await? {
@@ -480,7 +484,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "needs cluster (gets and writes cms)"]
     async fn entry_create_dry_run() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let api = Api::<ConfigMap>::default_namespaced(client);
 
         let object_name = "entry-cm-dry";

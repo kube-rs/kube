@@ -10,7 +10,7 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     // Equivalent to `kubectl get pods --all-namespace \
     // -o jsonpath='{.items[*].spec.containers[*].image}'`

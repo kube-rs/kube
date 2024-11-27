@@ -16,8 +16,10 @@ pub use kube_core::subresource::AttachParams;
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
-#[cfg(feature = "ws")] use crate::api::portforward::Portforwarder;
-#[cfg(feature = "ws")] use crate::api::remote_command::AttachedProcess;
+#[cfg(feature = "ws")]
+use crate::api::portforward::Portforwarder;
+#[cfg(feature = "ws")]
+use crate::api::remote_command::AttachedProcess;
 
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>
@@ -163,7 +165,7 @@ where
     /// use k8s_openapi::api::core::v1::Pod;
     /// use kube::{Api, api::PostParams};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = kube::Client::try_default().await?;
+    /// # let client = kube::Client::try_default()?;
     /// let pods: Api<Pod> = Api::namespaced(client, "apps");
     /// let pp = PostParams::default();
     ///
@@ -231,7 +233,7 @@ where
     /// use kube::api::{Api, PatchParams, Patch};
     /// use k8s_openapi::api::core::v1::Pod;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = kube::Client::try_default().await?;
+    /// # let client = kube::Client::try_default()?;
     /// let pods: Api<Pod> = Api::namespaced(client, "apps");
     /// let pp = PatchParams::default(); // stratetgic merge patch
     ///
@@ -312,7 +314,7 @@ where
     /// use kube::api::{Api, PatchParams, Patch};
     /// use k8s_openapi::api::batch::v1::Job;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = kube::Client::try_default().await?;
+    /// # let client = kube::Client::try_default()?;
     /// let jobs: Api<Job> = Api::namespaced(client, "apps");
     /// let mut j = jobs.get("baz").await?;
     /// let pp = PatchParams::default(); // json merge patch
@@ -349,7 +351,7 @@ where
     /// use kube::api::{Api, PostParams};
     /// use k8s_openapi::api::batch::v1::{Job, JobStatus};
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-    /// #   let client = kube::Client::try_default().await?;
+    /// #   let client = kube::Client::try_default()?;
     /// let jobs: Api<Job> = Api::namespaced(client, "apps");
     /// let mut o = jobs.get_status("baz").await?; // retrieve partial object
     /// o.status = Some(JobStatus::default()); // update the job part

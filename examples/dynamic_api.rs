@@ -10,7 +10,7 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     let discovery = Discovery::new(client.clone()).run().await?;
     for group in discovery.groups() {

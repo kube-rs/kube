@@ -6,7 +6,8 @@ use kube::{
     runtime::wait::{await_condition, conditions::is_pod_running},
     Client,
 };
-#[cfg(unix)] use tokio::signal;
+#[cfg(unix)]
+use tokio::signal;
 use tokio::{io::AsyncWriteExt, select};
 
 #[cfg(unix)]
@@ -39,7 +40,7 @@ async fn handle_terminal_size(mut channel: Sender<TerminalSize>) -> Result<(), a
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
 
     let pods: Api<Pod> = Api::default_namespaced(client);
     let p: Pod = serde_json::from_value(serde_json::json!({

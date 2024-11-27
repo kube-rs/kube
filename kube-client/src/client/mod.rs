@@ -11,7 +11,8 @@ use either::{Either, Left, Right};
 use futures::{future::BoxFuture, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
-#[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
+#[cfg(feature = "ws")]
+use hyper_util::rt::TokioIo;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
@@ -42,12 +43,15 @@ pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
+mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
-#[cfg(feature = "ws")] mod upgrade;
+#[cfg(feature = "rustls-tls")]
+pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "ws")]
+mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -57,7 +61,8 @@ pub use auth::OAuthError;
 #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
 pub use auth::oidc_errors;
 
-#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
+#[cfg(feature = "ws")]
+pub use upgrade::UpgradeConnectionError;
 
 #[cfg(feature = "kubelet-debug")]
 #[cfg_attr(docsrs, doc(cfg(feature = "kubelet-debug")))]
@@ -105,7 +110,7 @@ impl Client {
     /// use tower::{BoxError, ServiceBuilder};
     /// use hyper_util::rt::TokioExecutor;
     ///
-    /// let config = Config::infer().await?;
+    /// let config = Config::infer()?;
     /// let service = ServiceBuilder::new()
     ///     .layer(config.base_uri_layer())
     ///     .option_layer(config.auth_layer()?)
@@ -144,15 +149,15 @@ impl Client {
     /// ```rust
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
     /// # use kube::Client;
-    /// let client = Client::try_default().await?;
+    /// let client = Client::try_default()?;
     /// # Ok(())
     /// # }
     /// ```
     ///
     /// If you already have a [`Config`] then use [`Client::try_from`](Self::try_from)
     /// instead.
-    pub async fn try_default() -> Result<Self> {
-        Self::try_from(Config::infer().await.map_err(Error::InferConfig)?)
+    pub fn try_default() -> Result<Self> {
+        Self::try_from(Config::infer().map_err(Error::InferConfig)?)
     }
 
     /// Get the default namespace for the client

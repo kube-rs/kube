@@ -11,7 +11,7 @@ use std::{env, fmt::Debug};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = kube::Client::try_default().await?;
+    let client = kube::Client::try_default()?;
 
     // If set will receive only the metadata for watched resources
     let watch_metadata = env::var("WATCH_METADATA").map(|s| s == "1").unwrap_or(false);

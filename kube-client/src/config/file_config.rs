@@ -926,8 +926,8 @@ password: kube_rs
         assert_eq!(authinfo_debug_output, expected_output)
     }
 
-    #[tokio::test]
-    async fn authinfo_exec_provide_cluster_info() {
+    #[test]
+    fn authinfo_exec_provide_cluster_info() {
         let config = r#"
 apiVersion: v1
 clusters:
@@ -959,7 +959,7 @@ users:
       provideClusterInfo: true
 "#;
         let kube_config = Kubeconfig::from_yaml(config).unwrap();
-        let config_loader = ConfigLoader::load(kube_config, None, None, None).await.unwrap();
+        let config_loader = ConfigLoader::load(kube_config, None, None, None).unwrap();
         let auth_info = config_loader.user;
         let exec = auth_info.exec.unwrap();
         assert!(exec.provide_cluster_info);

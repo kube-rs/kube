@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let client = kube::Client::try_default().await?;
+    let client = kube::Client::try_default()?;
 
     let api: Api<Node> = Api::all(client.clone());
     let nodes = api.list(&ListParams::default()).await?;

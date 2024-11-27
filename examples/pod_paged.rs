@@ -14,7 +14,7 @@ const PAGE_SIZE: u32 = 5;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = Client::try_default().await?;
+    let client = Client::try_default()?;
     let api = Api::<Pod>::default_namespaced(client);
 
     let mut continue_token: Option<String> = None;

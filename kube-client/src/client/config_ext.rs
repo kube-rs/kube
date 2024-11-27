@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
 use http::{header::HeaderName, HeaderValue};
-#[cfg(feature = "openssl-tls")] use hyper::rt::{Read, Write};
+#[cfg(feature = "openssl-tls")]
+use hyper::rt::{Read, Write};
 use hyper_util::client::legacy::connect::HttpConnector;
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] use super::tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
+use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},
@@ -36,7 +38,7 @@ pub trait ConfigExt: private::Sealed {
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
     /// # use kube::{client::{Body, ConfigExt}, Config};
     /// # use hyper_util::rt::TokioExecutor;
-    /// let config = Config::infer().await?;
+    /// let config = Config::infer()?;
     /// let https = config.rustls_https_connector()?;
     /// let hyper_client: hyper_util::client::legacy::Client<_, Body> = hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https);
     /// # Ok(())
@@ -54,7 +56,7 @@ pub trait ConfigExt: private::Sealed {
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
     /// # use kube::{client::{Body, ConfigExt}, Config};
     /// # use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
-    /// let config = Config::infer().await?;
+    /// let config = Config::infer()?;
     /// let mut connector = HttpConnector::new();
     /// connector.enforce_http(false);
     /// let https = config.rustls_https_connector_with_connector(connector)?;
@@ -76,7 +78,7 @@ pub trait ConfigExt: private::Sealed {
     /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
     /// # use hyper_util::client::legacy::connect::HttpConnector;
     /// # use kube::{client::ConfigExt, Config};
-    /// let config = Config::infer().await?;
+    /// let config = Config::infer()?;
     /// let https = {
     ///     let rustls_config = std::sync::Arc::new(config.rustls_client_config()?);
     ///     let mut http = HttpConnector::new();

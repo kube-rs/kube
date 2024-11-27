@@ -25,7 +25,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Infer the runtime environment and try to create a Kubernetes Client
-//!     let client = Client::try_default().await?;
+//!     let client = Client::try_default()?;
 //!
 //!     // Read pods in the configured namespace into the typed interface from k8s-openapi
 //!     let pods: Api<Pod> = Api::default_namespaced(client);
@@ -69,7 +69,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = Client::try_default().await?;
+//!     let client = Client::try_default()?;
 //!     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
 //!
 //!     // Apply the CRD so users can create Foo instances in Kubernetes
@@ -174,7 +174,8 @@ pub use kube_derive::Resource;
 pub use kube_runtime as runtime;
 
 pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
-#[doc(inline)] pub use kube_core as core;
+#[doc(inline)]
+pub use kube_core as core;
 
 // Mock tests for the runtime
 #[cfg(test)]
@@ -198,13 +199,17 @@ pub mod prelude {
     #[allow(unreachable_pub)]
     pub use crate::client::ConfigExt as _;
 
-    #[cfg(feature = "unstable-client")] pub use crate::client::scope::NamespacedRef;
+    #[cfg(feature = "unstable-client")]
+    pub use crate::client::scope::NamespacedRef;
 
-    #[allow(unreachable_pub)] pub use crate::core::PartialObjectMetaExt as _;
-    #[allow(unreachable_pub)] pub use crate::core::SelectorExt as _;
+    #[allow(unreachable_pub)]
+    pub use crate::core::PartialObjectMetaExt as _;
+    #[allow(unreachable_pub)]
+    pub use crate::core::SelectorExt as _;
     pub use crate::{core::crd::CustomResourceExt as _, Resource as _, ResourceExt as _};
 
-    #[cfg(feature = "runtime")] pub use crate::runtime::utils::WatchStreamExt as _;
+    #[cfg(feature = "runtime")]
+    pub use crate::runtime::utils::WatchStreamExt as _;
 }
 
 // Tests that require a cluster and the complete feature set
@@ -241,7 +246,7 @@ mod test {
     #[ignore = "needs kubeconfig"]
     async fn custom_resource_generates_correct_core_structs() {
         use crate::core::{ApiResource, DynamicObject, GroupVersionKind};
-        let client = Client::try_default().await.unwrap();
+        let client = Client::try_default().unwrap();
 
         let gvk = GroupVersionKind::gvk("clux.dev", "v1", "Foo");
         let api_resource = ApiResource::from_gvk(&gvk);
@@ -263,7 +268,7 @@ mod test {
         use crate::runtime::wait::{await_condition, conditions};
 
         use serde_json::json;
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let ssapply = PatchParams::apply("kube").force();
         let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
         // Server-side apply CRD and wait for it to get ready
@@ -275,11 +280,14 @@ mod test {
         let foos: Api<Foo> = Api::default_namespaced(client.clone());
         // Apply from generated struct
         {
-            let foo = Foo::new("baz", FooSpec {
-                name: "baz".into(),
-                info: Some("old baz".into()),
-                replicas: 1,
-            });
+            let foo = Foo::new(
+                "baz",
+                FooSpec {
+                    name: "baz".into(),
+                    info: Some("old baz".into()),
+                    replicas: 1,
+                },
+            );
             let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
             assert_eq!(o.spec.name, "baz");
             let oref = o.object_ref(&());
@@ -355,7 +363,7 @@ mod test {
         // use known type information from pod (can also use discovery for this)
         let ar = ApiResource::erase::<Pod>(&());
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let api: Api<PodSimple> = Api::default_namespaced_with(client, &ar);
         let mut list = api.list(&Default::default()).await?;
         // check we can mutably iterate over ObjectList
@@ -398,7 +406,7 @@ mod test {
         #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
         struct TestCrSpec {}
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
 
         // install crd is installed
         let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
@@ -472,7 +480,7 @@ mod test {
         use std::time::Duration;
         use tokio::time::timeout;
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let pods: Api<Pod> = Api::default_namespaced(client);
 
         // create busybox pod that's alive for at most 20s
@@ -544,7 +552,7 @@ mod test {
     #[tokio::test]
     #[ignore = "needs cluster (lists cms)"]
     async fn api_get_opt_handles_404() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let api = Api::<ConfigMap>::default_namespaced(client);
         assert_eq!(
             api.get_opt("this-cm-does-not-exist-ajklisdhfqkljwhreq").await?,

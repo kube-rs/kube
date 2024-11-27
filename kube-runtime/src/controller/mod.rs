@@ -605,7 +605,7 @@ impl Config {
 /// /// something to drive the controller
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
+///     let client = Client::try_default()?;
 ///     let context = Arc::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
@@ -1450,7 +1450,7 @@ where
     ///     }
     /// });
     /// Controller::new(
-    ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
+    ///     Api::<ConfigMap>::all(Client::try_default().unwrap()),
     ///     watcher::Config::default(),
     /// )
     /// .reconcile_all_on(reload_rx.map(|_| ()))
@@ -1562,7 +1562,7 @@ where
     /// };
     /// use std::{convert::Infallible, sync::Arc};
     /// Controller::new(
-    ///     Api::<ConfigMap>::all(Client::try_default().await.unwrap()),
+    ///     Api::<ConfigMap>::all(Client::try_default().unwrap()),
     ///     watcher::Config::default(),
     /// )
     /// .graceful_shutdown_on(tokio::signal::ctrl_c().map(|_| ()))

@@ -76,7 +76,7 @@ async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Acti
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    let client = kube::Client::try_default().await?;
+    let client = kube::Client::try_default()?;
     Controller::new(
         Api::<ConfigMap>::all(client.clone()),
         watcher::Config::default().labels("configmap-secret-syncer.nullable.se/sync=true"),

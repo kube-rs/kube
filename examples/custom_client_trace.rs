@@ -17,7 +17,7 @@ use kube::{
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let config = Config::infer().await?;
+    let config = Config::infer()?;
     let https = config.rustls_https_connector()?;
     let service = ServiceBuilder::new()
         .layer(config.base_uri_layer())

@@ -19,7 +19,7 @@
 //!     // Read the environment to find config for kube client.
 //!     // Note that this tries an in-cluster configuration first,
 //!     // then falls back on a kubeconfig file.
-//!     let client = Client::try_default().await?;
+//!     let client = Client::try_default()?;
 //!
 //!     // Interact with pods in the configured namespace with the typed interface from k8s-openapi
 //!     let pods: Api<Pod> = Api::default_namespaced(client);
@@ -152,7 +152,7 @@ mod test {
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         use hyper_util::rt::TokioExecutor;
 
-        let config = Config::infer().await?;
+        let config = Config::infer()?;
         let https = config.rustls_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
@@ -185,7 +185,7 @@ mod test {
     #[cfg(feature = "client")]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{core::DynamicObject, discovery};
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let apigroup = discovery::group(&client, "apiregistration.k8s.io").await?;
         let (ar, _caps) = apigroup.recommended_kind("APIService").unwrap();
         let api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
@@ -199,7 +199,7 @@ mod test {
     async fn pod_can_use_core_apis() -> Result<(), Box<dyn std::error::Error>> {
         use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchEvent};
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let pods: Api<Pod> = Api::default_namespaced(client);
 
         // create busybox pod that's alive for at most 30s
@@ -280,7 +280,7 @@ mod test {
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let pods: Api<Pod> = Api::default_namespaced(client);
 
         // create busybox pod that's alive for at most 30s
@@ -394,7 +394,7 @@ mod test {
             core::subresource::LogParams,
         };
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let pods: Api<Pod> = Api::default_namespaced(client);
 
         // create busybox pod that's alive for at most 30s
@@ -480,7 +480,7 @@ mod test {
         };
         use kube_core::{ObjectList, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt};
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let pods: Api<Pod> = Api::default_namespaced(client);
 
         // create busybox pod that's alive for at most 30s
@@ -576,7 +576,7 @@ mod test {
             }
         }))?;
 
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
         let csr: Api<CertificateSigningRequest> = Api::all(client.clone());
         assert!(csr.create(&PostParams::default(), &dummy_csr).await.is_ok());
 
@@ -617,7 +617,7 @@ mod test {
     #[tokio::test]
     #[ignore = "needs cluster for ephemeral containers operations"]
     async fn can_operate_on_ephemeral_containers() -> Result<(), Box<dyn std::error::Error>> {
-        let client = Client::try_default().await?;
+        let client = Client::try_default()?;
 
         // Ephemeral containers were stabilized in Kubernetes v1.25.
         // This test therefore exits early if the current cluster version is older than v1.25.
