@@ -25,7 +25,7 @@ pub trait WatchStreamExt: Stream {
     where
         Self: TryStream + Sized,
     {
-        self.backoff(DefaultBackoffBuilder::default())
+        self.backoff(DefaultBackoffBuilder)
     }
 
     /// Apply a specific [`BackoffBuilder`] policy to a [`Stream`] using [`StreamBackoff`]
