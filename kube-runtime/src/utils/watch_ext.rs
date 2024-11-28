@@ -91,7 +91,7 @@ pub trait WatchStreamExt: Stream {
     /// # Ok(())
     /// # }
     /// ```
-
+    ///
     /// [`watcher()`]: crate::watcher::watcher
     fn modify<F, K>(self, f: F) -> EventModify<Self, F>
     where
