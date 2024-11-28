@@ -1,4 +1,4 @@
-/// Runs UI tests using [`trybuild`].
+#![allow(missing_docs)]
 
 // Test that `kube-derive` outputs helpful error messages.
 // If you make a change, remove `tests/ui/*.stderr` and run `cargo test`.
