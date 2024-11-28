@@ -4,6 +4,8 @@ use backon::BackoffBuilder;
 
 use super::{ResettableBackoff, ResettableBackoffWrapper};
 
+#[cfg(doc)] use backon::Backoff;
+
 /// Builder for [`ResetTimerBackoff`].
 #[derive(Debug, Clone)]
 pub struct ResetTimerBackoffBuilder<B> {

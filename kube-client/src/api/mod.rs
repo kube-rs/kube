@@ -60,7 +60,7 @@ pub struct Api<K> {
 
 /// Api constructors for Resource implementors with custom DynamicTypes
 ///
-/// This generally means resources created via [`DynamicObject`](crate::api::DynamicObject).
+/// This generally means resources created via [`DynamicObject`].
 impl<K: Resource> Api<K> {
     /// Cluster level resources, or resources viewed across all namespaces
     ///

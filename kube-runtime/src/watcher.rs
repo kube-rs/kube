@@ -18,6 +18,9 @@ use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duratio
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
+#[cfg(doc)] use crate::WatchStreamExt;
+#[cfg(doc)] use backon::Backoff;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("failed to perform initial object list: {0}")]
@@ -43,26 +46,27 @@ pub enum Event<K> {
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use Finalizers instead.
     Delete(K),
+
     /// The watch stream was restarted.
     ///
-    /// A series of `InitApply` events are expected to follow until all matching objects
+    /// A series of [`InitApply`](Event::InitApply) events will follow until all matching objects
     /// have been listed. This event can be used to prepare a buffer for `InitApply` events.
     Init,
-    /// Received an object during `Init`.
+    /// Received an object during [`Init`](Event::Init).
     ///
-    /// Objects returned here are either from the initial stream using the `StreamingList` strategy,
-    /// or from pages using the `ListWatch` strategy.
+    /// Objects returned here are either from the initial stream using the [`InitialListStrategy::StreamingList`] strategy,
+    /// or from pages using the [`InitialListStrategy::ListWatch`] strategy.
     ///
     /// These events can be passed up if having a complete set of objects is not a concern.
-    /// If you need to wait for a complete set, please buffer these events until an `InitDone`.
+    /// If you need to wait for a complete set, please buffer these events until an [`InitDone`](Event::InitDone).
     InitApply(K),
     /// The initialisation is complete.
     ///
     /// This can be used as a signal to replace buffered store contents atomically.
-    /// No more `InitApply` events will happen until the next `Init` event.
+    /// No more [`InitApply`](Event::InitApply) events will happen until the next [`Init`](Event::Init) event.
     ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
-    /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Deleted).
+    /// Any objects that were previously [`Apply`ed](Event::Apply) but are not listed in any of
+    /// the [`InitApply`](Event::InitApply) events should be assumed to have been [`Delete`d](Event::Delete).
     InitDone,
 }
 
@@ -339,7 +343,7 @@ impl Config {
 
     /// Configure typed label selectors
     ///
-    /// Configure typed selectors from [`Selector`](kube_client::core::Selector) and [`Expression`](kube_client::core::Expression) lists.
+    /// Configure typed selectors from [`Selector`] and [`Expression`](kube_client::core::Expression) lists.
     ///
     /// ```
     /// use kube_runtime::watcher::Config;
@@ -748,7 +752,7 @@ where
 ///
 /// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
 /// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
-/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+/// to introduce an artificial delay. [`WatchStreamExt::default_backoff`] returns a suitable default set of parameters.
 ///
 /// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
@@ -811,7 +815,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
 /// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
-/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+/// to introduce an artificial delay. [`WatchStreamExt::default_backoff`] returns a suitable default set of parameters.
 ///
 /// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)

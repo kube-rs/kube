@@ -16,7 +16,10 @@ use futures::{Stream, TryStream};
 
 use super::ResettableBackoffWrapper;
 
-/// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
+#[cfg(doc)] use crate::watcher::DefaultBackoff;
+#[cfg(doc)] use backon::Backoff;
+
+/// Extension trait for streams returned by [`watcher`](watcher::watcher) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
     /// Apply the [`DefaultBackoff`] watcher [`Backoff`] policy
     ///
@@ -40,6 +43,8 @@ pub trait WatchStreamExt: Stream {
     /// Decode a [`watcher()`] stream into a stream of applied objects
     ///
     /// All Added/Modified events are passed through, and critical errors bubble up.
+    ///
+    /// [`watcher()`]: crate::watcher::watcher
     fn applied_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
@@ -50,6 +55,8 @@ pub trait WatchStreamExt: Stream {
     /// Decode a [`watcher()`] stream into a stream of touched objects
     ///
     /// All Added/Modified/Deleted events are passed through, and critical errors bubble up.
+    ///
+    /// [`watcher()`]: crate::watcher::watcher
     fn touched_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
@@ -84,6 +91,8 @@ pub trait WatchStreamExt: Stream {
     /// # Ok(())
     /// # }
     /// ```
+
+    /// [`watcher()`]: crate::watcher::watcher
     fn modify<F, K>(self, f: F) -> EventModify<Self, F>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
@@ -173,6 +182,7 @@ pub trait WatchStreamExt: Stream {
     /// ```
     ///
     /// [`Store`]: crate::reflector::Store
+    /// [`watcher()`]: crate::watcher::watcher
     fn reflect<K>(self, writer: Writer<K>) -> Reflect<Self, K>
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
@@ -187,7 +197,7 @@ pub trait WatchStreamExt: Stream {
     /// Returns the stream unmodified, but passes every [`watcher::Event`]
     /// through a [`Writer`]. This populates a [`Store`] as the stream is
     /// polled. When the [`watcher::Event`] is not an error or a
-    /// [`watcher::Event::Deleted`] then its inner object will also be
+    /// [`watcher::Event::Delete`] then its inner object will also be
     /// propagated to subscribers.
     ///
     /// Subscribers can be created by calling [`subscribe()`] on a [`Writer`].
@@ -212,7 +222,9 @@ pub trait WatchStreamExt: Stream {
     /// [`Store`]: crate::reflector::Store
     /// [`subscribe()`]: crate::reflector::store::Writer::subscribe()
     /// [`Stream`]: futures::stream::Stream
-    /// [`ReflectHandle`]: crate::reflector::dispatcher::ReflectHandle
+    /// [`ReflectHandle`]: crate::reflector::ReflectHandle
+    /// [`watcher()`]: crate::watcher::watcher
+    ///
     /// ## Usage
     /// ```no_run
     /// # use futures::StreamExt;

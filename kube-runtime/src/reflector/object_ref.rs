@@ -28,7 +28,7 @@ pub trait Lookup {
     /// The [version](Resource::version) for this object.
     fn version(dyntype: &Self::DynamicType) -> Cow<'_, str>;
 
-    /// The [apiVersion](Resource::_version) for this object.
+    /// The [apiVersion](Resource::api_version) for this object.
     fn api_version(dyntype: &Self::DynamicType) -> Cow<'_, str> {
         api_version_from_group_version(Self::group(dyntype), Self::version(dyntype))
     }

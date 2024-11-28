@@ -6,12 +6,14 @@ use tokio::time::{sleep, Instant, Sleep};
 
 use super::ResettableBackoff;
 
+#[cfg(doc)] use backon::Backoff;
+
 /// Applies a [`Backoff`] policy to a [`Stream`]
 ///
-/// After any [`Err`] is emitted, the stream is paused for [`Backoff::next_backoff`]. The
-/// [`Backoff`] is [`reset`](`Backoff::reset`) on any [`Ok`] value.
+/// After any [`Err`] is emitted, the stream is paused for [`Backoff::next`](Iterator::next). The
+/// [`Backoff`] is [`reset`](`ResettableBackoff::reset`) on any [`Ok`] value.
 ///
-/// If [`Backoff::next_backoff`] returns [`None`] then the backing stream is given up on, and closed.
+/// If [`Backoff::next`](Iterator::next) returns [`None`] then the backing stream is given up on, and closed.
 #[pin_project]
 pub struct StreamBackoff<S, B> {
     #[pin]

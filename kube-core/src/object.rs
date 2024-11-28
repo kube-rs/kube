@@ -13,9 +13,9 @@ use std::borrow::Cow;
 /// Kubernetes' API [always seem to expose list structs in this manner](https://docs.rs/k8s-openapi/0.10.0/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.ObjectMeta.html?search=List).
 ///
 /// Note that this is only used internally within reflectors and informers,
-/// and is generally produced from list/watch/delete collection queries on an [`Resource`](super::Resource).
+/// and is generally produced from list/watch/delete collection queries on an [`Resource`].
 ///
-/// This is almost equivalent to [`k8s_openapi::List<T>`](k8s_openapi::List), but iterable.
+/// This is almost equivalent to [`k8s_openapi::List<T>`], but iterable.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ObjectList<T>
 where
@@ -27,7 +27,7 @@ where
 
     /// ListMeta - only really used for its `resourceVersion`
     ///
-    /// See [ListMeta](k8s_openapi::apimachinery::pkg::apis::meta::v1::ListMeta)
+    /// See [ListMeta]
     #[serde(default)]
     pub metadata: ListMeta,
 
@@ -312,7 +312,7 @@ where
 /// Empty struct for when data should be discarded
 ///
 /// Not using [`()`](https://doc.rust-lang.org/stable/std/primitive.unit.html), because serde's
-/// [`Deserialize`](serde::Deserialize) `impl` is too strict.
+/// [`Deserialize`] `impl` is too strict.
 #[derive(Clone, Deserialize, Serialize, Default, Debug)]
 pub struct NotUsed {}
 
