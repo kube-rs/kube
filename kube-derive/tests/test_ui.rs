@@ -1,3 +1,5 @@
+/// Runs UI tests using [`trybuild`].
+
 // Test that `kube-derive` outputs helpful error messages.
 // If you make a change, remove `tests/ui/*.stderr` and run `cargo test`.
 // Then copy the files that appear under `wip/` if it's what you expected.
