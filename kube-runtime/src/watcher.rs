@@ -896,6 +896,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 pub struct DefaultBackoffBuilder(Strategy);
 type Strategy = ResetTimerBackoffBuilder<backon::ExponentialBuilder>;
 
+/// See [`DefaultBackoffBuilder`].
 #[derive(Debug)]
 pub struct DefaultBackoff(<Strategy as BackoffBuilder>::Backoff);
 

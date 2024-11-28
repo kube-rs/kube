@@ -11,6 +11,7 @@ pub trait ResettableBackoff: Backoff {
 }
 
 impl ResettableBackoff for Box<dyn ResettableBackoff + Send> {
+    /// Reset the [`Backoff`] to its initial state.
     fn reset(&mut self) {
         Box::deref_mut(self).reset();
     }
