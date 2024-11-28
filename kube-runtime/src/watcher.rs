@@ -2,9 +2,9 @@
 //!
 //! See [`watcher`] for the primary entry point.
 
-use crate::utils::ResetTimerBackoff;
+use crate::utils::ResetTimerBackoffBuilder;
 use async_trait::async_trait;
-use backoff::{backoff::Backoff, ExponentialBackoff};
+use backon::BackoffBuilder;
 use educe::Educe;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
@@ -892,30 +892,42 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 /// This struct implements [`Backoff`] and is the default strategy used
 /// when calling `WatchStreamExt::default_backoff`. If you need to create
 /// this manually then [`DefaultBackoff::default`] can be used.
-pub struct DefaultBackoff(Strategy);
-type Strategy = ResetTimerBackoff<ExponentialBackoff>;
+#[derive(Debug, Clone)]
+pub struct DefaultBackoffBuilder(Strategy);
+type Strategy = ResetTimerBackoffBuilder<backon::ExponentialBuilder>;
 
-impl Default for DefaultBackoff {
+#[derive(Debug)]
+pub struct DefaultBackoff(<Strategy as BackoffBuilder>::Backoff);
+
+impl Default for DefaultBackoffBuilder {
     fn default() -> Self {
-        Self(ResetTimerBackoff::new(
-            backoff::ExponentialBackoffBuilder::new()
-                .with_initial_interval(Duration::from_millis(800))
-                .with_max_interval(Duration::from_secs(30))
-                .with_randomization_factor(1.0)
-                .with_multiplier(2.0)
-                .with_max_elapsed_time(None)
-                .build(),
+        Self(ResetTimerBackoffBuilder::new(
+            backon::ExponentialBuilder::default()
+                .with_min_delay(Duration::from_millis(800))
+                .with_max_delay(Duration::from_secs(30))
+                // .with_jitter() isn't quite a 1:1 match to randomization factor, it always *adds* 0..min_delay, vs multiplying
+                // the final delay by +-factor
+                .with_jitter()
+                // .with_randomization_factor(1.0)
+                .with_factor(2.0)
+                .without_max_times(),
             Duration::from_secs(120),
         ))
     }
 }
 
-impl Backoff for DefaultBackoff {
-    fn next_backoff(&mut self) -> Option<Duration> {
-        self.0.next_backoff()
-    }
+impl BackoffBuilder for DefaultBackoffBuilder {
+    type Backoff = DefaultBackoff;
 
-    fn reset(&mut self) {
-        self.0.reset()
+    fn build(self) -> Self::Backoff {
+        DefaultBackoff(self.0.build())
+    }
+}
+
+impl Iterator for DefaultBackoff {
+    type Item = Duration;
+
+    fn next(&mut self) -> Option<Duration> {
+        self.0.next()
     }
 }

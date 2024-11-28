@@ -282,7 +282,7 @@ mod tests {
                 let io: TokioIo<TcpStream> = TokioIo::new(tcp);
 
                 tokio::spawn(async move {
-                    let _ = http1::Builder::new()
+                    http1::Builder::new()
                         .timer(TokioTimer::new())
                         .serve_connection(
                             io,

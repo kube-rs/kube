@@ -9,11 +9,13 @@ use kube_derive::Resource;
 #[resource(inherit = "ConfigMap")]
 struct TypedMap {
     metadata: ObjectMeta,
+    #[allow(unused)]
     data: Option<TypedData>,
 }
 
 #[derive(Default)]
 struct TypedData {
+    #[allow(unused)]
     field: String,
 }
 
@@ -21,11 +23,13 @@ struct TypedData {
 #[resource(inherit = "Secret")]
 struct TypedSecret {
     metadata: ObjectMeta,
+    #[allow(unused)]
     data: Option<TypedSecretData>,
 }
 
 #[derive(Default)]
 struct TypedSecretData {
+    #[allow(unused)]
     field: ByteString,
 }
 

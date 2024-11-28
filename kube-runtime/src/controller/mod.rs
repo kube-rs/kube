@@ -8,10 +8,13 @@ use crate::{
         ObjectRef,
     },
     scheduler::{debounced_scheduler, ScheduleRequest},
-    utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
-    watcher::{self, metadata_watcher, watcher, DefaultBackoff},
+    utils::{
+        trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, ResettableBackoff,
+        ResettableBackoffWrapper, StreamBackoff, WatchStreamExt,
+    },
+    watcher::{self, metadata_watcher, watcher, DefaultBackoffBuilder},
 };
-use backoff::backoff::Backoff;
+use backon::BackoffBuilder;
 use educe::Educe;
 use futures::{
     channel,
@@ -629,7 +632,7 @@ where
 {
     // NB: Need to Unpin for stream::select_all
     trigger_selector: stream::SelectAll<BoxStream<'static, Result<ReconcileRequest<K>, watcher::Error>>>,
-    trigger_backoff: Box<dyn Backoff + Send>,
+    trigger_backoff: Box<dyn ResettableBackoff + Send>,
     /// [`run`](crate::Controller::run) starts a graceful shutdown when any of these [`Future`]s complete,
     /// refusing to start any new reconciliations but letting any existing ones finish.
     graceful_shutdown_selector: Vec<BoxFuture<'static, ()>>,
@@ -689,7 +692,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
-            trigger_backoff: Box::<DefaultBackoff>::default(),
+            trigger_backoff: Box::<ResettableBackoffWrapper<DefaultBackoffBuilder>>::default(),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -775,7 +778,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
-            trigger_backoff: Box::<DefaultBackoff>::default(),
+            trigger_backoff: Box::<ResettableBackoffWrapper<DefaultBackoffBuilder>>::default(),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -886,7 +889,7 @@ where
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
-            trigger_backoff: Box::<DefaultBackoff>::default(),
+            trigger_backoff: Box::<ResettableBackoffWrapper<DefaultBackoffBuilder>>::default(),
             graceful_shutdown_selector: vec![
                 // Fallback future, ensuring that we never terminate if no additional futures are added to the selector
                 future::pending().boxed(),
@@ -915,8 +918,8 @@ where
     /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
     /// but can be overridden by calling this method.
     #[must_use]
-    pub fn trigger_backoff(mut self, backoff: impl Backoff + Send + 'static) -> Self {
-        self.trigger_backoff = Box::new(backoff);
+    pub fn trigger_backoff(mut self, backoff_builder: impl BackoffBuilder + Clone + 'static) -> Self {
+        self.trigger_backoff = Box::new(ResettableBackoffWrapper::new(backoff_builder));
         self
     }
 

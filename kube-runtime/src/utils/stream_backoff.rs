@@ -1,9 +1,10 @@
 use std::{future::Future, pin::Pin, task::Poll};
 
-use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 use pin_project::pin_project;
 use tokio::time::{sleep, Instant, Sleep};
+
+use super::ResettableBackoff;
 
 /// Applies a [`Backoff`] policy to a [`Stream`]
 ///
@@ -30,7 +31,7 @@ enum State {
     Awake,
 }
 
-impl<S: TryStream, B: Backoff> StreamBackoff<S, B> {
+impl<S: TryStream, B: ResettableBackoff> StreamBackoff<S, B> {
     pub fn new(stream: S, backoff: B) -> Self {
         Self {
             stream,
@@ -40,7 +41,7 @@ impl<S: TryStream, B: Backoff> StreamBackoff<S, B> {
     }
 }
 
-impl<S: TryStream, B: Backoff> Stream for StreamBackoff<S, B> {
+impl<S: TryStream, B: ResettableBackoff> Stream for StreamBackoff<S, B> {
     type Item = Result<S::Ok, S::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
@@ -71,7 +72,7 @@ impl<S: TryStream, B: Backoff> Stream for StreamBackoff<S, B> {
         let next_item = this.stream.try_poll_next(cx);
         match &next_item {
             Poll::Ready(Some(Err(_))) => {
-                if let Some(backoff_duration) = this.backoff.next_backoff() {
+                if let Some(backoff_duration) = this.backoff.next() {
                     let backoff_sleep = sleep(backoff_duration);
                     tracing::debug!(
                         deadline = ?backoff_sleep.deadline(),
@@ -98,8 +99,9 @@ impl<S: TryStream, B: Backoff> Stream for StreamBackoff<S, B> {
 pub(crate) mod tests {
     use std::{pin::pin, task::Poll, time::Duration};
 
-    use super::StreamBackoff;
-    use backoff::backoff::Backoff;
+    use crate::WatchStreamExt;
+
+    use backon::BackoffBuilder;
     use futures::{channel::mpsc, poll, stream, StreamExt};
 
     #[tokio::test]
@@ -107,7 +109,11 @@ pub(crate) mod tests {
         tokio::time::pause();
         let tick = Duration::from_secs(1);
         let rx = stream::iter([Ok(0), Ok(1), Err(2), Ok(3), Ok(4)]);
-        let mut rx = pin!(StreamBackoff::new(rx, backoff::backoff::Constant::new(tick)));
+        let mut rx = pin!(rx.backoff(
+            backon::ConstantBuilder::default()
+                .with_delay(tick)
+                .without_max_times()
+        ));
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Ok(0))));
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Ok(1))));
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Err(2))));
@@ -123,7 +129,7 @@ pub(crate) mod tests {
         tokio::time::pause();
         let (tx, rx) = mpsc::unbounded();
         // let rx = stream::iter([Ok(0), Ok(1), Err(2), Ok(3)]);
-        let mut rx = pin!(StreamBackoff::new(rx, LinearBackoff::new(Duration::from_secs(2))));
+        let mut rx = pin!(rx.backoff(LinearBackoffBuilder::new(Duration::from_secs(2))));
         tx.unbounded_send(Ok(0)).unwrap();
         assert_eq!(poll!(rx.next()), Poll::Ready(Some(Ok(0))));
         tx.unbounded_send(Ok(1)).unwrap();
@@ -149,39 +155,62 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn backoff_should_close_when_requested() {
         assert_eq!(
-            StreamBackoff::new(
-                stream::iter([Ok(0), Ok(1), Err(2), Ok(3)]),
-                backoff::backoff::Stop {}
-            )
-            .collect::<Vec<_>>()
-            .await,
+            stream::iter([Ok(0), Ok(1), Err(2), Ok(3)])
+                .backoff(StopBackoff)
+                .collect::<Vec<_>>()
+                .await,
             vec![Ok(0), Ok(1), Err(2)]
         );
     }
 
+    /// Backoff policy that stops immediately
+    #[derive(Clone)]
+    // No need for a builder since it has no state anyway.
+    pub struct StopBackoff;
+    impl Iterator for StopBackoff {
+        type Item = Duration;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            None
+        }
+    }
+
+
     /// Dynamic backoff policy that is still deterministic and testable
-    pub struct LinearBackoff {
+    #[derive(Debug, Clone)]
+    pub struct LinearBackoffBuilder {
         interval: Duration,
+    }
+
+    impl LinearBackoffBuilder {
+        pub fn new(interval: Duration) -> Self {
+            Self { interval }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct LinearBackoff {
+        builder: LinearBackoffBuilder,
         current_duration: Duration,
     }
 
-    impl LinearBackoff {
-        pub fn new(interval: Duration) -> Self {
-            Self {
-                interval,
+    impl BackoffBuilder for LinearBackoffBuilder {
+        type Backoff = LinearBackoff;
+
+        fn build(self) -> Self::Backoff {
+            LinearBackoff {
+                builder: self,
                 current_duration: Duration::ZERO,
             }
         }
     }
 
-    impl Backoff for LinearBackoff {
-        fn next_backoff(&mut self) -> Option<Duration> {
-            self.current_duration += self.interval;
-            Some(self.current_duration)
-        }
+    impl Iterator for LinearBackoff {
+        type Item = Duration;
 
-        fn reset(&mut self) {
-            self.current_duration = Duration::ZERO
+        fn next(&mut self) -> Option<Duration> {
+            self.current_duration += self.builder.interval;
+            Some(self.current_duration)
         }
     }
 }

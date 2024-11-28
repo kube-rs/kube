@@ -1,6 +1,6 @@
 use std::{ops::Deref, sync::Arc, time::Duration};
 
-use futures::{future, StreamExt};
+use futures::StreamExt;
 use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
 use kube::{
     runtime::{
@@ -63,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
         .clone()
         .map(|r| Ok(r.deref().clone()))
         .predicate_filter(predicates::resource_version)
-        .filter_map(|r| future::ready(r.ok().map(Arc::new)));
+        .filter_map(|r| std::future::ready(r.ok().map(Arc::new)));
 
     // Reflect a stream of pod watch events into the store and apply a backoff. For subscribers to
     // be able to consume updates, the reflector must be shared.

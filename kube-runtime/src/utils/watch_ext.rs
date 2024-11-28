@@ -1,39 +1,40 @@
 use crate::{
+    reflector::store::Writer,
     utils::{
         event_decode::EventDecode,
         event_modify::EventModify,
         predicate::{Predicate, PredicateFilter},
         stream_backoff::StreamBackoff,
+        Reflect,
     },
-    watcher,
+    watcher::{self, DefaultBackoffBuilder},
 };
+use backon::BackoffBuilder;
 use kube_client::Resource;
 
-use crate::{reflector::store::Writer, utils::Reflect};
-
-use crate::watcher::DefaultBackoff;
-use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
+
+use super::ResettableBackoffWrapper;
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
     /// Apply the [`DefaultBackoff`] watcher [`Backoff`] policy
     ///
     /// This is recommended for controllers that want to play nicely with the apiserver.
-    fn default_backoff(self) -> StreamBackoff<Self, DefaultBackoff>
+    fn default_backoff(self) -> StreamBackoff<Self, ResettableBackoffWrapper<DefaultBackoffBuilder>>
     where
         Self: TryStream + Sized,
     {
-        StreamBackoff::new(self, DefaultBackoff::default())
+        self.backoff(DefaultBackoffBuilder::default())
     }
 
-    /// Apply a specific [`Backoff`] policy to a [`Stream`] using [`StreamBackoff`]
-    fn backoff<B>(self, b: B) -> StreamBackoff<Self, B>
+    /// Apply a specific [`BackoffBuilder`] policy to a [`Stream`] using [`StreamBackoff`]
+    fn backoff<B>(self, backoff_builder: B) -> StreamBackoff<Self, ResettableBackoffWrapper<B>>
     where
-        B: Backoff,
+        B: BackoffBuilder + Clone,
         Self: TryStream + Sized,
     {
-        StreamBackoff::new(self, b)
+        StreamBackoff::new(self, ResettableBackoffWrapper::new(backoff_builder))
     }
 
     /// Decode a [`watcher()`] stream into a stream of applied objects
@@ -297,7 +298,7 @@ pub(crate) mod tests {
     // not #[test] because this is only a compile check verification
     #[allow(dead_code, unused_must_use)]
     fn test_watcher_stream_type_drift() {
-        let pred_watch = watcher(compile_type::<Api<Pod>>(), Default::default())
+        let pred_watch = super::watcher::watcher(compile_type::<Api<Pod>>(), Default::default())
             .touched_objects()
             .predicate_filter(predicates::generation)
             .boxed();
