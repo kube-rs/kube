@@ -25,6 +25,24 @@ pub struct Rule {
     pub reason: Option<Reason>,
 }
 
+impl From<&str> for Rule {
+    fn from(value: &str) -> Self {
+        Self {
+            rule: value.into(),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<(&str, &str)> for Rule {
+    fn from((rule, msg): (&str, &str)) -> Self {
+        Self {
+            rule: rule.into(),
+            message: Some(msg.into()),
+            ..Default::default()
+        }
+    }
+}
 /// Message represents CEL validation message for the provided type
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]

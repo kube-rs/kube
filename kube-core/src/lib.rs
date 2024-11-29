@@ -25,10 +25,10 @@ pub use dynamic::{ApiResource, DynamicObject};
 pub mod crd;
 pub use crd::CustomResourceExt;
 
-pub mod validation;
-pub use validation::{Message, Reason, Rule};
+pub mod cel;
+pub use cel::{Message, Reason, Rule};
 
-#[cfg(feature = "schema")] pub use validation::validate;
+#[cfg(feature = "schema")] pub use cel::validate;
 
 pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
