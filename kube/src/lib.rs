@@ -170,7 +170,7 @@ pub use kube_derive::Resource;
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
-pub use kube_derive::Validated;
+pub use kube_derive::{cel_validate, CELValidate};
 
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
