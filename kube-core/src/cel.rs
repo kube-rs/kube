@@ -2,8 +2,7 @@
 
 use std::str::FromStr;
 
-#[cfg(feature = "schema")]
-use schemars::schema::Schema;
+#[cfg(feature = "schema")] use schemars::schema::Schema;
 use serde::{Deserialize, Serialize};
 
 /// Rule is a CEL validation rule for the CRD field
