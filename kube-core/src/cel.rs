@@ -2,11 +2,12 @@
 
 use std::str::FromStr;
 
-#[cfg(feature = "schema")] use schemars::schema::Schema;
+#[cfg(feature = "schema")]
+use schemars::schema::Schema;
 use serde::{Deserialize, Serialize};
 
 /// Rule is a CEL validation rule for the CRD field
-#[derive(Default, Serialize, Deserialize, Clone)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Rule {
     /// rule represents the expression which will be evaluated by CEL.
@@ -23,6 +24,68 @@ pub struct Rule {
     /// reason is a machine-readable value providing more detail about why a field failed the validation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<Reason>,
+}
+
+impl Rule {
+    /// Initialize the rule
+    ///
+    /// ```rust
+    /// use kube_core::Rule;
+    /// let r = Rule::new("self == oldSelf");
+    ///
+    /// assert_eq!(r.rule, "self == oldSelf".to_string())
+    /// ```
+    pub fn new(rule: impl Into<String>) -> Self {
+        Self {
+            rule: rule.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Set the rule message.
+    ///
+    /// use kube_core::Rule;
+    /// ```rust
+    /// use kube_core::{Rule, Message};
+    ///
+    /// let r = Rule::new("self == oldSelf").message("is immutable");
+    /// assert_eq!(r.rule, "self == oldSelf".to_string());
+    /// assert_eq!(r.message, Some(Message::Message("is immutable".to_string())));
+    /// ```
+    pub fn message(mut self, message: impl Into<Message>) -> Self {
+        self.message = Some(message.into());
+        self
+    }
+
+    /// Set the failure reason.
+    ///
+    /// use kube_core::Rule;
+    /// ```rust
+    /// use kube_core::{Rule, Reason};
+    ///
+    /// let r = Rule::new("self == oldSelf").reason(Reason::default());
+    /// assert_eq!(r.rule, "self == oldSelf".to_string());
+    /// assert_eq!(r.reason, Some(Reason::FieldValueInvalid));
+    /// ```
+    pub fn reason(mut self, reason: impl Into<Reason>) -> Self {
+        self.reason = Some(reason.into());
+        self
+    }
+
+    /// Set the failure field_path.
+    ///
+    /// use kube_core::Rule;
+    /// ```rust
+    /// use kube_core::Rule;
+    ///
+    /// let r = Rule::new("self == oldSelf").field_path("obj.field");
+    /// assert_eq!(r.rule, "self == oldSelf".to_string());
+    /// assert_eq!(r.field_path, Some("obj.field".to_string()));
+    /// ```
+    pub fn field_path(mut self, field_path: impl Into<String>) -> Self {
+        self.field_path = Some(field_path.into());
+        self
+    }
 }
 
 impl From<&str> for Rule {
@@ -44,7 +107,7 @@ impl From<(&str, &str)> for Rule {
     }
 }
 /// Message represents CEL validation message for the provided type
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Message {
     /// Message represents the message displayed when validation fails. The message is required if the Rule contains
@@ -73,10 +136,11 @@ impl From<&str> for Message {
 /// Reason is a machine-readable value providing more detail about why a field failed the validation.
 ///
 /// More in [docs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-reason)
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, PartialEq)]
 pub enum Reason {
     /// FieldValueInvalid is used to report malformed values (e.g. failed regex
     /// match, too long, out of bounds).
+    #[default]
     FieldValueInvalid,
     /// FieldValueForbidden is used to report valid (as per formatting rules)
     /// values which would be accepted under some conditions, but which are not
